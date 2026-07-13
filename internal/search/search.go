@@ -167,6 +167,36 @@ func PrintSession(w io.Writer, s model.Session) {
 	}
 }
 
+func PrintContext(w io.Writer, s model.Session, query string) {
+	fmt.Fprintf(w, "# deja context: %s · %s · %s", s.Harness, s.Project, s.ID)
+	if !s.Updated.IsZero() {
+		fmt.Fprintf(w, " · updated %s", s.Updated.Format("2006-01-02"))
+	}
+	fmt.Fprintln(w)
+	qlow := strings.ToLower(query)
+	budget := 8000
+	written := 0
+	for _, m := range s.Messages {
+		if written >= budget {
+			break
+		}
+		matched := qlow != "" && strings.Contains(strings.ToLower(m.Text), qlow)
+		if !matched && m.Role != "user" {
+			continue
+		}
+		text := contextText(m.Text, matched)
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		chunk := fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text)
+		if written+len(chunk) > budget {
+			chunk = chunk[:max(0, budget-written)]
+		}
+		fmt.Fprint(w, chunk)
+		written += len(chunk)
+	}
+}
+
 func Recent(ss []model.Session, n int) []model.Session {
 	out := mergeSessions(ss)
 	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
@@ -177,6 +207,7 @@ func Recent(ss []model.Session, n int) []model.Session {
 }
 
 func snippet(s, q string, re *regexp.Regexp) string {
+	s = proseForSnippet(s)
 	r := []rune(s)
 	idx := 0
 	if re != nil {
@@ -198,7 +229,15 @@ func snippet(s, q string, re *regexp.Regexp) string {
 	if end > len(r) {
 		end = len(r)
 	}
-	return strings.TrimSpace(string(r[start:end]))
+	out := strings.TrimSpace(string(r[start:end]))
+	out = strings.Trim(out, " ,.;:-\n\t")
+	if start > 0 {
+		out = "… " + out
+	}
+	if end < len(r) {
+		out += " …"
+	}
+	return out
 }
 func short(s string) string {
 	if len(s) > 12 {
@@ -275,4 +314,43 @@ func collapseTool(s string) string {
 		}
 	}
 	return s
+}
+
+var (
+	ansiRE       = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
+	lineNumberRE = regexp.MustCompile(`^\s*\d{1,5}[:|]\s+`)
+	toolDumpRE   = regexp.MustCompile(`(?i)(tool_use|tool_result|<local-command|netcat|npm ERR!|panic:|goroutine \d+)`)
+)
+
+func proseForSnippet(s string) string {
+	s = ansiRE.ReplaceAllString(s, "")
+	var keep []string
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || lineNumberRE.MatchString(line) || toolDumpRE.MatchString(line) {
+			continue
+		}
+		keep = append(keep, line)
+	}
+	out := strings.Join(keep, " ")
+	out = strings.Join(strings.Fields(out), " ")
+	if out == "" {
+		out = strings.Join(strings.Fields(ansiRE.ReplaceAllString(s, "")), " ")
+	}
+	return out
+}
+
+func contextText(s string, matched bool) string {
+	s = ansiRE.ReplaceAllString(s, "")
+	if strings.Contains(s, "```") {
+		return strings.TrimSpace(s)
+	}
+	if matched {
+		return proseForSnippet(s)
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) > 8 {
+		lines = lines[:8]
+	}
+	return proseForSnippet(strings.Join(lines, "\n"))
 }

@@ -75,6 +75,37 @@ func run(args []string) error {
 		search.PrintSession(os.Stdout, s)
 		return nil
 	}
+	if args[0] == "ctx" {
+		if len(args) < 2 {
+			return fmt.Errorf("ctx needs query or id-prefix")
+		}
+		q := strings.Join(args[1:], " ")
+		if !strings.Contains(q, " ") && len(q) >= 6 {
+			ss := append(loadAll("claude"), loadAll("codex")...)
+			ss = append(ss, sources.LoadOpencodePrefix(q)...)
+			if s, ok := search.FindByPrefix(ss, q); ok {
+				search.PrintContext(os.Stdout, s, "")
+				return nil
+			}
+		}
+		o := search.Options{Query: q, All: true}
+		if err := index.EnsureForSearch(index.DefaultDir(), o, false, os.Stderr); err != nil {
+			return err
+		}
+		ss, err := index.Search(index.DefaultDir(), o)
+		if err != nil {
+			return err
+		}
+		hits, err := search.Run(ss, o)
+		if err != nil {
+			return err
+		}
+		if len(hits) == 0 {
+			return fmt.Errorf("no session matches %q", q)
+		}
+		search.PrintContext(os.Stdout, hits[0].Session, q)
+		return nil
+	}
 	if args[0] == "last" {
 		n := 10
 		if len(args) > 1 {
@@ -215,5 +246,5 @@ func humanBytes(n int64) string {
 	return fmt.Sprintf("%.1f %s", f, units[i])
 }
 func usage() {
-	fmt.Println("usage: deja [--json] [--re] [--rebuild] [--harness name] [--project p] [--since 30d] [--role user] <query>\n       deja show <id-prefix>\n       deja last [n]\n       deja sources")
+	fmt.Println("usage: deja [--json] [--re] [--rebuild] [--harness name] [--project p] [--since 30d] [--role user] <query>\n       deja ctx <query|id-prefix>\n       deja show <id-prefix>\n       deja last [n]\n       deja sources")
 }

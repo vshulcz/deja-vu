@@ -20,13 +20,14 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const version = 3
+const version = 4
 const maxIndexedText = 64 * 1024
 
 type FileState struct {
-	Path  string `json:"path"`
-	Size  int64  `json:"size"`
-	MTime int64  `json:"mtime"`
+	Path        string `json:"path"`
+	Size        int64  `json:"size"`
+	MTime       int64  `json:"mtime"`
+	LastUpdated int64  `json:"last_updated,omitempty"`
 }
 
 type SessionMeta struct {
@@ -43,11 +44,12 @@ type Manifest struct {
 }
 
 type Record struct {
-	Key       string
-	Role      string
-	Text      string
-	Time      time.Time
-	LowerText string `json:"-"`
+	Key        string
+	SourcePath string
+	Role       string
+	Text       string
+	Time       time.Time
+	LowerText  string `json:"-"`
 }
 
 func DefaultDir() string {
@@ -67,10 +69,7 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if !force && err == nil && manifestFresh(m, want, "") {
 		return nil
 	}
-	if progress != nil {
-		fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
-	}
-	return rebuild(dir, harness, "", want)
+	return updateIndex(dir, harness, "", want, force, progress)
 }
 
 func EnsureForSearch(dir string, o search.Options, force bool, progress io.Writer) error {
@@ -83,10 +82,13 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 	if !force && err == nil && manifestFresh(m, want, scope) {
 		return nil
 	}
-	if progress != nil {
-		fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
+	if force || err != nil || m.Version != version || m.Scope != scope {
+		if progress != nil {
+			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
+		}
+		return rebuildForSearch(dir, o, scope, want)
 	}
-	return rebuildForSearch(dir, o, scope, want)
+	return updateIndex(dir, o.Harness, scope, want, force, progress)
 }
 
 func Search(dir string, o search.Options) ([]model.Session, error) {
@@ -139,7 +141,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 			if len(text) > maxIndexedText {
 				text = text[:maxIndexedText]
 			}
-			off, err := writeRecord(rf, Record{Key: key, Role: msg.Role, Text: text, Time: msg.Time})
+			off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 			if err != nil {
 				rf.Close()
 				return err
@@ -166,6 +168,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 			return err
 		}
 	}
+	setOpencodeLastUpdated(m.Files, m.Sessions)
 	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
 		return err
 	}
@@ -234,7 +237,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 			if len(text) > maxIndexedText {
 				text = text[:maxIndexedText]
 			}
-			off, err := writeRecord(rf, Record{Key: key, Role: msg.Role, Text: text, Time: msg.Time})
+			off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 			if err != nil {
 				rf.Close()
 				return err
@@ -261,11 +264,189 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 			return err
 		}
 	}
+	setOpencodeLastUpdated(m.Files, m.Sessions)
 	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
 		return err
 	}
 	os.RemoveAll(dir)
 	return os.Rename(tmp, dir)
+}
+
+func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
+	old, err := readManifest(dir)
+	if force || err != nil || old.Version != version || old.Scope != scope {
+		if progress != nil {
+			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
+		}
+		return rebuild(dir, harness, scope, files)
+	}
+	changed := map[string]FileState{}
+	removed := map[string]bool{}
+	for p, f := range files {
+		if of, ok := old.Files[p]; !ok || !sameFile(of, f) {
+			changed[p] = f
+		}
+	}
+	for p := range old.Files {
+		if _, ok := files[p]; !ok {
+			removed[p] = true
+		}
+	}
+	if len(changed) == 0 && len(removed) == 0 {
+		return nil
+	}
+	var replacements []model.Session
+	for p, f := range changed {
+		ss, err := parseChangedFile(harness, p, old.Files[p])
+		if err != nil {
+			return err
+		}
+		replacements = append(replacements, ss...)
+		files[p] = f
+	}
+	replaceKeys := map[string]bool{}
+	for _, s := range replacements {
+		replaceKeys[s.Harness+":"+s.ID] = true
+	}
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: incremental index changed_files=%d removed_files=%d sessions=%d\n", len(changed), len(removed), len(replacements))
+	}
+	tmp := dir + ".tmp"
+	os.RemoveAll(tmp)
+	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
+		return err
+	}
+	rf, err := os.Create(filepath.Join(tmp, "records.bin"))
+	if err != nil {
+		return err
+	}
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope}
+	buckets := map[string]map[string][]int64{}
+	addRec := func(r Record) error {
+		if r.SourcePath == "" {
+			return nil
+		}
+		off, err := writeRecord(rf, r)
+		if err != nil {
+			return err
+		}
+		seen := map[string]bool{}
+		for _, tok := range indexKeys(r.Text) {
+			if seen[tok] {
+				continue
+			}
+			seen[tok] = true
+			b := bucket(tok)
+			if buckets[b] == nil {
+				buckets[b] = map[string][]int64{}
+			}
+			buckets[b][tok] = append(buckets[b][tok], off)
+		}
+		if meta, ok := old.Sessions[r.Key]; ok {
+			if _, exists := m.Sessions[r.Key]; exists {
+				return nil
+			}
+			m.Sessions[r.Key] = meta
+		}
+		return nil
+	}
+	var recErr error
+	if err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+		if recErr != nil {
+			return
+		}
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && harnessForPath(r.SourcePath) != "opencode") || replaceKeys[r.Key] {
+			return
+		}
+		recErr = addRec(r)
+	}); err != nil {
+		rf.Close()
+		return err
+	}
+	if recErr != nil {
+		rf.Close()
+		return recErr
+	}
+	for _, s := range replacements {
+		key := s.Harness + ":" + s.ID
+		m.Sessions[key] = SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Started: s.Started, Updated: s.Updated}
+		for _, msg := range s.Messages {
+			text := msg.Text
+			if len(text) > maxIndexedText {
+				text = text[:maxIndexedText]
+			}
+			if err := addRec(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time}); err != nil {
+				rf.Close()
+				return err
+			}
+		}
+	}
+	if err := rf.Close(); err != nil {
+		return err
+	}
+	for b, data := range buckets {
+		if err := writeGob(filepath.Join(tmp, "buckets", b+".gob"), data); err != nil {
+			return err
+		}
+	}
+	setOpencodeLastUpdated(m.Files, m.Sessions)
+	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
+		return err
+	}
+	os.RemoveAll(dir)
+	return os.Rename(tmp, dir)
+}
+
+func sameFile(a, b FileState) bool { return a.Path == b.Path && a.Size == b.Size && a.MTime == b.MTime }
+
+func parseChangedFile(harness, p string, old FileState) ([]model.Session, error) {
+	switch harnessForPath(p) {
+	case "claude":
+		return sources.ParseClaudeFile(p)
+	case "codex-history":
+		return sources.ParseCodexHistory(p)
+	case "codex":
+		return sources.ParseCodexRollout(p)
+	case "opencode":
+		if old.LastUpdated > 0 {
+			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
+		}
+		return sources.ParseOpencodeDB(p)
+	default:
+		return nil, nil
+	}
+}
+
+func harnessForPath(p string) string {
+	if p == sources.OpencodeDB() {
+		return "opencode"
+	}
+	if filepath.Base(p) == "history.jsonl" && strings.HasPrefix(p, sources.CodexRoot()) {
+		return "codex-history"
+	}
+	if strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-") && strings.HasPrefix(p, filepath.Join(sources.CodexRoot(), "sessions")) {
+		return "codex"
+	}
+	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, sources.ClaudeRoot()) {
+		return "claude"
+	}
+	return ""
+}
+
+func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
+	db := sources.OpencodeDB()
+	f, ok := files[db]
+	if !ok {
+		return
+	}
+	var latest int64
+	for _, s := range sessions {
+		if s.Harness == "opencode" && s.Updated.UnixNano() > latest {
+			latest = s.Updated.UnixNano()
+		}
+	}
+	f.LastUpdated = latest
+	files[db] = f
 }
 
 func currentFiles(h string) map[string]FileState {
@@ -307,7 +488,7 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 		return false
 	}
 	for p, f := range files {
-		if m.Files[p] != f {
+		if !sameFile(m.Files[p], f) {
 			return false
 		}
 	}

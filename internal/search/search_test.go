@@ -38,3 +38,17 @@ func TestPrintPlainWhenNotTTY(t *testing.T) {
 		t.Fatalf("bad plain output: %q", out)
 	}
 }
+
+func TestSnippetPrefersProseOverToolDump(t *testing.T) {
+	text := "netcat output noise needle\n1: package main\n2: func main() {}\nUser asked about needle migration strategy and we concluded use small batches."
+	hits, err := Run([]model.Session{{ID: "s", Harness: "claude", Project: "p", Updated: time.Now(), Messages: []model.Message{{Role: "assistant", Text: text}}}}, Options{Query: "needle"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || strings.Contains(hits[0].Snippets[0], "1: package") || strings.Contains(hits[0].Snippets[0], "netcat") {
+		t.Fatalf("noisy snippet: %#v", hits)
+	}
+	if !strings.Contains(hits[0].Snippets[0], "migration strategy") {
+		t.Fatalf("missing prose snippet: %#v", hits[0].Snippets[0])
+	}
+}

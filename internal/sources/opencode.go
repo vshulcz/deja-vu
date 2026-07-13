@@ -31,6 +31,11 @@ func LoadOpencodeRecent(n int) []model.Session {
 	return ss
 }
 
+func LoadOpencodeSince(t time.Time) []model.Session {
+	ss, _ := ParseOpencodeDBSince(OpencodeDB(), t)
+	return ss
+}
+
 func LoadOpencodePrefix(p string) []model.Session {
 	where := fmt.Sprintf(" and s.id like '%s%%'", sqlQuote(p))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 0)
@@ -39,6 +44,14 @@ func LoadOpencodePrefix(p string) []model.Session {
 
 func ParseOpencodeDB(db string) ([]model.Session, error) {
 	return ParseOpencodeDBWhere(db, "", 0)
+}
+
+func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
+	if t.IsZero() {
+		return ParseOpencodeDBWhere(db, "", 0)
+	}
+	where := fmt.Sprintf(" and (s.time_updated > %d or s.time_updated > '%s')", t.UnixMilli(), sqlQuote(t.UTC().Format(time.RFC3339Nano)))
+	return ParseOpencodeDBWhere(db, where, 0)
 }
 
 func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) {

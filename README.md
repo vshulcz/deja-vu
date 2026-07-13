@@ -26,12 +26,22 @@ deja frobnicator
 deja --re 'panic|race' --harness claude --since 30d
 deja --json "database migration"
 deja --project deja-vu --role user parser
+deja ctx "database migration" > context.md
+claude "context:$(deja ctx c63004c3)"
 deja show c63004c3
 deja last 20
 deja sources
 ```
 
 Search defaults to case-insensitive substring matching. Results are grouped by session, ranked by match count and recency, with up to three highlighted snippets per session. `NO_COLOR=1` disables ANSI highlighting.
+
+`deja ctx <query|session-id-prefix>` prints a compact markdown digest for agent context: session metadata, matching user problem statements, and nearby assistant conclusions, capped around 8KB. It writes plain markdown to stdout, so it can be piped into Claude Code or opencode:
+
+```sh
+claude "context:$(deja ctx 'incremental indexing bug')"
+deja ctx c63004c3 > /tmp/deja-context.md
+opencode run "Use this prior context: $(deja ctx c63004c3)"
+```
 
 ## Harnesses
 
