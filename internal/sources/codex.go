@@ -22,8 +22,12 @@ func LoadCodex() []model.Session {
 }
 
 func ParseCodexHistory(path string) ([]model.Session, error) {
+	return ParseCodexHistoryFromOffset(path, 0)
+}
+
+func ParseCodexHistoryFromOffset(path string, offset int64) ([]model.Session, error) {
 	var out []model.Session
-	err := scanJSONL(path, func(m map[string]any) {
+	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		id, _ := m["session_id"].(string)
 		txt, _ := m["text"].(string)
 		if id == "" || txt == "" {
@@ -36,8 +40,12 @@ func ParseCodexHistory(path string) ([]model.Session, error) {
 }
 
 func ParseCodexRollout(path string) ([]model.Session, error) {
+	return ParseCodexRolloutFromOffset(path, 0)
+}
+
+func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, error) {
 	s := model.Session{Harness: "codex", ID: strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "rollout-"), ".jsonl"), Project: projectName(filepath.Dir(path)), Path: path}
-	err := scanJSONL(path, func(m map[string]any) {
+	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		t := parseTimeAny(m["timestamp"])
 		s.Touch(t)
 		payload, _ := m["payload"].(map[string]any)

@@ -50,7 +50,9 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseOpencodeDBWhere(db, "", 0)
 	}
-	where := fmt.Sprintf(" and (s.time_updated > %d or s.time_updated > '%s')", t.UnixMilli(), sqlQuote(t.UTC().Format(time.RFC3339Nano)))
+	rfc := sqlQuote(t.UTC().Format(time.RFC3339Nano))
+	ms := t.UnixMilli()
+	where := fmt.Sprintf(" and (m.time_created > %d or m.time_created > '%s' or json_extract(p.data,'$.time.start') > %d or json_extract(p.data,'$.time.start') > '%s')", ms, rfc, ms, rfc)
 	return ParseOpencodeDBWhere(db, where, 0)
 }
 

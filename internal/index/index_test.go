@@ -2,6 +2,7 @@ package index
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,8 +84,14 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	if err := Ensure(dir, "claude", false, &log); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(log.String(), "changed_files=1") {
-		t.Fatalf("incremental log missing changed_files=1: %q", log.String())
+	if !strings.Contains(log.String(), "deja: updated 1 file (1 new messages)") {
+		t.Fatalf("incremental log missing partial ingest line: %q", log.String())
+	}
+	if strings.Contains(log.String(), "indexing sessions") {
+		t.Fatalf("incremental path printed scary full-index line: %q", log.String())
+	}
+	if lastIngestFiles != 1 {
+		t.Fatalf("incremental ingest touched %d files, want 1", lastIngestFiles)
 	}
 	ss, err := Search(dir, search.Options{Query: "stable"})
 	if err != nil {
@@ -99,5 +106,70 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	}
 	if len(ss) != 1 || ss[0].ID != "s1" {
 		t.Fatalf("changed file was not reingested: %#v", ss)
+	}
+}
+
+func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-Users-shulcz-large")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const fileCount = 30
+	for i := 0; i < fileCount; i++ {
+		p := filepath.Join(proj, fmt.Sprintf("s%02d.jsonl", i))
+		var b strings.Builder
+		for j := 0; j < 30; j++ {
+			fmt.Fprintf(&b, `{"type":"user","sessionId":"s%02d","timestamp":"2026-01-02T03:%02d:05Z","message":{"role":"user","content":"fixture stable-%02d message-%02d"}}`+"\n", i, j%60, i, j)
+		}
+		if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	if err := EnsureForSearch(dir, search.Options{Query: "stable", Harness: "claude"}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if lastIngestFiles != fileCount {
+		t.Fatalf("full ingest touched %d files, want %d", lastIngestFiles, fileCount)
+	}
+	changed := filepath.Join(proj, "s17.jsonl")
+	f, err := os.OpenFile(changed, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 12; i++ {
+		fmt.Fprintf(f, `{"type":"assistant","sessionId":"s17","timestamp":"2026-01-02T04:%02d:05Z","message":{"role":"assistant","content":"one-file incremental-needle new-%02d"}}`+"\n", i, i)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Add(2 * time.Second)
+	_ = os.Chtimes(changed, now, now)
+	var log bytes.Buffer
+	if err := EnsureForSearch(dir, search.Options{Query: "incremental-needle", Harness: "claude"}, false, &log); err != nil {
+		t.Fatal(err)
+	}
+	if lastIngestFiles != 1 {
+		t.Fatalf("incremental ingest touched %d files, want exactly 1", lastIngestFiles)
+	}
+	if got, want := log.String(), "deja: updated 1 file (12 new messages)"; !strings.Contains(got, want) {
+		t.Fatalf("incremental log = %q, want %q", got, want)
+	}
+	if strings.Contains(log.String(), "indexing sessions") {
+		t.Fatalf("incremental path printed full-index line: %q", log.String())
+	}
+	ss, err := Search(dir, search.Options{Query: "incremental-needle", Harness: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := search.Run(ss, search.Options{Query: "incremental-needle", Harness: "claude", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].Session.ID != "s17" || hits[0].Count != 12 {
+		t.Fatalf("bad incremental search hits: %#v", hits)
 	}
 }

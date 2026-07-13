@@ -18,11 +18,19 @@ func LoadClaude() []model.Session {
 }
 
 func ParseClaudeFile(path string) ([]model.Session, error) {
+	return parseClaudeFileFromOffset(path, 0)
+}
+
+func ParseClaudeFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseClaudeFileFromOffset(path, offset)
+}
+
+func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(filepath.Dir(path)), Path: path}
 	if filepath.Base(filepath.Dir(path)) == "subagents" {
 		s.Project = claudeProjectName(filepath.Dir(filepath.Dir(path)))
 	}
-	err := scanJSONL(path, func(m map[string]any) {
+	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		if typ != "user" && typ != "assistant" {
 			return

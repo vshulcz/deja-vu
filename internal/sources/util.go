@@ -83,11 +83,20 @@ func projectName(path string) string {
 }
 
 func scanJSONL(path string, fn func(map[string]any)) error {
+	return scanJSONLFromOffset(path, 0, fn)
+}
+
+func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+	if offset > 0 {
+		if _, err := f.Seek(offset, io.SeekStart); err != nil {
+			return err
+		}
+	}
 	r := bufio.NewReaderSize(f, 1024*1024)
 	for {
 		line, err := r.ReadBytes('\n')
