@@ -255,6 +255,10 @@ func parseDur(s string) (time.Duration, error) {
 }
 
 func printSources() {
+	redactions := map[string]int{}
+	if stats, err := index.Redactions(index.DefaultDir()); err == nil {
+		redactions = stats.Files
+	}
 	items := []struct {
 		name, root string
 		load       func() []model.Session
@@ -266,14 +270,24 @@ func printSources() {
 		for _, s := range ss {
 			msg += len(s.Messages)
 		}
-		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s\n", it.name, it.root, len(ss), msg, humanBytes(size))
+		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d\n", it.name, it.root, len(ss), msg, humanBytes(size), redactionsUnder(redactions, it.root))
 	}
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
 	}
 	s, m, _ := sources.OpencodeCounts()
-	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s\n", sources.OpencodeDB(), s, m, humanBytes(size))
+	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()])
+}
+
+func redactionsUnder(files map[string]int, root string) int {
+	total := 0
+	for p, n := range files {
+		if p == root || strings.HasPrefix(p, root+string(os.PathSeparator)) {
+			total += n
+		}
+	}
+	return total
 }
 
 func pathSize(root string) int64 {
