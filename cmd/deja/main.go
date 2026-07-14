@@ -54,6 +54,10 @@ func run(args []string) error {
 	if args[0] == "mcp" {
 		return serveMCP(os.Stdin, os.Stdout)
 	}
+	if args[0] == "hook-context" {
+		_ = runHookContext()
+		return nil
+	}
 	if args[0] == "install" {
 		return runInstall(args[1:], false)
 	}

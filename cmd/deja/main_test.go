@@ -253,6 +253,85 @@ func TestInstallClaudeTempHome(t *testing.T) {
 	}
 }
 
+func TestHookContextSyntheticFixtures(t *testing.T) {
+	withTempStores(t)
+	if out, err := captureRun(t, "hook-context"); err != nil || out != "" {
+		t.Fatalf("hook without index out=%q err=%v", out, err)
+	}
+	if _, err := captureRun(t, "frobnicator"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", filepath.Join("tmp", "project"))
+	out, err := captureRun(t, "hook-context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resp struct {
+		HookSpecificOutput struct {
+			HookEventName     string `json:"hookEventName"`
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		t.Fatalf("bad json %q: %v", out, err)
+	}
+	digest := resp.HookSpecificOutput.AdditionalContext
+	if resp.HookSpecificOutput.HookEventName != "SessionStart" || !strings.Contains(digest, "Find frobnicator bug") || !strings.Contains(digest, "parser.go") {
+		t.Fatalf("bad hook response: %#v", resp)
+	}
+	if len(digest) > 2000 {
+		t.Fatalf("digest too large: %d", len(digest))
+	}
+}
+
+func TestInstallAutoClaudeHookIdempotentPreservesHooks(t *testing.T) {
+	h := t.TempDir()
+	t.Setenv("HOME", h)
+	t.Setenv("USERPROFILE", h)
+	mcpPath := filepath.Join(h, ".claude.json")
+	settingsPath := filepath.Join(h, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldSettings := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"/bin/user-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"/bin/stop"}]}]}}`
+	if err := os.WriteFile(settingsPath, []byte(oldSettings), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := captureRun(t, "install", "--auto"); err != nil || !strings.Contains(out, "claude-auto:") {
+		t.Fatalf("install --auto out=%q err=%v", out, err)
+	}
+	b, _ := os.ReadFile(mcpPath)
+	if !strings.Contains(string(b), `"mcpServers"`) || !strings.Contains(string(b), `"mcp"`) {
+		t.Fatalf("mcp not installed: %s", b)
+	}
+	b, _ = os.ReadFile(settingsPath)
+	s := string(b)
+	if strings.Count(s, "hook-context") != 1 || !strings.Contains(s, "/bin/user-hook") || !strings.Contains(s, `"Stop"`) {
+		t.Fatalf("bad auto settings: %s", s)
+	}
+	if _, err := os.Stat(settingsPath + ".bak"); err != nil {
+		t.Fatal("missing settings backup", err)
+	}
+	if out, err := captureRun(t, "install", "--auto"); err != nil || !strings.Contains(out, "unchanged") {
+		t.Fatalf("idempotent out=%q err=%v", out, err)
+	}
+	b, _ = os.ReadFile(settingsPath)
+	if strings.Count(string(b), "hook-context") != 1 {
+		t.Fatalf("duplicate hook: %s", b)
+	}
+	if out, err := captureRun(t, "uninstall", "--auto"); err != nil || !strings.Contains(out, "claude-auto:") {
+		t.Fatalf("uninstall --auto out=%q err=%v", out, err)
+	}
+	b, _ = os.ReadFile(settingsPath)
+	if strings.Contains(string(b), "hook-context") || !strings.Contains(string(b), "/bin/user-hook") {
+		t.Fatalf("bad uninstall settings: %s", b)
+	}
+	b, _ = os.ReadFile(mcpPath)
+	if strings.Contains(string(b), `"deja"`) {
+		t.Fatalf("mcp left deja: %s", b)
+	}
+}
+
 func TestInstallCodexTempHomePreservesOtherTOML(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)

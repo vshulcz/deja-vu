@@ -201,6 +201,58 @@ func Recent(dir string, n int) ([]model.Session, error) {
 	return out, nil
 }
 
+func HasManifest(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	_, err := os.Stat(filepath.Join(dir, "manifest.gob"))
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(dir, "sessions.gob"))
+	return err == nil
+}
+
+func RecentProject(dir, project string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, err
+	}
+	project = strings.ToLower(project)
+	var metas []SessionMeta
+	for _, meta := range m.Sessions {
+		p := strings.ToLower(meta.Project)
+		if p == project || (project != "" && strings.Contains(p, project)) {
+			metas = append(metas, meta)
+		}
+	}
+	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	if n > 0 && len(metas) > n {
+		metas = metas[:n]
+	}
+	out := make([]model.Session, 0, len(metas))
+	for _, meta := range metas {
+		s := sessionFromMeta(meta)
+		recs, err := recordsForKey(filepath.Join(dir, "records.bin"), meta.Harness+":"+meta.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range recs {
+			s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()

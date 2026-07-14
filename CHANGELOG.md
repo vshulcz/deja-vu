@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-14
+
+### Added
+
+- Optional Claude Code auto-recall via `deja install --auto`, which installs the MCP server and a read-only `SessionStart` hook that injects a capped project-session digest from the warm local index.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added
@@ -38,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vshulcz/deja-vu/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vshulcz/deja-vu/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/vshulcz/deja-vu/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/vshulcz/deja-vu/releases/tag/v0.1.0
