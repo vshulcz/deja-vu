@@ -7,31 +7,41 @@ on:
 
 jobs:
   test:
-    name: Go ${{ matrix.go-version }} / ${{ matrix.os }}
+    name: test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        go-version: ['1.22.x']
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.22.x'
           cache: false
 
-      - name: Verify dependencies
-        run: go mod verify
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build ./cmd/deja
 
-      - name: Vet
-        run: go vet ./...
+  cross-compile:
+    name: cross-compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Test with race detector
-        run: go test -race ./...
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+          cache: false
 
-      - name: Build
-        run: go build ./cmd/deja
+      - name: Build all release targets
+        run: |
+          for os in darwin linux windows; do
+            for arch in amd64 arm64; do
+              echo "== $os/$arch"
+              GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -o /dev/null ./cmd/deja
+            done
+          done

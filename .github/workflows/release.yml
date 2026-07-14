@@ -10,22 +10,19 @@ permissions:
 
 jobs:
   goreleaser:
-    name: GoReleaser
+    name: GitHub release + Homebrew
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.22.x'
           cache: false
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
@@ -33,19 +30,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-          GORELEASER: 'true'
 
-  # npm-publish:
-  #   name: Publish npm packages
-  #   runs-on: ubuntu-latest
-  #   needs: goreleaser
-  #   if: false # Enable after npm package automation is ready.
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 20
-  #         registry-url: https://registry.npmjs.org
-  #     - run: npm publish ./npm --access public
-  #       env:
-  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  npm:
+    name: npm packages
+    runs-on: ubuntu-latest
+    needs: goreleaser
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Download release archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist
+          gh release download "${GITHUB_REF_NAME}" --dir dist --pattern 'deja-vu_*'
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release-npm.mjs "${GITHUB_REF_NAME#v}" dist
