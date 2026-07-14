@@ -22,7 +22,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const version = 6
+const version = 7
 const maxIndexedText = 64 * 1024
 
 var bucketMagic = []byte("DJB1")
@@ -39,6 +39,7 @@ type FileState struct {
 type SessionMeta struct {
 	ID, Harness, Project, Path, Title string
 	Started, Updated                  time.Time
+	Ord                               uint32
 }
 
 type Manifest struct {
@@ -63,6 +64,11 @@ type Record struct {
 	Text       string
 	Time       time.Time
 	LowerText  string `json:"-"`
+}
+
+type posting struct {
+	Off int64
+	Sid uint32
 }
 
 func DefaultDir() string {
@@ -127,28 +133,33 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	var offsets []int64
+	var posts []posting
 	usedPostings := false
 	if !o.Regex {
 		if keys := queryKeys(o.Query); len(keys) > 0 {
 			if len(keys) == 1 {
-				offsets, _ = postingsFor(dir, keys[0])
+				posts, _ = postingsFor(dir, keys[0])
+				usedPostings = len(posts) > 0
 			} else {
 				usedPostings = true
-				offsets, err = intersectPostings(dir, keys)
+				posts, err = intersectPostings(dir, keys)
 				if err != nil {
 					return nil, err
 				}
 			}
 		}
 	}
-	if len(offsets) == 0 {
+	if len(posts) == 0 {
 		if usedPostings {
 			return nil, nil
 		}
 		return scanRecords(dir, m, o, nil)
 	}
-	return scanRecords(dir, m, o, offsets)
+	posts = cutPostingsBySession(posts, m, o)
+	if len(posts) == 0 {
+		return nil, nil
+	}
+	return scanRecords(dir, m, o, postingOffsets(posts))
 }
 
 func Recent(dir string, n int) ([]model.Session, error) {
@@ -235,7 +246,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 					s.Updated = old.Updated
 				}
 			}
-			m.Sessions[key] = metaForSession(s)
+			m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
 			for _, msg := range s.Messages {
 				text := msg.Text
 				if len(text) > maxIndexedText {
@@ -245,7 +256,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 				if err != nil {
 					return err
 				}
-				jobs <- tokenJob{text: msg.Text, offset: off}
+				jobs <- tokenJob{text: msg.Text, offset: off, sid: m.Sessions[key].Ord}
 			}
 		}
 		return nil
@@ -311,7 +322,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 					s.Updated = old.Updated
 				}
 			}
-			m.Sessions[key] = metaForSession(s)
+			m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
 			for _, msg := range s.Messages {
 				text := msg.Text
 				if len(text) > maxIndexedText {
@@ -321,7 +332,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 				if err != nil {
 					return err
 				}
-				jobs <- tokenJob{text: text, offset: off}
+				jobs <- tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord}
 			}
 		}
 		return nil
@@ -347,9 +358,10 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 type tokenJob struct {
 	text   string
 	offset int64
+	sid    uint32
 }
 
-type bucketPostings map[string]map[string][]int64
+type bucketPostings map[string]map[string][]posting
 
 func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error) {
 	workers := runtime.NumCPU()
@@ -366,7 +378,7 @@ func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error)
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				addIndexKeys(partials[i], job.text, job.offset)
+				addIndexKeys(partials[i], job.text, job.offset, job.sid)
 			}
 		}()
 	}
@@ -380,7 +392,7 @@ func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error)
 	for _, part := range partials {
 		for b, toks := range part {
 			if merged[b] == nil {
-				merged[b] = map[string][]int64{}
+				merged[b] = map[string][]posting{}
 			}
 			for tok, offsets := range toks {
 				merged[b][tok] = append(merged[b][tok], offsets...)
@@ -390,7 +402,7 @@ func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error)
 	return merged, nil
 }
 
-func addIndexKeys(buckets bucketPostings, text string, off int64) {
+func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32) {
 	seen := map[string]bool{}
 	for _, tok := range indexKeys(text) {
 		if seen[tok] {
@@ -399,9 +411,9 @@ func addIndexKeys(buckets bucketPostings, text string, off int64) {
 		seen[tok] = true
 		b := bucket(tok)
 		if buckets[b] == nil {
-			buckets[b] = map[string][]int64{}
+			buckets[b] = map[string][]posting{}
 		}
-		buckets[b][tok] = append(buckets[b][tok], off)
+		buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: sid})
 	}
 }
 
@@ -418,7 +430,7 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 	}
 	type bucketWrite struct {
 		name string
-		data map[string][]int64
+		data map[string][]posting
 	}
 	jobs := make(chan bucketWrite)
 	errCh := make(chan error, 1)
@@ -452,6 +464,21 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 
 func metaForSession(s model.Session) SessionMeta {
 	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: sessionTitle(s), Started: s.Started, Updated: s.Updated}
+}
+
+func metaWithOrd(meta SessionMeta, ord uint32) SessionMeta {
+	meta.Ord = ord
+	return meta
+}
+
+func nextSessionOrd(sessions map[string]SessionMeta) uint32 {
+	var maxOrd uint32
+	for _, meta := range sessions {
+		if meta.Ord > maxOrd {
+			maxOrd = meta.Ord
+		}
+	}
+	return maxOrd + 1
 }
 
 func sessionFromMeta(meta SessionMeta) model.Session {
@@ -552,6 +579,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if r.SourcePath == "" {
 			return nil
 		}
+		meta, ok := old.Sessions[r.Key]
+		if !ok {
+			meta, ok = m.Sessions[r.Key]
+		}
+		if !ok {
+			return nil
+		}
 		off, err := writeRecord(rf, r)
 		if err != nil {
 			return err
@@ -564,16 +598,14 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			seen[tok] = true
 			b := bucket(tok)
 			if buckets[b] == nil {
-				buckets[b] = map[string][]int64{}
+				buckets[b] = map[string][]posting{}
 			}
-			buckets[b][tok] = append(buckets[b][tok], off)
+			buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: meta.Ord})
 		}
-		if meta, ok := old.Sessions[r.Key]; ok {
-			if _, exists := m.Sessions[r.Key]; exists {
-				return nil
-			}
-			m.Sessions[r.Key] = meta
+		if _, exists := m.Sessions[r.Key]; exists {
+			return nil
 		}
+		m.Sessions[r.Key] = meta
 		return nil
 	}
 	var recErr error
@@ -595,7 +627,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	for _, s := range replacements {
 		key := s.Harness + ":" + s.ID
-		m.Sessions[key] = metaForSession(s)
+		m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
 		for _, msg := range s.Messages {
 			text := msg.Text
 			if len(text) > maxIndexedText {
@@ -650,17 +682,17 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		return 0, 0, err
 	}
 	buckets := bucketPostings{}
-	loadBucket := func(tok string) (map[string][]int64, error) {
+	loadBucket := func(tok string) (map[string][]posting, error) {
 		b := bucket(tok)
 		if data, ok := buckets[b]; ok {
 			return data, nil
 		}
-		data := map[string][]int64{}
+		data := map[string][]posting{}
 		p := filepath.Join(dir, "buckets", b+".bin")
 		var err error
 		data, err = readBucket(p)
 		if os.IsNotExist(err) {
-			data = map[string][]int64{}
+			data = map[string][]posting{}
 		}
 		if err != nil && !os.IsNotExist(err) {
 			return nil, err
@@ -687,7 +719,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			key := s.Harness + ":" + s.ID
 			meta := m.Sessions[key]
 			if meta.ID == "" {
-				meta = metaForSession(s)
+				meta = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
 			}
 			if meta.Started.IsZero() || (!s.Started.IsZero() && s.Started.Before(meta.Started)) {
 				meta.Started = s.Started
@@ -725,7 +757,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					if err != nil {
 						return filesTouched, messages, err
 					}
-					data[tok] = append(data[tok], off)
+					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
 				}
 			}
 		}
@@ -914,6 +946,89 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 	return out, nil
 }
 
+func cutPostingsBySession(posts []posting, m Manifest, o search.Options) []posting {
+	// Rank from posting counts before reading record text. Harness/project/since are
+	// session metadata filters; role is record-level, so search.Run applies it after
+	// the cut and pre-rank counts may include other roles.
+	type candidate struct {
+		sid     uint32
+		count   int
+		updated time.Time
+	}
+	metaByOrd := sessionMetaByOrd(m)
+	counts := map[uint32]int{}
+	for _, p := range sortedUniquePostings(posts) {
+		meta, ok := metaByOrd[p.Sid]
+		if !ok || !sessionMetaMatches(meta, o) {
+			continue
+		}
+		counts[p.Sid]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	candidates := make([]candidate, 0, len(counts))
+	for sid, count := range counts {
+		candidates = append(candidates, candidate{sid: sid, count: count, updated: metaByOrd[sid].Updated})
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		si := preRankScore(candidates[i].count, candidates[i].updated)
+		sj := preRankScore(candidates[j].count, candidates[j].updated)
+		if si == sj {
+			return candidates[i].updated.After(candidates[j].updated)
+		}
+		return si > sj
+	})
+	if !o.All && len(candidates) > 15 {
+		candidates = candidates[:15]
+	}
+	keep := make(map[uint32]bool, len(candidates))
+	for _, c := range candidates {
+		keep[c.sid] = true
+	}
+	out := make([]posting, 0, len(posts))
+	for _, p := range posts {
+		if keep[p.Sid] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func sessionMetaByOrd(m Manifest) map[uint32]SessionMeta {
+	out := make(map[uint32]SessionMeta, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		out[meta.Ord] = meta
+	}
+	return out
+}
+
+func sessionMetaMatches(meta SessionMeta, o search.Options) bool {
+	if o.Harness != "" && meta.Harness != o.Harness {
+		return false
+	}
+	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
+		return false
+	}
+	if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
+		return false
+	}
+	return true
+}
+
+func preRankScore(count int, updated time.Time) float64 {
+	age := time.Since(updated).Hours() / 24
+	return float64(count) * 1000 / (1 + age)
+}
+
+func postingOffsets(posts []posting) []int64 {
+	out := make([]int64, 0, len(posts))
+	for _, p := range posts {
+		out = append(out, p.Off)
+	}
+	return out
+}
+
 func sortedUniqueOffsets(offsets []int64) []int64 {
 	out := append([]int64(nil), offsets...)
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
@@ -921,6 +1036,24 @@ func sortedUniqueOffsets(offsets []int64) []int64 {
 	for _, off := range out {
 		if n == 0 || out[n-1] != off {
 			out[n] = off
+			n++
+		}
+	}
+	return out[:n]
+}
+
+func sortedUniquePostings(posts []posting) []posting {
+	out := append([]posting(nil), posts...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Off == out[j].Off {
+			return out[i].Sid < out[j].Sid
+		}
+		return out[i].Off < out[j].Off
+	})
+	n := 0
+	for _, p := range out {
+		if n == 0 || out[n-1].Off != p.Off {
+			out[n] = p
 			n++
 		}
 	}
@@ -1031,15 +1164,15 @@ func consumeField(b []byte) (string, []byte, bool) {
 	return string(b[start:end]), b[end:], true
 }
 
-func postingsFor(dir, tok string) ([]int64, error) {
+func postingsFor(dir, tok string) ([]posting, error) {
 	return readBucketToken(filepath.Join(dir, "buckets", bucket(tok)+".bin"), tok)
 }
 
-func intersectPostings(dir string, keys []string) ([]int64, error) {
+func intersectPostings(dir string, keys []string) ([]posting, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	lists := make([][]int64, 0, len(keys))
+	lists := make([][]posting, 0, len(keys))
 	for _, key := range keys {
 		list, err := postingsFor(dir, key)
 		if os.IsNotExist(err) {
@@ -1054,15 +1187,15 @@ func intersectPostings(dir string, keys []string) ([]int64, error) {
 		lists = append(lists, list)
 	}
 	sort.Slice(lists, func(i, j int) bool { return len(lists[i]) < len(lists[j]) })
-	set := make(map[int64]struct{}, len(lists[0]))
-	for _, off := range lists[0] {
-		set[off] = struct{}{}
+	set := make(map[int64]posting, len(lists[0]))
+	for _, p := range lists[0] {
+		set[p.Off] = p
 	}
 	for _, list := range lists[1:] {
-		next := make(map[int64]struct{}, min(len(set), len(list)))
-		for _, off := range list {
-			if _, ok := set[off]; ok {
-				next[off] = struct{}{}
+		next := make(map[int64]posting, min(len(set), len(list)))
+		for _, p := range list {
+			if _, ok := set[p.Off]; ok {
+				next[p.Off] = p
 			}
 		}
 		set = next
@@ -1070,11 +1203,11 @@ func intersectPostings(dir string, keys []string) ([]int64, error) {
 			return nil, nil
 		}
 	}
-	out := make([]int64, 0, len(set))
-	for off := range set {
-		out = append(out, off)
+	out := make([]posting, 0, len(set))
+	for _, p := range set {
+		out = append(out, p)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
 	return out, nil
 }
 
@@ -1187,7 +1320,7 @@ type bucketEntry struct {
 	n   uint32
 }
 
-func writeBucket(p string, data map[string][]int64) error {
+func writeBucket(p string, data map[string][]posting) error {
 	toks := make([]string, 0, len(data))
 	for tok := range data {
 		toks = append(toks, tok)
@@ -1197,7 +1330,7 @@ func writeBucket(p string, data map[string][]int64) error {
 	dirLen := len(bucketMagic) + uvarintLen(uint64(len(toks)))
 	for _, tok := range toks {
 		dirLen += uvarintLen(uint64(len(tok))) + len(tok) + 8 + 4
-		encoded[tok] = encodeOffsets(data[tok])
+		encoded[tok] = encodePostings(data[tok])
 	}
 	entries := make([]bucketEntry, 0, len(toks))
 	pos := uint64(dirLen)
@@ -1242,24 +1375,24 @@ func writeBucket(p string, data map[string][]int64) error {
 	return nil
 }
 
-func readBucket(p string) (map[string][]int64, error) {
+func readBucket(p string) (map[string][]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	out := make(map[string][]int64, len(entries))
+	out := make(map[string][]posting, len(entries))
 	for _, e := range entries {
 		b := make([]byte, e.n)
 		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
 			return nil, err
 		}
-		out[e.tok] = decodeOffsets(b)
+		out[e.tok] = decodePostings(b)
 	}
 	return out, nil
 }
 
-func readBucketToken(p, tok string) ([]int64, error) {
+func readBucketToken(p, tok string) ([]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
 		return nil, err
@@ -1273,7 +1406,7 @@ func readBucketToken(p, tok string) ([]int64, error) {
 		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
 			return nil, err
 		}
-		return decodeOffsets(b), nil
+		return decodePostings(b), nil
 	}
 	return nil, nil
 }
@@ -1320,22 +1453,23 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	return entries, f, nil
 }
 
-func encodeOffsets(offsets []int64) []byte {
-	if len(offsets) == 0 {
+func encodePostings(posts []posting) []byte {
+	if len(posts) == 0 {
 		return nil
 	}
-	s := sortedUniqueOffsets(offsets)
-	b := make([]byte, 0, len(s)*4)
+	s := sortedUniquePostings(posts)
+	b := make([]byte, 0, len(s)*6)
 	var prev int64
-	for _, off := range s {
-		b = binary.AppendUvarint(b, uint64(off-prev))
-		prev = off
+	for _, p := range s {
+		b = binary.AppendUvarint(b, uint64(p.Off-prev))
+		b = binary.AppendUvarint(b, uint64(p.Sid))
+		prev = p.Off
 	}
 	return b
 }
 
-func decodeOffsets(b []byte) []int64 {
-	out := make([]int64, 0)
+func decodePostings(b []byte) []posting {
+	out := make([]posting, 0)
 	var prev int64
 	for len(b) > 0 {
 		d, n := binary.Uvarint(b)
@@ -1343,7 +1477,12 @@ func decodeOffsets(b []byte) []int64 {
 			return out
 		}
 		prev += int64(d)
-		out = append(out, prev)
+		b = b[n:]
+		sid, n := binary.Uvarint(b)
+		if n <= 0 {
+			return out
+		}
+		out = append(out, posting{Off: prev, Sid: uint32(sid)})
 		b = b[n:]
 	}
 	return out

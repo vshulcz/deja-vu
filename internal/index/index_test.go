@@ -305,23 +305,29 @@ func BenchmarkWarmSearchSynthetic(b *testing.B) {
 	if err := EnsureForSearch(dir, o, false, nil); err != nil {
 		b.Fatal(err)
 	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		start := time.Now()
-		ss, err := Search(dir, o)
-		if err != nil {
-			b.Fatal(err)
-		}
-		hits, err := search.Run(ss, o)
-		if err != nil {
-			b.Fatal(err)
-		}
-		if len(hits) != 10 {
-			b.Fatalf("hits=%d, want 10", len(hits))
-		}
-		b.ReportMetric(float64(time.Since(start).Microseconds())/1000, "warm_ms")
+	bench := func(name string, o search.Options, wantHits int) {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				start := time.Now()
+				ss, err := Search(dir, o)
+				if err != nil {
+					b.Fatal(err)
+				}
+				hits, err := search.Run(ss, o)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(hits) != wantHits {
+					b.Fatalf("hits=%d, want %d", len(hits), wantHits)
+				}
+				b.ReportMetric(float64(time.Since(start).Microseconds())/1000, "warm_ms")
+			}
+		})
 	}
+	bench("selective", o, 10)
+	bench("fat-top15", search.Options{Query: "synthetic", Harness: "claude"}, 15)
 }
 
 func TestEachRecordIgnoresTruncatedTail(t *testing.T) {

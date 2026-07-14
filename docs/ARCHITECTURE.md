@@ -22,17 +22,20 @@ Default path: `~/.cache/deja/index.db`.
 
 Files:
 
-- `records.bin`: length-prefixed JSON records. Each record stores session key, source path, role, text, and timestamp.
-- `buckets/*.gob`: token bucket files. A token maps to record offsets in `records.bin`.
-- `manifest.json`: index version, source file state, session metadata, build time, and search scope.
+- `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp.
+- `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset plus session ordinal.
+- `manifest.gob` / `sessions.gob`: index version, source file state, session metadata (including ordinals), build time, and search scope.
 
 Search flow:
 
 1. Tokenize the query.
 2. Read posting lists from the token buckets.
 3. Intersect posting lists for multi-word searches.
-4. Read matching records from `records.bin`.
-5. Group records back into sessions and rank in `internal/search`.
+4. Aggregate posting counts per session and pre-rank by count × recency using session metadata.
+5. Read matching records from `records.bin` only for the top sessions (`--all` keeps all candidates).
+6. Group records back into sessions and rank in `internal/search`.
+
+`--harness`, `--project`, and `--since` are applied during pre-rank from session metadata. `--role` needs record data, so it is applied after the pre-rank cut; pre-rank counts may include other roles.
 
 Regex search scans records because arbitrary regex cannot use token postings safely.
 
