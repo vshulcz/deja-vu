@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-14
+
+### Added
+
+- `deja share <id-prefix>` sanitized markdown session digests for handing context to colleagues.
+- `deja sync export <dir>` and `deja sync import <dir>` append-only JSONL batches with export watermarks and idempotent imported-session ingest.
+
 ## [0.4.0] - 2026-07-14
 
 ### Added
@@ -50,7 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vshulcz/deja-vu/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vshulcz/deja-vu/compare/v0.1.1...v0.2.0

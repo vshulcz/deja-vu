@@ -87,6 +87,35 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 	}
 }
 
+func TestShareOutputsRedactedMarkdown(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	t.Setenv("NO_COLOR", "1")
+	secret := "api_key=" + strings.Repeat("a", 16)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-share", "sharefixture.jsonl"), "sharefixture", []string{
+		`{"type":"user","sessionId":"sharefixture","timestamp":"2026-01-02T10:00:00Z","message":{"role":"user","content":"please fix share redaction ` + secret + `"}}`,
+		`{"type":"assistant","sessionId":"sharefixture","timestamp":"2026-01-02T10:01:00Z","message":{"role":"assistant","content":"conclusion: sanitize every line before printing"}}`,
+	})
+	out, err := captureRun(t, "share", "sharefix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"# deja share:", "## User problem statement", "## Key assistant conclusions", "conclusion: sanitize"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("share output missing %q: %s", want, out)
+		}
+	}
+	if strings.Contains(out, secret) {
+		t.Fatalf("share leaked secret: %s", out)
+	}
+}
+
 func withStatsStores(t *testing.T) {
 	t.Helper()
 	tmp := t.TempDir()
@@ -231,6 +260,24 @@ func TestParseSearchAndSmallHelpers(t *testing.T) {
 	got := firstUserTitle(model.Session{ID: "id", Messages: []model.Message{{Role: "assistant", Text: "skip"}, {Role: "user", Text: "  hello   " + long}}})
 	if !strings.HasPrefix(got, "hello") || !strings.HasSuffix(got, "…") {
 		t.Fatalf("firstUserTitle=%q", got)
+	}
+	if err := runShare(nil, io.Discard); err == nil || !strings.Contains(err.Error(), "share needs") {
+		t.Fatalf("runShare missing args err=%v", err)
+	}
+	if err := runSync([]string{"export"}); err == nil || !strings.Contains(err.Error(), "sync needs") {
+		t.Fatalf("runSync missing args err=%v", err)
+	}
+	if err := runSync([]string{"bogus", t.TempDir()}); err == nil || !strings.Contains(err.Error(), "unknown sync") {
+		t.Fatalf("runSync unknown err=%v", err)
+	}
+	if got := shareMessageText("\x1b[31mhello\x1b[0m\n<local-command x>"); got != "hello" {
+		t.Fatalf("shareMessageText=%q", got)
+	}
+	if got := shareMessageText("```go\nfmt.Println(1)\n```"); !strings.Contains(got, "```go") {
+		t.Fatalf("share code block=%q", got)
+	}
+	if got := utf8SafeCut("éclair", 1); got != "" {
+		t.Fatalf("utf8SafeCut=%q", got)
 	}
 }
 

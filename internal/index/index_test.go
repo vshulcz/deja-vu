@@ -62,6 +62,114 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	}
 }
 
+func TestSyncExportImportSearchIdempotent(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-tmp-sync")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"type":"user","sessionId":"sync1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"syncneedle question"}}` + "\n" +
+		`{"type":"assistant","sessionId":"sync1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"syncneedle answer"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "sync1.jsonl"), []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dirA := filepath.Join(tmp, "a.db")
+	if err := EnsureForSearch(dirA, search.Options{Query: "syncneedle"}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	batchDir := filepath.Join(tmp, "batches")
+	n, err := Export(dirA, batchDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("exported %d, want 2", n)
+	}
+	again, err := Export(dirA, batchDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != 0 {
+		t.Fatalf("second export = %d, want 0", again)
+	}
+	dirB := filepath.Join(tmp, "b.db")
+	imported, err := Import(dirB, batchDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if imported != 2 {
+		t.Fatalf("imported %d, want 2", imported)
+	}
+	ss, err := Search(dirB, search.Options{Query: "syncneedle", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || ss[0].Harness != "claude" || !strings.HasPrefix(ss[0].Project, "imported:") || len(ss[0].Messages) != 2 {
+		t.Fatalf("bad imported search result: %#v", ss)
+	}
+	recent, err := Recent(dirB, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recent) != 1 || recent[0].Harness != "claude" {
+		t.Fatalf("bad recent imported session: %#v", recent)
+	}
+	found, ok, err := FindByPrefix(dirB, recent[0].ID[:12])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || len(found.Messages) != 2 {
+		t.Fatalf("FindByPrefix imported ok=%v found=%#v", ok, found)
+	}
+	if imported, err = Import(dirB, batchDir); err != nil {
+		t.Fatal(err)
+	} else if imported != 0 {
+		t.Fatalf("re-import added %d records", imported)
+	}
+	ss, err = Search(dirB, search.Options{Query: "syncneedle", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || len(ss[0].Messages) != 2 {
+		t.Fatalf("re-import duplicated records: %#v", ss)
+	}
+}
+
+func TestSyncImportBadJSONAndEmptyExport(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "idx.db")
+	if err := initEmptyIndex(dir); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Export(dir, filepath.Join(tmp, "out"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("empty export=%d", n)
+	}
+	badDir := filepath.Join(tmp, "bad")
+	if err := os.MkdirAll(badDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(badDir, "bad.jsonl"), []byte("{bad\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Import(filepath.Join(tmp, "new.db"), badDir); err == nil || !strings.Contains(err.Error(), "bad.jsonl") {
+		t.Fatalf("bad import err=%v", err)
+	}
+	if got := ImportedSessionID("claude", "abc"); !strings.HasPrefix(got, "imported-") {
+		t.Fatalf("ImportedSessionID=%q", got)
+	}
+}
+
 func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
@@ -654,5 +762,12 @@ func TestRedactsSecretsAtIngest(t *testing.T) {
 	}
 	if m.Redacted < len(secrets) || m.Files[p].Redactions < len(secrets) {
 		t.Fatalf("redaction counters not reported: total=%d file=%d", m.Redacted, m.Files[p].Redactions)
+	}
+	stats, err := Redactions(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Total != m.Redacted || stats.Files[p] != m.Files[p].Redactions {
+		t.Fatalf("Redactions()=%#v manifest=%#v", stats, m.Files[p])
 	}
 }
