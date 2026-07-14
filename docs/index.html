@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deja-vu — persistent memory for your coding agents</title>
+<meta name="description" content="deja indexes every session Claude Code, Codex CLI and opencode wrote on your machine and serves it back — to you and to your agents via MCP. Local, fast, zero dependencies.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="deja-vu — persistent memory for your coding agents">
+<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across Claude Code, Codex and opencode, served back to agents via MCP.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
+<meta property="og:image" content="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔁</text></svg>">
+<style>
+:root{--bg:#0f0e17;--panel:#17162299;--ink:#e8e6f0;--dim:#8a87a0;--a1:#7c6cf0;--a2:#4ecdc4;--mono:"SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:0 20px}
+header{padding:72px 0 40px;text-align:center}
+header img.logo{width:min(360px,80vw)}
+.tagline{font-size:1.25rem;color:var(--dim);margin-top:8px}
+.hero-install{margin:28px auto 0;max-width:640px;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid #2a2838;border-radius:10px;padding:12px 16px;font-family:var(--mono);font-size:.95rem;overflow-x:auto}
+.hero-install code{color:var(--a2);white-space:nowrap}
+.copy{margin-left:auto;background:none;border:1px solid #3a3850;color:var(--dim);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
+.copy:hover{color:var(--ink);border-color:var(--a1)}
+.demo{margin:40px 0;text-align:center}
+.demo img{max-width:100%;border-radius:12px;border:1px solid #2a2838}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:48px 0}
+.card{background:var(--panel);border:1px solid #2a2838;border-radius:12px;padding:22px}
+.card h3{font-size:1.02rem;margin-bottom:8px}
+.card h3 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.card p{color:var(--dim);font-size:.93rem}
+h2{margin:56px 0 16px;font-size:1.3rem}
+.installs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.inst{background:var(--panel);border:1px solid #2a2838;border-radius:10px;padding:14px 16px}
+.inst .k{color:var(--dim);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
+.inst pre{font-family:var(--mono);font-size:.83rem;color:var(--a2);margin-top:6px;overflow-x:auto}
+.how{color:var(--dim)}
+.how code{font-family:var(--mono);color:var(--ink);font-size:.9em}
+footer{margin:72px 0 40px;text-align:center;color:var(--dim);font-size:.9rem}
+a{color:var(--a2);text-decoration:none}
+a:hover{text-decoration:underline}
+.gh{display:inline-block;margin-top:20px;border:1px solid #3a3850;border-radius:8px;padding:10px 22px;color:var(--ink)}
+.gh:hover{border-color:var(--a1);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <img class="logo" src="assets/logo.svg" alt="deja-vu">
+  <p class="tagline">Persistent memory for your coding agents.</p>
+  <div class="hero-install">
+    <code id="cmd">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
+    <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent);this.textContent='copied'">copy</button>
+  </div>
+  <a class="gh" href="https://github.com/vshulcz/deja-vu">GitHub →</a>
+</header>
+
+<div class="demo"><img src="assets/demo.gif" alt="deja demo: searching agent session history from the terminal"></div>
+
+<div class="features">
+  <div class="card">
+    <h3><span>Agent memory via MCP</span></h3>
+    <p>One <code>deja install --all</code> and your agent gets a <code>recall</code> tool. Next session it answers “we fixed this three weeks ago” instead of re-debugging. Responses stay under ~4KB — cheap on context.</p>
+  </div>
+  <div class="card">
+    <h3><span>One index, every harness</span></h3>
+    <p>Claude Code, Codex CLI and opencode all write session logs to your disk. deja indexes them together — a solution found in Codex is recalled inside Claude Code.</p>
+  </div>
+  <div class="card">
+    <h3><span>Local and private</span></h3>
+    <p>No network code exists in the tool. Local files in, local cache out. Warm search over gigabytes of history in under 100&nbsp;ms.</p>
+  </div>
+</div>
+
+<h2>Install</h2>
+<div class="installs">
+  <div class="inst"><div class="k">curl</div><pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre></div>
+  <div class="inst"><div class="k">Homebrew</div><pre>brew install vshulcz/tap/deja-vu</pre></div>
+  <div class="inst"><div class="k">Go</div><pre>go install github.com/vshulcz/deja-vu/cmd/deja@latest</pre></div>
+  <div class="inst"><div class="k">npm</div><pre>npx @vshulcz/deja-vu "your query"</pre></div>
+</div>
+
+<h2>How it works</h2>
+<p class="how">
+deja parses the local history stores each harness already writes (<code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, opencode's SQLite db) into an incremental inverted index in <code>~/.cache/deja</code>. Cold index over ~3GB takes about ten seconds, once; after that searches are 45–97&nbsp;ms and only changed files get re-read. The MCP server exposes the same index to agents as <code>recall</code> and <code>recall_context</code>. Single Go binary, zero runtime dependencies. Details in <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a>.
+</p>
+
+<footer>
+  MIT © <a href="https://github.com/vshulcz">Vladislav Shulcz</a> · <a href="https://github.com/vshulcz/deja-vu">github.com/vshulcz/deja-vu</a>
+</footer>
+
+</div>
+</body>
+</html>
