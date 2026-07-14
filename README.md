@@ -98,7 +98,7 @@ Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
 
 | | |
 | --- | --- |
-| Warm search | **45–97 ms** |
+| Warm search | **7–9 ms** typical, ~40 ms worst-case |
 | Cold index (once) | ~10 s |
 | Index size | ~2.4% of corpus |
 
