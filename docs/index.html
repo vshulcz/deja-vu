@@ -51,7 +51,9 @@ h1 .grad{background:linear-gradient(92deg,var(--a1),var(--a2));-webkit-backgroun
 section{margin-top:88px}
 h2{font-size:1.5rem;letter-spacing:-.01em;margin-bottom:6px}
 .lead{color:var(--dim);margin-bottom:26px}
-.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:900px){.features{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.features{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;transition:border-color .2s}
 .card:hover{border-color:#3a3756}
 .card .ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#7c6cf022,#4ecdc422);margin-bottom:14px}
@@ -158,7 +160,7 @@ a:hover{text-decoration:underline}
       <h3>Sync between machines</h3>
       <p><code>deja sync export/import</code> moves memory laptop&nbsp;↔&nbsp;server. Watermarked, append-only, idempotent.</p>
     </div>
-  </div></div>
+  </div>
 </section>
 
 <section>
