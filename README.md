@@ -104,6 +104,18 @@ deja sync ssh mini --pull   # fetch mini's new records into this machine
 
 Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep the folder as an append-only log and run both commands from cron if you like. Records never echo back to their origin. `--full` re-exports everything regardless of watermarks — useful when adding a machine after old batches are gone. Synced sessions show up under `imported:<project>` in search, `recall`, and session-start auto-recall.
 
+## Teach your agent to remember
+
+`deja install --all` wires up MCP recall and the session-start hook. To make
+the agent reach for memory on its own, add this to your `CLAUDE.md` /
+`AGENTS.md`:
+
+```
+Before debugging or re-implementing something, run `deja "<query>"` (or the
+MCP recall tool) — past agent sessions across Claude Code, Codex and opencode
+are indexed locally. Cite what you reuse.
+```
+
 ## MCP tools
 
 | Tool | Arguments | Returns |
