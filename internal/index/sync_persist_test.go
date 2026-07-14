@@ -112,4 +112,52 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 		t.Fatalf("re-import n=%d err=%v", n, err)
 	}
 	findImported("after re-import")
+
+	// Export must not echo imported records back to their origin: only the
+	// two native local messages leave this machine.
+	outDir := filepath.Join(filepath.Dir(dir), "echo-out")
+	n, err := Export(dir, outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("export n=%d, want 1 native record only", n)
+	}
+	matches, err := filepath.Glob(filepath.Join(outDir, "*.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range matches {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(b), "importneedle") {
+			t.Fatalf("exported batch %s echoes imported records", p)
+		}
+	}
+
+	// --full ignores watermarks (recovers history for a new machine) but
+	// still never echoes imported records.
+	fullDir := filepath.Join(filepath.Dir(dir), "echo-out-full")
+	n, err = ExportFull(dir, fullDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("full export n=%d, want 1 native record", n)
+	}
+	matches, err = filepath.Glob(filepath.Join(fullDir, "*.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range matches {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(b), "importneedle") {
+			t.Fatalf("full export batch %s echoes imported records", p)
+		}
+	}
 }

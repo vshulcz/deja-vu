@@ -25,7 +25,18 @@ type SyncRecord struct {
 	Time      time.Time `json:"time"`
 }
 
+// Export writes records newer than the per-source watermarks. ExportFull
+// ignores watermarks so a fresh machine can receive the whole history even
+// after earlier batch dirs are gone; import-side dedupe makes it safe.
 func Export(dir, outDir string) (int, error) {
+	return exportRecords(dir, outDir, false)
+}
+
+func ExportFull(dir, outDir string) (int, error) {
+	return exportRecords(dir, outDir, true)
+}
+
+func exportRecords(dir, outDir string, full bool) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -50,11 +61,14 @@ func Export(dir, outDir string) (int, error) {
 		nextWatermarks[k] = v
 	}
 	err = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+		if r.SourcePath == syncImportPath {
+			return
+		}
 		source := r.SourcePath
 		if source == "" {
 			source = r.Key
 		}
-		if !r.Time.IsZero() && r.Time.UnixNano() <= m.ExportWatermarks[source] {
+		if !full && !r.Time.IsZero() && r.Time.UnixNano() <= m.ExportWatermarks[source] {
 			return
 		}
 		meta, ok := m.Sessions[r.Key]

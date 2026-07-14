@@ -337,7 +337,7 @@ Usage:
   deja show <id-prefix>
   deja share <id-prefix>
   deja ctx <query|id-prefix>
-  deja sync export <dir>
+  deja sync export <dir> [--full]
   deja sync import <dir>
   deja last [n]
   deja sources
