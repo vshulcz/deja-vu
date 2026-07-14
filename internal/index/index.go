@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -88,12 +87,12 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 		return err
 	}
 	defer unlock()
-	want := currentFiles(harness)
+	want := currentFiles("")
 	m, err := readManifest(dir)
 	if !force && err == nil && manifestFresh(m, want, "") {
 		return nil
 	}
-	return updateIndex(dir, harness, "", want, force, progress)
+	return updateIndex(dir, "", "", want, force, progress)
 }
 
 func EnsureForSearch(dir string, o search.Options, force bool, progress io.Writer) error {
@@ -105,8 +104,8 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 		return err
 	}
 	defer unlock()
-	want := currentFiles(o.Harness)
-	scope := scopeFor(o)
+	want := currentFiles("")
+	scope := ""
 	m, err := readManifest(dir)
 	if !force && err == nil && manifestFresh(m, want, scope) {
 		return nil
@@ -117,7 +116,8 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 		}
 		return rebuildForSearch(dir, o, scope, want)
 	}
-	return updateIndex(dir, o.Harness, scope, want, force, progress)
+	if err := updateIndex(dir, o.Harness, scope, want, force, progress); err != nil { return fmt.Errorf("update: %w", err) }
+	return nil
 }
 
 func Search(dir string, o search.Options) ([]model.Session, error) {
@@ -131,20 +131,24 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 	defer unlock()
 	m, err := readManifest(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("manifest: %w", err)
 	}
 	var posts []posting
 	usedPostings := false
 	if !o.Regex {
 		if keys := queryKeys(o.Query); len(keys) > 0 {
-			if len(keys) == 1 {
-				posts, _ = postingsFor(dir, keys[0])
-				usedPostings = len(posts) > 0
-			} else {
-				usedPostings = true
-				posts, err = intersectPostings(dir, keys)
+			usedPostings = true
+			posts, err = intersectPostings(dir, retrievalKeys(keys))
+			if err != nil {
+				return nil, fmt.Errorf("postings: %w", err)
+			}
+			if len(posts) == 0 {
+				// grep expectation: "code" should find "opencode". Expand each query
+				// token to all indexed tokens containing it (bucket directories only,
+				// no record scan), then intersect.
+				posts, err = intersectSubstringPostings(dir, tokens(o.Query))
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("substr postings: %w", err)
 				}
 			}
 		}
@@ -238,15 +242,26 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
+			ord := uint32(0)
 			if old, ok := m.Sessions[key]; ok {
+				ord = old.Ord
 				if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
 					s.Started = old.Started
 				}
 				if old.Updated.After(s.Updated) {
 					s.Updated = old.Updated
 				}
+				if s.Project == "history" && old.Project != "" && old.Project != "history" {
+					s.Project = old.Project
+				}
+				if s.Title == "" {
+					s.Title = old.Title
+				}
 			}
-			m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
+			if ord == 0 {
+				ord = nextSessionOrd(m.Sessions)
+			}
+			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			for _, msg := range s.Messages {
 				text := msg.Text
 				if len(text) > maxIndexedText {
@@ -256,7 +271,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 				if err != nil {
 					return err
 				}
-				jobs <- tokenJob{text: msg.Text, offset: off, sid: m.Sessions[key].Ord}
+				jobs <- tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord}
 			}
 		}
 		return nil
@@ -299,7 +314,7 @@ func rebuildForSearch(dir string, o search.Options, scope string, files map[stri
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
 		return err
 	}
-	ss := load(o.Harness)
+	ss := load("")
 	return writeSessions(tmp, dir, ss, files, scope)
 }
 
@@ -314,15 +329,26 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
+			ord := uint32(0)
 			if old, ok := m.Sessions[key]; ok {
+				ord = old.Ord
 				if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
 					s.Started = old.Started
 				}
 				if old.Updated.After(s.Updated) {
 					s.Updated = old.Updated
 				}
+				if s.Project == "history" && old.Project != "" && old.Project != "history" {
+					s.Project = old.Project
+				}
+				if s.Title == "" {
+					s.Title = old.Title
+				}
 			}
-			m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
+			if ord == 0 {
+				ord = nextSessionOrd(m.Sessions)
+			}
+			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			for _, msg := range s.Messages {
 				text := msg.Text
 				if len(text) > maxIndexedText {
@@ -463,7 +489,11 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 }
 
 func metaForSession(s model.Session) SessionMeta {
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: sessionTitle(s), Started: s.Started, Updated: s.Updated}
+	title := s.Title
+	if title == "" {
+		title = sessionTitle(s)
+	}
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated}
 }
 
 func metaWithOrd(meta SessionMeta, ord uint32) SessionMeta {
@@ -487,9 +517,16 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 
 func sessionTitle(s model.Session) string {
 	for _, msg := range s.Messages {
-		if msg.Role == "user" {
-			return truncateTitle(msg.Text, 60)
+		if msg.Role != "user" {
+			continue
 		}
+		t := strings.TrimSpace(msg.Text)
+		if t == "" || strings.HasPrefix(t, "<local-command") || strings.HasPrefix(t, "<command-") ||
+			strings.HasPrefix(t, "<task-notification") || strings.HasPrefix(t, "<teammate-message") ||
+			strings.HasPrefix(t, "Caveat:") {
+			continue
+		}
+		return truncateTitle(t, 60)
 	}
 	return ""
 }
@@ -540,7 +577,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if len(removed) == 0 && canAppendIncremental(changed, old.Files) {
 		filesTouched, messages, err := appendIncremental(dir, harness, scope, old, files, changed)
 		if err != nil {
-			return err
+			return fmt.Errorf("append: %w", err)
 		}
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: updated %d file (%d new messages)\n", filesTouched, messages)
@@ -552,7 +589,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
 		if err != nil {
-			return err
+			return fmt.Errorf("changed %s: %w", p, err)
 		}
 		replacements = append(replacements, ss...)
 		files[p] = f
@@ -710,7 +747,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	for p := range changed {
 		ss, err := parseAppendedFile(harness, p, old.Files[p])
 		if err != nil {
-			return filesTouched, messages, err
+			return filesTouched, messages, fmt.Errorf("parse %s: %w", filepath.Base(p), err)
 		}
 		filesTouched++
 		for _, s := range ss {
@@ -887,10 +924,6 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 		}
 	}
 	return true
-}
-
-func scopeFor(o search.Options) string {
-	return "h:" + o.Harness
 }
 
 func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]model.Session, error) {
@@ -1209,6 +1242,71 @@ func intersectPostings(dir string, keys []string) ([]posting, error) {
 	return out, nil
 }
 
+func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
+	if len(bare) == 0 {
+		return nil, nil
+	}
+	if len(bare) > 3 {
+		bare = bare[:3] // longest-first; keep the expansion bounded
+	}
+	buckets, err := os.ReadDir(filepath.Join(dir, "buckets"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	perTok := make([]map[int64]posting, len(bare))
+	for i := range perTok {
+		perTok[i] = map[int64]posting{}
+	}
+	for _, de := range buckets {
+		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+			continue
+		}
+		path := filepath.Join(dir, "buckets", de.Name())
+		entries, f, err := openBucketDir(path)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			tok := strings.TrimPrefix(e.tok, "t")
+			for i, b := range bare {
+				if !strings.Contains(tok, b) {
+					continue
+				}
+				buf := make([]byte, e.n)
+				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
+					continue
+				}
+				for _, p := range decodePostings(buf) {
+					perTok[i][p.Off] = p
+				}
+			}
+		}
+		f.Close()
+	}
+	set := perTok[0]
+	for _, m := range perTok[1:] {
+		next := map[int64]posting{}
+		for off, p := range m {
+			if _, ok := set[off]; ok {
+				next[off] = p
+			}
+		}
+		set = next
+		if len(set) == 0 {
+			return nil, nil
+		}
+	}
+	out := make([]posting, 0, len(set))
+	for _, p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out, nil
+}
+
 func tokens(s string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -1244,6 +1342,13 @@ func indexKeys(s string) []string {
 		out = append(out, "t"+tok)
 	}
 	return out
+}
+
+func retrievalKeys(keys []string) []string {
+	if len(keys) <= 3 {
+		return keys
+	}
+	return keys[:3] // tokens() sorts longest-first; long tokens are the most selective
 }
 
 func queryKeys(s string) []string {
@@ -1494,22 +1599,6 @@ func uvarintLen(v uint64) int {
 	}
 	return n
 }
-func writeJSON(p string, v any) error {
-	f, err := os.Create(p)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(v)
-}
-func readJSON(p string, v any) error {
-	f, err := os.Open(p)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return json.NewDecoder(f).Decode(v)
-}
 func writeGob(p string, v any) error {
 	f, err := os.Create(p)
 	if err != nil {
@@ -1524,5 +1613,8 @@ func readGob(p string, v any) error {
 		return err
 	}
 	defer f.Close()
-	return gob.NewDecoder(f).Decode(v)
+	if err := gob.NewDecoder(f).Decode(v); err != nil {
+		return fmt.Errorf("read %s: %w", filepath.Base(p), err)
+	}
+	return nil
 }

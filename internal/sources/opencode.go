@@ -3,6 +3,8 @@ package sources
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -57,6 +59,10 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 }
 
 func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) {
+	// The sqlite3 CLI CREATES a missing database file on open — never let it.
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, nil
+	}
 	lim := ""
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
@@ -84,6 +90,9 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	tok, err := dec.Token()
 	if err != nil {
 		_ = cmd.Wait()
+		if err == io.EOF {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if d, ok := tok.(json.Delim); !ok || d != '[' {
@@ -137,6 +146,9 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 }
 
 func OpencodeCounts() (sessions, messages int, err error) {
+	if fi, e := os.Stat(OpencodeDB()); e != nil || fi.Size() == 0 {
+		return 0, 0, nil
+	}
 	cmd := exec.Command("sqlite3", OpencodeDB(), "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
 	b, err := cmd.Output()
 	if err != nil {

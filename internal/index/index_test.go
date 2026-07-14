@@ -25,6 +25,8 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
 	dir := filepath.Join(tmp, "index.db")
 	var first bytes.Buffer
 	if err := Ensure(dir, "claude", false, &first); err != nil {
@@ -68,6 +70,8 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 		}
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := EnsureForSearch(dir, search.Options{Query: "jwt refresh token", Harness: "claude"}, false, nil); err != nil {
 		t.Fatal(err)
@@ -127,6 +131,8 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := Ensure(dir, "claude", false, nil); err != nil {
 		t.Fatal(err)
@@ -190,6 +196,8 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 		}
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := EnsureForSearch(dir, search.Options{Query: "stable", Harness: "claude"}, false, nil); err != nil {
 		t.Fatal(err)
@@ -371,6 +379,8 @@ func TestCurrentFilesSkipsSymlinks(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
 	files := currentFiles("claude")
 	if _, ok := files[link]; ok {
 		t.Fatalf("symlink was indexed: %#v", files[link])
@@ -388,12 +398,14 @@ func TestOldJSONManifestRebuildsTransparently(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	old := Manifest{Version: version - 1, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: "h:claude"}
-	if err := writeJSON(filepath.Join(dir, "manifest.json"), old); err != nil {
+	if err := writeManifest(dir, old); err != nil {
 		t.Fatal(err)
 	}
 	if err := EnsureForSearch(dir, search.Options{Query: "needle", Harness: "claude"}, false, nil); err != nil {

@@ -198,7 +198,11 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		}
 		chunk := fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text)
 		if written+len(chunk) > budget {
-			chunk = chunk[:max(0, budget-written)]
+			cut := max(0, budget-written)
+			for cut > 0 && !utf8.RuneStart(chunk[cut]) {
+				cut--
+			}
+			chunk = chunk[:cut]
 		}
 		fmt.Fprint(w, chunk)
 		written += len(chunk)
@@ -224,7 +228,15 @@ func snippet(s, q string, re *regexp.Regexp) string {
 			idx = utf8.RuneCountInString(s[:loc[0]])
 		}
 	} else {
-		b := strings.Index(strings.ToLower(s), strings.ToLower(q))
+		low := strings.ToLower(s)
+		b := strings.Index(low, strings.ToLower(q))
+		if b < 0 {
+			for _, tok := range queryTokens(q) {
+				if p := strings.Index(low, tok); p >= 0 && (b < 0 || p < b) {
+					b = p
+				}
+			}
+		}
 		if b > 0 {
 			idx = utf8.RuneCountInString(s[:b])
 		}
@@ -289,7 +301,18 @@ func highlight(s, q string, isRe bool, color bool) string {
 			return re.ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
 		}
 	}
-	return regexp.MustCompile(`(?i)`+regexp.QuoteMeta(q)).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
+	if strings.Contains(strings.ToLower(s), strings.ToLower(q)) {
+		return regexp.MustCompile(`(?i)`+regexp.QuoteMeta(q)).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
+	}
+	toks := queryTokens(q)
+	if len(toks) == 0 {
+		return s
+	}
+	parts := make([]string, 0, len(toks))
+	for _, t := range toks {
+		parts = append(parts, regexp.QuoteMeta(t))
+	}
+	return regexp.MustCompile(`(?i)(`+strings.Join(parts, "|")+`)`).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
 }
 
 func colorOK(w io.Writer) bool {

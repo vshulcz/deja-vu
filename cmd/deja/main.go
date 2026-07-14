@@ -145,15 +145,15 @@ func run(args []string) error {
 		return err
 	}
 	if err := index.EnsureForSearch(index.DefaultDir(), o, force, os.Stderr); err != nil {
-		return err
+		return fmt.Errorf("ensure: %w", err)
 	}
 	ss, err := index.Search(index.DefaultDir(), o)
 	if err != nil {
-		return err
+		return fmt.Errorf("search: %w", err)
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
-		return err
+		return fmt.Errorf("run: %w", err)
 	}
 	if len(hits) == 0 {
 		printNoMatches(os.Stderr, o.Query, len(ss))
