@@ -169,7 +169,7 @@ a:hover{text-decoration:underline}
 <section>
   <h2>How it works</h2>
   <p class="how">
-  deja parses the local history stores each harness already writes (<code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, opencode's SQLite db) into an incremental inverted index in <code>~/.cache/deja</code>. Only changed files are re-read on each run. The MCP server exposes the same index to agents. Details in <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> — adding a harness is one parser file.
+  deja parses the local history stores each harness already writes (<code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, opencode's SQLite db) into an incremental inverted index in <code>~/.cache/deja</code>. Only changed files are re-read on each run. The MCP server exposes the same index to agents. Also: secrets are redacted at ingest, <code>deja stats</code> summarizes your agent work, <code>deja share</code> hands a sanitized session to a colleague, and <code>deja sync</code> moves memory between machines. Details in <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> — adding a harness is one parser file.
   </p>
 </section>
 
