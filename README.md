@@ -26,7 +26,7 @@ Claude Code, Codex and opencode write every conversation to local files — giga
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
 
-One binary. No models to download, no services to run, nothing leaves your machine.
+One binary. No models to download, no services to run, nothing leaves your machine. (opencode indexing shells out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros.)
 
 ## Install
 

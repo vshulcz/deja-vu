@@ -13,6 +13,13 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// SQLite3Available reports whether the sqlite3 CLI the opencode parser
+// shells out to is on PATH.
+func SQLite3Available() bool {
+	_, err := exec.LookPath("sqlite3")
+	return err == nil
+}
+
 func OpencodeDB() string {
 	return EnvPath("DEJA_OPENCODE_DB", filepath.Join(Home(), ".local", "share", "opencode", "opencode.db"))
 }

@@ -293,7 +293,11 @@ func printSources() {
 		size = fi.Size()
 	}
 	s, m, _ := sources.OpencodeCounts()
-	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()])
+	note := ""
+	if size > 0 && !sources.SQLite3Available() {
+		note = "\t(sqlite3 CLI not found — opencode sessions unavailable)"
+	}
+	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
 
 func redactionsUnder(files map[string]int, root string) int {
