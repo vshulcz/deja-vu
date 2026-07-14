@@ -63,6 +63,15 @@ func run(args []string) error {
 		printSources()
 		return nil
 	}
+	if args[0] == "mcp" {
+		return serveMCP(os.Stdin, os.Stdout)
+	}
+	if args[0] == "install" {
+		return runInstall(args[1:], false)
+	}
+	if args[0] == "uninstall" {
+		return runInstall(args[1:], true)
+	}
 	if args[0] == "show" {
 		if len(args) < 2 {
 			return fmt.Errorf("show needs id-prefix")
@@ -254,5 +263,5 @@ func humanBytes(n int64) string {
 	return fmt.Sprintf("%.1f %s", f, units[i])
 }
 func usage() {
-	fmt.Println("usage: deja [--json] [--re] [--rebuild] [--harness name] [--project p] [--since 30d] [--role user] <query>\n       deja ctx <query|id-prefix>\n       deja show <id-prefix>\n       deja last [n]\n       deja sources")
+	fmt.Println("usage: deja [--json] [--re] [--rebuild] [--harness name] [--project p] [--since 30d] [--role user] <query>\n       deja ctx <query|id-prefix>\n       deja show <id-prefix>\n       deja last [n]\n       deja sources\n       deja mcp\n       deja install <claude-code|codex|opencode|--all>\n       deja uninstall <claude-code|codex|opencode>")
 }
