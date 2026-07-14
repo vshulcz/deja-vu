@@ -1,11 +1,13 @@
-run:
-  timeout: 5m
+version: "2"
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
-    - gofmt
     - govet
     - misspell
     - staticcheck
+
+formatters:
+  enable:
+    - gofmt

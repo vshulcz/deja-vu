@@ -84,6 +84,7 @@ func TestMCPRecallContext(t *testing.T) {
 func TestInstallClaudeTempHome(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
+	t.Setenv("USERPROFILE", h)
 	path := filepath.Join(h, ".claude.json")
 	if err := os.WriteFile(path, []byte(`{"other":true}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -115,6 +116,7 @@ func TestInstallClaudeTempHome(t *testing.T) {
 func TestInstallCodexTempHomePreservesOtherTOML(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
+	t.Setenv("USERPROFILE", h)
 	path := filepath.Join(h, ".codex", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -149,6 +151,7 @@ func TestInstallCodexTempHomePreservesOtherTOML(t *testing.T) {
 func TestInstallOpencodeJSONAndJSONC(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
+	t.Setenv("USERPROFILE", h)
 	jsonPath := filepath.Join(h, ".config", "opencode", "opencode.json")
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -166,6 +169,7 @@ func TestInstallOpencodeJSONAndJSONC(t *testing.T) {
 
 	h2 := t.TempDir()
 	t.Setenv("HOME", h2)
+	t.Setenv("USERPROFILE", h2)
 	jsoncPath := filepath.Join(h2, ".config", "opencode", "opencode.jsonc")
 	if err := os.MkdirAll(filepath.Dir(jsoncPath), 0o755); err != nil {
 		t.Fatal(err)
