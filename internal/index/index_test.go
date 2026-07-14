@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -242,6 +243,162 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	if len(hits) != 1 || hits[0].Session.ID != "s17" || hits[0].Count != 12 {
 		t.Fatalf("bad incremental search hits: %#v", hits)
 	}
+}
+
+func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
+	idx := filepath.Join(tmp, "custom-index")
+	t.Setenv("DEJA_INDEX_DIR", idx)
+	if DefaultDir() != idx {
+		t.Fatalf("DefaultDir env ignored")
+	}
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-tmp-demo")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(proj, "s1.jsonl")
+	line1 := `{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"alpha needle"}}` + "\n"
+	line2 := `{"type":"assistant","sessionId":"s1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"beta answer"}}` + "\n"
+	if err := os.WriteFile(p, []byte(line1+line2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	if err := Ensure(idx, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Recent(idx, 1); err != nil || len(got) != 1 || got[0].ID != "s1" {
+		t.Fatalf("Recent=%#v err=%v", got, err)
+	}
+	if got, ok, err := FindByPrefix(idx, "s"); err != nil || !ok || len(got.Messages) != 2 {
+		t.Fatalf("FindByPrefix=%#v ok=%v err=%v", got, ok, err)
+	}
+	recs, err := recordsForKey(filepath.Join(idx, "records.bin"), "claude:s1")
+	if err != nil || len(recs) != 2 {
+		t.Fatalf("records=%#v err=%v", recs, err)
+	}
+	if got, err := parseAppendedFile("", p, FileState{Size: int64(len(line1))}); err != nil || len(got) != 1 || got[0].Messages[0].Text != "beta answer" {
+		t.Fatalf("parse appended=%#v err=%v", got, err)
+	}
+	if got, err := parseChangedFile("", p, FileState{}); err != nil || len(got) != 1 {
+		t.Fatalf("parse changed=%#v err=%v", got, err)
+	}
+	if preRankScore(2, time.Now()) <= 0 {
+		t.Fatalf("preRankScore not positive")
+	}
+	if !strings.HasPrefix(bucket("a"), "x") || bucket("ab") != "ab" {
+		t.Fatalf("short bucket failed")
+	}
+
+	// Shrinking a file forces the non-append replacement path.
+	if err := os.WriteFile(p, []byte(line1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chtimes(p, time.Now().Add(3*time.Second), time.Now().Add(3*time.Second))
+	var log bytes.Buffer
+	if err := Ensure(idx, "claude", false, &log); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(log.String(), "incremental index") {
+		t.Fatalf("want non-append incremental log, got %q", log.String())
+	}
+	if got, ok, err := FindByPrefix(idx, "s1"); err != nil || !ok || len(got.Messages) != 1 {
+		t.Fatalf("after shrink=%#v ok=%v err=%v", got, ok, err)
+	}
+
+	// Removing the file also takes the rebuild/replacement path and drops records.
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chtimes(proj, time.Now().Add(4*time.Second), time.Now().Add(4*time.Second))
+	log.Reset()
+	if err := Ensure(idx, "claude", false, &log); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(log.String(), "removed_files=1") {
+		t.Fatalf("want removed file log, got %q", log.String())
+	}
+	if got, err := Recent(idx, 10); err != nil || len(got) != 0 {
+		t.Fatalf("recent after remove=%#v err=%v", got, err)
+	}
+}
+
+func TestSetOpencodeLastUpdated(t *testing.T) {
+	tmp := t.TempDir()
+	db := filepath.Join(tmp, "opencode.db")
+	t.Setenv("DEJA_OPENCODE_DB", db)
+	files := map[string]FileState{db: {Path: db}}
+	now := time.Now()
+	setOpencodeLastUpdated(files, map[string]SessionMeta{"opencode:s": {Harness: "opencode", Updated: now}})
+	if files[db].LastUpdated != now.UnixNano() {
+		t.Fatalf("LastUpdated=%d", files[db].LastUpdated)
+	}
+}
+
+func TestIndexHelperBranchCoverage(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
+	t.Setenv("DEJA_INDEX_DIR", "")
+	if !strings.Contains(DefaultDir(), filepath.Join(".cache", "deja", "index.db")) {
+		t.Fatalf("DefaultDir default=%q", DefaultDir())
+	}
+	if title := sessionTitle(modelSession("<local-command>x", "Caveat: y", "real title here")); title != "real title here" {
+		t.Fatalf("sessionTitle=%q", title)
+	}
+	meta := SessionMeta{Harness: "claude", Project: "deja-vu", Updated: time.Now()}
+	if !sessionMetaMatches(meta, search.Options{Harness: "claude", Project: "deja", Since: time.Hour}) || sessionMetaMatches(meta, search.Options{Harness: "codex"}) || sessionMetaMatches(meta, search.Options{Project: "missing"}) || sessionMetaMatches(SessionMeta{Updated: time.Now().Add(-48 * time.Hour)}, search.Options{Since: time.Hour}) {
+		t.Fatalf("sessionMetaMatches branches failed")
+	}
+
+	codexRoot := filepath.Join(tmp, "codex")
+	t.Setenv("DEJA_CODEX_ROOT", codexRoot)
+	hist := filepath.Join(codexRoot, "history.jsonl")
+	if err := os.MkdirAll(filepath.Dir(hist), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hist, []byte(`{"session_id":"h","text":"history","ts":"2026-01-02T03:04:05Z"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	roll := filepath.Join(codexRoot, "sessions", "2026", "01", "02", "rollout-2026-01-02T03-04-05-r.jsonl")
+	if err := os.MkdirAll(filepath.Dir(roll), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rollLine := `{"timestamp":"2026-01-02T03:04:05Z","payload":{"role":"user","message":"roll msg"}}` + "\n"
+	if err := os.WriteFile(roll, []byte(rollLine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{hist, roll} {
+		if got, err := parseChangedFile("", p, FileState{}); err != nil || len(got) != 1 {
+			t.Fatalf("parseChanged %s=%#v %v", p, got, err)
+		}
+		if got, err := parseAppendedFile("", p, FileState{Size: 0}); err != nil || len(got) != 1 {
+			t.Fatalf("parseAppended %s=%#v %v", p, got, err)
+		}
+	}
+	db := filepath.Join(tmp, "opencode.db")
+	t.Setenv("DEJA_OPENCODE_DB", db)
+	if got, err := parseChangedFile("", db, FileState{LastUpdated: time.Now().UnixNano()}); err != nil || got != nil {
+		t.Fatalf("opencode changed missing=%#v %v", got, err)
+	}
+	if got, err := parseAppendedFile("", db, FileState{}); err != nil || got != nil {
+		t.Fatalf("opencode appended missing=%#v %v", got, err)
+	}
+	if got, err := parseChangedFile("", filepath.Join(tmp, "unknown.txt"), FileState{}); err != nil || got != nil {
+		t.Fatalf("unknown=%#v %v", got, err)
+	}
+}
+
+func modelSession(texts ...string) model.Session {
+	s := model.Session{Harness: "claude", ID: "s"}
+	for _, txt := range texts {
+		s.Messages = append(s.Messages, model.Message{Role: "user", Text: txt})
+	}
+	return s
 }
 
 func BenchmarkColdEnsureSynthetic(b *testing.B) {

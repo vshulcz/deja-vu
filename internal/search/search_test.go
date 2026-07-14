@@ -2,6 +2,8 @@ package search
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +27,78 @@ func TestSearchRanksAndFilters(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].Session.ID != "b" {
 		t.Fatalf("bad filter: %#v", hits)
+	}
+}
+
+func TestPrintJSONSessionContextAndHelpers(t *testing.T) {
+	now := time.Now()
+	s := model.Session{ID: "abcdef1234567890", Harness: "claude", Project: "proj", Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "hello needle world", Time: now},
+		{Role: "assistant", Text: strings.Repeat("tool_use ", 80), Time: now},
+		{Role: "assistant", Text: "```go\nfmt.Println(needle)\n```", Time: now},
+	}}
+	hits := []Hit{{Session: s, Count: 1, Snippets: []string{"hello needle"}}}
+	var b bytes.Buffer
+	Print(&b, hits, Options{Query: "needle", JSON: true})
+	var decoded []Hit
+	if err := json.Unmarshal(b.Bytes(), &decoded); err != nil || len(decoded) != 1 {
+		t.Fatalf("bad json %q err=%v", b.String(), err)
+	}
+	b.Reset()
+	PrintSession(&b, s)
+	if !strings.Contains(b.String(), "# claude") || !strings.Contains(b.String(), "[tool/local output collapsed]") {
+		t.Fatalf("bad session: %q", b.String())
+	}
+	b.Reset()
+	PrintContext(&b, s, "needle")
+	if !strings.Contains(b.String(), "# deja context:") || !strings.Contains(b.String(), "fmt.Println") {
+		t.Fatalf("bad context: %q", b.String())
+	}
+	if got, ok := FindByPrefix([]model.Session{s}, "abcdef"); !ok || got.ID != s.ID {
+		t.Fatalf("FindByPrefix got %#v ok=%v", got, ok)
+	}
+	if got := Recent([]model.Session{s, {ID: "old", Updated: now.Add(-time.Hour)}}, 1); len(got) != 1 || got[0].ID != s.ID {
+		t.Fatalf("Recent=%#v", got)
+	}
+}
+
+func TestHighlightDateSnippetAndColorBranches(t *testing.T) {
+	if got := highlight("Needle and thread", "needle", false, true); !strings.Contains(got, cMatch+"Needle"+cReset) {
+		t.Fatalf("highlight literal=%q", got)
+	}
+	if got := highlight("abc 123", `\d+`, true, true); !strings.Contains(got, cMatch+"123"+cReset) {
+		t.Fatalf("highlight regex=%q", got)
+	}
+	if got := highlight("jwt and refresh", "jwt refresh", false, true); strings.Count(got, cMatch) != 2 {
+		t.Fatalf("highlight tokens=%q", got)
+	}
+	if got := highlight("x", "x", false, false); got != "x" {
+		t.Fatalf("highlight no color=%q", got)
+	}
+	for _, h := range []string{"claude", "codex", "opencode", "other"} {
+		if !strings.Contains(harnessTag(h, true), "["+h+"]") || harnessTag(h, false) != "["+h+"]" {
+			t.Fatalf("bad harness tag %q", h)
+		}
+	}
+	now := time.Now()
+	for _, tt := range []time.Time{now, now.AddDate(0, 0, -3), now.AddDate(0, -1, 0), now.AddDate(-1, 0, 0)} {
+		if relativeDate(tt) == "" {
+			t.Fatalf("empty relative date")
+		}
+	}
+	if got := snippet("needle at start "+strings.Repeat("x", 300), "needle", nil); !strings.HasPrefix(got, "needle") || !strings.HasSuffix(got, "…") {
+		t.Fatalf("snippet start=%q", got)
+	}
+	if got := snippet(strings.Repeat("x", 300)+" needle", "needle", nil); !strings.HasPrefix(got, "…") || !strings.Contains(got, "needle") {
+		t.Fatalf("snippet end=%q", got)
+	}
+	if got := snippet("no direct tokens but has jwt", "jwt refresh", nil); !strings.Contains(got, "jwt") {
+		t.Fatalf("snippet token=%q", got)
+	}
+	os.Setenv("NO_COLOR", "1")
+	defer os.Unsetenv("NO_COLOR")
+	if colorOK(os.Stdout) {
+		t.Fatalf("NO_COLOR ignored")
 	}
 }
 
