@@ -144,10 +144,10 @@ func Import(dir, inDir string) (int, error) {
 			importID := ImportedSessionID(sr.Harness, origID)
 			key := sr.Harness + ":" + importID
 			text, _ := redact.Text(sr.Text)
-			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: "deja-sync-import"})
+			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
 			meta := metas[key]
 			if meta.ID == "" {
-				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: "deja-sync-import"}
+				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath}
 			}
 			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
 				meta.Started = sr.Time
@@ -213,6 +213,10 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Record, metas map[string]SessionMeta) error {
 	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
+		return err
+	}
+	if _, err := rf.Seek(0, io.SeekEnd); err != nil {
+		_ = rf.Close()
 		return err
 	}
 	buckets := bucketPostings{}
