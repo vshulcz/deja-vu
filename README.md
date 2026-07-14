@@ -1,14 +1,18 @@
-<p align=center><img src=assets/logo.svg width=340></p>
+<p align="center"><img src="assets/logo.svg" width="340" alt="deja-vu"></p>
 
-Persistent memory for your coding agents.
-
-<p align=center><img src=assets/demo.gif></p>
+<p align="center"><strong>Persistent memory for your coding agents.</strong></p>
 
 <p align=center>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://pkg.go.dev/github.com/vshulcz/deja-vu"><img src="https://pkg.go.dev/badge/github.com/vshulcz/deja-vu.svg" alt="Go Reference"></a>
   <a href="https://goreportcard.com/report/github.com/vshulcz/deja-vu"><img src="https://goreportcard.com/badge/github.com/vshulcz/deja-vu" alt="Go Report Card"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
+
+<!-- Go Report Card and pkg.go.dev badges populate after the repository is public and indexed. -->
+
+<p align="center"><img src="assets/demo.gif" alt="deja demo"></p>
 
 # deja-vu
 
@@ -18,10 +22,29 @@ Agents forget everything between sessions.
 Your machine already holds every solution they found.
 `deja` indexes those histories and serves them back — to you and to the agent.
 
-## Quickstart
+## Install
+
+Curl installer:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+```
+
+Go install:
 
 ```sh
 go install github.com/vshulcz/deja-vu/cmd/deja@latest
+```
+
+Homebrew (coming with the tap):
+
+```sh
+brew install vshulcz/homebrew-tap/deja-vu
+```
+
+Then install the MCP integration you use:
+
+```sh
 deja install --all
 ```
 
