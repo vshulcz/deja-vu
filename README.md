@@ -76,6 +76,7 @@ $ deja "jwt refresh token"
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
+| `deja warmup` | Build/refresh the index without searching — handy in cron or shell startup. |
 
 Context piping without MCP:
 
