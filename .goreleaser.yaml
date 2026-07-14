@@ -75,10 +75,10 @@ brews:
     # Publishing the formula needs a PAT with access to vshulcz/homebrew-tap
     # (workflow GITHUB_TOKEN is repo-scoped). Flip to false at public launch
     # after adding the TAP_GITHUB_TOKEN secret and token: ... here.
-    skip_upload: true
     repository:
       owner: vshulcz
       name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://github.com/vshulcz/deja-vu
     description: Persistent memory for your coding agents
