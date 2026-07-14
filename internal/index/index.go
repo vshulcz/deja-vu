@@ -230,7 +230,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 func rebuild(dir string, harness string, scope string, files map[string]FileState) error {
 	lastIngestFiles = len(files)
 	tmp := dir + ".tmp"
-	os.RemoveAll(tmp)
+	_ = os.RemoveAll(tmp)
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 		return nil
 	})
 	if err != nil {
-		rf.Close()
+		_ = rf.Close()
 		return err
 	}
 	if err := rf.Close(); err != nil {
@@ -292,7 +292,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 	return os.Rename(tmp, dir)
 }
 
@@ -312,7 +312,7 @@ func load(h string) []model.Session {
 
 func rebuildForSearch(dir string, o search.Options, scope string, files map[string]FileState) error {
 	tmp := dir + ".tmp"
-	os.RemoveAll(tmp)
+	_ = os.RemoveAll(tmp)
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
 		return err
 	}
@@ -366,7 +366,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 		return nil
 	})
 	if err != nil {
-		rf.Close()
+		_ = rf.Close()
 		return err
 	}
 	if err := rf.Close(); err != nil {
@@ -657,7 +657,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 		recErr = addRec(r)
 	}); err != nil {
-		rf.Close()
+		_ = rf.Close()
 		return err
 	}
 	if recErr != nil {
