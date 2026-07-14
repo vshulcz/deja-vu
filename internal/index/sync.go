@@ -25,7 +25,18 @@ type SyncRecord struct {
 	Time      time.Time `json:"time"`
 }
 
+// Export writes records newer than the per-source watermarks. ExportFull
+// ignores watermarks so a fresh machine can receive the whole history even
+// after earlier batch dirs are gone; import-side dedupe makes it safe.
 func Export(dir, outDir string) (int, error) {
+	return exportRecords(dir, outDir, false)
+}
+
+func ExportFull(dir, outDir string) (int, error) {
+	return exportRecords(dir, outDir, true)
+}
+
+func exportRecords(dir, outDir string, full bool) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -50,11 +61,14 @@ func Export(dir, outDir string) (int, error) {
 		nextWatermarks[k] = v
 	}
 	err = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+		if r.SourcePath == syncImportPath {
+			return
+		}
 		source := r.SourcePath
 		if source == "" {
 			source = r.Key
 		}
-		if !r.Time.IsZero() && r.Time.UnixNano() <= m.ExportWatermarks[source] {
+		if !full && !r.Time.IsZero() && r.Time.UnixNano() <= m.ExportWatermarks[source] {
 			return
 		}
 		meta, ok := m.Sessions[r.Key]
@@ -144,10 +158,10 @@ func Import(dir, inDir string) (int, error) {
 			importID := ImportedSessionID(sr.Harness, origID)
 			key := sr.Harness + ":" + importID
 			text, _ := redact.Text(sr.Text)
-			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: "deja-sync-import"})
+			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
 			meta := metas[key]
 			if meta.ID == "" {
-				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: "deja-sync-import"}
+				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath}
 			}
 			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
 				meta.Started = sr.Time
@@ -213,6 +227,10 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Record, metas map[string]SessionMeta) error {
 	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
+		return err
+	}
+	if _, err := rf.Seek(0, io.SeekEnd); err != nil {
+		_ = rf.Close()
 		return err
 	}
 	buckets := bucketPostings{}

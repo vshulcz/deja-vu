@@ -89,7 +89,7 @@ func replaceProvider(s string, counts Counts) string {
 			kind = "openai-key"
 		case strings.HasPrefix(v, "npm_"):
 			kind = "npm-token"
-		case strings.HasPrefix(v, "xoxb-"), strings.HasPrefix(v, "xoxp-"):
+		case strings.HasPrefix(v, "xoxb-"), strings.HasPrefix(v, "xoxp-"), strings.HasPrefix(v, "xoxc-"), strings.HasPrefix(v, "xoxs-"):
 			kind = "slack-token"
 		case strings.HasPrefix(v, "AIza"):
 			kind = "google-api-key"

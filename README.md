@@ -72,7 +72,7 @@ $ deja "jwt refresh token"
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
-| `deja sync export <dir>` / `import <dir>` | Move memory between machines. Watermarked, append-only, idempotent. |
+| `deja sync export <dir> [--full]` / `import <dir>` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
@@ -82,6 +82,17 @@ Context piping without MCP:
 ```sh
 claude "Prior context: $(deja ctx 'database migration')"
 ```
+
+## Sync between machines
+
+Point both machines at one shared folder (Syncthing, iCloud, a git repo — anything that moves files):
+
+```sh
+deja sync export ~/Sync/deja   # machine A: appends new batches since last export
+deja sync import ~/Sync/deja   # machine B: picks up what it hasn't seen
+```
+
+Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep the folder as an append-only log and run both commands from cron if you like. Records never echo back to their origin. `--full` re-exports everything regardless of watermarks — useful when adding a machine after old batches are gone. Synced sessions show up under `imported:<project>` in search, `recall`, and session-start auto-recall.
 
 ## MCP tools
 

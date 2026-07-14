@@ -14,10 +14,29 @@ func runSync(args []string) error {
 	}
 	switch args[0] {
 	case "export":
+		full := false
+		rest := args[1:]
+		out := ""
+		for _, a := range rest {
+			if a == "--full" {
+				full = true
+				continue
+			}
+			out = a
+		}
+		if out == "" {
+			return fmt.Errorf("sync export needs a target dir")
+		}
 		if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, os.Stderr); err != nil {
 			return err
 		}
-		n, err := index.Export(index.DefaultDir(), args[1])
+		var n int
+		var err error
+		if full {
+			n, err = index.ExportFull(index.DefaultDir(), out)
+		} else {
+			n, err = index.Export(index.DefaultDir(), out)
+		}
 		if err != nil {
 			return err
 		}

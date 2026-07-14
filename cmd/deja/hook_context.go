@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -47,10 +50,32 @@ func hookDigest() string {
 			return ""
 		}
 	}
-	project := sources.ClaudeProjectName(cwd)
-	ss, err := index.RecentProject(dir, project, 3)
-	if err != nil || len(ss) == 0 {
+	names := []string{sources.ClaudeProjectName(cwd)}
+	if base := filepath.Base(cwd); base != "" && base != names[0] {
+		names = append(names, base)
+	}
+	var ss []model.Session
+	seen := map[string]bool{}
+	for _, name := range names {
+		got, err := index.RecentProject(dir, name, 3)
+		if err != nil {
+			continue
+		}
+		for _, s := range got {
+			k := s.Harness + ":" + s.ID
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			ss = append(ss, s)
+		}
+	}
+	if len(ss) == 0 {
 		return ""
+	}
+	sort.Slice(ss, func(i, j int) bool { return ss[i].Updated.After(ss[j].Updated) })
+	if len(ss) > 3 {
+		ss = ss[:3]
 	}
 	return search.AutoRecallDigest(ss, 2000)
 }

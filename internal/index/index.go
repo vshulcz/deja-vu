@@ -294,13 +294,16 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 
 func rebuild(dir string, harness string, scope string, files map[string]FileState) error {
 	lastIngestFiles = len(files)
+	imported := importedSessions(dir)
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
 		return err
 	}
 	ss := load(harness)
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope}
+	ss = append(ss, imported.sessions...)
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
+		ExportWatermarks: imported.watermarks, ImportedRecords: imported.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.Create(recPath)
 	if err != nil {
@@ -362,6 +365,48 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	return os.Rename(tmp, dir)
 }
 
+const syncImportPath = "deja-sync-import"
+
+type importedState struct {
+	sessions   []model.Session
+	watermarks map[string]int64
+	dedupe     map[string]bool
+}
+
+// importedSessions preserves sync-imported data across full rebuilds: records
+// with SourcePath deja-sync-import exist only in the index, not in any source.
+func importedSessions(dir string) importedState {
+	var out importedState
+	m, err := readManifest(dir)
+	if err != nil {
+		return out
+	}
+	out.watermarks = m.ExportWatermarks
+	out.dedupe = m.ImportedRecords
+	by := map[string]*model.Session{}
+	_ = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+		if r.SourcePath != syncImportPath {
+			return
+		}
+		s := by[r.Key]
+		if s == nil {
+			meta, ok := m.Sessions[r.Key]
+			if !ok {
+				return
+			}
+			cp := sessionFromMeta(meta)
+			cp.Path = syncImportPath
+			s = &cp
+			by[r.Key] = s
+		}
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	})
+	for _, sess := range by {
+		out.sessions = append(out.sessions, *sess)
+	}
+	return out
+}
+
 func load(h string) []model.Session {
 	var ss []model.Session
 	if h == "" || h == "claude" {
@@ -383,12 +428,19 @@ func rebuildForSearch(dir string, o search.Options, scope string, files map[stri
 		return err
 	}
 	ss := load("")
-	return writeSessions(tmp, dir, ss, files, scope)
+	imported := importedSessions(dir)
+	ss = append(ss, imported.sessions...)
+	return writeSessionsWithSync(tmp, dir, ss, files, scope, imported)
 }
 
 func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileState, scope string) error {
+	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{})
+}
+
+func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string]FileState, scope string, imp importedState) error {
 	lastIngestFiles = len(files)
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope}
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
+		ExportWatermarks: imp.watermarks, ImportedRecords: imp.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.Create(recPath)
 	if err != nil {
@@ -627,12 +679,10 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 	}
 	m.Redacted += n
 	if sourcePath != "" && m.Files != nil {
-		fs := m.Files[sourcePath]
-		if fs.Path == "" {
-			fs.Path = sourcePath
+		if fs, ok := m.Files[sourcePath]; ok {
+			fs.Redactions += n
+			m.Files[sourcePath] = fs
 		}
-		fs.Redactions += n
-		m.Files[sourcePath] = fs
 	}
 	return redacted
 }
@@ -685,6 +735,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 	}
 	for p := range old.Files {
+		if p == syncImportPath {
+			continue
+		}
 		if _, ok := files[p]; !ok {
 			removed[p] = true
 		}
@@ -729,7 +782,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err != nil {
 		return err
 	}
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope}
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
+		ExportWatermarks: old.ExportWatermarks, ImportedRecords: old.ImportedRecords}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true
@@ -792,7 +846,16 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	for _, s := range replacements {
 		key := s.Harness + ":" + s.ID
-		m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
+		ord := uint32(0)
+		if om, ok := old.Sessions[key]; ok {
+			ord = om.Ord
+		} else if cur, ok := m.Sessions[key]; ok {
+			ord = cur.Ord
+		}
+		if ord == 0 {
+			ord = nextSessionOrd(m.Sessions)
+		}
+		m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 		for _, msg := range s.Messages {
 			text := msg.Text
 			if len(text) > maxIndexedText {
