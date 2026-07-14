@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -11,6 +12,9 @@ import (
 // filesystem must recover hyphenated project names instead of mangling
 // deja-vu into deja/vu.
 func TestClaudeProjectNameResolvesHyphenatedDirs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("claude encodes unix-style absolute paths; resolution is a no-op on windows")
+	}
 	tmp := t.TempDir()
 	real := filepath.Join(tmp, "projects", "deja-vu")
 	if err := os.MkdirAll(real, 0o755); err != nil {
