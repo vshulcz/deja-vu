@@ -116,7 +116,9 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 		}
 		return rebuildForSearch(dir, o, scope, want)
 	}
-	if err := updateIndex(dir, o.Harness, scope, want, force, progress); err != nil { return fmt.Errorf("update: %w", err) }
+	if err := updateIndex(dir, o.Harness, scope, want, force, progress); err != nil {
+		return fmt.Errorf("update: %w", err)
+	}
 	return nil
 }
 
