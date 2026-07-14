@@ -89,7 +89,7 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.Sessions["claude:unposted"] = SessionMeta{ID: "unposted", Harness: "claude", Project: filepath.Join("deja", "vu"), Path: "manual", Updated: time.Now()}
-	if err := writeJSON(filepath.Join(dir, "manifest.json"), m); err != nil {
+	if err := writeManifest(dir, m); err != nil {
 		t.Fatal(err)
 	}
 	rec, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_APPEND|os.O_WRONLY, 0)
@@ -272,6 +272,58 @@ func BenchmarkColdEnsureSynthetic(b *testing.B) {
 	}
 }
 
+func BenchmarkWarmSearchSynthetic(b *testing.B) {
+	tmp := b.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-Users-shulcz-warm")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		b.Fatal(err)
+	}
+	const fileCount = 1250
+	const messagesPerFile = 12
+	for i := 0; i < fileCount; i++ {
+		p := filepath.Join(proj, fmt.Sprintf("s%04d.jsonl", i))
+		var sb strings.Builder
+		for j := 0; j < messagesPerFile; j++ {
+			role := "user"
+			if j%2 == 1 {
+				role = "assistant"
+			}
+			needle := "common filler"
+			if i%125 == 0 && j == 3 {
+				needle = "warm-single-digit-needle"
+			}
+			fmt.Fprintf(&sb, `{"type":%q,"sessionId":"s%04d","timestamp":"2026-01-02T03:%02d:%02dZ","message":{"role":%q,"content":"synthetic warm search corpus file-%04d msg-%02d %s alpha beta gamma delta repeated tokenizer words"}}`+"\n", role, i, (j/60)%60, j%60, role, i, j, needle)
+		}
+		if err := os.WriteFile(p, []byte(sb.String()), 0o644); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	o := search.Options{Query: "warm-single-digit-needle", Harness: "claude", All: true}
+	if err := EnsureForSearch(dir, o, false, nil); err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		start := time.Now()
+		ss, err := Search(dir, o)
+		if err != nil {
+			b.Fatal(err)
+		}
+		hits, err := search.Run(ss, o)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(hits) != 10 {
+			b.Fatalf("hits=%d, want 10", len(hits))
+		}
+		b.ReportMetric(float64(time.Since(start).Microseconds())/1000, "warm_ms")
+	}
+}
+
 func TestEachRecordIgnoresTruncatedTail(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "records.bin")
@@ -316,5 +368,36 @@ func TestCurrentFilesSkipsSymlinks(t *testing.T) {
 	files := currentFiles("claude")
 	if _, ok := files[link]; ok {
 		t.Fatalf("symlink was indexed: %#v", files[link])
+	}
+}
+
+func TestOldJSONManifestRebuildsTransparently(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "project")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"old manifest rebuild needle"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := Manifest{Version: version - 1, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: "h:claude"}
+	if err := writeJSON(filepath.Join(dir, "manifest.json"), old); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureForSearch(dir, search.Options{Query: "needle", Harness: "claude"}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := Search(dir, search.Options{Query: "needle", Harness: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || ss[0].ID != "s1" {
+		t.Fatalf("old index was not rebuilt: %#v", ss)
 	}
 }

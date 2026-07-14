@@ -22,8 +22,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const version = 5
+const version = 6
 const maxIndexedText = 64 * 1024
+
+var bucketMagic = []byte("DJB1")
 
 var lastIngestFiles int
 
@@ -45,6 +47,13 @@ type Manifest struct {
 	Sessions map[string]SessionMeta `json:"sessions"`
 	BuiltAt  time.Time              `json:"built_at"`
 	Scope    string                 `json:"scope"`
+}
+
+type manifestCore struct {
+	Version int
+	Files   map[string]FileState
+	BuiltAt time.Time
+	Scope   string
 }
 
 type Record struct {
@@ -252,7 +261,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
-	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
+	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
 	os.RemoveAll(dir)
@@ -328,7 +337,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
-	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
+	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
 	os.RemoveAll(dir)
@@ -419,7 +428,7 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				if err := writeGob(filepath.Join(dir, job.name+".gob"), job.data); err != nil {
+				if err := writeBucket(filepath.Join(dir, job.name+".bin"), job.data); err != nil {
 					select {
 					case errCh <- err:
 					default:
@@ -605,7 +614,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
-	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
+	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
 	os.RemoveAll(dir)
@@ -647,8 +656,13 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			return data, nil
 		}
 		data := map[string][]int64{}
-		p := filepath.Join(dir, "buckets", b+".gob")
-		if err := readGob(p, &data); err != nil && !os.IsNotExist(err) {
+		p := filepath.Join(dir, "buckets", b+".bin")
+		var err error
+		data, err = readBucket(p)
+		if os.IsNotExist(err) {
+			data = map[string][]int64{}
+		}
+		if err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
 		buckets[b] = data
@@ -723,7 +737,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		return filesTouched, messages, err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
-	if err := writeJSON(filepath.Join(dir, "manifest.json"), m); err != nil {
+	if err := writeManifest(dir, m); err != nil {
 		return filesTouched, messages, err
 	}
 	return filesTouched, messages, nil
@@ -918,10 +932,7 @@ func writeRecord(f *os.File, r Record) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	b, err := json.Marshal(r)
-	if err != nil {
-		return 0, err
-	}
+	b := encodeRecord(r)
 	if len(b) > 1<<31 {
 		return 0, fmt.Errorf("record too large")
 	}
@@ -938,7 +949,7 @@ func readRecordAt(f *os.File, off int64) (Record, error) {
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
 		return Record{}, err
 	}
-	return readRecord(bufio.NewReader(f))
+	return readRecord(f)
 }
 
 func eachRecord(path string, fn func(Record)) error {
@@ -969,16 +980,59 @@ func readRecord(r io.Reader) (Record, error) {
 	if _, err := io.ReadFull(r, b); err != nil {
 		return Record{}, err
 	}
+	return decodeRecord(b)
+}
+
+func encodeRecord(r Record) []byte {
+	b := make([]byte, 0, len(r.Key)+len(r.SourcePath)+len(r.Role)+len(r.Text)+32)
+	b = appendField(b, r.Key)
+	b = appendField(b, r.SourcePath)
+	b = appendField(b, r.Role)
+	b = binary.LittleEndian.AppendUint64(b, uint64(r.Time.UnixNano()))
+	b = appendField(b, r.Text)
+	return b
+}
+
+func appendField(b []byte, s string) []byte {
+	b = binary.AppendUvarint(b, uint64(len(s)))
+	return append(b, s...)
+}
+
+func decodeRecord(b []byte) (Record, error) {
 	var rec Record
-	return rec, json.Unmarshal(b, &rec)
+	var ok bool
+	if rec.Key, b, ok = consumeField(b); !ok {
+		return rec, io.ErrUnexpectedEOF
+	}
+	if rec.SourcePath, b, ok = consumeField(b); !ok {
+		return rec, io.ErrUnexpectedEOF
+	}
+	if rec.Role, b, ok = consumeField(b); !ok {
+		return rec, io.ErrUnexpectedEOF
+	}
+	if len(b) < 8 {
+		return rec, io.ErrUnexpectedEOF
+	}
+	rec.Time = time.Unix(0, int64(binary.LittleEndian.Uint64(b[:8])))
+	b = b[8:]
+	if rec.Text, b, ok = consumeField(b); !ok {
+		return rec, io.ErrUnexpectedEOF
+	}
+	return rec, nil
+}
+
+func consumeField(b []byte) (string, []byte, bool) {
+	n, used := binary.Uvarint(b)
+	if used <= 0 || uint64(len(b)-used) < n {
+		return "", nil, false
+	}
+	start := used
+	end := start + int(n)
+	return string(b[start:end]), b[end:], true
 }
 
 func postingsFor(dir, tok string) ([]int64, error) {
-	var data map[string][]int64
-	if err := readGob(filepath.Join(dir, "buckets", bucket(tok)+".gob"), &data); err != nil {
-		return nil, err
-	}
-	return data[tok], nil
+	return readBucketToken(filepath.Join(dir, "buckets", bucket(tok)+".bin"), tok)
 }
 
 func intersectPostings(dir string, keys []string) ([]int64, error) {
@@ -1108,9 +1162,200 @@ func safe(s string) string {
 }
 
 func readManifest(dir string) (Manifest, error) {
-	var m Manifest
-	err := readJSON(filepath.Join(dir, "manifest.json"), &m)
-	return m, err
+	var core manifestCore
+	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
+		return Manifest{}, err
+	}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Sessions: map[string]SessionMeta{}}
+	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
+		return Manifest{}, err
+	}
+	return m, nil
+}
+
+func writeManifest(dir string, m Manifest) error {
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope}
+	if err := writeGob(filepath.Join(dir, "manifest.gob"), core); err != nil {
+		return err
+	}
+	return writeGob(filepath.Join(dir, "sessions.gob"), m.Sessions)
+}
+
+type bucketEntry struct {
+	tok string
+	off uint64
+	n   uint32
+}
+
+func writeBucket(p string, data map[string][]int64) error {
+	toks := make([]string, 0, len(data))
+	for tok := range data {
+		toks = append(toks, tok)
+	}
+	sort.Strings(toks)
+	encoded := make(map[string][]byte, len(toks))
+	dirLen := len(bucketMagic) + uvarintLen(uint64(len(toks)))
+	for _, tok := range toks {
+		dirLen += uvarintLen(uint64(len(tok))) + len(tok) + 8 + 4
+		encoded[tok] = encodeOffsets(data[tok])
+	}
+	entries := make([]bucketEntry, 0, len(toks))
+	pos := uint64(dirLen)
+	for _, tok := range toks {
+		b := encoded[tok]
+		entries = append(entries, bucketEntry{tok: tok, off: pos, n: uint32(len(b))})
+		pos += uint64(len(b))
+	}
+	f, err := os.Create(p)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.Write(bucketMagic); err != nil {
+		return err
+	}
+	var scratch [binary.MaxVarintLen64]byte
+	n := binary.PutUvarint(scratch[:], uint64(len(entries)))
+	if _, err := f.Write(scratch[:n]); err != nil {
+		return err
+	}
+	for _, e := range entries {
+		n = binary.PutUvarint(scratch[:], uint64(len(e.tok)))
+		if _, err := f.Write(scratch[:n]); err != nil {
+			return err
+		}
+		if _, err := f.Write([]byte(e.tok)); err != nil {
+			return err
+		}
+		var fixed [12]byte
+		binary.LittleEndian.PutUint64(fixed[:8], e.off)
+		binary.LittleEndian.PutUint32(fixed[8:], e.n)
+		if _, err := f.Write(fixed[:]); err != nil {
+			return err
+		}
+	}
+	for _, tok := range toks {
+		if _, err := f.Write(encoded[tok]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readBucket(p string) (map[string][]int64, error) {
+	entries, f, err := openBucketDir(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	out := make(map[string][]int64, len(entries))
+	for _, e := range entries {
+		b := make([]byte, e.n)
+		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+			return nil, err
+		}
+		out[e.tok] = decodeOffsets(b)
+	}
+	return out, nil
+}
+
+func readBucketToken(p, tok string) ([]int64, error) {
+	entries, f, err := openBucketDir(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	for _, e := range entries {
+		if e.tok != tok {
+			continue
+		}
+		b := make([]byte, e.n)
+		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
+			return nil, err
+		}
+		return decodeOffsets(b), nil
+	}
+	return nil, nil
+}
+
+func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, nil, err
+	}
+	r := bufio.NewReader(f)
+	magic := make([]byte, len(bucketMagic))
+	if _, err := io.ReadFull(r, magic); err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	if string(magic) != string(bucketMagic) {
+		f.Close()
+		return nil, nil, fmt.Errorf("bad bucket format")
+	}
+	count, err := binary.ReadUvarint(r)
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	entries := make([]bucketEntry, 0, count)
+	for i := uint64(0); i < count; i++ {
+		ln, err := binary.ReadUvarint(r)
+		if err != nil {
+			f.Close()
+			return nil, nil, err
+		}
+		tb := make([]byte, ln)
+		if _, err := io.ReadFull(r, tb); err != nil {
+			f.Close()
+			return nil, nil, err
+		}
+		var fixed [12]byte
+		if _, err := io.ReadFull(r, fixed[:]); err != nil {
+			f.Close()
+			return nil, nil, err
+		}
+		entries = append(entries, bucketEntry{tok: string(tb), off: binary.LittleEndian.Uint64(fixed[:8]), n: binary.LittleEndian.Uint32(fixed[8:])})
+	}
+	return entries, f, nil
+}
+
+func encodeOffsets(offsets []int64) []byte {
+	if len(offsets) == 0 {
+		return nil
+	}
+	s := sortedUniqueOffsets(offsets)
+	b := make([]byte, 0, len(s)*4)
+	var prev int64
+	for _, off := range s {
+		b = binary.AppendUvarint(b, uint64(off-prev))
+		prev = off
+	}
+	return b
+}
+
+func decodeOffsets(b []byte) []int64 {
+	out := make([]int64, 0)
+	var prev int64
+	for len(b) > 0 {
+		d, n := binary.Uvarint(b)
+		if n <= 0 {
+			return out
+		}
+		prev += int64(d)
+		out = append(out, prev)
+		b = b[n:]
+	}
+	return out
+}
+
+func uvarintLen(v uint64) int {
+	n := 1
+	for v >= 0x80 {
+		v >>= 7
+		n++
+	}
+	return n
 }
 func writeJSON(p string, v any) error {
 	f, err := os.Create(p)
