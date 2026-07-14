@@ -1,23 +1,37 @@
-name: ci
+name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
-  go:
-    name: go (${{ matrix.os }})
+  test:
+    name: Go ${{ matrix.go-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        go-version: ['1.22.x']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ matrix.go-version }}
           cache: true
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build ./cmd/deja
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with race detector
+        run: go test -race ./...
+
+      - name: Build
+        run: go build ./cmd/deja

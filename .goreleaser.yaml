@@ -2,10 +2,6 @@ version: 2
 
 project_name: deja-vu
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: deja
     main: ./cmd/deja
@@ -19,6 +15,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
 
 archives:
   - id: default
@@ -26,6 +24,7 @@ archives:
       - deja
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
@@ -41,18 +40,44 @@ snapshot:
 
 changelog:
   sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat(\(.+\))?:'
+      order: 0
+    - title: Fixes
+      regexp: '^fix(\(.+\))?:'
+      order: 1
+    - title: Performance
+      regexp: '^perf(\(.+\))?:'
+      order: 2
+    - title: Documentation
+      regexp: '^docs(\(.+\))?:'
+      order: 3
+    - title: Other
+      order: 999
   filters:
     exclude:
-      - "^docs:"
       - "^test:"
 
-# TODO: uncomment and set owner/name when the Homebrew tap exists.
-# brews:
-#   - name: deja-vu
-#     repository:
-#       owner: vshulcz
-#       name: homebrew-tap
-#     directory: Formula
-#     homepage: https://github.com/vshulcz/deja-vu
-#     description: Search AI coding-agent session histories locally.
-#     license: MIT
+release:
+  header: |
+    ## Install
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+    go install github.com/vshulcz/deja-vu/cmd/deja@{{ .Tag }}
+    brew install vshulcz/homebrew-tap/deja-vu
+    ```
+
+# The tap repository (github.com/vshulcz/homebrew-tap) must exist before tagged releases run.
+brews:
+  - name: deja-vu
+    repository:
+      owner: vshulcz
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/vshulcz/deja-vu
+    description: Search AI coding-agent session histories locally.
+    license: MIT
+
+# nfpms intentionally omitted for now; add .deb/.rpm packaging when distro packages are needed.
