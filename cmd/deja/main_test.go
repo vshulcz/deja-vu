@@ -19,6 +19,12 @@ func TestPrintNoMatchesHelpfulMessage(t *testing.T) {
 	}
 }
 
+func TestVersionDefaultIsDev(t *testing.T) {
+	if version != "dev" {
+		t.Fatalf("version = %q, want dev", version)
+	}
+}
+
 func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
 	if err != nil {

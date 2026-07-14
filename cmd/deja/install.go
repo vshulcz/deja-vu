@@ -21,9 +21,6 @@ func runInstall(args []string, uninstall bool) error {
 	}
 	targets := []string{args[0]}
 	if args[0] == "--all" {
-		if uninstall {
-			return fmt.Errorf("uninstall --all is not supported")
-		}
 		targets = existingTargets()
 		if len(targets) == 0 {
 			fmt.Println("no known agent config directories found")

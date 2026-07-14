@@ -15,6 +15,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+var version = "dev"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "deja:", err)
@@ -57,6 +59,10 @@ func loadForSearch(o search.Options) []model.Session {
 func run(args []string) error {
 	if len(args) == 0 {
 		usage()
+		return nil
+	}
+	if args[0] == "version" || args[0] == "--version" || args[0] == "-version" {
+		fmt.Fprintf(os.Stdout, "deja %s\n", version)
 		return nil
 	}
 	if args[0] == "sources" {
@@ -263,5 +269,20 @@ func humanBytes(n int64) string {
 	return fmt.Sprintf("%.1f %s", f, units[i])
 }
 func usage() {
-	fmt.Println("usage: deja [--json] [--re] [--rebuild] [--harness name] [--project p] [--since 30d] [--role user] <query>\n       deja ctx <query|id-prefix>\n       deja show <id-prefix>\n       deja last [n]\n       deja sources\n       deja mcp\n       deja install <claude-code|codex|opencode|--all>\n       deja uninstall <claude-code|codex|opencode>")
+	fmt.Println(`deja - persistent memory for coding agents
+
+Usage:
+  deja [flags] <query>
+  deja ctx <query|id-prefix>
+  deja install <claude-code|codex|opencode|--all>
+  deja uninstall <claude-code|codex|opencode|--all>
+
+Examples:
+  deja "jwt refresh token bug"
+  deja --harness claude --since 30d "panic in indexer"
+  deja --re "timeout|deadline exceeded"
+  deja ctx "schema migration rollback" > /tmp/deja-context.md
+  deja install --all
+
+Run README.md for the full CLI reference.`)
 }

@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -129,10 +131,19 @@ func walkFiles(root string, pred func(string) bool) []string {
 }
 
 func parseFiles(files []string, parse func(string) ([]model.Session, error)) []model.Session {
-	jobs := make(chan string)
-	outs := make(chan []model.Session)
+	files = append([]string(nil), files...)
+	sort.Strings(files)
+	type job struct {
+		i int
+		p string
+	}
+	jobs := make(chan job)
+	outs := make(chan struct {
+		i  int
+		ss []model.Session
+	})
 	var wg sync.WaitGroup
-	n := 8
+	n := runtime.NumCPU()
 	if len(files) < n {
 		n = len(files)
 	}
@@ -143,22 +154,29 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for f := range jobs {
-				ss, _ := parse(f)
-				outs <- ss
+			for j := range jobs {
+				ss, _ := parse(j.p)
+				outs <- struct {
+					i  int
+					ss []model.Session
+				}{i: j.i, ss: ss}
 			}
 		}()
 	}
 	go func() {
-		for _, f := range files {
-			jobs <- f
+		for i, f := range files {
+			jobs <- job{i: i, p: f}
 		}
 		close(jobs)
 		wg.Wait()
 		close(outs)
 	}()
+	byFile := make([][]model.Session, len(files))
+	for out := range outs {
+		byFile[out.i] = out.ss
+	}
 	var all []model.Session
-	for ss := range outs {
+	for _, ss := range byFile {
 		all = append(all, ss...)
 	}
 	return all

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 func TestParseClaudeFile(t *testing.T) {
@@ -81,6 +83,18 @@ func TestParseCodexHistory(t *testing.T) {
 	}
 	if len(ss) != 1 || ss[0].ID != "hist-abc" || ss[0].Messages[0].Text != "history needle" {
 		t.Fatalf("bad history: %#v", ss)
+	}
+}
+
+func TestParseFilesKeepsSortedPathOrder(t *testing.T) {
+	files := []string{"/tmp/c.jsonl", "/tmp/a.jsonl", "/tmp/b.jsonl"}
+	ss := parseFiles(files, func(p string) ([]model.Session, error) {
+		return []model.Session{{ID: filepath.Base(p)}}, nil
+	})
+	got := []string{ss[0].ID, ss[1].ID, ss[2].ID}
+	want := []string{"a.jsonl", "b.jsonl", "c.jsonl"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("order = %v, want %v", got, want)
 	}
 }
 
