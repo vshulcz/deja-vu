@@ -43,6 +43,14 @@ Wire it into the agents you use (edits config, keeps a `.bak`):
 deja install --all        # or: claude-code | codex | opencode
 ```
 
+## Auto-recall (optional)
+
+For Claude Code, `deja install --auto` does the normal MCP install and also adds a read-only `SessionStart` hook. When a session starts, Claude receives a tiny (<2KB) markdown digest of the most recent sessions for the current project, so it can remember prior fixes without being asked; if the local index is missing or stale, the hook prints nothing and startup continues.
+
+```sh
+deja install --auto
+```
+
 That's it. Next session, ask your agent:
 
 > have we dealt with jwt refresh rotation before? check your memory
@@ -124,6 +132,8 @@ Redacted classes: AWS access keys and AWS secret assignments, generic `api_key`/
 **Does anything leave my machine?** No. There is no network code in the tool.
 
 **Are secrets stored in the index?** By default, no for supported patterns: secrets are redacted before index writes. If older indexes predate redaction, v0.2.0 bumps the index version and rebuilds transparently. `DEJA_NO_REDACT=1` disables this and is unsafe.
+
+**What does the auto-recall hook do?** It is read-only: it only checks the warm local index for the current Claude project and returns a capped (<2KB) summary. It never builds the index from the hook, and on any error it exits successfully with no output.
 
 **How is this different from `/resume` or a history viewer?** Those are per-harness and per-project. `deja` is one index across every harness and project on the machine, plus an MCP tool so the *agent* can search it.
 

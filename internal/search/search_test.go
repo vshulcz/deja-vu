@@ -127,6 +127,26 @@ func TestPrintPlainWhenNotTTY(t *testing.T) {
 	}
 }
 
+func TestAutoRecallDigestCappedMarkdown(t *testing.T) {
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	ss := []model.Session{{ID: "abcdef123456", Harness: "claude", Project: "project", Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "Find frobnicator bug\nwith extra detail", Time: now},
+		{Role: "assistant", Text: "The frobnicator bug is in parser.go and the fix is to trim tokens.", Time: now},
+		{Role: "assistant", Text: "Add a regression test for parser.go.", Time: now},
+	}}}
+	digest := AutoRecallDigest(ss, 2000)
+	if !strings.Contains(digest, "**project**") || !strings.Contains(digest, "Find frobnicator bug") || !strings.Contains(digest, "parser.go") {
+		t.Fatalf("bad digest: %q", digest)
+	}
+	short := AutoRecallDigest(ss, 80)
+	if len(short) > 80 || strings.TrimSpace(short) == "" {
+		t.Fatalf("bad capped digest len=%d %q", len(short), short)
+	}
+	if got := AutoRecallDigest([]model.Session{{ID: "empty"}}, 100); got != "" {
+		t.Fatalf("empty digest=%q", got)
+	}
+}
+
 func TestSnippetPrefersProseOverToolDump(t *testing.T) {
 	text := "netcat output noise needle\n1: package main\n2: func main() {}\nUser asked about needle migration strategy and we concluded use small batches."
 	hits, err := Run([]model.Session{{ID: "s", Harness: "claude", Project: "p", Updated: time.Now(), Messages: []model.Message{{Role: "assistant", Text: text}}}}, Options{Query: "needle"})

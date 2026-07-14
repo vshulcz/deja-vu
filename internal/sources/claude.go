@@ -93,3 +93,7 @@ func claudeProjectName(dir string) string {
 	}
 	return filepath.Join(clean[len(clean)-2], clean[len(clean)-1])
 }
+
+// ClaudeProjectName derives the display project name using the same rules as
+// the Claude source parser.
+func ClaudeProjectName(dir string) string { return claudeProjectName(dir) }

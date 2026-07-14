@@ -77,6 +77,16 @@ Tools:
 
 The MCP server calls the same index/search code as the CLI. It writes protocol responses to stdout and keeps logs/progress off stdout so agents receive valid JSON-RPC.
 
+## Claude SessionStart hook
+
+`deja install --auto` installs the Claude MCP entry and adds a matcher-less command hook to `~/.claude/settings.json`:
+
+```json
+{"type":"command","command":"/abs/path/to/deja hook-context"}
+```
+
+`deja hook-context` is intentionally hidden from normal help. It derives the current project from `CLAUDE_PROJECT_DIR` or `cwd` using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB. It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked.
+
 ## Add a new harness
 
 Implement the same shape as the existing sources.

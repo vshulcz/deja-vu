@@ -36,6 +36,16 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	if first.Len() == 0 {
 		t.Fatal("first build did not print progress")
 	}
+	if !HasManifest(dir) {
+		t.Fatal("manifest missing after build")
+	}
+	projectSessions, err := RecentProject(dir, filepath.Join("deja", "vu"), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projectSessions) != 1 || projectSessions[0].ID != "s1" || len(projectSessions[0].Messages) != 2 {
+		t.Fatalf("bad project sessions: %#v", projectSessions)
+	}
 	var second bytes.Buffer
 	if err := Ensure(dir, "claude", false, &second); err != nil {
 		t.Fatal(err)

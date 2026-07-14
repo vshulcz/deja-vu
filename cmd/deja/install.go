@@ -20,6 +20,9 @@ func runInstall(args []string, uninstall bool) error {
 		return fmt.Errorf("install needs target")
 	}
 	targets := []string{args[0]}
+	if args[0] == "--auto" {
+		targets = []string{"claude-auto"}
+	}
 	if args[0] == "--all" {
 		targets = existingTargets()
 		if len(targets) == 0 {
@@ -65,6 +68,8 @@ func existingTargets() []string {
 
 func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	switch target {
+	case "claude-auto":
+		return installClaudeAuto(exe, uninstall)
 	case "claude-code", "claude":
 		return installClaude(exe, uninstall)
 	case "codex":
@@ -74,6 +79,13 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	default:
 		return installResult{}, fmt.Errorf("unknown target %q", target)
 	}
+}
+
+func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installClaude(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installClaudeHook(exe, uninstall)
 }
 
 func backupOnce(path string) error {
@@ -137,6 +149,78 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a}, err
+}
+
+func installClaudeHook(exe string, uninstall bool) (installResult, error) {
+	h, _ := os.UserHomeDir()
+	path := filepath.Join(h, ".claude", "settings.json")
+	old, _ := os.ReadFile(path)
+	var root map[string]any
+	if len(bytes.TrimSpace(old)) == 0 {
+		root = map[string]any{}
+	} else if err := json.Unmarshal(old, &root); err != nil {
+		return installResult{}, err
+	}
+	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
+	next, err := json.MarshalIndent(nextRoot, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
+}
+
+func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall bool) map[string]any {
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+		root["hooks"] = hooks
+	}
+	cmd := exe + " hook-context"
+	entries, _ := hooks["SessionStart"].([]any)
+	var out []any
+	found := false
+	for _, entryAny := range entries {
+		entry, _ := entryAny.(map[string]any)
+		if entry == nil {
+			out = append(out, entryAny)
+			continue
+		}
+		hs, _ := entry["hooks"].([]any)
+		var kept []any
+		removed := false
+		for _, hAny := range hs {
+			h, _ := hAny.(map[string]any)
+			if h != nil && h["type"] == "command" && h["command"] == cmd {
+				found = true
+				if uninstall {
+					removed = true
+					continue
+				}
+			}
+			kept = append(kept, hAny)
+		}
+		if removed {
+			if len(kept) == 0 && len(entry) == 1 {
+				continue
+			}
+			entry["hooks"] = kept
+		}
+		out = append(out, entry)
+	}
+	if !uninstall && !found {
+		out = append(out, map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd}}})
+	}
+	if len(out) == 0 {
+		delete(hooks, "SessionStart")
+	} else {
+		hooks["SessionStart"] = out
+	}
+	if len(hooks) == 0 {
+		delete(root, "hooks")
+	}
+	return root
 }
 
 func installCodex(exe string, uninstall bool) (installResult, error) {
