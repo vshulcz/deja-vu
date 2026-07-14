@@ -1,5 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="680" height="180" viewBox="0 0 680 180" role="img" aria-label="deja-vu">
-  <rect width="680" height="180" rx="24" fill="#0f172a"/>
-  <text x="50%" y="52%" text-anchor="middle" dominant-baseline="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="64" fill="#e5e7eb">deja-vu</text>
-  <text x="50%" y="74%" text-anchor="middle" dominant-baseline="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#94a3b8">agent memory, local first</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="200" viewBox="0 0 680 200" role="img" aria-label="deja-vu">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c6cf0"/>
+      <stop offset="1" stop-color="#4ecdc4"/>
+    </linearGradient>
+  </defs>
+  <!-- rewind-loop mark: an arrow circling back on itself -->
+  <g transform="translate(36,36)">
+    <path d="M64 16 A48 48 0 1 0 112 64" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M112 64 l-20 -14 M112 64 l-24 6" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="64" cy="64" r="8" fill="url(#g)"/>
+  </g>
+  <!-- wordmark -->
+  <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
+    <text x="200" y="118" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>
+    <text x="203" y="160" font-size="22" fill="#8a87a0">persistent memory for coding agents</text>
+  </g>
+  <style>
+    @media (prefers-color-scheme: light) {
+      text { fill: #1d1b2e; }
+      text + text { fill: #5a5770; }
+    }
+  </style>
 </svg>
