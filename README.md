@@ -72,7 +72,7 @@ $ deja "jwt refresh token"
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
-| `deja sync export <dir> [--full]` / `import <dir>` | Move memory between machines. Watermarked, append-only, idempotent. |
+| `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
@@ -91,6 +91,15 @@ Point both machines at one shared folder (Syncthing, iCloud, a git repo — anyt
 deja sync export ~/Sync/deja   # machine A: appends new batches since last export
 deja sync import ~/Sync/deja   # machine B: picks up what it hasn't seen
 ```
+
+Or skip the shared folder when the other machine is a ssh hop away:
+
+```sh
+deja sync ssh mini          # push new records to mini and import them there
+deja sync ssh mini --pull   # fetch mini's new records into this machine
+```
+
+`ssh` mode uses your system ssh/scp and the `deja` binary on the remote (looked up on PATH, falling back to `~/.local/bin/deja`).
 
 Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep the folder as an append-only log and run both commands from cron if you like. Records never echo back to their origin. `--full` re-exports everything regardless of watermarks — useful when adding a machine after old batches are gone. Synced sessions show up under `imported:<project>` in search, `recall`, and session-start auto-recall.
 

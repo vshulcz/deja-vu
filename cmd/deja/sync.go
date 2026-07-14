@@ -10,9 +10,11 @@ import (
 
 func runSync(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("sync needs export <dir> or import <dir>")
+		return fmt.Errorf("sync needs export <dir>, import <dir>, or ssh <host>")
 	}
 	switch args[0] {
+	case "ssh":
+		return runSyncSSH(args[1:])
 	case "export":
 		full := false
 		rest := args[1:]

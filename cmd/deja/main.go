@@ -342,6 +342,7 @@ Usage:
   deja ctx <query|id-prefix>
   deja sync export <dir> [--full]
   deja sync import <dir>
+  deja sync ssh <host> [--pull] [--full]
   deja last [n]
   deja sources
   deja warmup
