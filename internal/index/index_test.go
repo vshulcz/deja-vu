@@ -576,3 +576,73 @@ func TestOldJSONManifestRebuildsTransparently(t *testing.T) {
 		t.Fatalf("old index was not rebuilt: %#v", ss)
 	}
 }
+
+func TestRedactsSecretsAtIngest(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "project")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	secrets := []string{
+		"AKIA" + "ABCDEFGHIJKLMNOP",
+		"aws_secret_access_key=abcdEFGH12345678abcdEFGH12345678",
+		"api_key=0123456789abcdef",
+		"password=abcdefabcdefabcd",
+		"Authorization: abcdefabcdefabcd",
+		"Bearer eyJhbGciOiJIUzI1NiJ9abcdef",
+		"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAfakefakefakefakefake\n-----END RSA PRIVATE KEY-----",
+		"ghp_" + "1234567890abcdefghijklmnop",
+		"gho_1234567890abcdefghijklmnop",
+		"gith" + "ub_pat_1234567890abcdefghijklmnop",
+		"sk-1" + "2345678901234567890",
+		"npm_" + "123456789012345678901234567890",
+		"xoxb" + "-123456789012-123456789012-abcdefghijkl",
+		"xoxp" + "-123456789012-123456789012-abcdefghijkl",
+		"AIza123456789012345678901234567890",
+		"postgres://user:pass1234567890@localhost/db",
+	}
+	text := "redactionmarker before " + strings.Join(secrets, " middle ") + " after"
+	data := fmt.Sprintf(`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":%q}}`+"\n", text)
+	p := filepath.Join(proj, "s1.jsonl")
+	if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	if err := EnsureForSearch(dir, search.Options{Query: "redactionmarker", Harness: "claude"}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	recordBytes, err := os.ReadFile(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range secrets {
+		if bytes.Contains(recordBytes, []byte(secret)) {
+			t.Fatalf("records.bin contains secret %q", secret)
+		}
+		ss, err := Search(dir, search.Options{Query: secret, Harness: "claude"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ss) != 0 {
+			t.Fatalf("search for secret %q returned %#v", secret, ss)
+		}
+	}
+	ss, err := Search(dir, search.Options{Query: "redactionmarker", Harness: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || !strings.Contains(ss[0].Messages[0].Text, "[redacted:") || !strings.Contains(ss[0].Messages[0].Text, "before") || !strings.Contains(ss[0].Messages[0].Text, "after") {
+		t.Fatalf("surrounding words not searchable/redacted: %#v", ss)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Redacted < len(secrets) || m.Files[p].Redactions < len(secrets) {
+		t.Fatalf("redaction counters not reported: total=%d file=%d", m.Redacted, m.Files[p].Redactions)
+	}
+}

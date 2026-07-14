@@ -17,11 +17,12 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const version = 7
+const version = 8
 const maxIndexedText = 64 * 1024
 
 var bucketMagic = []byte("DJB1")
@@ -33,6 +34,7 @@ type FileState struct {
 	Size        int64  `json:"size"`
 	MTime       int64  `json:"mtime"`
 	LastUpdated int64  `json:"last_updated,omitempty"`
+	Redactions  int    `json:"redactions,omitempty"`
 }
 
 type SessionMeta struct {
@@ -47,13 +49,20 @@ type Manifest struct {
 	Sessions map[string]SessionMeta `json:"sessions"`
 	BuiltAt  time.Time              `json:"built_at"`
 	Scope    string                 `json:"scope"`
+	Redacted int                    `json:"redacted"`
 }
 
 type manifestCore struct {
-	Version int
-	Files   map[string]FileState
-	BuiltAt time.Time
-	Scope   string
+	Version  int
+	Files    map[string]FileState
+	BuiltAt  time.Time
+	Scope    string
+	Redacted int
+}
+
+type RedactionStats struct {
+	Total int
+	Files map[string]int
 }
 
 type Record struct {
@@ -269,6 +278,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 				if len(text) > maxIndexedText {
 					text = text[:maxIndexedText]
 				}
+				text = redactForIngest(&m, s.Path, text)
 				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -356,6 +366,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 				if len(text) > maxIndexedText {
 					text = text[:maxIndexedText]
 				}
+				text = redactForIngest(&m, s.Path, text)
 				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -552,6 +563,56 @@ func recordsForKey(path, key string) ([]Record, error) {
 	return out, err
 }
 
+func redactForIngest(m *Manifest, sourcePath, text string) string {
+	redacted, counts := redact.Text(text)
+	n := counts.Total()
+	if n == 0 || m == nil {
+		return redacted
+	}
+	m.Redacted += n
+	if sourcePath != "" && m.Files != nil {
+		fs := m.Files[sourcePath]
+		if fs.Path == "" {
+			fs.Path = sourcePath
+		}
+		fs.Redactions += n
+		m.Files[sourcePath] = fs
+	}
+	return redacted
+}
+
+func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
+	for p, f := range old.Files {
+		if skip[p] || f.Redactions == 0 || m.Files == nil {
+			continue
+		}
+		cur, ok := m.Files[p]
+		if !ok {
+			continue
+		}
+		cur.Redactions = f.Redactions
+		m.Files[p] = cur
+		m.Redacted += f.Redactions
+	}
+}
+
+func Redactions(dir string) (RedactionStats, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return RedactionStats{}, err
+	}
+	out := RedactionStats{Total: m.Redacted, Files: map[string]int{}}
+	for p, f := range m.Files {
+		if f.Redactions > 0 {
+			out.Files[p] = f.Redactions
+		}
+	}
+	return out, nil
+}
+
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
 	old, err := readManifest(dir)
 	if force || err != nil || old.Version != version || old.Scope != scope {
@@ -613,6 +674,14 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope}
+	skipRedactions := map[string]bool{}
+	for p := range changed {
+		skipRedactions[p] = true
+	}
+	for p := range removed {
+		skipRedactions[p] = true
+	}
+	carryRedactions(&m, old, skipRedactions)
 	buckets := bucketPostings{}
 	addRec := func(r Record) error {
 		if r.SourcePath == "" {
@@ -625,6 +694,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if !ok {
 			return nil
 		}
+		r.Text = redactForIngest(&m, r.SourcePath, r.Text)
 		off, err := writeRecord(rf, r)
 		if err != nil {
 			return err
@@ -672,6 +742,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			if len(text) > maxIndexedText {
 				text = text[:maxIndexedText]
 			}
+			text = redactForIngest(&m, s.Path, text)
 			if err := addRec(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time}); err != nil {
 				rf.Close()
 				return err
@@ -742,6 +813,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	m.Scope = scope
 	m.BuiltAt = time.Now()
 	m.Files = files
+	m.Redacted = 0
+	carryRedactions(&m, old, map[string]bool{})
 	if m.Sessions == nil {
 		m.Sessions = map[string]SessionMeta{}
 	}
@@ -779,6 +852,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				if len(text) > maxIndexedText {
 					text = text[:maxIndexedText]
 				}
+				text = redactForIngest(&m, s.Path, text)
 				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return filesTouched, messages, err
@@ -1404,7 +1478,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Redacted: core.Redacted, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -1412,7 +1486,7 @@ func readManifest(dir string) (Manifest, error) {
 }
 
 func writeManifest(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope}
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope, Redacted: m.Redacted}
 	if err := writeGob(filepath.Join(dir, "manifest.gob"), core); err != nil {
 		return err
 	}

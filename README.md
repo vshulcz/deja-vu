@@ -107,13 +107,23 @@ The index is incremental: when a session file grows, only that file is re-read.
 
 ## How it works
 
-Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → `records.bin` + token buckets → `manifest.json` tracks per-file size/mtime so repeat runs only ingest what changed. The MCP server is the same index behind two tools. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact secrets → `records.bin` + token buckets → manifest tracks per-file size/mtime so repeat runs only ingest what changed. The MCP server is the same index behind two tools. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 **Privacy:** no network path exists in the indexing or search code. Local files in, local cache out.
+
+## Security
+
+deja redacts secrets at ingest before writing `~/.cache/deja/index.db/records.bin`. It keeps surrounding text searchable and replaces only the secret value with `[redacted:<kind>]`.
+
+Redacted classes: AWS access keys and AWS secret assignments, generic `api_key`/`secret`/`token`/`passwd`/`password`/`authorization` assignments with long base64/hex-ish values, bearer tokens, PEM private key blocks, GitHub/OpenAI/npm/Slack/Google provider tokens, and connection URLs with `user:pass@host` credentials.
+
+`deja sources` reports a `redacted=` count from the manifest. Unsafe escape hatch: set `DEJA_NO_REDACT=1` to disable ingest redaction for users who intentionally want plaintext secrets in the local index.
 
 ## FAQ
 
 **Does anything leave my machine?** No. There is no network code in the tool.
+
+**Are secrets stored in the index?** By default, no for supported patterns: secrets are redacted before index writes. If older indexes predate redaction, v0.2.0 bumps the index version and rebuilds transparently. `DEJA_NO_REDACT=1` disables this and is unsafe.
 
 **How is this different from `/resume` or a history viewer?** Those are per-harness and per-project. `deja` is one index across every harness and project on the machine, plus an MCP tool so the *agent* can search it.
 

@@ -24,7 +24,15 @@ Files:
 
 - `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp.
 - `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset plus session ordinal.
-- `manifest.gob` / `sessions.gob`: index version, source file state, session metadata (including ordinals), build time, and search scope.
+- `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, session metadata (including ordinals), build time, and search scope.
+
+## Secret redaction
+
+`internal/redact` runs before every `writeRecord` path: cold rebuild, `writeSessions`, non-append incremental replacement, and append-only incremental ingest. The pass is disabled only when `DEJA_NO_REDACT=1` is set; that escape hatch is unsafe because plaintext credentials will be written to the local index.
+
+The redactor replaces only secret values, keeping keys and surrounding prose searchable. It covers AWS access keys and AWS secret assignments, generic credential assignments, bearer tokens, PEM private key blocks, GitHub/OpenAI/npm/Slack/Google provider prefixes, and connection URLs with `scheme://user:pass@host` credentials.
+
+Redaction counts are accumulated per source file in `FileState.Redactions` and as a manifest total. `deja sources` reads those counters and prints `redacted=` per harness.
 
 Search flow:
 
