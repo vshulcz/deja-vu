@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -73,10 +75,35 @@ func claudeProjectDir(path string) string {
 	return dir
 }
 
+var projectNameCache sync.Map // encoded base -> display name
+
 func claudeProjectName(dir string) string {
 	base := filepath.Base(dir)
 	if base == "" || base == "." || base == string(filepath.Separator) {
 		return "-"
+	}
+	if v, ok := projectNameCache.Load(base); ok {
+		return v.(string)
+	}
+	name := decodeProjectBase(base)
+	projectNameCache.Store(base, name)
+	return name
+}
+
+// decodeProjectBase turns a Claude Code project dir name back into a display
+// name. Claude encodes both "/" and "-" as "-", so "-Users-x-deja-vu" is
+// ambiguous; resolving against the filesystem recovers hyphenated project
+// names ("deja-vu", not "deja/vu"). Falls back to the dash heuristic when the
+// path no longer exists (deleted projects, dirs imported from other machines).
+func decodeProjectBase(base string) string {
+	if resolved := resolveEncodedPath(base); resolved != "" {
+		segs := strings.Split(strings.Trim(resolved, string(filepath.Separator)), string(filepath.Separator))
+		if len(segs) >= 2 {
+			return filepath.Join(segs[len(segs)-2], segs[len(segs)-1])
+		}
+		if len(segs) == 1 {
+			return segs[0]
+		}
 	}
 	parts := strings.Split(base, "-")
 	var clean []string
@@ -92,6 +119,43 @@ func claudeProjectName(dir string) string {
 		return clean[0]
 	}
 	return filepath.Join(clean[len(clean)-2], clean[len(clean)-1])
+}
+
+// resolveEncodedPath finds the real directory an encoded project name points
+// at. Segments are re-joined with "/" or "-" and pruned by checking each
+// completed directory prefix on disk.
+func resolveEncodedPath(base string) string {
+	if !strings.HasPrefix(base, "-") {
+		return ""
+	}
+	parts := strings.Split(strings.TrimPrefix(base, "-"), "-")
+	if len(parts) == 0 || len(parts) > 24 {
+		return ""
+	}
+	var try func(done, seg string, i int) string
+	try = func(done, seg string, i int) string {
+		if i == len(parts) {
+			p := done + string(filepath.Separator) + seg
+			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+				return p
+			}
+			return ""
+		}
+		// close the current segment with "/" first (most path characters are
+		// separators), pruning when the prefix does not exist
+		p := done + string(filepath.Separator) + seg
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			if r := try(p, parts[i], i+1); r != "" {
+				return r
+			}
+		}
+		// or keep extending it with a literal hyphen
+		return try(done, seg+"-"+parts[i], i+1)
+	}
+	if parts[0] == "" {
+		return ""
+	}
+	return try("", parts[0], 1)
 }
 
 // ClaudeProjectName derives the display project name using the same rules as
