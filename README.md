@@ -30,6 +30,7 @@ or:
 
 ```sh
 go install github.com/vshulcz/deja-vu/cmd/deja@latest   # Go
+npx @vshulcz/deja-vu "query"                            # npm, no install
 brew install vshulcz/tap/deja-vu                        # Homebrew
 ```
 
