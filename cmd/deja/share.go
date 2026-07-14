@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -100,7 +101,7 @@ func shareMessageText(s string) string {
 	var keep []string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" || noisyShareMessage(line) {
+		if line == "" || noisyShareMessage(line) || noiseLine(line) || !looksLikeProse(line) {
 			continue
 		}
 		keep = append(keep, line)
@@ -109,6 +110,41 @@ func shareMessageText(s string) string {
 		}
 	}
 	return strings.Join(strings.Fields(strings.Join(keep, " ")), " ")
+}
+
+var (
+	shareLineNumRE = regexp.MustCompile(`^\s*\d{1,6}\s`)            // "1 diff --git", numbered dumps
+	shareGrepRE    = regexp.MustCompile(`^\S+\.[a-z]{1,5}:\d+[:)]`) // path/file.go:18: grep output
+)
+
+func looksLikeProse(line string) bool {
+	letters, total, wordish := 0, 0, 0
+	for _, f := range strings.Fields(line) {
+		hasLetter := false
+		for _, r := range f {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x80 {
+				hasLetter = true
+			}
+		}
+		if hasLetter && len(f) >= 2 {
+			wordish++
+		}
+	}
+	for _, r := range line {
+		total++
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x80 {
+			letters++
+		}
+	}
+	if total == 0 {
+		return false
+	}
+	// enough real words, and letters are a real share of the characters
+	return wordish >= 4 && letters*100/total >= 45
+}
+
+func noiseLine(line string) bool {
+	return shareLineNumRE.MatchString(line) || shareGrepRE.MatchString(line)
 }
 
 func noisyShareMessage(s string) bool {
@@ -121,7 +157,33 @@ func noisyShareMessage(s string) bool {
 			return true
 		}
 	}
-	return strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result")
+	if strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result") {
+		return true
+	}
+	return looksLikeDataDump(t)
+}
+
+// looksLikeDataDump flags pasted JSON, CLI output, or blobs with very long
+// unbroken tokens — content that would make a shared digest unreadable.
+func looksLikeDataDump(t string) bool {
+	if len(t) > 400 {
+		if (strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[")) && strings.Contains(t, "\":\"") {
+			return true
+		}
+	}
+	longestRun := 0
+	run := 0
+	for _, r := range t {
+		if r == ' ' || r == '\n' || r == '\t' {
+			run = 0
+			continue
+		}
+		run++
+		if run > longestRun {
+			longestRun = run
+		}
+	}
+	return longestRun > 200
 }
 
 func stripANSI(s string) string {
