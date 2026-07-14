@@ -95,8 +95,7 @@ func TestHighlightDateSnippetAndColorBranches(t *testing.T) {
 	if got := snippet("no direct tokens but has jwt", "jwt refresh", nil); !strings.Contains(got, "jwt") {
 		t.Fatalf("snippet token=%q", got)
 	}
-	os.Setenv("NO_COLOR", "1")
-	defer os.Unsetenv("NO_COLOR")
+	t.Setenv("NO_COLOR", "1")
 	if colorOK(os.Stdout) {
 		t.Fatalf("NO_COLOR ignored")
 	}
