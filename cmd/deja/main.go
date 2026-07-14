@@ -109,7 +109,7 @@ func run(args []string) error {
 		if err := index.EnsureForSearch(index.DefaultDir(), o, false, os.Stderr); err != nil {
 			return err
 		}
-		ss, err := index.Search(index.DefaultDir(), o)
+		ss, err := index.SearchWithRecovery(index.DefaultDir(), o, os.Stderr)
 		if err != nil {
 			return err
 		}
@@ -163,7 +163,7 @@ func run(args []string) error {
 	if err := index.EnsureForSearch(index.DefaultDir(), o, force, os.Stderr); err != nil {
 		return fmt.Errorf("ensure: %w", err)
 	}
-	ss, err := index.Search(index.DefaultDir(), o)
+	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}

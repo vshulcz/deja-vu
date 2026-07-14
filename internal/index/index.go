@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -26,6 +27,14 @@ const version = 9
 const maxIndexedText = 64 * 1024
 
 var bucketMagic = []byte("DJB1")
+
+// errCorruptIndex marks unreadable index structures (e.g. a bucket file cut
+// short by a crash). Callers treat it as a cache miss and rebuild.
+var errCorruptIndex = errors.New("corrupt index")
+
+// IsCorrupt reports whether err means the on-disk index is damaged and a
+// rebuild will heal it.
+func IsCorrupt(err error) bool { return errors.Is(err, errCorruptIndex) }
 
 var lastIngestFiles int
 
@@ -179,6 +188,23 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 		return nil, nil
 	}
 	return scanRecords(dir, m, o, postingOffsets(posts))
+}
+
+// SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
+// mid-append) triggers one full rebuild instead of erroring until the user
+// runs --rebuild by hand.
+func SearchWithRecovery(dir string, o search.Options, progress io.Writer) ([]model.Session, error) {
+	ss, err := Search(dir, o)
+	if err == nil || !IsCorrupt(err) {
+		return ss, err
+	}
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+	}
+	if rerr := EnsureForSearch(dir, o, true, progress); rerr != nil {
+		return nil, rerr
+	}
+	return Search(dir, o)
 }
 
 func Recent(dir string, n int) ([]model.Session, error) {
@@ -748,6 +774,12 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	if len(removed) == 0 && canAppendIncremental(changed, old.Files) {
 		filesTouched, messages, err := appendIncremental(dir, harness, scope, old, files, changed)
+		if IsCorrupt(err) {
+			if progress != nil {
+				fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+			}
+			return rebuild(dir, harness, scope, files)
+		}
 		if err != nil {
 			return fmt.Errorf("append: %w", err)
 		}
@@ -1718,33 +1750,33 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	magic := make([]byte, len(bucketMagic))
 	if _, err := io.ReadFull(r, magic); err != nil {
 		f.Close()
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 	}
 	if string(magic) != string(bucketMagic) {
 		f.Close()
-		return nil, nil, fmt.Errorf("bad bucket format")
+		return nil, nil, fmt.Errorf("%w: bad bucket magic", errCorruptIndex)
 	}
 	count, err := binary.ReadUvarint(r)
 	if err != nil {
 		f.Close()
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 	}
 	entries := make([]bucketEntry, 0, count)
 	for i := uint64(0); i < count; i++ {
 		ln, err := binary.ReadUvarint(r)
 		if err != nil {
 			f.Close()
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 		}
 		tb := make([]byte, ln)
 		if _, err := io.ReadFull(r, tb); err != nil {
 			f.Close()
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 		}
 		var fixed [12]byte
 		if _, err := io.ReadFull(r, fixed[:]); err != nil {
 			f.Close()
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 		}
 		entries = append(entries, bucketEntry{tok: string(tb), off: binary.LittleEndian.Uint64(fixed[:8]), n: binary.LittleEndian.Uint32(fixed[8:])})
 	}

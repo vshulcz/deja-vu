@@ -82,7 +82,7 @@ func runStats(args []string) error {
 	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
 		return err
 	}
-	ss, err := index.Search(index.DefaultDir(), search.Options{All: true})
+	ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, os.Stderr)
 	if err != nil {
 		return err
 	}

@@ -148,7 +148,7 @@ func recallText(q, harness string, limit, budget int) (string, error) {
 	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
 		return "", err
 	}
-	ss, err := index.Search(index.DefaultDir(), o)
+	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, mcpProgress())
 	if err != nil {
 		return "", err
 	}
@@ -199,7 +199,7 @@ func recallContext(q string) (string, error) {
 	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
 		return "", err
 	}
-	ss, err := index.Search(index.DefaultDir(), o)
+	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, mcpProgress())
 	if err != nil {
 		return "", err
 	}
