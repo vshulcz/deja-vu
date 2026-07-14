@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deja-vu — your agents already solved this. deja finds it.</title>
-<meta name="description" content="deja indexes every session Claude Code, Codex CLI and opencode wrote on your machine and serves it back — to you and to your agents via MCP. Local, fast, zero dependencies.">
+<meta name="description" content="A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex and opencode already write. One zero-dependency binary, fully local.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="deja-vu — search every session your coding agents ever wrote">
@@ -100,7 +100,7 @@ a:hover{text-decoration:underline}
 
 <header>
   <h1>Your agents already solved this.<br><span class="grad">deja finds it.</span></h1>
-  <p class="sub">Claude Code, Codex and opencode forget everything between sessions — but the solutions are still on your disk. <code>deja</code> indexes those histories and serves them back, to you and to the agent.</p>
+  <p class="sub">Claude Code, Codex and opencode write every session to disk — gigabytes of solved problems nobody can search. <code>deja</code> turns them into a memory layer: search, agent recall, auto-context, redaction, stats, share and sync. One zero-dependency binary.</p>
   <div class="cta">
     <a class="btn primary" href="#install">Get started</a>
     <a class="btn" href="https://github.com/vshulcz/deja-vu">Star on GitHub</a>
@@ -131,19 +131,34 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 12l-4-3M21 12l-4 2"/></svg></div>
       <h3>Agent memory via MCP</h3>
-      <p>Two tools — <code>recall</code> and <code>recall_context</code> — answers stay under ~4KB, cheap on context. One command wires it into Claude Code, Codex and opencode.</p>
+      <p><code>recall</code> and <code>recall_context</code> tools, answers under ~4KB. Add <code>--auto</code> and a SessionStart hook feeds project memory in before you ask.</p>
     </div>
     <div class="card">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
       <h3>One index, every harness</h3>
-      <p>All your harnesses write session logs to disk. deja indexes them together — a fix found in Codex is recalled inside Claude Code.</p>
+      <p>All your harnesses write session logs to disk. deja indexes them together, retroactively — a fix found in Codex is recalled inside Claude Code.</p>
     </div>
     <div class="card">
       <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-      <h3>Local and private</h3>
-      <p>No network code exists in the tool. Local files in, local cache out. A single Go binary with zero dependencies.</p>
+      <h3>Secrets redacted</h3>
+      <p>API keys, JWTs and private-key blocks are stripped at index time — the cache is safe to keep, shares and exports are safe to send.</p>
     </div>
-  </div>
+    <div class="card">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+      <h3>Stats, wrapped</h3>
+      <p><code>deja stats</code> — sessions, top projects, a monthly activity sparkline. Your agent year, one screenshot.</p>
+    </div>
+    <div class="card">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v9M8 8l4-4 4 4"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg></div>
+      <h3>Share a session</h3>
+      <p><code>deja share &lt;id&gt;</code> hands a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</p>
+    </div>
+    <div class="card">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M7 8h10M7 8l3-3M7 8l3 3M17 16H7M17 16l-3-3M17 16l-3 3"/></svg></div>
+      <h3>Sync between machines</h3>
+      <p><code>deja sync export/import</code> moves memory laptop&nbsp;↔&nbsp;server. Watermarked, append-only, idempotent.</p>
+    </div>
+  </div></div>
 </section>
 
 <section>

@@ -118,6 +118,11 @@ var (
 )
 
 func looksLikeProse(line string) bool {
+	// Short lines are kept: dumps are long. The prose gate exists to drop
+	// pasted JSON/CLI walls, not three-word problem statements.
+	if len(line) < 80 {
+		return true
+	}
 	letters, total, wordish := 0, 0, 0
 	for _, f := range strings.Fields(line) {
 		hasLetter := false
