@@ -236,6 +236,42 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	}
 }
 
+func BenchmarkColdEnsureSynthetic(b *testing.B) {
+	tmp := b.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-Users-shulcz-synthetic")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		b.Fatal(err)
+	}
+	const fileCount = 200
+	const messagesPerFile = 200
+	for i := 0; i < fileCount; i++ {
+		p := filepath.Join(proj, fmt.Sprintf("s%03d.jsonl", i))
+		var sb strings.Builder
+		for j := 0; j < messagesPerFile; j++ {
+			role := "user"
+			if j%2 == 1 {
+				role = "assistant"
+			}
+			fmt.Fprintf(&sb, `{"type":%q,"sessionId":"s%03d","timestamp":"2026-01-02T03:%02d:%02dZ","message":{"role":%q,"content":"synthetic cold index token file-%03d msg-%03d shared needle alpha beta gamma delta repeated words for tokenizer throughput"}}`+"\n", role, i, (j/60)%60, j%60, role, i, j)
+		}
+		if err := os.WriteFile(p, []byte(sb.String()), 0o644); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dir := filepath.Join(tmp, fmt.Sprintf("index-%d.db", i))
+		start := time.Now()
+		if err := Ensure(dir, "claude", false, nil); err != nil {
+			b.Fatal(err)
+		}
+		b.ReportMetric(float64(time.Since(start).Milliseconds()), "ensure_ms")
+	}
+}
+
 func TestEachRecordIgnoresTruncatedTail(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "records.bin")

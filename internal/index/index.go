@@ -10,8 +10,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -213,49 +215,41 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err != nil {
 		return err
 	}
-	buckets := map[string]map[string][]int64{}
-	for _, s := range ss {
-		key := s.Harness + ":" + s.ID
-		if old, ok := m.Sessions[key]; ok {
-			if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
-				s.Started = old.Started
+	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
+		for _, s := range ss {
+			key := s.Harness + ":" + s.ID
+			if old, ok := m.Sessions[key]; ok {
+				if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
+					s.Started = old.Started
+				}
+				if old.Updated.After(s.Updated) {
+					s.Updated = old.Updated
+				}
 			}
-			if old.Updated.After(s.Updated) {
-				s.Updated = old.Updated
+			m.Sessions[key] = metaForSession(s)
+			for _, msg := range s.Messages {
+				text := msg.Text
+				if len(text) > maxIndexedText {
+					text = text[:maxIndexedText]
+				}
+				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				if err != nil {
+					return err
+				}
+				jobs <- tokenJob{text: msg.Text, offset: off}
 			}
 		}
-		m.Sessions[key] = metaForSession(s)
-		for _, msg := range s.Messages {
-			text := msg.Text
-			if len(text) > maxIndexedText {
-				text = text[:maxIndexedText]
-			}
-			off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
-			if err != nil {
-				rf.Close()
-				return err
-			}
-			seen := map[string]bool{}
-			for _, tok := range indexKeys(msg.Text) {
-				if seen[tok] {
-					continue
-				}
-				seen[tok] = true
-				b := bucket(tok)
-				if buckets[b] == nil {
-					buckets[b] = map[string][]int64{}
-				}
-				buckets[b][tok] = append(buckets[b][tok], off)
-			}
-		}
+		return nil
+	})
+	if err != nil {
+		rf.Close()
+		return err
 	}
 	if err := rf.Close(); err != nil {
 		return err
 	}
-	for b, data := range buckets {
-		if err := writeGob(filepath.Join(tmp, "buckets", b+".gob"), data); err != nil {
-			return err
-		}
+	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
+		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
@@ -297,49 +291,41 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 	if err != nil {
 		return err
 	}
-	buckets := map[string]map[string][]int64{}
-	for _, s := range ss {
-		key := s.Harness + ":" + s.ID
-		if old, ok := m.Sessions[key]; ok {
-			if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
-				s.Started = old.Started
+	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
+		for _, s := range ss {
+			key := s.Harness + ":" + s.ID
+			if old, ok := m.Sessions[key]; ok {
+				if s.Started.IsZero() || (!old.Started.IsZero() && old.Started.Before(s.Started)) {
+					s.Started = old.Started
+				}
+				if old.Updated.After(s.Updated) {
+					s.Updated = old.Updated
+				}
 			}
-			if old.Updated.After(s.Updated) {
-				s.Updated = old.Updated
+			m.Sessions[key] = metaForSession(s)
+			for _, msg := range s.Messages {
+				text := msg.Text
+				if len(text) > maxIndexedText {
+					text = text[:maxIndexedText]
+				}
+				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				if err != nil {
+					return err
+				}
+				jobs <- tokenJob{text: text, offset: off}
 			}
 		}
-		m.Sessions[key] = metaForSession(s)
-		for _, msg := range s.Messages {
-			text := msg.Text
-			if len(text) > maxIndexedText {
-				text = text[:maxIndexedText]
-			}
-			off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
-			if err != nil {
-				rf.Close()
-				return err
-			}
-			seen := map[string]bool{}
-			for _, tok := range indexKeys(text) {
-				if seen[tok] {
-					continue
-				}
-				seen[tok] = true
-				b := bucket(tok)
-				if buckets[b] == nil {
-					buckets[b] = map[string][]int64{}
-				}
-				buckets[b][tok] = append(buckets[b][tok], off)
-			}
-		}
+		return nil
+	})
+	if err != nil {
+		rf.Close()
+		return err
 	}
 	if err := rf.Close(); err != nil {
 		return err
 	}
-	for b, data := range buckets {
-		if err := writeGob(filepath.Join(tmp, "buckets", b+".gob"), data); err != nil {
-			return err
-		}
+	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
+		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
@@ -347,6 +333,112 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 	}
 	os.RemoveAll(dir)
 	return os.Rename(tmp, dir)
+}
+
+type tokenJob struct {
+	text   string
+	offset int64
+}
+
+type bucketPostings map[string]map[string][]int64
+
+func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error) {
+	workers := runtime.NumCPU()
+	if workers < 1 {
+		workers = 1
+	}
+	jobs := make(chan tokenJob, workers*256)
+	partials := make([]bucketPostings, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		i := i
+		partials[i] = bucketPostings{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				addIndexKeys(partials[i], job.text, job.offset)
+			}
+		}()
+	}
+	err := feed(jobs)
+	close(jobs)
+	wg.Wait()
+	if err != nil {
+		return nil, err
+	}
+	merged := bucketPostings{}
+	for _, part := range partials {
+		for b, toks := range part {
+			if merged[b] == nil {
+				merged[b] = map[string][]int64{}
+			}
+			for tok, offsets := range toks {
+				merged[b][tok] = append(merged[b][tok], offsets...)
+			}
+		}
+	}
+	return merged, nil
+}
+
+func addIndexKeys(buckets bucketPostings, text string, off int64) {
+	seen := map[string]bool{}
+	for _, tok := range indexKeys(text) {
+		if seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		b := bucket(tok)
+		if buckets[b] == nil {
+			buckets[b] = map[string][]int64{}
+		}
+		buckets[b][tok] = append(buckets[b][tok], off)
+	}
+}
+
+func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
+	if len(buckets) == 0 {
+		return nil
+	}
+	workers := runtime.NumCPU()
+	if workers > 8 {
+		workers = 8
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	type bucketWrite struct {
+		name string
+		data map[string][]int64
+	}
+	jobs := make(chan bucketWrite)
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				if err := writeGob(filepath.Join(dir, job.name+".gob"), job.data); err != nil {
+					select {
+					case errCh <- err:
+					default:
+					}
+				}
+			}
+		}()
+	}
+	for b, data := range buckets {
+		jobs <- bucketWrite{name: b, data: data}
+	}
+	close(jobs)
+	wg.Wait()
+	select {
+	case err := <-errCh:
+		return err
+	default:
+		return nil
+	}
 }
 
 func metaForSession(s model.Session) SessionMeta {
@@ -446,7 +538,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope}
-	buckets := map[string]map[string][]int64{}
+	buckets := bucketPostings{}
 	addRec := func(r Record) error {
 		if r.SourcePath == "" {
 			return nil
@@ -509,10 +601,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err := rf.Close(); err != nil {
 		return err
 	}
-	for b, data := range buckets {
-		if err := writeGob(filepath.Join(tmp, "buckets", b+".gob"), data); err != nil {
-			return err
-		}
+	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
+		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	if err := writeJSON(filepath.Join(tmp, "manifest.json"), m); err != nil {
@@ -550,7 +640,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if _, err := rf.Seek(0, io.SeekEnd); err != nil {
 		return 0, 0, err
 	}
-	buckets := map[string]map[string][]int64{}
+	buckets := bucketPostings{}
 	loadBucket := func(tok string) (map[string][]int64, error) {
 		b := bucket(tok)
 		if data, ok := buckets[b]; ok {
@@ -629,10 +719,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := rf.Close(); err != nil {
 		return filesTouched, messages, err
 	}
-	for b, data := range buckets {
-		if err := writeGob(filepath.Join(dir, "buckets", b+".gob"), data); err != nil {
-			return filesTouched, messages, err
-		}
+	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
+		return filesTouched, messages, err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	if err := writeJSON(filepath.Join(dir, "manifest.json"), m); err != nil {
@@ -794,6 +882,7 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 			return nil, err
 		}
 		defer f.Close()
+		offsets = sortedUniqueOffsets(offsets)
 		for _, off := range offsets {
 			if r, err := readRecordAt(f, off); err == nil && recordMatchesQuery(r, o) {
 				add(r)
@@ -809,6 +898,19 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 		out = append(out, *s)
 	}
 	return out, nil
+}
+
+func sortedUniqueOffsets(offsets []int64) []int64 {
+	out := append([]int64(nil), offsets...)
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	n := 0
+	for _, off := range out {
+		if n == 0 || out[n-1] != off {
+			out[n] = off
+			n++
+		}
+	}
+	return out[:n]
 }
 
 func writeRecord(f *os.File, r Record) (int64, error) {
