@@ -61,7 +61,16 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
 	}
-	q := `select s.id,s.directory,s.title,s.time_created,s.time_updated,m.data as mdata,p.data as pdata from session s join message m on m.session_id=s.id join part p on p.message_id=m.id where json_extract(p.data,'$.type')='text'` + where + ` order by s.time_updated desc,m.time_created,p.id` + lim
+	// Narrow projection: shipping full m.data/p.data JSON blobs through the
+	// sqlite3 pipe on multi-GB stores takes minutes; extracting just the
+	// needed scalars keeps the dump to tens of MB and seconds.
+	q := `select s.id,s.directory,s.time_created,s.time_updated,` +
+		`json_extract(m.data,'$.role') as role,` +
+		`json_extract(p.data,'$.text') as text,` +
+		`json_extract(p.data,'$.time.start') as pt,` +
+		`json_extract(m.data,'$.time.created') as mt ` +
+		`from session s join message m on m.session_id=s.id join part p on p.message_id=m.id ` +
+		`where json_extract(p.data,'$.type')='text'` + where + ` order by s.id,m.time_created,p.id` + lim
 	cmd := exec.Command("sqlite3", "-json", db, q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -98,20 +107,17 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 			s = &model.Session{Harness: "opencode", ID: id, Project: projectName(dir), Path: dir, Started: parseTimeAny(r["time_created"]), Updated: parseTimeAny(r["time_updated"])}
 			by[id] = s
 		}
-		var md, pd map[string]any
-		json.Unmarshal([]byte(str(r["mdata"])), &md)
-		json.Unmarshal([]byte(str(r["pdata"])), &pd)
-		role, _ := md["role"].(string)
-		txt, _ := pd["text"].(string)
+		role := str(r["role"])
+		txt := str(r["text"])
 		if txt == "" {
 			continue
 		}
 		if len(txt) > 64*1024 {
 			txt = txt[:64*1024]
 		}
-		t := parseNestedTime(pd, "time", "start")
+		t := parseTimeAny(r["pt"])
 		if t.IsZero() {
-			t = parseNestedTime(md, "time", "created")
+			t = parseTimeAny(r["mt"])
 		}
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
