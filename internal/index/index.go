@@ -687,10 +687,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		if data, ok := buckets[b]; ok {
 			return data, nil
 		}
-		data := map[string][]posting{}
 		p := filepath.Join(dir, "buckets", b+".bin")
-		var err error
-		data, err = readBucket(p)
+		data, err := readBucket(p)
 		if os.IsNotExist(err) {
 			data = map[string][]posting{}
 		}
@@ -1148,7 +1146,7 @@ func decodeRecord(b []byte) (Record, error) {
 	}
 	rec.Time = time.Unix(0, int64(binary.LittleEndian.Uint64(b[:8])))
 	b = b[8:]
-	if rec.Text, b, ok = consumeField(b); !ok {
+	if rec.Text, _, ok = consumeField(b); !ok {
 		return rec, io.ErrUnexpectedEOF
 	}
 	return rec, nil
