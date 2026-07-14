@@ -75,12 +75,44 @@ $ deja "jwt refresh token"
 | `deja show <id>` | Print one session, tool noise collapsed. |
 | `deja last [n]` | Recent sessions across all harnesses. |
 | `deja sources` | What stores were found, sizes, message counts. |
+| `deja stats [--json]` | Shareable summary: totals, harness split, top projects, activity sparkline, longest session, busiest day. |
 | `deja mcp` | Run the stdio MCP server (what `deja install` wires in). |
 
 Context piping without MCP:
 
 ```sh
 claude "Prior context: $(deja ctx 'database migration')"
+```
+
+## Stats
+
+`deja stats` renders a screenshot-ready summary entirely from the local index. Use `--json` for the same numbers in machine-readable form.
+
+```text
+$ deja stats
+deja stats
+indexed agent work, wrapped for sharing
+
+Sessions  1284
+Messages  58391
+Range     2025-08-03 → 2026-07-14
+
+By harness
+  [claude]              884 sessions  42110 messages
+  [codex]               291 sessions  11142 messages
+  [opencode]            109 sessions   5139 messages
+
+Top projects
+  deja/vu            ################## 312
+  api                ############ 211
+  web                ######### 164
+
+Last 12 months
+  ▁▁▂▃▄▅▆▇██▇█  Aug Sep Oct Nov Dec Jan Feb Mar Apr May Jun Jul
+
+Highlights
+  Longest session  642 messages · [claude] · index append race in records.bin
+  Busiest day      2026-07-08 · 1831 messages
 ```
 
 ## MCP tools

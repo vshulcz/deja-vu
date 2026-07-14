@@ -51,6 +51,9 @@ func run(args []string) error {
 		printSources()
 		return nil
 	}
+	if args[0] == "stats" {
+		return runStats(args[1:])
+	}
 	if args[0] == "mcp" {
 		return serveMCP(os.Stdin, os.Stdout)
 	}
@@ -329,6 +332,7 @@ Usage:
   deja ctx <query|id-prefix>
   deja last [n]
   deja sources
+  deja stats [--json]
   deja mcp
   deja version
   deja install <claude-code|codex|opencode|--all>

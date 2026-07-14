@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-14
+
+### Added
+
+- `deja stats` shareable indexed-work summary with totals, harness breakdown, top projects, 12-month activity sparkline, date range, longest session, busiest day, and `--json` output.
+
 ## [0.3.0] - 2026-07-14
 
 ### Added
@@ -44,7 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vshulcz/deja-vu/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vshulcz/deja-vu/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/vshulcz/deja-vu/compare/v0.1.0...v0.1.1

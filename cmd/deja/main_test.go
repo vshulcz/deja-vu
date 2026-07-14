@@ -62,6 +62,7 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 		{"ctx", []string{"ctx", "frobnicator"}, "# deja context:", ""},
 		{"last", []string{"last", "1"}, "claude", ""},
 		{"sources", []string{"sources"}, "opencode", ""},
+		{"stats", []string{"stats"}, "deja stats", ""},
 		{"ctx missing", []string{"ctx"}, "", "ctx needs query"},
 		{"show missing", []string{"show"}, "", "show needs id-prefix"},
 		{"bad duration", []string{"--since", "nope", "needle"}, "", "invalid duration"},
@@ -83,6 +84,119 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 				t.Fatalf("out %q does not contain %q", out, tc.want)
 			}
 		})
+	}
+}
+
+func withStatsStores(t *testing.T) {
+	t.Helper()
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
+	claudeRoot := filepath.Join(tmp, "claude")
+	codexRoot := filepath.Join(tmp, "codex")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", codexRoot)
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	t.Setenv("NO_COLOR", "1")
+
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-alpha", "c1.jsonl"), "c1", []string{
+		`{"type":"user","sessionId":"c1","timestamp":"2026-01-02T10:00:00Z","message":{"role":"user","content":"alpha plan"}}`,
+		`{"type":"assistant","sessionId":"c1","timestamp":"2026-01-02T10:01:00Z","message":{"role":"assistant","content":"alpha answer"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-alpha", "c2.jsonl"), "c2", []string{
+		`{"type":"user","sessionId":"c2","timestamp":"2026-03-05T11:00:00Z","message":{"role":"user","content":"march alpha"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-beta", "c3.jsonl"), "c3", []string{
+		`{"type":"user","sessionId":"c3","timestamp":"2026-07-04T12:00:00Z","message":{"role":"user","content":"long beta session"}}`,
+		`{"type":"assistant","sessionId":"c3","timestamp":"2026-07-04T12:01:00Z","message":{"role":"assistant","content":"beta answer one"}}`,
+		`{"type":"assistant","sessionId":"c3","timestamp":"2026-07-04T12:02:00Z","message":{"role":"assistant","content":"beta answer two"}}`,
+	})
+	codexFile := filepath.Join(codexRoot, "sessions", "2026", "02", "02", "rollout-2026-02-02T09-00-00-codex1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(codexFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	codex := strings.Join([]string{
+		`{"type":"session_meta","timestamp":"2026-02-02T09:00:00Z","payload":{"session_id":"codex1","cwd":"/tmp/gamma"}}`,
+		`{"type":"message","timestamp":"2026-02-02T09:01:00Z","payload":{"role":"user","content":"gamma question"}}`,
+		`{"type":"message","timestamp":"2026-02-02T09:02:00Z","payload":{"role":"assistant","content":"gamma answer"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(codexFile, []byte(codex), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeClaudeFixture(t *testing.T, path, sessionID string, lines []string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = sessionID
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStatsCommandJSONAndNoColor(t *testing.T) {
+	withStatsStores(t)
+	out, err := captureRun(t, "stats", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report statsReport
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if report.TotalSessions != 4 || report.TotalMessages != 8 {
+		t.Fatalf("totals = %d/%d", report.TotalSessions, report.TotalMessages)
+	}
+	if len([]rune(report.Sparkline)) != 12 {
+		t.Fatalf("sparkline length = %d (%q)", len([]rune(report.Sparkline)), report.Sparkline)
+	}
+	if report.DateRange.Start != "2026-01-02" || report.DateRange.End != "2026-07-04" {
+		t.Fatalf("range = %#v", report.DateRange)
+	}
+	if report.Longest.ID != "c3" || report.Longest.Messages != 3 {
+		t.Fatalf("longest = %#v", report.Longest)
+	}
+	if report.BusiestDay.Date != "2026-07-04" || report.BusiestDay.Messages != 3 {
+		t.Fatalf("busiest = %#v", report.BusiestDay)
+	}
+	byHarness := map[string]harnessStats{}
+	for _, h := range report.Harnesses {
+		byHarness[h.Harness] = h
+	}
+	if byHarness["claude"].Sessions != 3 || byHarness["claude"].Messages != 6 || byHarness["codex"].Sessions != 1 || byHarness["codex"].Messages != 2 {
+		t.Fatalf("harnesses = %#v", report.Harnesses)
+	}
+	if len(report.TopProjects) == 0 || report.TopProjects[0].Project != filepath.Join("tmp", "alpha") || report.TopProjects[0].Sessions != 2 {
+		t.Fatalf("top projects = %#v", report.TopProjects)
+	}
+
+	out, err = captureRun(t, "stats")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") {
+		t.Fatalf("NO_COLOR/plain output wrong: %q", out)
+	}
+}
+
+func TestBuildStatsMonthlyDistribution(t *testing.T) {
+	ss := []model.Session{{
+		ID: "s", Harness: "claude", Project: "p", Started: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Updated: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+		Messages: []model.Message{
+			{Role: "user", Text: "jan", Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
+			{Role: "user", Text: "jan", Time: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
+			{Role: "user", Text: "jul", Time: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)},
+		},
+	}}
+	report := buildStats(ss, time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC))
+	if len(report.Monthly) != 12 || report.Monthly[0].Month != "2025-08" || report.Monthly[11].Month != "2026-07" {
+		t.Fatalf("months = %#v", report.Monthly)
+	}
+	if report.Monthly[5].Messages != 2 || report.Monthly[11].Messages != 1 || len([]rune(report.Sparkline)) != 12 {
+		t.Fatalf("monthly counts/sparkline = %#v %q", report.Monthly, report.Sparkline)
 	}
 }
 
