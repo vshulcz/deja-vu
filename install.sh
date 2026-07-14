@@ -81,5 +81,5 @@ printf 'installed %s %s to %s/%s\n' "$bin" "$tag" "$dest_dir" "$bin"
 
 case ":$PATH:" in
   *":$dest_dir:"*) ;;
-  *) [ "$dest_dir" = "$HOME/.local/bin" ] && printf 'hint: add export PATH=%s:%s to your shell profile\n' "$HOME/.local/bin" "$PATH" ;;
+  *) [ "$dest_dir" = "$HOME/.local/bin" ] && printf 'hint: add export PATH=%s:$PATH to your shell profile\n' "$HOME/.local/bin" ;;
 esac

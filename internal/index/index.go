@@ -846,7 +846,16 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	for _, s := range replacements {
 		key := s.Harness + ":" + s.ID
-		m.Sessions[key] = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
+		ord := uint32(0)
+		if om, ok := old.Sessions[key]; ok {
+			ord = om.Ord
+		} else if cur, ok := m.Sessions[key]; ok {
+			ord = cur.Ord
+		}
+		if ord == 0 {
+			ord = nextSessionOrd(m.Sessions)
+		}
+		m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 		for _, msg := range s.Messages {
 			text := msg.Text
 			if len(text) > maxIndexedText {

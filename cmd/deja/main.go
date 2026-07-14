@@ -51,6 +51,9 @@ func run(args []string) error {
 		printSources()
 		return nil
 	}
+	if args[0] == "warmup" {
+		return index.Ensure(index.DefaultDir(), "", false, os.Stderr)
+	}
 	if args[0] == "stats" {
 		return runStats(args[1:])
 	}
@@ -341,6 +344,7 @@ Usage:
   deja sync import <dir>
   deja last [n]
   deja sources
+  deja warmup
   deja stats [--json]
   deja mcp
   deja version
