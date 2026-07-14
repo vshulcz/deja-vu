@@ -26,10 +26,7 @@ func ParseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 }
 
 func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, error) {
-	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(filepath.Dir(path)), Path: path}
-	if filepath.Base(filepath.Dir(path)) == "subagents" {
-		s.Project = claudeProjectName(filepath.Dir(filepath.Dir(path)))
-	}
+	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(claudeProjectDir(path)), Path: path}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		if typ != "user" && typ != "assistant" {
@@ -56,6 +53,24 @@ func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+func claudeProjectDir(path string) string {
+	root := ClaudeRoot()
+	if rel, err := filepath.Rel(root, path); err == nil && rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." {
+		parts := strings.Split(rel, string(filepath.Separator))
+		if len(parts) > 1 && parts[0] != "" {
+			return filepath.Join(root, parts[0])
+		}
+	}
+	dir := filepath.Dir(path)
+	if filepath.Base(dir) == "subagents" {
+		project := filepath.Dir(filepath.Dir(dir))
+		if project != "." && project != string(filepath.Separator) {
+			return project
+		}
+	}
+	return dir
 }
 
 func claudeProjectName(dir string) string {

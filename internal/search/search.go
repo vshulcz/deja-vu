@@ -41,6 +41,7 @@ type Hit struct {
 func Run(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
 	qlow := strings.ToLower(o.Query)
+	qtoks := queryTokens(o.Query)
 	if o.Regex {
 		var err error
 		re, err = regexp.Compile("(?i)" + o.Query)
@@ -71,8 +72,15 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 			c := 0
 			if re != nil {
 				c = len(re.FindAllStringIndex(m.Text, -1))
-			} else if strings.Contains(strings.ToLower(m.Text), qlow) {
-				c = strings.Count(strings.ToLower(m.Text), qlow)
+			} else {
+				low := strings.ToLower(m.Text)
+				if len(qtoks) <= 1 {
+					if strings.Contains(low, qlow) {
+						c = strings.Count(low, qlow)
+					}
+				} else {
+					c = countAllTokens(low, qtoks)
+				}
 			}
 			if c > 0 {
 				h.Count += c
@@ -238,6 +246,32 @@ func snippet(s, q string, re *regexp.Regexp) string {
 		out += " …"
 	}
 	return out
+}
+
+func queryTokens(s string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, tok := range strings.Fields(strings.ToLower(s)) {
+		tok = strings.Trim(tok, "\t\n\r .,;:!?()[]{}<>\"'`")
+		if len(tok) < 2 || seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	return out
+}
+
+func countAllTokens(low string, toks []string) int {
+	total := 0
+	for _, tok := range toks {
+		c := strings.Count(low, tok)
+		if c == 0 {
+			return 0
+		}
+		total += c
+	}
+	return total
 }
 func short(s string) string {
 	if len(s) > 12 {

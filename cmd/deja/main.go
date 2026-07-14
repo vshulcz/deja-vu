@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -144,8 +145,15 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	if len(hits) == 0 {
+		printNoMatches(os.Stderr, o.Query, len(ss))
+	}
 	search.Print(os.Stdout, hits, o)
 	return nil
+}
+
+func printNoMatches(w io.Writer, q string, n int) {
+	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode) — try fewer words or --re\n", q, n)
 }
 
 func parseSearch(args []string) (search.Options, error) {

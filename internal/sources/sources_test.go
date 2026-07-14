@@ -40,6 +40,29 @@ func TestParseClaudeProjectFromEncodedDirectory(t *testing.T) {
 	}
 }
 
+func TestParseClaudeProjectFromNestedSubagentPath(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "claude")
+	project := filepath.Join(root, "-Users-shulcz-deja-vu")
+	dir := filepath.Join(project, "a7fa", "subagents")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "7ca3b9dd0928.jsonl")
+	line := `{"type":"user","sessionId":"sub1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(p, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	ss, err := ParseClaudeFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || ss[0].Project != filepath.Join("deja", "vu") {
+		t.Fatalf("project came from id path segment: %#v", ss)
+	}
+}
+
 func TestParseCodexRollout(t *testing.T) {
 	p := filepath.Join("..", "..", "fixtures", "synthetic", "codex", "sessions", "2026", "01", "02", "rollout-2026-01-02T03-04-05-codex-abc.jsonl")
 	ss, err := ParseCodexRollout(p)

@@ -49,6 +49,68 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	}
 }
 
+func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fixtures := map[string]string{
+		"s1": "token comes before jwt and refresh later",
+		"s2": "jwt only",
+		"s3": "refresh token only",
+	}
+	for id, text := range fixtures {
+		data := fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":%q}}`+"\n", id, text)
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	if err := EnsureForSearch(dir, search.Options{Query: "jwt refresh token", Harness: "claude"}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := Search(dir, search.Options{Query: "jwt refresh token", Harness: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := search.Run(ss, search.Options{Query: "jwt refresh token", Harness: "claude", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].Session.ID != "s1" {
+		t.Fatalf("multi-word AND failed: sessions=%#v hits=%#v", ss, hits)
+	}
+
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Sessions["claude:unposted"] = SessionMeta{ID: "unposted", Harness: "claude", Project: filepath.Join("deja", "vu"), Path: "manual", Updated: time.Now()}
+	if err := writeJSON(filepath.Join(dir, "manifest.json"), m); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = writeRecord(rec, Record{Key: "claude:unposted", Role: "user", Text: "jwt only refresh would appear during a full scan", Time: time.Now()})
+	if closeErr := rec.Close(); err != nil {
+		t.Fatal(err)
+	} else if closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	ss, err = Search(dir, search.Options{Query: "jwt only refresh", Harness: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 0 {
+		t.Fatalf("search fell back to full scan despite indexed query tokens: %#v", ss)
+	}
+}
+
 func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")

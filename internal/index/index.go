@@ -117,12 +117,24 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 		return nil, err
 	}
 	var offsets []int64
+	usedPostings := false
 	if !o.Regex {
 		if keys := queryKeys(o.Query); len(keys) > 0 {
-			offsets, _ = postingsFor(dir, keys[0])
+			if len(keys) == 1 {
+				offsets, _ = postingsFor(dir, keys[0])
+			} else {
+				usedPostings = true
+				offsets, err = intersectPostings(dir, keys)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 	if len(offsets) == 0 {
+		if usedPostings {
+			return nil, nil
+		}
 		return scanRecords(dir, m, o, nil)
 	}
 	return scanRecords(dir, m, o, offsets)
@@ -685,7 +697,7 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 		}
 		defer f.Close()
 		for _, off := range offsets {
-			if r, err := readRecordAt(f, off); err == nil {
+			if r, err := readRecordAt(f, off); err == nil && recordMatchesQuery(r, o) {
 				add(r)
 			}
 		}
@@ -769,6 +781,49 @@ func postingsFor(dir, tok string) ([]int64, error) {
 	return data[tok], nil
 }
 
+func intersectPostings(dir string, keys []string) ([]int64, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	lists := make([][]int64, 0, len(keys))
+	for _, key := range keys {
+		list, err := postingsFor(dir, key)
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(list) == 0 {
+			return nil, nil
+		}
+		lists = append(lists, list)
+	}
+	sort.Slice(lists, func(i, j int) bool { return len(lists[i]) < len(lists[j]) })
+	set := make(map[int64]struct{}, len(lists[0]))
+	for _, off := range lists[0] {
+		set[off] = struct{}{}
+	}
+	for _, list := range lists[1:] {
+		next := make(map[int64]struct{}, min(len(set), len(list)))
+		for _, off := range list {
+			if _, ok := set[off]; ok {
+				next[off] = struct{}{}
+			}
+		}
+		set = next
+		if len(set) == 0 {
+			return nil, nil
+		}
+	}
+	out := make([]int64, 0, len(set))
+	for off := range set {
+		out = append(out, off)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out, nil
+}
+
 func tokens(s string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -811,7 +866,28 @@ func queryKeys(s string) []string {
 	if len(toks) == 0 {
 		return nil
 	}
-	return []string{"t" + toks[0]}
+	out := make([]string, 0, len(toks))
+	for _, tok := range toks {
+		out = append(out, "t"+tok)
+	}
+	return out
+}
+
+func recordMatchesQuery(r Record, o search.Options) bool {
+	if o.Regex {
+		return true
+	}
+	toks := tokens(o.Query)
+	if len(toks) == 0 {
+		return true
+	}
+	text := strings.ToLower(r.Text)
+	for _, tok := range toks {
+		if !strings.Contains(text, tok) {
+			return false
+		}
+	}
+	return true
 }
 
 func bucket(tok string) string {
