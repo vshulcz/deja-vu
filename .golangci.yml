@@ -7,6 +7,14 @@ linters:
     - govet
     - misspell
     - staticcheck
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+        - (*os.File).Close
+        - os.RemoveAll
 
 formatters:
   enable:

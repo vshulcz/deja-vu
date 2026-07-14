@@ -222,13 +222,14 @@ func parseSearch(args []string) (search.Options, error) {
 			}
 			i++
 			v := args[i]
-			if a == "--harness" {
+			switch a {
+			case "--harness":
 				o.Harness = v
-			} else if a == "--project" {
+			case "--project":
 				o.Project = v
-			} else if a == "--role" {
+			case "--role":
 				o.Role = v
-			} else {
+			default:
 				d, err := parseDur(v)
 				if err != nil {
 					return o, err
