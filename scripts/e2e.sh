@@ -10,7 +10,8 @@ go build -o /tmp/deja-e2e ./cmd/deja
 export DEJA_CLAUDE_ROOT="$PWD/fixtures/synthetic/claude"
 export DEJA_CODEX_ROOT="$PWD/fixtures/synthetic/codex"
 export DEJA_OPENCODE_DB="/tmp/deja-e2e-no.db"
-export DEJA_INDEX_DIR="$(mktemp -d)/index.db"
+DEJA_INDEX_DIR="$(mktemp -d)/index.db"
+export DEJA_INDEX_DIR
 export NO_COLOR=1
 
 D=/tmp/deja-e2e
