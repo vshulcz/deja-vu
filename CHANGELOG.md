@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-14
+
+### Added
+- `deja sync ssh <host>` — one-command sync between machines over system ssh/scp, `--pull` for the reverse direction.
+- `deja sync export --full` re-exports everything regardless of watermarks, for onboarding a new machine.
+- `deja warmup` builds the index without searching.
+- `deja sources` warns when the sqlite3 CLI is missing instead of silently showing zero opencode sessions.
+
+### Fixed
+- Sessions replaced during a non-append index update kept stale posting ordinals and dropped out of search.
+- A bucket file corrupted by a crash now triggers one automatic rebuild instead of erroring until a manual `--rebuild`.
+- Claude project names resolve against the filesystem, so `deja-vu` no longer displays as `deja/vu`.
+
+## [0.5.2] - 2026-07-14
+
+### Fixed
+- Sync-imported records survive full rebuilds and incremental index updates; re-import stays idempotent.
+- Redaction bookkeeping no longer creates phantom source-file entries that purged imported records.
+- Exports skip imported records, so bidirectional sync does not echo history back to its origin.
+- The first record of a sync import got a wrong posting offset and was unsearchable.
+
+## [0.5.1] - 2026-07-14
+
+### Changed
+- `deja share` filters pasted JSON, diff and CLI dumps out of digests.
+- Session titles and stats skip tool-wrapper and caveat noise.
+
 ## [0.5.0] - 2026-07-14
 
 ### Added
