@@ -51,8 +51,13 @@ func hookDigest() string {
 		}
 	}
 	names := []string{sources.ClaudeProjectName(cwd)}
-	if base := filepath.Base(cwd); base != "" && base != names[0] {
-		names = append(names, base)
+	if base := filepath.Base(cwd); base != "" {
+		if two := filepath.Join(filepath.Base(filepath.Dir(cwd)), base); two != names[0] {
+			names = append(names, two)
+		}
+		if base != names[0] {
+			names = append(names, base)
+		}
 	}
 	var ss []model.Session
 	seen := map[string]bool{}
