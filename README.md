@@ -73,6 +73,8 @@ $ deja "jwt refresh token"
 | `deja <query>` | Search all histories. Multi-word = AND. `--re` for regex, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja show <id>` | Print one session, tool noise collapsed. |
+| `deja share <id>` | Sanitized markdown digest for a colleague: project/harness/date, user problem, key assistant conclusions/code. |
+| `deja sync export <dir>` / `deja sync import <dir>` | Append-only JSONL batches for moving indexed memory between machines. |
 | `deja last [n]` | Recent sessions across all harnesses. |
 | `deja sources` | What stores were found, sizes, message counts. |
 | `deja stats [--json]` | Shareable summary: totals, harness split, top projects, activity sparkline, longest session, busiest day. |
@@ -82,6 +84,31 @@ Context piping without MCP:
 
 ```sh
 claude "Prior context: $(deja ctx 'database migration')"
+```
+
+## Share
+
+`deja share <id-prefix>` prints a pasteable markdown digest of one session. It is more complete than `ctx`, skips tool-wrapper noise, and every output line is redacted again before printing.
+
+```sh
+deja last 5
+deja share 8f31c0a9 > session-digest.md
+```
+
+## Sync
+
+`deja sync` moves indexed, redacted records between machines with append-only JSONL batches. Export tracks per-source watermarks in the index manifest, so repeated exports only write new records. Import marks sessions as imported and dedupes by `harness:id:time`, so re-importing the same batch is safe.
+
+Laptop → server workflow:
+
+```sh
+# laptop
+deja sync export ~/deja-batches
+rsync -a ~/deja-batches/ server:~/deja-batches/
+
+# server
+deja sync import ~/deja-batches
+deja "jwt refresh token"
 ```
 
 ## Stats

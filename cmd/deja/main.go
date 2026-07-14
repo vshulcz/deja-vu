@@ -81,6 +81,12 @@ func run(args []string) error {
 		search.PrintSession(os.Stdout, s)
 		return nil
 	}
+	if args[0] == "share" {
+		return runShare(args[1:], os.Stdout)
+	}
+	if args[0] == "sync" {
+		return runSync(args[1:])
+	}
 	if args[0] == "ctx" {
 		if len(args) < 2 {
 			return fmt.Errorf("ctx needs query or id-prefix")
@@ -329,7 +335,10 @@ func usage() {
 Usage:
   deja [flags] <query>
   deja show <id-prefix>
+  deja share <id-prefix>
   deja ctx <query|id-prefix>
+  deja sync export <dir>
+  deja sync import <dir>
   deja last [n]
   deja sources
   deja stats [--json]

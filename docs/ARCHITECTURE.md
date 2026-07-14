@@ -24,7 +24,7 @@ Files:
 
 - `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp.
 - `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset plus session ordinal.
-- `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, session metadata (including ordinals), build time, and search scope.
+- `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, sync export watermarks, imported-record dedupe keys, session metadata (including ordinals), build time, and search scope.
 
 ## Secret redaction
 
@@ -46,6 +46,18 @@ Search flow:
 `--harness`, `--project`, and `--since` are applied during pre-rank from session metadata. `--role` needs record data, so it is applied after the pre-rank cut; pre-rank counts may include other roles.
 
 Regex search scans records because arbitrary regex cannot use token postings safely.
+
+## Sync format
+
+`deja sync export <dir>` reads `records.bin` and writes JSONL batch files named `deja-sync-<source-hash>-<timestamp>.jsonl`. Each line is one object:
+
+```json
+{"harness":"claude","session_id":"abc123","project":"api","role":"assistant","text":"fixed by ...","time":"2026-07-14T12:00:00Z"}
+```
+
+The export watermark is per source path (falling back to session key for synthetic records) and is stored in `manifest.gob` as the max exported record timestamp. Re-running export emits only records with a newer timestamp for that source. Text is redacted again during export.
+
+`deja sync import <dir>` reads all `*.jsonl` batches, appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time`, making re-import idempotent.
 
 ## Incremental algorithm
 

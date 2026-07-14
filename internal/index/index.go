@@ -22,7 +22,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const version = 8
+const version = 9
 const maxIndexedText = 64 * 1024
 
 var bucketMagic = []byte("DJB1")
@@ -44,20 +44,24 @@ type SessionMeta struct {
 }
 
 type Manifest struct {
-	Version  int                    `json:"version"`
-	Files    map[string]FileState   `json:"files"`
-	Sessions map[string]SessionMeta `json:"sessions"`
-	BuiltAt  time.Time              `json:"built_at"`
-	Scope    string                 `json:"scope"`
-	Redacted int                    `json:"redacted"`
+	Version          int                    `json:"version"`
+	Files            map[string]FileState   `json:"files"`
+	Sessions         map[string]SessionMeta `json:"sessions"`
+	BuiltAt          time.Time              `json:"built_at"`
+	Scope            string                 `json:"scope"`
+	Redacted         int                    `json:"redacted"`
+	ExportWatermarks map[string]int64       `json:"export_watermarks,omitempty"`
+	ImportedRecords  map[string]bool        `json:"imported_records,omitempty"`
 }
 
 type manifestCore struct {
-	Version  int
-	Files    map[string]FileState
-	BuiltAt  time.Time
-	Scope    string
-	Redacted int
+	Version          int
+	Files            map[string]FileState
+	BuiltAt          time.Time
+	Scope            string
+	Redacted         int
+	ExportWatermarks map[string]int64
+	ImportedRecords  map[string]bool
 }
 
 type RedactionStats struct {
@@ -1530,7 +1534,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Redacted: core.Redacted, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Redacted: core.Redacted, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -1538,7 +1542,7 @@ func readManifest(dir string) (Manifest, error) {
 }
 
 func writeManifest(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope, Redacted: m.Redacted}
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope, Redacted: m.Redacted, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
 	if err := writeGob(filepath.Join(dir, "manifest.gob"), core); err != nil {
 		return err
 	}
