@@ -62,6 +62,9 @@ func runInstall(args []string, uninstall bool) error {
 		}
 		fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
 	}
+	if !uninstall && (args[0] == "--auto" || args[0] == "--all") && logoWanted(os.Stdout) {
+		printLogo(os.Stdout, "memory for coding agents")
+	}
 	return nil
 }
 

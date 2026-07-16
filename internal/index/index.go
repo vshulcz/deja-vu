@@ -38,6 +38,25 @@ func IsCorrupt(err error) bool { return errors.Is(err, errCorruptIndex) }
 
 var lastIngestFiles int
 
+// BuildSummary describes the most recent (re)build in this process; the CLI
+// uses it to greet a first-ever index with a summary instead of silence.
+type BuildSummary struct {
+	Initial   bool
+	Sessions  int
+	Messages  int
+	Harnesses int
+}
+
+var LastBuild BuildSummary
+
+func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session) {
+	hs := map[string]bool{}
+	for _, s := range ss {
+		hs[s.Harness] = true
+	}
+	LastBuild = BuildSummary{Initial: initial, Sessions: sessions, Messages: messages, Harnesses: len(hs)}
+}
+
 type FileState struct {
 	Path          string `json:"path"`
 	Size          int64  `json:"size"`
@@ -336,6 +355,8 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 
 func rebuild(dir string, harness string, scope string, files map[string]FileState, progress io.Writer) error {
 	lastIngestFiles = len(files)
+	initialBuild := !HasManifest(dir)
+	writtenMessages := 0
 	imported := importedSessions(dir)
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
@@ -393,6 +414,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 				if err != nil {
 					return err
 				}
+				writtenMessages++
 				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord})
 			}
 		}
@@ -413,7 +435,11 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 		return err
 	}
 	_ = os.RemoveAll(dir)
-	return os.Rename(tmp, dir)
+	if err := os.Rename(tmp, dir); err != nil {
+		return err
+	}
+	summarizeBuild(initialBuild, len(m.Sessions), writtenMessages, ss)
+	return nil
 }
 
 const syncImportPath = "deja-sync-import"
@@ -512,6 +538,8 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 }
 
 func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string]FileState, scope string, imp importedState) error {
+	initialBuild := !HasManifest(dir)
+	writtenMessages := 0
 	lastIngestFiles = len(files)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
 		ExportWatermarks: imp.watermarks, ImportedRecords: imp.dedupe}
@@ -558,6 +586,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				if err != nil {
 					return err
 				}
+				writtenMessages++
 				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord})
 			}
 		}
@@ -578,7 +607,11 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	os.RemoveAll(dir)
-	return os.Rename(tmp, dir)
+	if err := os.Rename(tmp, dir); err != nil {
+		return err
+	}
+	summarizeBuild(initialBuild, len(m.Sessions), writtenMessages, ss)
+	return nil
 }
 
 type tokenJob struct {

@@ -78,7 +78,11 @@ func run(args []string) error {
 		return runDoctor(os.Stdout, doctorLookup)
 	}
 	if args[0] == "warmup" {
-		return index.Ensure(index.DefaultDir(), "", false, os.Stderr)
+		if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
+			return err
+		}
+		maybeFirstIndexGreeting()
+		return nil
 	}
 	if args[0] == "index" {
 		force := false
@@ -89,7 +93,11 @@ func run(args []string) error {
 			}
 			return fmt.Errorf("index: unknown flag %q", a)
 		}
-		return index.Ensure(index.DefaultDir(), "", force, os.Stderr)
+		if err := index.Ensure(index.DefaultDir(), "", force, os.Stderr); err != nil {
+			return err
+		}
+		maybeFirstIndexGreeting()
+		return nil
 	}
 	if args[0] == "statusline" {
 		return runStatusline(os.Stdin, os.Stdout)
@@ -210,6 +218,7 @@ func run(args []string) error {
 	if err := index.EnsureForSearch(index.DefaultDir(), o, force, os.Stderr); err != nil {
 		return fmt.Errorf("ensure: %w", err)
 	}
+	maybeFirstIndexGreeting()
 	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
