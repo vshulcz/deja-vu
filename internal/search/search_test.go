@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -27,6 +29,63 @@ func TestSearchRanksAndFilters(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].Session.ID != "b" {
 		t.Fatalf("bad filter: %#v", hits)
+	}
+}
+
+func TestRunInvalidRegexAndResultLimit(t *testing.T) {
+	if _, err := Run(nil, Options{Query: "(", Regex: true}); err == nil {
+		t.Fatal("expected invalid regex error")
+	}
+	var ss []model.Session
+	for i := 0; i < 20; i++ {
+		ss = append(ss, model.Session{ID: string(rune('a' + i)), Harness: "claude", Project: "p", Updated: time.Now().Add(time.Duration(i) * time.Minute), Messages: []model.Message{{Role: "user", Text: "needle"}}})
+	}
+	hits, err := Run(ss, Options{Query: "needle"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 15 {
+		t.Fatalf("limited hits = %d", len(hits))
+	}
+	hits, err = Run(ss, Options{Query: "needle", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 20 {
+		t.Fatalf("all hits = %d", len(hits))
+	}
+}
+
+func TestRunFilterSkipsRegexAndTieBranches(t *testing.T) {
+	now := time.Now()
+	ss := []model.Session{
+		{ID: "old", Harness: "claude", Project: "proj", Updated: now.Add(-48 * time.Hour), Messages: []model.Message{{Role: "user", Text: "needle 123"}}},
+		{ID: "project-skip", Harness: "claude", Project: "other", Updated: now, Messages: []model.Message{{Role: "user", Text: "needle 123"}}},
+		{ID: "role-skip", Harness: "claude", Project: "proj", Updated: now, Messages: []model.Message{{Role: "assistant", Text: "needle 123"}}},
+		{ID: "hit-a", Harness: "claude", Project: "proj", Updated: now, Messages: []model.Message{{Role: "user", Text: "needle 123"}}},
+		{ID: "hit-b", Harness: "claude", Project: "proj", Updated: now, Messages: []model.Message{{Role: "user", Text: "needle 456"}}},
+	}
+	hits, err := Run(ss, Options{Query: `needle \d+`, Regex: true, Project: "proj", Role: "user", Since: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 2 || hits[0].Session.Updated.Before(hits[1].Session.Updated) {
+		t.Fatalf("filtered regex hits = %#v", hits)
+	}
+	if _, ok := FindByPrefix(ss, "missing"); ok {
+		t.Fatal("unexpected prefix match")
+	}
+}
+
+func TestMergeSessionsHistoryProjectReplacement(t *testing.T) {
+	now := time.Now()
+	ss := []model.Session{
+		{ID: "same", Harness: "codex", Project: "history", Updated: now, Messages: []model.Message{{Role: "user", Text: "first needle"}}},
+		{ID: "same", Harness: "codex", Project: "real-project", Updated: now.Add(time.Hour), Messages: []model.Message{{Role: "assistant", Text: "second needle"}}},
+	}
+	got, ok := FindByPrefix(ss, "sam")
+	if !ok || got.Project != "real-project" || len(got.Messages) != 2 || !got.Updated.Equal(now.Add(time.Hour)) {
+		t.Fatalf("merged = %#v ok=%v", got, ok)
 	}
 }
 
@@ -59,6 +118,29 @@ func TestPrintJSONSessionContextAndHelpers(t *testing.T) {
 	}
 	if got := Recent([]model.Session{s, {ID: "old", Updated: now.Add(-time.Hour)}}, 1); len(got) != 1 || got[0].ID != s.ID {
 		t.Fatalf("Recent=%#v", got)
+	}
+}
+
+func TestPrintSessionContextAndDigestBudgetEdges(t *testing.T) {
+	long := strings.Repeat("context prose ", 900) + "é"
+	s := model.Session{ID: "short", Harness: "codex", Project: "p", Messages: []model.Message{
+		{Role: "assistant", Text: "ignored when unmatched"},
+		{Role: "user", Text: long},
+		{Role: "assistant", Text: "needle " + long},
+	}}
+	var b bytes.Buffer
+	PrintSession(&b, model.Session{ID: "empty", Messages: []model.Message{{Role: "user", Text: "   "}}})
+	if strings.Contains(b.String(), "user:") {
+		t.Fatalf("blank message printed: %q", b.String())
+	}
+	b.Reset()
+	PrintContext(&b, s, "needle")
+	if b.Len() > 8050 || !strings.Contains(b.String(), "# deja context:") {
+		t.Fatalf("context budget bad len=%d out=%q", b.Len(), b.String()[:min(b.Len(), 80)])
+	}
+	digest := AutoRecallDigest([]model.Session{s}, 79)
+	if len(digest) > 79 || !utf8.ValidString(digest) {
+		t.Fatalf("digest budget invalid len=%d valid=%v", len(digest), utf8.ValidString(digest))
 	}
 }
 
@@ -95,6 +177,15 @@ func TestHighlightDateSnippetAndColorBranches(t *testing.T) {
 	if got := snippet("no direct tokens but has jwt", "jwt refresh", nil); !strings.Contains(got, "jwt") {
 		t.Fatalf("snippet token=%q", got)
 	}
+	if got := snippet(strings.Repeat("x", 100)+" 123 "+strings.Repeat("y", 200), "\\d+", regexp.MustCompile(`\d+`)); !strings.HasPrefix(got, "…") || !strings.HasSuffix(got, "…") {
+		t.Fatalf("snippet regex middle=%q", got)
+	}
+	if got := highlight("abc", "(", true, true); got != "abc" {
+		t.Fatalf("highlight bad regex=%q", got)
+	}
+	if got := highlight("abc", "a", false, true); !strings.Contains(got, cMatch+"a"+cReset) {
+		t.Fatalf("highlight short token literal=%q", got)
+	}
 	t.Setenv("NO_COLOR", "1")
 	if colorOK(os.Stdout) {
 		t.Fatalf("NO_COLOR ignored")
@@ -127,6 +218,24 @@ func TestPrintPlainWhenNotTTY(t *testing.T) {
 	}
 }
 
+func TestPrintZeroDateAndContextHelpers(t *testing.T) {
+	hits := []Hit{{Session: model.Session{ID: "id", Harness: "x", Project: "p"}, Count: 2}}
+	var b bytes.Buffer
+	Print(&b, hits, Options{Query: "needle"})
+	if !strings.Contains(b.String(), " · - · ") {
+		t.Fatalf("zero date print = %q", b.String())
+	}
+	longLines := strings.Repeat("line with prose words\n", 12)
+	if got := contextText(longLines, false); strings.Count(got, "line") > 8 {
+		t.Fatalf("contextText did not cap lines: %q", got)
+	}
+	for _, p := range []string{"<command-x", "<task-notification", "<teammate-message", "<bash-x", "Caveat:", "<system-reminder"} {
+		if !noiseMessage(p + " noise") {
+			t.Fatalf("noiseMessage missed %q", p)
+		}
+	}
+}
+
 func TestAutoRecallDigestCappedMarkdown(t *testing.T) {
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	ss := []model.Session{{ID: "abcdef123456", Harness: "claude", Project: "project", Updated: now, Messages: []model.Message{
@@ -144,6 +253,12 @@ func TestAutoRecallDigestCappedMarkdown(t *testing.T) {
 	}
 	if got := AutoRecallDigest([]model.Session{{ID: "empty"}}, 100); got != "" {
 		t.Fatalf("empty digest=%q", got)
+	}
+	if got := AutoRecallDigest(append(ss, ss...), 0); got == "" {
+		t.Fatal("default budget digest empty")
+	}
+	if got := AutoRecallDigest(append(ss, ss...), 10); len(got) > 10 {
+		t.Fatalf("tiny digest len=%d", len(got))
 	}
 }
 

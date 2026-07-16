@@ -4,10 +4,21 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestPathTrimsTrailingSeparator(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db") + string(filepath.Separator)
+	if got, want := Path(dir), strings.TrimSuffix(dir, string(filepath.Separator))+".usage.jsonl"; got != want {
+		t.Fatalf("Path(%q) = %q, want %q", dir, got, want)
+	}
+	if got := read(filepath.Join(t.TempDir(), "missing.usage.jsonl")); got != nil {
+		t.Fatalf("read missing = %#v", got)
+	}
+}
 
 func TestRecordAndToday(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
@@ -39,7 +50,8 @@ func TestTodayIgnoresYesterday(t *testing.T) {
 
 func TestCorruptLinesIgnored(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	if err := os.WriteFile(Path(dir), []byte("{broken\n\n"), 0o644); err != nil {
+	zero, _ := json.Marshal(Event{Kind: KindRecall, Bytes: 99})
+	if err := os.WriteFile(Path(dir), []byte("{broken\n\n"+string(zero)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	Record(dir, KindContext, 42)
@@ -47,6 +59,56 @@ func TestCorruptLinesIgnored(t *testing.T) {
 	if recalls != 1 || bytes != 42 {
 		t.Fatalf("today = %d/%d, want 1/42", recalls, bytes)
 	}
+}
+
+func TestRotateMissingAndSmallNoop(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	p := Path(dir)
+	rotate(p)
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatalf("rotate missing stat err = %v", err)
+	}
+	if err := os.WriteFile(p, []byte("small\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rotate(p)
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != "small\n" {
+		t.Fatalf("small log changed: %q", b)
+	}
+}
+
+func TestRecordSwallowsDirectoryErrors(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not reliable on windows")
+	}
+	dir := t.TempDir()
+	blocked := filepath.Join(dir, "blocked")
+	if err := os.WriteFile(blocked, []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	Record(filepath.Join(blocked, "index.db"), KindRecall, 1)
+
+	idx := filepath.Join(dir, "asdir")
+	if err := os.Mkdir(Path(idx), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	Record(idx, KindRecall, 1) // OpenFile on a directory fails and is swallowed.
+}
+
+func TestRotateCreateTempFailure(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "usage.jsonl")
+	if err := os.WriteFile(p, []byte(strings.Repeat("x", rotateAt)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(p+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rotate(p)
 }
 
 func TestRotateKeepsRecentWindow(t *testing.T) {
