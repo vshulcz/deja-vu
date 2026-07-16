@@ -268,10 +268,14 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 func cursorTranscriptProject(path string) string {
 	dir := path
 	for filepath.Base(filepath.Dir(dir)) != "projects" && dir != "/" && dir != "." {
-		dir = filepath.Dir(dir)
+		parent := filepath.Dir(dir)
+		if parent == dir { // reached a root like C:\ on Windows
+			break
+		}
+		dir = parent
 	}
 	encoded := filepath.Base(dir)
-	if encoded == "" || encoded == "/" || encoded == "." {
+	if encoded == "" || encoded == "/" || encoded == "." || encoded == string(filepath.Separator) {
 		return "-"
 	}
 	if resolved := resolveEncodedPath("-" + encoded); resolved != "" {

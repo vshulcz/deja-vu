@@ -25,9 +25,16 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "no-gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "no-cursor"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "no-cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "no-aider"))
 	dir := filepath.Join(tmp, "index.db")
 	var first bytes.Buffer
 	if err := Ensure(dir, "claude", false, &first); err != nil {
@@ -74,6 +81,8 @@ func TestSyncExportImportSearchIdempotent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "sync1.jsonl"), []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
@@ -141,6 +150,8 @@ func TestSyncExportImportSearchIdempotent(t *testing.T) {
 
 func TestSyncImportBadJSONAndEmptyExport(t *testing.T) {
 	tmp := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
@@ -188,9 +199,16 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "no-gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "no-cursor"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "no-cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "no-aider"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := EnsureForSearch(dir, search.Options{Query: "jwt refresh token", Harness: "claude"}, false, nil); err != nil {
 		t.Fatal(err)
@@ -249,9 +267,16 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	if err := os.WriteFile(s2, []byte(`{"type":"user","sessionId":"s2","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"beta stable"}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "no-gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "no-cursor"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "no-cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "no-aider"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := Ensure(dir, "claude", false, nil); err != nil {
 		t.Fatal(err)
@@ -314,9 +339,16 @@ func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "no-gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "no-cursor"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "no-cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "no-aider"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := EnsureForSearch(dir, search.Options{Query: "stable", Harness: "claude"}, false, nil); err != nil {
 		t.Fatal(err)
@@ -448,6 +480,8 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 func TestSetOpencodeLastUpdated(t *testing.T) {
 	tmp := t.TempDir()
 	db := filepath.Join(tmp, "opencode.db")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	files := map[string]FileState{db: {Path: db}}
 	now := time.Now()
@@ -653,6 +687,8 @@ func TestCurrentFilesSkipsSymlinks(t *testing.T) {
 	if err := os.Symlink(outside, link); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
@@ -672,9 +708,16 @@ func TestOldJSONManifestRebuildsTransparently(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"old manifest rebuild needle"}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "no-gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "no-cursor"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "no-cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "no-aider"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -726,9 +769,16 @@ func TestRedactsSecretsAtIngest(t *testing.T) {
 	if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "no-codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "no-opencode.db"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "no-gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "no-cursor"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "no-cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "no-antigravity"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "no-aider"))
 	dir := filepath.Join(tmp, "index.db")
 	if err := EnsureForSearch(dir, search.Options{Query: "redactionmarker", Harness: "claude"}, false, nil); err != nil {
 		t.Fatal(err)

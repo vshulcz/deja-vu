@@ -321,6 +321,8 @@ func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(t.TempDir(), "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
@@ -358,6 +360,8 @@ func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 
 func TestMCPRecallContext(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(t.TempDir(), "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
