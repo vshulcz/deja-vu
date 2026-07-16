@@ -33,6 +33,8 @@ func TestUnreadableSourceSkippedNotFatal(t *testing.T) {
 	if err := os.WriteFile(bad, []byte(line("b1", "badneedle original")), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))

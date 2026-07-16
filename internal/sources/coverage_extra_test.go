@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,8 +102,8 @@ func TestGeminiBranchesAndLoadGemini(t *testing.T) {
 	if err := os.WriteFile(jsonPath, []byte(doc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, content := range []string{"not json", `{"messages":[]}`, `{"sessionId":"empty","messages":[]}`} {
-		p := filepath.Join(chats, strings.ReplaceAll(content[:3], " ", "_")+".json")
+	for i, content := range []string{"not json", `{"messages":[]}`, `{"sessionId":"empty","messages":[]}`} {
+		p := filepath.Join(chats, fmt.Sprintf("skip%d.json", i))
 		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}

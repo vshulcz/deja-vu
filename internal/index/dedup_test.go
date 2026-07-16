@@ -32,6 +32,8 @@ func TestDuplicateFormatSessionsDoNotDuplicateMessages(t *testing.T) {
 	if err := os.WriteFile(jsonl, []byte(head), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_GEMINI_ROOT", gem)
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "nc"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "nx"))

@@ -188,6 +188,8 @@ func TestRunSyncImportAndExportBranches(t *testing.T) {
 
 func TestResumeRemainingHarnessBranches(t *testing.T) {
 	tmp := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
 	cases := []struct {
 		s       model.Session
@@ -238,7 +240,8 @@ func TestMainHelpersFallbackAndSourcesBranches(t *testing.T) {
 	if err != nil || len(ss) == 0 || ss[0].ID != "fallback123" {
 		t.Fatalf("recent fallback = %#v err=%v", ss, err)
 	}
-	if got := redactionsUnder(map[string]int{"/root": 1, filepath.Join("/root", "child"): 2, "/other": 9}, "/root"); got != 3 {
+	rroot := filepath.Join(string(filepath.Separator), "root")
+	if got := redactionsUnder(map[string]int{rroot: 1, filepath.Join(rroot, "child"): 2, filepath.Join(string(filepath.Separator), "other"): 9}, rroot); got != 3 {
 		t.Fatalf("redactionsUnder = %d", got)
 	}
 	aiderDir := filepath.Join(tmp, "aider-root")

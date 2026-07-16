@@ -38,6 +38,8 @@ func TestLoadersOffsetsAndUtilityVariants(t *testing.T) {
 	if err := os.WriteFile(claudeFile, []byte(first+second), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	if got := LoadClaude(); len(got) != 1 || len(got[0].Messages) != 2 {
 		t.Fatalf("LoadClaude=%#v", got)
@@ -108,6 +110,8 @@ insert into part values('p3','m3','{"type":"text","text":"other text","time":{"s
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite setup: %v %s", err, out)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	ss, err := ParseOpencodeDB(db)
 	if err != nil || len(ss) != 2 {
@@ -174,6 +178,8 @@ func TestParseClaudeProjectFromNestedSubagentPath(t *testing.T) {
 	if err := os.WriteFile(p, []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	ss, err := ParseClaudeFile(p)
 	if err != nil {

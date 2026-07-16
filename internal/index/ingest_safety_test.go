@@ -41,6 +41,8 @@ func TestTornTailLineIndexedOnce(t *testing.T) {
 	writeClaudeLine(t, file, "t1", "first tornneedle message", false)
 	// torn second line: writer got interrupted mid-json
 	writeClaudeLine(t, file, "t1", "second tornneedle message", true)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
@@ -102,6 +104,8 @@ func TestSubagentTranscriptsSkipped(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(sub, "a1.jsonl"), []byte(agent), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
