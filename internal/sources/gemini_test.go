@@ -113,3 +113,19 @@ func TestGeminiDedupePrefersJSONL(t *testing.T) {
 		t.Fatalf("jsonl not preferred: %#v", out[0])
 	}
 }
+
+func TestGeminiMessageTimeFallback(t *testing.T) {
+	_, chats := geminiTree(t)
+	doc := `{"sessionId":"s1","startTime":"2026-07-15T10:00:00.000Z","lastUpdated":"2026-07-15T10:00:00.000Z","messages":[{"id":"m1","type":"user","content":"no timestamp here"}]}`
+	p := filepath.Join(chats, "session-s1.json")
+	if err := os.WriteFile(p, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseGeminiFile(p)
+	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 1 {
+		t.Fatalf("ss=%#v err=%v", ss, err)
+	}
+	if ss[0].Messages[0].Time.IsZero() || ss[0].Messages[0].Time != ss[0].Started {
+		t.Fatalf("message time not defaulted to start: %v vs %v", ss[0].Messages[0].Time, ss[0].Started)
+	}
+}

@@ -157,6 +157,9 @@ func ParseCursorDB(db string) ([]model.Session, error) {
 				role = "user"
 			}
 			t := epochMS(b["ts"])
+			if t.IsZero() {
+				t = s.Started
+			}
 			s.Touch(t)
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
 			if s.Project == "-" {

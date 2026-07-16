@@ -182,6 +182,9 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 			continue
 		}
 		t, _ := time.Parse(time.RFC3339Nano, m.Timestamp)
+		if t.IsZero() {
+			t = s.Started
+		}
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
 	}
