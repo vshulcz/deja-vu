@@ -47,6 +47,9 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "antigravity" {
 		ss = append(ss, sources.LoadAntigravity()...)
 	}
+	if h == "" || h == "grok" {
+		ss = append(ss, sources.LoadGrok()...)
+	}
 	return ss
 }
 

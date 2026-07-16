@@ -464,6 +464,9 @@ func load(h string) []model.Session {
 	if h == "" || h == "antigravity" {
 		ss = append(ss, sources.LoadAntigravity()...)
 	}
+	if h == "" || h == "grok" {
+		ss = append(ss, sources.LoadGrok()...)
+	}
 	return ss
 }
 
@@ -1131,6 +1134,8 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 		return sources.ParseCursorTranscript(p)
 	case "antigravity":
 		return sources.ParseAntigravityFile(p)
+	case "grok":
+		return sources.ParseGrokFile(p)
 	default:
 		return nil, nil
 	}
@@ -1194,6 +1199,9 @@ func harnessForPath(p string) string {
 				return "antigravity"
 			}
 		}
+	}
+	if filepath.Base(p) == "updates.jsonl" && strings.HasPrefix(p, filepath.Join(sources.GrokRoot(), "sessions")) {
+		return "grok"
 	}
 	return ""
 }
@@ -1264,6 +1272,11 @@ func currentFiles(h string) map[string]FileState {
 	}
 	if h == "" || h == "antigravity" {
 		for _, p := range sources.AntigravityTranscripts() {
+			paths[p] = true
+		}
+	}
+	if h == "" || h == "grok" {
+		for _, p := range sources.GrokSessionFiles() {
 			paths[p] = true
 		}
 	}
