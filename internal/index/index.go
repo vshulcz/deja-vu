@@ -745,6 +745,14 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 		if fs, ok := m.Files[sourcePath]; ok {
 			fs.Redactions += n
 			m.Files[sourcePath] = fs
+		} else if db := sources.OpencodeDB(); sourcePath != db {
+			// opencode sessions carry their project dir as Path; the store
+			// on record is the database file. Attribute stats there so
+			// `deja sources` reports them.
+			if fs, ok := m.Files[db]; ok {
+				fs.Redactions += n
+				m.Files[db] = fs
+			}
 		}
 	}
 	return redacted
