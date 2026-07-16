@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vshulcz/deja-vu",
+  "description": "Memory layer over the session histories coding agents already write: search, MCP recall, auto-recall, secret redaction, SSH sync.",
+  "repository": {
+    "url": "https://github.com/vshulcz/deja-vu",
+    "source": "github"
+  },
+  "version": "0.7.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@vshulcz/deja-vu",
+      "version": "0.7.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "npx",
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "run the stdio MCP server"
+        }
+      ]
+    }
+  ]
+}
