@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.22.x'
+          go-version: '1.25.x'
           cache: false
       - run: go mod verify
       - run: go vet ./...
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.22.x'
+          go-version: '1.25.x'
           cache: false
       - run: sh scripts/e2e.sh
 
@@ -56,7 +56,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.22.x'
+          go-version: '1.25.x'
           cache: false
       - name: Build all release targets
         run: |
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version: '1.25.x'
           cache: false
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
@@ -88,7 +88,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.22.x'
+          go-version: '1.25.x'
           cache: false
       - uses: goreleaser/goreleaser-action@v7
         with:

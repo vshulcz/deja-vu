@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.22.x'
+          go-version: '1.25.x'
           cache: false
 
       - uses: goreleaser/goreleaser-action@v7

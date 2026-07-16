@@ -5,15 +5,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -43,42 +42,52 @@ type updateRelease struct {
 type updateDownloader func(url string, limit int64, label string) ([]byte, error)
 
 func defaultUpdateDownloader() updateDownloader {
+	return newHTTPUpdateDownloader(&http.Client{Timeout: 2 * time.Minute})
+}
+
+func newHTTPUpdateDownloader(client *http.Client) updateDownloader {
+	configured := *client
+	previousRedirect := configured.CheckRedirect
+	configured.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" {
+			return fmt.Errorf("refusing non-HTTPS redirect")
+		}
+		if previousRedirect != nil {
+			return previousRedirect(req, via)
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after 10 redirects")
+		}
+		return nil
+	}
+	client = &configured
 	return func(url string, limit int64, label string) ([]byte, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, "curl",
-			"--disable", "--fail", "--silent", "--show-error", "--location",
-			"--proto", "=https", "--proto-redir", "=https",
-			"--header", "Accept: application/vnd.github+json",
-			"--user-agent", "deja/"+normalizeUpdateVersion(version), url)
-		stdout, err := cmd.StdoutPipe()
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("request %s: %w", label, err)
+		}
+		if req.URL.Scheme != "https" {
+			return nil, fmt.Errorf("download %s: URL must use HTTPS", label)
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("User-Agent", "deja/"+normalizeUpdateVersion(version))
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("download %s: %w", label, err)
 		}
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		if err := cmd.Start(); err != nil {
-			return nil, fmt.Errorf("download %s: %w", label, err)
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("download %s: HTTP %s", label, resp.Status)
 		}
-		body, readErr := io.ReadAll(io.LimitReader(stdout, limit+1))
-		if int64(len(body)) > limit {
-			_ = cmd.Process.Kill()
-			_ = cmd.Wait()
+		if resp.ContentLength > limit {
 			return nil, fmt.Errorf("download %s: response exceeds %d bytes", label, limit)
 		}
-		waitErr := cmd.Wait()
-		if readErr != nil {
-			return nil, fmt.Errorf("download %s: %w", label, readErr)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+		if err != nil {
+			return nil, fmt.Errorf("download %s: %w", label, err)
 		}
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("download %s: %w", label, ctx.Err())
-		}
-		if waitErr != nil {
-			message := strings.TrimSpace(stderr.String())
-			if message != "" {
-				return nil, fmt.Errorf("download %s: %s", label, message)
-			}
-			return nil, fmt.Errorf("download %s: %w", label, waitErr)
+		if int64(len(body)) > limit {
+			return nil, fmt.Errorf("download %s: response exceeds %d bytes", label, limit)
 		}
 		return body, nil
 	}

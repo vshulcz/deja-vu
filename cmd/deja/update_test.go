@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -224,11 +226,43 @@ func TestUpdateCommandShapeAndPlatforms(t *testing.T) {
 	}
 }
 
-func TestUpdateDownloaderReportsMissingCurl(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
-	_, err := defaultUpdateDownloader()("https://example.invalid", 1024, "test asset")
-	if err == nil || !strings.Contains(err.Error(), "curl") {
-		t.Fatalf("missing curl error = %v", err)
+func TestHTTPUpdateDownloader(t *testing.T) {
+	insecure := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "non-HTTPS redirect was followed", http.StatusInternalServerError)
+	}))
+	defer insecure.Close()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") != "application/vnd.github+json" || !strings.HasPrefix(r.Header.Get("User-Agent"), "deja/") {
+			t.Errorf("headers = %#v", r.Header)
+		}
+		switch r.URL.Path {
+		case "/ok":
+			_, _ = io.WriteString(w, "release")
+		case "/error":
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+		case "/redirect":
+			http.Redirect(w, r, insecure.URL, http.StatusFound)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	download := newHTTPUpdateDownloader(server.Client())
+	body, err := download(server.URL+"/ok", 32, "test asset")
+	if err != nil || string(body) != "release" {
+		t.Fatalf("download body=%q err=%v", body, err)
+	}
+	if _, err := download(server.URL+"/ok", 3, "test asset"); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("size limit error = %v", err)
+	}
+	if _, err := download(server.URL+"/error", 32, "test asset"); err == nil || !strings.Contains(err.Error(), "HTTP 503") {
+		t.Fatalf("HTTP status error = %v", err)
+	}
+	if _, err := download("http://example.invalid", 32, "test asset"); err == nil || !strings.Contains(err.Error(), "HTTPS") {
+		t.Fatalf("insecure URL error = %v", err)
+	}
+	if _, err := download(server.URL+"/redirect", 32, "test asset"); err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
+		t.Fatalf("insecure redirect error = %v", err)
 	}
 }
 
