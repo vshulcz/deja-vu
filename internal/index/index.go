@@ -69,6 +69,10 @@ type Manifest struct {
 	Redacted         int                    `json:"redacted"`
 	ExportWatermarks map[string]int64       `json:"export_watermarks,omitempty"`
 	ImportedRecords  map[string]bool        `json:"imported_records,omitempty"`
+	// RecordsSize is records.bin's byte length when the manifest was committed.
+	// A live index whose records.bin is shorter than this lost its tail to a
+	// torn write and must be treated as corrupt.
+	RecordsSize int64 `json:"records_size,omitempty"`
 }
 
 type manifestCore struct {
@@ -79,6 +83,7 @@ type manifestCore struct {
 	Redacted         int
 	ExportWatermarks map[string]int64
 	ImportedRecords  map[string]bool
+	RecordsSize      int64
 }
 
 type RedactionStats struct {
@@ -119,7 +124,7 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	defer unlock()
 	want := currentFiles("")
 	m, err := readManifest(dir)
-	if !force && err == nil && manifestFresh(m, want, "") {
+	if !force && err == nil && manifestFresh(m, want, "") && recordsIntact(dir, m) {
 		return nil
 	}
 	return updateIndex(dir, "", "", want, force, progress)
@@ -137,10 +142,10 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 	want := currentFiles("")
 	scope := ""
 	m, err := readManifest(dir)
-	if !force && err == nil && manifestFresh(m, want, scope) {
+	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
-	if force || err != nil || m.Version != version || m.Scope != scope {
+	if force || err != nil || m.Version != version || m.Scope != scope || !recordsIntact(dir, m) {
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
 		}
@@ -164,6 +169,9 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 	m, err := readManifest(dir)
 	if err != nil {
 		return nil, fmt.Errorf("manifest: %w", err)
+	}
+	if !recordsIntact(dir, m) {
+		return nil, fmt.Errorf("%w: records.bin truncated", errCorruptIndex)
 	}
 	var posts []posting
 	usedPostings := false
@@ -834,6 +842,9 @@ func Redactions(dir string) (RedactionStats, error) {
 
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
 	old, err := readManifest(dir)
+	if err == nil && !recordsIntact(dir, old) {
+		force = true // records.bin lost its tail to a crash; only a rebuild is safe
+	}
 	if force || err != nil || old.Version != version || old.Scope != scope {
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
@@ -1920,19 +1931,42 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Redacted: core.Redacted, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Redacted: core.Redacted, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
 	return m, nil
 }
 
+// writeManifest commits the two-file manifest crash-safely. sessions.gob is
+// written (and renamed into place) before manifest.gob, and both go through a
+// temp file + rename. manifest.gob carries the version/file sizes that decide
+// whether the index is fresh, so it must land last: a crash between the two
+// leaves the old manifest pointing at old data, and the next run reindexes
+// rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
 	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope, Redacted: m.Redacted, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
-	if err := writeGob(filepath.Join(dir, "manifest.gob"), core); err != nil {
+	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
+		core.RecordsSize = fi.Size()
+	}
+	if err := writeGobAtomic(filepath.Join(dir, "sessions.gob"), m.Sessions); err != nil {
 		return err
 	}
-	return writeGob(filepath.Join(dir, "sessions.gob"), m.Sessions)
+	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+}
+
+// recordsIntact reports whether records.bin still holds everything the manifest
+// committed. A shorter file means a crash truncated the record log; the index
+// must rebuild rather than silently return fewer messages.
+func recordsIntact(dir string, m Manifest) bool {
+	if m.RecordsSize <= 0 {
+		return true // empty index, or one written before the size stamp existed
+	}
+	fi, err := os.Stat(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		return false
+	}
+	return fi.Size() >= m.RecordsSize
 }
 
 type bucketEntry struct {
@@ -2125,6 +2159,26 @@ func writeGob(p string, v any) error {
 	}
 	defer func() { _ = f.Close() }()
 	return gob.NewEncoder(f).Encode(v)
+}
+
+// writeGobAtomic writes to a sibling temp file and renames it over p, so a
+// crash mid-write can never leave p half-decoded.
+func writeGobAtomic(p string, v any) error {
+	tmp := p + ".tmp"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	if err := gob.NewEncoder(f).Encode(v); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, p)
 }
 func readGob(p string, v any) error {
 	f, err := os.Open(p)
