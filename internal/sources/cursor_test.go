@@ -51,7 +51,7 @@ insert into cursorDiskKV values
 func TestParseCursorTranscript(t *testing.T) {
 	tmp := t.TempDir()
 	encoded := "Users-x-work-my-app"
-	wantProject := filepath.Join("work", "my-app") // fallback: last two parts
+	wantProject := filepath.Join("my", "app") // fallback splits on every hyphen
 	if runtime.GOOS != "windows" {
 		real := filepath.Join(tmp, "work", "my-app")
 		if err := os.MkdirAll(real, 0o755); err != nil {
