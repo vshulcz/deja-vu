@@ -653,7 +653,7 @@ func TestIndexErrorBranches(t *testing.T) {
 		if err := os.Chmod(blockedParent, 0o500); err != nil {
 			t.Fatal(err)
 		}
-		defer os.Chmod(blockedParent, 0o755)
+		defer func() { _ = os.Chmod(blockedParent, 0o755) }()
 		badDir := filepath.Join(blockedParent, "child", "idx")
 		for name, fn := range map[string]func() error{
 			"Ensure":          func() error { return Ensure(badDir, "", false, nil) },

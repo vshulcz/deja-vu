@@ -182,7 +182,7 @@ func TestAiderClaudeAntigravityAndUtilityEdges(t *testing.T) {
 		if err := os.WriteFile(unreadable, []byte("{}\n"), 0o000); err != nil {
 			t.Fatal(err)
 		}
-		defer os.Chmod(unreadable, 0o644)
+		defer func() { _ = os.Chmod(unreadable, 0o644) }()
 		if _, err := ParseAntigravityFile(unreadable); err == nil {
 			t.Fatal("unreadable antigravity file returned nil error")
 		}
