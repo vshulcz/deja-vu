@@ -809,7 +809,19 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
 		if err != nil {
-			return fmt.Errorf("changed %s: %w", p, err)
+			// A live-locked or half-written store (Cursor holds its sqlite
+			// under WAL) must not fail every search. Keep the old records
+			// and the old FileState so the next run retries this file.
+			if progress != nil {
+				fmt.Fprintf(progress, "deja: skipping %s this pass: %v\n", filepath.Base(p), err)
+			}
+			delete(changed, p)
+			if of, ok := old.Files[p]; ok {
+				files[p] = of
+			} else {
+				delete(files, p)
+			}
+			continue
 		}
 		replacements = append(replacements, ss...)
 		files[p] = f
@@ -989,7 +1001,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	for p := range changed {
 		ss, err := parseAppendedFile(harness, p, old.Files[p])
 		if err != nil {
-			return filesTouched, messages, fmt.Errorf("parse %s: %w", filepath.Base(p), err)
+			if of, ok := old.Files[p]; ok {
+				m.Files[p] = of // retry this file on the next pass
+			} else {
+				delete(m.Files, p)
+			}
+			continue
 		}
 		filesTouched++
 		for _, s := range ss {
