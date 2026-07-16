@@ -38,6 +38,9 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "aider" {
 		ss = append(ss, sources.LoadAider()...)
 	}
+	if h == "" || h == "gemini" {
+		ss = append(ss, sources.LoadGemini()...)
+	}
 	return ss
 }
 

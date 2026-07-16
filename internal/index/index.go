@@ -451,6 +451,9 @@ func load(h string) []model.Session {
 	if h == "" || h == "aider" {
 		ss = append(ss, sources.LoadAider()...)
 	}
+	if h == "" || h == "gemini" {
+		ss = append(ss, sources.LoadGemini()...)
+	}
 	return ss
 }
 
@@ -1061,6 +1064,8 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 		return sources.ParseOpencodeDB(p)
 	case "aider":
 		return sources.ParseAiderFile(p)
+	case "gemini":
+		return sources.ParseGeminiFile(p)
 	default:
 		return nil, nil
 	}
@@ -1103,6 +1108,9 @@ func harnessForPath(p string) string {
 	}
 	if filepath.Base(p) == ".aider.chat.history.md" {
 		return "aider"
+	}
+	if strings.HasPrefix(p, filepath.Join(sources.GeminiRoot(), "tmp")) && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
+		return "gemini"
 	}
 	return ""
 }
@@ -1147,6 +1155,11 @@ func currentFiles(h string) map[string]FileState {
 	}
 	if h == "" || h == "aider" {
 		for _, p := range sources.AiderFiles() {
+			paths[p] = true
+		}
+	}
+	if h == "" || h == "gemini" {
+		for _, p := range sources.GeminiChatFiles() {
 			paths[p] = true
 		}
 	}
