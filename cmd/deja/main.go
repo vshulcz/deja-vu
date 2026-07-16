@@ -74,6 +74,9 @@ func run(args []string) error {
 		printSources()
 		return nil
 	}
+	if args[0] == "doctor" {
+		return runDoctor(os.Stdout, doctorLookup)
+	}
 	if args[0] == "warmup" {
 		return index.Ensure(index.DefaultDir(), "", false, os.Stderr)
 	}
@@ -435,6 +438,7 @@ Usage:
   deja sync ssh <host> [--pull] [--full]
   deja last [n]
   deja sources
+  deja doctor
   deja warmup
   deja index [--rebuild]
   deja statusline
