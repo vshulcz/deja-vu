@@ -102,7 +102,7 @@ func TestInstallTargetErrorsAndAliases(t *testing.T) {
 	if _, err := installTarget("missing", "/bin/deja", false); err == nil || !strings.Contains(err.Error(), "unknown target") {
 		t.Fatalf("unknown target err = %v", err)
 	}
-	for _, args := range [][]string{nil, []string{"a", "b"}} {
+	for _, args := range [][]string{nil, {"a", "b"}} {
 		if err := runInstall(args, false); err == nil || !strings.Contains(err.Error(), "install needs target") {
 			t.Fatalf("install args %v err = %v", args, err)
 		}
