@@ -144,7 +144,7 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
 		}
-		return rebuildForSearch(dir, o, scope, want)
+		return rebuildForSearch(dir, o, scope, want, progress)
 	}
 	if err := updateIndex(dir, o.Harness, scope, want, force, progress); err != nil {
 		return fmt.Errorf("update: %w", err)
@@ -326,7 +326,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	return s, true, nil
 }
 
-func rebuild(dir string, harness string, scope string, files map[string]FileState) error {
+func rebuild(dir string, harness string, scope string, files map[string]FileState, progress io.Writer) error {
 	lastIngestFiles = len(files)
 	imported := importedSessions(dir)
 	tmp := dir + ".tmp"
@@ -334,7 +334,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
 		return err
 	}
-	ss := load(harness)
+	ss := loadProgress(harness, progress)
 	ss = append(ss, imported.sessions...)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
 		ExportWatermarks: imported.watermarks, ImportedRecords: imported.dedupe}
@@ -450,42 +450,50 @@ func importedSessions(dir string) importedState {
 	return out
 }
 
-func load(h string) []model.Session {
+var harnessLoaders = []struct {
+	name string
+	load func() []model.Session
+}{
+	{"claude", sources.LoadClaude},
+	{"codex", sources.LoadCodex},
+	{"opencode", sources.LoadOpencode},
+	{"aider", sources.LoadAider},
+	{"gemini", sources.LoadGemini},
+	{"cursor", sources.LoadCursor},
+	{"antigravity", sources.LoadAntigravity},
+	{"grok", sources.LoadGrok},
+}
+
+func load(h string) []model.Session { return loadProgress(h, nil) }
+
+// loadProgress narrates a full rebuild per harness: a cold pass over a large
+// corpus takes seconds and used to look hung.
+func loadProgress(h string, progress io.Writer) []model.Session {
 	var ss []model.Session
-	if h == "" || h == "claude" {
-		ss = append(ss, sources.LoadClaude()...)
-	}
-	if h == "" || h == "codex" {
-		ss = append(ss, sources.LoadCodex()...)
-	}
-	if h == "" || h == "opencode" {
-		ss = append(ss, sources.LoadOpencode()...)
-	}
-	if h == "" || h == "aider" {
-		ss = append(ss, sources.LoadAider()...)
-	}
-	if h == "" || h == "gemini" {
-		ss = append(ss, sources.LoadGemini()...)
-	}
-	if h == "" || h == "cursor" {
-		ss = append(ss, sources.LoadCursor()...)
-	}
-	if h == "" || h == "antigravity" {
-		ss = append(ss, sources.LoadAntigravity()...)
-	}
-	if h == "" || h == "grok" {
-		ss = append(ss, sources.LoadGrok()...)
+	for _, hl := range harnessLoaders {
+		if h != "" && h != hl.name {
+			continue
+		}
+		got := hl.load()
+		ss = append(ss, got...)
+		if progress != nil && len(got) > 0 {
+			msgs := 0
+			for _, s := range got {
+				msgs += len(s.Messages)
+			}
+			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", hl.name, len(got), msgs)
+		}
 	}
 	return ss
 }
 
-func rebuildForSearch(dir string, o search.Options, scope string, files map[string]FileState) error {
+func rebuildForSearch(dir string, o search.Options, scope string, files map[string]FileState, progress io.Writer) error {
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
 		return err
 	}
-	ss := load("")
+	ss := loadProgress("", progress)
 	imported := importedSessions(dir)
 	ss = append(ss, imported.sessions...)
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, imported)
@@ -830,7 +838,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
 		}
-		return rebuild(dir, harness, scope, files)
+		return rebuild(dir, harness, scope, files, progress)
 	}
 	changed := map[string]FileState{}
 	removed := map[string]bool{}
@@ -857,7 +865,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			if progress != nil {
 				fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
 			}
-			return rebuild(dir, harness, scope, files)
+			return rebuild(dir, harness, scope, files, progress)
 		}
 		if err != nil {
 			return fmt.Errorf("append: %w", err)
