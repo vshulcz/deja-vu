@@ -44,6 +44,10 @@ type FileState struct {
 	MTime       int64  `json:"mtime"`
 	LastUpdated int64  `json:"last_updated,omitempty"`
 	Redactions  int    `json:"redactions,omitempty"`
+	// SafeSize is the offset just past the last complete line at index time.
+	// A session file caught mid-write ends in a torn line; parsing skips it,
+	// and the next append must resume from here or that message is lost.
+	SafeSize int64 `json:"safe_size,omitempty"`
 }
 
 type SessionMeta struct {
@@ -1058,13 +1062,17 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 }
 
 func parseAppendedFile(harness, p string, old FileState) ([]model.Session, error) {
+	from := old.SafeSize
+	if from == 0 || from > old.Size {
+		from = old.Size
+	}
 	switch harnessForPath(p) {
 	case "claude":
-		return sources.ParseClaudeFileFromOffset(p, old.Size)
+		return sources.ParseClaudeFileFromOffset(p, from)
 	case "codex-history":
-		return sources.ParseCodexHistoryFromOffset(p, old.Size)
+		return sources.ParseCodexHistoryFromOffset(p, from)
 	case "codex":
-		return sources.ParseCodexRolloutFromOffset(p, old.Size)
+		return sources.ParseCodexRolloutFromOffset(p, from)
 	case "opencode":
 		if old.LastUpdated > 0 {
 			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
@@ -1118,7 +1126,7 @@ func currentFiles(h string) map[string]FileState {
 		})
 	}
 	if h == "" || h == "claude" {
-		addWalk(sources.ClaudeRoot(), func(p string) bool { return strings.HasSuffix(p, ".jsonl") })
+		addWalk(sources.ClaudeRoot(), sources.ClaudeFileWanted)
 	}
 	if h == "" || h == "codex" {
 		addWalk(filepath.Join(sources.CodexRoot(), "sessions"), func(p string) bool {
@@ -1132,10 +1140,46 @@ func currentFiles(h string) map[string]FileState {
 	out := map[string]FileState{}
 	for p := range paths {
 		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink == 0 && !fi.IsDir() {
-			out[p] = FileState{Path: p, Size: fi.Size(), MTime: fi.ModTime().UnixNano()}
+			fs := FileState{Path: p, Size: fi.Size(), MTime: fi.ModTime().UnixNano()}
+			if strings.HasSuffix(p, ".jsonl") {
+				fs.SafeSize = lastCompleteLineOffset(p, fi.Size())
+			}
+			out[p] = fs
 		}
 	}
 	return out
+}
+
+// lastCompleteLineOffset finds the offset just past the final newline, so an
+// append can resume without re-reading or losing a torn tail line. Reads at
+// most the last 64KB; a longer unterminated tail falls back to full size.
+func lastCompleteLineOffset(p string, size int64) int64 {
+	if size == 0 {
+		return 0
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return size
+	}
+	defer func() { _ = f.Close() }()
+	const window = 64 * 1024
+	start := size - window
+	if start < 0 {
+		start = 0
+	}
+	buf := make([]byte, size-start)
+	if _, err := f.ReadAt(buf, start); err != nil {
+		return size
+	}
+	for i := len(buf) - 1; i >= 0; i-- {
+		if buf[i] == '\n' {
+			return start + int64(i) + 1
+		}
+	}
+	if start == 0 {
+		return 0
+	}
+	return size
 }
 
 func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
