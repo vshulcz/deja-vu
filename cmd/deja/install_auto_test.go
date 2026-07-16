@@ -53,6 +53,37 @@ func TestInstallCodexHooksMergeAndUninstall(t *testing.T) {
 	}
 }
 
+func TestInstallCodexHooksErrorsAndMissingUninstall(t *testing.T) {
+	t.Run("malformed json", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+		path := filepath.Join(home, ".codex", "hooks.json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(`{"hooks":`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := installCodexHooks("/bin/deja", false); err == nil {
+			t.Fatal("expected malformed hooks.json error")
+		}
+	})
+
+	t.Run("uninstall missing file", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+		r, err := installCodexHooks("/bin/deja", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Path != filepath.Join(home, ".codex", "hooks.json") || r.Action != "created" {
+			t.Fatalf("result = %#v", r)
+		}
+	})
+}
+
 func TestInstallOpencodePlugin(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -79,5 +110,49 @@ func TestInstallOpencodePlugin(t *testing.T) {
 	}
 	if r, _ := installOpencodePlugin("/opt/deja", true); r.Action != "unchanged" {
 		t.Fatalf("second uninstall action = %s", r.Action)
+	}
+}
+
+func TestInstallOpencodePluginUninstallMissingDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	r, err := installOpencodePlugin("/opt/deja", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Action != "unchanged" || r.Path != filepath.Join(home, ".config", "opencode", "plugins", "deja.js") {
+		t.Fatalf("result = %#v", r)
+	}
+}
+
+func TestInstallAutoWrappers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		fn   func(string, bool) (installResult, error)
+		want string
+	}{
+		{"codex", installCodexAuto, filepath.Join(".codex", "hooks.json")},
+		{"opencode", installOpencodeAuto, filepath.Join(".config", "opencode", "plugins", "deja.js")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("USERPROFILE", home)
+			r, err := tc.fn("/bin/deja", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Action != "created" || r.Path != filepath.Join(home, tc.want) {
+				t.Fatalf("install result = %#v", r)
+			}
+			r, err = tc.fn("/bin/deja", true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Path != filepath.Join(home, tc.want) {
+				t.Fatalf("uninstall result = %#v", r)
+			}
+		})
 	}
 }

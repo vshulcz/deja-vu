@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +18,42 @@ func TestStatuslineEmpty(t *testing.T) {
 	}
 	if got := out.String(); got != "deja · no recalls yet today" {
 		t.Fatalf("empty statusline = %q", got)
+	}
+}
+
+type chunkReader struct {
+	chunks []string
+	reads  int
+}
+
+func (r *chunkReader) Read(p []byte) (int, error) {
+	if r.reads >= len(r.chunks) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.chunks[r.reads])
+	r.reads++
+	return n, nil
+}
+
+func TestDrainStdinNonFileReader(t *testing.T) {
+	r := &chunkReader{chunks: []string{"{}", "ignored"}}
+	drainStdin(r)
+	if r.reads != len(r.chunks) {
+		t.Fatalf("reads = %d, want %d", r.reads, len(r.chunks))
+	}
+}
+
+func TestStatuslineMissingUsageFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	var out bytes.Buffer
+	if err := runStatusline(strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "deja · no recalls yet today" {
+		t.Fatalf("statusline = %q", got)
 	}
 }
 
