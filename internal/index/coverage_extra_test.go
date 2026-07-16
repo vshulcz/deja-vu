@@ -716,7 +716,7 @@ func TestIndexErrorBranches(t *testing.T) {
 	if err := writeSessions(filepath.Join(tmp, "missing-tmp"), filepath.Join(tmp, "out"), nil, nil, ""); err == nil {
 		t.Fatal("writeSessions missing tmp returned nil")
 	}
-	if _, err := indexTextParallel(func(chan<- tokenJob) error { return errors.New("feed") }); err == nil {
+	if _, err := indexTextParallel(func(func(tokenJob)) error { return errors.New("feed") }); err == nil {
 		t.Fatal("indexTextParallel feed error returned nil")
 	}
 	if err := writeBucketsConcurrent(badWriteDir, bucketPostings{"ta": {"talpha": {{Off: 1, Sid: 1}}}}); err == nil {
