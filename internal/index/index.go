@@ -454,6 +454,9 @@ func load(h string) []model.Session {
 	if h == "" || h == "gemini" {
 		ss = append(ss, sources.LoadGemini()...)
 	}
+	if h == "" || h == "cursor" {
+		ss = append(ss, sources.LoadCursor()...)
+	}
 	return ss
 }
 
@@ -1066,6 +1069,10 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 		return sources.ParseAiderFile(p)
 	case "gemini":
 		return sources.ParseGeminiFile(p)
+	case "cursor-db":
+		return sources.ParseCursorDB(p)
+	case "cursor":
+		return sources.ParseCursorTranscript(p)
 	default:
 		return nil, nil
 	}
@@ -1111,6 +1118,12 @@ func harnessForPath(p string) string {
 	}
 	if strings.HasPrefix(p, filepath.Join(sources.GeminiRoot(), "tmp")) && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
 		return "gemini"
+	}
+	if filepath.Base(p) == "state.vscdb" && strings.HasPrefix(p, sources.CursorUserRoot()) {
+		return "cursor-db"
+	}
+	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(sources.CursorCLIRoot(), "projects")) {
+		return "cursor"
 	}
 	return ""
 }
@@ -1160,6 +1173,14 @@ func currentFiles(h string) map[string]FileState {
 	}
 	if h == "" || h == "gemini" {
 		for _, p := range sources.GeminiChatFiles() {
+			paths[p] = true
+		}
+	}
+	if h == "" || h == "cursor" {
+		for _, p := range sources.CursorDBs() {
+			paths[p] = true
+		}
+		for _, p := range sources.CursorTranscripts() {
 			paths[p] = true
 		}
 	}

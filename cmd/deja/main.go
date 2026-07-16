@@ -41,6 +41,9 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "gemini" {
 		ss = append(ss, sources.LoadGemini()...)
 	}
+	if h == "" || h == "cursor" {
+		ss = append(ss, sources.LoadCursor()...)
+	}
 	return ss
 }
 
