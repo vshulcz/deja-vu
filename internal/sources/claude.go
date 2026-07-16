@@ -174,3 +174,18 @@ func resolveEncodedPath(base string) string {
 // ClaudeProjectName derives the display project name using the same rules as
 // the Claude source parser.
 func ClaudeProjectName(dir string) string { return claudeProjectName(dir) }
+
+// ClaudeProjectDirBase returns the encoded project dir name for a transcript
+// path, e.g. "-Users-x-projects-app" for .../projects/-Users-x-projects-app/s.jsonl.
+func ClaudeProjectDirBase(path string) string {
+	dir := claudeProjectDir(path)
+	base := filepath.Base(dir)
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		return ""
+	}
+	return base
+}
+
+// ResolveEncodedPath maps an encoded project dir name back to the real
+// directory when it still exists on disk; empty string otherwise.
+func ResolveEncodedPath(base string) string { return resolveEncodedPath(base) }
