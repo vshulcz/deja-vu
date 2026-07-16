@@ -33,6 +33,7 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "gemini"))
 	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "cursor"))
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
+	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
 	t.Setenv("NO_COLOR", "1")
 	return tmp
 }
@@ -64,6 +65,46 @@ func TestInstallMCPJSONTargetsAndErrors(t *testing.T) {
 	}
 	if _, err := installMCPJSON(bad, "/bin/deja", false); err == nil {
 		t.Fatal("expected malformed mcp json error")
+	}
+}
+
+func TestInstallGrokTOML(t *testing.T) {
+	tmp := hermeticEnv(t)
+	cfg := filepath.Join(tmp, "grok", "config.toml")
+
+	r, err := installTarget("grok", "/bin/deja", false)
+	if err != nil || r.Action != "created" || r.Path != cfg {
+		t.Fatalf("grok install: %#v %v", r, err)
+	}
+	b, _ := os.ReadFile(cfg)
+	if !strings.Contains(string(b), "[mcp_servers.deja]") || !strings.Contains(string(b), `command = "/bin/deja"`) {
+		t.Fatalf("grok config: %s", b)
+	}
+	// merge into an existing config without touching other sections
+	existing := "[cli]\nauto_update = false\n\n[mcp_servers.other]\ncommand = \"x\"\n"
+	if err := os.WriteFile(cfg, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r, err = installTarget("grok", "/bin/deja", false); err != nil || r.Action != "updated" {
+		t.Fatalf("grok merge: %#v %v", r, err)
+	}
+	b, _ = os.ReadFile(cfg)
+	for _, want := range []string{"auto_update = false", "[mcp_servers.other]", "[mcp_servers.deja]"} {
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("grok merge lost %q: %s", want, b)
+		}
+	}
+	// idempotent
+	if r, err = installTarget("grok", "/bin/deja", false); err != nil || r.Action != "unchanged" {
+		t.Fatalf("grok repeat: %#v %v", r, err)
+	}
+	// uninstall removes only our block
+	if r, err = installTarget("grok", "/bin/deja", true); err != nil || r.Action != "updated" {
+		t.Fatalf("grok uninstall: %#v %v", r, err)
+	}
+	b, _ = os.ReadFile(cfg)
+	if strings.Contains(string(b), "mcp_servers.deja") || !strings.Contains(string(b), "[mcp_servers.other]") {
+		t.Fatalf("grok uninstall config: %s", b)
 	}
 }
 

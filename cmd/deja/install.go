@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 type installResult struct{ Path, Action string }
@@ -30,6 +32,10 @@ func runInstall(args []string, uninstall bool) error {
 				targets = append(targets, "codex-auto")
 			case "opencode":
 				targets = append(targets, "opencode-auto")
+			default:
+				// cursor, gemini, antigravity, grok: the MCP server is the
+				// deepest integration those harnesses support.
+				targets = append(targets, t)
 			}
 		}
 		if len(targets) == 0 {
@@ -68,6 +74,7 @@ func existingTargets() []string {
 		"cursor":      filepath.Join(h, ".cursor"),
 		"gemini":      filepath.Join(h, ".gemini", "settings.json"),
 		"antigravity": filepath.Join(h, ".gemini", "config"),
+		"grok":        sources.GrokRoot(),
 	}
 	var out []string
 	for name, p := range checks {
@@ -99,6 +106,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "settings.json"), exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "config", "mcp_config.json"), exe, uninstall)
+	case "grok":
+		return installGrok(exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -304,11 +313,24 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 func installCodex(exe string, uninstall bool) (installResult, error) {
 	h, _ := os.UserHomeDir()
 	path := filepath.Join(h, ".codex", "config.toml")
+	block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = [\"mcp\"]\n", exe)
+	return installTOML(path, block, uninstall)
+}
+
+// installGrok wires the MCP server into Grok Build's ~/.grok/config.toml.
+// Same [mcp_servers.NAME] TOML shape as Codex; Grok's hook stdout is ignored
+// on passive events, so MCP is the deepest integration available.
+func installGrok(exe string, uninstall bool) (installResult, error) {
+	path := filepath.Join(sources.GrokRoot(), "config.toml")
+	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = [\"mcp\"]\n", exe)
+	return installTOML(path, block, uninstall)
+}
+
+func installTOML(path, block string, uninstall bool) (installResult, error) {
 	old, _ := os.ReadFile(path)
 	s := removeCodexDejaBlock(string(old))
 	s = strings.TrimRight(s, "\n")
 	if !uninstall {
-		block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = [\"mcp\"]\n", exe)
 		if s != "" {
 			s += "\n\n"
 		}
