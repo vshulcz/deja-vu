@@ -426,8 +426,8 @@ Usage:
   deja stats [--json]
   deja mcp
   deja version
-  deja install <claude-code|codex|opencode|statusline|--all>
-  deja uninstall <claude-code|codex|opencode|statusline|--all>
+  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|statusline|--all|--auto>
+  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|statusline|--all|--auto>
 
 Examples:
   deja "jwt refresh token bug"

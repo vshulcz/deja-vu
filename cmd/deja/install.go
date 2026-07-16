@@ -30,6 +30,10 @@ func runInstall(args []string, uninstall bool) error {
 				targets = append(targets, "codex-auto")
 			case "opencode":
 				targets = append(targets, "opencode-auto")
+			default:
+				// cursor, gemini, antigravity, grok: the MCP server is the
+				// deepest integration those harnesses support.
+				targets = append(targets, t)
 			}
 		}
 		if len(targets) == 0 {
