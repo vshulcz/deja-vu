@@ -294,7 +294,7 @@ func fetchUpdateURL(client *http.Client, url string, limit int64, label string) 
 	if err != nil {
 		return nil, fmt.Errorf("download %s: %w", label, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("download %s: HTTP %s", label, resp.Status)
 	}
@@ -362,7 +362,7 @@ func extractUpdateBinary(archive []byte, binaryName, goos string) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	tr := tar.NewReader(gz)
 	for {
 		header, err := tr.Next()
