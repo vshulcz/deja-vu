@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-16
+
+### Added
+- deja resume <id-prefix> reopens a found session in its native harness (claude --resume, codex resume, opencode -s), recovering the original working directory where possible. --exec runs it directly.
+
+### Changed
+- Subagent transcripts are skipped by default; DEJA_INCLUDE_SUBAGENTS=1 opts back in.
+
+### Fixed
+- A session file caught mid-write no longer loses its torn tail line: appends resume from the last complete line and pick the message up exactly once.
+
 ## [0.7.0] - 2026-07-16
 
 ### Added
