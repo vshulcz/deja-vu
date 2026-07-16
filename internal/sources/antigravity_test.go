@@ -81,6 +81,7 @@ func TestAntigravityRootsGlob(t *testing.T) {
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	want := filepath.Join(home, ".gemini", "antigravity-cli")
 	if err := os.MkdirAll(want, 0o755); err != nil {
 		t.Fatal(err)
