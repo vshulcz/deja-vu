@@ -339,6 +339,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err != nil {
 		return err
 	}
+	seenMsgs := msgSeen{}
 	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -363,6 +364,9 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 			}
 			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			for _, msg := range s.Messages {
+				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
+					continue
+				}
 				text := msg.Text
 				if len(text) > maxIndexedText {
 					text = text[:maxIndexedText]
@@ -651,6 +655,23 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 	}
 }
 
+// msgSeen dedupes identical messages within a session across duplicate
+// session objects in one indexing pass. Distinct messages (codex history
+// accumulation) pass through; format twins (gemini .json/.jsonl, cursor
+// multi-store composers) collapse.
+type msgSeen map[string]bool
+
+func (m msgSeen) dup(key, role string, ts time.Time, text string) bool {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(text))
+	k := key + "\x00" + role + "\x00" + ts.UTC().Format(time.RFC3339Nano) + "\x00" + fmt.Sprintf("%x", h.Sum64())
+	if m[k] {
+		return true
+	}
+	m[k] = true
+	return false
+}
+
 func metaForSession(s model.Session) SessionMeta {
 	title := s.Title
 	if title == "" {
@@ -904,6 +925,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		rf.Close()
 		return recErr
 	}
+	seenMsgs := msgSeen{}
 	for _, s := range replacements {
 		key := s.Harness + ":" + s.ID
 		ord := uint32(0)
@@ -917,6 +939,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 		m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 		for _, msg := range s.Messages {
+			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
+				continue
+			}
 			text := msg.Text
 			if len(text) > maxIndexedText {
 				text = text[:maxIndexedText]
