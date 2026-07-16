@@ -197,7 +197,12 @@ func printStats(w io.Writer, r statsReport) {
 
 	fmt.Fprintf(w, "%sBy harness%s\n", bold, reset)
 	for _, h := range r.Harnesses {
-		fmt.Fprintf(w, "  %-20s %4d sessions  %5d messages\n", statHarnessTag(h.Harness, color), h.Sessions, h.Messages)
+		tag := statHarnessTag(h.Harness, color)
+		pad := 14 - len(h.Harness) - 2 // visible width: [name]
+		if pad < 1 {
+			pad = 1
+		}
+		fmt.Fprintf(w, "  %s%s %4d sessions  %5d messages\n", tag, strings.Repeat(" ", pad), h.Sessions, h.Messages)
 	}
 	fmt.Fprintln(w)
 
@@ -346,6 +351,14 @@ func statHarnessTag(h string, color bool) string {
 		return statGreen + tag + statReset + statBold
 	case "opencode":
 		return statBlue + tag + statReset + statBold
+	case "cursor":
+		return "\x1b[36m" + tag + statReset + statBold
+	case "gemini":
+		return "\x1b[35m" + tag + statReset + statBold
+	case "aider":
+		return "\x1b[33m" + tag + statReset + statBold
+	case "antigravity":
+		return "\x1b[94m" + tag + statReset + statBold
 	}
 	return tag
 }
