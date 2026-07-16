@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 type sessionStartHookResponse struct {
@@ -25,6 +26,7 @@ func runHookContext() error {
 	if digest == "" {
 		return nil
 	}
+	usage.Record(index.DefaultDir(), usage.KindHook, len(digest))
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "SessionStart"
 	resp.HookSpecificOutput.AdditionalContext = digest

@@ -76,6 +76,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCodex(exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
+	case "statusline":
+		return installStatusline(exe, uninstall)
 	default:
 		return installResult{}, fmt.Errorf("unknown target %q", target)
 	}
@@ -221,6 +223,41 @@ func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall boo
 		delete(root, "hooks")
 	}
 	return root
+}
+
+// installStatusline wires `deja statusline` as the Claude Code status bar.
+// It refuses to replace a statusline the user already configured (many run
+// ccstatusline or their own script) — printing how to combine instead.
+func installStatusline(exe string, uninstall bool) (installResult, error) {
+	h, _ := os.UserHomeDir()
+	path := filepath.Join(h, ".claude", "settings.json")
+	old, _ := os.ReadFile(path)
+	var root map[string]any
+	if len(bytes.TrimSpace(old)) == 0 {
+		root = map[string]any{}
+	} else if err := json.Unmarshal(old, &root); err != nil {
+		return installResult{}, err
+	}
+	cmd := exe + " statusline"
+	existing, _ := root["statusLine"].(map[string]any)
+	if uninstall {
+		if existing == nil || existing["command"] != cmd {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		delete(root, "statusLine")
+	} else {
+		if existing != nil && existing["command"] != cmd {
+			return installResult{}, fmt.Errorf("a statusline is already configured (%v) — append `deja statusline` output to it instead of replacing it", existing["command"])
+		}
+		root["statusLine"] = map[string]any{"type": "command", "command": cmd}
+	}
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
 }
 
 func installCodex(exe string, uninstall bool) (installResult, error) {

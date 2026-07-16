@@ -12,6 +12,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 const mcpProtocolVersion = "2024-11-05"
@@ -123,7 +124,11 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		return recallText(a.Query, a.Harness, a.Limit, 4096)
+		text, err := recallText(a.Query, a.Harness, a.Limit, 4096)
+		if err == nil {
+			usage.Record(index.DefaultDir(), usage.KindRecall, len(text))
+		}
+		return text, err
 	case "recall_context":
 		var a struct {
 			Query string `json:"query"`
@@ -134,7 +139,11 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		return recallContext(a.Query)
+		text, err := recallContext(a.Query)
+		if err == nil {
+			usage.Record(index.DefaultDir(), usage.KindContext, len(text))
+		}
+		return text, err
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
 	}

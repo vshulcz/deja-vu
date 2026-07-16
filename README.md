@@ -77,6 +77,7 @@ $ deja "jwt refresh token"
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
 | `deja warmup` | Build/refresh the index without searching — handy in cron or shell startup. |
+| `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
 
 Context piping without MCP:
 

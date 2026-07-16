@@ -40,7 +40,7 @@ func loadAll(h string) []model.Session {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		usage()
+		printUsage()
 		return nil
 	}
 	if args[0] == "version" || args[0] == "--version" || args[0] == "-version" {
@@ -53,6 +53,9 @@ func run(args []string) error {
 	}
 	if args[0] == "warmup" {
 		return index.Ensure(index.DefaultDir(), "", false, os.Stderr)
+	}
+	if args[0] == "statusline" {
+		return runStatusline(os.Stdin, os.Stdout)
 	}
 	if args[0] == "stats" {
 		return runStats(args[1:])
@@ -336,7 +339,7 @@ func humanBytes(n int64) string {
 	}
 	return fmt.Sprintf("%.1f %s", f, units[i])
 }
-func usage() {
+func printUsage() {
 	fmt.Println(`deja - persistent memory for coding agents
 
 Usage:
@@ -350,11 +353,12 @@ Usage:
   deja last [n]
   deja sources
   deja warmup
+  deja statusline
   deja stats [--json]
   deja mcp
   deja version
-  deja install <claude-code|codex|opencode|--all>
-  deja uninstall <claude-code|codex|opencode|--all>
+  deja install <claude-code|codex|opencode|statusline|--all>
+  deja uninstall <claude-code|codex|opencode|statusline|--all>
 
 Examples:
   deja "jwt refresh token bug"
