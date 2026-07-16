@@ -617,7 +617,11 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h, ".gemini", "settings.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := existingTargets(); strings.Join(got, ",") != "antigravity,claude-code,codex,cursor,gemini,opencode" {
+	t.Setenv("DEJA_GROK_ROOT", filepath.Join(h, ".grok"))
+	if err := os.MkdirAll(filepath.Join(h, ".grok"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := existingTargets(); strings.Join(got, ",") != "antigravity,claude-code,codex,cursor,gemini,grok,opencode" {
 		t.Fatalf("existingTargets=%v", got)
 	}
 	if out, err := captureRun(t, "install", "--all"); err != nil || !strings.Contains(out, "claude-code:") || !strings.Contains(out, "codex:") || !strings.Contains(out, "opencode:") || !strings.Contains(out, "cursor:") {
@@ -626,7 +630,8 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 	// --auto wires MCP-only harnesses too, not just the three with hooks
 	if out, err := captureRun(t, "install", "--auto"); err != nil ||
 		!strings.Contains(out, "claude-auto:") || !strings.Contains(out, "cursor:") ||
-		!strings.Contains(out, "gemini:") || !strings.Contains(out, "antigravity:") {
+		!strings.Contains(out, "gemini:") || !strings.Contains(out, "antigravity:") ||
+		!strings.Contains(out, "grok:") {
 		t.Fatalf("install --auto out=%q err=%v", out, err)
 	}
 	for _, p := range []string{
@@ -638,6 +643,9 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 		if err != nil || !strings.Contains(string(b), `"deja"`) {
 			t.Fatalf("auto install missing mcp in %s: %v", p, err)
 		}
+	}
+	if b, err := os.ReadFile(filepath.Join(h, ".grok", "config.toml")); err != nil || !strings.Contains(string(b), "[mcp_servers.deja]") {
+		t.Fatalf("auto install missing grok mcp: %v", err)
 	}
 	if out, err := captureRun(t, "uninstall", "--all"); err != nil || !strings.Contains(out, "opencode:") {
 		t.Fatalf("uninstall --all out=%q err=%v", out, err)
