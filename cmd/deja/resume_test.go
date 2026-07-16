@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -33,6 +34,9 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"unknown harness", model.Session{Harness: "mystery", ID: "x"}, "", "", "don't know how"},
 	}
 	for _, c := range cases {
+		if runtime.GOOS == "windows" && c.name == "claude with resolvable dir" {
+			continue // claude encodes unix-style absolute paths; resolution is a no-op on windows
+		}
 		dir, cmd, err := resumeCommand(c.s)
 		if c.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
