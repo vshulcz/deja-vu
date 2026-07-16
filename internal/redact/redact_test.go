@@ -50,6 +50,81 @@ func TestTextRedactsSupportedPatterns(t *testing.T) {
 	}
 }
 
+// Modern hyphenated provider keys and the env-var / JSON key shapes that a bare
+// `api_key=` pattern misses. Fixtures are assembled at runtime so no literal
+// token ever lands in the source (GitHub push protection).
+func TestTextRedactsModernKeysAndEnvJSONShapes(t *testing.T) {
+	ant := fake("sk-ant-api03-", 40)
+	proj := fake("sk-proj-", 32)
+	cases := []struct {
+		name   string
+		in     string
+		secret string
+	}{
+		{"anthropic bare in prose", "the key is " + ant + " use it", ant},
+		{"anthropic env export", "export ANTHROPIC_API_KEY=" + ant, ant},
+		{"anthropic env assign", "ANTHROPIC_API_KEY=" + ant, ant},
+		{"anthropic json", `"ANTHROPIC_API_KEY": "` + ant + `"`, ant},
+		{"x-api-key json header", `"x-api-key": "` + ant + `"`, ant},
+		{"openai project key", "OPENAI_API_KEY=" + proj, proj},
+		{"groq key", "GROQ_API_KEY=" + fake("gsk_", 32), fake("gsk_", 32)},
+		{"xai key", "XAI_KEY=" + fake("xai-", 32), fake("xai-", 32)},
+		{"huggingface token", "HF_TOKEN=" + fake("hf_", 32), fake("hf_", 32)},
+		{"gitlab pat", "GITLAB=" + fake("glpat-", 24), fake("glpat-", 24)},
+		{"stripe live secret", "using " + fake("sk_live_", 24) + " to charge", fake("sk_live_", 24)},
+		{"stripe test secret", fake("sk_test_", 24), fake("sk_test_", 24)},
+		{"github server token", "token " + fake("ghs_", 24), fake("ghs_", 24)},
+		{"github user token", fake("ghu_", 24), fake("ghu_", 24)},
+		{"aws temporary access key", "id=" + "ASIA" + strings.Repeat("WXYZ", 4), "ASIA" + strings.Repeat("WXYZ", 4)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, counts := Text(c.in)
+			if strings.Contains(out, c.secret) {
+				t.Fatalf("secret leaked: in=%q out=%q", c.in, out)
+			}
+			if counts.Total() == 0 {
+				t.Fatalf("nothing redacted for %q", c.in)
+			}
+		})
+	}
+}
+
+// A password containing '@' must be redacted whole, not just up to the first
+// '@' (which would leave the rest of the password in the "host" portion).
+func TestTextRedactsConnURLPasswordWithAt(t *testing.T) {
+	pw := "p@ss@w0rd"
+	in := "mysql://user:" + pw + "@dbhost:3306/app"
+	out, counts := Text(in)
+	if strings.Contains(out, "ss@w0rd") || strings.Contains(out, pw) {
+		t.Fatalf("password fragment leaked: out=%q", out)
+	}
+	for _, keep := range []string{"mysql://user:", "@dbhost:3306/app"} {
+		if !strings.Contains(out, keep) {
+			t.Fatalf("surrounding text %q missing from %q", keep, out)
+		}
+	}
+	if counts.Total() == 0 {
+		t.Fatalf("nothing redacted for %q", in)
+	}
+}
+
+// Ordinary prose that merely mentions credential words must not be redacted:
+// the value class + length floor should keep false positives out.
+func TestTextKeepsOrdinaryProse(t *testing.T) {
+	for _, s := range []string{
+		"this is a token of my appreciation",
+		"the secret to success is grit",
+		"password reset link sent to your inbox",
+		"authorization is pending review",
+	} {
+		out, counts := Text(s)
+		if out != s || counts.Total() != 0 {
+			t.Fatalf("false positive on %q: out=%q counts=%#v", s, out, counts)
+		}
+	}
+}
+
 func TestDisabledEscapeHatch(t *testing.T) {
 	t.Setenv("DEJA_NO_REDACT", "1")
 	in := "api_key=" + fake("", 16)

@@ -23,14 +23,23 @@ func (c Counts) Total() int {
 }
 
 var (
-	awsAccessKeyRE = regexp.MustCompile(`AKIA[0-9A-Z]{16}`)
-	awsSecretRE    = regexp.MustCompile(`(?i)\b(aws[_-]?secret[_-]?access[_-]?key)(\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=_-]{32,})(['"]?)`)
-	genericKVRE    = regexp.MustCompile(`(?i)\b(api[_-]?key|secret|token|passwd|password|authorization)(\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
-	bearerRE       = regexp.MustCompile(`(?i)\b(Bearer)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
-	pemPrivateRE   = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`)
-	providerRE     = regexp.MustCompile(`\b(ghp_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
-	jwtRE          = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b`)
-	connURLRE      = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://)([^\s/@:]+):([^\s/@]+)@([^\s]+)`) // scheme://user:pass@host
+	awsAccessKeyRE = regexp.MustCompile(`A(?:KIA|SIA)[0-9A-Z]{16}`)
+	awsSecretRE    = regexp.MustCompile(`(?i)\b(aws[_-]?secret[_-]?access[_-]?key)(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=_-]{32,})(['"]?)`)
+	// The key may be embedded in a larger identifier (ANTHROPIC_API_KEY,
+	// x-api-key) and, in JSON, a closing quote can sit between the key and the
+	// delimiter ("api_key": "..."). Tolerate both so env-var and JSON forms are
+	// caught, not just a bare `api_key=`.
+	genericKVRE  = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
+	bearerRE     = regexp.MustCompile(`(?i)\b(Bearer)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	pemPrivateRE = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`)
+	// Provider prefixes. sk- allows internal hyphens/underscores so modern
+	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
+	// sk-<alnum> keys.
+	providerRE = regexp.MustCompile(`\b(gh[opsur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9-]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
+	jwtRE      = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b`)
+	// Password is greedy so a password containing '@' (user:p@ss@host) splits on
+	// the last '@' and is redacted whole, not just up to the first '@'.
+	connURLRE = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://)([^\s/@:]+):([^\s]+)@([^\s]+)`) // scheme://user:pass@host
 )
 
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
@@ -83,10 +92,24 @@ func replaceProvider(s string, counts Counts) string {
 	return providerRE.ReplaceAllStringFunc(s, func(v string) string {
 		kind := "provider-token"
 		switch {
-		case strings.HasPrefix(v, "ghp_"), strings.HasPrefix(v, "gho_"), strings.HasPrefix(v, "github_pat_"):
+		case strings.HasPrefix(v, "ghp_"), strings.HasPrefix(v, "gho_"), strings.HasPrefix(v, "ghs_"),
+			strings.HasPrefix(v, "ghu_"), strings.HasPrefix(v, "ghr_"), strings.HasPrefix(v, "github_pat_"):
 			kind = "github-token"
+		case strings.HasPrefix(v, "sk_live_"), strings.HasPrefix(v, "sk_test_"),
+			strings.HasPrefix(v, "rk_live_"), strings.HasPrefix(v, "rk_test_"):
+			kind = "stripe-key"
+		case strings.HasPrefix(v, "sk-ant-"):
+			kind = "anthropic-key"
 		case strings.HasPrefix(v, "sk-"):
 			kind = "openai-key"
+		case strings.HasPrefix(v, "gsk_"):
+			kind = "groq-key"
+		case strings.HasPrefix(v, "xai-"):
+			kind = "xai-key"
+		case strings.HasPrefix(v, "hf_"):
+			kind = "huggingface-token"
+		case strings.HasPrefix(v, "glpat-"):
+			kind = "gitlab-token"
 		case strings.HasPrefix(v, "npm_"):
 			kind = "npm-token"
 		case strings.HasPrefix(v, "xoxb-"), strings.HasPrefix(v, "xoxp-"), strings.HasPrefix(v, "xoxc-"), strings.HasPrefix(v, "xoxs-"):
