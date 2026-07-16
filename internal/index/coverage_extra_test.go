@@ -440,6 +440,209 @@ func TestImportOldMetaBranchAndSkips(t *testing.T) {
 	}
 }
 
+func TestRequestedPureCheapIndexCoverageBranches(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+
+	cursorDB := filepath.Join(os.Getenv("DEJA_CURSOR_ROOT"), "globalStorage", "state.vscdb")
+	gemini := filepath.Join(os.Getenv("DEJA_GEMINI_ROOT"), "tmp", "gid", "chats", "g.json")
+	ag := filepath.Join(os.Getenv("DEJA_ANTIGRAVITY_ROOT"), "brain", "traj", ".system_generated", "logs", "transcript.jsonl")
+	unknown := filepath.Join(tmp, "unknown.txt")
+	for _, p := range []string{cursorDB, gemini, ag, unknown} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(cursorDB, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(gemini, []byte(`{"sessionId":"g","startTime":"2026-01-01T00:00:00Z","messages":[{"type":"user","content":"hello gemini"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ag, []byte(`{"source":"USER_EXPLICIT","created_at":"2026-01-01T00:00:00Z","content":"hello antigravity"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(unknown, []byte("ignored"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		path string
+		old  FileState
+		want int
+	}{
+		{name: "cursor-db full", path: cursorDB},
+		{name: "cursor-db since", path: cursorDB, old: FileState{LastUpdated: time.Now().UnixNano()}},
+		{name: "gemini", path: gemini, want: 1},
+		{name: "antigravity", path: ag, want: 1},
+		{name: "unknown", path: unknown},
+	} {
+		t.Run("changed "+tc.name, func(t *testing.T) {
+			got, err := parseChangedFile("", tc.path, tc.old)
+			if err != nil || len(got) != tc.want {
+				t.Fatalf("parseChangedFile len=%d err=%v", len(got), err)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name string
+		path string
+		old  FileState
+	}{
+		{name: "cursor-db full", path: cursorDB, old: FileState{Size: 10, SafeSize: 20}},
+		{name: "cursor-db since", path: cursorDB, old: FileState{LastUpdated: time.Now().UnixNano()}},
+		{name: "gemini default", path: gemini},
+		{name: "antigravity default", path: ag},
+		{name: "unknown default", path: unknown},
+	} {
+		t.Run("appended "+tc.name, func(t *testing.T) {
+			got, err := parseAppendedFile("", tc.path, tc.old)
+			if err != nil || got != nil {
+				t.Fatalf("parseAppendedFile got=%#v err=%v", got, err)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name string
+		s    model.Session
+		want string
+	}{
+		{name: "local command", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<local-command x"}, {Role: "user", Text: "real title"}}}, want: "real title"},
+		{name: "command", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<command-name>"}, {Role: "user", Text: "next"}}}, want: "next"},
+		{name: "task notification", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<task-notification z"}, {Role: "user", Text: "task"}}}, want: "task"},
+		{name: "teammate", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<teammate-message z"}, {Role: "user", Text: "team"}}}, want: "team"},
+		{name: "caveat", s: model.Session{Messages: []model.Message{{Role: "user", Text: "Caveat: noisy"}, {Role: "assistant", Text: "skip"}}}, want: ""},
+	} {
+		t.Run("title "+tc.name, func(t *testing.T) {
+			if got := sessionTitle(tc.s); got != tc.want {
+				t.Fatalf("sessionTitle=%q want %q", got, tc.want)
+			}
+		})
+	}
+
+	manifestDir := filepath.Join(tmp, "manifest-check")
+	if err := os.MkdirAll(manifestDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if HasManifest(manifestDir) {
+		t.Fatal("empty dir has manifest")
+	}
+	if err := os.WriteFile(filepath.Join(manifestDir, "manifest.gob"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if HasManifest(manifestDir) {
+		t.Fatal("manifest without sessions detected")
+	}
+
+	idx := filepath.Join(tmp, "empty-index")
+	if err := initEmptyIndex(idx); err != nil {
+		t.Fatal(err)
+	}
+	if !HasManifest(idx) {
+		t.Fatal("initEmptyIndex did not write manifest files")
+	}
+	if fi, err := os.Stat(filepath.Join(idx, "records.bin")); err != nil || fi.Size() != 0 {
+		t.Fatalf("records.bin stat=%v err=%v", fi, err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		rec  Record
+		o    search.Options
+		want bool
+	}{
+		{name: "regex bypass", rec: Record{Text: ""}, o: search.Options{Regex: true, Query: "missing"}, want: true},
+		{name: "empty query", rec: Record{Text: ""}, o: search.Options{}, want: true},
+		{name: "all tokens", rec: Record{Text: "Hello brave world"}, o: search.Options{Query: "hello world"}, want: true},
+		{name: "missing token", rec: Record{Text: "Hello world"}, o: search.Options{Query: "hello absent"}, want: false},
+	} {
+		t.Run("match "+tc.name, func(t *testing.T) {
+			if got := recordMatchesQuery(tc.rec, tc.o); got != tc.want {
+				t.Fatalf("recordMatchesQuery=%v want %v", got, tc.want)
+			}
+		})
+	}
+	if got := queryKeys("b aa b ccc"); strings.Join(got, ",") != "tccc,taa" {
+		t.Fatalf("queryKeys=%#v", got)
+	}
+	if got := queryKeys("! ?"); got != nil {
+		t.Fatalf("empty queryKeys=%#v", got)
+	}
+}
+
+func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	if got := lastCompleteLineOffset(filepath.Join(tmp, "empty"), 0); got != 0 {
+		t.Fatalf("empty lastCompleteLineOffset=%d", got)
+	}
+	largeNoNL := filepath.Join(tmp, "large-nonl")
+	large := strings.Repeat("x", 64*1024+5)
+	if err := os.WriteFile(largeNoNL, []byte(large), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastCompleteLineOffset(largeNoNL, int64(len(large))); got != int64(len(large)) {
+		t.Fatalf("large no newline offset=%d", got)
+	}
+	exact := filepath.Join(tmp, "exact-window")
+	exactData := strings.Repeat("x", 64*1024-1) + "\n"
+	if err := os.WriteFile(exact, []byte(exactData), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastCompleteLineOffset(exact, int64(len(exactData))); got != int64(len(exactData)) {
+		t.Fatalf("exact boundary offset=%d", got)
+	}
+
+	for _, data := range [][]byte{
+		{0x80},
+		appendField(nil, "key"),
+		[]byte("garbage"),
+	} {
+		if _, err := decodeRecord(data); !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("decodeRecord(%v) err=%v", data, err)
+		}
+	}
+	recPath := filepath.Join(tmp, "records.bin")
+	if err := os.WriteFile(recPath, []byte{0, 0, 0}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(recPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := readRecordAt(f, 99); !errors.Is(err, io.EOF) {
+		t.Fatalf("readRecordAt bad offset err=%v", err)
+	}
+
+	if got, err := intersectSubstringPostings(filepath.Join(tmp, "missing-index"), []string{"nope"}); err != nil || got != nil {
+		t.Fatalf("missing substring postings=%#v err=%v", got, err)
+	}
+	dir := filepath.Join(tmp, "substring-index")
+	if err := os.MkdirAll(filepath.Join(dir, "buckets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := intersectSubstringPostings(dir, nil); err != nil || got != nil {
+		t.Fatalf("empty substring postings=%#v err=%v", got, err)
+	}
+	bp := filepath.Join(dir, "buckets", bucket("talpha")+".bin")
+	if err := writeBucket(bp, map[string][]posting{
+		"talpha": {{Off: 1, Sid: 1}, {Off: 2, Sid: 2}},
+		"tbeta":  {{Off: 2, Sid: 2}, {Off: 3, Sid: 3}},
+		"tgamma": {{Off: 2, Sid: 2}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := intersectSubstringPostings(dir, []string{"alp", "bet", "gam", "ignored"})
+	if err != nil || len(got) != 1 || got[0].Off != 2 || got[0].Sid != 2 {
+		t.Fatalf("multi substring postings=%#v err=%v", got, err)
+	}
+	got, err = intersectSubstringPostings(dir, []string{"alp", "zzz"})
+	if err != nil || got != nil {
+		t.Fatalf("disjoint substring postings=%#v err=%v", got, err)
+	}
+}
+
 func TestIndexErrorBranches(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	blockedParent := filepath.Join(tmp, "blocked")
