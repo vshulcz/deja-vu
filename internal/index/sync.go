@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -151,8 +153,15 @@ func Import(dir, inDir string) (int, error) {
 			if sr.Harness == "" || origID == "" {
 				return nil
 			}
-			dedupe := sr.Harness + ":" + origID + ":" + sr.Time.UTC().Format(time.RFC3339Nano)
-			if m.ImportedRecords[dedupe] {
+			// Key includes role and a text hash: two messages can legally share
+			// a timestamp (aider stamps a whole session with its start time).
+			// The legacy time-only key is still honored so batches imported by
+			// older versions stay idempotent.
+			legacy := sr.Harness + ":" + origID + ":" + sr.Time.UTC().Format(time.RFC3339Nano)
+			th := fnv.New64a()
+			_, _ = th.Write([]byte(sr.Text))
+			dedupe := legacy + ":" + sr.Role + ":" + strconv.FormatUint(th.Sum64(), 16)
+			if m.ImportedRecords[dedupe] || m.ImportedRecords[legacy] {
 				return nil
 			}
 			importID := ImportedSessionID(sr.Harness, origID)

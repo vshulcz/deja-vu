@@ -96,19 +96,40 @@ func LoadCursor() []model.Session {
 	return ss
 }
 
+// ParseCursorDBSince returns only messages newer than t: composers whose
+// lastUpdatedAt passed the watermark, and within them only bubbles stamped
+// after it. Bubbles without timestamps are only picked up by full rebuilds —
+// modern Cursor stamps every bubble, so the append path stays correct.
+func ParseCursorDBSince(db string, t time.Time) ([]model.Session, error) {
+	if t.IsZero() {
+		return ParseCursorDB(db)
+	}
+	return parseCursorDB(db, t.UnixMilli())
+}
+
 // ParseCursorDB reads composer sessions with a narrow projection — dumping
 // whole JSON values through the sqlite3 pipe on a multi-hundred-MB store
 // takes minutes, extracting scalars takes seconds (same lesson as opencode).
 func ParseCursorDB(db string) ([]model.Session, error) {
+	return parseCursorDB(db, 0)
+}
+
+func parseCursorDB(db string, sinceMS int64) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
+	}
+	composerWhere := ""
+	bubbleWhere := ""
+	if sinceMS > 0 {
+		composerWhere = fmt.Sprintf(" and json_extract(value,'$.lastUpdatedAt') > %d", sinceMS)
+		bubbleWhere = fmt.Sprintf(" and json_extract(value,'$.timestamp') > %d", sinceMS)
 	}
 	composers, err := cursorQuery(db, `select key,`+
 		`json_extract(value,'$.composerId') as cid,`+
 		`json_extract(value,'$.name') as name,`+
 		`json_extract(value,'$.createdAt') as created,`+
 		`json_extract(value,'$.lastUpdatedAt') as updated `+
-		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`)
+		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`+composerWhere)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +141,7 @@ func ParseCursorDB(db string) ([]model.Session, error) {
 		`coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')) as text,`+
 		`json_extract(value,'$.timestamp') as ts,`+
 		`json_extract(value,'$.workspaceProjectDir') as wsdir `+
-		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`)
+		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`+bubbleWhere)
 	if err != nil {
 		return nil, err
 	}

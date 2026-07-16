@@ -985,7 +985,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			return false
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode":
+		case "claude", "codex", "codex-history", "opencode", "cursor-db":
 		default:
 			return false
 		}
@@ -1118,12 +1118,15 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
 		}
 		return sources.ParseOpencodeDB(p)
+	case "cursor-db":
+		if old.LastUpdated > 0 {
+			return sources.ParseCursorDBSince(p, time.Unix(0, old.LastUpdated))
+		}
+		return sources.ParseCursorDB(p)
 	case "aider":
 		return sources.ParseAiderFile(p)
 	case "gemini":
 		return sources.ParseGeminiFile(p)
-	case "cursor-db":
-		return sources.ParseCursorDB(p)
 	case "cursor":
 		return sources.ParseCursorTranscript(p)
 	case "antigravity":
@@ -1150,6 +1153,11 @@ func parseAppendedFile(harness, p string, old FileState) ([]model.Session, error
 			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
 		}
 		return sources.ParseOpencodeDB(p)
+	case "cursor-db":
+		if old.LastUpdated > 0 {
+			return sources.ParseCursorDBSince(p, time.Unix(0, old.LastUpdated))
+		}
+		return sources.ParseCursorDB(p)
 	default:
 		return nil, nil
 	}
@@ -1191,14 +1199,22 @@ func harnessForPath(p string) string {
 }
 
 func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
-	db := sources.OpencodeDB()
+	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
+	for _, db := range sources.CursorDBs() {
+		setStoreLastUpdated(files, sessions, "cursor", db)
+	}
+}
+
+// setStoreLastUpdated stamps a database-backed store with the newest session
+// time so incremental passes can query only newer content.
+func setStoreLastUpdated(files map[string]FileState, sessions map[string]SessionMeta, harness, db string) {
 	f, ok := files[db]
 	if !ok {
 		return
 	}
 	var latest int64
 	for _, s := range sessions {
-		if s.Harness == "opencode" && s.Updated.UnixNano() > latest {
+		if s.Harness == harness && s.Updated.UnixNano() > latest {
 			latest = s.Updated.UnixNano()
 		}
 	}
