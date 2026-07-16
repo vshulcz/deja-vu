@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -68,6 +69,7 @@ func hookDigest() string {
 			names = append(names, base)
 		}
 	}
+	localOnly := os.Getenv("DEJA_AUTORECALL_LOCAL_ONLY") == "1"
 	var ss []model.Session
 	seen := map[string]bool{}
 	for _, name := range names {
@@ -76,6 +78,9 @@ func hookDigest() string {
 			continue
 		}
 		for _, s := range got {
+			if localOnly && strings.HasPrefix(s.Project, "imported:") {
+				continue
+			}
 			k := s.Harness + ":" + s.ID
 			if seen[k] {
 				continue
