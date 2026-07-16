@@ -97,6 +97,9 @@ func run(args []string) error {
 	if args[0] == "uninstall" {
 		return runInstall(args[1:], true)
 	}
+	if args[0] == "update" {
+		return runUpdate(args[1:], os.Stdout)
+	}
 	if args[0] == "show" {
 		if len(args) < 2 {
 			return fmt.Errorf("show needs id-prefix")
@@ -426,6 +429,7 @@ Usage:
   deja stats [--json]
   deja mcp
   deja version
+  deja update
   deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|statusline|--all|--auto>
   deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|statusline|--all|--auto>
 
