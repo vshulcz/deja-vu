@@ -372,7 +372,7 @@ func TestDuplicateSessionBranchesAndAdditionalParsers(t *testing.T) {
 		}
 	}
 	dir := filepath.Join(tmp, "dup-index")
-	if err := rebuild(dir, "claude", "", currentFiles("claude")); err != nil {
+	if err := rebuild(dir, "claude", "", currentFiles("claude"), nil); err != nil {
 		t.Fatal(err)
 	}
 	if ss, err := Search(dir, search.Options{Query: "duplicate", All: true}); err != nil || len(ss) != 1 {

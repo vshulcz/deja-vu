@@ -77,6 +77,17 @@ func run(args []string) error {
 	if args[0] == "warmup" {
 		return index.Ensure(index.DefaultDir(), "", false, os.Stderr)
 	}
+	if args[0] == "index" {
+		force := false
+		for _, a := range args[1:] {
+			if a == "--rebuild" || a == "-rebuild" {
+				force = true
+				continue
+			}
+			return fmt.Errorf("index: unknown flag %q", a)
+		}
+		return index.Ensure(index.DefaultDir(), "", force, os.Stderr)
+	}
 	if args[0] == "statusline" {
 		return runStatusline(os.Stdin, os.Stdout)
 	}
@@ -425,6 +436,7 @@ Usage:
   deja last [n]
   deja sources
   deja warmup
+  deja index [--rebuild]
   deja statusline
   deja stats [--json]
   deja mcp

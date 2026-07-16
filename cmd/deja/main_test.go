@@ -667,3 +667,16 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 		})
 	}
 }
+
+func TestRunIndexCommand(t *testing.T) {
+	withTempStores(t)
+	if out, err := captureRun(t, "index"); err != nil || out != "" {
+		t.Fatalf("index out=%q err=%v", out, err)
+	}
+	if _, err := captureRun(t, "index", "--rebuild"); err != nil {
+		t.Fatalf("index --rebuild err=%v", err)
+	}
+	if _, err := captureRun(t, "index", "--bogus"); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("index bogus err=%v", err)
+	}
+}
