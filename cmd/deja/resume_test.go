@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -50,5 +51,51 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		if dir != c.wantDir || cmd != c.wantCmd {
 			t.Fatalf("%s: got (%q, %q), want (%q, %q)", c.name, dir, cmd, c.wantDir, c.wantCmd)
 		}
+	}
+}
+
+func TestRunResumePrintAndErrors(t *testing.T) {
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-tmp-resume")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"type":"user","sessionId":"resume123","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"resume needle"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "resume123.jsonl"), []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+
+	var out bytes.Buffer
+	if err := runResume([]string{"resume"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); !strings.Contains(got, "claude --resume resume123") {
+		t.Fatalf("resume output = %q", got)
+	}
+
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"missing", nil, "resume needs id-prefix"},
+		{"exec without prefix", []string{"--exec"}, "resume needs id-prefix"},
+		{"not found", []string{"nope"}, `no session matches "nope"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var discard bytes.Buffer
+			err := runResume(tc.args, &discard)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+		})
 	}
 }

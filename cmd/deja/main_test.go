@@ -296,6 +296,26 @@ func TestVersionDefaultIsDev(t *testing.T) {
 	}
 }
 
+func TestLoadAllHermeticEmptySources(t *testing.T) {
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "aider"))
+	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "gemini"))
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "cursor-workspaces"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
+	if got := loadAll(""); len(got) != 0 {
+		t.Fatalf("loadAll empty sources = %#v", got)
+	}
+	if got := loadAll("claude"); len(got) != 0 {
+		t.Fatalf("loadAll claude = %#v", got)
+	}
+}
+
 func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
 	if err != nil {

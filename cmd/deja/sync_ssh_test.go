@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,9 @@ import (
 func setupLocalIndex(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-tmp-sshsync")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
@@ -29,6 +33,41 @@ func setupLocalIndex(t *testing.T) string {
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	return tmp
+}
+
+func TestSyncSSHPullFullAndScpFailure(t *testing.T) {
+	setupLocalIndex(t)
+	old := sshRunner
+	defer func() { sshRunner = old }()
+	var exportCmd string
+	var cleanup bool
+	sshRunner = func(name string, args ...string) (string, error) {
+		if name == "ssh" && args[1] == "mktemp -d" {
+			return "/tmp/remote-out", nil
+		}
+		if name == "ssh" && strings.Contains(args[1], "sync export") {
+			exportCmd = args[1]
+			return "deja: exported 1 records", nil
+		}
+		if name == "ssh" && strings.Contains(args[1], "rm -rf") {
+			cleanup = true
+			return "", nil
+		}
+		if name == "scp" {
+			return "permission denied", errors.New("exit status 1")
+		}
+		return "", nil
+	}
+	err := runSyncSSH([]string{"minihost", "--pull", "--full"})
+	if err == nil || !strings.Contains(err.Error(), "scp: exit status 1: permission denied") {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(exportCmd, "sync export --full") {
+		t.Fatalf("export command = %q", exportCmd)
+	}
+	if !cleanup {
+		t.Fatal("expected remote cleanup after scp failure")
+	}
 }
 
 func TestSyncSSHPush(t *testing.T) {
@@ -136,5 +175,32 @@ func TestSyncSSHBadArgs(t *testing.T) {
 	}
 	if err := runSyncSSH([]string{"a", "b"}); err == nil {
 		t.Fatal("expected error for two hosts")
+	}
+}
+
+func TestRunSyncExportImport(t *testing.T) {
+	setupLocalIndex(t)
+	out := filepath.Join(t.TempDir(), "export")
+	if err := runSync([]string{"export", "--full", out}); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected exported batch")
+	}
+	importDir := filepath.Join(t.TempDir(), "import.db")
+	t.Setenv("DEJA_INDEX_DIR", importDir)
+	if err := runSync([]string{"import", out}); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := index.Search(importDir, search.Options{Query: "sshneedle", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 {
+		t.Fatalf("imported sessions = %#v", ss)
 	}
 }
