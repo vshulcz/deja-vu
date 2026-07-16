@@ -45,7 +45,7 @@ brew install vshulcz/tap/deja-vu                        # Homebrew
 Wire it into the agents you use (edits config, keeps a `.bak`):
 
 ```sh
-deja install --all          # MCP recall for claude-code, codex, opencode
+deja install --all          # MCP recall for every agent it finds on this machine
 deja install claude-code --auto   # + SessionStart auto-recall hook
 ```
 
@@ -108,7 +108,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall; `deja install --auto` also adds session-start auto-recall on every harness it finds (Claude Code hook, Codex hooks.json, an opencode plugin). To make
+`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` also adds session-start auto-recall on every harness it finds (Claude Code hook, Codex hooks.json, an opencode plugin). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
