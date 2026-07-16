@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-07-16
+
+### Added
+- MCP install targets for Cursor (~/.cursor/mcp.json), Gemini CLI (~/.gemini/settings.json) and Antigravity (~/.gemini/config/mcp_config.json); install --all picks them up.
+
+### Fixed
+- Cursor searches no longer re-merge the whole index on every call: the state store carries a watermark and incremental passes fetch only new messages (#72).
+- The same chat arriving from two stores (gemini .json/.jsonl, cursor multi-store) no longer duplicates messages.
+- Sync import keeps messages that share a timestamp within one session.
+- deja sources lists all seven harnesses and attributes opencode redaction counts correctly.
+- deja resume covers all seven harnesses — native commands where they exist, honest guidance where they do not.
+- deja stats aligns and colors every harness tag.
+
 ## [0.9.1] - 2026-07-16
 
 ### Added
