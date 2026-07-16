@@ -140,7 +140,7 @@ Credentials are redacted at index time: AWS keys, generic `api_key=`/`token=` as
 | Claude Code | `~/.claude/projects/**/*.jsonl` | ✅ |
 | Codex CLI | `~/.codex/sessions/**` + `history.jsonl` | ✅ |
 | opencode | `~/.local/share/opencode/opencode.db` | ✅ |
-| aider, Gemini CLI | [#6](https://github.com/vshulcz/deja-vu/issues/6), [#7](https://github.com/vshulcz/deja-vu/issues/7) | planned |
+| aider, Gemini CLI, Antigravity | [#6](https://github.com/vshulcz/deja-vu/issues/6), [#7](https://github.com/vshulcz/deja-vu/issues/7) | planned |
 
 Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_INDEX_DIR`.
 

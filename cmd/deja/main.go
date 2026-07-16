@@ -44,6 +44,9 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "cursor" {
 		ss = append(ss, sources.LoadCursor()...)
 	}
+	if h == "" || h == "antigravity" {
+		ss = append(ss, sources.LoadAntigravity()...)
+	}
 	return ss
 }
 

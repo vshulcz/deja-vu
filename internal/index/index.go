@@ -457,6 +457,9 @@ func load(h string) []model.Session {
 	if h == "" || h == "cursor" {
 		ss = append(ss, sources.LoadCursor()...)
 	}
+	if h == "" || h == "antigravity" {
+		ss = append(ss, sources.LoadAntigravity()...)
+	}
 	return ss
 }
 
@@ -1073,6 +1076,8 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 		return sources.ParseCursorDB(p)
 	case "cursor":
 		return sources.ParseCursorTranscript(p)
+	case "antigravity":
+		return sources.ParseAntigravityFile(p)
 	default:
 		return nil, nil
 	}
@@ -1124,6 +1129,13 @@ func harnessForPath(p string) string {
 	}
 	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(sources.CursorCLIRoot(), "projects")) {
 		return "cursor"
+	}
+	if filepath.Base(p) == "transcript.jsonl" {
+		for _, root := range sources.AntigravityRoots() {
+			if strings.HasPrefix(p, root+string(filepath.Separator)) {
+				return "antigravity"
+			}
+		}
 	}
 	return ""
 }
@@ -1181,6 +1193,11 @@ func currentFiles(h string) map[string]FileState {
 			paths[p] = true
 		}
 		for _, p := range sources.CursorTranscripts() {
+			paths[p] = true
+		}
+	}
+	if h == "" || h == "antigravity" {
+		for _, p := range sources.AntigravityTranscripts() {
 			paths[p] = true
 		}
 	}
