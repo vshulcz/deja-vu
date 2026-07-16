@@ -238,7 +238,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	if err != nil {
 		return err
 	}
-	if _, err := rf.Seek(0, io.SeekEnd); err != nil {
+	rw, err := newRecordWriter(rf)
+	if err != nil {
 		_ = rf.Close()
 		return err
 	}
@@ -280,22 +281,22 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {
-			off, err := writeRecord(rf, r)
+			off, err := rw.write(r)
 			if err != nil {
-				_ = rf.Close()
+				_ = rw.Close()
 				return err
 			}
 			for _, tok := range indexKeys(r.Text) {
 				data, err := loadBucket(tok)
 				if err != nil {
-					_ = rf.Close()
+					_ = rw.Close()
 					return err
 				}
 				data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
 			}
 		}
 	}
-	if err := rf.Close(); err != nil {
+	if err := rw.Close(); err != nil {
 		return err
 	}
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {

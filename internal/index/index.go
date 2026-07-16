@@ -343,8 +343,13 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err != nil {
 		return err
 	}
+	rw, err := newRecordWriter(rf)
+	if err != nil {
+		_ = rf.Close()
+		return err
+	}
 	seenMsgs := msgSeen{}
-	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
+	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
@@ -376,20 +381,20 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 					text = text[:maxIndexedText]
 				}
 				text = redactForIngest(&m, s.Path, text)
-				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
 				}
-				jobs <- tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord}
+				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord})
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		_ = rf.Close()
+		_ = rw.Close()
 		return err
 	}
-	if err := rf.Close(); err != nil {
+	if err := rw.Close(); err != nil {
 		return err
 	}
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
@@ -499,7 +504,12 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if err != nil {
 		return err
 	}
-	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
+	rw, err := newRecordWriter(rf)
+	if err != nil {
+		_ = rf.Close()
+		return err
+	}
+	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
@@ -528,20 +538,20 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 					text = text[:maxIndexedText]
 				}
 				text = redactForIngest(&m, s.Path, text)
-				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
 				}
-				jobs <- tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord}
+				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord})
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		_ = rf.Close()
+		_ = rw.Close()
 		return err
 	}
-	if err := rf.Close(); err != nil {
+	if err := rw.Close(); err != nil {
 		return err
 	}
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
@@ -563,12 +573,16 @@ type tokenJob struct {
 
 type bucketPostings map[string]map[string][]posting
 
-func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error) {
+// indexTextParallel hands the feed a push callback and moves jobs to the
+// workers in batches: one channel send per message caused enough scheduler
+// wakeups to show up as ~20% of a cold rebuild profile.
+func indexTextParallel(feed func(push func(tokenJob)) error) (bucketPostings, error) {
 	workers := runtime.NumCPU()
 	if workers < 1 {
 		workers = 1
 	}
-	jobs := make(chan tokenJob, workers*256)
+	const batchSize = 512
+	jobs := make(chan []tokenJob, workers*4)
 	partials := make([]bucketPostings, workers)
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
@@ -577,12 +591,25 @@ func indexTextParallel(feed func(chan<- tokenJob) error) (bucketPostings, error)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for job := range jobs {
-				addIndexKeys(partials[i], job.text, job.offset, job.sid)
+			for batch := range jobs {
+				for _, job := range batch {
+					addIndexKeys(partials[i], job.text, job.offset, job.sid)
+				}
 			}
 		}()
 	}
-	err := feed(jobs)
+	batch := make([]tokenJob, 0, batchSize)
+	push := func(j tokenJob) {
+		batch = append(batch, j)
+		if len(batch) == batchSize {
+			jobs <- batch
+			batch = make([]tokenJob, 0, batchSize)
+		}
+	}
+	err := feed(push)
+	if len(batch) > 0 {
+		jobs <- batch
+	}
 	close(jobs)
 	wg.Wait()
 	if err != nil {
@@ -878,6 +905,11 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err != nil {
 		return err
 	}
+	rw, err := newRecordWriter(rf)
+	if err != nil {
+		_ = rf.Close()
+		return err
+	}
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ImportedRecords: old.ImportedRecords}
 	skipRedactions := map[string]bool{}
@@ -901,7 +933,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			return nil
 		}
 		r.Text = redactForIngest(&m, r.SourcePath, r.Text)
-		off, err := writeRecord(rf, r)
+		off, err := rw.write(r)
 		if err != nil {
 			return err
 		}
@@ -933,11 +965,11 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 		recErr = addRec(r)
 	}); err != nil {
-		_ = rf.Close()
+		_ = rw.Close()
 		return err
 	}
 	if recErr != nil {
-		rf.Close()
+		_ = rw.Close()
 		return recErr
 	}
 	seenMsgs := msgSeen{}
@@ -963,12 +995,12 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			}
 			text = redactForIngest(&m, s.Path, text)
 			if err := addRec(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time}); err != nil {
-				rf.Close()
+				_ = rw.Close()
 				return err
 			}
 		}
 	}
-	if err := rf.Close(); err != nil {
+	if err := rw.Close(); err != nil {
 		return err
 	}
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
@@ -1006,10 +1038,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err != nil {
 		return 0, 0, err
 	}
-	defer rf.Close()
-	if _, err := rf.Seek(0, io.SeekEnd); err != nil {
+	rw, err := newRecordWriter(rf)
+	if err != nil {
+		_ = rf.Close()
 		return 0, 0, err
 	}
+	defer func() { _ = rw.Close() }()
 	buckets := bucketPostings{}
 	loadBucket := func(tok string) (map[string][]posting, error) {
 		b := bucket(tok)
@@ -1077,7 +1111,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					text = text[:maxIndexedText]
 				}
 				text = redactForIngest(&m, s.Path, text)
-				off, err := writeRecord(rf, Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
+				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return filesTouched, messages, err
 				}
@@ -1097,7 +1131,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			}
 		}
 	}
-	if err := rf.Close(); err != nil {
+	if err := rw.Close(); err != nil {
 		return filesTouched, messages, err
 	}
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
@@ -1523,6 +1557,50 @@ func sortedUniquePostings(posts []posting) []posting {
 	return out[:n]
 }
 
+// recordWriter appends length-prefixed records through one buffer, tracking
+// the file offset in memory: the hot rebuild path used to pay a Seek syscall
+// per record, which dominated cold-rebuild profiles.
+type recordWriter struct {
+	f   *os.File
+	w   *bufio.Writer
+	off int64
+}
+
+func newRecordWriter(f *os.File) (*recordWriter, error) {
+	off, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, err
+	}
+	return &recordWriter{f: f, w: bufio.NewWriterSize(f, 1<<20), off: off}, nil
+}
+
+func (rw *recordWriter) write(r Record) (int64, error) {
+	b := encodeRecord(r)
+	if len(b) > 1<<31 {
+		return 0, fmt.Errorf("record too large")
+	}
+	var hdr [4]byte
+	binary.LittleEndian.PutUint32(hdr[:], uint32(len(b)))
+	if _, err := rw.w.Write(hdr[:]); err != nil {
+		return 0, err
+	}
+	if _, err := rw.w.Write(b); err != nil {
+		return 0, err
+	}
+	off := rw.off
+	rw.off += int64(len(hdr)) + int64(len(b))
+	return off, nil
+}
+
+func (rw *recordWriter) Close() error {
+	ferr := rw.w.Flush()
+	cerr := rw.f.Close()
+	if ferr != nil {
+		return ferr
+	}
+	return cerr
+}
+
 func writeRecord(f *os.File, r Record) (int64, error) {
 	off, err := f.Seek(0, io.SeekCurrent)
 	if err != nil {
@@ -1879,35 +1957,36 @@ func writeBucket(p string, data map[string][]posting) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.Write(bucketMagic); err != nil {
+	w := bufio.NewWriterSize(f, 1<<20)
+	if _, err := w.Write(bucketMagic); err != nil {
 		return err
 	}
 	var scratch [binary.MaxVarintLen64]byte
 	n := binary.PutUvarint(scratch[:], uint64(len(entries)))
-	if _, err := f.Write(scratch[:n]); err != nil {
+	if _, err := w.Write(scratch[:n]); err != nil {
 		return err
 	}
 	for _, e := range entries {
 		n = binary.PutUvarint(scratch[:], uint64(len(e.tok)))
-		if _, err := f.Write(scratch[:n]); err != nil {
+		if _, err := w.Write(scratch[:n]); err != nil {
 			return err
 		}
-		if _, err := f.Write([]byte(e.tok)); err != nil {
+		if _, err := w.Write([]byte(e.tok)); err != nil {
 			return err
 		}
 		var fixed [12]byte
 		binary.LittleEndian.PutUint64(fixed[:8], e.off)
 		binary.LittleEndian.PutUint32(fixed[8:], e.n)
-		if _, err := f.Write(fixed[:]); err != nil {
+		if _, err := w.Write(fixed[:]); err != nil {
 			return err
 		}
 	}
 	for _, tok := range toks {
-		if _, err := f.Write(encoded[tok]); err != nil {
+		if _, err := w.Write(encoded[tok]); err != nil {
 			return err
 		}
 	}
-	return nil
+	return w.Flush()
 }
 
 func readBucket(p string) (map[string][]posting, error) {

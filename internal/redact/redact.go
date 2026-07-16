@@ -44,27 +44,61 @@ var (
 
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
 
+// kvHints are the substrings genericKVRE can anchor on; providerHints the
+// literal prefixes of providerRE. Checking them first keeps the regexes off
+// the vast majority of messages, which contain no credentials at all.
+var kvHints = []string{"key", "secret", "token", "passw", "authorization"}
+
+// "github_pat_" is listed on its own: "gh" is not a substring of "github".
+var providerHints = []string{"gh", "github_pat_", "glpat-", "sk_", "rk_", "sk-", "gsk_", "xai-", "hf_", "npm_", "xox", "AIza"}
+
+func containsAnyFold(s string, hints []string) bool {
+	for _, h := range hints {
+		if strings.Contains(s, h) {
+			return true
+		}
+	}
+	return false
+}
+
 func Text(s string) (string, Counts) {
 	counts := Counts{}
 	if Disabled() || s == "" {
 		return s, counts
 	}
-	s = replaceWhole(s, pemPrivateRE, "private-key", counts)
-	s = replaceSubmatch(s, connURLRE, "url-credentials", counts, func(m []string) string {
-		return m[1] + m[2] + ":[redacted:url-credentials]@" + m[4]
-	})
-	s = replaceSubmatch(s, awsSecretRE, "aws-secret", counts, func(m []string) string {
-		return m[1] + m[2] + m[3] + "[redacted:aws-secret]" + closingQuote(m[3], m[5])
-	})
-	s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", counts)
-	s = replaceSubmatch(s, bearerRE, "bearer-token", counts, func(m []string) string {
-		return m[1] + m[2] + "[redacted:bearer-token]"
-	})
-	s = replaceWhole(s, jwtRE, "jwt", counts)
-	s = replaceSubmatch(s, genericKVRE, "credential", counts, func(m []string) string {
-		return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
-	})
-	s = replaceProvider(s, counts)
+	lower := strings.ToLower(s)
+	if strings.Contains(s, "-----BEGIN") {
+		s = replaceWhole(s, pemPrivateRE, "private-key", counts)
+	}
+	if strings.Contains(s, "://") {
+		s = replaceSubmatch(s, connURLRE, "url-credentials", counts, func(m []string) string {
+			return m[1] + m[2] + ":[redacted:url-credentials]@" + m[4]
+		})
+	}
+	if strings.Contains(lower, "aws") {
+		s = replaceSubmatch(s, awsSecretRE, "aws-secret", counts, func(m []string) string {
+			return m[1] + m[2] + m[3] + "[redacted:aws-secret]" + closingQuote(m[3], m[5])
+		})
+	}
+	if strings.Contains(s, "AKIA") || strings.Contains(s, "ASIA") {
+		s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", counts)
+	}
+	if strings.Contains(lower, "bearer") {
+		s = replaceSubmatch(s, bearerRE, "bearer-token", counts, func(m []string) string {
+			return m[1] + m[2] + "[redacted:bearer-token]"
+		})
+	}
+	if strings.Contains(s, "eyJ") {
+		s = replaceWhole(s, jwtRE, "jwt", counts)
+	}
+	if containsAnyFold(lower, kvHints) {
+		s = replaceSubmatch(s, genericKVRE, "credential", counts, func(m []string) string {
+			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+		})
+	}
+	if containsAnyFold(s, providerHints) {
+		s = replaceProvider(s, counts)
+	}
 	return s, counts
 }
 
