@@ -14,9 +14,13 @@ func ClaudeRoot() string {
 }
 
 func LoadClaude() []model.Session {
-	root := ClaudeRoot()
-	files := walkFiles(root, ClaudeFileWanted)
-	return parseFiles(files, ParseClaudeFile)
+	return parseFiles(ClaudeFiles(), ParseClaudeFile)
+}
+
+// ClaudeFiles lists the transcript files under the Claude root without parsing
+// them — a cheap count for diagnostics.
+func ClaudeFiles() []string {
+	return walkFiles(ClaudeRoot(), ClaudeFileWanted)
 }
 
 // ClaudeFileWanted reports whether a path under the Claude root belongs in

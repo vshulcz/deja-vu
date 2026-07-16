@@ -11,14 +11,27 @@ func CodexRoot() string { return EnvPath("DEJA_CODEX_ROOT", filepath.Join(Home()
 
 func LoadCodex() []model.Session {
 	root := CodexRoot()
-	files := walkFiles(filepath.Join(root, "sessions"), func(p string) bool {
-		return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-")
-	})
+	files := walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)
 	ss := parseFiles(files, ParseCodexRollout)
 	if hist, _ := ParseCodexHistory(filepath.Join(root, "history.jsonl")); len(hist) > 0 {
 		ss = append(ss, hist...)
 	}
 	return ss
+}
+
+func codexRolloutWanted(p string) bool {
+	return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-")
+}
+
+// CodexFiles lists the rollout transcripts (plus history.jsonl when present)
+// without parsing them — a cheap count for diagnostics.
+func CodexFiles() []string {
+	root := CodexRoot()
+	files := walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)
+	if hist := filepath.Join(root, "history.jsonl"); fileExists(hist) {
+		files = append(files, hist)
+	}
+	return files
 }
 
 func ParseCodexHistory(path string) ([]model.Session, error) {
