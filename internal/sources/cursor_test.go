@@ -50,11 +50,16 @@ insert into cursorDiskKV values
 
 func TestParseCursorTranscript(t *testing.T) {
 	tmp := t.TempDir()
-	real := filepath.Join(tmp, "work", "my-app")
-	if err := os.MkdirAll(real, 0o755); err != nil {
-		t.Fatal(err)
+	encoded := "Users-x-work-my-app"
+	wantProject := filepath.Join("work", "my-app") // fallback: last two parts
+	if runtime.GOOS != "windows" {
+		real := filepath.Join(tmp, "work", "my-app")
+		if err := os.MkdirAll(real, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		encoded = strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
+		wantProject = "my-app" // resolved against the real directory
 	}
-	encoded := strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
 	dir := filepath.Join(tmp, "cursorcli", "projects", encoded, "agent-transcripts", "sess-1")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -77,10 +82,8 @@ func TestParseCursorTranscript(t *testing.T) {
 	if len(ss[0].Messages) != 2 {
 		t.Fatalf("messages = %d, want 2 (control line skipped): %#v", len(ss[0].Messages), ss[0].Messages)
 	}
-	if runtime.GOOS != "windows" && ss[0].Project != "my-app" {
-		// path resolution decodes unix-style absolute paths; the fallback
-		// name is fine on windows
-		t.Fatalf("project = %q, want my-app (greedy decode)", ss[0].Project)
+	if ss[0].Project != wantProject {
+		t.Fatalf("project = %q, want %q", ss[0].Project, wantProject)
 	}
 }
 
