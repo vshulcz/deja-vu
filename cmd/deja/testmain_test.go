@@ -12,8 +12,15 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	stores := map[string]string{
-		"HOME":                    root,
-		"USERPROFILE":             root,
+		"HOME":        root,
+		"USERPROFILE": root,
+		// Neutralize ambient profile overrides so install/read paths resolve
+		// under the temp HOME instead of the developer's real agent profiles.
+		"CLAUDE_CONFIG_DIR":       "",
+		"CODEX_HOME":              "",
+		"GEMINI_CLI_HOME":         "",
+		"CURSOR_CONFIG_DIR":       "",
+		"AIDER_CHAT_HISTORY_FILE": "",
 		"DEJA_CLAUDE_ROOT":        filepath.Join(root, "claude"),
 		"DEJA_CODEX_ROOT":         filepath.Join(root, "codex"),
 		"DEJA_OPENCODE_DB":        filepath.Join(root, "opencode.db"),
@@ -23,10 +30,6 @@ func TestMain(m *testing.M) {
 		"DEJA_CURSOR_CLI_ROOT":    filepath.Join(root, "cursor-cli"),
 		"DEJA_ANTIGRAVITY_ROOT":   filepath.Join(root, "antigravity"),
 		"DEJA_GROK_ROOT":          filepath.Join(root, "grok"),
-		"CODEX_HOME":              "",
-		"GEMINI_CLI_HOME":         "",
-		"CURSOR_CONFIG_DIR":       "",
-		"AIDER_CHAT_HISTORY_FILE": "",
 	}
 	for key, value := range stores {
 		if err := os.Setenv(key, value); err != nil {

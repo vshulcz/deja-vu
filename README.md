@@ -150,7 +150,7 @@ Credentials are redacted at index time: AWS keys, generic `api_key=`/`token=` as
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl` | ✅ |
 | Grok Build | `~/.grok/sessions/**/updates.jsonl` | ✅ |
 
-Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_INDEX_DIR`. Grok's native `GROK_HOME` is also honored.
+Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_INDEX_DIR`. Grok's native `GROK_HOME` and Claude Code's native `CLAUDE_CONFIG_DIR` are also honored.
 
 ## Performance
 

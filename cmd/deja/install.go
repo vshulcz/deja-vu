@@ -96,7 +96,7 @@ func shortHome(p string) string {
 func existingTargets() []string {
 	h, _ := os.UserHomeDir()
 	checks := map[string]string{
-		"claude-code": filepath.Join(h, ".claude"),
+		"claude-code": sources.ClaudeConfigDir(),
 		"codex":       sources.CodexHome(),
 		"opencode":    filepath.Join(h, ".config", "opencode"),
 		"cursor":      sources.CursorCLIHome(),
@@ -109,7 +109,7 @@ func existingTargets() []string {
 		if _, err := os.Stat(p); err == nil {
 			out = append(out, name)
 		} else if name == "claude-code" {
-			if _, err := os.Stat(filepath.Join(h, ".claude.json")); err == nil {
+			if _, err := os.Stat(sources.ClaudeJSONPath()); err == nil {
 				out = append(out, name)
 			}
 		}
@@ -203,8 +203,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 }
 
 func installClaude(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	path := filepath.Join(h, ".claude.json")
+	path := sources.ClaudeJSONPath()
 	old, _ := os.ReadFile(path)
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -232,8 +231,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 }
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	path := filepath.Join(h, ".claude", "settings.json")
+	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	old, _ := os.ReadFile(path)
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -307,8 +305,7 @@ func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall boo
 // It refuses to replace a statusline the user already configured (many run
 // ccstatusline or their own script) — printing how to combine instead.
 func installStatusline(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	path := filepath.Join(h, ".claude", "settings.json")
+	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	old, _ := os.ReadFile(path)
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
