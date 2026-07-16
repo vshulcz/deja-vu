@@ -21,12 +21,19 @@ type sessionStartHookResponse struct {
 	} `json:"hookSpecificOutput"`
 }
 
-func runHookContext() error {
+// runHookContext prints session-start context. plain=false emits the Claude
+// Code / Codex hook JSON envelope; plain=true prints the bare digest for
+// hosts that inject raw text (the opencode plugin).
+func runHookContext(plain bool) error {
 	digest := hookDigest()
 	if digest == "" {
 		return nil
 	}
 	usage.Record(index.DefaultDir(), usage.KindHook, len(digest))
+	if plain {
+		fmt.Fprintln(os.Stdout, digest)
+		return nil
+	}
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "SessionStart"
 	resp.HookSpecificOutput.AdditionalContext = digest

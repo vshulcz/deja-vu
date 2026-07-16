@@ -21,7 +21,21 @@ func runInstall(args []string, uninstall bool) error {
 	}
 	targets := []string{args[0]}
 	if args[0] == "--auto" {
-		targets = []string{"claude-auto"}
+		targets = nil
+		for _, t := range existingTargets() {
+			switch t {
+			case "claude-code":
+				targets = append(targets, "claude-auto")
+			case "codex":
+				targets = append(targets, "codex-auto")
+			case "opencode":
+				targets = append(targets, "opencode-auto")
+			}
+		}
+		if len(targets) == 0 {
+			fmt.Println("no known agent config directories found")
+			return nil
+		}
 	}
 	if args[0] == "--all" {
 		targets = existingTargets()
@@ -74,8 +88,12 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installClaude(exe, uninstall)
 	case "codex":
 		return installCodex(exe, uninstall)
+	case "codex-auto":
+		return installCodexAuto(exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
+	case "opencode-auto":
+		return installOpencodeAuto(exe, uninstall)
 	case "statusline":
 		return installStatusline(exe, uninstall)
 	default:
@@ -88,6 +106,20 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installClaudeHook(exe, uninstall)
+}
+
+func installCodexAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installCodex(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installCodexHooks(exe, uninstall)
+}
+
+func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installOpencode(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installOpencodePlugin(exe, uninstall)
 }
 
 func backupOnce(path string) error {

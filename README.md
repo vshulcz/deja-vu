@@ -107,7 +107,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall and the session-start hook. To make
+`deja install --all` wires up MCP recall; `deja install --auto` also adds session-start auto-recall on every harness it finds (Claude Code hook, Codex hooks.json, an opencode plugin). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
