@@ -35,6 +35,9 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "opencode" {
 		ss = append(ss, sources.LoadOpencode()...)
 	}
+	if h == "" || h == "aider" {
+		ss = append(ss, sources.LoadAider()...)
+	}
 	return ss
 }
 

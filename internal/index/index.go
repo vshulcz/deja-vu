@@ -448,6 +448,9 @@ func load(h string) []model.Session {
 	if h == "" || h == "opencode" {
 		ss = append(ss, sources.LoadOpencode()...)
 	}
+	if h == "" || h == "aider" {
+		ss = append(ss, sources.LoadAider()...)
+	}
 	return ss
 }
 
@@ -1056,6 +1059,8 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
 		}
 		return sources.ParseOpencodeDB(p)
+	case "aider":
+		return sources.ParseAiderFile(p)
 	default:
 		return nil, nil
 	}
@@ -1095,6 +1100,9 @@ func harnessForPath(p string) string {
 	}
 	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, sources.ClaudeRoot()) {
 		return "claude"
+	}
+	if filepath.Base(p) == ".aider.chat.history.md" {
+		return "aider"
 	}
 	return ""
 }
@@ -1136,6 +1144,11 @@ func currentFiles(h string) map[string]FileState {
 	}
 	if h == "" || h == "opencode" {
 		paths[sources.OpencodeDB()] = true
+	}
+	if h == "" || h == "aider" {
+		for _, p := range sources.AiderFiles() {
+			paths[p] = true
+		}
 	}
 	out := map[string]FileState{}
 	for p := range paths {
