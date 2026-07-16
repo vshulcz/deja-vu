@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -43,11 +44,7 @@ func runResume(args []string, stdout io.Writer) error {
 		return err
 	}
 	if !doExec {
-		if dir != "" {
-			fmt.Fprintf(stdout, "cd %s && %s\n", shellQuote(dir), cmdline)
-		} else {
-			fmt.Fprintln(stdout, cmdline)
-		}
+		fmt.Fprintln(stdout, formatResumeCommand(dir, cmdline))
 		return nil
 	}
 	parts := strings.Fields(cmdline)
@@ -57,6 +54,17 @@ func runResume(args []string, stdout io.Writer) error {
 	}
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
+}
+
+func formatResumeCommand(dir, cmdline string) string {
+	if dir == "" {
+		return cmdline
+	}
+	if runtime.GOOS == "windows" {
+		dir = "'" + strings.ReplaceAll(dir, "'", "''") + "'"
+		return fmt.Sprintf(`powershell.exe -NoProfile -Command "Set-Location -LiteralPath %s -ErrorAction Stop; %s"`, dir, cmdline)
+	}
+	return fmt.Sprintf("cd %s && %s", shellQuote(dir), cmdline)
 }
 
 // resumeCommand maps a session to (workdir, command). workdir is empty when
@@ -91,6 +99,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 			return "", "", fmt.Errorf("cursor CLI transcripts have no documented resume command yet")
 		}
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
+	case "grok":
+		return sources.GrokCWDForSession(s.Path), "grok --resume " + s.ID, nil
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}

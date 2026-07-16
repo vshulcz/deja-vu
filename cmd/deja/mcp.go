@@ -75,8 +75,8 @@ func handleMCP(req rpcRequest) (any, int, string) {
 		return map[string]any{"tools": []map[string]any{
 			{
 				"name":        "recall",
-				"description": "Search past coding-agent sessions (Claude Code, Codex, opencode) indexed on this machine and return the best matches as dense text under ~4KB. Use before debugging or re-implementing something: prior sessions often contain the exact fix, error message, or command. Query works best with specific tokens — an error string, function name, or flag.",
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex or opencode."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
+				"description": "Search past coding-agent sessions (Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build) indexed on this machine and return the best matches as dense text under ~4KB. Use before debugging or re-implementing something: prior sessions often contain the exact fix, error message, or command. Query works best with specific tokens — an error string, function name, or flag.",
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity or grok."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "recall_context",

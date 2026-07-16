@@ -193,6 +193,17 @@ func readGrokSummary(updatePath string) grokSummary {
 	return doc
 }
 
+// GrokCWDForSession recovers the working directory needed by grok --resume.
+func GrokCWDForSession(updatePath string) string {
+	if updatePath == "" {
+		return ""
+	}
+	if cwd := readGrokSummary(updatePath).Info.CWD; cwd != "" {
+		return cwd
+	}
+	return grokCWDFromPath(updatePath)
+}
+
 func grokCWDFromPath(updatePath string) string {
 	if updatePath == "" {
 		return ""

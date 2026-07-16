@@ -7,9 +7,18 @@ fail() { echo "e2e FAIL: $*" >&2; exit 1; }
 
 go build -o /tmp/deja-e2e ./cmd/deja
 
+SOURCE_HOME="$(mktemp -d)"
+export HOME="$SOURCE_HOME"
+export USERPROFILE="$SOURCE_HOME"
 export DEJA_CLAUDE_ROOT="$PWD/fixtures/synthetic/claude"
 export DEJA_CODEX_ROOT="$PWD/fixtures/synthetic/codex"
 export DEJA_OPENCODE_DB="/tmp/deja-e2e-no.db"
+export DEJA_AIDER_ROOTS="$SOURCE_HOME/aider"
+export DEJA_GEMINI_ROOT="$SOURCE_HOME/gemini"
+export DEJA_CURSOR_ROOT="$SOURCE_HOME/cursor"
+export DEJA_CURSOR_CLI_ROOT="$SOURCE_HOME/cursor-cli"
+export DEJA_ANTIGRAVITY_ROOT="$SOURCE_HOME/antigravity"
+export DEJA_GROK_ROOT="$SOURCE_HOME/grok"
 DEJA_INDEX_DIR="$(mktemp -d)/index.db"
 export DEJA_INDEX_DIR
 export NO_COLOR=1

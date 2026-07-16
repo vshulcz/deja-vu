@@ -78,14 +78,14 @@ func TestGrokDiscoveryAndRootOverrides(t *testing.T) {
 
 func TestGrokCWDFromEncodedGroupAndMarker(t *testing.T) {
 	_, updates := grokTree(t)
-	if got := grokCWDFromPath(updates); got != "/work/cool-app" {
+	if got := GrokCWDForSession(updates); got != "/work/cool-app" {
 		t.Fatalf("encoded cwd = %q", got)
 	}
 	group := filepath.Dir(filepath.Dir(updates))
 	if err := os.WriteFile(filepath.Join(group, ".cwd"), []byte("/a/very/long/project\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := grokCWDFromPath(updates); got != "/a/very/long/project" {
+	if got := GrokCWDForSession(updates); got != "/a/very/long/project" {
 		t.Fatalf("marker cwd = %q", got)
 	}
 }

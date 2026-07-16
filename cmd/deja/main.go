@@ -53,6 +53,14 @@ func loadAll(h string) []model.Session {
 	return ss
 }
 
+func loadFileSources() []model.Session {
+	var ss []model.Session
+	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok"} {
+		ss = append(ss, loadAll(harness)...)
+	}
+	return ss
+}
+
 func run(args []string) error {
 	if len(args) == 0 {
 		printUsage()
@@ -201,7 +209,7 @@ func run(args []string) error {
 }
 
 func printNoMatches(w io.Writer, q string, n int) {
-	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode) — try fewer words or --re\n", q, n)
+	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode/aider/gemini/cursor/antigravity/grok) — try fewer words or --re\n", q, n)
 }
 
 func findByPrefix(p string) (model.Session, bool, error) {
@@ -210,7 +218,7 @@ func findByPrefix(p string) (model.Session, bool, error) {
 			return s, ok, nil
 		}
 	}
-	ss := append(loadAll("claude"), loadAll("codex")...)
+	ss := loadFileSources()
 	ss = append(ss, sources.LoadOpencodePrefix(p)...)
 	s, ok := search.FindByPrefix(ss, p)
 	return s, ok, nil
@@ -222,7 +230,7 @@ func recent(n int) ([]model.Session, error) {
 			return ss, nil
 		}
 	}
-	ss := append(loadAll("claude"), loadAll("codex")...)
+	ss := loadFileSources()
 	ss = append(ss, sources.LoadOpencodeRecent(n)...)
 	return search.Recent(ss, n), nil
 }
@@ -297,26 +305,60 @@ func printSources() {
 	if stats, err := index.Redactions(index.DefaultDir()); err == nil {
 		redactions = stats.Files
 	}
+	antigravityRoots := sources.AntigravityRoots()
+	antigravityLocation := strings.Join(antigravityRoots, string(os.PathListSeparator))
+	if antigravityLocation == "" {
+		antigravityLocation = filepath.Join(sources.Home(), ".gemini", "antigravity*")
+	}
 	items := []struct {
-		name, root string
-		load       func() []model.Session
+		name, location string
+		roots          []string
+		load           func() []model.Session
 	}{
-		{"claude", sources.ClaudeRoot(), sources.LoadClaude},
-		{"codex", sources.CodexRoot(), sources.LoadCodex},
-		{"cursor", sources.CursorUserRoot(), sources.LoadCursor},
-		{"gemini", filepath.Join(sources.GeminiRoot(), "tmp"), sources.LoadGemini},
-		{"antigravity", filepath.Join(sources.Home(), ".gemini"), sources.LoadAntigravity},
-		{"aider", "(home + DEJA_AIDER_ROOTS)", sources.LoadAider},
+		{"claude", sources.ClaudeRoot(), []string{sources.ClaudeRoot()}, sources.LoadClaude},
+		{"codex", sources.CodexRoot(), []string{sources.CodexRoot()}, sources.LoadCodex},
+		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.LoadGemini},
+		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, sources.LoadCursor},
+		{"antigravity", antigravityLocation, antigravityRoots, sources.LoadAntigravity},
+		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.LoadGrok},
 	}
 	for _, it := range items {
-		size := pathSize(it.root)
+		var size int64
+		redacted := 0
+		for _, root := range it.roots {
+			size += pathSize(root)
+			redacted += redactionsUnder(redactions, root)
+		}
 		ss := it.load()
 		msg := 0
 		for _, s := range ss {
 			msg += len(s.Messages)
 		}
-		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d\n", it.name, it.root, len(ss), msg, humanBytes(size), redactionsUnder(redactions, it.root))
+		note := ""
+		if it.name == "cursor" && len(sources.CursorDBs()) > 0 && !sources.SQLite3Available() {
+			note = "\t(sqlite3 CLI not found — Cursor IDE sessions unavailable)"
+		}
+		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, len(ss), msg, humanBytes(size), redacted, note)
 	}
+	aiderFiles := sources.AiderFiles()
+	var aiderSize int64
+	aiderRedactions := 0
+	for _, p := range aiderFiles {
+		if fi, err := os.Stat(p); err == nil {
+			aiderSize += fi.Size()
+		}
+		aiderRedactions += redactions[p]
+	}
+	aiderSessions := sources.LoadAider()
+	aiderMessages := 0
+	for _, s := range aiderSessions {
+		aiderMessages += len(s.Messages)
+	}
+	aiderLocation := filepath.Join(sources.Home(), ".aider.chat.history.md")
+	if roots := os.Getenv("DEJA_AIDER_ROOTS"); roots != "" {
+		aiderLocation += string(os.PathListSeparator) + roots
+	}
+	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d\n", aiderLocation, len(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions)
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
@@ -340,15 +382,6 @@ func redactionsUnder(files map[string]int, root string) int {
 }
 
 func pathSize(root string) int64 {
-	if strings.HasPrefix(root, "(") {
-		var total int64
-		for _, p := range sources.AiderFiles() {
-			if fi, err := os.Stat(p); err == nil {
-				total += fi.Size()
-			}
-		}
-		return total
-	}
 	var total int64
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && d.Type()&os.ModeSymlink == 0 && !d.IsDir() {
@@ -393,8 +426,8 @@ Usage:
   deja stats [--json]
   deja mcp
   deja version
-  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|statusline|--all>
-  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|statusline|--all>
+  deja install <claude-code|codex|opencode|statusline|--all>
+  deja uninstall <claude-code|codex|opencode|statusline|--all>
 
 Examples:
   deja "jwt refresh token bug"

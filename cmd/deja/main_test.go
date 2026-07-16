@@ -285,7 +285,7 @@ func TestPrintNoMatchesHelpfulMessage(t *testing.T) {
 	var b bytes.Buffer
 	printNoMatches(&b, "jwt refresh token", 3)
 	out := b.String()
-	if !strings.Contains(out, `deja: no matches for "jwt refresh token"`) || !strings.Contains(out, "searched 3 sessions across claude/codex/opencode") || !strings.Contains(out, "try fewer words or --re") {
+	if !strings.Contains(out, `deja: no matches for "jwt refresh token"`) || !strings.Contains(out, "searched 3 sessions across claude/codex/opencode/aider/gemini/cursor/antigravity/grok") || !strings.Contains(out, "try fewer words or --re") {
 		t.Fatalf("bad no-match message: %q", out)
 	}
 }
@@ -308,6 +308,8 @@ func TestLoadAllHermeticEmptySources(t *testing.T) {
 	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "gemini"))
 	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "cursor-workspaces"))
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "antigravity"))
+	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
 	if got := loadAll(""); len(got) != 0 {
 		t.Fatalf("loadAll empty sources = %#v", got)
 	}

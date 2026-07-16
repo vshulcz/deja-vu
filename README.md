@@ -14,7 +14,7 @@
 
 <p align="center"><img src="assets/demo.gif" alt="deja demo"></p>
 
-Claude Code, Codex and opencode write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
+Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity and Grok Build write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
 | | |
 | --- | --- |
@@ -26,7 +26,7 @@ Claude Code, Codex and opencode write every conversation to local files — giga
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
 
-One binary. No models to download, no services to run, nothing leaves your machine. (opencode indexing shells out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros.)
+One binary. No models to download, no services to run, nothing leaves your machine. (opencode and Cursor IDE indexing shell out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros; Cursor CLI transcripts do not need it.)
 
 ## Install
 
@@ -74,7 +74,7 @@ $ deja "jwt refresh token"
 | `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
-| `deja resume <id> [--exec]` | Reopen a found session in its native harness (`claude --resume`, `codex resume`, `opencode -s`). |
+| `deja resume <id> [--exec]` | Reopen a found session in its native harness (`claude --resume`, `codex resume`, `opencode -s`, `grok --resume`). |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
 | `deja warmup` | Build/refresh the index without searching — handy in cron or shell startup. |
@@ -114,7 +114,7 @@ the agent reach for memory on its own, add this to your `CLAUDE.md` /
 
 ```
 Before debugging or re-implementing something, run `deja "<query>"` (or the
-MCP recall tool) — past agent sessions across Claude Code, Codex and opencode
+MCP recall tool) — past agent sessions across Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity and Grok Build
 are indexed locally. Cite what you reuse.
 ```
 
@@ -140,9 +140,13 @@ Credentials are redacted at index time: AWS keys, generic `api_key=`/`token=` as
 | Claude Code | `~/.claude/projects/**/*.jsonl` | ✅ |
 | Codex CLI | `~/.codex/sessions/**` + `history.jsonl` | ✅ |
 | opencode | `~/.local/share/opencode/opencode.db` | ✅ |
-| aider, Gemini CLI, Antigravity | [#6](https://github.com/vshulcz/deja-vu/issues/6), [#7](https://github.com/vshulcz/deja-vu/issues/7) | planned |
+| aider | `.aider.chat.history.md` | ✅ |
+| Gemini CLI | `~/.gemini/tmp/*/chats/**` | ✅ |
+| Cursor | `state.vscdb` + `~/.cursor/projects/**/agent-transcripts/*.jsonl` | ✅ |
+| Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl` | ✅ |
+| Grok Build | `~/.grok/sessions/**/updates.jsonl` | ✅ |
 
-Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_INDEX_DIR`.
+Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_INDEX_DIR`. Grok's native `GROK_HOME` is also honored.
 
 ## Performance
 
@@ -167,7 +171,7 @@ Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact cr
 **Does anything leave my machine?** No. There is no network code in the tool. `sync` writes files to a directory you choose; moving them is up to you.
 
 **How is this different from cass?**
-[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, three harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
+[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, eight harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
 
 **And from MemPalace / Mem0 / Letta?**
 Those are memory *platforms*: embeddings, vector stores, capture hooks or APIs that record going forward. deja has no capture step at all — it indexes what your agents already wrote to disk, including months of history from before you installed it. They can coexist.

@@ -11,10 +11,15 @@ Parsers live in `internal/sources` and return `[]model.Session`.
 | Claude Code | `claude.go` | JSONL files under `~/.claude/projects` |
 | Codex CLI | `codex.go` | rollout JSONL files plus `history.jsonl` under `~/.codex` |
 | opencode | `opencode.go` | SQLite database at `~/.local/share/opencode/opencode.db` |
+| aider | `aider.go` | `.aider.chat.history.md` files under configured project roots |
+| Gemini CLI | `gemini.go` | JSON and JSONL chats under `~/.gemini/tmp` |
+| Cursor | `cursor.go` | SQLite state stores plus CLI agent transcripts |
+| Antigravity | `antigravity.go` | JSONL transcripts under `~/.gemini/antigravity*` |
+| Grok Build | `grok.go` | ACP update streams and session summaries under `~/.grok/sessions` |
 
-Claude and Codex JSONL files are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
+File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
 
-opencode is read through the local `sqlite3` command. There is no CGO SQLite dependency.
+opencode and Cursor IDE state are read through the local `sqlite3` command. Cursor CLI transcripts are plain JSONL. There is no CGO SQLite dependency.
 
 ## Index format
 

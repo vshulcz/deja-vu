@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,6 +20,7 @@ func TestResumeCommandPerHarness(t *testing.T) {
 	}
 	encoded := strings.ReplaceAll(real, string(filepath.Separator), "-")
 	claudePath := filepath.Join("/claude/projects", encoded, "abc.jsonl")
+	grokPath := filepath.Join(tmp, "grok-sessions", url.PathEscape(real), "019f-grok", "updates.jsonl")
 
 	cases := []struct {
 		name    string
@@ -31,6 +33,7 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
 		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
+		{"grok with dir", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, real, "grok --resume 019f-grok", ""},
 		{"imported", model.Session{Harness: "claude", ID: "imported-9f5", Project: "imported:my-app"}, "", "", "another machine"},
 		{"unknown harness", model.Session{Harness: "mystery", ID: "x"}, "", "", "don't know how"},
 	}
@@ -51,6 +54,21 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		if dir != c.wantDir || cmd != c.wantCmd {
 			t.Fatalf("%s: got (%q, %q), want (%q, %q)", c.name, dir, cmd, c.wantDir, c.wantCmd)
 		}
+	}
+}
+
+func TestFormatResumeCommand(t *testing.T) {
+	dir := filepath.Join("tmp", "project's dir")
+	got := formatResumeCommand(dir, "grok --resume 019f")
+	if runtime.GOOS == "windows" {
+		if !strings.HasPrefix(got, "powershell.exe -NoProfile") || !strings.Contains(got, "project''s dir") || !strings.Contains(got, "-ErrorAction Stop") || !strings.Contains(got, "grok --resume 019f") {
+			t.Fatalf("Windows resume command = %q", got)
+		}
+		return
+	}
+	want := "cd " + shellQuote(dir) + " && grok --resume 019f"
+	if got != want {
+		t.Fatalf("resume command = %q, want %q", got, want)
 	}
 }
 
