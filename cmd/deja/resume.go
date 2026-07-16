@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -78,6 +79,18 @@ func resumeCommand(s model.Session) (string, string, error) {
 			dir = s.Path // opencode sessions carry their project directory
 		}
 		return dir, "opencode -s " + s.ID, nil
+	case "antigravity":
+		return "", "agy --conversation " + s.ID, nil
+	case "aider":
+		dir := filepath.Dir(s.Path)
+		return "", "", fmt.Errorf("aider has no session resume — run aider in %s and it continues the same history", dir)
+	case "gemini":
+		return "", "", fmt.Errorf("gemini sessions reopen from inside the CLI: run gemini, then /chat resume")
+	case "cursor":
+		if strings.HasSuffix(s.Path, ".jsonl") {
+			return "", "", fmt.Errorf("cursor CLI transcripts have no documented resume command yet")
+		}
+		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}

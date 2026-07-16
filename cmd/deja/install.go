@@ -65,6 +65,9 @@ func existingTargets() []string {
 		"claude-code": filepath.Join(h, ".claude"),
 		"codex":       filepath.Join(h, ".codex"),
 		"opencode":    filepath.Join(h, ".config", "opencode"),
+		"cursor":      filepath.Join(h, ".cursor"),
+		"gemini":      filepath.Join(h, ".gemini", "settings.json"),
+		"antigravity": filepath.Join(h, ".gemini", "config"),
 	}
 	var out []string
 	for name, p := range checks {
@@ -90,6 +93,12 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCodex(exe, uninstall)
 	case "codex-auto":
 		return installCodexAuto(exe, uninstall)
+	case "cursor":
+		return installCursor(exe, uninstall)
+	case "gemini":
+		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "settings.json"), exe, uninstall)
+	case "antigravity":
+		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "config", "mcp_config.json"), exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -326,6 +335,45 @@ func removeCodexDejaBlock(s string) string {
 		i--
 	}
 	return strings.Join(out, "\n")
+}
+
+func homeDir() string {
+	h, _ := os.UserHomeDir()
+	return h
+}
+
+// installCursor wires the MCP server into Cursor's global config
+// (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
+// mcpServers shape in their own files.
+func installCursor(exe string, uninstall bool) (installResult, error) {
+	return installMCPJSON(filepath.Join(homeDir(), ".cursor", "mcp.json"), exe, uninstall)
+}
+
+func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
+	old, _ := os.ReadFile(path)
+	var root map[string]any
+	if len(bytes.TrimSpace(old)) == 0 {
+		root = map[string]any{}
+	} else if err := json.Unmarshal(old, &root); err != nil {
+		return installResult{}, err
+	}
+	m, _ := root["mcpServers"].(map[string]any)
+	if m == nil {
+		m = map[string]any{}
+		root["mcpServers"] = m
+	}
+	if uninstall {
+		delete(m, "deja")
+	} else {
+		m["deja"] = map[string]any{"command": exe, "args": []string{"mcp"}}
+	}
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
 }
 
 func installOpencode(exe string, uninstall bool) (installResult, error) {

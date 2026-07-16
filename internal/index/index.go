@@ -339,6 +339,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err != nil {
 		return err
 	}
+	seenMsgs := msgSeen{}
 	buckets, err := indexTextParallel(func(jobs chan<- tokenJob) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -363,6 +364,9 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 			}
 			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			for _, msg := range s.Messages {
+				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
+					continue
+				}
 				text := msg.Text
 				if len(text) > maxIndexedText {
 					text = text[:maxIndexedText]
@@ -651,6 +655,23 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 	}
 }
 
+// msgSeen dedupes identical messages within a session across duplicate
+// session objects in one indexing pass. Distinct messages (codex history
+// accumulation) pass through; format twins (gemini .json/.jsonl, cursor
+// multi-store composers) collapse.
+type msgSeen map[string]bool
+
+func (m msgSeen) dup(key, role string, ts time.Time, text string) bool {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(text))
+	k := key + "\x00" + role + "\x00" + ts.UTC().Format(time.RFC3339Nano) + "\x00" + fmt.Sprintf("%x", h.Sum64())
+	if m[k] {
+		return true
+	}
+	m[k] = true
+	return false
+}
+
 func metaForSession(s model.Session) SessionMeta {
 	title := s.Title
 	if title == "" {
@@ -724,6 +745,14 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 		if fs, ok := m.Files[sourcePath]; ok {
 			fs.Redactions += n
 			m.Files[sourcePath] = fs
+		} else if db := sources.OpencodeDB(); sourcePath != db {
+			// opencode sessions carry their project dir as Path; the store
+			// on record is the database file. Attribute stats there so
+			// `deja sources` reports them.
+			if fs, ok := m.Files[db]; ok {
+				fs.Redactions += n
+				m.Files[db] = fs
+			}
 		}
 	}
 	return redacted
@@ -904,6 +933,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		rf.Close()
 		return recErr
 	}
+	seenMsgs := msgSeen{}
 	for _, s := range replacements {
 		key := s.Harness + ":" + s.ID
 		ord := uint32(0)
@@ -917,6 +947,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 		m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 		for _, msg := range s.Messages {
+			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
+				continue
+			}
 			text := msg.Text
 			if len(text) > maxIndexedText {
 				text = text[:maxIndexedText]
@@ -952,7 +985,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			return false
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode":
+		case "claude", "codex", "codex-history", "opencode", "cursor-db":
 		default:
 			return false
 		}
@@ -1085,12 +1118,15 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
 		}
 		return sources.ParseOpencodeDB(p)
+	case "cursor-db":
+		if old.LastUpdated > 0 {
+			return sources.ParseCursorDBSince(p, time.Unix(0, old.LastUpdated))
+		}
+		return sources.ParseCursorDB(p)
 	case "aider":
 		return sources.ParseAiderFile(p)
 	case "gemini":
 		return sources.ParseGeminiFile(p)
-	case "cursor-db":
-		return sources.ParseCursorDB(p)
 	case "cursor":
 		return sources.ParseCursorTranscript(p)
 	case "antigravity":
@@ -1117,6 +1153,11 @@ func parseAppendedFile(harness, p string, old FileState) ([]model.Session, error
 			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
 		}
 		return sources.ParseOpencodeDB(p)
+	case "cursor-db":
+		if old.LastUpdated > 0 {
+			return sources.ParseCursorDBSince(p, time.Unix(0, old.LastUpdated))
+		}
+		return sources.ParseCursorDB(p)
 	default:
 		return nil, nil
 	}
@@ -1158,14 +1199,22 @@ func harnessForPath(p string) string {
 }
 
 func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
-	db := sources.OpencodeDB()
+	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
+	for _, db := range sources.CursorDBs() {
+		setStoreLastUpdated(files, sessions, "cursor", db)
+	}
+}
+
+// setStoreLastUpdated stamps a database-backed store with the newest session
+// time so incremental passes can query only newer content.
+func setStoreLastUpdated(files map[string]FileState, sessions map[string]SessionMeta, harness, db string) {
 	f, ok := files[db]
 	if !ok {
 		return
 	}
 	var latest int64
 	for _, s := range sessions {
-		if s.Harness == "opencode" && s.Updated.UnixNano() > latest {
+		if s.Harness == harness && s.Updated.UnixNano() > latest {
 			latest = s.Updated.UnixNano()
 		}
 	}

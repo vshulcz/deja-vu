@@ -161,3 +161,29 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 		}
 	}
 }
+
+// Two messages in one session can share a timestamp (aider); both must
+// survive import, and re-import must stay a no-op.
+func TestImportKeepsSameTimestampMessages(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	base := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	batch := filepath.Join(tmp, "batch")
+	writeSyncBatch(t, batch, []SyncRecord{
+		{Harness: "aider", SessionID: "same-ts", Project: "p", Role: "user", Text: "samets question", Time: base},
+		{Harness: "aider", SessionID: "same-ts", Project: "p", Role: "assistant", Text: "samets answer", Time: base},
+	})
+	if n, err := Import(dir, batch); err != nil || n != 2 {
+		t.Fatalf("import n=%d err=%v", n, err)
+	}
+	ss, err := Search(dir, search.Options{Query: "samets", All: true})
+	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 2 {
+		t.Fatalf("both messages must survive: %#v err=%v", ss, err)
+	}
+	if n, err := Import(dir, batch); err != nil || n != 0 {
+		t.Fatalf("re-import n=%d err=%v", n, err)
+	}
+}

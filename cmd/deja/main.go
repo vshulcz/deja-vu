@@ -297,7 +297,14 @@ func printSources() {
 	items := []struct {
 		name, root string
 		load       func() []model.Session
-	}{{"claude", sources.ClaudeRoot(), sources.LoadClaude}, {"codex", sources.CodexRoot(), sources.LoadCodex}}
+	}{
+		{"claude", sources.ClaudeRoot(), sources.LoadClaude},
+		{"codex", sources.CodexRoot(), sources.LoadCodex},
+		{"cursor", sources.CursorUserRoot(), sources.LoadCursor},
+		{"gemini", filepath.Join(sources.GeminiRoot(), "tmp"), sources.LoadGemini},
+		{"antigravity", filepath.Join(sources.Home(), ".gemini"), sources.LoadAntigravity},
+		{"aider", "(home + DEJA_AIDER_ROOTS)", sources.LoadAider},
+	}
 	for _, it := range items {
 		size := pathSize(it.root)
 		ss := it.load()
@@ -330,6 +337,15 @@ func redactionsUnder(files map[string]int, root string) int {
 }
 
 func pathSize(root string) int64 {
+	if strings.HasPrefix(root, "(") {
+		var total int64
+		for _, p := range sources.AiderFiles() {
+			if fi, err := os.Stat(p); err == nil {
+				total += fi.Size()
+			}
+		}
+		return total
+	}
 	var total int64
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && d.Type()&os.ModeSymlink == 0 && !d.IsDir() {
@@ -374,8 +390,8 @@ Usage:
   deja stats [--json]
   deja mcp
   deja version
-  deja install <claude-code|codex|opencode|statusline|--all>
-  deja uninstall <claude-code|codex|opencode|statusline|--all>
+  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|statusline|--all>
+  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|statusline|--all>
 
 Examples:
   deja "jwt refresh token bug"
