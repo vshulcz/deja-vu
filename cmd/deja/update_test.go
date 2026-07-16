@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,6 +16,8 @@ import (
 	"sync/atomic"
 	"testing"
 )
+
+const testLatestReleaseURL = "test://latest"
 
 func TestPerformUpdate(t *testing.T) {
 	for _, goos := range []string{"linux", "windows"} {
@@ -33,8 +33,7 @@ func TestPerformUpdate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			server, requests := newUpdateServer(t, "1.2.0", goos, "amd64", []byte("new binary"), false)
-			defer server.Close()
+			download, requests := newUpdateDownloader(t, "1.2.0", goos, "amd64", []byte("new binary"), false)
 
 			var out bytes.Buffer
 			err = performUpdate(updateConfig{
@@ -42,8 +41,8 @@ func TestPerformUpdate(t *testing.T) {
 				goos:           goos,
 				goarch:         "amd64",
 				executable:     target,
-				latestURL:      server.URL + "/latest",
-				client:         server.Client(),
+				latestURL:      testLatestReleaseURL,
+				download:       download,
 			}, &out)
 			if err != nil {
 				t.Fatal(err)
@@ -79,8 +78,7 @@ func TestPerformUpdateAlreadyCurrent(t *testing.T) {
 	if err := os.WriteFile(target, []byte("current binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	server, requests := newUpdateServer(t, "1.2.0", "linux", "amd64", []byte("unused"), false)
-	defer server.Close()
+	download, requests := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("unused"), false)
 
 	var out bytes.Buffer
 	err := performUpdate(updateConfig{
@@ -88,8 +86,8 @@ func TestPerformUpdateAlreadyCurrent(t *testing.T) {
 		goos:           "linux",
 		goarch:         "amd64",
 		executable:     target,
-		latestURL:      server.URL + "/latest",
-		client:         server.Client(),
+		latestURL:      testLatestReleaseURL,
+		download:       download,
 	}, &out)
 	if err != nil {
 		t.Fatal(err)
@@ -108,8 +106,7 @@ func TestPerformUpdateDoesNotDowngrade(t *testing.T) {
 	if err := os.WriteFile(target, []byte("newer binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	server, requests := newUpdateServer(t, "1.2.0", "linux", "amd64", []byte("older binary"), false)
-	defer server.Close()
+	download, requests := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("older binary"), false)
 
 	var out bytes.Buffer
 	err := performUpdate(updateConfig{
@@ -117,8 +114,8 @@ func TestPerformUpdateDoesNotDowngrade(t *testing.T) {
 		goos:           "linux",
 		goarch:         "amd64",
 		executable:     target,
-		latestURL:      server.URL + "/latest",
-		client:         server.Client(),
+		latestURL:      testLatestReleaseURL,
+		download:       download,
 	}, &out)
 	if err != nil {
 		t.Fatal(err)
@@ -137,16 +134,15 @@ func TestPerformUpdateChecksumFailurePreservesBinary(t *testing.T) {
 	if err := os.WriteFile(target, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	server, _ := newUpdateServer(t, "1.2.0", "linux", "amd64", []byte("new binary"), true)
-	defer server.Close()
+	download, _ := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("new binary"), true)
 
 	err := performUpdate(updateConfig{
 		currentVersion: "dev",
 		goos:           "linux",
 		goarch:         "amd64",
 		executable:     target,
-		latestURL:      server.URL + "/latest",
-		client:         server.Client(),
+		latestURL:      testLatestReleaseURL,
+		download:       download,
 	}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("error = %v", err)
@@ -157,25 +153,22 @@ func TestPerformUpdateChecksumFailurePreservesBinary(t *testing.T) {
 	}
 }
 
-func TestPerformUpdateHTTPFailurePreservesBinary(t *testing.T) {
+func TestPerformUpdateDownloadFailurePreservesBinary(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "deja")
 	if err := os.WriteFile(target, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "unavailable", http.StatusServiceUnavailable)
-	}))
-	defer server.Close()
-
 	err := performUpdate(updateConfig{
 		currentVersion: "1.1.0",
 		goos:           "linux",
 		goarch:         "amd64",
 		executable:     target,
-		latestURL:      server.URL,
-		client:         server.Client(),
+		latestURL:      testLatestReleaseURL,
+		download: func(_ string, _ int64, _ string) ([]byte, error) {
+			return nil, fmt.Errorf("service unavailable")
+		},
 	}, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "HTTP 503") {
+	if err == nil || !strings.Contains(err.Error(), "service unavailable") {
 		t.Fatalf("error = %v", err)
 	}
 	got, _ := os.ReadFile(target)
@@ -231,7 +224,15 @@ func TestUpdateCommandShapeAndPlatforms(t *testing.T) {
 	}
 }
 
-func newUpdateServer(t *testing.T, version, goos, goarch string, binary []byte, badChecksum bool) (*httptest.Server, *atomic.Int32) {
+func TestUpdateDownloaderReportsMissingCurl(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	_, err := defaultUpdateDownloader()("https://example.invalid", 1024, "test asset")
+	if err == nil || !strings.Contains(err.Error(), "curl") {
+		t.Fatalf("missing curl error = %v", err)
+	}
+}
+
+func newUpdateDownloader(t *testing.T, version, goos, goarch string, binary []byte, badChecksum bool) (updateDownloader, *atomic.Int32) {
 	t.Helper()
 	archiveName, binaryName, err := updateAssetNames(version, goos, goarch)
 	if err != nil {
@@ -244,28 +245,34 @@ func newUpdateServer(t *testing.T, version, goos, goarch string, binary []byte, 
 		checksum = strings.Repeat("0", sha256.Size*2) + "  " + archiveName + "\n"
 	}
 
+	release, err := json.Marshal(updateRelease{
+		TagName: "v" + version,
+		Assets: []updateAsset{
+			{Name: archiveName, URL: "test://archive"},
+			{Name: "checksums.txt", URL: "test://checksums"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	responses := map[string][]byte{
+		testLatestReleaseURL: release,
+		"test://archive":     archive,
+		"test://checksums":   []byte(checksum),
+	}
 	requests := &atomic.Int32{}
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	download := func(url string, limit int64, label string) ([]byte, error) {
 		requests.Add(1)
-		switch r.URL.Path {
-		case "/latest":
-			_ = json.NewEncoder(w).Encode(updateRelease{
-				TagName: "v" + version,
-				Assets: []updateAsset{
-					{Name: archiveName, URL: server.URL + "/archive"},
-					{Name: "checksums.txt", URL: server.URL + "/checksums"},
-				},
-			})
-		case "/archive":
-			_, _ = w.Write(archive)
-		case "/checksums":
-			_, _ = io.WriteString(w, checksum)
-		default:
-			http.NotFound(w, r)
+		body, ok := responses[url]
+		if !ok {
+			return nil, fmt.Errorf("download %s: unexpected URL %s", label, url)
 		}
-	}))
-	return server, requests
+		if int64(len(body)) > limit {
+			return nil, fmt.Errorf("download %s: response exceeds %d bytes", label, limit)
+		}
+		return append([]byte(nil), body...), nil
+	}
+	return download, requests
 }
 
 func makeUpdateArchive(t *testing.T, goos, binaryName string, binary []byte) []byte {

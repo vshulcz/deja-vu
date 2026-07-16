@@ -5,14 +5,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -39,13 +40,57 @@ type updateRelease struct {
 	Assets  []updateAsset `json:"assets"`
 }
 
+type updateDownloader func(url string, limit int64, label string) ([]byte, error)
+
+func defaultUpdateDownloader() updateDownloader {
+	return func(url string, limit int64, label string) ([]byte, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "curl",
+			"--disable", "--fail", "--silent", "--show-error", "--location",
+			"--proto", "=https", "--proto-redir", "=https",
+			"--header", "Accept: application/vnd.github+json",
+			"--user-agent", "deja/"+normalizeUpdateVersion(version), url)
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, fmt.Errorf("download %s: %w", label, err)
+		}
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Start(); err != nil {
+			return nil, fmt.Errorf("download %s: %w", label, err)
+		}
+		body, readErr := io.ReadAll(io.LimitReader(stdout, limit+1))
+		if int64(len(body)) > limit {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+			return nil, fmt.Errorf("download %s: response exceeds %d bytes", label, limit)
+		}
+		waitErr := cmd.Wait()
+		if readErr != nil {
+			return nil, fmt.Errorf("download %s: %w", label, readErr)
+		}
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("download %s: %w", label, ctx.Err())
+		}
+		if waitErr != nil {
+			message := strings.TrimSpace(stderr.String())
+			if message != "" {
+				return nil, fmt.Errorf("download %s: %s", label, message)
+			}
+			return nil, fmt.Errorf("download %s: %w", label, waitErr)
+		}
+		return body, nil
+	}
+}
+
 type updateConfig struct {
 	currentVersion string
 	goos           string
 	goarch         string
 	executable     string
 	latestURL      string
-	client         *http.Client
+	download       updateDownloader
 }
 
 func runUpdate(args []string, out io.Writer) error {
@@ -65,13 +110,13 @@ func runUpdate(args []string, out io.Writer) error {
 		goarch:         runtime.GOARCH,
 		executable:     executable,
 		latestURL:      latestReleaseURL,
-		client:         &http.Client{Timeout: 2 * time.Minute},
+		download:       defaultUpdateDownloader(),
 	}, out)
 }
 
 func performUpdate(cfg updateConfig, out io.Writer) error {
-	if cfg.client == nil {
-		return fmt.Errorf("update HTTP client is required")
+	if cfg.download == nil {
+		return fmt.Errorf("update downloader is required")
 	}
 	if cfg.executable == "" {
 		return fmt.Errorf("update executable path is required")
@@ -80,7 +125,7 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 		return err
 	}
 
-	body, err := fetchUpdateURL(cfg.client, cfg.latestURL, maxReleaseJSON, "latest release")
+	body, err := cfg.download(cfg.latestURL, maxReleaseJSON, "latest release")
 	if err != nil {
 		return err
 	}
@@ -122,7 +167,7 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 		return fmt.Errorf("release v%s has no checksums.txt", latest)
 	}
 
-	checksums, err := fetchUpdateURL(cfg.client, checksumsAsset.URL, maxChecksums, "checksums.txt")
+	checksums, err := cfg.download(checksumsAsset.URL, maxChecksums, "checksums.txt")
 	if err != nil {
 		return err
 	}
@@ -130,7 +175,7 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	archive, err := fetchUpdateURL(cfg.client, archiveAsset.URL, maxArchive, archiveName)
+	archive, err := cfg.download(archiveAsset.URL, maxArchive, archiveName)
 	if err != nil {
 		return err
 	}
@@ -281,34 +326,6 @@ func findUpdateAsset(assets []updateAsset, name string) (updateAsset, bool) {
 		}
 	}
 	return updateAsset{}, false
-}
-
-func fetchUpdateURL(client *http.Client, url string, limit int64, label string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("request %s: %w", label, err)
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "deja/"+normalizeUpdateVersion(version))
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", label, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("download %s: HTTP %s", label, resp.Status)
-	}
-	if resp.ContentLength > limit {
-		return nil, fmt.Errorf("download %s: response exceeds %d bytes", label, limit)
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
-	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", label, err)
-	}
-	if int64(len(body)) > limit {
-		return nil, fmt.Errorf("download %s: response exceeds %d bytes", label, limit)
-	}
-	return body, nil
 }
 
 func checksumForArchive(checksums []byte, archiveName string) (string, error) {

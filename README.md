@@ -81,7 +81,7 @@ $ deja "jwt refresh token"
 | `deja update` | Download the latest GitHub release, verify its checksum, and replace the current binary. |
 | `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
 
-`deja update` is for standalone installs. Homebrew and npm installs update through the package manager.
+`deja update` is for standalone installs and uses `curl` to download releases. Homebrew and npm installs update through the package manager.
 
 Context piping without MCP:
 
