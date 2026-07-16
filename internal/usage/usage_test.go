@@ -139,3 +139,17 @@ func TestRotateKeepsRecentWindow(t *testing.T) {
 		t.Fatalf("today after rotate = %d/%d, want 2/5", recalls, bytes)
 	}
 }
+
+// Record must stay silent when the log directory cannot be created.
+func TestRecordSilentOnMkdirFailure(t *testing.T) {
+	parent := filepath.Join(t.TempDir(), "blocker")
+	if err := os.WriteFile(parent, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// index dir nested under a regular file: MkdirAll must fail on every OS
+	Record(filepath.Join(parent, "deep", "index.db"), KindRecall, 1)
+	r, b := Today(filepath.Join(parent, "deep", "index.db"))
+	if r != 0 || b != 0 {
+		t.Fatalf("unexpected events recorded: %d/%d", r, b)
+	}
+}
