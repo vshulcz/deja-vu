@@ -15,8 +15,21 @@ func ClaudeRoot() string {
 
 func LoadClaude() []model.Session {
 	root := ClaudeRoot()
-	files := walkFiles(root, func(p string) bool { return strings.HasSuffix(p, ".jsonl") })
+	files := walkFiles(root, ClaudeFileWanted)
 	return parseFiles(files, ParseClaudeFile)
+}
+
+// ClaudeFileWanted reports whether a path under the Claude root belongs in
+// the index. Subagent transcripts mostly duplicate their parent session, so
+// they are skipped unless DEJA_INCLUDE_SUBAGENTS=1.
+func ClaudeFileWanted(p string) bool {
+	if !strings.HasSuffix(p, ".jsonl") {
+		return false
+	}
+	if os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1" {
+		return true
+	}
+	return !strings.Contains(p, string(filepath.Separator)+"subagents"+string(filepath.Separator))
 }
 
 func ParseClaudeFile(path string) ([]model.Session, error) {

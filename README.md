@@ -128,6 +128,8 @@ With `--auto`, a SessionStart hook also feeds the current project's recent memor
 
 ## Security
 
+Subagent transcripts are skipped by default (they mostly duplicate the parent session); set `DEJA_INCLUDE_SUBAGENTS=1` to index them. Files caught mid-write are handled safely — the torn tail line is picked up on the next pass.
+
 Credentials are redacted at index time: AWS keys, generic `api_key=`/`token=` assignments, bearer tokens and raw JWTs, PEM private key blocks, provider tokens (`ghp_`, `sk-`, `npm_`, `xox.`, `AIza`), and `scheme://user:pass@host` URLs. The value is replaced with `[redacted:<kind>]`; surrounding text stays searchable. `deja sources` shows per-store counts. Opt out with `DEJA_NO_REDACT=1` (unsafe). `deja share` and `deja sync export` re-apply redaction on the way out.
 
 ## Supported harnesses
