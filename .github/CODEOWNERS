@@ -1,1 +1,5 @@
 * @vshulcz
+
+# Parser ownership template; uncomment and replace the owner when delegated.
+# /internal/sources/claude.go @parser-maintainer
+# /internal/sources/claude_test.go @parser-maintainer

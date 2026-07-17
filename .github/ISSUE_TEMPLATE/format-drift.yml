@@ -1,0 +1,67 @@
+name: Session format drift
+description: Report an existing harness whose sessions stopped indexing correctly
+title: "format drift: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not include credentials, private source code, or an unreviewed session
+        file. Replace identifying values in all pasted output.
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Harness
+      options:
+        - Claude Code
+        - Codex CLI
+        - opencode
+        - aider
+        - Gemini CLI
+        - Cursor
+        - Antigravity
+        - Grok Build
+    validations:
+      required: true
+  - type: input
+    id: agent-version
+    attributes:
+      label: Agent version
+      description: Exact version and installation method, if known.
+      placeholder: "1.2.3 installed with Homebrew"
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal redacted sample
+      description: >-
+        Paste the smallest session fragment that demonstrates the new shape.
+        Preserve field names and nesting, but replace message text, paths, IDs,
+        account data, and credentials.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: deja doctor output
+      description: Run `deja doctor` and redact local paths before pasting.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: State what stopped indexing and when it last worked.
+    validations:
+      required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Data review
+      options:
+        - label: I reviewed the sample and doctor output for secrets and private data.
+          required: true

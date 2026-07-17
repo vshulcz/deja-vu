@@ -18,6 +18,9 @@ update` (fetches releases from GitHub) and `deja sync ssh` (your own SSH
 connection). Reports about secrets surviving redaction in indexed or shared
 output are in scope and appreciated.
 
+See the [security model](docs/SECURITY-MODEL.md) for data flows, redaction
+limits, trust assumptions, and release verification.
+
 ## Supported versions
 
 Only the latest release receives fixes.

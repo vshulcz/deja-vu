@@ -16,7 +16,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -trimpath -X main.version={{ .Version }}
 
 archives:
   - id: default
@@ -34,6 +34,12 @@ archives:
 
 checksum:
   name_template: checksums.txt
+
+sboms:
+  - id: archives
+    artifacts: archive
+    documents:
+      - "${artifact}.spdx.json"
 
 # Keyless cosign signature over the checksum file; the .sig and .pem land in
 # the release assets so consumers (and scorecards) can verify without keys.
