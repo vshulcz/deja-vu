@@ -11,11 +11,11 @@ func TestPrintLogo(t *testing.T) {
 	var b bytes.Buffer
 	printLogo(&b, "memory for coding agents")
 	out := b.String()
-	if !strings.Contains(out, "┌┬┐") || !strings.Contains(out, "memory for coding agents") {
+	if !strings.Contains(out, "●") || !strings.Contains(out, "▲") || !strings.Contains(out, "deja-vu") || !strings.Contains(out, "memory for coding agents") {
 		t.Fatalf("logo output: %q", out)
 	}
-	if len(strings.Split(strings.TrimSpace(out), "\n")) != 4 {
-		t.Fatalf("logo should be 3 glyph lines + tagline: %q", out)
+	if len(strings.Split(strings.TrimSpace(out), "\n")) != 5 {
+		t.Fatalf("loop mark should be 5 lines: %q", out)
 	}
 }
 

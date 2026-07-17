@@ -8,17 +8,29 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// The wordmark prints on exactly two occasions: the end of a successful
-// install and the first index build. Everywhere else deja lives in pipes,
-// hooks and status bars, where a banner is noise.
-const logoAccent = "\x1b[38;5;141m"
-const logoDim = "\x1b[2m"
-const logoReset = "\x1b[0m"
+// The mark prints on exactly two occasions: the end of a successful install
+// and the first index build. Everywhere else deja lives in pipes, hooks and
+// status bars, where a banner is noise.
+//
+// It is the rewind-loop from the project logo: an arrow circling back on
+// itself around a dot, purple into teal like the gradient in logo.svg.
+const (
+	logoPurple = "\x1b[38;5;141m"
+	logoTeal   = "\x1b[38;5;80m"
+	logoBold   = "\x1b[1m"
+	logoDim    = "\x1b[2m"
+	logoReset  = "\x1b[0m"
+)
 
-var logoLines = []string{
-	`┌┬┐┌─┐ ┬┌─┐   ┬  ┬┬ ┬`,
-	` ││├┤  │├─┤───└┐┌┘│ │`,
-	`─┴┘└─┘└┘┴ ┴    └┘ └─┘`,
+func logoLines(tagline string) []string {
+	p, t, b, d, r := logoPurple, logoTeal, logoBold, logoDim, logoReset
+	return []string{
+		p + "  ╭──────╴" + r,
+		p + " ╭╯" + r,
+		p + " │    ●    " + t + "▲" + r + "    " + b + "deja-vu" + r,
+		p + " ╰╮        " + t + "│" + r + "    " + d + tagline + r,
+		p + "  ╰────────" + t + "╯" + r,
+	}
 }
 
 func logoWanted(f *os.File) bool {
@@ -34,11 +46,8 @@ func logoWanted(f *os.File) bool {
 
 func printLogo(w io.Writer, tagline string) {
 	fmt.Fprintln(w)
-	for _, l := range logoLines {
-		fmt.Fprintf(w, "  %s%s%s\n", logoAccent, l, logoReset)
-	}
-	if tagline != "" {
-		fmt.Fprintf(w, "  %s%s%s\n", logoDim, tagline, logoReset)
+	for _, l := range logoLines(tagline) {
+		fmt.Fprintf(w, " %s\n", l)
 	}
 	fmt.Fprintln(w)
 }
