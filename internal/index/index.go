@@ -40,21 +40,46 @@ var lastIngestFiles int
 
 // BuildSummary describes the most recent (re)build in this process; the CLI
 // uses it to greet a first-ever index with a summary instead of silence.
+type HarnessCount struct {
+	Name     string
+	Sessions int
+	Messages int
+}
+
 type BuildSummary struct {
-	Initial   bool
-	Sessions  int
-	Messages  int
-	Harnesses int
+	Initial    bool
+	Sessions   int
+	Messages   int
+	Harnesses  int
+	PerHarness []HarnessCount
 }
 
 var LastBuild BuildSummary
 
+// SuppressHarnessNarration silences the per-harness progress lines for one
+// build; the CLI sets it when it is about to greet a first index with the
+// same numbers in the summary block.
+var SuppressHarnessNarration bool
+
 func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session) {
-	hs := map[string]bool{}
+	counts := map[string]*HarnessCount{}
+	order := []string{}
 	for _, s := range ss {
-		hs[s.Harness] = true
+		c := counts[s.Harness]
+		if c == nil {
+			c = &HarnessCount{Name: s.Harness}
+			counts[s.Harness] = c
+			order = append(order, s.Harness)
+		}
+		c.Sessions++
+		c.Messages += len(s.Messages)
 	}
-	LastBuild = BuildSummary{Initial: initial, Sessions: sessions, Messages: messages, Harnesses: len(hs)}
+	sort.Strings(order)
+	per := make([]HarnessCount, 0, len(order))
+	for _, name := range order {
+		per = append(per, *counts[name])
+	}
+	LastBuild = BuildSummary{Initial: initial, Sessions: sessions, Messages: messages, Harnesses: len(order), PerHarness: per}
 }
 
 type FileState struct {
@@ -510,7 +535,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		}
 		got := hl.load()
 		ss = append(ss, got...)
-		if progress != nil && len(got) > 0 {
+		if progress != nil && len(got) > 0 && !SuppressHarnessNarration {
 			msgs := 0
 			for _, s := range got {
 				msgs += len(s.Messages)
