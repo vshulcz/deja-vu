@@ -18,7 +18,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity and Grok Bu
 
 | | |
 | --- | --- |
-| **Search** | `deja "connection pool exhausted"` — 7–9 ms over gigabytes, retroactive: months of logs from before you installed it |
+| **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses |
 | **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
@@ -159,7 +159,7 @@ Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
 
 | | |
 | --- | --- |
-| Warm search | **7–9 ms** typical, ~40 ms worst-case |
+| Warm search | **~12 ms** typical, ~25 ms worst-case |
 | Cold index (once) | ~10 s |
 | Index size | ~2.4% of corpus |
 
