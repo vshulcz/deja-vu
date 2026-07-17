@@ -35,6 +35,15 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# Keyless cosign signature over the checksum file; the .sig and .pem land in
+# the release assets so consumers (and scorecards) can verify without keys.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args: ["sign-blob", "--yes", "--output-signature", "${signature}", "--output-certificate", "${certificate}", "${artifact}"]
+    artifacts: checksum
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
