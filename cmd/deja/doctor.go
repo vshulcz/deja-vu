@@ -38,10 +38,28 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 	}
 }
 
-// runDoctor prints a self-diagnosis report. It never fails: every section
-// degrades to a plain status line so the exit code stays 0.
-func runDoctor(w io.Writer, lookup doctorVersionLookup) error {
+// runDoctor prints a self-diagnosis report. Diagnosis itself never fails, so
+// both human and JSON reports keep exit status 0.
+func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
+	jsonOutput := false
+	for _, arg := range args {
+		if arg != "--json" {
+			return fmt.Errorf("doctor: unknown flag %q", arg)
+		}
+		jsonOutput = true
+	}
+	report := collectDoctorReport(lookup)
+	if jsonOutput {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(report)
+	}
 	doctorHarnesses(w)
+	for _, store := range report.Stores {
+		if store.State == "parsed-zero" {
+			fmt.Fprintf(w, "  warning      %s files found but newest parsed to zero\n", store.Name)
+		}
+	}
 	fmt.Fprintln(w)
 	doctorTools(w)
 	fmt.Fprintln(w)
@@ -49,7 +67,7 @@ func runDoctor(w io.Writer, lookup doctorVersionLookup) error {
 	fmt.Fprintln(w)
 	doctorIndex(w)
 	fmt.Fprintln(w)
-	doctorVersion(w, lookup)
+	doctorVersion(w, func() (string, bool) { return report.Version.Latest, report.Version.Latest != "" })
 	return nil
 }
 
@@ -156,21 +174,7 @@ func doctorTools(w io.Writer) {
 
 func doctorMCP(w io.Writer) {
 	fmt.Fprintln(w, "MCP wiring:")
-	h := homeDir()
-	configs := []struct {
-		name  string
-		path  string
-		wired func(string) bool
-	}{
-		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers")},
-		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired},
-		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp")},
-		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
-		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
-		{"antigravity", filepath.Join(h, ".gemini", "config", "mcp_config.json"), doctorJSONWired("mcpServers")},
-		{"grok", filepath.Join(sources.GrokRoot(), "config.toml"), doctorTOMLWired},
-	}
-	for _, c := range configs {
+	for _, c := range doctorMCPConfigs() {
 		status := "config missing"
 		if doctorExists(c.path) {
 			if c.wired(c.path) {
@@ -180,6 +184,25 @@ func doctorMCP(w io.Writer) {
 			}
 		}
 		fmt.Fprintf(w, "  %-12s %-14s %s\n", c.name, status, c.path)
+	}
+}
+
+type doctorMCPConfig struct {
+	name  string
+	path  string
+	wired func(string) bool
+}
+
+func doctorMCPConfigs() []doctorMCPConfig {
+	h := homeDir()
+	return []doctorMCPConfig{
+		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers")},
+		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired},
+		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp")},
+		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
+		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
+		{"antigravity", filepath.Join(h, ".gemini", "config", "mcp_config.json"), doctorJSONWired("mcpServers")},
+		{"grok", filepath.Join(sources.GrokRoot(), "config.toml"), doctorTOMLWired},
 	}
 }
 

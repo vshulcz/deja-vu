@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -80,6 +81,9 @@ func runInstall(args []string, uninstall bool) error {
 		for _, d := range done {
 			info = append(info, fmt.Sprintf("%-*s  %s%-9s%s %s", nameW, d.target, logoBold, d.action, logoReset, logoDim+d.path+logoReset))
 		}
+		if hint := installIndexHint(); hint != "" {
+			info = append(info, "", hint)
+		}
 		printLogo(os.Stdout, info)
 	}
 	return nil
@@ -91,6 +95,36 @@ func shortHome(p string) string {
 		return "~" + strings.TrimPrefix(p, h)
 	}
 	return p
+}
+
+func installIndexHint() string {
+	if index.HasManifest(index.DefaultDir()) {
+		return ""
+	}
+	checks := doctorStoreChecks()
+	detected := 0
+	onlyMissingOrEmpty := true
+	var paths []string
+	seen := map[string]bool{}
+	for _, check := range checks {
+		store, _ := inspectDoctorStore(check)
+		if store.Files > 0 {
+			detected++
+		}
+		if store.State != "missing" && store.State != "empty" {
+			onlyMissingOrEmpty = false
+		}
+		for _, path := range store.Paths {
+			if path != "" && !seen[path] {
+				seen[path] = true
+				paths = append(paths, shortHome(path))
+			}
+		}
+	}
+	if onlyMissingOrEmpty {
+		return "no agent history found on this machine; checked " + strings.Join(paths, ", ")
+	}
+	return fmt.Sprintf("next: run `deja index` to index %d agent stores", detected)
 }
 
 func existingTargets() []string {

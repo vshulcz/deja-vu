@@ -1,0 +1,119 @@
+{
+  "stores": [
+    {
+      "name": "claude",
+      "state": "ok",
+      "paths": [
+        "<tmp>/claude"
+      ],
+      "files": 1
+    },
+    {
+      "name": "codex",
+      "state": "missing",
+      "paths": [
+        "<tmp>/codex"
+      ],
+      "files": 0
+    },
+    {
+      "name": "opencode",
+      "state": "missing",
+      "paths": [
+        "<tmp>/opencode.db"
+      ],
+      "files": 0
+    },
+    {
+      "name": "aider",
+      "state": "empty",
+      "paths": [
+        "<tmp>/home",
+        "<tmp>/aider"
+      ],
+      "files": 0
+    },
+    {
+      "name": "gemini",
+      "state": "missing",
+      "paths": [
+        "<tmp>/gemini"
+      ],
+      "files": 0
+    },
+    {
+      "name": "cursor",
+      "state": "missing",
+      "paths": [
+        "<tmp>/cursor",
+        "<tmp>/cursor-cli"
+      ],
+      "files": 0
+    },
+    {
+      "name": "antigravity",
+      "state": "missing",
+      "paths": [
+        "<tmp>/antigravity"
+      ],
+      "files": 0
+    },
+    {
+      "name": "grok",
+      "state": "missing",
+      "paths": [
+        "<tmp>/grok"
+      ],
+      "files": 0
+    }
+  ],
+  "index": {
+    "state": "missing",
+    "path": "<tmp>/index.db"
+  },
+  "mcp": [
+    {
+      "name": "claude-code",
+      "state": "config-missing",
+      "path": "<tmp>/home/.claude.json"
+    },
+    {
+      "name": "codex",
+      "state": "config-missing",
+      "path": "<tmp>/home/.codex/config.toml"
+    },
+    {
+      "name": "opencode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/opencode/opencode.json"
+    },
+    {
+      "name": "cursor",
+      "state": "config-missing",
+      "path": "<tmp>/home/.cursor/mcp.json"
+    },
+    {
+      "name": "gemini",
+      "state": "config-missing",
+      "path": "<tmp>/home/.gemini/settings.json"
+    },
+    {
+      "name": "antigravity",
+      "state": "config-missing",
+      "path": "<tmp>/home/.gemini/config/mcp_config.json"
+    },
+    {
+      "name": "grok",
+      "state": "config-missing",
+      "path": "<tmp>/grok/config.toml"
+    }
+  ],
+  "sqlite3": {
+    "state": "missing"
+  },
+  "version": {
+    "state": "update-available",
+    "current": "1.0.0",
+    "latest": "2.0.0"
+  }
+}
