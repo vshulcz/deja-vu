@@ -11,10 +11,12 @@ import (
 
 func lockDir(dir string) (func(), error) {
 	lockPath := dir + ".lock"
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+	// Tighten pre-existing indexes created before the 0700 default.
+	_ = os.Chmod(dir, 0o700)
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}

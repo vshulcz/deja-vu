@@ -51,7 +51,7 @@ func exportRecords(dir, outDir string, full bool) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(outDir, 0o700); err != nil {
 		return 0, err
 	}
 	if m.ExportWatermarks == nil {
@@ -196,7 +196,7 @@ func Import(dir, inDir string) (int, error) {
 }
 
 func initEmptyIndex(dir string) error {
-	if err := os.MkdirAll(filepath.Join(dir, "buckets"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "buckets"), 0o700); err != nil {
 		return err
 	}
 	f, err := os.Create(filepath.Join(dir, "records.bin"))
@@ -234,7 +234,7 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 }
 
 func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Record, metas map[string]SessionMeta) error {
-	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
