@@ -69,10 +69,17 @@ func TestGrokDiscoveryAndRootOverrides(t *testing.T) {
 		t.Fatalf("files = %v, want [%s]", files, updates)
 	}
 
-	t.Setenv("DEJA_GROK_ROOT", "")
-	t.Setenv("GROK_HOME", root)
+	home := t.TempDir()
+	t.Setenv("GROK_HOME", home)
+	if GrokHome() != home {
+		t.Fatalf("GROK_HOME ignored: %q", GrokHome())
+	}
 	if GrokRoot() != root {
-		t.Fatalf("GROK_HOME ignored: %q", GrokRoot())
+		t.Fatalf("DEJA_GROK_ROOT ignored: %q", GrokRoot())
+	}
+	t.Setenv("DEJA_GROK_ROOT", "")
+	if GrokRoot() != home {
+		t.Fatalf("GrokRoot fallback = %q, want %q", GrokRoot(), home)
 	}
 }
 

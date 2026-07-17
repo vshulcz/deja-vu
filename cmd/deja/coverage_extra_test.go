@@ -76,7 +76,9 @@ func TestInstallMCPJSONTargetsAndErrors(t *testing.T) {
 
 func TestInstallGrokTOML(t *testing.T) {
 	tmp := hermeticEnv(t)
-	cfg := filepath.Join(tmp, "grok", "config.toml")
+	home := filepath.Join(tmp, "grok-home")
+	t.Setenv("GROK_HOME", home)
+	cfg := filepath.Join(home, "config.toml")
 
 	r, err := installTarget("grok", "/bin/deja", false)
 	if err != nil || r.Action != "created" || r.Path != cfg {

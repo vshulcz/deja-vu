@@ -202,7 +202,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
 		{"antigravity", filepath.Join(h, ".gemini", "config", "mcp_config.json"), doctorJSONWired("mcpServers")},
-		{"grok", filepath.Join(sources.GrokRoot(), "config.toml"), doctorTOMLWired},
+		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
 	}
 }
 
