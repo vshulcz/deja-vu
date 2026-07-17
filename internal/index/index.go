@@ -191,7 +191,7 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 	}
 	if force || err != nil || m.Version != version || m.Scope != scope || !recordsIntact(dir, m) {
 		if progress != nil {
-			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
+			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
 		}
 		return rebuildForSearch(dir, o, scope, want, progress)
 	}
@@ -289,6 +289,14 @@ func Recent(dir string, n int) ([]model.Session, error) {
 		out = out[:n]
 	}
 	return out, nil
+}
+
+// displayPath contracts the home directory to ~ in user-facing messages.
+func displayPath(p string) string {
+	if h, err := os.UserHomeDir(); err == nil && h != "" && strings.HasPrefix(p, h) {
+		return "~" + strings.TrimPrefix(p, h)
+	}
+	return p
 }
 
 func HasManifest(dir string) bool {
@@ -905,7 +913,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	if force || err != nil || old.Version != version || old.Scope != scope {
 		if progress != nil {
-			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", dir)
+			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
 		}
 		return rebuild(dir, harness, scope, files, progress)
 	}
