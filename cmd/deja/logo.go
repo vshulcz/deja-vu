@@ -49,7 +49,9 @@ var ansiRE = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 func visibleLen(s string) int { return len([]rune(ansiRE.ReplaceAllString(s, ""))) }
 
-func logoWanted(f *os.File) bool {
+var logoWanted = defaultLogoWanted
+
+func defaultLogoWanted(f *os.File) bool {
 	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}
@@ -130,5 +132,8 @@ func maybeFirstIndexGreeting() {
 		fmt.Sprintf("indexed %s%d%s messages across %s%d%s agents", logoBold, b.Messages, logoReset, logoBold, b.Harnesses, logoReset),
 		logoDim+`try: deja "something you fixed weeks ago"`+logoReset,
 	)
+	if warning := doctorParsedZeroWarning(); warning != "" {
+		info = append(info, warning)
+	}
 	printLogo(os.Stdout, info)
 }

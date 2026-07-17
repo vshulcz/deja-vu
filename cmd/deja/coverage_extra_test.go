@@ -33,7 +33,13 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "gemini"))
 	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "cursor"))
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "antigravity"))
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("GEMINI_CLI_HOME", "")
+	t.Setenv("CURSOR_CONFIG_DIR", "")
+	t.Setenv("AIDER_CHAT_HISTORY_FILE", "")
 	t.Setenv("NO_COLOR", "1")
 	return tmp
 }

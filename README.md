@@ -49,6 +49,8 @@ deja install --all     # MCP recall for every agent it finds on this machine
 deja install --auto    # same, plus session-start auto-recall where supported
 ```
 
+On a terminal, install reports whether it found local history and points to `deja index` when the first index still needs to be built.
+
 That's it. Next session, ask your agent:
 
 > have we dealt with jwt refresh rotation before? check your memory
@@ -72,7 +74,7 @@ $ deja "jwt refresh token"
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
-| `deja doctor` | Self-diagnosis: which stores were found, sqlite3 presence, MCP wiring per agent, index health, version. |
+| `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
 | `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
 | `deja resume <id> [--exec]` | Reopen a found session in its native harness (`claude --resume`, `codex resume`, `opencode -s`, `grok --resume`). |
@@ -84,6 +86,22 @@ $ deja "jwt refresh token"
 | `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
 
 `deja update` is for standalone installs. Homebrew and npm installs update through the package manager.
+
+### Doctor JSON
+
+`deja doctor --json` reports an explicit state for every check and exits 0 even when it finds a problem. Store states are `ok`, `missing`, `empty`, `unreadable`, or `parsed-zero`; the last state means session files exist but the newest file produced no sessions.
+
+```json
+{
+  "stores": [{"name": "claude", "state": "ok", "paths": ["/home/me/.claude/projects"], "files": 42}],
+  "index": {"state": "stale", "path": "/home/me/.cache/deja/index.db"},
+  "mcp": [{"name": "claude-code", "state": "wired", "path": "/home/me/.claude.json"}],
+  "sqlite3": {"state": "ok"},
+  "version": {"state": "ok", "current": "1.2.3", "latest": "1.2.3"}
+}
+```
+
+Index states are `ok`, `missing`, or `stale`; MCP states are `wired`, `not-wired`, or `config-missing`. The sqlite3 state is `ok` or `missing`. Version state is `ok`, `update-available`, `ahead`, `dev`, or `unknown`.
 
 Context piping without MCP:
 
