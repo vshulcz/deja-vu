@@ -183,7 +183,7 @@ func doctorMCP(w io.Writer) {
 				status = "not wired"
 			}
 		}
-		fmt.Fprintf(w, "  %-12s %-14s %s\n", c.name, status, c.path)
+		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)
 	}
 }
 
@@ -207,7 +207,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 }
 
 func doctorOpencodeConfigPath() string {
-	dir := filepath.Join(homeDir(), ".config", "opencode")
+	dir := filepath.Join(opencodeConfigHome(), "opencode")
 	path := filepath.Join(dir, "opencode.json")
 	if !doctorExists(path) {
 		if jsonc := filepath.Join(dir, "opencode.jsonc"); doctorExists(jsonc) {
