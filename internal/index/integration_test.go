@@ -27,6 +27,7 @@ func allHarnessEnv(t *testing.T) (root, dir string) {
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(root, "cursor-cli"))
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(root, "antigravity"))
 	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(root, "aiderroot"))
+	t.Setenv("DEJA_GROK_ROOT", filepath.Join(root, "grok"))
 	if err := os.MkdirAll(filepath.Join(root, "home"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -67,6 +68,12 @@ func seedFileHarnesses(t *testing.T, root string) {
 	// aider
 	write(t, filepath.Join(root, "aiderroot", ".aider.chat.history.md"),
 		"# aider chat started at 2026-02-01 10:00:00\n\n#### aiderneedle question\n\naiderneedle answer\n")
+	// grok
+	grokDir := filepath.Join(root, "grok", "sessions", "%2Fp%2Fapp")
+	write(t, filepath.Join(grokDir, "gr1", "summary.json"),
+		`{"info":{"id":"gr1","cwd":"/p/app"},"generated_title":"grok session","created_at":"2026-02-01T10:00:00Z","updated_at":"2026-02-01T10:05:00Z"}`)
+	write(t, filepath.Join(grokDir, "gr1", "updates.jsonl"),
+		`{"timestamp":1769940000000,"params":{"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"grokneedle question"},"_meta":{"promptIndex":0}},"_meta":{"promptId":"p0"}}}`+"\n")
 }
 
 func seedCursorDB(t *testing.T, root string) bool {
@@ -102,6 +109,7 @@ func TestAllHarnessesIndexAndSearch(t *testing.T) {
 		"claundneedle unicode": "claude", "codexneedle question": "codex",
 		"historyneedle entry": "codex", "geminineedle dup": "gemini",
 		"antineedle request": "antigravity", "aiderneedle question": "aider",
+		"grokneedle question": "grok",
 	}
 	if hasCursor {
 		cases["cursorneedle question"] = "cursor"
