@@ -1,0 +1,3 @@
+{"timestamp":1784278801,"params":{"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"inspect the grok stream"},"_meta":{"promptIndex":0}}}}
+{"timestamp":1784278802,"params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"the stream "}},"_meta":{"promptId":"prompt-1"}}}
+{"timestamp":1784278803,"params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"is readable"}},"_meta":{"promptId":"prompt-1"}}}

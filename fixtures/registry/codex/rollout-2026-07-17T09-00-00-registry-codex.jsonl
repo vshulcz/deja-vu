@@ -1,0 +1,3 @@
+{"timestamp":"2026-07-17T09:00:00Z","type":"session_meta","payload":{"session_id":"registry-codex","cwd":"/workspace/registry-demo"}}
+{"timestamp":"2026-07-17T09:00:01Z","type":"response_item","payload":{"role":"user","content":[{"type":"input_text","text":"inspect the rollout"}]}}
+{"timestamp":"2026-07-17T09:00:02Z","type":"response_item","payload":{"role":"assistant","content":[{"type":"output_text","text":"the rollout is readable"}]}}

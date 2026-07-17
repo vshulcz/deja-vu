@@ -1,0 +1,2 @@
+{"type":"user","sessionId":"registry-claude","timestamp":"2026-07-17T09:00:00Z","message":{"role":"user","content":"inspect the registry fixture"}}
+{"type":"assistant","sessionId":"registry-claude","timestamp":"2026-07-17T09:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"the fixture has a valid message pair"}]}}

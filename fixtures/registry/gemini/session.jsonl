@@ -1,0 +1,3 @@
+{"sessionId":"registry-gemini","startTime":"2026-07-17T09:00:00Z","lastUpdated":"2026-07-17T09:00:02Z"}
+{"id":"message-user","timestamp":"2026-07-17T09:00:01Z","type":"user","content":"inspect the gemini session"}
+{"id":"message-assistant","timestamp":"2026-07-17T09:00:02Z","type":"gemini","content":[{"text":"the session is readable"}]}

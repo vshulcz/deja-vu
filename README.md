@@ -155,6 +155,10 @@ Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, 
 
 `DEJA_RECALL=safe` is the default: SessionStart recall stays in the current project, filters weak or duplicate results, prefers the last 90 days, and injects at most 2KB. `DEJA_RECALL=aggressive` searches across projects and raises the injection cap to 4KB. `DEJA_RECALL=off` disables SessionStart recall output.
 
+### Session format registry
+
+The [session format registry](docs/registry/README.md) documents the observed store paths, record schemas, role mapping, timestamps, and compatibility notes for each supported harness. Synthetic fixtures keep those descriptions checked against the parsers.
+
 ## Performance
 
 Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
