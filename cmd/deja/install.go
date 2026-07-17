@@ -55,17 +55,42 @@ func runInstall(args []string, uninstall bool) error {
 		return err
 	}
 	exe, _ = filepath.Abs(exe)
+	banner := !uninstall && (args[0] == "--auto" || args[0] == "--all") && logoWanted(os.Stdout)
+	type lineItem struct{ target, action, path string }
+	var done []lineItem
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
+		if banner {
+			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
+		} else {
+			fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
+		}
 	}
-	if !uninstall && (args[0] == "--auto" || args[0] == "--all") && logoWanted(os.Stdout) {
-		printLogo(os.Stdout, brandInfo())
+	if banner {
+		info := append(brandInfo(), "")
+		nameW := 0
+		for _, d := range done {
+			if len(d.target) > nameW {
+				nameW = len(d.target)
+			}
+		}
+		for _, d := range done {
+			info = append(info, fmt.Sprintf("%-*s  %s%-9s%s %s", nameW, d.target, logoBold, d.action, logoReset, logoDim+d.path+logoReset))
+		}
+		printLogo(os.Stdout, info)
 	}
 	return nil
+}
+
+// shortHome contracts the home directory to ~ for display.
+func shortHome(p string) string {
+	if h := homeDir(); h != "" && strings.HasPrefix(p, h) {
+		return "~" + strings.TrimPrefix(p, h)
+	}
+	return p
 }
 
 func existingTargets() []string {
