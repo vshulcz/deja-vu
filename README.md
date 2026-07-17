@@ -138,6 +138,9 @@ Subagent transcripts are skipped by default (they mostly duplicate the parent se
 
 Credentials are redacted at index time: AWS keys, generic `api_key=`/`token=` assignments, bearer tokens and raw JWTs, PEM private key blocks, provider tokens (`ghp_`, `sk-`, `npm_`, `xox.`, `AIza`), and `scheme://user:pass@host` URLs. The value is replaced with `[redacted:<kind>]`; surrounding text stays searchable. `deja sources` shows per-store counts. Opt out with `DEJA_NO_REDACT=1` (unsafe). `deja share` and `deja sync export` re-apply redaction on the way out.
 
+The [security model](docs/SECURITY-MODEL.md) documents data flows, redaction
+limits, trust assumptions, and release verification.
+
 ## Supported harnesses
 
 | Harness | Store | Status |
@@ -179,7 +182,7 @@ Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact cr
 
 ## FAQ
 
-**Does anything leave my machine?** No. Indexing and search are fully local. `sync` writes files to a directory you choose, moving them is up to you. The only network call is `deja update`, which downloads releases from GitHub.
+**Does anything leave my machine?** Indexing and search are local. `deja update` downloads releases from GitHub, and user-invoked `deja sync ssh` transfers redacted batches through the system SSH client. Directory exports and shares go only to the destination you choose. See the [security model](docs/SECURITY-MODEL.md#data-flows) for the full data flow.
 
 **How is this different from cass?**
 [cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, eight harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
@@ -202,7 +205,7 @@ rm -rf ~/.cache/deja
 
 ## Contributing
 
-`make build test lint` — see [CONTRIBUTING.md](CONTRIBUTING.md). Adding a harness is one parser file: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#adding-a-harness). Good first issues are labeled.
+`make build test lint` — see [CONTRIBUTING.md](CONTRIBUTING.md). Adding a harness starts in the [parser registry](docs/ARCHITECTURE.md#source-parsers). Current priorities and non-goals are in [ROADMAP.md](ROADMAP.md). Good first issues are labeled.
 
 ## License
 

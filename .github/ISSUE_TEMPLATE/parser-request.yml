@@ -1,0 +1,56 @@
+name: New harness parser
+description: Request indexing support for another coding agent
+title: "parser: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not upload a complete private history. Provide a minimal synthetic or
+        reviewed sample with credentials, source code, paths, and IDs replaced.
+  - type: input
+    id: harness
+    attributes:
+      label: Harness
+      placeholder: Agent name and version
+    validations:
+      required: true
+  - type: textarea
+    id: locations
+    attributes:
+      label: Session locations
+      description: >-
+        List default paths on each supported OS and any documented environment
+        variable that relocates the store.
+      placeholder: "Linux/macOS: ~/.example/sessions/*.jsonl"
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal redacted sample
+      description: Preserve the fields and nesting needed to parse one exchange.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: resume
+    attributes:
+      label: Resume command
+      description: Command that reopens a session by ID, or "none".
+      placeholder: "example --resume <session-id>"
+    validations:
+      required: true
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration notes
+      description: Documented MCP configuration, hooks, and SQLite CLI requirements, if any.
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Data review
+      options:
+        - label: I reviewed the sample for secrets and private data.
+          required: true
