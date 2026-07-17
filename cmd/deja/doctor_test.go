@@ -165,11 +165,13 @@ func TestDoctorJSONGolden(t *testing.T) {
 	got := strings.ReplaceAll(out.String(), `\\`, `/`)
 	got = filepath.ToSlash(got)
 	got = strings.ReplaceAll(got, filepath.ToSlash(tmp), "<tmp>")
-	want, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
+	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != string(want) {
+	// The golden may be checked out with CRLF on windows.
+	want := strings.ReplaceAll(string(wantRaw), "\r\n", "\n")
+	if got != want {
 		t.Fatalf("doctor JSON mismatch\n--- got ---\n%s--- want ---\n%s", got, want)
 	}
 }
