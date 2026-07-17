@@ -137,6 +137,7 @@ func existingTargets() []string {
 		"gemini":      filepath.Join(sources.GeminiHome(), "settings.json"),
 		"antigravity": filepath.Join(h, ".gemini", "config"),
 		"grok":        sources.GrokRoot(),
+		"qwen":        sources.QwenConfigDir(),
 	}
 	var out []string
 	for name, p := range checks {
@@ -170,6 +171,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "config", "mcp_config.json"), exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
+	case "qwen":
+		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":

@@ -64,6 +64,14 @@
       "fixture_paths": ["fixtures/registry/grok/sessions/workspace%2Fregistry-demo/registry-grok/updates.jsonl"],
       "parser_source": "internal/sources/grok.go",
       "last_verified": "2026-07-17"
+    },
+    {
+      "id": "qwen",
+      "store_paths": ["${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl"],
+      "format_kind": "jsonl",
+      "fixture_paths": ["fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl"],
+      "parser_source": "internal/sources/qwen.go",
+      "last_verified": "2026-07-17"
     }
   ]
 }

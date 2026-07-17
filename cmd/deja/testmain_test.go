@@ -30,6 +30,7 @@ func TestMain(m *testing.M) {
 		"DEJA_CURSOR_CLI_ROOT":    filepath.Join(root, "cursor-cli"),
 		"DEJA_ANTIGRAVITY_ROOT":   filepath.Join(root, "antigravity"),
 		"DEJA_GROK_ROOT":          filepath.Join(root, "grok"),
+		"DEJA_QWEN_ROOT":          filepath.Join(root, "qwen"),
 	}
 	for key, value := range stores {
 		if err := os.Setenv(key, value); err != nil {

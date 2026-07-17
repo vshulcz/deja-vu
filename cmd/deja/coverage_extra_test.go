@@ -35,6 +35,7 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "antigravity"))
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	t.Setenv("CODEX_HOME", "")
 	t.Setenv("GEMINI_CLI_HOME", "")
@@ -49,7 +50,7 @@ func TestInstallMCPJSONTargetsAndErrors(t *testing.T) {
 	if got := homeDir(); got == "" {
 		t.Fatal("homeDir empty")
 	}
-	for _, target := range []string{"cursor", "gemini", "antigravity"} {
+	for _, target := range []string{"cursor", "gemini", "antigravity", "qwen"} {
 		t.Run(target, func(t *testing.T) {
 			r, err := installTarget(target, "/bin/deja", false)
 			if err != nil || r.Action != "created" {

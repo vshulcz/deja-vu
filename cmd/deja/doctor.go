@@ -107,6 +107,9 @@ func doctorHarnesses(w io.Writer) {
 
 	grokRoot := sources.GrokRoot()
 	printRow("grok", grokRoot, doctorExists(grokRoot), doctorCount(len(sources.GrokSessionFiles()), "file"))
+
+	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
+	printRow("qwen", qwenRoot, doctorExists(qwenRoot), doctorCount(len(sources.QwenSessionFiles()), "file"))
 }
 
 func doctorSQLiteDetail(db string, sqlite bool) string {
@@ -203,6 +206,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
 		{"antigravity", filepath.Join(h, ".gemini", "config", "mcp_config.json"), doctorJSONWired("mcpServers")},
 		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
+		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers")},
 	}
 }
 

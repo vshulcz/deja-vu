@@ -79,4 +79,14 @@ func TestUpstreamHomeVariables(t *testing.T) {
 			t.Fatalf("AiderFiles missed AIDER_CHAT_HISTORY_FILE: %v", AiderFiles())
 		}
 	})
+
+	t.Run("qwen DEJA_QWEN_ROOT", func(t *testing.T) {
+		t.Setenv("DEJA_QWEN_ROOT", filepath.Join(home, "qwen-read"))
+		if got := QwenRoot(); got != filepath.Join(home, "qwen-read") {
+			t.Fatalf("QwenRoot=%q", got)
+		}
+		if got := QwenConfigDir(); got != filepath.Join(home, ".qwen") {
+			t.Fatalf("QwenConfigDir=%q", got)
+		}
+	})
 }

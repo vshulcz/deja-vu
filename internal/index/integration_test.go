@@ -28,6 +28,7 @@ func allHarnessEnv(t *testing.T) (root, dir string) {
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(root, "antigravity"))
 	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(root, "aiderroot"))
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(root, "grok"))
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(root, "qwen"))
 	if err := os.MkdirAll(filepath.Join(root, "home"), 0o755); err != nil {
 		t.Fatal(err)
 	}
