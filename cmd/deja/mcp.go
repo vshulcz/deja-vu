@@ -75,13 +75,13 @@ func handleMCP(req rpcRequest) (any, int, string) {
 		return map[string]any{"tools": []map[string]any{
 			{
 				"name":        "recall",
-				"description": "Search past coding-agent sessions (Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build) indexed on this machine and return the best matches as dense text under ~4KB. Use before debugging or re-implementing something: prior sessions often contain the exact fix, error message, or command. Query works best with specific tokens — an error string, function name, or flag.",
+				"description": "Search past coding-agent sessions and return the best matches as dense text under ~4KB. Call before debugging or re-implementing: use a specific error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok).",
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity or grok."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "recall_context",
-				"description": "Return a markdown digest (~8KB) of the single best-matching prior session — the full problem/solution arc, not just snippets. Use after recall points at a session and more detail is needed.",
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}}, "required": []string{"query"}},
+				"description": "Return a markdown digest (~8KB) of the best prior session. Call before debugging or re-implementing; query with an error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok).",
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
 			},
 		}}, 0, ""
 	case "tools/call":
@@ -124,14 +124,15 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, err := recallText(a.Query, a.Harness, a.Limit, 4096)
+		text, sessions, err := recallTextResult(a.Query, a.Harness, a.Limit, 4096)
 		if err == nil {
-			usage.Record(index.DefaultDir(), usage.KindRecall, len(text))
+			usage.RecordResult(index.DefaultDir(), usage.KindRecall, len(text), sessions, sessions == 0)
 		}
 		return text, err
 	case "recall_context":
 		var a struct {
-			Query string `json:"query"`
+			Query   string `json:"query"`
+			Harness string `json:"harness"`
 		}
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return "", err
@@ -139,9 +140,9 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, err := recallContext(a.Query)
+		text, sessions, err := recallContextResult(a.Query, a.Harness)
 		if err == nil {
-			usage.Record(index.DefaultDir(), usage.KindContext, len(text))
+			usage.RecordResult(index.DefaultDir(), usage.KindContext, len(text), sessions, sessions == 0)
 		}
 		return text, err
 	default:
@@ -150,28 +151,34 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 }
 
 func recallText(q, harness string, limit, budget int) (string, error) {
+	text, _, err := recallTextResult(q, harness, limit, budget)
+	return text, err
+}
+
+func recallTextResult(q, harness string, limit, budget int) (string, int, error) {
 	if limit <= 0 {
 		limit = 5
 	}
 	o := search.Options{Query: q, Harness: harness, All: true}
 	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, mcpProgress())
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if len(hits) == 0 {
-		return fmt.Sprintf("No prior deja sessions matched %q.", q), nil
+		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
 	}
 	if len(hits) > limit {
 		hits = hits[:limit]
 	}
 	var b strings.Builder
+	served := 0
 	fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
 	for i, h := range hits {
 		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1, h.Session.Harness, h.Session.Project, h.Session.ID, h.Count)
@@ -182,6 +189,7 @@ func recallText(q, harness string, limit, budget int) (string, error) {
 		for _, sn := range h.Snippets {
 			fmt.Fprintf(&b, "- %s\n", sn)
 		}
+		served++
 		if b.Len() >= budget {
 			break
 		}
@@ -190,7 +198,7 @@ func recallText(q, harness string, limit, budget int) (string, error) {
 	if len(out) > budget {
 		out = trimUTF8(out, budget)
 	}
-	return out, nil
+	return out, served, nil
 }
 
 func trimUTF8(s string, budget int) string {
@@ -204,24 +212,29 @@ func trimUTF8(s string, budget int) string {
 }
 
 func recallContext(q string) (string, error) {
-	o := search.Options{Query: q, All: true}
+	text, _, err := recallContextResult(q, "")
+	return text, err
+}
+
+func recallContextResult(q, harness string) (string, int, error) {
+	o := search.Options{Query: q, Harness: harness, All: true}
 	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, mcpProgress())
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if len(hits) == 0 {
-		return fmt.Sprintf("No prior deja sessions matched %q.", q), nil
+		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, hits[0].Session, q)
-	return b.String(), nil
+	return b.String(), 1, nil
 }
 
 func mcpProgress() io.Writer {

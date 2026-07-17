@@ -128,7 +128,7 @@ are indexed locally. Cite what you reuse.
 | Tool | Arguments | Returns |
 | --- | --- | --- |
 | `recall` | `query`, `harness?`, `limit?` | Dense matching snippets, ≤4KB — cheap on context. |
-| `recall_context` | `query` | Markdown digest of the best-matching session. |
+| `recall_context` | `query`, `harness?` | Markdown digest of the best-matching session. |
 
 With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup.
 
@@ -152,6 +152,8 @@ Credentials are redacted at index time: AWS keys, generic `api_key=`/`token=` as
 | Grok Build | `~/.grok/sessions/**/updates.jsonl` | ✅ |
 
 Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_INDEX_DIR`. Each agent's own relocation variable is honored too: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GEMINI_CLI_HOME`, `CURSOR_CONFIG_DIR`, `GROK_HOME`, `AIDER_CHAT_HISTORY_FILE`, and `XDG_DATA_HOME` for opencode on Linux.
+
+`DEJA_RECALL=safe` is the default: SessionStart recall stays in the current project, filters weak or duplicate results, prefers the last 90 days, and injects at most 2KB. `DEJA_RECALL=aggressive` searches across projects and raises the injection cap to 4KB. `DEJA_RECALL=off` disables SessionStart recall output.
 
 ## Performance
 

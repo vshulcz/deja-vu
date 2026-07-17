@@ -152,6 +152,20 @@ func TestMCPMalformedParamsOversizedAndToolErrors(t *testing.T) {
 	}
 }
 
+func TestMCPEmptyResultsCounted(t *testing.T) {
+	hermeticEnv(t)
+	if _, err := callMCPTool("recall", json.RawMessage(`{"query":"no-such-result"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := callMCPTool("recall_context", json.RawMessage(`{"query":"no-such-result","harness":"claude"}`)); err != nil {
+		t.Fatal(err)
+	}
+	got := usage.Totals(index.DefaultDir())
+	if got.Recalls != 2 || got.EmptyResultRate != 1 {
+		t.Fatalf("MCP usage = %#v", got)
+	}
+}
+
 func TestShareDigestBudgetNoiseAndRunErrors(t *testing.T) {
 	long := "useful prose before cut " + strings.Repeat("é", 200)
 	s := model.Session{ID: "s", Harness: "claude", Project: "p", Messages: []model.Message{

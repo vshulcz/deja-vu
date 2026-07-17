@@ -16,7 +16,7 @@ func TestStatuslineEmpty(t *testing.T) {
 	if err := runStatusline(strings.NewReader("{}"), &out); err != nil {
 		t.Fatal(err)
 	}
-	if got := out.String(); got != "deja · no recalls yet today" {
+	if got := out.String(); got != "deja · no recalls yet today · 0 B injected" {
 		t.Fatalf("empty statusline = %q", got)
 	}
 }
@@ -52,7 +52,7 @@ func TestStatuslineMissingUsageFile(t *testing.T) {
 	if err := runStatusline(strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
-	if got := out.String(); got != "deja · no recalls yet today" {
+	if got := out.String(); got != "deja · no recalls yet today · 0 B injected" {
 		t.Fatalf("statusline = %q", got)
 	}
 }
@@ -68,7 +68,7 @@ func TestStatuslineCountsRecalls(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "2 recalls") || !strings.Contains(got, "3.0 KB ctx") {
+	if !strings.Contains(got, "2 recalls") || !strings.Contains(got, "3.0 KB ctx") || !strings.Contains(got, "1.0 KB injected") {
 		t.Fatalf("statusline = %q", got)
 	}
 }

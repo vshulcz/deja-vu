@@ -262,6 +262,85 @@ func TestAutoRecallDigestCappedMarkdown(t *testing.T) {
 	}
 }
 
+func TestBuildAutoRecallPolicy(t *testing.T) {
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+	session := func(id, project, text string, updated time.Time) model.Session {
+		return model.Session{ID: id, Harness: "claude", Project: project, Updated: updated, Messages: []model.Message{{Role: "user", Text: text}}}
+	}
+	duplicate := "parser failure needs the same token trimming regression fix"
+	large := strings.Repeat("distinct relevant context ", 160)
+	tests := []struct {
+		name     string
+		mode     string
+		sessions []model.Session
+		want     []string
+		notWant  []string
+		maxBytes int
+		wantN    int
+	}{
+		{name: "off", mode: RecallOff, sessions: []model.Session{session("off", "org/app", large, now)}, notWant: []string{"app"}, maxBytes: 0, wantN: 0},
+		{name: "safe scope and floor", mode: RecallSafe, sessions: []model.Session{
+			session("current", `org\app`, "app parser regression fixed safely", now),
+			session("other", "org/other", "other parser regression fixed safely", now),
+			session("weak", "org/app", "too short", now),
+		}, want: []string{"`current`"}, notWant: []string{"`other`", "`weak`"}, maxBytes: 2048, wantN: 1},
+		{name: "safe dedupe", mode: RecallSafe, sessions: []model.Session{
+			session("first", "org/app", duplicate, now),
+			session("second", "org/app", duplicate+".", now.Add(-time.Hour)),
+		}, want: []string{"`first`"}, notWant: []string{"`second`"}, maxBytes: 2048, wantN: 1},
+		{name: "safe prefers recent", mode: RecallSafe, sessions: []model.Session{
+			session("old", "org/app", "old unique migration details remain useful", now.AddDate(0, 0, -100)),
+			session("new", "org/app", "new unique parser details remain useful", now.AddDate(0, 0, -2)),
+		}, want: []string{"`new`", "`old`"}, maxBytes: 2048, wantN: 2},
+		{name: "aggressive cross project and cap", mode: RecallAggressive, sessions: []model.Session{
+			session("other", "org/other", large, now),
+			session("current", "org/app", large+" unique", now.Add(-time.Hour)),
+		}, want: []string{"org/other"}, maxBytes: 4096, wantN: 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := BuildAutoRecall(tc.sessions, AutoRecallOptions{Mode: tc.mode, ProjectNames: []string{"org/app"}, Now: now})
+			if len(got.Text) > tc.maxBytes || got.Sessions != tc.wantN {
+				t.Fatalf("result len=%d sessions=%d, want <=%d/%d: %q", len(got.Text), got.Sessions, tc.maxBytes, tc.wantN, got.Text)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(got.Text, want) {
+					t.Fatalf("result missing %q: %q", want, got.Text)
+				}
+			}
+			for _, notWant := range tc.notWant {
+				if strings.Contains(got.Text, notWant) {
+					t.Fatalf("result contains %q: %q", notWant, got.Text)
+				}
+			}
+		})
+	}
+
+	ordered := BuildAutoRecall([]model.Session{
+		session("old-order", "org/app", "old unique migration details remain useful", now.AddDate(0, 0, -100)),
+		session("new-order", "org/app", "new unique parser details remain useful", now.AddDate(0, 0, -2)),
+	}, AutoRecallOptions{Mode: RecallSafe, ProjectNames: []string{"org/app"}, Now: now}).Text
+	if strings.Index(ordered, "`new-order`") > strings.Index(ordered, "`old-order`") {
+		t.Fatalf("recent result was not first: %q", ordered)
+	}
+
+	multibyte := "relevant parser context " + strings.Repeat("界", 300)
+	capSession := model.Session{ID: "cap", Harness: "claude", Project: "org/app", Updated: now, Messages: []model.Message{
+		{Role: "user", Text: multibyte},
+		{Role: "assistant", Text: multibyte},
+		{Role: "assistant", Text: multibyte},
+	}}
+	for _, tc := range []struct {
+		mode string
+		cap  int
+	}{{RecallSafe, 2048}, {RecallAggressive, 4096}} {
+		got := BuildAutoRecall([]model.Session{capSession, capSession, capSession}, AutoRecallOptions{Mode: tc.mode, ProjectNames: []string{"org/app"}, Now: now})
+		if len(got.Text) > tc.cap || !utf8.ValidString(got.Text) {
+			t.Fatalf("%s cap result len=%d valid=%v", tc.mode, len(got.Text), utf8.ValidString(got.Text))
+		}
+	}
+}
+
 func TestSnippetPrefersProseOverToolDump(t *testing.T) {
 	text := "netcat output noise needle\n1: package main\n2: func main() {}\nUser asked about needle migration strategy and we concluded use small batches."
 	hits, err := Run([]model.Session{{ID: "s", Harness: "claude", Project: "p", Updated: time.Now(), Messages: []model.Message{{Role: "assistant", Text: text}}}}, Options{Query: "needle"})
