@@ -9,13 +9,13 @@ import (
 
 func TestPrintLogo(t *testing.T) {
 	var b bytes.Buffer
-	printLogo(&b, "memory for coding agents")
+	printLogo(&b, brandInfo())
 	out := b.String()
-	if !strings.Contains(out, "●") || !strings.Contains(out, "▲") || !strings.Contains(out, "deja-vu") || !strings.Contains(out, "memory for coding agents") {
+	if !strings.Contains(out, "█") || !strings.Contains(out, "deja-vu") || !strings.Contains(out, "memory for coding agents") {
 		t.Fatalf("logo output: %q", out)
 	}
-	if len(strings.Split(strings.TrimSpace(out), "\n")) != 5 {
-		t.Fatalf("loop mark should be 5 lines: %q", out)
+	if n := len(strings.Split(strings.TrimSpace(out), "\n")); n != len(loopArt) {
+		t.Fatalf("mark should be %d lines, got %d: %q", len(loopArt), n, out)
 	}
 }
 
