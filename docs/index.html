@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deja-vu — your agents already solved this. deja finds it.</title>
-<meta name="description" content="A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex and opencode already write. One zero-dependency binary, fully local.">
+<meta name="description" content="A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex, opencode, Cursor, Gemini CLI, aider, Antigravity and Grok Build already write. One zero-dependency binary, fully local.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="deja-vu — search every session your coding agents ever wrote">
-<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across Claude Code, Codex and opencode, served back to agents via MCP.">
+<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across eight coding agents, served back to them via MCP.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -116,7 +116,7 @@ a:hover{text-decoration:underline}
 
 <header>
   <h1>Your agents already solved this.<br><span class="grad">deja finds it.</span></h1>
-  <p class="sub">Claude Code, Codex and opencode write every session to disk — gigabytes of solved problems nobody can search. <code>deja</code> turns them into a memory layer: search, agent recall, auto-context, redaction, stats, share and sync. One zero-dependency binary.</p>
+  <p class="sub">Eight coding agents write every session to disk — gigabytes of solved problems nobody can search. <code>deja</code> turns them into a memory layer: search, agent recall, auto-context, redaction, stats, share and sync. One zero-dependency binary.</p>
   <div class="cta">
     <a class="btn primary" href="#install">Get started</a>
     <a class="btn" href="https://github.com/vshulcz/deja-vu">Star on GitHub</a>
@@ -149,7 +149,7 @@ a:hover{text-decoration:underline}
 
 <section>
   <h2>Memory your agent actually uses</h2>
-  <p class="lead">After <code style="font-family:var(--mono);font-size:.9em">deja install --all</code>, every agent on your machine gets a <span style="font-family:var(--mono);font-size:.9em">recall</span> tool over MCP — add <span style="font-family:var(--mono);font-size:.9em">--auto</span> for session-start auto-recall on Claude Code, Codex and opencode.</p>
+  <p class="lead">After <code style="font-family:var(--mono);font-size:.9em">deja install --all</code>, every agent on your machine gets a <span style="font-family:var(--mono);font-size:.9em">recall</span> tool over MCP — add <span style="font-family:var(--mono);font-size:.9em">--auto</span> for session-start auto-recall where the agent supports it.</p>
   <div class="chat">
     <div class="msg you"><span class="who">you</span><div class="bubble">have we dealt with jwt refresh rotation before? check your memory</div></div>
     <div class="msg ai"><span class="who">AI</span><div class="bubble"><div class="tool">→ recall("jwt refresh rotation")</div>Yes — three weeks ago in the <code>api-gateway</code> project (a Codex session). Login broke after key rotation: the jwks cache wasn't reloaded after <code>rotateKey</code>. You fixed it by reloading the cache and adding a clock-skew test. Want me to apply the same pattern here?</div></div>
@@ -161,7 +161,7 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 12l-4-3M21 12l-4 2"/></svg></div>
       <h3>Agent memory via MCP</h3>
-      <p><code>recall</code> and <code>recall_context</code> tools, answers under ~4KB. Add <code>--auto</code> and project memory lands in Claude Code, Codex and opencode before you ask.</p>
+      <p><code>recall</code> and <code>recall_context</code> tools, answers under ~4KB. Add <code>--auto</code> and project memory lands in your agent before you ask.</p>
     </div>
     <div class="card">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
@@ -193,7 +193,7 @@ a:hover{text-decoration:underline}
 
 <section>
   <div class="stats">
-    <div class="stat"><b>7–9 ms</b><span>warm search over ~3.3GB</span></div>
+    <div class="stat"><b>~12 ms</b><span>warm search over ~3.3GB</span></div>
     <div class="stat"><b>~10 s</b><span>cold index, once</span></div>
     <div class="stat"><b>~2.4%</b><span>index size vs corpus</span></div>
     <div class="stat"><b>0</b><span>runtime dependencies</span></div>
