@@ -1446,24 +1446,28 @@ func lastCompleteLineOffset(p string, size int64) int64 {
 		return size
 	}
 	defer func() { _ = f.Close() }()
+	// Walk backwards window by window: a torn line longer than one window
+	// (a fat tool result caught mid-write) must not fool us into treating
+	// the whole file as complete, or its message is lost after completion.
 	const window = 64 * 1024
-	start := size - window
-	if start < 0 {
-		start = 0
-	}
-	buf := make([]byte, size-start)
-	if _, err := f.ReadAt(buf, start); err != nil {
-		return size
-	}
-	for i := len(buf) - 1; i >= 0; i-- {
-		if buf[i] == '\n' {
-			return start + int64(i) + 1
+	end := size
+	for end > 0 {
+		start := end - window
+		if start < 0 {
+			start = 0
 		}
+		buf := make([]byte, end-start)
+		if _, err := f.ReadAt(buf, start); err != nil {
+			return size
+		}
+		for i := len(buf) - 1; i >= 0; i-- {
+			if buf[i] == '\n' {
+				return start + int64(i) + 1
+			}
+		}
+		end = start
 	}
-	if start == 0 {
-		return 0
-	}
-	return size
+	return 0
 }
 
 func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {

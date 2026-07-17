@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -157,5 +158,31 @@ func TestWriteManifestAtomicAndStamped(t *testing.T) {
 	}
 	if !recordsIntact(dir, m) {
 		t.Fatal("recordsIntact false on a clean index")
+	}
+}
+
+// A torn trailing line longer than the scan window used to make SafeSize
+// fall back to the file size, silently skipping the message once completed.
+func TestSafeSizeTornLineLongerThanWindow(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "big.jsonl")
+	complete := `{"type":"user","sessionId":"s","message":{"role":"user","content":"ok"}}` + "\n"
+	torn := `{"type":"user","sessionId":"s","message":{"role":"user","content":"` + strings.Repeat("x", 100*1024)
+	if err := os.WriteFile(p, []byte(complete+torn), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fi, _ := os.Stat(p)
+	got := lastCompleteLineOffset(p, fi.Size())
+	if got != int64(len(complete)) {
+		t.Fatalf("SafeSize=%d want %d (end of last complete line)", got, len(complete))
+	}
+	// no newline at all -> nothing is safe yet
+	p2 := filepath.Join(dir, "noline.jsonl")
+	if err := os.WriteFile(p2, []byte(strings.Repeat("y", 70*1024)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fi2, _ := os.Stat(p2)
+	if got := lastCompleteLineOffset(p2, fi2.Size()); got != 0 {
+		t.Fatalf("SafeSize=%d want 0 for newline-free file", got)
 	}
 }
