@@ -793,6 +793,10 @@ func metaForSession(s model.Session) SessionMeta {
 	if title == "" {
 		title = sessionTitle(s)
 	}
+	// Titles come from unredacted places — an agent-generated summary, a
+	// composer name, the first user message — and are persisted in
+	// sessions.gob, so they need the same scrubbing as record text.
+	title, _ = redact.Text(title)
 	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated}
 }
 
@@ -1498,7 +1502,7 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 		}
 		s := by[r.Key]
 		if s == nil {
-			cp := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Started: meta.Started, Updated: meta.Updated}
+			cp := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Title: meta.Title, Started: meta.Started, Updated: meta.Updated}
 			s = &cp
 			by[r.Key] = s
 		}
