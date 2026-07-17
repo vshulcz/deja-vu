@@ -119,7 +119,7 @@ func TestWinGetManifestSet(t *testing.T) {
 	if strings.Count(installer, "  InstallerSha256: ") != 2 || strings.Count(installer, "- RelativeFilePath: deja.exe\n") != 1 {
 		t.Error("installer must have two hashes and one portable deja.exe entry")
 	}
-	for _, line := range strings.Split(installer, "\n") {
+	for _, line := range strings.Split(strings.ReplaceAll(installer, "\r\n", "\n"), "\n") {
 		if hash, ok := strings.CutPrefix(line, "  InstallerSha256: "); ok && !hashRE.MatchString(hash) {
 			t.Errorf("invalid InstallerSha256 %q", hash)
 		}
