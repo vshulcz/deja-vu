@@ -96,17 +96,38 @@ func brandInfo() []string {
 	}
 }
 
+// prepareFirstIndexGreeting silences the per-harness narration when the
+// greeting is about to show the same numbers in its info column.
+func prepareFirstIndexGreeting() {
+	if !index.HasManifest(index.DefaultDir()) && logoWanted(os.Stdout) {
+		index.SuppressHarnessNarration = true
+	}
+}
+
 func maybeFirstIndexGreeting() {
+	index.SuppressHarnessNarration = false
 	b := index.LastBuild
 	if !b.Initial || b.Messages == 0 || !logoWanted(os.Stdout) {
 		return
 	}
-	info := append(brandInfo(),
+	info := brandInfo()
+	info = append(info, "")
+	nameW := 0
+	for _, h := range b.PerHarness {
+		if h.Messages > 0 && len(h.Name) > nameW {
+			nameW = len(h.Name)
+		}
+	}
+	for _, h := range b.PerHarness {
+		if h.Messages == 0 {
+			continue
+		}
+		info = append(info, fmt.Sprintf("%-*s  %s%6d%s messages · %d sessions",
+			nameW, h.Name, logoBold, h.Messages, logoReset, h.Sessions))
+	}
+	info = append(info,
 		"",
-		fmt.Sprintf("messages   %s%d%s", logoBold, b.Messages, logoReset),
-		fmt.Sprintf("sessions   %s%d%s", logoBold, b.Sessions, logoReset),
-		fmt.Sprintf("agents     %s%d%s", logoBold, b.Harnesses, logoReset),
-		"",
+		fmt.Sprintf("indexed %s%d%s messages across %s%d%s agents", logoBold, b.Messages, logoReset, logoBold, b.Harnesses, logoReset),
 		logoDim+`try: deja "something you fixed weeks ago"`+logoReset,
 	)
 	printLogo(os.Stdout, info)

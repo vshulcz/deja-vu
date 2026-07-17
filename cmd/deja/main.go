@@ -78,6 +78,7 @@ func run(args []string) error {
 		return runDoctor(os.Stdout, doctorLookup)
 	}
 	if args[0] == "warmup" {
+		prepareFirstIndexGreeting()
 		if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
 			return err
 		}
@@ -93,6 +94,7 @@ func run(args []string) error {
 			}
 			return fmt.Errorf("index: unknown flag %q", a)
 		}
+		prepareFirstIndexGreeting()
 		if err := index.Ensure(index.DefaultDir(), "", force, os.Stderr); err != nil {
 			return err
 		}
@@ -215,6 +217,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	prepareFirstIndexGreeting()
 	if err := index.EnsureForSearch(index.DefaultDir(), o, force, os.Stderr); err != nil {
 		return fmt.Errorf("ensure: %w", err)
 	}
