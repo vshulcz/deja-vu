@@ -53,6 +53,20 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	if len(projectSessions) != 1 || projectSessions[0].ID != "s1" || len(projectSessions[0].Messages) != 2 {
 		t.Fatalf("bad project sessions: %#v", projectSessions)
 	}
+	filteredRecent, err := RecentMatching(dir, 2, search.Options{Harness: "claude", Project: "deja"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filteredRecent) != 1 || filteredRecent[0].ID != "s1" {
+		t.Fatalf("bad filtered recent sessions: %#v", filteredRecent)
+	}
+	filteredRecent, err = RecentMatching(dir, 2, search.Options{Harness: "codex"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filteredRecent) != 0 {
+		t.Fatalf("unexpected filtered recent sessions: %#v", filteredRecent)
+	}
 	var second bytes.Buffer
 	if err := Ensure(dir, "claude", false, &second); err != nil {
 		t.Fatal(err)

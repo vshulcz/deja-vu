@@ -268,6 +268,10 @@ func SearchWithRecovery(dir string, o search.Options, progress io.Writer) ([]mod
 }
 
 func Recent(dir string, n int) ([]model.Session, error) {
+	return RecentMatching(dir, n, search.Options{})
+}
+
+func RecentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -282,6 +286,9 @@ func Recent(dir string, n int) ([]model.Session, error) {
 	}
 	out := make([]model.Session, 0, len(m.Sessions))
 	for _, meta := range m.Sessions {
+		if !sessionMetaMatches(meta, o) {
+			continue
+		}
 		out = append(out, sessionFromMeta(meta))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })

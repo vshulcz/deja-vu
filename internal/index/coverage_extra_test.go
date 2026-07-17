@@ -59,6 +59,14 @@ func TestIndexReadWriteAndQueryEdgeBranches(t *testing.T) {
 	if DefaultDir() != filepath.Join(tmp, "default-index") {
 		t.Fatal("DefaultDir ignored env")
 	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		if got := displayPath(filepath.Join(home, "idx")); got != "~"+string(os.PathSeparator)+"idx" {
+			t.Fatalf("displayPath home contraction = %q", got)
+		}
+	}
+	if got := displayPath(filepath.Join(t.TempDir(), "idx")); strings.HasPrefix(got, "~") {
+		t.Fatalf("displayPath outside home = %q", got)
+	}
 	if err := EnsureForSearch(dir, search.Options{Query: "alpha"}, false, nil); err != nil {
 		t.Fatalf("EnsureForSearch rebuild for scope mismatch: %v", err)
 	}

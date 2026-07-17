@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -88,6 +89,92 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 				t.Fatalf("out %q does not contain %q", out, tc.want)
 			}
 		})
+	}
+}
+
+func TestLastFiltersProjectAndHarness(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "alpha", "claude-alpha.jsonl"), "claude-alpha", []string{
+		`{"type":"user","sessionId":"claude-alpha","timestamp":"2026-01-03T10:00:00Z","message":{"role":"user","content":"alpha claude memory"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "claude-beta.jsonl"), "claude-beta", []string{
+		`{"type":"user","sessionId":"claude-beta","timestamp":"2026-01-02T10:00:00Z","message":{"role":"user","content":"beta claude memory"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "gamma", "claude-gamma.jsonl"), "claude-gamma", []string{
+		`{"type":"assistant","sessionId":"claude-gamma","timestamp":"2026-01-05T10:00:00Z","message":{"role":"assistant","content":"assistant-only memory"}}`,
+	})
+	codexFile := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "01", "04", "rollout-2026-01-04T10-00-00-codex-alpha.jsonl")
+	if err := os.MkdirAll(filepath.Dir(codexFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	codex := strings.Join([]string{
+		`{"type":"session_meta","timestamp":"2026-01-04T10:00:00Z","payload":{"session_id":"codex-alpha","cwd":"/tmp/alpha"}}`,
+		`{"type":"message","timestamp":"2026-01-04T10:01:00Z","payload":{"role":"user","content":"alpha codex memory"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(codexFile, []byte(codex), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := captureRun(t, "last", "--project", "alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "alpha codex memory") || !strings.Contains(out, "alpha claude memory") || strings.Contains(out, "beta claude memory") {
+		t.Fatalf("project-filtered last output = %q", out)
+	}
+
+	out, err = captureRun(t, "last", "20", "--harness", "codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "alpha codex memory") || strings.Contains(out, "alpha claude memory") || strings.Contains(out, "beta claude memory") {
+		t.Fatalf("harness-filtered last output = %q", out)
+	}
+
+	out, err = captureRun(t, "last", "--project", "gamma")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "[claude · gamma · 2026-01-05 · claude-gamma]") || strings.Contains(out, "assistant-only memory") {
+		t.Fatalf("title-less last output = %q", out)
+	}
+
+	if _, err := captureRun(t, "last", "--project"); err == nil || !strings.Contains(err.Error(), "--project needs value") {
+		t.Fatalf("missing last filter value err=%v", err)
+	}
+	if _, err := captureRun(t, "last", "--unknown"); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("unknown last flag err=%v", err)
+	}
+}
+
+func TestLastParserAndSourceFilters(t *testing.T) {
+	n, o, err := parseLast([]string{"25", "--harness", "codex", "--project", "api"})
+	if err != nil || n != 25 || o.Harness != "codex" || o.Project != "api" {
+		t.Fatalf("parseLast = n:%d options:%#v err:%v", n, o, err)
+	}
+	n, o, err = parseLast([]string{"bad"})
+	if err != nil || n != 10 || o.Harness != "" || o.Project != "" {
+		t.Fatalf("parseLast compatibility = n:%d options:%#v err:%v", n, o, err)
+	}
+	if _, _, err := parseLast([]string{"--unknown"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("parseLast unknown flag err=%v", err)
+	}
+	if _, _, err := parseLast([]string{"--harness"}); err == nil || !strings.Contains(err.Error(), "--harness needs value") {
+		t.Fatalf("parseLast missing harness err=%v", err)
+	}
+
+	sessions := []model.Session{
+		{ID: "c1", Harness: "codex", Project: "api-gateway"},
+		{ID: "c2", Harness: "claude", Project: "api-gateway"},
+		{ID: "c3", Harness: "codex", Project: "frontend"},
+	}
+	if got := filterRecentSources(sessions, search.Options{}); len(got) != 3 {
+		t.Fatalf("unfiltered sources = %#v", got)
+	}
+	got := filterRecentSources(sessions, search.Options{Harness: "codex", Project: "API"})
+	if len(got) != 1 || got[0].ID != "c1" {
+		t.Fatalf("filtered sources = %#v", got)
 	}
 }
 

@@ -181,13 +181,11 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "last" {
-		n := 10
-		if len(args) > 1 {
-			if x, err := strconv.Atoi(args[1]); err == nil {
-				n = x
-			}
+		n, o, err := parseLast(args[1:])
+		if err != nil {
+			return err
 		}
-		ss, err := recent(n)
+		ss, err := recentMatching(n, o)
 		if err != nil {
 			return err
 		}
@@ -254,14 +252,70 @@ func findByPrefix(p string) (model.Session, bool, error) {
 }
 
 func recent(n int) ([]model.Session, error) {
+	return recentMatching(n, search.Options{})
+}
+
+func recentMatching(n int, o search.Options) ([]model.Session, error) {
 	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err == nil {
-		if ss, err := index.Recent(index.DefaultDir(), n); err == nil {
+		if ss, err := index.RecentMatching(index.DefaultDir(), n, o); err == nil {
 			return ss, nil
 		}
 	}
-	ss := loadFileSources()
-	ss = append(ss, sources.LoadOpencodeRecent(n)...)
+	ss := filterRecentSources(loadFileSources(), o)
+	if o.Harness == "" || o.Harness == "opencode" {
+		ss = append(ss, filterRecentSources(sources.LoadOpencodeRecent(n), o)...)
+	}
 	return search.Recent(ss, n), nil
+}
+
+func parseLast(args []string) (int, search.Options, error) {
+	n := 10
+	seenN := false
+	o := search.Options{}
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch a {
+		case "--harness", "--project":
+			if i+1 >= len(args) {
+				return n, o, fmt.Errorf("%s needs value", a)
+			}
+			i++
+			if a == "--harness" {
+				o.Harness = args[i]
+			} else {
+				o.Project = args[i]
+			}
+		default:
+			if strings.HasPrefix(a, "-") {
+				return n, o, fmt.Errorf("last: unknown flag %q", a)
+			}
+			if !seenN {
+				if x, err := strconv.Atoi(a); err == nil {
+					n = x
+					seenN = true
+				}
+			}
+		}
+	}
+	return n, o, nil
+}
+
+func filterRecentSources(ss []model.Session, o search.Options) []model.Session {
+	if o.Harness == "" && o.Project == "" {
+		return ss
+	}
+	out := ss[:0]
+	project := strings.ToLower(o.Project)
+	for _, s := range ss {
+		if o.Harness != "" && s.Harness != o.Harness {
+			continue
+		}
+		if project != "" && !strings.Contains(strings.ToLower(s.Project), project) {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 func firstUserTitle(s model.Session) string {
@@ -448,7 +502,7 @@ Usage:
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]
-  deja last [n]
+  deja last [n] [--project name] [--harness name]
   deja sources
   deja doctor [--json]
   deja warmup
@@ -464,6 +518,8 @@ Usage:
 Examples:
   deja "jwt refresh token bug"
   deja --harness claude --since 30d "panic in indexer"
+  deja last 20 --harness codex
+  deja last --project api-gateway
   deja --re "timeout|deadline exceeded"
   deja ctx "schema migration rollback" > /tmp/deja-context.md
   deja install --all
