@@ -15,8 +15,10 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - -trimpath
     ldflags:
-      - -s -w -trimpath -X main.version={{ .Version }}
+      - -s -w -X main.version={{ .Version }}
 
 archives:
   - id: default
