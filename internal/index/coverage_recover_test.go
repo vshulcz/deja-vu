@@ -71,7 +71,7 @@ func TestSearchWithRecoveryPassthroughAndForcedRebuildFailure(t *testing.T) {
 	if err := os.Chmod(parent, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(parent, 0o755)
+	defer func() { _ = os.Chmod(parent, 0o755) }()
 	if _, err := SearchWithRecovery(dir, o, nil); err == nil {
 		t.Fatal("SearchWithRecovery with blocked rebuild returned nil error")
 	}
@@ -146,7 +146,7 @@ func TestRebuildStagingDirBlocked(t *testing.T) {
 	if err := os.Chmod(blocked, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(blocked, 0o755)
+	defer func() { _ = os.Chmod(blocked, 0o755) }()
 
 	dir := filepath.Join(blocked, "idx-a")
 	if err := rebuild(dir, "", "", map[string]FileState{}, nil); err == nil {
@@ -334,7 +334,7 @@ func TestUpdateIndexAppendNonCorruptErrorWrapped(t *testing.T) {
 	if err := os.Chmod(bpath, 0o000); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(bpath, 0o644)
+	defer func() { _ = os.Chmod(bpath, 0o644) }()
 	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)

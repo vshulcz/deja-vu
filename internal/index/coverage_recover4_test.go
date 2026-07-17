@@ -88,7 +88,7 @@ func TestEnsureForSearchWrapsUpdateIndexError(t *testing.T) {
 	if err := os.Chmod(parent, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(parent, 0o755)
+	defer func() { _ = os.Chmod(parent, 0o755) }()
 	if err := EnsureForSearch(dir, o, false, nil); err == nil {
 		t.Fatal("EnsureForSearch with blocked updateIndex replace path returned nil")
 	}
@@ -110,11 +110,11 @@ func TestSearchSubstringPostingsDirErrorAndEmptyAfterCut(t *testing.T) {
 	if err := os.Chmod(filepath.Join(dir, "buckets"), 0o300); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(filepath.Join(dir, "buckets"), 0o755)
+	defer func() { _ = os.Chmod(filepath.Join(dir, "buckets"), 0o755) }()
 	if _, err := Search(dir, search.Options{Query: "nonexistenttoken12345"}); err == nil {
 		t.Fatal("Search substring fallback over unreadable buckets dir returned nil")
 	}
-	os.Chmod(filepath.Join(dir, "buckets"), 0o755)
+	_ = os.Chmod(filepath.Join(dir, "buckets"), 0o755)
 
 	if ss, err := Search(dir, search.Options{Query: "alpha", Harness: "does-not-exist"}); err != nil || ss != nil {
 		t.Fatalf("Search filtered to nothing by cutPostingsBySession = %#v err=%v", ss, err)
@@ -149,7 +149,7 @@ func TestAppendIncrementalDirectDefensiveBranches(t *testing.T) {
 	if err := os.Chmod(unknown, 0o000); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(unknown, 0o644)
+	defer func() { _ = os.Chmod(unknown, 0o644) }()
 	old := Manifest{Files: map[string]FileState{}, Sessions: nil}
 	changed := map[string]FileState{unknown: {Path: unknown, Size: 1}}
 	files := map[string]FileState{unknown: {Path: unknown, Size: 1}}
@@ -186,11 +186,11 @@ func TestAppendIncrementalUnreadableGrownFileKeepsOldState(t *testing.T) {
 	if err := os.Chmod(file, 0o000); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(file, 0o644)
+	defer func() { _ = os.Chmod(file, 0o644) }()
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatalf("Ensure over unreadable grown claude file err=%v", err)
 	}
-	os.Chmod(file, 0o644)
+	_ = os.Chmod(file, 0o644)
 	if ss, err := Search(dir, search.Options{Query: "keepold needle", All: true}); err != nil || len(ss) != 1 {
 		t.Fatalf("original content lost when append retry deferred: %#v err=%v", ss, err)
 	}
@@ -257,7 +257,7 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	if err := os.Chmod(filepath.Join(dir, "buckets"), 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(filepath.Join(dir, "buckets"), 0o755)
+	defer func() { _ = os.Chmod(filepath.Join(dir, "buckets"), 0o755) }()
 	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	if err := Ensure(dir, "", false, nil); err == nil {
 		t.Fatal("Ensure with unwritable buckets dir for a new token returned nil")
 	}
-	os.Chmod(filepath.Join(dir, "buckets"), 0o755)
+	_ = os.Chmod(filepath.Join(dir, "buckets"), 0o755)
 
 	file2 := filepath.Join(claudeRoot, "p2", "s2.jsonl")
 	write(t, file2, claudeLine("s2", "2026-01-02T03:04:05Z", "manifesterr existingtoken"))
@@ -282,7 +282,7 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	if err := os.Chmod(dir2, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(dir2, 0o755)
+	defer func() { _ = os.Chmod(dir2, 0o755) }()
 	f2, err := os.OpenFile(file2, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
@@ -394,7 +394,7 @@ func TestImportBlockedBucketsDirWriteError(t *testing.T) {
 	if err := os.Chmod(filepath.Join(dir, "buckets"), 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(filepath.Join(dir, "buckets"), 0o755)
+	defer func() { _ = os.Chmod(filepath.Join(dir, "buckets"), 0o755) }()
 	batch := filepath.Join(tmp, "batch")
 	writeSyncBatch(t, batch, []SyncRecord{{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "blockedbucket text", Time: time.Now()}})
 	if _, err := Import(dir, batch); err == nil {
@@ -429,7 +429,7 @@ func TestExportRecordsErrorBranches(t *testing.T) {
 	if err := os.Chmod(outDir, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(outDir, 0o755)
+	defer func() { _ = os.Chmod(outDir, 0o755) }()
 	if _, err := Export(dir2, outDir); err == nil {
 		t.Fatal("Export into a read-only outDir returned nil error")
 	}
@@ -439,7 +439,7 @@ func TestExportRecordsErrorBranches(t *testing.T) {
 	if err := os.Chmod(dir3, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(dir3, 0o755)
+	defer func() { _ = os.Chmod(dir3, 0o755) }()
 	if _, err := Export(dir3, filepath.Join(tmp, "out3")); err == nil {
 		t.Fatal("Export with a read-only index dir (final writeManifest) returned nil error")
 	}
