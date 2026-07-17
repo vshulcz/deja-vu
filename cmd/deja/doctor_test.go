@@ -160,7 +160,10 @@ func TestDoctorJSONGolden(t *testing.T) {
 	if err := runDoctor(&out, []string{"--json"}, stubLookup("2.0.0", true)); err != nil {
 		t.Fatal(err)
 	}
-	got := filepath.ToSlash(out.String())
+	// JSON escapes windows separators as \\, which ToSlash would turn
+	// into //; collapse them to / before substituting the temp dir.
+	got := strings.ReplaceAll(out.String(), `\\`, `/`)
+	got = filepath.ToSlash(got)
 	got = strings.ReplaceAll(got, filepath.ToSlash(tmp), "<tmp>")
 	want, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
