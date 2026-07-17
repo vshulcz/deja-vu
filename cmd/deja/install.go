@@ -375,11 +375,11 @@ func installCodex(exe string, uninstall bool) (installResult, error) {
 	return installTOML(path, block, uninstall)
 }
 
-// installGrok wires the MCP server into Grok Build's ~/.grok/config.toml.
+// installGrok wires the MCP server into Grok Build's config.toml.
 // Same [mcp_servers.NAME] TOML shape as Codex; Grok's hook stdout is ignored
 // on passive events, so MCP is the deepest integration available.
 func installGrok(exe string, uninstall bool) (installResult, error) {
-	path := filepath.Join(sources.GrokRoot(), "config.toml")
+	path := filepath.Join(sources.GrokHome(), "config.toml")
 	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = [\"mcp\"]\n", exe)
 	return installTOML(path, block, uninstall)
 }

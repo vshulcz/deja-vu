@@ -105,7 +105,7 @@
     {
       "name": "grok",
       "state": "config-missing",
-      "path": "<tmp>/grok/config.toml"
+      "path": "<tmp>/home/.grok/config.toml"
     }
   ],
   "sqlite3": {

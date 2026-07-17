@@ -298,13 +298,15 @@ func TestDoctorMCPWiringStates(t *testing.T) {
 	home := filepath.Join(tmp, "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	grokHome := filepath.Join(tmp, "grok-home")
+	t.Setenv("GROK_HOME", grokHome)
 
 	// wired via JSON
 	writeFileMkdir(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"deja":{}}}`)
 	// present but not wired (TOML without our block)
 	writeFileMkdir(t, filepath.Join(home, ".codex", "config.toml"), "[cli]\nauto_update = false\n")
-	// wired via TOML at the grok root
-	writeFileMkdir(t, filepath.Join(os.Getenv("DEJA_GROK_ROOT"), "config.toml"), "[mcp_servers.deja]\ncommand = \"x\"\n")
+	// wired via TOML at the Grok home, separate from the session read root
+	writeFileMkdir(t, filepath.Join(grokHome, "config.toml"), "[mcp_servers.deja]\ncommand = \"x\"\n")
 	// gemini settings.json left absent -> config missing
 
 	var out bytes.Buffer
