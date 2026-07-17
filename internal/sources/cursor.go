@@ -75,18 +75,31 @@ func CursorTranscripts() []string {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(p, ".jsonl") {
+		if !strings.EqualFold(filepath.Ext(p), ".jsonl") {
 			return nil
 		}
-		if strings.Contains(p, string(filepath.Separator)+"subagents"+string(filepath.Separator)) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		if cursorPathHasDir(p, "subagents") && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 			return nil
 		}
-		if strings.Contains(p, string(filepath.Separator)+"agent-transcripts"+string(filepath.Separator)) {
+		if cursorPathHasDir(p, "agent-transcripts") {
 			out = append(out, p)
 		}
 		return nil
 	})
 	return out
+}
+
+func cursorPathHasDir(path, want string) bool {
+	for dir := filepath.Dir(path); ; {
+		if strings.EqualFold(filepath.Base(dir), want) {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
 }
 
 func fileExists(p string) bool {
@@ -274,16 +287,16 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 // back to a path with a greedy existence-checked walk; hyphens in real dir
 // names survive because the literal branch is tried when the split fails.
 func cursorTranscriptProject(path string) string {
-	dir := path
-	for filepath.Base(filepath.Dir(dir)) != "projects" && dir != "/" && dir != "." {
+	dir := filepath.Clean(path)
+	for !strings.EqualFold(filepath.Base(filepath.Dir(dir)), "projects") {
 		parent := filepath.Dir(dir)
-		if parent == dir { // reached a root like C:\ on Windows
-			break
+		if parent == dir {
+			return "-"
 		}
 		dir = parent
 	}
 	encoded := filepath.Base(dir)
-	if encoded == "" || encoded == "/" || encoded == "." || encoded == string(filepath.Separator) {
+	if encoded == "" || encoded == "." {
 		return "-"
 	}
 	if resolved := resolveEncodedPath("-" + encoded); resolved != "" {
