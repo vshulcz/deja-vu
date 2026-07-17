@@ -58,6 +58,7 @@ func TestDoctorAntigravityLocationFallback(t *testing.T) {
 }
 
 func TestDoctorOpencodeConfigPathJSONCFallback(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "home", ".config", "opencode")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

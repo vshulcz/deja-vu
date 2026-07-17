@@ -585,6 +585,7 @@ func TestFallbackFindRecentAndMCPEnsureErrors(t *testing.T) {
 }
 
 func TestMoreErrorBranches(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -667,6 +668,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 }
 
 func TestInstallAdditionalBranches(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)
