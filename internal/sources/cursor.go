@@ -35,8 +35,10 @@ func CursorUserRoot() string {
 	return filepath.Join(h, ".config", "Cursor", "User")
 }
 
+// CursorCLIRoot honors Cursor CLI's documented CURSOR_CONFIG_DIR; the IDE's
+// global storage has no relocation variable and stays put.
 func CursorCLIRoot() string {
-	return EnvPath("DEJA_CURSOR_CLI_ROOT", filepath.Join(Home(), ".cursor"))
+	return EnvPath("DEJA_CURSOR_CLI_ROOT", EnvPath("CURSOR_CONFIG_DIR", filepath.Join(Home(), ".cursor")))
 }
 
 // CursorDBs lists state.vscdb stores; modern chats live in globalStorage.

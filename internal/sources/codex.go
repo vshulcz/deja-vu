@@ -7,7 +7,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-func CodexRoot() string { return EnvPath("DEJA_CODEX_ROOT", filepath.Join(Home(), ".codex")) }
+// CodexRoot honors Codex's own CODEX_HOME (it relocates the whole ~/.codex
+// tree: config.toml, sessions, history), with DEJA_CODEX_ROOT still winning.
+func CodexRoot() string {
+	return EnvPath("DEJA_CODEX_ROOT", EnvPath("CODEX_HOME", filepath.Join(Home(), ".codex")))
+}
 
 func LoadCodex() []model.Session {
 	root := CodexRoot()

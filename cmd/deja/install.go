@@ -97,10 +97,10 @@ func existingTargets() []string {
 	h, _ := os.UserHomeDir()
 	checks := map[string]string{
 		"claude-code": filepath.Join(h, ".claude"),
-		"codex":       filepath.Join(h, ".codex"),
+		"codex":       sources.CodexRoot(),
 		"opencode":    filepath.Join(h, ".config", "opencode"),
-		"cursor":      filepath.Join(h, ".cursor"),
-		"gemini":      filepath.Join(h, ".gemini", "settings.json"),
+		"cursor":      sources.CursorCLIRoot(),
+		"gemini":      filepath.Join(sources.GeminiRoot(), "settings.json"),
 		"antigravity": filepath.Join(h, ".gemini", "config"),
 		"grok":        sources.GrokRoot(),
 	}
@@ -131,7 +131,7 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "cursor":
 		return installCursor(exe, uninstall)
 	case "gemini":
-		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "settings.json"), exe, uninstall)
+		return installMCPJSON(filepath.Join(sources.GeminiRoot(), "settings.json"), exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "config", "mcp_config.json"), exe, uninstall)
 	case "grok":
@@ -339,8 +339,7 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 }
 
 func installCodex(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	path := filepath.Join(h, ".codex", "config.toml")
+	path := filepath.Join(sources.CodexRoot(), "config.toml")
 	block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = [\"mcp\"]\n", exe)
 	return installTOML(path, block, uninstall)
 }
@@ -396,7 +395,7 @@ func homeDir() string {
 // (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
 // mcpServers shape in their own files.
 func installCursor(exe string, uninstall bool) (installResult, error) {
-	return installMCPJSON(filepath.Join(homeDir(), ".cursor", "mcp.json"), exe, uninstall)
+	return installMCPJSON(filepath.Join(sources.CursorCLIRoot(), "mcp.json"), exe, uninstall)
 }
 
 func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {

@@ -16,8 +16,17 @@ import (
 // "$rewindTo" truncation markers. Project ids are either path-hashes or
 // slugs; ~/.gemini/projects.json maps real paths to ids.
 
+// GeminiRoot honors GEMINI_CLI_HOME, the home-dir override Gemini CLI itself
+// implements (it appends .gemini to it). The often-cited GEMINI_CONFIG_DIR only
+// exists in upstream feature requests, so it is deliberately not read here.
 func GeminiRoot() string {
-	return EnvPath("DEJA_GEMINI_ROOT", filepath.Join(Home(), ".gemini"))
+	if root := os.Getenv("DEJA_GEMINI_ROOT"); root != "" {
+		return root
+	}
+	if h := os.Getenv("GEMINI_CLI_HOME"); h != "" {
+		return filepath.Join(h, ".gemini")
+	}
+	return filepath.Join(Home(), ".gemini")
 }
 
 func GeminiChatFiles() []string {
