@@ -36,14 +36,17 @@ func captureRun(t *testing.T, args ...string) (string, error) {
 		t.Fatal(err)
 	}
 	os.Stdout = w
+	// Drain concurrently: windows anonymous pipes buffer only a few KB, so
+	// commands that print more would block a sequential read-after-run.
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
 	err = run(args)
 	_ = w.Close()
 	os.Stdout = old
-	b, readErr := io.ReadAll(r)
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	return string(b), err
+	return <-done, err
 }
 
 func TestRunDispatcherSyntheticFixtures(t *testing.T) {
