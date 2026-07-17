@@ -9,8 +9,25 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// ClaudeConfigDir is the directory Claude Code keeps its state in
+// (settings.json, projects/, ...). Claude Code lets users relocate it with the
+// CLAUDE_CONFIG_DIR environment variable — common when juggling separate
+// personal/work profiles — so we honor the same variable to read from and
+// install into whichever profile is active. Falls back to the default
+// ~/.claude.
+func ClaudeConfigDir() string {
+	return EnvPath("CLAUDE_CONFIG_DIR", filepath.Join(Home(), ".claude"))
+}
+
+// ClaudeJSONPath is Claude Code's top-level state file (holds mcpServers). By
+// default it lives at ~/.claude.json, a sibling of ~/.claude, but when
+// CLAUDE_CONFIG_DIR is set Claude Code moves it inside that directory.
+func ClaudeJSONPath() string {
+	return filepath.Join(EnvPath("CLAUDE_CONFIG_DIR", Home()), ".claude.json")
+}
+
 func ClaudeRoot() string {
-	return EnvPath("DEJA_CLAUDE_ROOT", filepath.Join(Home(), ".claude", "projects"))
+	return EnvPath("DEJA_CLAUDE_ROOT", filepath.Join(ClaudeConfigDir(), "projects"))
 }
 
 func LoadClaude() []model.Session {

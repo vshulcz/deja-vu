@@ -162,7 +162,7 @@ func doctorMCP(w io.Writer) {
 		path  string
 		wired func(string) bool
 	}{
-		{"claude-code", filepath.Join(h, ".claude.json"), doctorJSONWired("mcpServers")},
+		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers")},
 		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired},
 		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp")},
 		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
