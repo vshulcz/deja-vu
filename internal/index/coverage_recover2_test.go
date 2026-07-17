@@ -181,7 +181,7 @@ func TestIntersectSubstringPostingsSkipBranches(t *testing.T) {
 		if err := os.Chmod(unreadableBuckets, 0o300); err != nil {
 			t.Fatal(err)
 		}
-		defer os.Chmod(unreadableBuckets, 0o755)
+		defer func() { _ = os.Chmod(unreadableBuckets, 0o755) }()
 		if _, err := intersectSubstringPostings(unreadableParent, []string{"x"}); err == nil {
 			t.Fatal("intersectSubstringPostings on unreadable buckets dir returned nil")
 		}
@@ -203,7 +203,7 @@ func TestLockDirOpenFileFailure(t *testing.T) {
 	if err := os.Chmod(parent, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(parent, 0o755)
+	defer func() { _ = os.Chmod(parent, 0o755) }()
 	if _, err := lockDir(dir); err == nil {
 		t.Fatal("lockDir with read-only parent returned nil error")
 	}

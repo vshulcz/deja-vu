@@ -228,7 +228,7 @@ func TestUpdateIndexReplacePathParseFailureSkipBranches(t *testing.T) {
 	if err := os.Chmod(newAiderFile, 0o000); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(newAiderFile, 0o644)
+	defer func() { _ = os.Chmod(newAiderFile, 0o644) }()
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatalf("Ensure with new unreadable aider file err=%v", err)
 	}
@@ -249,7 +249,7 @@ func TestUpdateIndexReplacePathParseFailureSkipBranches(t *testing.T) {
 	if err := os.Chmod(blockedParent, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(blockedParent, 0o755)
+	defer func() { _ = os.Chmod(blockedParent, 0o755) }()
 	if err := Ensure(dir2, "", false, nil); err == nil {
 		t.Fatal("Ensure replace-path with blocked own staging dir returned nil")
 	}
