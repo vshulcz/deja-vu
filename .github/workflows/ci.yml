@@ -30,7 +30,7 @@ jobs:
           cache: false
       - run: go mod verify
       - run: go vet ./...
-      - run: go test -race -coverprofile=coverage.out -covermode=atomic -v -timeout 8m ./cmd/deja
+      - run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
         shell: bash
       - run: go build ./cmd/deja
       - name: Coverage summary
