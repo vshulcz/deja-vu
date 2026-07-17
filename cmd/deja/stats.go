@@ -73,13 +73,49 @@ type dayStat struct {
 
 func runStats(args []string) error {
 	jsonOut := false
-	for _, a := range args {
-		switch a {
+	cardPath := ""
+	card := false
+	var options search.Options
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--json":
 			jsonOut = true
+		case "--card":
+			if card {
+				return fmt.Errorf("stats: --card specified twice")
+			}
+			card = true
+			cardPath = "deja-stats.svg"
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				cardPath = args[i+1]
+				i++
+			}
+		case "--harness", "--project", "--since", "--role":
+			if i+1 >= len(args) {
+				return fmt.Errorf("stats: %s needs value", args[i])
+			}
+			v := args[i+1]
+			i++
+			switch args[i-1] {
+			case "--harness":
+				options.Harness = v
+			case "--project":
+				options.Project = v
+			case "--role":
+				options.Role = v
+			case "--since":
+				d, err := parseDur(v)
+				if err != nil {
+					return err
+				}
+				options.Since = d
+			}
 		default:
-			return fmt.Errorf("stats: unknown flag %s", a)
+			return fmt.Errorf("stats: unknown flag %s", args[i])
 		}
+	}
+	if jsonOut && card {
+		return fmt.Errorf("stats: choose one output")
 	}
 	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
 		return err
@@ -88,8 +124,16 @@ func runStats(args []string) error {
 	if err != nil {
 		return err
 	}
-	report := buildStats(ss, time.Now())
+	report := buildStats(filterStatsSessions(ss, options), time.Now())
 	report.Recall = usage.Totals(index.DefaultDir())
+	if cardPath != "" {
+		path, err := writeStatsCard(cardPath, report)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stdout, path)
+		return nil
+	}
 	if jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -97,6 +141,43 @@ func runStats(args []string) error {
 	}
 	printStats(os.Stdout, report)
 	return nil
+}
+
+func filterStatsSessions(ss []model.Session, o search.Options) []model.Session {
+	if o.Harness == "" && o.Project == "" && o.Since <= 0 && o.Role == "" {
+		return ss
+	}
+	cut := time.Time{}
+	if o.Since > 0 {
+		cut = time.Now().Add(-o.Since)
+	}
+	out := make([]model.Session, 0, len(ss))
+	for _, s := range ss {
+		if o.Harness != "" && s.Harness != o.Harness {
+			continue
+		}
+		if o.Project != "" && !strings.Contains(strings.ToLower(s.Project), strings.ToLower(o.Project)) {
+			continue
+		}
+		if !cut.IsZero() && s.Updated.Before(cut) {
+			continue
+		}
+		if o.Role != "" {
+			cp := s
+			cp.Messages = nil
+			for _, m := range s.Messages {
+				if m.Role == o.Role {
+					cp.Messages = append(cp.Messages, m)
+				}
+			}
+			if len(cp.Messages) == 0 {
+				continue
+			}
+			s = cp
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 func buildStats(ss []model.Session, now time.Time) statsReport {

@@ -454,7 +454,7 @@ Usage:
   deja warmup
   deja index [--rebuild]
   deja statusline
-  deja stats [--json]
+  deja stats [--json] [--card [path]]
   deja mcp
   deja version
   deja update

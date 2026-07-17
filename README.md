@@ -85,6 +85,10 @@ $ deja "jwt refresh token"
 | `deja update` | Download the latest GitHub release, verify its checksum, and replace the current binary. |
 | `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
 
+### Share your stats
+
+Run `deja stats --card` to write a self-contained `deja-stats.svg` for a README or social post.
+
 `deja update` is for standalone installs. Homebrew and npm installs update through the package manager.
 
 ### Doctor JSON
