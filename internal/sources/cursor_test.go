@@ -87,6 +87,54 @@ func TestParseCursorTranscript(t *testing.T) {
 	}
 }
 
+func TestCursorTranscriptProjectWalkUp(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{
+			name: "project directory",
+			path: filepath.Join("root", "projects", "Users-me-work-app", "agent-transcripts", "session", "session.jsonl"),
+			want: filepath.Join("work", "app"),
+		},
+		{
+			name: "project directory case",
+			path: filepath.Join("root", "Projects", "Users-me-work-app", "agent-transcripts", "session", "session.jsonl"),
+			want: filepath.Join("work", "app"),
+		},
+		{
+			name: "filesystem root",
+			path: filepath.Join(string(filepath.Separator), "session.jsonl"),
+			want: "-",
+		},
+		{
+			name: "relative path without projects directory",
+			path: filepath.Join("agent-transcripts", "session.jsonl"),
+			want: "-",
+		},
+	}
+	if runtime.GOOS == "windows" {
+		tests = append(tests, struct {
+			name string
+			path string
+			want string
+		}{
+			name: "windows drive root",
+			path: filepath.Join(`C:\`, "session.jsonl"),
+			want: "-",
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cursorTranscriptProject(tt.path); got != tt.want {
+				t.Fatalf("cursorTranscriptProject(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCursorTranscriptsSkipSubagents(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", root)
@@ -104,5 +152,25 @@ func TestCursorTranscriptsSkipSubagents(t *testing.T) {
 	files := CursorTranscripts()
 	if len(files) != 1 || !strings.HasSuffix(files[0], "s1.jsonl") {
 		t.Fatalf("discovery wrong: %v", files)
+	}
+}
+
+func TestCursorTranscriptsPathMatchingIsCaseInsensitive(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", root)
+	dir := filepath.Join(root, "projects", "Users-x-app", "Agent-Transcripts", "s1", "SubAgents")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "child.JSONL")
+	if err := os.WriteFile(path, []byte(`{"role":"user","message":{"content":"hi"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := CursorTranscripts(); len(got) != 0 {
+		t.Fatalf("subagent transcript discovered: %v", got)
+	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
+	if got := CursorTranscripts(); len(got) != 1 || got[0] != path {
+		t.Fatalf("case-insensitive transcript discovery = %v, want %q", got, path)
 	}
 }
