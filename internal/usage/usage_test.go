@@ -61,6 +61,24 @@ func TestCorruptLinesIgnored(t *testing.T) {
 	}
 }
 
+func TestBackwardCompatibleEventsAndTotals(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	old := `{"t":"` + time.Now().UTC().Format(time.RFC3339Nano) + `","kind":"recall","bytes":10}` + "\n"
+	if err := os.WriteFile(Path(dir), []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	RecordResult(dir, KindContext, 20, 0, true)
+	RecordResult(dir, KindHook, 30, 2, false)
+	Record(dir, KindSearch, 100)
+	got := Totals(dir)
+	if got.Recalls != 2 || got.Injections != 1 || got.InjectedSessions != 2 || got.Bytes != 60 || got.InjectedBytes != 30 || got.EmptyResultRate != 0.5 {
+		t.Fatalf("Totals = %#v", got)
+	}
+	if injected := InjectedToday(dir); injected != 30 {
+		t.Fatalf("InjectedToday = %d, want 30", injected)
+	}
+}
+
 func TestRotateMissingAndSmallNoop(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	p := Path(dir)

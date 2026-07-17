@@ -14,16 +14,16 @@ import (
 // because status bars call it constantly.
 func runStatusline(stdin io.Reader, stdout io.Writer) error {
 	drainStdin(stdin)
-	recalls, bytes := usage.Today(index.DefaultDir())
+	recalls, bytes, injected := usage.TodayWithInjections(index.DefaultDir())
 	if recalls == 0 {
-		fmt.Fprint(stdout, "deja · no recalls yet today")
+		fmt.Fprint(stdout, "deja · no recalls yet today · 0 B injected")
 		return nil
 	}
 	noun := "recalls"
 	if recalls == 1 {
 		noun = "recall"
 	}
-	fmt.Fprintf(stdout, "deja · %d %s · %s ctx today", recalls, noun, humanBytes(int64(bytes)))
+	fmt.Fprintf(stdout, "deja · %d %s · %s ctx today · %s injected", recalls, noun, humanBytes(int64(bytes)), humanBytes(int64(injected)))
 	return nil
 }
 

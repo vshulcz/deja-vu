@@ -12,6 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 const (
@@ -33,6 +34,7 @@ type statsReport struct {
 	DateRange     dateRangeStats `json:"date_range"`
 	Longest       sessionStat    `json:"longest_session"`
 	BusiestDay    dayStat        `json:"busiest_day"`
+	Recall        usage.Summary  `json:"recall"`
 }
 
 type harnessStats struct {
@@ -87,6 +89,7 @@ func runStats(args []string) error {
 		return err
 	}
 	report := buildStats(ss, time.Now())
+	report.Recall = usage.Totals(index.DefaultDir())
 	if jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -225,6 +228,11 @@ func printStats(w io.Writer, r statsReport) {
 	fmt.Fprintf(w, "%sHighlights%s\n", bold, reset)
 	fmt.Fprintf(w, "  Longest session  %d messages · %s · %s\n", r.Longest.Messages, statHarnessTag(r.Longest.Harness, color), valueOrDash(r.Longest.Title))
 	fmt.Fprintf(w, "  Busiest day      %s · %d messages\n", valueOrDash(r.BusiestDay.Date), r.BusiestDay.Messages)
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
+	fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
+	fmt.Fprintf(w, "  Injections       %d · %d sessions · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, humanBytes(int64(r.Recall.InjectedBytes)))
+	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)
 }
 
 func considerTime(minT, maxT *time.Time, t time.Time) {

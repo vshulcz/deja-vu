@@ -26,11 +26,11 @@ type sessionStartHookResponse struct {
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).
 func runHookContext(plain bool) error {
-	digest := hookDigest()
+	digest, sessions := hookDigestResult()
 	if digest == "" {
 		return nil
 	}
-	usage.Record(index.DefaultDir(), usage.KindHook, len(digest))
+	usage.RecordResult(index.DefaultDir(), usage.KindHook, len(digest), sessions, false)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -47,17 +47,26 @@ func runHookContext(plain bool) error {
 }
 
 func hookDigest() string {
+	digest, _ := hookDigestResult()
+	return digest
+}
+
+func hookDigestResult() (string, int) {
 	defer func() { _ = recover() }()
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
+	if mode == search.RecallOff {
+		return "", 0
+	}
 	dir := index.DefaultDir()
 	if !index.HasManifest(dir) {
-		return ""
+		return "", 0
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return ""
+			return "", 0
 		}
 	}
 	names := []string{sources.ClaudeProjectName(cwd)}
@@ -72,7 +81,17 @@ func hookDigest() string {
 	localOnly := os.Getenv("DEJA_AUTORECALL_LOCAL_ONLY") == "1"
 	var ss []model.Session
 	seen := map[string]bool{}
-	for _, name := range names {
+	lookupNames := names
+	if mode == search.RecallAggressive {
+		recent, err := index.Recent(dir, 12)
+		if err == nil {
+			lookupNames = nil
+			for _, s := range recent {
+				lookupNames = append(lookupNames, s.Project)
+			}
+		}
+	}
+	for _, name := range lookupNames {
 		got, err := index.RecentProject(dir, name, 3)
 		if err != nil {
 			continue
@@ -90,11 +109,12 @@ func hookDigest() string {
 		}
 	}
 	if len(ss) == 0 {
-		return ""
+		return "", 0
 	}
 	sort.Slice(ss, func(i, j int) bool { return ss[i].Updated.After(ss[j].Updated) })
-	if len(ss) > 3 {
-		ss = ss[:3]
+	if len(ss) > 12 {
+		ss = ss[:12]
 	}
-	return search.AutoRecallDigest(ss, 2000)
+	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names})
+	return result.Text, result.Sessions
 }

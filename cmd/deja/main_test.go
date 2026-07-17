@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 func withTempStores(t *testing.T) string {
@@ -168,6 +169,9 @@ func writeClaudeFixture(t *testing.T, path, sessionID string, lines []string) {
 
 func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	withStatsStores(t)
+	usage.RecordResult(os.Getenv("DEJA_INDEX_DIR"), usage.KindRecall, 100, 1, false)
+	usage.RecordResult(os.Getenv("DEJA_INDEX_DIR"), usage.KindContext, 20, 0, true)
+	usage.RecordResult(os.Getenv("DEJA_INDEX_DIR"), usage.KindHook, 50, 2, false)
 	out, err := captureRun(t, "stats", "--json")
 	if err != nil {
 		t.Fatal(err)
@@ -191,6 +195,9 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if report.BusiestDay.Date != "2026-07-04" || report.BusiestDay.Messages != 3 {
 		t.Fatalf("busiest = %#v", report.BusiestDay)
 	}
+	if report.Recall.Recalls != 2 || report.Recall.Injections != 1 || report.Recall.InjectedSessions != 2 || report.Recall.EmptyResultRate != 0.5 {
+		t.Fatalf("recall = %#v", report.Recall)
+	}
 	byHarness := map[string]harnessStats{}
 	for _, h := range report.Harnesses {
 		byHarness[h.Harness] = h
@@ -206,7 +213,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") {
+	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") || !strings.Contains(out, "Recalls served   2") {
 		t.Fatalf("NO_COLOR/plain output wrong: %q", out)
 	}
 }

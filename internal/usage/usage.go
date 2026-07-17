@@ -23,9 +23,21 @@ const (
 )
 
 type Event struct {
-	Time  time.Time `json:"t"`
-	Kind  string    `json:"kind"`
-	Bytes int       `json:"bytes"`
+	Time     time.Time `json:"t"`
+	Kind     string    `json:"kind"`
+	Bytes    int       `json:"bytes"`
+	Sessions int       `json:"sessions,omitempty"`
+	Empty    bool      `json:"empty,omitempty"`
+}
+
+type Summary struct {
+	Recalls          int     `json:"recalls_served"`
+	Injections       int     `json:"injections"`
+	RecallSessions   int     `json:"recall_sessions"`
+	InjectedSessions int     `json:"injected_sessions"`
+	Bytes            int     `json:"bytes"`
+	InjectedBytes    int     `json:"injected_bytes"`
+	EmptyResultRate  float64 `json:"empty_result_rate"`
 }
 
 const (
@@ -41,6 +53,11 @@ func Path(indexDir string) string {
 
 // Record appends one event. Errors are swallowed on purpose.
 func Record(indexDir, kind string, bytes int) {
+	RecordResult(indexDir, kind, bytes, 0, false)
+}
+
+// RecordResult appends an event with result accounting. Errors are swallowed.
+func RecordResult(indexDir, kind string, bytes, sessions int, empty bool) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return
@@ -51,16 +68,22 @@ func Record(indexDir, kind string, bytes int) {
 		return
 	}
 	defer f.Close()
-	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes})
+	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty})
 	if err != nil {
 		return
 	}
 	_, _ = f.Write(append(b, '\n'))
 }
 
-// Today sums events since local midnight: agent recalls (recall, context,
-// hook) and the context bytes they served.
-func Today(indexDir string) (recalls int, bytes int) {
+// InjectedToday returns session-start context bytes injected since local midnight.
+func InjectedToday(indexDir string) int {
+	_, _, injected := TodayWithInjections(indexDir)
+	return injected
+}
+
+// TodayWithInjections returns today's agent-memory events, served bytes, and
+// the subset of those bytes injected by session-start hooks.
+func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for _, e := range read(Path(indexDir)) {
@@ -68,11 +91,48 @@ func Today(indexDir string) (recalls int, bytes int) {
 			continue
 		}
 		switch e.Kind {
-		case KindRecall, KindContext, KindHook:
+		case KindRecall, KindContext:
 			recalls++
 			bytes += e.Bytes
+		case KindHook:
+			recalls++
+			bytes += e.Bytes
+			injected += e.Bytes
 		}
 	}
+	return recalls, bytes, injected
+}
+
+// Totals summarizes the retained usage log.
+func Totals(indexDir string) Summary {
+	var out Summary
+	empty := 0
+	for _, e := range read(Path(indexDir)) {
+		switch e.Kind {
+		case KindRecall, KindContext:
+			out.Recalls++
+			out.RecallSessions += e.Sessions
+			out.Bytes += e.Bytes
+			if e.Empty {
+				empty++
+			}
+		case KindHook:
+			out.Injections++
+			out.InjectedSessions += e.Sessions
+			out.InjectedBytes += e.Bytes
+			out.Bytes += e.Bytes
+		}
+	}
+	if out.Recalls > 0 {
+		out.EmptyResultRate = float64(empty) / float64(out.Recalls)
+	}
+	return out
+}
+
+// Today sums events since local midnight: agent recalls (recall, context,
+// hook) and the context bytes they served.
+func Today(indexDir string) (recalls int, bytes int) {
+	recalls, bytes, _ = TodayWithInjections(indexDir)
 	return recalls, bytes
 }
 
