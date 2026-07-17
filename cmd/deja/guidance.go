@@ -45,7 +45,7 @@ func opencodeConfigHome() string {
 
 func guidanceText(harness string) string {
 	if harness == "claude-code" || harness == "claude" {
-		return "---\ntitle: deja-history\ndescription: Consult deja MCP history tools when the user refers to past work or previous decisions.\n---\n\n" + guidanceBody + "\n"
+		return "---\nname: deja-history\ndescription: Consult deja MCP history tools when the user refers to past work or previous decisions.\n---\n\n" + guidanceBody + "\n"
 	}
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
 }
