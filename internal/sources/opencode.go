@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -20,8 +21,18 @@ func SQLite3Available() bool {
 	return err == nil
 }
 
+// OpencodeDB mirrors upstream's path logic: XDG_DATA_HOME is honored on Linux
+// only (opencode's xdg-basedir dependency ignores it elsewhere).
 func OpencodeDB() string {
-	return EnvPath("DEJA_OPENCODE_DB", filepath.Join(Home(), ".local", "share", "opencode", "opencode.db"))
+	if p := os.Getenv("DEJA_OPENCODE_DB"); p != "" {
+		return p
+	}
+	if runtime.GOOS == "linux" {
+		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+			return filepath.Join(xdg, "opencode", "opencode.db")
+		}
+	}
+	return filepath.Join(Home(), ".local", "share", "opencode", "opencode.db")
 }
 
 func LoadOpencode() []model.Session {

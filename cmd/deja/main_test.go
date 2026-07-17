@@ -680,3 +680,26 @@ func TestRunIndexCommand(t *testing.T) {
 		t.Fatalf("index bogus err=%v", err)
 	}
 }
+
+// install must land in the profile the upstream variable points at.
+func TestInstallHonorsUpstreamHomes(t *testing.T) {
+	h := t.TempDir()
+	t.Setenv("HOME", h)
+	t.Setenv("USERPROFILE", h)
+	codexHome := filepath.Join(h, "profiles", "codex-work")
+	cursorCfg := filepath.Join(h, "profiles", "cursor-work")
+	t.Setenv("DEJA_CODEX_ROOT", "")
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", "")
+	t.Setenv("CODEX_HOME", codexHome)
+	t.Setenv("CURSOR_CONFIG_DIR", cursorCfg)
+
+	if r, err := installTarget("codex", "/bin/deja", false); err != nil || r.Path != filepath.Join(codexHome, "config.toml") {
+		t.Fatalf("codex install path=%q err=%v", r.Path, err)
+	}
+	if r, err := installTarget("cursor", "/bin/deja", false); err != nil || r.Path != filepath.Join(cursorCfg, "mcp.json") {
+		t.Fatalf("cursor install path=%q err=%v", r.Path, err)
+	}
+	if _, err := os.Stat(filepath.Join(h, ".codex")); !os.IsNotExist(err) {
+		t.Fatal("default ~/.codex must stay untouched")
+	}
+}

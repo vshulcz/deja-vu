@@ -7,7 +7,17 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-func CodexRoot() string { return EnvPath("DEJA_CODEX_ROOT", filepath.Join(Home(), ".codex")) }
+// CodexHome is where the Codex CLI itself keeps state; CODEX_HOME relocates
+// the whole tree (config.toml, sessions, history). Install and doctor use it.
+func CodexHome() string {
+	return EnvPath("CODEX_HOME", filepath.Join(Home(), ".codex"))
+}
+
+// CodexRoot is the session-reading root; DEJA_CODEX_ROOT overrides it without
+// affecting where install writes.
+func CodexRoot() string {
+	return EnvPath("DEJA_CODEX_ROOT", CodexHome())
+}
 
 func LoadCodex() []model.Session {
 	root := CodexRoot()
