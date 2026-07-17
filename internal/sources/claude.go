@@ -92,7 +92,10 @@ func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 }
 
 func claudeProjectDir(path string) string {
-	root := ClaudeRoot()
+	return projectDir(ClaudeRoot(), path)
+}
+
+func projectDir(root, path string) string {
 	if rel, err := filepath.Rel(root, path); err == nil && rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." {
 		parts := strings.Split(rel, string(filepath.Separator))
 		if len(parts) > 1 && parts[0] != "" {

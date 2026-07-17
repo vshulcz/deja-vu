@@ -75,12 +75,12 @@ func handleMCP(req rpcRequest) (any, int, string) {
 		return map[string]any{"tools": []map[string]any{
 			{
 				"name":        "recall",
-				"description": "Search past coding-agent sessions and return the best matches as dense text under ~4KB. Call before debugging or re-implementing: use a specific error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok).",
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity or grok."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
+				"description": "Search past coding-agent sessions and return the best matches as dense text under ~4KB. Call before debugging or re-implementing: use a specific error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok, qwen).",
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "recall_context",
-				"description": "Return a markdown digest (~8KB) of the best prior session. Call before debugging or re-implementing; query with an error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok).",
+				"description": "Return a markdown digest (~8KB) of the best prior session. Call before debugging or re-implementing; query with an error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok, qwen).",
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
 			},
 		}}, 0, ""

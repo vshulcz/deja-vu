@@ -65,6 +65,14 @@
         "<tmp>/grok"
       ],
       "files": 0
+    },
+    {
+      "name": "qwen",
+      "state": "missing",
+      "paths": [
+        "<tmp>/qwen/projects"
+      ],
+      "files": 0
     }
   ],
   "index": {
@@ -106,6 +114,11 @@
       "name": "grok",
       "state": "config-missing",
       "path": "<tmp>/home/.grok/config.toml"
+    },
+    {
+      "name": "qwen",
+      "state": "config-missing",
+      "path": "<tmp>/home/.qwen/settings.json"
     }
   ],
   "sqlite3": {

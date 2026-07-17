@@ -25,6 +25,7 @@ func fuzzEnv(t *testing.T) string {
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(root, "codex"))
 	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(root, "gemini"))
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(root, "grok"))
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(root, "qwen"))
 	t.Setenv("GROK_HOME", filepath.Join(root, "grok"))
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(root, "antigravity"))
 	return root
