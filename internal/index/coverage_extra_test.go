@@ -581,8 +581,8 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 	if err := os.WriteFile(largeNoNL, []byte(large), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := lastCompleteLineOffset(largeNoNL, int64(len(large))); got != int64(len(large)) {
-		t.Fatalf("large no newline offset=%d", got)
+	if got := lastCompleteLineOffset(largeNoNL, int64(len(large))); got != 0 {
+		t.Fatalf("large no newline offset=%d, want 0: no complete line exists yet", got)
 	}
 	exact := filepath.Join(tmp, "exact-window")
 	exactData := strings.Repeat("x", 64*1024-1) + "\n"
