@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/logo.svg" width="340" alt="deja-vu"></p>
 
-<p align="center"><strong>Your agents already solved this. deja finds it.</strong></p>
+<p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Search 3.3&nbsp;GB of agent history in ~12&nbsp;ms &mdash; one zero-dependency binary, fully local.</p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">vshulcz.github.io/deja-vu</a></p>
 
