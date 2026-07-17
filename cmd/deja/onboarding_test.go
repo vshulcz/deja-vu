@@ -92,15 +92,19 @@ func captureStdoutCall(t *testing.T, fn func()) string {
 		t.Fatal(err)
 	}
 	os.Stdout = w
+	// Drain concurrently: windows anonymous pipes buffer only a few KB, so
+	// callbacks that print more would block a sequential read-after-call.
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
 	fn()
 	_ = w.Close()
 	os.Stdout = old
-	b, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatal(err)
-	}
+	out := <-done
 	_ = r.Close()
-	return string(b)
+	return out
 }
 
 func sourcesClaudeConfigDir() string {
