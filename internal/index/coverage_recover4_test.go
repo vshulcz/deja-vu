@@ -279,10 +279,11 @@ func TestAppendIncrementalBucketAndManifestWriteErrors(t *testing.T) {
 	if err := Ensure(dir2, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(dir2, 0o500); err != nil {
+	// Block the manifest tmp path instead of chmod: lockDir re-tightens the
+	// directory to 0700, so permission games no longer stick.
+	if err := os.MkdirAll(filepath.Join(dir2, "manifest.gob.tmp", "block"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = os.Chmod(dir2, 0o755) }()
 	f2, err := os.OpenFile(file2, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
@@ -436,11 +437,12 @@ func TestExportRecordsErrorBranches(t *testing.T) {
 
 	dir3 := filepath.Join(tmp, "idx3")
 	writeTinyIndex(t, dir3)
-	if err := os.Chmod(dir3, 0o500); err != nil {
+	// A directory squatting on sessions.gob.tmp makes writeGobAtomic fail
+	// regardless of directory permissions (lockDir re-tightens those).
+	if err := os.MkdirAll(filepath.Join(dir3, "sessions.gob.tmp", "block"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = os.Chmod(dir3, 0o755) }()
 	if _, err := Export(dir3, filepath.Join(tmp, "out3")); err == nil {
-		t.Fatal("Export with a read-only index dir (final writeManifest) returned nil error")
+		t.Fatal("Export with a blocked manifest tmp returned nil error")
 	}
 }

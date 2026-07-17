@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -184,5 +185,41 @@ func TestSafeSizeTornLineLongerThanWindow(t *testing.T) {
 	fi2, _ := os.Stat(p2)
 	if got := lastCompleteLineOffset(p2, fi2.Size()); got != 0 {
 		t.Fatalf("SafeSize=%d want 0 for newline-free file", got)
+	}
+}
+
+// The index must not be wider-readable than the agent logs it derives from.
+func TestIndexPermissionsAreOwnerOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix permission bits")
+	}
+	root, dir := allHarnessEnv(t)
+	write(t, filepath.Join(root, "claude", "-p-app", "s1.jsonl"),
+		`{"type":"user","sessionId":"s1","timestamp":"2026-02-01T10:00:00Z","message":{"role":"user","content":"perm probe"}}`+"\n")
+	if err := EnsureForSearch(dir, search.Options{Query: "x", All: true}, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(dir); err != nil || fi.Mode().Perm() != 0o700 {
+		t.Fatalf("index dir perm=%v err=%v, want 0700", fi.Mode().Perm(), err)
+	}
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		fi, err := os.Stat(p)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if fi.Mode().Perm() != 0o700 {
+				t.Errorf("%s perm=%v want 0700", p, fi.Mode().Perm())
+			}
+		} else if fi.Mode().Perm() != 0o600 {
+			t.Errorf("%s perm=%v want 0600", p, fi.Mode().Perm())
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

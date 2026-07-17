@@ -393,7 +393,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	imported := importedSessions(dir)
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
 	ss := loadProgress(harness, progress)
@@ -401,7 +401,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
 		ExportWatermarks: imported.watermarks, ImportedRecords: imported.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
-	rf, err := os.Create(recPath)
+	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -557,7 +557,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 func rebuildForSearch(dir string, o search.Options, scope string, files map[string]FileState, progress io.Writer) error {
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
 	ss := loadProgress("", progress)
@@ -577,7 +577,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
 		ExportWatermarks: imp.watermarks, ImportedRecords: imp.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
-	rf, err := os.Create(recPath)
+	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -987,10 +987,10 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	tmp := dir + ".tmp"
 	os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
-	rf, err := os.Create(filepath.Join(tmp, "records.bin"))
+	rf, err := os.OpenFile(filepath.Join(tmp, "records.bin"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -1123,7 +1123,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 
 func appendIncremental(dir, harness, scope string, old Manifest, files map[string]FileState, changed map[string]FileState) (int, int, error) {
 	lastIngestFiles = len(changed)
-	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -2068,7 +2068,7 @@ func writeBucket(p string, data map[string][]posting) error {
 		entries = append(entries, bucketEntry{tok: tok, off: pos, n: uint32(len(b))})
 		pos += uint64(len(b))
 	}
-	f, err := os.Create(p)
+	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -2227,7 +2227,7 @@ func uvarintLen(v uint64) int {
 	return n
 }
 func writeGob(p string, v any) error {
-	f, err := os.Create(p)
+	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -2239,7 +2239,7 @@ func writeGob(p string, v any) error {
 // crash mid-write can never leave p half-decoded.
 func writeGobAtomic(p string, v any) error {
 	tmp := p + ".tmp"
-	f, err := os.Create(tmp)
+	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}

@@ -42,11 +42,11 @@ func Path(indexDir string) string {
 // Record appends one event. Errors are swallowed on purpose.
 func Record(indexDir, kind string, bytes int) {
 	p := Path(indexDir)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
 	}
 	rotate(p)
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
