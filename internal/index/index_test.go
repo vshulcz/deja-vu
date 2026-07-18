@@ -83,6 +83,51 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	}
 }
 
+func TestReadRecordsAndGeneration(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "records.bin"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Record{Key: "claude:s", SourcePath: "session.jsonl", Role: "user", Text: "semantic text", Time: time.Unix(10, 20)}
+	off, err := writeRecord(f, want)
+	if err != nil {
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if off != 0 || f.Close() != nil {
+		t.Fatal("record write did not start at zero")
+	}
+	got, err := ReadRecords(dir)
+	if err != nil || len(got) != 1 || got[0].Offset != 0 || got[0].Record.Text != want.Text || got[0].Record.Time != want.Time {
+		t.Fatalf("records=%#v err=%v", got, err)
+	}
+	if err := writeManifest(dir, Manifest{Version: version, BuiltAt: time.Unix(20, 0), Generation: "gen-1", Sessions: map[string]SessionMeta{}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Generation(dir); err != nil || got != "gen-1" {
+		t.Fatalf("explicit generation=%q err=%v", got, err)
+	}
+	if err := writeManifest(dir, Manifest{Version: version, BuiltAt: time.Unix(30, 0), Sessions: map[string]SessionMeta{}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Generation(dir); err != nil || got != "1970-01-01T00:00:30Z" {
+		t.Fatalf("built-at generation=%q err=%v", got, err)
+	}
+	if _, err := ReadRecords(filepath.Join(dir, "missing")); err == nil {
+		t.Fatal("missing records should fail")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "records.bin"), []byte{4, 0, 0, 0, 1}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadRecords(dir); err == nil {
+		t.Fatal("truncated record should fail")
+	}
+}
+
 func TestSyncExportImportSearchIdempotent(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")

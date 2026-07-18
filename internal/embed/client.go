@@ -17,6 +17,8 @@ type Client struct {
 	HTTP  *http.Client
 }
 
+var probeURLs = []string{"http://localhost:11434/api/embed", "http://localhost:1234/v1/embeddings"}
+
 func New() (*Client, error) {
 	model := os.Getenv("DEJA_EMBED_MODEL")
 	if model == "" {
@@ -25,7 +27,7 @@ func New() (*Client, error) {
 	if url := os.Getenv("DEJA_EMBED_URL"); url != "" {
 		return &Client{URL: url, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
 	}
-	for _, url := range []string{"http://localhost:11434/api/embed", "http://localhost:1234/v1/embeddings"} {
+	for _, url := range probeURLs {
 		c := &Client{URL: url, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}
 		if err := c.probe(); err == nil {
 			return c, nil
