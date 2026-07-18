@@ -1,8 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -78,5 +83,54 @@ func TestMaybeSemanticGuards(t *testing.T) {
 	// No sidecar at all.
 	if _, used := maybeSemantic(nil, search.Options{}, os.Stderr); used {
 		t.Fatal("missing sidecar must skip")
+	}
+}
+
+func TestMaybeSemanticSidecarBranches(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "idx"))
+	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "s1.jsonl"), "s1", []string{
+		`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"connection pool exhausted"}}`,
+	})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Input any `json:"input"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		n := 1
+		if list, ok := req.Input.([]any); ok {
+			n = len(list)
+		}
+		vecs := make([]string, n)
+		for i := range vecs {
+			vecs[i] = "[1,0]"
+		}
+		_, _ = fmt.Fprintf(w, `{"embeddings":[%s]}`, strings.Join(vecs, ","))
+	}))
+	defer srv.Close()
+	t.Setenv("DEJA_EMBED_URL", srv.URL+"/api/embed")
+	if err := runEmbed(nil); err != nil {
+		t.Fatal(err)
+	}
+	// Sidecar current: fallback fires.
+	out, used := maybeSemantic(nil, search.Options{Query: "totally different words"}, os.Stderr)
+	if !used || len(out) == 0 {
+		t.Fatalf("semantic fallback did not fire: used=%v out=%d", used, len(out))
+	}
+	// Dead endpoint with a valid sidecar: query embed fails, silent skip.
+	t.Setenv("DEJA_EMBED_URL", "http://127.0.0.1:1/api/embed")
+	if _, used := maybeSemantic(nil, search.Options{Query: "anything"}, os.Stderr); used {
+		t.Fatal("dead endpoint must skip")
+	}
+	t.Setenv("DEJA_EMBED_URL", srv.URL+"/api/embed")
+	// Generation moves on re-index: stale sidecar skips.
+	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "s2.jsonl"), "s2", []string{
+		`{"type":"user","sessionId":"s2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"another session"}}`,
+	})
+	if err := run([]string{"index", "--rebuild"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, used := maybeSemantic(nil, search.Options{Query: "anything"}, os.Stderr); used {
+		t.Fatal("stale sidecar generation must skip")
 	}
 }

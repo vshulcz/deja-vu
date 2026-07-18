@@ -70,12 +70,12 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, fmt.Errorf("decode embedding response: %w", err)
 	}
-	if len(out.Embeddings) > 0 {
-		return out.Embeddings, nil
-	}
-	result := make([][]float32, len(out.Data))
-	for i := range out.Data {
-		result[i] = out.Data[i].Embedding
+	result := out.Embeddings
+	if len(result) == 0 {
+		result = make([][]float32, len(out.Data))
+		for i := range out.Data {
+			result[i] = out.Data[i].Embedding
+		}
 	}
 	if len(result) != len(texts) {
 		return nil, fmt.Errorf("embedding endpoint returned %d vectors for %d texts", len(result), len(texts))
