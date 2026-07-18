@@ -11,10 +11,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+const Seed int64 = 1
+
 const (
-	Seed         int64 = 1
-	SessionCount       = 500
-	QueryCount         = 50
+	SessionCount = 500
+	QueryCount   = 50
 )
 
 type Query struct {
@@ -43,7 +44,7 @@ var topics = []topic{
 	{name: "pool", exact: "connection pool exhausted", rephrased: "database clients ran out", typo: "exhaustd", phrase: "connection pool exhausted", code: "db/pool.go"},
 	{name: "oauth", exact: "refresh token rotation", rephrased: "renewing credentials after rotation", typo: "rotaton", phrase: "refresh token rotation", code: "auth/tokens.go"},
 	{name: "queue", exact: "duplicate job delivery", rephrased: "the worker received one task twice", typo: "delivry", phrase: "duplicate job delivery", code: "jobs/worker.go"},
-	{name: "parser", exact: "parser boundary error", rephrased: "the decoder crossed a record boundary", typo: "boundry", phrase: "parser boundary error", code: "internal/parse.go"},
+	{name: "parser", exact: "parser boundary error", rephrased: "the decoder crossed a record boundary", typo: "boundray", phrase: "parser boundary error", code: "internal/parse.go"},
 	{name: "timeout", exact: "request deadline timeout", rephrased: "the upstream call exceeded its deadline", typo: "deadine", phrase: "request deadline timeout", code: "net/client.go"},
 	{name: "locking", exact: "file lock contention", rephrased: "writers waited on the same lock", typo: "contetion", phrase: "file lock contention", code: "internal/lock.go"},
 	{name: "redaction", exact: "credential redaction", rephrased: "secrets are removed before indexing", typo: "redacton", phrase: "credential redaction", code: "security/redact.go"},
