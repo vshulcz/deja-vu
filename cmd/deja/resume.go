@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -69,9 +70,18 @@ func formatResumeCommand(dir, cmdline string) string {
 
 // resumeCommand maps a session to (workdir, command). workdir is empty when
 // the harness resumes globally or the original directory is unknown.
+// resumeIDPattern matches every supported harness's session identifiers
+// (UUIDs, ses_... ids, hex prefixes). Anything else — whitespace, shell
+// metacharacters, quotes, leading dashes — is refused so a crafted id read
+// from a session store cannot alter the command deja builds or prints.
+var resumeIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
 func resumeCommand(s model.Session) (string, string, error) {
 	if strings.HasPrefix(s.Project, "imported:") {
 		return "", "", fmt.Errorf("session %s was synced from another machine — resume it there", short(s.ID))
+	}
+	if !resumeIDPattern.MatchString(s.ID) {
+		return "", "", fmt.Errorf("session id %q contains characters deja will not place in a command", short(s.ID))
 	}
 	switch s.Harness {
 	case "claude":

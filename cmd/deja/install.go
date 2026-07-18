@@ -237,7 +237,9 @@ func backupOnce(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(bak, b, 0o644)
+	// Configs can carry MCP credentials; the snapshot is owner-only even
+	// when the live file is looser.
+	return os.WriteFile(bak, b, 0o600)
 }
 
 func writeIfChanged(path string, old, next []byte) (string, error) {
@@ -260,7 +262,13 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 		_ = tmp.Close()
 		return "", err
 	}
-	if err := tmp.Chmod(0o644); err != nil {
+	// Preserve the live file's mode; brand-new configs start owner-only
+	// because they may carry MCP credentials.
+	mode := os.FileMode(0o600)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return "", err
 	}
