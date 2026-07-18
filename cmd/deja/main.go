@@ -108,6 +108,9 @@ func run(args []string) error {
 	if args[0] == "embed" {
 		return runEmbed(args[1:])
 	}
+	if args[0] == "bench" {
+		return runBench(args[1:])
+	}
 	if args[0] == "statusline" {
 		return runStatusline(os.Stdin, os.Stdout)
 	}
@@ -717,8 +720,9 @@ Usage:
 	deja forget --list | --unforget <id>
   deja doctor [--json]
   deja warmup
-	deja index [--rebuild]
-	deja embed
+  deja index [--rebuild]
+  deja embed
+  deja bench recall [--json]
   deja statusline
 	deja stats [--json] [--card [path]] [--html [path]]
 	deja remember "text" [--project name]

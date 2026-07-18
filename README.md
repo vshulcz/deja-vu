@@ -238,6 +238,21 @@ Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
 
 The index is incremental: when a session file grows, only that file is re-read.
 
+## Benchmarks
+
+Run the reproducible recall benchmark with:
+
+```sh
+deja bench recall
+deja bench recall --json
+```
+
+The current lexical run reports recall@5 **1.00**, recall@10 **1.00**, and
+median latency **0.33 ms**; hybrid recall is skipped when no embedding
+endpoint is available. It generates 500 fixed-seed sessions and 50 derived
+queries, then runs them through the normal index and search pipeline; the
+[generator](internal/bench/corpus.go) defines the corpus and relevance.
+
 ## How it works
 
 Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact credentials → `records.bin` + token buckets → `manifest.json` tracks per-file state so repeat runs only ingest what changed. The MCP server, stats, share and sync all read the same index. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

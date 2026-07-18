@@ -3,3 +3,4 @@ fixtures/private/
 /deja
 .build.log
 fixtures/synthetic/opencode.db
+.deja-bench/

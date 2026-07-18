@@ -33,6 +33,13 @@ jobs:
       - run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
         shell: bash
       - run: go build ./cmd/deja
+      - name: Benchmark lexical recall floor
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          report=$(./deja bench recall --json)
+          printf '%s\n' "$report"
+          printf '%s\n' "$report" | jq -e '.lexical.recall_at_5 >= 0.85'
       - name: Coverage summary
         if: runner.os == 'Linux'
         run: go tool cover -func=coverage.out | tail -1
