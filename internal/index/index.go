@@ -1557,50 +1557,17 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 }
 
 func cutPostingsBySession(posts []posting, m Manifest, o search.Options) []posting {
-	// Rank from posting counts before reading record text. Harness/project/since are
-	// session metadata filters; role is record-level, so search.Run applies it after
-	// the cut and pre-rank counts may include other roles.
-	type candidate struct {
-		sid     uint32
-		count   int
-		updated time.Time
-	}
 	metaByOrd := sessionMetaByOrd(m)
-	counts := map[uint32]int{}
-	for _, p := range sortedUniquePostings(posts) {
-		meta, ok := metaByOrd[p.Sid]
-		if !ok || !sessionMetaMatches(meta, o) {
-			continue
-		}
-		counts[p.Sid]++
-	}
-	if len(counts) == 0 {
-		return nil
-	}
-	candidates := make([]candidate, 0, len(counts))
-	for sid, count := range counts {
-		candidates = append(candidates, candidate{sid: sid, count: count, updated: metaByOrd[sid].Updated})
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		si := preRankScore(candidates[i].count, candidates[i].updated)
-		sj := preRankScore(candidates[j].count, candidates[j].updated)
-		if si == sj {
-			return candidates[i].updated.After(candidates[j].updated)
-		}
-		return si > sj
-	})
-	if !o.All && len(candidates) > 15 {
-		candidates = candidates[:15]
-	}
-	keep := make(map[uint32]bool, len(candidates))
-	for _, c := range candidates {
-		keep[c.sid] = true
-	}
+	// Keep the complete posting-derived candidate set. Ranking needs the
+	// candidate records to calculate BM25 document frequency and length.
 	out := make([]posting, 0, len(posts))
 	for _, p := range posts {
-		if keep[p.Sid] {
+		if meta, ok := metaByOrd[p.Sid]; ok && sessionMetaMatches(meta, o) {
 			out = append(out, p)
 		}
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }
@@ -1624,11 +1591,6 @@ func sessionMetaMatches(meta SessionMeta, o search.Options) bool {
 		return false
 	}
 	return true
-}
-
-func preRankScore(count int, updated time.Time) float64 {
-	age := time.Since(updated).Hours() / 24
-	return float64(count) * 1000 / (1 + age)
 }
 
 func postingOffsets(posts []posting) []int64 {

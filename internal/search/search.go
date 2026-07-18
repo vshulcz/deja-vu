@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -38,6 +40,19 @@ type Hit struct {
 	Score    float64       `json:"score"`
 }
 
+const (
+	bm25K1        = 1.2
+	bm25B         = 0.75
+	userRoleBoost = 1.3
+)
+
+type bm25Document struct {
+	hit       Hit
+	termCount []int
+	userCount []int
+	length    int
+}
+
 func Run(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
 	qlow := strings.ToLower(o.Query)
@@ -53,8 +68,12 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 	if o.Since > 0 {
 		cut = time.Now().Add(-o.Since)
 	}
-	var hits []Hit
-	for _, s := range mergeSessions(ss) {
+	merged := mergeSessions(ss)
+	documents := make([]bm25Document, 0, len(merged))
+	df := make([]int, len(qtoks))
+	corpusDocuments := 0
+	corpusLength := 0
+	for _, s := range merged {
 		if o.Harness != "" && s.Harness != o.Harness {
 			continue
 		}
@@ -64,7 +83,11 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 		if !cut.IsZero() && s.Updated.Before(cut) {
 			continue
 		}
-		h := Hit{Session: s}
+		doc := bm25Document{hit: Hit{Session: s}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
+		if len(qtoks) == 0 {
+			doc.termCount = []int{0}
+			doc.userCount = []int{0}
+		}
 		for _, m := range s.Messages {
 			if o.Role != "" && m.Role != o.Role {
 				continue
@@ -74,37 +97,131 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 				c = len(re.FindAllStringIndex(m.Text, -1))
 			} else {
 				low := strings.ToLower(m.Text)
-				if len(qtoks) <= 1 {
-					if strings.Contains(low, qlow) {
-						c = strings.Count(low, qlow)
-					}
-				} else {
-					c = countAllTokens(low, qtoks)
+				c = countAllTokens(low, qtoks)
+				if len(qtoks) == 1 && c == 0 && strings.Contains(low, qlow) {
+					c = strings.Count(low, qlow)
 				}
 			}
 			if c > 0 {
-				h.Count += c
-				if len(h.Snippets) < 3 {
-					h.Snippets = append(h.Snippets, snippet(m.Text, o.Query, re))
+				doc.hit.Count += c
+				if len(doc.hit.Snippets) < 3 {
+					doc.hit.Snippets = append(doc.hit.Snippets, snippet(m.Text, o.Query, re))
+				}
+			}
+			low := strings.ToLower(m.Text)
+			doc.length += countDocumentWords(low, qtoks, doc.termCount, doc.userCount, m.Role == "user")
+			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qlow) {
+				n := strings.Count(low, qlow)
+				doc.termCount[0] += n
+				if m.Role == "user" {
+					doc.userCount[0] += n
 				}
 			}
 		}
-		if h.Count > 0 {
-			age := time.Since(s.Updated).Hours() / 24
-			h.Score = float64(h.Count) * 1000 / (1 + age)
-			hits = append(hits, h)
+		corpusDocuments++
+		corpusLength += doc.length
+		for i, n := range doc.termCount {
+			if n > 0 {
+				df[i]++
+			}
+		}
+		if doc.hit.Count > 0 {
+			documents = append(documents, doc)
 		}
 	}
-	sort.Slice(hits, func(i, j int) bool {
-		if hits[i].Score == hits[j].Score {
-			return hits[i].Session.Updated.After(hits[j].Session.Updated)
-		}
-		return hits[i].Score > hits[j].Score
-	})
+	avgLength := 0.0
+	if corpusDocuments > 0 {
+		avgLength = float64(corpusLength) / float64(corpusDocuments)
+	}
+	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks) == 0)
 	if !o.All && len(hits) > 15 {
 		hits = hits[:15]
 	}
 	return hits, nil
+}
+
+func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, emptyQuery bool) []Hit {
+	now := time.Now()
+	hits := make([]Hit, 0, len(documents))
+	for _, doc := range documents {
+		score := 0.0
+		for i, tf := range doc.termCount {
+			if tf == 0 {
+				continue
+			}
+			idf := math.Log(1 + (float64(corpusDocuments-df[i])+.5)/(float64(df[i])+.5))
+			norm := 1 - bm25B
+			if avgLength > 0 {
+				norm += bm25B * float64(doc.length) / avgLength
+			}
+			term := idf * (float64(tf) * (bm25K1 + 1)) / (float64(tf) + bm25K1*norm)
+			if doc.userCount[i] > 0 {
+				term += idf * (float64(doc.userCount[i]) * (bm25K1 + 1)) / (float64(tf) + bm25K1*norm) * (userRoleBoost - 1)
+			}
+			score += term
+		}
+		if emptyQuery {
+			score = float64(doc.hit.Count)
+		}
+		score *= freshnessDecay(doc.hit.Session.Updated, now)
+		doc.hit.Score = score
+		hits = append(hits, doc.hit)
+	}
+	sort.Slice(hits, func(i, j int) bool {
+		if hits[i].Score == hits[j].Score {
+			if hits[i].Session.Updated.Equal(hits[j].Session.Updated) {
+				return hits[i].Session.ID < hits[j].Session.ID
+			}
+			return hits[i].Session.Updated.After(hits[j].Session.Updated)
+		}
+		return hits[i].Score > hits[j].Score
+	})
+	return hits
+}
+
+func freshnessDecay(updated, now time.Time) float64 {
+	if updated.IsZero() {
+		return 0
+	}
+	age := now.Sub(updated).Hours() / 24
+	if age <= 0 {
+		return 1
+	}
+	return 1 / (1 + age)
+}
+
+func countDocumentWords(s string, terms []string, counts, userCounts []int, user bool) int {
+	length := 0
+	start := -1
+	for i := 0; i <= len(s); {
+		isWord := false
+		size := 0
+		if i < len(s) {
+			r, n := utf8.DecodeRuneInString(s[i:])
+			size = n
+			isWord = unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+		}
+		if isWord && start < 0 {
+			start = i
+		} else if !isWord && start >= 0 {
+			word := s[start:i]
+			length++
+			for j, term := range terms {
+				if word == term {
+					counts[j]++
+					if user {
+						userCounts[j]++
+					}
+				}
+			}
+			start = -1
+		}
+		if i == len(s) {
+			break
+		}
+		i += size
+	}
+	return length
 }
 
 func mergeSessions(in []model.Session) []model.Session {

@@ -451,9 +451,6 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 	if got, err := parseChangedFile("", p, FileState{}); err != nil || len(got) != 1 {
 		t.Fatalf("parse changed=%#v err=%v", got, err)
 	}
-	if preRankScore(2, time.Now()) <= 0 {
-		t.Fatalf("preRankScore not positive")
-	}
 	if !strings.HasPrefix(bucket("a"), "x") || bucket("ab") != "ab" {
 		t.Fatalf("short bucket failed")
 	}
