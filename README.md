@@ -16,7 +16,7 @@
 
 Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build and Qwen Code write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
-| | |
+| Feature | What it does |
 | --- | --- |
 | **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses |
@@ -26,6 +26,8 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
+| **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
+| **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
 
 ## Privacy
 
@@ -230,7 +232,7 @@ The [session format registry](docs/registry/README.md) documents the observed st
 
 Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
 
-| | |
+| Measurement | Result |
 | --- | --- |
 | Warm search | **~12 ms** typical, ~25 ms worst-case |
 | Cold index (once) | ~10 s |
@@ -247,11 +249,7 @@ deja bench recall
 deja bench recall --json
 ```
 
-The current lexical run reports recall@5 **1.00**, recall@10 **1.00**, and
-median latency **0.33 ms**; hybrid recall is skipped when no embedding
-endpoint is available. It generates 500 fixed-seed sessions and 50 derived
-queries, then runs them through the normal index and search pipeline; the
-[generator](internal/bench/corpus.go) defines the corpus and relevance.
+The synthetic set is currently saturated by lexical search (recall@5 1.00 at ~0.7 ms median), so it serves as a regression floor for ranking changes rather than a bragging number; CI fails if recall drops. The corpus generator and the relevance labels are ordinary reviewed Go — audit what "relevant" means before trusting any figure, ours included. With a local embedding endpoint up, the same command reports the hybrid column.
 
 ## How it works
 

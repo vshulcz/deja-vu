@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-19
+
+### Added
+- BM25 ranking with a user-message boost, quoted phrase queries, and a typo fallback that only runs on zero results.
+- Optional semantic recall: `deja embed` builds a vector sidecar from a local Ollama/LM Studio endpoint; search and MCP recall blend it with the lexical score.
+- `deja blame <path>` and an MCP `blame` tool: sessions that discussed a file, newest and most specific first.
+- `deja remember` and an MCP `remember` tool: durable notes stored as a tenth source with full redaction, sync and provenance.
+- Privacy set: `deja forget` with persistent tombstones, ingest exclusion patterns, and `deja stats --redaction` per-rule reports.
+- `deja stats --card` (shareable SVG) and `deja stats --html` (self-contained, metadata-only timeline).
+- Qwen Code as the ninth harness, `deja last --project/--harness` filters, a session format registry with conformance fixtures, and a reproducible `deja bench recall`.
+- User-level agent guidance written by install for Claude Code, Codex, Gemini, opencode, Antigravity, Qwen and Copilot.
+
+### Fixed
+- Torn lines longer than one scan window no longer lose messages.
+- `GROK_HOME`/`DEJA_GROK_ROOT` split: session-read overrides no longer move where install writes config.
+
+### Security
+- Index and usage files are created owner-only; install backups and new agent configs are 0600.
+- `deja resume` refuses session ids with shell-unsafe characters.
+- Agent-facing recall output is framed as untrusted historical data.
+
+## [0.12.0] - 2026-07-17
+
+See the release notes: harness coverage through Grok Build, `deja update`, signed checksums, npm and install-script distribution.
+
+## [0.11.0] - 2026-07-16
+
+See the release notes.
+
+## [0.10.0] - 2026-07-16
+
+See the release notes: Antigravity harness, share redaction hardening.
+
 ## [0.9.2] - 2026-07-16
 
 ### Added
