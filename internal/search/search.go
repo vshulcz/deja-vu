@@ -27,13 +27,13 @@ const (
 )
 
 type Options struct {
-	Query                  string
-	Regex                  bool
-	Harness, Project, Role string
-	Since                  time.Duration
-	All, JSON, Fuzzy       bool
-	NoEmbed                bool
-	FuzzyVariants          map[string][]string `json:"-"`
+	Query                     string
+	Regex                     bool
+	Harness, Project, Role    string
+	Since                     time.Duration
+	All, JSON, Fuzzy, Stemmed bool
+	NoEmbed                   bool
+	FuzzyVariants             map[string][]string `json:"-"`
 }
 type Hit struct {
 	Session  model.Session `json:"session"`
@@ -262,7 +262,13 @@ func mergeSessions(in []model.Session) []model.Session {
 
 func Print(w io.Writer, hits []Hit, o Options) {
 	if o.JSON {
-		if o.Fuzzy {
+		if o.Stemmed {
+			_ = json.NewEncoder(w).Encode(struct {
+				Hits     []Hit               `json:"hits"`
+				Stemmed  bool                `json:"stemmed"`
+				Variants map[string][]string `json:"variants,omitempty"`
+			}{hits, true, o.FuzzyVariants})
+		} else if o.Fuzzy {
 			_ = json.NewEncoder(w).Encode(struct {
 				Hits  []Hit `json:"hits"`
 				Fuzzy bool  `json:"fuzzy"`

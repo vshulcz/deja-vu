@@ -5,6 +5,17 @@ import (
 	"unicode"
 )
 
+var stopWords = map[string]bool{
+	"a": true, "an": true, "and": true, "are": true, "as": true,
+	"at": true, "be": true, "before": true, "but": true, "by": true,
+	"did": true, "do": true, "does": true, "for": true, "from": true,
+	"dealt": true,
+	"have":  true, "how": true, "in": true, "is": true, "it": true,
+	"of": true, "on": true, "or": true, "that": true, "the": true,
+	"this": true, "to": true, "was": true, "we": true, "what": true,
+	"when": true, "where": true, "which": true, "who": true, "with": true,
+}
+
 // QueryParts separates ordinary terms from quoted phrases without changing
 // the query syntax used by callers.
 func QueryParts(q string) (terms []string, phrases []string) {
@@ -35,10 +46,24 @@ func QueryParts(q string) (terms []string, phrases []string) {
 	}
 	if start >= 0 {
 		// An unfinished quote is just whitespace, as it was before phrases.
-		return queryTokens(q), nil
+		return withoutStopWords(queryTokens(q)), nil
 	}
 	flushPlain()
+	terms = withoutStopWords(terms)
 	return terms, phrases
+}
+
+func withoutStopWords(terms []string) []string {
+	kept := make([]string, 0, len(terms))
+	for _, term := range terms {
+		if !stopWords[term] {
+			kept = append(kept, term)
+		}
+	}
+	if len(kept) == 0 {
+		return terms
+	}
+	return kept
 }
 
 func hasLetterOrDigit(s string) bool {

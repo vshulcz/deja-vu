@@ -244,7 +244,11 @@ func run(args []string) error {
 		return fmt.Errorf("search: %w", err)
 	}
 	ss := result.Sessions
-	if result.Fuzzy {
+	if result.Stemmed {
+		printStemmed(os.Stderr, result.Variants)
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Fuzzy {
 		printFuzzy(os.Stderr, result.Variants)
 		o.Fuzzy = true
 		o.FuzzyVariants = result.Variants
@@ -261,6 +265,21 @@ func run(args []string) error {
 	}
 	search.Print(os.Stdout, hits, o)
 	return nil
+}
+
+func printStemmed(w io.Writer, variants map[string][]string) {
+	keys := make([]string, 0, len(variants))
+	for token := range variants {
+		keys = append(keys, token)
+	}
+	sort.Strings(keys)
+	for _, token := range keys {
+		for _, variant := range variants[token] {
+			if variant != token {
+				fmt.Fprintf(w, "deja: no exact match, trying word forms: %s -> %s\n", token, variant)
+			}
+		}
+	}
 }
 
 func printNoMatches(w io.Writer, q string, n int) {
