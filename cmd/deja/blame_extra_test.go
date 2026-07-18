@@ -36,10 +36,13 @@ func TestBlameErrorAndEmptyBranches(t *testing.T) {
 func TestEmbedCommandBranches(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "s.jsonl"), "s", []string{
+		`{"type":"user","sessionId":"s","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"embed me"}}`,
+	})
 	if err := runEmbed([]string{"--bogus"}); err == nil {
 		t.Fatal("expected unknown flag error")
 	}
-	// Dead endpoint: the embed pass must surface the connection error.
+	// Dead endpoint with real records: the embed call must surface the error.
 	t.Setenv("DEJA_EMBED_URL", "http://127.0.0.1:1/api/embed")
 	if err := runEmbed(nil); err == nil {
 		t.Fatal("expected embed endpoint error")
