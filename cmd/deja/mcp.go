@@ -78,22 +78,26 @@ func handleMCP(req rpcRequest) (any, int, string) {
 		return map[string]any{"tools": []map[string]any{
 			{
 				"name":        "recall",
-				"description": "Search past coding-agent sessions and return the best matches as dense text under ~4KB. Call before debugging or re-implementing: use a specific error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok, qwen).",
+				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with the most specific token available: an exact error string, function name, file path, or flag (multiple words are ANDed). Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. Follow up with recall_context when one session looks right and you need its full story. Optionally filter by harness.",
+				"annotations": map[string]any{"title": "Search past sessions", "readOnlyHint": true, "openWorldHint": false},
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "recall_context",
-				"description": "Return a markdown digest (~8KB) of the best prior session. Call before debugging or re-implementing; query with an error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok, qwen).",
+				"description": "Return a full markdown digest (~8KB) of the single best-matching prior session — problem, decisions, outcome — when a bare recall hit is not enough and you need the reasoning behind it. Use after recall, or directly when the user asks 'remind me how we handled X' or 'what was the whole story with Y'. Query with the error string, function name, or flag that identifies the session. Not for browsing many sessions — use recall for that; this returns one deep digest.",
+				"annotations": map[string]any{"title": "Digest one past session", "readOnlyHint": true, "openWorldHint": false},
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "blame",
-				"description": "Before changing a file, see why it is the way it is. Find prior sessions that discussed a path, with the most specific mentions first.",
+				"description": "Before editing, refactoring, or deleting a file, find the prior sessions that discussed it so you know why it is shaped the way it is. Call whenever you are about to change a file, or when the user asks 'why is this like this', 'what was this for', 'is it safe to remove this'. Most specific mentions come first. This is session history across AI tools, not git blame — it explains intent and past decisions, not commit authorship. Give an absolute path, relative path, or bare filename.",
+				"annotations": map[string]any{"title": "Why is this file like this", "readOnlyHint": true, "openWorldHint": false},
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string", "description": "Absolute, relative, or bare filename."}, "harness": map[string]any{"type": "string"}, "project": map[string]any{"type": "string"}, "since": map[string]any{"type": "string", "description": "Age such as 30d or 24h."}, "limit": map[string]any{"type": "number"}, "all": map[string]any{"type": "boolean"}}, "required": []string{"path"}},
 			},
 			{
 				"name":        "remember",
-				"description": "Store a durable decision or conclusion for later recall. Do not store transcripts or routine conversation; text is required and project is optional.",
+				"description": "Store one durable decision or conclusion so a future session can recall it. Call right after a decision is settled, a tricky bug is resolved, or the user says 'remember this', 'note that for next time', 'don't forget we chose X'. Write a single self-contained fact (e.g. 'We use Postgres advisory locks for the job queue because Redis lost messages under load'). Do NOT store transcripts, routine conversation, or anything already obvious from the code. text is required; project defaults to notes.",
+				"annotations": map[string]any{"title": "Remember a decision", "readOnlyHint": false},
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}}, "required": []string{"text"}},
 			},
 		}}, 0, ""

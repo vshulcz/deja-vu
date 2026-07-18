@@ -55,7 +55,7 @@ func guidanceText(harness string) string {
 		if harness == "copilot" {
 			body = "deja does not index Copilot history. It is a consumer: use the deja MCP tools to search memory from the other harnesses.\n\n" + guidanceBody
 		}
-		return "---\nname: deja-history\ndescription: Consult deja MCP history tools when the user refers to past work or previous decisions.\n---\n\n" + body + "\n"
+		return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
 	}
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
 }

@@ -37,6 +37,9 @@ func runHookContext(plain bool) error {
 	if digest == "" {
 		return nil
 	}
+	// One actionable line so injected memory leads somewhere: models that see
+	// bare data tend to ignore it.
+	digest = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting.\n" + digest
 	digest = frameRecall(digest)
 	usage.RecordResult(index.DefaultDir(), usage.KindHook, len(digest), sessions, false)
 	if plain {
