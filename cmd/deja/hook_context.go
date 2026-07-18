@@ -30,6 +30,7 @@ func runHookContext(plain bool) error {
 	if digest == "" {
 		return nil
 	}
+	digest = frameRecall(digest)
 	usage.RecordResult(index.DefaultDir(), usage.KindHook, len(digest), sessions, false)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)

@@ -137,8 +137,9 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, err := recallTextResult(a.Query, a.Harness, a.Limit, 4096)
+		text, sessions, err := recallTextResult(a.Query, a.Harness, a.Limit, 4096-recallFrameOverhead)
 		if err == nil {
+			text = frameRecall(text)
 			usage.RecordResult(index.DefaultDir(), usage.KindRecall, len(text), sessions, sessions == 0)
 		}
 		return text, err
@@ -155,6 +156,7 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		}
 		text, sessions, err := recallContextResult(a.Query, a.Harness)
 		if err == nil {
+			text = frameRecall(text)
 			usage.RecordResult(index.DefaultDir(), usage.KindContext, len(text), sessions, sessions == 0)
 		}
 		return text, err

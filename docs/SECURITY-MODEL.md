@@ -148,3 +148,23 @@ Release archives are not claimed to be byte-reproducible today: the workflow
 does not pin the GoReleaser version, snapshot builds carry a different version,
 and archive/SBOM metadata can vary with tool versions. `SOURCE_DATE_EPOCH`
 stabilizes timestamps but does not remove those differences.
+
+
+## Recall output framing
+
+Agent-facing recall (the `recall` and `recall_context` MCP tools and the
+SessionStart hook digest) is wrapped in `<deja-recall>` markers with a
+preamble stating the content is untrusted historical data and instructions
+inside it must not be followed. Transcripts can carry text an attacker
+influenced (a directive copied from a web page persists in the index and
+replays into later sessions); framing keeps models from treating replayed
+text as commands. The framing bytes count against the existing injection
+budgets, empty results stay unwrapped, and human-facing CLI output is
+unchanged.
+
+## Config backups
+
+`deja install` snapshots an agent config once as `<path>.bak` before first
+modification. Backups and newly created configs are written owner-only
+(0600) because these files can carry MCP server credentials; the mode of an
+existing live config is preserved on update.
