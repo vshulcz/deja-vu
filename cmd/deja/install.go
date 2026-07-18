@@ -16,14 +16,23 @@ import (
 type installResult struct{ Path, Action string }
 
 func runInstall(args []string, uninstall bool) error {
-	if len(args) != 1 {
+	guidance := true
+	var targetArgs []string
+	for _, arg := range args {
+		if arg == "--no-guidance" {
+			guidance = false
+			continue
+		}
+		targetArgs = append(targetArgs, arg)
+	}
+	if len(targetArgs) != 1 {
 		if uninstall {
 			return fmt.Errorf("uninstall needs target")
 		}
 		return fmt.Errorf("install needs target")
 	}
-	targets := []string{args[0]}
-	if args[0] == "--auto" {
+	targets := []string{targetArgs[0]}
+	if targetArgs[0] == "--auto" {
 		targets = nil
 		for _, t := range existingTargets() {
 			switch t {
@@ -44,7 +53,7 @@ func runInstall(args []string, uninstall bool) error {
 			return nil
 		}
 	}
-	if args[0] == "--all" {
+	if targetArgs[0] == "--all" {
 		targets = existingTargets()
 		if len(targets) == 0 {
 			fmt.Println("no known agent config directories found")
@@ -56,13 +65,22 @@ func runInstall(args []string, uninstall bool) error {
 		return err
 	}
 	exe, _ = filepath.Abs(exe)
-	banner := !uninstall && (args[0] == "--auto" || args[0] == "--all") && logoWanted(os.Stdout)
+	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
 	var done []lineItem
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
 		if err != nil {
 			return err
+		}
+		if guidance {
+			gr, err := guidanceResult(t, uninstall)
+			if err != nil {
+				return err
+			}
+			if gr.Path != "" && !banner {
+				fmt.Println(guidanceOutput(t, gr))
+			}
 		}
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
@@ -132,11 +150,12 @@ func existingTargets() []string {
 	checks := map[string]string{
 		"claude-code": sources.ClaudeConfigDir(),
 		"codex":       sources.CodexHome(),
-		"opencode":    filepath.Join(h, ".config", "opencode"),
+		"opencode":    filepath.Join(opencodeConfigHome(), "opencode"),
 		"cursor":      sources.CursorCLIHome(),
 		"gemini":      filepath.Join(sources.GeminiHome(), "settings.json"),
 		"antigravity": filepath.Join(h, ".gemini", "config"),
 		"grok":        sources.GrokRoot(),
+		"qwen":        sources.QwenConfigDir(),
 	}
 	var out []string
 	for name, p := range checks {
@@ -170,6 +189,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "config", "mcp_config.json"), exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
+	case "qwen":
+		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -375,11 +396,11 @@ func installCodex(exe string, uninstall bool) (installResult, error) {
 	return installTOML(path, block, uninstall)
 }
 
-// installGrok wires the MCP server into Grok Build's ~/.grok/config.toml.
+// installGrok wires the MCP server into Grok Build's config.toml.
 // Same [mcp_servers.NAME] TOML shape as Codex; Grok's hook stdout is ignored
 // on passive events, so MCP is the deepest integration available.
 func installGrok(exe string, uninstall bool) (installResult, error) {
-	path := filepath.Join(sources.GrokRoot(), "config.toml")
+	path := filepath.Join(sources.GrokHome(), "config.toml")
 	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = [\"mcp\"]\n", exe)
 	return installTOML(path, block, uninstall)
 }
@@ -457,8 +478,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 }
 
 func installOpencode(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	dir := filepath.Join(h, ".config", "opencode")
+	dir := filepath.Join(opencodeConfigHome(), "opencode")
 	path := filepath.Join(dir, "opencode.json")
 	if _, err := os.Stat(path); err != nil {
 		if _, e := os.Stat(filepath.Join(dir, "opencode.jsonc")); e == nil {

@@ -25,6 +25,7 @@ func hermeticEnv(t *testing.T) string {
 	home := filepath.Join(tmp, "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
@@ -35,6 +36,7 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "antigravity"))
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	t.Setenv("CODEX_HOME", "")
 	t.Setenv("GEMINI_CLI_HOME", "")
@@ -49,7 +51,7 @@ func TestInstallMCPJSONTargetsAndErrors(t *testing.T) {
 	if got := homeDir(); got == "" {
 		t.Fatal("homeDir empty")
 	}
-	for _, target := range []string{"cursor", "gemini", "antigravity"} {
+	for _, target := range []string{"cursor", "gemini", "antigravity", "qwen"} {
 		t.Run(target, func(t *testing.T) {
 			r, err := installTarget(target, "/bin/deja", false)
 			if err != nil || r.Action != "created" {
@@ -76,7 +78,9 @@ func TestInstallMCPJSONTargetsAndErrors(t *testing.T) {
 
 func TestInstallGrokTOML(t *testing.T) {
 	tmp := hermeticEnv(t)
-	cfg := filepath.Join(tmp, "grok", "config.toml")
+	home := filepath.Join(tmp, "grok-home")
+	t.Setenv("GROK_HOME", home)
+	cfg := filepath.Join(home, "config.toml")
 
 	r, err := installTarget("grok", "/bin/deja", false)
 	if err != nil || r.Action != "created" || r.Path != cfg {
@@ -585,6 +589,7 @@ func TestFallbackFindRecentAndMCPEnsureErrors(t *testing.T) {
 }
 
 func TestMoreErrorBranches(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -667,6 +672,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 }
 
 func TestInstallAdditionalBranches(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)

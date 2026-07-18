@@ -107,6 +107,9 @@ func doctorHarnesses(w io.Writer) {
 
 	grokRoot := sources.GrokRoot()
 	printRow("grok", grokRoot, doctorExists(grokRoot), doctorCount(len(sources.GrokSessionFiles()), "file"))
+
+	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
+	printRow("qwen", qwenRoot, doctorExists(qwenRoot), doctorCount(len(sources.QwenSessionFiles()), "file"))
 }
 
 func doctorSQLiteDetail(db string, sqlite bool) string {
@@ -183,7 +186,7 @@ func doctorMCP(w io.Writer) {
 				status = "not wired"
 			}
 		}
-		fmt.Fprintf(w, "  %-12s %-14s %s\n", c.name, status, c.path)
+		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)
 	}
 }
 
@@ -202,12 +205,13 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
 		{"antigravity", filepath.Join(h, ".gemini", "config", "mcp_config.json"), doctorJSONWired("mcpServers")},
-		{"grok", filepath.Join(sources.GrokRoot(), "config.toml"), doctorTOMLWired},
+		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
+		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers")},
 	}
 }
 
 func doctorOpencodeConfigPath() string {
-	dir := filepath.Join(homeDir(), ".config", "opencode")
+	dir := filepath.Join(opencodeConfigHome(), "opencode")
 	path := filepath.Join(dir, "opencode.json")
 	if !doctorExists(path) {
 		if jsonc := filepath.Join(dir, "opencode.jsonc"); doctorExists(jsonc) {

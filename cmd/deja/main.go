@@ -50,12 +50,15 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "grok" {
 		ss = append(ss, sources.LoadGrok()...)
 	}
+	if h == "" || h == "qwen" {
+		ss = append(ss, sources.LoadQwen()...)
+	}
 	return ss
 }
 
 func loadFileSources() []model.Session {
 	var ss []model.Session
-	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok"} {
+	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen"} {
 		ss = append(ss, loadAll(harness)...)
 	}
 	return ss
@@ -236,7 +239,7 @@ func run(args []string) error {
 }
 
 func printNoMatches(w io.Writer, q string, n int) {
-	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode/aider/gemini/cursor/antigravity/grok) — try fewer words or --re\n", q, n)
+	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode/aider/gemini/cursor/antigravity/grok/qwen) — try fewer words or --re\n", q, n)
 }
 
 func findByPrefix(p string) (model.Session, bool, error) {
@@ -404,6 +407,7 @@ func printSources() {
 		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, sources.LoadCursor},
 		{"antigravity", antigravityLocation, antigravityRoots, sources.LoadAntigravity},
 		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.LoadGrok},
+		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.LoadQwen},
 	}
 	for _, it := range items {
 		var size int64
@@ -508,12 +512,12 @@ Usage:
   deja warmup
   deja index [--rebuild]
   deja statusline
-  deja stats [--json]
+  deja stats [--json] [--card [path]]
   deja mcp
   deja version
   deja update
-  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|statusline|--all|--auto>
-  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|statusline|--all|--auto>
+  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|statusline|--all|--auto>
+  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|statusline|--all|--auto>
 
 Examples:
   deja "jwt refresh token bug"

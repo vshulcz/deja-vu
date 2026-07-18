@@ -21,6 +21,8 @@ func TestMain(m *testing.M) {
 		"GEMINI_CLI_HOME":         "",
 		"CURSOR_CONFIG_DIR":       "",
 		"AIDER_CHAT_HISTORY_FILE": "",
+		"XDG_CONFIG_HOME":         "",
+		"XDG_DATA_HOME":           "",
 		"DEJA_CLAUDE_ROOT":        filepath.Join(root, "claude"),
 		"DEJA_CODEX_ROOT":         filepath.Join(root, "codex"),
 		"DEJA_OPENCODE_DB":        filepath.Join(root, "opencode.db"),
@@ -30,6 +32,7 @@ func TestMain(m *testing.M) {
 		"DEJA_CURSOR_CLI_ROOT":    filepath.Join(root, "cursor-cli"),
 		"DEJA_ANTIGRAVITY_ROOT":   filepath.Join(root, "antigravity"),
 		"DEJA_GROK_ROOT":          filepath.Join(root, "grok"),
+		"DEJA_QWEN_ROOT":          filepath.Join(root, "qwen"),
 	}
 	for key, value := range stores {
 		if err := os.Setenv(key, value); err != nil {

@@ -16,17 +16,22 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// GrokHome is where Grok Build itself keeps state; GROK_HOME relocates the
+// whole tree (config.toml, sessions). Install and doctor use it.
+func GrokHome() string {
+	return EnvPath("GROK_HOME", filepath.Join(Home(), ".grok"))
+}
+
+// GrokRoot is the session-reading root; DEJA_GROK_ROOT overrides it without
+// affecting where install writes.
+func GrokRoot() string {
+	return EnvPath("DEJA_GROK_ROOT", GrokHome())
+}
+
 // Grok Build stores sessions by URL-encoded working directory. summary.json
 // carries metadata and updates.jsonl is the authoritative ACP conversation
 // stream. Grok can truncate and regrow the stream after a rewind, so changed
 // files are always reparsed in full.
-
-func GrokRoot() string {
-	if root := os.Getenv("DEJA_GROK_ROOT"); root != "" {
-		return root
-	}
-	return EnvPath("GROK_HOME", filepath.Join(Home(), ".grok"))
-}
 
 func GrokSessionFiles() []string {
 	return walkFiles(filepath.Join(GrokRoot(), "sessions"), func(p string) bool {

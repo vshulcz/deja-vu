@@ -79,8 +79,7 @@ func entryHasCommand(entry map[string]any, cmd string) bool {
 // system prompt per request. The generated plugin shells out to
 // `deja hook-context --plain` once per session and caches the result.
 func installOpencodePlugin(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	dir := filepath.Join(h, ".config", "opencode", "plugins")
+	dir := filepath.Join(opencodeConfigHome(), "opencode", "plugins")
 	path := filepath.Join(dir, "deja.js")
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
