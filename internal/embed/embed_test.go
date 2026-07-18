@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -235,6 +236,94 @@ func TestRerankUsesBestDuplicateAndRejectsEmptyQueryVector(t *testing.T) {
 	defer empty.Close()
 	if _, err := Rerank(context.Background(), hits, "q", sidecar, &Client{URL: empty.URL}); err == nil {
 		t.Fatal("expected empty query vector error")
+	}
+}
+
+func TestSemanticSearchFiltersRanksAndCaps(t *testing.T) {
+	if errBadQueryVector.Error() != "embedding endpoint returned no query vector" {
+		t.Fatal("unexpected query vector error")
+	}
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "claude")
+	if err := os.MkdirAll(filepath.Join(root, "project"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := func(id, text string) string {
+		return fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":%q}}`+"\n", id, text)
+	}
+	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(line("a", "semantic answer")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "project", "b.jsonl"), []byte(line("b", "weak answer")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for key, value := range map[string]string{
+		"HOME": tmp, "USERPROFILE": tmp, "DEJA_CLAUDE_ROOT": root,
+		"DEJA_CODEX_ROOT": filepath.Join(tmp, "codex"), "DEJA_OPENCODE_DB": filepath.Join(tmp, "open.db"),
+		"DEJA_AIDER_ROOTS": filepath.Join(tmp, "aider"), "DEJA_GEMINI_ROOT": filepath.Join(tmp, "gemini"),
+		"DEJA_CURSOR_ROOT": filepath.Join(tmp, "cursor"), "DEJA_CURSOR_CLI_ROOT": filepath.Join(tmp, "cursor-cli"),
+		"DEJA_ANTIGRAVITY_ROOT": filepath.Join(tmp, "antigravity"), "DEJA_GROK_ROOT": filepath.Join(tmp, "grok"),
+		"DEJA_QWEN_ROOT": filepath.Join(tmp, "qwen"),
+	} {
+		t.Setenv(key, value)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	records, err := index.ReadRecords(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen, err := index.Generation(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := write(dir, Sidecar{Generation: gen, Dim: 2, Vectors: []Vector{
+		{Offset: records[0].Offset, Key: records[0].Record.Key, Values: []float32{1, 0}},
+		{Offset: records[1].Offset, Key: records[1].Record.Key, Values: []float32{0.8, 0.6}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"embeddings":[[1,0]]}`))
+	}))
+	defer ts.Close()
+	hits, err := SemanticSearch(context.Background(), dir, search.Options{Query: "rephrased", All: true}, Sidecar{Generation: gen, Dim: 2, Vectors: []Vector{
+		{Offset: records[0].Offset, Key: records[0].Record.Key, Values: []float32{1, 0}},
+		{Offset: records[1].Offset, Key: records[1].Record.Key, Values: []float32{0, 1}},
+	}}, &Client{URL: ts.URL})
+	if err != nil || len(hits) != 1 || hits[0].Session.ID != "a" || hits[0].Count != 0 || hits[0].Score != 1 || !strings.Contains(hits[0].Snippets[0], "semantic answer") {
+		t.Fatalf("semantic hits=%#v err=%v", hits, err)
+	}
+	if _, err := SemanticSearch(context.Background(), dir, search.Options{Query: "q", All: true}, Sidecar{}, &Client{URL: "http://127.0.0.1:1", HTTP: &http.Client{}}); err == nil {
+		t.Fatal("endpoint failure was ignored")
+	}
+	badVector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"embeddings":[[1],[2]]}`))
+	}))
+	defer badVector.Close()
+	if _, err := SemanticSearch(context.Background(), dir, search.Options{Query: "q", All: true}, Sidecar{}, &Client{URL: badVector.URL}); err == nil {
+		t.Fatal("multiple query vectors were accepted")
+	}
+	if _, err := SemanticSearch(context.Background(), filepath.Join(tmp, "missing"), search.Options{Query: "q", All: true}, Sidecar{}, &Client{URL: ts.URL}); err == nil {
+		t.Fatal("missing records were accepted")
+	}
+	if got, err := SemanticSearch(context.Background(), dir, search.Options{Query: "q", Role: "assistant"}, Sidecar{Vectors: []Vector{
+		{Offset: 999, Key: records[0].Record.Key, Values: []float32{1, 0}},
+		{Offset: records[0].Offset, Key: "claude:missing", Values: []float32{1, 0}},
+	}}, &Client{URL: ts.URL}); err != nil || len(got) != 0 {
+		t.Fatalf("filtered semantic results=%#v err=%v", got, err)
+	}
+	noManifest := filepath.Join(tmp, "no-manifest")
+	if err := os.MkdirAll(noManifest, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(noManifest, "records.bin"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SemanticSearch(context.Background(), noManifest, search.Options{Query: "q", All: true}, Sidecar{}, &Client{URL: ts.URL}); err == nil {
+		t.Fatal("missing manifest was accepted")
 	}
 }
 

@@ -33,6 +33,7 @@ type Options struct {
 	Since                     time.Duration
 	All, JSON, Fuzzy, Stemmed bool
 	NoEmbed                   bool
+	Semantic                  bool                `json:"-"`
 	FuzzyVariants             map[string][]string `json:"-"`
 }
 type Hit struct {
@@ -262,7 +263,12 @@ func mergeSessions(in []model.Session) []model.Session {
 
 func Print(w io.Writer, hits []Hit, o Options) {
 	if o.JSON {
-		if o.Stemmed {
+		if o.Semantic {
+			_ = json.NewEncoder(w).Encode(struct {
+				Hits     []Hit `json:"hits"`
+				Semantic bool  `json:"semantic"`
+			}{hits, true})
+		} else if o.Stemmed {
 			_ = json.NewEncoder(w).Encode(struct {
 				Hits     []Hit               `json:"hits"`
 				Stemmed  bool                `json:"stemmed"`
@@ -403,6 +409,9 @@ func snippet(s, q string, re *regexp.Regexp) string {
 	}
 	return out
 }
+
+// Snippet formats a message for search results, including semantic matches.
+func Snippet(s, q string) string { return snippet(s, q, nil) }
 
 func queryTokens(s string) []string {
 	seen := map[string]bool{}

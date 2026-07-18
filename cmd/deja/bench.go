@@ -18,9 +18,10 @@ import (
 )
 
 type benchMetric struct {
-	RecallAt5  float64 `json:"recall_at_5"`
-	RecallAt10 float64 `json:"recall_at_10"`
-	MedianMS   float64 `json:"median_latency_ms"`
+	RecallAt5             float64 `json:"recall_at_5"`
+	RecallAt10            float64 `json:"recall_at_10"`
+	MedianMS              float64 `json:"median_latency_ms"`
+	SemanticOnlyRephrased float64 `json:"semantic_only_rephrased_recall,omitempty"`
 }
 
 type benchReport struct {
@@ -68,6 +69,10 @@ func runBenchRecall(jsonOutput bool) error {
 			if err != nil {
 				return err
 			}
+			hybrid.SemanticOnlyRephrased, err = measureSemanticOnlyRephrased(indexDir, corpus.Queries, client)
+			if err != nil {
+				return err
+			}
 			report.Hybrid = &hybrid
 			report.HybridStatus = "available"
 		} else {
@@ -81,6 +86,31 @@ func runBenchRecall(jsonOutput bool) error {
 	}
 	printBenchReport(os.Stdout, report)
 	return nil
+}
+
+func measureSemanticOnlyRephrased(dir string, queries []bench.Query, client *embed.Client) (float64, error) {
+	sidecar, err := embed.Read(dir)
+	if err != nil {
+		return 0, err
+	}
+	matched, total := 0, 0
+	for i, q := range queries {
+		if i%5 != 1 {
+			continue
+		}
+		total++
+		hits, searchErr := embed.SemanticSearch(context.Background(), dir, search.Options{Query: q.Text, All: true}, sidecar, client)
+		if searchErr != nil {
+			return 0, fmt.Errorf("semantic-only benchmark query %q: %w", q.Text, searchErr)
+		}
+		if containsRelevant(hits, q.Relevant, 5) {
+			matched++
+		}
+	}
+	if total == 0 {
+		return 0, nil
+	}
+	return float64(matched) / float64(total), nil
 }
 
 func measureRecall(dir string, queries []bench.Query, client *embed.Client) (benchMetric, error) {
@@ -223,7 +253,7 @@ func printBenchReport(w io.Writer, report benchReport) {
 	fmt.Fprintln(w, "mode    recall@5  recall@10  median latency")
 	fmt.Fprintf(w, "lexical %.2f      %.2f       %.2f ms\n", report.Lexical.RecallAt5, report.Lexical.RecallAt10, report.Lexical.MedianMS)
 	if report.Hybrid != nil {
-		fmt.Fprintf(w, "hybrid  %.2f      %.2f       %.2f ms\n", report.Hybrid.RecallAt5, report.Hybrid.RecallAt10, report.Hybrid.MedianMS)
+		fmt.Fprintf(w, "hybrid  %.2f      %.2f       %.2f ms  semantic-only rephrased %.2f\n", report.Hybrid.RecallAt5, report.Hybrid.RecallAt10, report.Hybrid.MedianMS, report.Hybrid.SemanticOnlyRephrased)
 	} else {
 		fmt.Fprintln(w, "hybrid: endpoint unavailable, skipped")
 	}

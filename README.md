@@ -149,6 +149,7 @@ OpenAI-compatible embedding endpoint. Set `DEJA_EMBED_URL` and optionally
 `nomic-embed-text`; without a configured and reachable runtime, ordinary
 lexical search and MCP recall continue unchanged. `--no-embed` or
 `DEJA_EMBED=off` disables reranking for one invocation.
+Without an embedding endpoint, the semantic zero-result fallback does not exist.
 
 The vector sidecar is stored beside the index as `.vectors.bin`, not in
 `index.db`. Float32 vectors cost roughly 4 KB per 1k messages for a 1,024

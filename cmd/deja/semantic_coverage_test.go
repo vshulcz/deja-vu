@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/bench"
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -54,6 +55,24 @@ func TestEmbedCommandBuildsSemanticSidecar(t *testing.T) {
 	if report == nil || report.State != "reachable" || report.Dim != 2 || report.Coverage != 100 {
 		t.Fatalf("doctor embedding report=%#v", report)
 	}
+	var notice bytes.Buffer
+	semanticHits, semantic := maybeSemantic(nil, search.Options{Query: "rephrased"}, os.Stderr)
+	if !semantic || len(semanticHits) != 1 || semanticHits[0].Count != 0 {
+		t.Fatalf("semantic fallback hits=%#v semantic=%v", semanticHits, semantic)
+	}
+	var jsonOut bytes.Buffer
+	search.Print(&jsonOut, semanticHits, search.Options{JSON: true, Semantic: true})
+	if !strings.Contains(jsonOut.String(), `"semantic":true`) {
+		t.Fatalf("semantic JSON=%q", jsonOut.String())
+	}
+	metric, err := measureSemanticOnlyRephrased(indexDirForTest(), []bench.Query{{Text: "ignored"}, {Text: "rephrased", Relevant: []string{"s"}}}, &embed.Client{URL: ts.URL})
+	if err != nil || metric != 1 {
+		t.Fatalf("semantic-only metric=%v err=%v", metric, err)
+	}
+	if metric, err := measureSemanticOnlyRephrased(indexDirForTest(), nil, &embed.Client{URL: ts.URL}); err != nil || metric != 0 {
+		t.Fatalf("empty semantic-only metric=%v err=%v", metric, err)
+	}
+	_ = notice
 	hits := []search.Hit{{Session: model.Session{ID: "s", Harness: "claude"}, Score: 1}}
 	if got := maybeRerank(hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
 		t.Fatalf("semantic rerank=%#v", got)

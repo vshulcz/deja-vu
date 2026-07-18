@@ -261,6 +261,9 @@ func run(args []string) error {
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(hits, o, os.Stderr)
 	}
+	var semantic bool
+	hits, semantic = maybeSemantic(hits, o, os.Stderr)
+	o.Semantic = semantic
 	if len(hits) == 0 {
 		printNoMatches(os.Stderr, o.Query, len(ss))
 	}

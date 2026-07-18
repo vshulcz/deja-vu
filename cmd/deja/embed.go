@@ -46,3 +46,27 @@ func maybeRerank(hits []search.Hit, o search.Options, notice *os.File) []search.
 	}
 	return out
 }
+
+func maybeSemantic(hits []search.Hit, o search.Options, notice *os.File) ([]search.Hit, bool) {
+	if len(hits) != 0 || o.NoEmbed || os.Getenv("DEJA_EMBED") == "off" {
+		return hits, false
+	}
+	sidecar, err := embed.Read(index.DefaultDir())
+	if err != nil {
+		return hits, false
+	}
+	gen, err := index.Generation(index.DefaultDir())
+	if err != nil || gen != sidecar.Generation {
+		return hits, false
+	}
+	client, err := embed.New()
+	if err != nil {
+		return hits, false
+	}
+	out, err := embed.SemanticSearch(context.Background(), index.DefaultDir(), o, sidecar, client)
+	if err != nil || len(out) == 0 {
+		return hits, false
+	}
+	fmt.Fprintln(notice, "deja: no lexical match, semantic results:")
+	return out, true
+}
