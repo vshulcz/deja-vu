@@ -63,9 +63,9 @@ deja install --all     # MCP recall for every agent it finds on this machine
 deja install --auto    # same, plus session-start auto-recall where supported
 ```
 
-Install also writes user-level guidance: `~/.claude/skills/deja-history/SKILL.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.gemini/config/skills/deja-history/SKILL.md`, `~/.qwen/QWEN.md`, `~/.copilot/skills/deja-history/SKILL.md`, and `~/.config/opencode/AGENTS.md` (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Cursor and Grok have no documented user-level guidance location and are skipped.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, Gemini CLI, Qwen, Copilot, and OpenCode use their corresponding guidance files (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Cursor and Grok have no documented user-level guidance location and are skipped.
 
-On a terminal, install reports whether it found local history and points to `deja index` when the first index still needs to be built.
+Install reports whether it found local history and builds the first index immediately when history is present.
 
 That's it. Next session, ask your agent:
 
@@ -255,7 +255,7 @@ The synthetic set is currently saturated by lexical search (recall@5 1.00 at ~0.
 
 Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact credentials → `records.bin` + token buckets → `manifest.json` tracks per-file state so repeat runs only ingest what changed. The MCP server, stats, share and sync all read the same index. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-**Privacy:** no network path exists in the indexing or search code. Local files in, local cache out.
+**Privacy:** indexing and search are local. Network is used only by `deja update`, `deja sync ssh`, and the `deja doctor` version check. Local files in, local cache out.
 
 ## FAQ
 

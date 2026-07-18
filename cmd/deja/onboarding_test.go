@@ -19,7 +19,7 @@ func TestInstallIndexHintsTTYOnly(t *testing.T) {
 		unwanted string
 	}{
 		{"no history", false, true, "no agent history found on this machine", "next: run"},
-		{"history found", true, true, "next: run `deja index` to index 1 agent stores", "no agent history"},
+		{"history found", true, true, "claude-code", "no agent history"},
 		{"non tty", true, false, "claude-code: created", "next: run"},
 	}
 	for _, tc := range cases {
@@ -61,6 +61,85 @@ func TestInstallHintSkippedWhenIndexExists(t *testing.T) {
 	}
 	if got := installIndexHint(); got != "" {
 		t.Fatalf("hint = %q, want empty", got)
+	}
+}
+
+func TestRequestWarmupUsesRecentSentinel(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(t.TempDir(), "index")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	var calls int
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(exe, sentinel string) error {
+		calls++
+		if exe == "" || sentinel != filepath.Join(dir, "warmup.sentinel") {
+			t.Fatalf("warmup args = %q, %q", exe, sentinel)
+		}
+		return nil
+	}
+	defer func() { spawnWarmup = oldSpawn }()
+	requestWarmup(dir)
+	requestWarmup(dir)
+	if calls != 1 {
+		t.Fatalf("warmup calls = %d, want 1", calls)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "warmup.sentinel")); err != nil {
+		t.Fatalf("sentinel missing: %v", err)
+	}
+}
+
+func TestRequestWarmupRetriesStaleAndRecordsFailure(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(t.TempDir(), "index")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	sentinel := filepath.Join(dir, "warmup.sentinel")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sentinel, []byte("1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error {
+		calls++
+		return os.ErrPermission
+	}
+	defer func() { spawnWarmup = oldSpawn }()
+	requestWarmup(dir)
+	if calls != 1 {
+		t.Fatalf("stale sentinel calls = %d, want 1", calls)
+	}
+	b, err := os.ReadFile(sentinel)
+	if err != nil || string(b) == "1\n" {
+		t.Fatalf("failed warmup sentinel = %q, err=%v", b, err)
+	}
+}
+
+func TestHookMissingManifestRequestsWarmup(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(t.TempDir(), "index")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	called := false
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { called = true; return nil }
+	defer func() { spawnWarmup = oldSpawn }()
+	if digest, sessions := hookDigestResult(); digest != "" || sessions != 0 {
+		t.Fatalf("missing-manifest digest = %q, sessions=%d", digest, sessions)
+	}
+	if !called {
+		t.Fatal("missing manifest did not request warmup")
+	}
+}
+
+func TestHookContextMissingManifestStaysSilent(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index"))
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { return nil }
+	defer func() { spawnWarmup = oldSpawn }()
+	if err := runHookContext(true); err != nil {
+		t.Fatal(err)
 	}
 }
 

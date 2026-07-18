@@ -102,6 +102,7 @@ func run(args []string) error {
 		if err := index.Ensure(index.DefaultDir(), "", force, os.Stderr); err != nil {
 			return err
 		}
+		clearWarmupSentinel()
 		maybeFirstIndexGreeting()
 		return nil
 	}
@@ -264,7 +265,13 @@ func run(args []string) error {
 }
 
 func printNoMatches(w io.Writer, q string, n int) {
-	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode/aider/gemini/cursor/antigravity/grok/qwen) — try fewer words or --re\n", q, n)
+	fmt.Fprintf(w, "deja: no matches in %d indexed sessions — try fewer words or --re (query %q)\n", n, q)
+}
+
+func clearWarmupSentinel() {
+	if path := os.Getenv("DEJA_WARMUP_SENTINEL"); path != "" {
+		_ = os.Remove(path)
+	}
 }
 
 func printFuzzy(w io.Writer, variants map[string][]string) {
@@ -716,15 +723,15 @@ Usage:
   deja sync ssh <host> [--pull] [--full]
   deja last [n] [--project name] [--harness name]
   deja sources
-	deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
-	deja forget --list | --unforget <id>
+  deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
+  deja forget --list | --unforget <id>
   deja doctor [--json]
   deja warmup
   deja index [--rebuild]
   deja embed
   deja bench recall [--json]
   deja statusline
-	deja stats [--json] [--card [path]] [--html [path]]
+  deja stats [--json] [--card [path]] [--html [path]]
 	deja remember "text" [--project name]
   deja mcp
   deja version
@@ -740,7 +747,7 @@ Examples:
   deja last 20 --harness codex
   deja last --project api-gateway
   deja --re "timeout|deadline exceeded"
-  deja ctx "schema migration rollback" > /tmp/deja-context.md
+  deja ctx "schema migration rollback" > deja-context.md
   deja install --all
 
 See README.md for the full CLI reference.`)

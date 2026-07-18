@@ -13,6 +13,11 @@ need() {
   command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
 }
 
+yes=0
+for arg in "$@"; do
+  [ "$arg" = "--yes" ] && yes=1 || fail "unknown option: $arg"
+done
+
 need curl
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -35,7 +40,7 @@ version=${tag#v}
 
 archive="deja-vu_${version}_${os}_${arch}.tar.gz"
 base="https://github.com/$repo/releases/download/$tag"
-tmp=${TMPDIR:-/tmp}/deja-vu-install.$$
+tmp=${DEJA_INSTALL_TMPDIR:-"$PWD/.deja-vu-install.$$"}
 
 cleanup() {
   rm -rf "$tmp"
@@ -82,5 +87,26 @@ printf 'installed %s %s to %s/%s\n' "$bin" "$tag" "$dest_dir" "$bin"
 # shellcheck disable=SC2016  # $PATH is intentionally literal in the hint
 case ":$PATH:" in
   *":$dest_dir:"*) ;;
-  *) [ "$dest_dir" = "$HOME/.local/bin" ] && printf 'hint: add export PATH=%s:$PATH to your shell profile\n' "$HOME/.local/bin" ;;
+  *)
+    shell=$(basename "${SHELL:-}")
+    case "$shell" in
+      zsh) rc="$HOME/.zshrc" ;;
+      bash) rc="$HOME/.bashrc" ;;
+      *) rc="$HOME/.profile" ;;
+    esac
+    line="export PATH=$dest_dir:\$PATH"
+    if [ "$yes" -eq 0 ] && [ -t 0 ] && [ -t 1 ]; then
+      printf 'deja install: append %s to %s? [y/N] ' "$line" "$rc"
+      read -r answer
+      case "$answer" in
+        y|Y|yes|YES)
+          printf '%s\n' "$line" >> "$rc"
+          printf 'updated %s\n' "$rc"
+          ;;
+        *) printf 'PATH unchanged. Add this line to %s:\n  %s\n' "$rc" "$line" ;;
+      esac
+    else
+      printf 'ACTION REQUIRED: add this line to %s:\n  %s\n' "$rc" "$line"
+    fi
+    ;;
 esac

@@ -42,11 +42,19 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 // both human and JSON reports keep exit status 0.
 func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 	jsonOutput := false
+	offline := os.Getenv("DEJA_OFFLINE") == "1"
 	for _, arg := range args {
-		if arg != "--json" {
+		switch arg {
+		case "--json":
+			jsonOutput = true
+		case "--offline":
+			offline = true
+		default:
 			return fmt.Errorf("doctor: unknown flag %q", arg)
 		}
-		jsonOutput = true
+	}
+	if offline {
+		lookup = nil
 	}
 	report := collectDoctorReport(lookup)
 	if jsonOutput {
@@ -73,7 +81,11 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 		doctorEmbed(w, doctorEmbedReport{State: "unavailable"})
 	}
 	fmt.Fprintln(w)
-	doctorVersion(w, func() (string, bool) { return report.Version.Latest, report.Version.Latest != "" })
+	if offline {
+		fmt.Fprintln(w, "version: check skipped (offline)")
+	} else {
+		doctorVersion(w, func() (string, bool) { return report.Version.Latest, report.Version.Latest != "" })
+	}
 	return nil
 }
 
@@ -165,7 +177,7 @@ func doctorCursorPresent() bool {
 }
 
 func doctorCursorLocation() string {
-	return strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator))
+	return strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, ", ")
 }
 
 func doctorAiderLocation() string {

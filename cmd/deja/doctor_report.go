@@ -144,7 +144,6 @@ func parseDoctorCursor(path string) ([]model.Session, error) {
 
 func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	store := doctorStore{Name: check.name, State: "missing", Paths: check.paths, Files: len(check.files)}
-	rootExists := false
 	for _, path := range check.paths {
 		if path == "" {
 			continue
@@ -157,7 +156,6 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 			}
 			continue
 		}
-		rootExists = true
 		if fi.IsDir() {
 			f, err := os.Open(path)
 			if err != nil {
@@ -176,9 +174,6 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 		}
 	}
 	if len(check.files) == 0 {
-		if rootExists {
-			store.State = "empty"
-		}
 		return store, time.Time{}
 	}
 	newest, mod := newestDoctorFile(check.files)
@@ -244,6 +239,10 @@ func collectDoctorMCP() []doctorMCPStatus {
 
 func collectDoctorVersion(lookup doctorVersionLookup) doctorVersionReport {
 	report := doctorVersionReport{State: "unknown", Current: version}
+	if lookup == nil {
+		report.State = "offline"
+		return report
+	}
 	latest, ok := lookup()
 	if !ok {
 		return report

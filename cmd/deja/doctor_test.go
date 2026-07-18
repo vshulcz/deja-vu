@@ -83,7 +83,7 @@ func TestDoctorStoreStates(t *testing.T) {
 		want  string
 	}{
 		{"missing", doctorStoreCheck{name: "x", paths: []string{filepath.Join(tmp, "missing")}}, "missing"},
-		{"empty", doctorStoreCheck{name: "x", paths: []string{tmp}}, "empty"},
+		{"empty", doctorStoreCheck{name: "x", paths: []string{tmp}}, "missing"},
 		{"unreadable", doctorStoreCheck{name: "x", paths: []string{unreadable}}, "unreadable"},
 	}
 	for _, tc := range cases {
@@ -362,6 +362,36 @@ func TestDoctorDispatchHermetic(t *testing.T) {
 	}
 	if !strings.Contains(out, "Harness stores:") || !strings.Contains(out, "latest   v9.9.9") {
 		t.Fatalf("doctor dispatch out=%q", out)
+	}
+}
+
+func TestDoctorOfflineSkipsLookup(t *testing.T) {
+	hermeticEnv(t)
+	var out bytes.Buffer
+	err := runDoctor(&out, []string{"--offline"}, func() (string, bool) {
+		t.Fatal("offline doctor performed version lookup")
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "version: check skipped (offline)") {
+		t.Fatalf("offline output = %q", out.String())
+	}
+}
+
+func TestDoctorOfflineEnvironmentSkipsLookupInJSON(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("DEJA_OFFLINE", "1")
+	var out bytes.Buffer
+	if err := runDoctor(&out, []string{"--json"}, func() (string, bool) {
+		t.Fatal("offline doctor performed version lookup")
+		return "", false
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"state": "offline"`) {
+		t.Fatalf("offline JSON = %q", out.String())
 	}
 }
 

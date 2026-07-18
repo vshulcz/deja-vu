@@ -68,6 +68,9 @@ func runInstall(args []string, uninstall bool) error {
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
 	var done []lineItem
+	guidanceCount := 0
+	mcpCount := 0
+	hookCount := 0
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
 		if err != nil {
@@ -81,12 +84,24 @@ func runInstall(args []string, uninstall bool) error {
 			if gr.Path != "" && !banner {
 				fmt.Println(guidanceOutput(t, gr))
 			}
+			if gr.Path != "" && !uninstall {
+				guidanceCount++
+			}
 		}
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
 		} else if t != "copilot" {
 			fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
 		}
+		if !uninstall && t != "copilot" && t != "statusline" {
+			mcpCount++
+		}
+		if !uninstall && strings.HasSuffix(t, "-auto") {
+			hookCount++
+		}
+	}
+	if !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") {
+		installIndexWarmup(mcpCount, hookCount, guidanceCount)
 	}
 	if banner {
 		info := append(brandInfo(), "")
@@ -105,6 +120,36 @@ func runInstall(args []string, uninstall bool) error {
 		printLogo(os.Stdout, info)
 	}
 	return nil
+}
+
+func installIndexWarmup(mcp, hooks, guidance int) {
+	dir := index.DefaultDir()
+	built := false
+	detected := 0
+	if !index.HasManifest(dir) {
+		for _, check := range doctorStoreChecks() {
+			store, _ := inspectDoctorStore(check)
+			if store.Files > 0 {
+				detected++
+				if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
+					built = true
+				}
+				break
+			}
+		}
+	}
+	fmt.Fprintf(os.Stderr, "installed: %d MCP, %d hooks, %d guidance files\n", mcp, hooks, guidance)
+	if built {
+		b := index.LastBuild
+		fmt.Fprintf(os.Stderr, "index: built (%d sessions, %d messages)\n", b.Sessions, b.Messages)
+	} else if !index.HasManifest(dir) && detected > 0 {
+		fmt.Fprintln(os.Stderr, "next: run `deja index` to finish building memory")
+	} else if !index.HasManifest(dir) {
+		fmt.Fprintln(os.Stderr, "index: no agent history detected")
+	} else {
+		fmt.Fprintln(os.Stderr, "index: already built")
+	}
+	fmt.Fprintln(os.Stderr, "try: deja \"something you fixed weeks ago\"")
 }
 
 // shortHome contracts the home directory to ~ for display.

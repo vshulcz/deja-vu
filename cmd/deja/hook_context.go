@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -14,6 +17,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
+
+const warmupRetryAfter = 10 * time.Minute
+
+var spawnWarmup = startDetachedWarmup
 
 type sessionStartHookResponse struct {
 	HookSpecificOutput struct {
@@ -60,6 +67,7 @@ func hookDigestResult() (string, int) {
 	}
 	dir := index.DefaultDir()
 	if !index.HasManifest(dir) {
+		requestWarmup(dir)
 		return "", 0
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
@@ -118,4 +126,60 @@ func hookDigestResult() (string, int) {
 	}
 	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names})
 	return result.Text, result.Sessions
+}
+
+func requestWarmup(dir string) {
+	if os.Getenv("DEJA_WARMUP_SENTINEL") != "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	sentinel := filepath.Join(dir, "warmup.sentinel")
+	now := time.Now()
+	f, err := os.OpenFile(sentinel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if !os.IsExist(err) {
+			return
+		}
+		b, readErr := os.ReadFile(sentinel)
+		stamp, parseErr := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
+		if readErr == nil && parseErr == nil && now.Sub(time.Unix(0, stamp)) < warmupRetryAfter {
+			return
+		}
+		if os.Remove(sentinel) != nil {
+			return
+		}
+		f, err = os.OpenFile(sentinel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err != nil {
+			return
+		}
+	}
+	if _, err := fmt.Fprintln(f, now.UnixNano()); err != nil {
+		_ = f.Close()
+		return
+	}
+	if err := f.Close(); err != nil {
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	if err := spawnWarmup(exe, sentinel); err != nil {
+		return
+	}
+}
+
+func startDetachedWarmup(exe, sentinel string) error {
+	cmd := exec.Command(exe, "index")
+	cmd.Env = append(os.Environ(), "DEJA_WARMUP_SENTINEL="+sentinel)
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = devNull.Close() }()
+	cmd.Stdout = devNull
+	cmd.Stderr = cmd.Stdout
+	return startDetached(cmd)
 }
