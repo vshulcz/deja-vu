@@ -16,7 +16,7 @@
 
 Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build and Qwen Code write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
-| | |
+| Feature | What it does |
 | --- | --- |
 | **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses |
@@ -26,6 +26,8 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
+| **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
+| **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
 
 ## Privacy
 
@@ -230,7 +232,7 @@ The [session format registry](docs/registry/README.md) documents the observed st
 
 Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
 
-| | |
+| Measurement | Result |
 | --- | --- |
 | Warm search | **~12 ms** typical, ~25 ms worst-case |
 | Cold index (once) | ~10 s |
