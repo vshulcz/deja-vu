@@ -220,3 +220,37 @@ func TestCopilotInstallIsGuidanceOnly(t *testing.T) {
 		t.Fatalf("copilot MCP install = %#v, %v", result, err)
 	}
 }
+
+func TestInstallGuidanceSkillErrorBranches(t *testing.T) {
+	tmp := hermeticEnv(t)
+	// path == "" branch for a harness without a guidance location.
+	if r, err := installGuidance("grok", false); err != nil || r.Path != "" {
+		t.Fatalf("grok guidance = %#v err=%v", r, err)
+	}
+	// Read failure that is not IsNotExist must surface (copilot skill dir
+	// squatted by a file).
+	squat := filepath.Join(tmp, "home", ".copilot", "skills")
+	if err := os.MkdirAll(filepath.Dir(squat), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(squat, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installGuidance("copilot", false); err == nil {
+		t.Fatal("expected copilot read error")
+	}
+	// Uninstall of a skill whose path parent blocks removal errors out.
+	if _, err := installGuidance("copilot", true); err == nil {
+		t.Fatal("expected copilot uninstall read error")
+	}
+	// antigravity skill install + uninstall roundtrip.
+	if r, err := installGuidance("antigravity", false); err != nil || r.Action != "created" {
+		t.Fatalf("antigravity install = %#v err=%v", r, err)
+	}
+	if r, err := installGuidance("antigravity", true); err != nil || r.Action != "removed" {
+		t.Fatalf("antigravity uninstall = %#v err=%v", r, err)
+	}
+	if r, err := installGuidance("antigravity", true); err != nil || r.Action != "unchanged" {
+		t.Fatalf("antigravity re-uninstall = %#v err=%v", r, err)
+	}
+}
