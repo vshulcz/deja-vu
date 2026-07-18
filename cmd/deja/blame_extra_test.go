@@ -57,3 +57,26 @@ func TestEmbedCommandBranches(t *testing.T) {
 		t.Fatal("expected ensure error")
 	}
 }
+
+func TestMaybeSemanticGuards(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "idx"))
+	hit := []search.Hit{{}}
+	// Existing hits pass through untouched.
+	if out, used := maybeSemantic(hit, search.Options{}, os.Stderr); used || len(out) != 1 {
+		t.Fatal("hits must pass through")
+	}
+	// NoEmbed and env opt-outs.
+	if _, used := maybeSemantic(nil, search.Options{NoEmbed: true}, os.Stderr); used {
+		t.Fatal("NoEmbed must skip")
+	}
+	t.Setenv("DEJA_EMBED", "off")
+	if _, used := maybeSemantic(nil, search.Options{}, os.Stderr); used {
+		t.Fatal("env off must skip")
+	}
+	t.Setenv("DEJA_EMBED", "")
+	// No sidecar at all.
+	if _, used := maybeSemantic(nil, search.Options{}, os.Stderr); used {
+		t.Fatal("missing sidecar must skip")
+	}
+}
