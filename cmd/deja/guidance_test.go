@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -240,8 +241,11 @@ func TestInstallGuidanceSkillErrorBranches(t *testing.T) {
 		t.Fatal("expected copilot read error")
 	}
 	// Uninstall of a skill whose path parent blocks removal errors out.
-	if _, err := installGuidance("copilot", true); err == nil {
-		t.Fatal("expected copilot uninstall read error")
+	// Windows maps the squatted read to not-exist, which reads as unchanged.
+	if runtime.GOOS != "windows" {
+		if _, err := installGuidance("copilot", true); err == nil {
+			t.Fatal("expected copilot uninstall read error")
+		}
 	}
 	// antigravity skill install + uninstall roundtrip.
 	if r, err := installGuidance("antigravity", false); err != nil || r.Action != "created" {
