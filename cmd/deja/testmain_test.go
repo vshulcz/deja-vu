@@ -25,16 +25,19 @@ func TestMain(m *testing.M) {
 		"XDG_DATA_HOME":           "",
 		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
 		"DEJA_NOTES_FILE":         "",
-		"DEJA_CLAUDE_ROOT":        filepath.Join(root, "claude"),
-		"DEJA_CODEX_ROOT":         filepath.Join(root, "codex"),
-		"DEJA_OPENCODE_DB":        filepath.Join(root, "opencode.db"),
-		"DEJA_AIDER_ROOTS":        filepath.Join(root, "aider"),
-		"DEJA_GEMINI_ROOT":        filepath.Join(root, "gemini"),
-		"DEJA_CURSOR_ROOT":        filepath.Join(root, "cursor"),
-		"DEJA_CURSOR_CLI_ROOT":    filepath.Join(root, "cursor-cli"),
-		"DEJA_ANTIGRAVITY_ROOT":   filepath.Join(root, "antigravity"),
-		"DEJA_GROK_ROOT":          filepath.Join(root, "grok"),
-		"DEJA_QWEN_ROOT":          filepath.Join(root, "qwen"),
+		// Guard: hook tests must never spawn a real detached warmup —
+		// os.Executable() inside tests is the test binary itself.
+		"DEJA_WARMUP_SENTINEL":  filepath.Join(root, "warmup-guard"),
+		"DEJA_CLAUDE_ROOT":      filepath.Join(root, "claude"),
+		"DEJA_CODEX_ROOT":       filepath.Join(root, "codex"),
+		"DEJA_OPENCODE_DB":      filepath.Join(root, "opencode.db"),
+		"DEJA_AIDER_ROOTS":      filepath.Join(root, "aider"),
+		"DEJA_GEMINI_ROOT":      filepath.Join(root, "gemini"),
+		"DEJA_CURSOR_ROOT":      filepath.Join(root, "cursor"),
+		"DEJA_CURSOR_CLI_ROOT":  filepath.Join(root, "cursor-cli"),
+		"DEJA_ANTIGRAVITY_ROOT": filepath.Join(root, "antigravity"),
+		"DEJA_GROK_ROOT":        filepath.Join(root, "grok"),
+		"DEJA_QWEN_ROOT":        filepath.Join(root, "qwen"),
 	}
 	for key, value := range stores {
 		if err := os.Setenv(key, value); err != nil {

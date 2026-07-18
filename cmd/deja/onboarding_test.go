@@ -67,6 +67,7 @@ func TestInstallHintSkippedWhenIndexExists(t *testing.T) {
 }
 
 func TestRequestWarmupUsesRecentSentinel(t *testing.T) {
+	t.Setenv("DEJA_WARMUP_SENTINEL", "")
 	hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "index")
 	t.Setenv("DEJA_INDEX_DIR", dir)
@@ -91,6 +92,7 @@ func TestRequestWarmupUsesRecentSentinel(t *testing.T) {
 }
 
 func TestRequestWarmupRetriesStaleAndRecordsFailure(t *testing.T) {
+	t.Setenv("DEJA_WARMUP_SENTINEL", "")
 	hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "index")
 	t.Setenv("DEJA_INDEX_DIR", dir)
@@ -119,6 +121,7 @@ func TestRequestWarmupRetriesStaleAndRecordsFailure(t *testing.T) {
 }
 
 func TestHookMissingManifestRequestsWarmup(t *testing.T) {
+	t.Setenv("DEJA_WARMUP_SENTINEL", "")
 	hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "index")
 	t.Setenv("DEJA_INDEX_DIR", dir)
