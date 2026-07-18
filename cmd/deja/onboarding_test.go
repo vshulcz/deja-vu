@@ -4,8 +4,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -188,4 +190,56 @@ func captureStdoutCall(t *testing.T, fn func()) string {
 
 func sourcesClaudeConfigDir() string {
 	return filepath.Join(homeDir(), ".claude")
+}
+
+func TestRequestWarmupBranches(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "warm-index")
+	spawned := 0
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(exe, sentinel string) error { spawned++; return nil }
+	defer func() { spawnWarmup = oldSpawn }()
+
+	// Inside a warmup child: no recursion.
+	t.Setenv("DEJA_WARMUP_SENTINEL", filepath.Join(dir, "warmup.sentinel"))
+	requestWarmup(dir)
+	if spawned != 0 {
+		t.Fatal("warmup child must not spawn again")
+	}
+	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+
+	// First call spawns and leaves a sentinel.
+	requestWarmup(dir)
+	if spawned != 1 {
+		t.Fatalf("spawned=%d", spawned)
+	}
+	// Second call within the retry window is suppressed by the sentinel.
+	requestWarmup(dir)
+	if spawned != 1 {
+		t.Fatalf("sentinel did not suppress: spawned=%d", spawned)
+	}
+	// A stale sentinel is replaced and spawns again.
+	stale := time.Now().Add(-2 * warmupRetryAfter).UnixNano()
+	if err := os.WriteFile(filepath.Join(dir, "warmup.sentinel"), []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	requestWarmup(dir)
+	if spawned != 2 {
+		t.Fatalf("stale sentinel not replaced: spawned=%d", spawned)
+	}
+	// A corrupt sentinel is also replaced.
+	if err := os.WriteFile(filepath.Join(dir, "warmup.sentinel"), []byte("garbage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	requestWarmup(dir)
+	if spawned != 3 {
+		t.Fatalf("corrupt sentinel not replaced: spawned=%d", spawned)
+	}
+	// The index command clears the sentinel it was born with.
+	sentinel := filepath.Join(dir, "warmup.sentinel")
+	t.Setenv("DEJA_WARMUP_SENTINEL", sentinel)
+	clearWarmupSentinel()
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Fatal("sentinel not cleared")
+	}
 }
