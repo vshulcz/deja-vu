@@ -90,3 +90,28 @@ func TestStatsHTMLCommandAndConflicts(t *testing.T) {
 		}
 	}
 }
+
+func TestStatsHTMLEdgeBranches(t *testing.T) {
+	tmp := t.TempDir()
+	// A session with only a start time falls back to it for date and sorting.
+	started := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
+	sessions := []model.Session{
+		{ID: "b", Harness: "claude", Started: started, Messages: []model.Message{{Role: "user", Text: "hello"}}},
+		{ID: "a", Harness: "claude", Started: started},
+	}
+	page, err := newStatsHTMLPage(statsReport{}, sessions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.SessionCount != 2 || !strings.Contains(string(page.SessionsJSON), "2026-02-03") || !strings.Contains(string(page.SessionsJSON), `"-"`) {
+		t.Fatalf("page json=%s", page.SessionsJSON)
+	}
+	// Write failure: parent path squatted by a file.
+	squat := filepath.Join(tmp, "f")
+	if err := os.WriteFile(squat, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeStatsHTML(filepath.Join(squat, "out.html"), statsReport{}, nil); err == nil {
+		t.Fatal("expected write error")
+	}
+}
