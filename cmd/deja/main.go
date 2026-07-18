@@ -632,7 +632,7 @@ Usage:
 	deja index [--rebuild]
 	deja embed
   deja statusline
-	deja stats [--json] [--card [path]]
+	deja stats [--json] [--card [path]] [--html [path]]
 	deja remember "text" [--project name]
   deja mcp
   deja version

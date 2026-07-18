@@ -77,11 +77,23 @@ func runStats(args []string) error {
 	jsonOut := false
 	cardPath := ""
 	card := false
+	htmlPath := ""
+	html := false
 	var options search.Options
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			jsonOut = true
+		case "--html":
+			if html {
+				return fmt.Errorf("stats: --html specified twice")
+			}
+			html = true
+			htmlPath = "deja-stats.html"
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				htmlPath = args[i+1]
+				i++
+			}
 		case "--card":
 			if card {
 				return fmt.Errorf("stats: --card specified twice")
@@ -116,7 +128,7 @@ func runStats(args []string) error {
 			return fmt.Errorf("stats: unknown flag %s", args[i])
 		}
 	}
-	if jsonOut && card {
+	if (jsonOut && card) || (jsonOut && html) || (card && html) {
 		return fmt.Errorf("stats: choose one output")
 	}
 	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
@@ -133,6 +145,14 @@ func runStats(args []string) error {
 	}
 	if cardPath != "" {
 		path, err := writeStatsCard(cardPath, report)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stdout, path)
+		return nil
+	}
+	if htmlPath != "" {
+		path, err := writeStatsHTML(htmlPath, report, filterStatsSessions(ss, options))
 		if err != nil {
 			return err
 		}

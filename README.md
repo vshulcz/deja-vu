@@ -94,6 +94,8 @@ $ deja "jwt refresh token"
 
 Run `deja stats --card` to write a self-contained `deja-stats.svg` for a README or social post.
 
+Run `deja stats --html` to write a self-contained, browsable `deja-stats.html` timeline. The HTML export embeds metadata only: dates, harnesses, projects, message counts, and already-redacted first-user titles; it never includes message text.
+
 `deja update` is for standalone installs. Homebrew and npm installs update through the package manager.
 
 ### Doctor JSON
