@@ -871,7 +871,11 @@ func TestFuzzySearchFilterAndCatalogErrors(t *testing.T) {
 	}
 
 	// buckets squatted by a regular file: ReadDir fails with a non-NotExist
-	// error that must propagate.
+	// error that must propagate. Windows maps this to a NotExist-style error,
+	// which tokenCatalog treats as an empty catalog.
+	if runtime.GOOS == "windows" {
+		return
+	}
 	flat := filepath.Join(tmp, "flat-index")
 	if err := os.MkdirAll(flat, 0o700); err != nil {
 		t.Fatal(err)
