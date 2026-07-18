@@ -32,6 +32,7 @@ type Options struct {
 	Harness, Project, Role string
 	Since                  time.Duration
 	All, JSON, Fuzzy       bool
+	NoEmbed                bool
 	FuzzyVariants          map[string][]string `json:"-"`
 }
 type Hit struct {

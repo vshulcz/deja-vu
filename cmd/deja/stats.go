@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -35,6 +36,7 @@ type statsReport struct {
 	Longest       sessionStat    `json:"longest_session"`
 	BusiestDay    dayStat        `json:"busiest_day"`
 	Recall        usage.Summary  `json:"recall"`
+	SidecarSize   int64          `json:"sidecar_size,omitempty"`
 }
 
 type harnessStats struct {
@@ -126,6 +128,9 @@ func runStats(args []string) error {
 	}
 	report := buildStats(filterStatsSessions(ss, options), time.Now())
 	report.Recall = usage.Totals(index.DefaultDir())
+	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
+		report.SidecarSize = fi.Size()
+	}
 	if cardPath != "" {
 		path, err := writeStatsCard(cardPath, report)
 		if err != nil {
@@ -278,6 +283,9 @@ func printStats(w io.Writer, r statsReport) {
 	fmt.Fprintf(w, "Sessions  %s%d%s\n", bold, r.TotalSessions, reset)
 	fmt.Fprintf(w, "Messages  %s%d%s\n", bold, r.TotalMessages, reset)
 	fmt.Fprintf(w, "Range     %s → %s\n\n", valueOrDash(r.DateRange.Start), valueOrDash(r.DateRange.End))
+	if r.SidecarSize > 0 {
+		fmt.Fprintf(w, "Semantic  sidecar %s\n\n", humanBytes(r.SidecarSize))
+	}
 
 	fmt.Fprintf(w, "%sBy harness%s\n", bold, reset)
 	for _, h := range r.Harnesses {

@@ -115,6 +115,21 @@ Context piping without MCP:
 claude "Prior context: $(deja ctx 'database migration')"
 ```
 
+## Semantic recall (optional)
+
+Semantic search is an opt-in layer for a local Ollama, LM Studio, or
+OpenAI-compatible embedding endpoint. Set `DEJA_EMBED_URL` and optionally
+`DEJA_EMBED_MODEL`, then run `deja embed`. Ollama defaults to
+`nomic-embed-text`; without a configured and reachable runtime, ordinary
+lexical search and MCP recall continue unchanged. `--no-embed` or
+`DEJA_EMBED=off` disables reranking for one invocation.
+
+The vector sidecar is stored beside the index as `.vectors.bin`, not in
+`index.db`. Float32 vectors cost roughly 4 KB per 1k messages for a 1,024
+dimension model, plus a small record key. Embedding is local and can consume
+CPU, memory, and model-server time; it never sends raw source files, only the
+redacted indexed text truncated to about 2k characters.
+
 ## Sync between machines
 
 Point both machines at one shared folder (Syncthing, iCloud, a git repo — anything that moves files):

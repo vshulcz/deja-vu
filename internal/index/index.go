@@ -110,6 +110,7 @@ type Manifest struct {
 	Files            map[string]FileState   `json:"files"`
 	Sessions         map[string]SessionMeta `json:"sessions"`
 	BuiltAt          time.Time              `json:"built_at"`
+	Generation       string                 `json:"generation,omitempty"`
 	Scope            string                 `json:"scope"`
 	Redacted         int                    `json:"redacted"`
 	ExportWatermarks map[string]int64       `json:"export_watermarks,omitempty"`
@@ -124,6 +125,7 @@ type manifestCore struct {
 	Version          int
 	Files            map[string]FileState
 	BuiltAt          time.Time
+	Generation       string
 	Scope            string
 	Redacted         int
 	ExportWatermarks map[string]int64
@@ -143,6 +145,46 @@ type Record struct {
 	Text       string
 	Time       time.Time
 	LowerText  string `json:"-"`
+}
+
+type OffsetRecord struct {
+	Offset int64
+	Record Record
+}
+
+func ReadRecords(dir string) ([]OffsetRecord, error) {
+	var out []OffsetRecord
+	f, err := os.Open(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	for {
+		off, err := f.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+		r, err := readRecord(f)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, OffsetRecord{Offset: off, Record: r})
+	}
+	return out, nil
+}
+
+func Generation(dir string) (string, error) {
+	m, err := readManifest(dir)
+	if err != nil {
+		return "", err
+	}
+	if m.Generation != "" {
+		return m.Generation, nil
+	}
+	return m.BuiltAt.UTC().Format(time.RFC3339Nano), nil
 }
 
 type posting struct {
@@ -436,7 +478,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	}
 	ss := loadProgress(harness, progress)
 	ss = append(ss, imported.sessions...)
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ImportedRecords: imported.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
@@ -613,7 +655,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
 	lastIngestFiles = len(files)
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ImportedRecords: imp.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
@@ -1038,7 +1080,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		_ = rf.Close()
 		return err
 	}
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Scope: scope,
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: old.Generation, Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ImportedRecords: old.ImportedRecords}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
@@ -2220,7 +2262,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Scope: core.Scope, Redacted: core.Redacted, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -2234,7 +2276,7 @@ func readManifest(dir string) (Manifest, error) {
 // leaves the old manifest pointing at old data, and the next run reindexes
 // rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Scope: m.Scope, Redacted: m.Redacted, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
