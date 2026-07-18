@@ -338,6 +338,19 @@ func TestDoctorJSONCWiringFallback(t *testing.T) {
 	}
 }
 
+func TestDoctorGuidanceFileState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "SKILL.md")
+	if doctorFileWired(path) {
+		t.Fatal("missing guidance file reported as present")
+	}
+	if err := os.WriteFile(path, []byte("skill"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !doctorFileWired(path) {
+		t.Fatal("written guidance file reported as missing")
+	}
+}
+
 func TestDoctorDispatchHermetic(t *testing.T) {
 	hermeticEnv(t)
 	old := doctorLookup

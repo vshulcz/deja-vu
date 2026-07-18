@@ -119,6 +119,11 @@
       "name": "qwen",
       "state": "config-missing",
       "path": "<tmp>/home/.qwen/settings.json"
+    },
+    {
+      "name": "copilot",
+      "state": "config-missing",
+      "path": "<tmp>/home/.copilot/skills/deja-history/SKILL.md"
     }
   ],
   "sqlite3": {

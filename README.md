@@ -49,7 +49,7 @@ deja install --all     # MCP recall for every agent it finds on this machine
 deja install --auto    # same, plus session-start auto-recall where supported
 ```
 
-Install also writes user-level guidance: `~/.claude/skills/deja-history/SKILL.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and `~/.config/opencode/AGENTS.md` (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Cursor, Grok, and Antigravity have no documented user-level guidance location and are skipped.
+Install also writes user-level guidance: `~/.claude/skills/deja-history/SKILL.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.gemini/config/skills/deja-history/SKILL.md`, `~/.qwen/QWEN.md`, `~/.copilot/skills/deja-history/SKILL.md`, and `~/.config/opencode/AGENTS.md` (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Cursor and Grok have no documented user-level guidance location and are skipped.
 
 On a terminal, install reports whether it found local history and points to `deja index` when the first index still needs to be built.
 

@@ -19,10 +19,85 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("opencode"); got != filepath.Join(xdg, "opencode", "AGENTS.md") {
 		t.Fatalf("opencode path = %q", got)
 	}
-	for _, harness := range []string{"cursor", "grok", "antigravity"} {
+	if got := guidancePath("antigravity"); got != filepath.Join(home, ".gemini", "config", "skills", "deja-history", "SKILL.md") {
+		t.Fatalf("antigravity path = %q", got)
+	}
+	if got := guidancePath("qwen"); got != filepath.Join(home, ".qwen", "QWEN.md") {
+		t.Fatalf("qwen path = %q", got)
+	}
+	if got := guidancePath("copilot"); got != filepath.Join(home, ".copilot", "skills", "deja-history", "SKILL.md") {
+		t.Fatalf("copilot path = %q", got)
+	}
+	for _, harness := range []string{"cursor", "grok"} {
 		if got := guidancePath(harness); got != "" {
 			t.Fatalf("%s path = %q, want unsupported", harness, got)
 		}
+	}
+}
+
+func TestOwnedGuidanceTargetsAndMarkerBoundaries(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	for _, harness := range []string{"antigravity", "qwen", "copilot"} {
+		r, err := installGuidance(harness, false)
+		if err != nil || r.Action != "created" {
+			t.Fatalf("%s install = %#v, %v", harness, r, err)
+		}
+		if r, err = installGuidance(harness, false); err != nil || r.Action != "unchanged" {
+			t.Fatalf("%s rerun = %#v, %v", harness, r, err)
+		}
+		b, _ := os.ReadFile(guidancePath(harness))
+		if harness != "qwen" && !strings.Contains(string(b), "name: deja-history") {
+			t.Fatalf("%s frontmatter missing: %s", harness, b)
+		}
+	}
+	old := "prose " + guidanceStart + "\nkeep\n" + guidanceEnd + "\n"
+	want := old + "\n" + guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
+	if got := updateGuidanceBlock(old, false); got != want {
+		t.Fatalf("inline markers were replaced: %q", got)
+	}
+	qwen := guidancePath("qwen")
+	if err := os.WriteFile(qwen, []byte("# Personal context\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installGuidance("qwen", false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(qwen)
+	if !strings.Contains(string(b), "# Personal context") {
+		t.Fatalf("qwen context was not preserved: %s", b)
+	}
+	if _, err := installGuidance("qwen", true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(qwen)
+	if strings.Contains(string(b), guidanceStart) || !strings.Contains(string(b), "# Personal context") {
+		t.Fatalf("qwen uninstall changed personal context: %s", b)
+	}
+
+	squat := filepath.Join(home, ".copilot", "skills", "deja-history")
+	if err := os.RemoveAll(filepath.Dir(squat)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(squat), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(squat, []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installGuidance("copilot", false); err == nil {
+		t.Fatal("expected path-squatting error")
+	}
+	if _, err := writeIfChanged(filepath.Join(squat, "SKILL.md"), nil, []byte("skill")); err == nil {
+		t.Fatal("expected atomic write path-squatting error")
+	}
+	entries, err := os.ReadDir(filepath.Dir(squat))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != filepath.Base(squat) {
+		t.Fatalf("temporary file left after failed write: %v", entries)
 	}
 }
 
@@ -137,5 +212,11 @@ func TestInstallGuidanceEdgeBranches(t *testing.T) {
 	}
 	if r, err := installGuidance("claude-code", true); err != nil || r.Action != "unchanged" {
 		t.Fatalf("uninstall with no skill = %#v err=%v", r, err)
+	}
+}
+
+func TestCopilotInstallIsGuidanceOnly(t *testing.T) {
+	if result, err := installTarget("copilot", "/bin/deja", false); err != nil || result.Action != "guidance-only" || result.Path != guidancePath("copilot") {
+		t.Fatalf("copilot MCP install = %#v, %v", result, err)
 	}
 }

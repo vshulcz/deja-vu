@@ -84,7 +84,7 @@ func runInstall(args []string, uninstall bool) error {
 		}
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
-		} else {
+		} else if t != "copilot" {
 			fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
 		}
 	}
@@ -146,14 +146,14 @@ func installIndexHint() string {
 }
 
 func existingTargets() []string {
-	h, _ := os.UserHomeDir()
 	checks := map[string]string{
 		"claude-code": sources.ClaudeConfigDir(),
 		"codex":       sources.CodexHome(),
 		"opencode":    filepath.Join(opencodeConfigHome(), "opencode"),
 		"cursor":      sources.CursorCLIHome(),
 		"gemini":      filepath.Join(sources.GeminiHome(), "settings.json"),
-		"antigravity": filepath.Join(h, ".gemini", "config"),
+		"antigravity": antigravityConfigHome(),
+		"copilot":     filepath.Join(homeDir(), ".copilot"),
 		"grok":        sources.GrokRoot(),
 		"qwen":        sources.QwenConfigDir(),
 	}
@@ -186,11 +186,13 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 	case "antigravity":
-		return installMCPJSON(filepath.Join(homeDir(), ".gemini", "config", "mcp_config.json"), exe, uninstall)
+		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
+	case "copilot":
+		return installResult{Path: guidancePath("copilot"), Action: "guidance-only"}, nil
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -248,7 +250,24 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if err := backupOnce(path); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(path, next, 0o644); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
+	if err != nil {
+		return "", err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if _, err := tmp.Write(next); err != nil {
+		_ = tmp.Close()
+		return "", err
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		_ = tmp.Close()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
 		return "", err
 	}
 	if len(old) == 0 {
@@ -441,6 +460,10 @@ func removeCodexDejaBlock(s string) string {
 func homeDir() string {
 	h, _ := os.UserHomeDir()
 	return h
+}
+
+func antigravityConfigHome() string {
+	return filepath.Join(homeDir(), ".gemini", "config")
 }
 
 // installCursor wires the MCP server into Cursor's global config

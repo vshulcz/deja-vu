@@ -25,6 +25,12 @@ func guidancePath(harness string) string {
 	switch harness {
 	case "claude-code", "claude":
 		return filepath.Join(sources.ClaudeConfigDir(), "skills", "deja-history", "SKILL.md")
+	case "antigravity":
+		return filepath.Join(antigravityConfigHome(), "skills", "deja-history", "SKILL.md")
+	case "copilot":
+		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
+	case "qwen":
+		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
 	case "codex":
 		return filepath.Join(sources.CodexHome(), "AGENTS.md")
 	case "gemini":
@@ -44,8 +50,12 @@ func opencodeConfigHome() string {
 }
 
 func guidanceText(harness string) string {
-	if harness == "claude-code" || harness == "claude" {
-		return "---\nname: deja-history\ndescription: Consult deja MCP history tools when the user refers to past work or previous decisions.\n---\n\n" + guidanceBody + "\n"
+	if harness == "claude-code" || harness == "claude" || harness == "antigravity" || harness == "copilot" {
+		body := guidanceBody
+		if harness == "copilot" {
+			body = "deja does not index Copilot history. It is a consumer: use the deja MCP tools to search memory from the other harnesses.\n\n" + guidanceBody
+		}
+		return "---\nname: deja-history\ndescription: Consult deja MCP history tools when the user refers to past work or previous decisions.\n---\n\n" + body + "\n"
 	}
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
 }
@@ -60,7 +70,7 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	var next []byte
-	if harness == "claude-code" || harness == "claude" {
+	if harness == "claude-code" || harness == "claude" || harness == "antigravity" || harness == "copilot" {
 		if uninstall {
 			if len(old) == 0 {
 				return installResult{Path: path, Action: "unchanged"}, nil
@@ -84,13 +94,9 @@ func updateGuidanceBlock(old string, uninstall bool) string {
 	if strings.Contains(old, "\r\n") {
 		newline = "\r\n"
 	}
-	start := strings.Index(old, guidanceStart)
-	if start >= 0 {
-		end := strings.Index(old[start+len(guidanceStart):], guidanceEnd)
-		if end >= 0 {
-			end += start + len(guidanceStart) + len(guidanceEnd)
-			old = old[:start] + old[end:]
-		}
+	start, end := guidanceMarkerLines(old)
+	if start >= 0 && end >= 0 {
+		old = old[:start] + old[end:]
 	}
 	if uninstall {
 		return old
@@ -100,6 +106,22 @@ func updateGuidanceBlock(old string, uninstall bool) string {
 		old += newline + newline
 	}
 	return old + strings.ReplaceAll(guidanceText("append"), "\n", newline)
+}
+
+func guidanceMarkerLines(s string) (start, end int) {
+	start, end = -1, -1
+	offset := 0
+	for _, line := range strings.SplitAfter(s, "\n") {
+		content := strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
+		if start < 0 && content == guidanceStart {
+			start = offset
+		} else if start >= 0 && content == guidanceEnd {
+			end = offset + len(line)
+			break
+		}
+		offset += len(line)
+	}
+	return start, end
 }
 
 func guidanceHarness(harness string) string {
@@ -128,7 +150,7 @@ func guidanceStatus(harness string) string {
 
 func guidanceResult(harness string, uninstall bool) (installResult, error) {
 	canonical := guidanceHarness(harness)
-	if canonical == "cursor" || canonical == "grok" || canonical == "antigravity" {
+	if canonical == "cursor" || canonical == "grok" {
 		return installResult{}, nil
 	}
 	return installGuidance(canonical, uninstall)

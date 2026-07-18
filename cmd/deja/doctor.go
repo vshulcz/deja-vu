@@ -197,17 +197,22 @@ type doctorMCPConfig struct {
 }
 
 func doctorMCPConfigs() []doctorMCPConfig {
-	h := homeDir()
 	return []doctorMCPConfig{
 		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers")},
 		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired},
 		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp")},
 		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
-		{"antigravity", filepath.Join(h, ".gemini", "config", "mcp_config.json"), doctorJSONWired("mcpServers")},
+		{"antigravity", filepath.Join(antigravityConfigHome(), "mcp_config.json"), doctorJSONWired("mcpServers")},
 		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
 		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers")},
+		{"copilot", guidancePath("copilot"), doctorFileWired},
 	}
+}
+
+func doctorFileWired(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func doctorOpencodeConfigPath() string {
