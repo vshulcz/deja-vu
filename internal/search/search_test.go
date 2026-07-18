@@ -318,7 +318,7 @@ func TestFuzzyMatchingUsesVariants(t *testing.T) {
 		t.Fatal("literal query matcher failed")
 	}
 	hits, err := Run([]model.Session{{ID: "fuzzy", Updated: time.Now(), Messages: []model.Message{{Text: "connection exhausted"}}}}, Options{
-		Query: "conection exhaustd", All: true, FuzzyVariants: map[string][]string{"conection": {"connection"}, "exhaustd": {"exhausted"}},
+		Query: "connecton exhaustd", All: true, FuzzyVariants: map[string][]string{"connecton": {"connection"}, "exhaustd": {"exhausted"}},
 	})
 	if err != nil || len(hits) != 1 || hits[0].Count == 0 {
 		t.Fatalf("fuzzy hits=%#v err=%v", hits, err)

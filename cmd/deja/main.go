@@ -544,7 +544,7 @@ Usage:
 Examples:
   deja "jwt refresh token bug"
   deja '"connection pool exhausted"'
-  deja "conection"  # zero exact results try close spellings
+  deja "exhaustd"  # zero exact results try close spellings
   deja --harness claude --since 30d "panic in indexer"
   deja last 20 --harness codex
   deja last --project api-gateway

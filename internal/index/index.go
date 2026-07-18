@@ -1958,10 +1958,9 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 			}
 		}
 	}
-	if len(phrases) > 0 {
-		// Phrase text is verified from records; its tokens still participate in
-		// the same fuzzy candidate intersection above.
-	}
+	// Phrase text is verified from records; phrase tokens participate in the
+	// same fuzzy candidate intersection above, so phrases need no extra work.
+	_ = phrases
 	return intersectPostingMaps(perToken), variants, nil
 }
 
