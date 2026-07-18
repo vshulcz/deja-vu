@@ -249,11 +249,7 @@ deja bench recall
 deja bench recall --json
 ```
 
-The current lexical run reports recall@5 **1.00**, recall@10 **1.00**, and
-median latency **0.33 ms**; hybrid recall is skipped when no embedding
-endpoint is available. It generates 500 fixed-seed sessions and 50 derived
-queries, then runs them through the normal index and search pipeline; the
-[generator](internal/bench/corpus.go) defines the corpus and relevance.
+The synthetic set is currently saturated by lexical search (recall@5 1.00 at ~0.7 ms median), so it serves as a regression floor for ranking changes rather than a bragging number; CI fails if recall drops. The corpus generator and the relevance labels are ordinary reviewed Go — audit what "relevant" means before trusting any figure, ours included. With a local embedding endpoint up, the same command reports the hybrid column.
 
 ## How it works
 
