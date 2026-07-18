@@ -26,7 +26,15 @@ location. The directory contains:
 - `records.bin`, with redacted message records;
 - `buckets/*.bin`, with token postings into those records;
 - `manifest.gob` and `sessions.gob`, with source file state, session metadata,
-  redaction counts, sync watermarks, and imported-record deduplication keys.
+  redaction counts by rule, sync watermarks, and imported-record deduplication
+  keys.
+
+Privacy control files are primary data, not cache data: the XDG-aware
+`~/.config/deja/tombstones` list prevents forgotten source sessions from being
+re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
+ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A full `forget`
+rebuild replaces the index atomically before the tombstone list is used by the
+next index pass.
 
 Usage events are appended to the sibling file `<index-dir>.usage.jsonl`. This
 sidecar records the kind and time of local search, recall, context, and hook

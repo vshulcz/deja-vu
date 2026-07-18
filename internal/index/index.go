@@ -24,7 +24,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const version = 9
+const version = 10
 const maxIndexedText = 64 * 1024
 
 var bucketMagic = []byte("DJB1")
@@ -113,6 +113,7 @@ type Manifest struct {
 	Generation       string                 `json:"generation,omitempty"`
 	Scope            string                 `json:"scope"`
 	Redacted         int                    `json:"redacted"`
+	RedactionRules   map[string]int         `json:"redaction_rules,omitempty"`
 	ExportWatermarks map[string]int64       `json:"export_watermarks,omitempty"`
 	ImportedRecords  map[string]bool        `json:"imported_records,omitempty"`
 	// RecordsSize is records.bin's byte length when the manifest was committed.
@@ -128,6 +129,7 @@ type manifestCore struct {
 	Generation       string
 	Scope            string
 	Redacted         int
+	RedactionRules   map[string]int
 	ExportWatermarks map[string]int64
 	ImportedRecords  map[string]bool
 	RecordsSize      int64
@@ -136,6 +138,7 @@ type manifestCore struct {
 type RedactionStats struct {
 	Total int
 	Files map[string]int
+	Rules map[string]map[string]int
 }
 
 type Record struct {
@@ -467,6 +470,10 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 }
 
 func rebuild(dir string, harness string, scope string, files map[string]FileState, progress io.Writer) error {
+	return rebuildWithTombstones(dir, harness, scope, files, progress, readTombstones())
+}
+
+func rebuildWithTombstones(dir string, harness string, scope string, files map[string]FileState, progress io.Writer, dead map[string]bool) error {
 	lastIngestFiles = len(files)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
@@ -476,8 +483,9 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
-	ss := loadProgress(harness, progress)
+	ss := sources.FilterSessions(filterTombstonedSet(loadProgress(harness, progress), dead))
 	ss = append(ss, imported.sessions...)
+	ss = filterTombstonedSet(ss, dead)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ImportedRecords: imported.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
@@ -652,9 +660,10 @@ func rebuildForSearch(dir string, o search.Options, scope string, files map[stri
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
-	ss := loadProgress("", progress)
+	ss := sources.FilterSessions(filterTombstoned(loadProgress("", progress)))
 	imported := importedSessions(dir)
 	ss = append(ss, imported.sessions...)
+	ss = filterTombstoned(ss)
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, imported)
 }
 
@@ -953,6 +962,18 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 		return redacted
 	}
 	m.Redacted += n
+	if m.RedactionRules == nil {
+		m.RedactionRules = map[string]int{}
+	}
+	h := harnessForPath(sourcePath)
+	if h == "" {
+		if _, ok := m.Files[sources.OpencodeDB()]; ok {
+			h = "opencode"
+		}
+	}
+	for rule, count := range counts {
+		m.RedactionRules[h+":"+rule] += count
+	}
 	if sourcePath != "" && m.Files != nil {
 		if fs, ok := m.Files[sourcePath]; ok {
 			fs.Redactions += n
@@ -971,6 +992,9 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 }
 
 func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
+	if m.RedactionRules == nil {
+		m.RedactionRules = map[string]int{}
+	}
 	for p, f := range old.Files {
 		if skip[p] || f.Redactions == 0 || m.Files == nil {
 			continue
@@ -983,6 +1007,23 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 		m.Files[p] = cur
 		m.Redacted += f.Redactions
 	}
+	skipHarness := map[string]bool{}
+	for path, skipped := range skip {
+		if !skipped {
+			continue
+		}
+		h := harnessForPath(path)
+		if h == "" && path == sources.OpencodeDB() {
+			h = "opencode"
+		}
+		skipHarness[h] = true
+	}
+	for key, count := range old.RedactionRules {
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) == 2 && !skipHarness[parts[0]] {
+			m.RedactionRules[key] = count
+		}
+	}
 }
 
 func Redactions(dir string) (RedactionStats, error) {
@@ -993,11 +1034,21 @@ func Redactions(dir string) (RedactionStats, error) {
 	if err != nil {
 		return RedactionStats{}, err
 	}
-	out := RedactionStats{Total: m.Redacted, Files: map[string]int{}}
+	out := RedactionStats{Total: m.Redacted, Files: map[string]int{}, Rules: map[string]map[string]int{}}
 	for p, f := range m.Files {
 		if f.Redactions > 0 {
 			out.Files[p] = f.Redactions
 		}
+	}
+	for key, count := range m.RedactionRules {
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if out.Rules[parts[0]] == nil {
+			out.Rules[parts[0]] = map[string]int{}
+		}
+		out.Rules[parts[0]][parts[1]] = count
 	}
 	return out, nil
 }
@@ -1067,7 +1118,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			}
 			continue
 		}
-		replacements = append(replacements, ss...)
+		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
 		files[p] = f
 	}
 	replaceKeys := map[string]bool{}
@@ -1263,6 +1314,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			}
 			continue
 		}
+		ss = sources.FilterSessions(filterTombstoned(ss))
 		filesTouched++
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -2283,7 +2335,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -2297,7 +2349,7 @@ func readManifest(dir string) (Manifest, error) {
 // leaves the old manifest pointing at old data, and the next run reindexes
 // rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}

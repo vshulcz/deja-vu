@@ -117,6 +117,9 @@ func run(args []string) error {
 	if args[0] == "remember" {
 		return runRemember(args[1:])
 	}
+	if args[0] == "forget" {
+		return runForget(args[1:])
+	}
 	if args[0] == "mcp" {
 		return serveMCP(os.Stdin, os.Stdout)
 	}
@@ -534,7 +537,9 @@ func printSources() {
 			size += pathSize(root)
 			redacted += redactionsUnder(redactions, root)
 		}
-		ss := it.load()
+		raw := it.load()
+		ss := sources.FilterSessions(raw)
+		excluded := len(raw) - len(ss)
 		msg := 0
 		for _, s := range ss {
 			msg += len(s.Messages)
@@ -542,6 +547,12 @@ func printSources() {
 		note := ""
 		if it.name == "cursor" && len(sources.CursorDBs()) > 0 && !sources.SQLite3Available() {
 			note = "\t(sqlite3 CLI not found — Cursor IDE sessions unavailable)"
+		}
+		if n := len(sources.ExclusionPatterns()); n > 0 {
+			note += fmt.Sprintf("\texcluded-patterns=%d", n)
+		}
+		if excluded > 0 {
+			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 		}
 		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, len(ss), msg, humanBytes(size), redacted, note)
 	}
@@ -554,7 +565,8 @@ func printSources() {
 		}
 		aiderRedactions += redactions[p]
 	}
-	aiderSessions := sources.LoadAider()
+	rawAiderSessions := sources.LoadAider()
+	aiderSessions := sources.FilterSessions(rawAiderSessions)
 	aiderMessages := 0
 	for _, s := range aiderSessions {
 		aiderMessages += len(s.Messages)
@@ -563,17 +575,91 @@ func printSources() {
 	if roots := os.Getenv("DEJA_AIDER_ROOTS"); roots != "" {
 		aiderLocation += string(os.PathListSeparator) + roots
 	}
-	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d\n", aiderLocation, len(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions)
+	note := ""
+	if n := len(sources.ExclusionPatterns()); n > 0 {
+		note = fmt.Sprintf("\texcluded-patterns=%d", n)
+	}
+	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
+		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
+	}
+	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, len(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
 	}
 	s, m, _ := sources.OpencodeCounts()
-	note := ""
+	note = ""
 	if size > 0 && !sources.SQLite3Available() {
 		note = "\t(sqlite3 CLI not found — opencode sessions unavailable)"
 	}
+	if n := len(sources.ExclusionPatterns()); n > 0 {
+		note += fmt.Sprintf("\texcluded-patterns=%d", n)
+	}
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
+}
+
+func runForget(args []string) error {
+	var o index.ForgetOptions
+	list := false
+	unforget := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--list":
+			list = true
+		case "--dry-run":
+			o.DryRun = true
+		case "--session", "--project", "--before", "--unforget":
+			if i+1 >= len(args) {
+				return fmt.Errorf("forget: %s needs value", args[i])
+			}
+			i++
+			switch args[i-1] {
+			case "--session":
+				o.Session = args[i]
+			case "--project":
+				o.Project = args[i]
+			case "--unforget":
+				unforget = args[i]
+			case "--before":
+				if d, err := parseDur(args[i]); err == nil {
+					o.Before = time.Now().Add(-d)
+				} else if t, e := parseForgetDate(args[i]); e == nil {
+					o.Before = t
+				} else {
+					return fmt.Errorf("forget: invalid before %q", args[i])
+				}
+			}
+		default:
+			return fmt.Errorf("forget: unknown flag %q", args[i])
+		}
+	}
+	if !list && unforget == "" && o.Session == "" && o.Project == "" && o.Before.IsZero() {
+		return fmt.Errorf("forget: selector required")
+	}
+	if list {
+		for _, key := range index.Tombstones() {
+			fmt.Fprintln(os.Stdout, key)
+		}
+		return nil
+	}
+	if unforget != "" {
+		return index.Unforget(unforget)
+	}
+	result, err := index.Forget(index.DefaultDir(), o)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
+	return nil
+}
+
+func parseForgetDate(s string) (time.Time, error) {
+	for _, layout := range []string{time.RFC3339, "2006-01-02", "2006-01-02 15:04:05"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date")
 }
 
 func redactionsUnder(files map[string]int, root string) int {
@@ -627,6 +713,8 @@ Usage:
   deja sync ssh <host> [--pull] [--full]
   deja last [n] [--project name] [--harness name]
   deja sources
+	deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
+	deja forget --list | --unforget <id>
   deja doctor [--json]
   deja warmup
 	deja index [--rebuild]

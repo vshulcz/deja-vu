@@ -27,6 +27,17 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
 
+## Privacy
+
+`deja forget` removes matching sessions from a rebuilt index and records exact
+session tombstones so a later `deja index` cannot restore them from source
+history. Tombstones are stored at `~/.config/deja/tombstones` (or
+`$XDG_CONFIG_HOME/deja/tombstones`); use `--dry-run`, `--list`, or `--unforget`.
+Ingest exclusions are one case-insensitive project pattern per line in
+`~/.config/deja/exclude` (XDG-aware), or comma-separated in
+`DEJA_EXCLUDE_PROJECTS`. `deja stats --redaction` reports redactions by
+harness and rule, along with tombstone and semantic-sidecar facts.
+
 One binary. No models to download, no services to run, nothing leaves your machine unless you sync or share it. (opencode and Cursor IDE indexing shell out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros; Cursor CLI transcripts do not need it.)
 
 ## Install

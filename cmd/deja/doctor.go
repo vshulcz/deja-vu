@@ -272,6 +272,7 @@ func doctorIndex(w io.Writer) {
 	fmt.Fprintln(w, "Index:")
 	dir := index.DefaultDir()
 	fmt.Fprintf(w, "  location %s\n", dir)
+	fmt.Fprintf(w, "  exclusions %d active patterns\n", len(sources.ExclusionPatterns()))
 	if !index.HasManifest(dir) {
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return

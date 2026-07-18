@@ -39,6 +39,13 @@ type statsReport struct {
 	SidecarSize   int64          `json:"sidecar_size,omitempty"`
 }
 
+type redactionReport struct {
+	Total       int                       `json:"total"`
+	ByHarness   map[string]map[string]int `json:"by_harness"`
+	SidecarSize int64                     `json:"sidecar_size,omitempty"`
+	Tombstones  int                       `json:"tombstones"`
+}
+
 type harnessStats struct {
 	Harness  string `json:"harness"`
 	Sessions int    `json:"sessions"`
@@ -79,6 +86,7 @@ func runStats(args []string) error {
 	card := false
 	htmlPath := ""
 	html := false
+	redaction := false
 	var options search.Options
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -94,6 +102,8 @@ func runStats(args []string) error {
 				htmlPath = args[i+1]
 				i++
 			}
+		case "--redaction":
+			redaction = true
 		case "--card":
 			if card {
 				return fmt.Errorf("stats: --card specified twice")
@@ -131,8 +141,14 @@ func runStats(args []string) error {
 	if (jsonOut && card) || (jsonOut && html) || (card && html) {
 		return fmt.Errorf("stats: choose one output")
 	}
+	if redaction && card {
+		return fmt.Errorf("stats: --redaction cannot combine with --card")
+	}
 	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
 		return err
+	}
+	if redaction {
+		return printRedactionReport(jsonOut)
 	}
 	ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, os.Stderr)
 	if err != nil {
@@ -165,6 +181,43 @@ func runStats(args []string) error {
 		return enc.Encode(report)
 	}
 	printStats(os.Stdout, report)
+	return nil
+}
+
+func printRedactionReport(jsonOut bool) error {
+	stats, err := index.RedactionReport(index.DefaultDir())
+	if err != nil {
+		return err
+	}
+	r := redactionReport{Total: stats.Total, ByHarness: stats.Rules, Tombstones: len(index.Tombstones())}
+	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
+		r.SidecarSize = fi.Size()
+	}
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(r)
+	}
+	fmt.Fprintf(os.Stdout, "Redactions\n  Total       %d\n  Tombstones  %d\n", r.Total, r.Tombstones)
+	if r.SidecarSize > 0 {
+		fmt.Fprintf(os.Stdout, "  Sidecar     %s\n", humanBytes(r.SidecarSize))
+	}
+	harnesses := make([]string, 0, len(r.ByHarness))
+	for h := range r.ByHarness {
+		harnesses = append(harnesses, h)
+	}
+	sort.Strings(harnesses)
+	for _, h := range harnesses {
+		fmt.Fprintf(os.Stdout, "  %s\n", h)
+		rules := make([]string, 0, len(r.ByHarness[h]))
+		for rule := range r.ByHarness[h] {
+			rules = append(rules, rule)
+		}
+		sort.Strings(rules)
+		for _, rule := range rules {
+			fmt.Fprintf(os.Stdout, "    %-20s %d\n", rule, r.ByHarness[h][rule])
+		}
+	}
 	return nil
 }
 
