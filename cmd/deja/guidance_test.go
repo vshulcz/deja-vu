@@ -113,3 +113,29 @@ func TestInstallNoGuidanceOptOut(t *testing.T) {
 		t.Fatalf("guidance was written despite opt-out, err=%v", err)
 	}
 }
+
+func TestInstallGuidanceReadFailureSurfaces(t *testing.T) {
+	tmp := hermeticEnv(t)
+	// Squat the skill directory path with a regular file so reading the
+	// skill file fails with a non-NotExist error.
+	skills := filepath.Join(tmp, "home", ".claude", "skills")
+	if err := os.MkdirAll(filepath.Dir(skills), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(skills, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installGuidance("claude-code", false); err == nil {
+		t.Fatal("expected guidance install error when skills path is a file")
+	}
+}
+
+func TestInstallGuidanceEdgeBranches(t *testing.T) {
+	hermeticEnv(t)
+	if r, err := installGuidance("nope", false); err != nil || r.Path != "" {
+		t.Fatalf("unknown harness = %#v err=%v", r, err)
+	}
+	if r, err := installGuidance("claude-code", true); err != nil || r.Action != "unchanged" {
+		t.Fatalf("uninstall with no skill = %#v err=%v", r, err)
+	}
+}

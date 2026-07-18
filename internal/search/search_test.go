@@ -279,6 +279,63 @@ func TestMultiWordSearchRequiresAllTokensAndCountsOccurrences(t *testing.T) {
 	}
 }
 
+func TestQuotedPhrasesRequireContiguousCaseInsensitiveText(t *testing.T) {
+	now := time.Now()
+	ss := []model.Session{
+		{ID: "phrase", Updated: now, Messages: []model.Message{{Text: "Connection POOL exhausted again"}}},
+		{ID: "apart", Updated: now, Messages: []model.Message{{Text: "connection pool was completely exhausted"}}},
+	}
+	hits, err := Run(ss, Options{Query: `"connection pool exhausted"`})
+	if err != nil || len(hits) != 1 || hits[0].Session.ID != "phrase" {
+		t.Fatalf("phrase hits = %#v err=%v", hits, err)
+	}
+	hits, err = Run(ss, Options{Query: `"connection pool exhausted" again`})
+	if err != nil || len(hits) != 1 || hits[0].Session.ID != "phrase" {
+		t.Fatalf("mixed phrase hits = %#v err=%v", hits, err)
+	}
+	if got, _ := Run(ss, Options{Query: `"connection pool`}); len(got) != 2 {
+		t.Fatalf("unbalanced quote should be ordinary terms: %#v", got)
+	}
+}
+
+func TestQuotedPunctuationOnlyIsIgnored(t *testing.T) {
+	terms, phrases := QueryParts(`"---" needle`)
+	if len(phrases) != 0 || len(terms) != 1 || terms[0] != "needle" {
+		t.Fatalf("parts = %#v %#v", terms, phrases)
+	}
+}
+
+func TestFuzzyJSONEnvelope(t *testing.T) {
+	var b bytes.Buffer
+	Print(&b, []Hit{{Count: 1}}, Options{JSON: true, Fuzzy: true})
+	if !strings.Contains(b.String(), `"fuzzy":true`) || !strings.Contains(b.String(), `"hits"`) {
+		t.Fatalf("fuzzy json = %q", b.String())
+	}
+}
+
+func TestFuzzyMatchingUsesVariants(t *testing.T) {
+	if !MatchesQuery("needle", "needle") || MatchesQuery("other", "needle") {
+		t.Fatal("literal query matcher failed")
+	}
+	hits, err := Run([]model.Session{{ID: "fuzzy", Updated: time.Now(), Messages: []model.Message{{Text: "connection exhausted"}}}}, Options{
+		Query: "connecton exhaustd", All: true, FuzzyVariants: map[string][]string{"connecton": {"connection"}, "exhaustd": {"exhausted"}},
+	})
+	if err != nil || len(hits) != 1 || hits[0].Count == 0 {
+		t.Fatalf("fuzzy hits=%#v err=%v", hits, err)
+	}
+}
+
+func BenchmarkPhraseVerification(b *testing.B) {
+	text := strings.Repeat("prefix words ", 200) + "connection pool exhausted" + strings.Repeat(" suffix words", 200)
+	terms, phrases := QueryParts(`"connection pool exhausted"`)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if !MatchesParts(text, terms, phrases, nil) {
+			b.Fatal("phrase did not match")
+		}
+	}
+}
+
 func TestPrintPlainWhenNotTTY(t *testing.T) {
 	now := time.Now()
 	hits := []Hit{{Session: model.Session{ID: "abcdef1234567890", Harness: "opencode", Project: "deja", Updated: now}, Count: 1, Snippets: []string{"hello needle"}}}

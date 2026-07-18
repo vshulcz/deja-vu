@@ -35,6 +35,83 @@ func hermeticIndexEnv(t *testing.T) string {
 	return tmp
 }
 
+func TestPhraseAndFuzzyIndexedSearch(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "fuzzy-index")
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	sessions := []model.Session{{ID: "phrase", Harness: "claude", Project: "p", Updated: base, Messages: []model.Message{{Role: "user", Text: "connection pool exhausted"}}}, {ID: "apart", Harness: "claude", Project: "p", Updated: base, Messages: []model.Message{{Role: "user", Text: "connection pool was exhausted"}}}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, sessions, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	result, err := SearchDetailed(dir, search.Options{Query: `"connection pool exhausted"`, All: true})
+	if err != nil || len(result.Sessions) != 1 || result.Sessions[0].ID != "phrase" {
+		t.Fatalf("phrase result=%#v err=%v", result, err)
+	}
+	result, err = SearchDetailed(dir, search.Options{Query: "exhaustd", All: true})
+	if err != nil || !result.Fuzzy || len(result.Sessions) != 2 {
+		t.Fatalf("fuzzy result=%#v err=%v", result, err)
+	}
+	o := search.Options{Query: "exhaustd", All: true, FuzzyVariants: result.Variants}
+	hits, err := search.Run(result.Sessions, o)
+	if err != nil || len(hits) != 2 || hits[0].Count == 0 {
+		t.Fatalf("fuzzy pipeline hits=%#v err=%v", hits, err)
+	}
+}
+
+func BenchmarkFuzzyTokenEnumeration(b *testing.B) {
+	catalog := make(map[string]bool, 50000)
+	for i := 0; i < 50000; i++ {
+		catalog[fmt.Sprintf("synthetic-token-%05d", i)] = true
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = closeTokens("synthetic-token-12345", catalog)
+	}
+}
+
+func TestFuzzyHelperCapsAndDistanceRules(t *testing.T) {
+	catalog := map[string]bool{"abcdefgh": true, "abcdefgi": true, "abcdxfgh": true, "abcdefghij": true}
+	got := closeTokens("abcdefgh", catalog)
+	if len(got) > 8 || len(got) == 0 || got[0] != "abcdefgh" {
+		t.Fatalf("close tokens=%v", got)
+	}
+	if damerauDistance("abcd", "acbd", 1) != 1 || damerauDistance("abcdefgh", "abcfghxy", 1) <= 1 {
+		t.Fatal("distance cap or transposition is wrong")
+	}
+	if damerauDistance("界界", "界界界", 1) != 1 || abs(-4) != 4 || abs(4) != 4 {
+		t.Fatal("unicode distance helpers failed")
+	}
+	if got := intersectPostingMaps(nil); got != nil {
+		t.Fatalf("empty intersection=%v", got)
+	}
+	empty := t.TempDir()
+	if catalog, err := tokenCatalog(empty); err != nil || len(catalog) != 0 {
+		t.Fatalf("missing catalog=%v err=%v", catalog, err)
+	}
+	if posts, variants, err := fuzzyPostings(empty, []string{"abc"}, nil); err != nil || posts != nil || variants != nil {
+		t.Fatalf("short fuzzy query=%v %v err=%v", posts, variants, err)
+	}
+	if posts, variants, err := fuzzyPostings(empty, []string{"abcd"}, nil); err != nil || posts != nil || variants != nil {
+		t.Fatalf("unmatched fuzzy query=%v %v err=%v", posts, variants, err)
+	}
+	bad := filepath.Join(empty, "buckets")
+	if err := os.MkdirAll(bad, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bad, "aa.bin"), []byte("bad"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tokenCatalog(empty); err == nil {
+		t.Fatal("malformed catalog returned nil error")
+	}
+	if result, err := fuzzySearch(empty, Manifest{}, search.Options{Query: "abc"}); err != nil || result.Fuzzy {
+		t.Fatalf("empty fuzzy search=%#v err=%v", result, err)
+	}
+}
+
 func writeTinyIndex(t *testing.T, dir string) {
 	t.Helper()
 	tmp := dir + ".tmp"
@@ -757,5 +834,89 @@ func TestIndexErrorBranches(t *testing.T) {
 	}
 	if got, err := parseAppendedFile("", filepath.Join(os.Getenv("DEJA_CURSOR_ROOT"), "state.vscdb"), FileState{LastUpdated: time.Now().UnixNano()}); err != nil || got != nil {
 		t.Fatalf("cursor lastupdated parse=%#v err=%v", got, err)
+	}
+}
+
+func TestFuzzySearchFilterAndCatalogErrors(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "fuzzy-edge")
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	sessions := []model.Session{{ID: "one", Harness: "claude", Project: "p", Updated: base, Messages: []model.Message{{Role: "user", Text: "connection pool exhausted"}}}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, sessions, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	// A harness filter that excludes every candidate session must yield an
+	// empty non-fuzzy result, not an error.
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := fuzzySearch(dir, m, search.Options{Query: "exhaustd", Harness: "codex"}); err != nil || result.Fuzzy || len(result.Sessions) != 0 {
+		t.Fatalf("filtered fuzzy = %#v err=%v", result, err)
+	}
+
+	// A bucket entry with a corrupt header surfaces as an error.
+	if err := os.WriteFile(filepath.Join(dir, "buckets", "zz.bin"), []byte("not a bucket"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tokenCatalog(dir); err == nil {
+		t.Fatal("expected tokenCatalog error for squatting directory")
+	}
+	if _, err := fuzzySearch(dir, m, search.Options{Query: "exhaustd"}); err == nil {
+		t.Fatal("expected fuzzySearch to propagate catalog error")
+	}
+
+	// buckets squatted by a regular file: ReadDir fails with a non-NotExist
+	// error that must propagate. Windows maps this to a NotExist-style error,
+	// which tokenCatalog treats as an empty catalog.
+	if runtime.GOOS == "windows" {
+		return
+	}
+	flat := filepath.Join(tmp, "flat-index")
+	if err := os.MkdirAll(flat, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(flat, "buckets"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tokenCatalog(flat); err == nil {
+		t.Fatal("expected tokenCatalog ReadDir error")
+	}
+}
+
+func TestFuzzySearchWithPhraseTokens(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "fuzzy-phrase")
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	sessions := []model.Session{{ID: "one", Harness: "claude", Project: "p", Updated: base, Messages: []model.Message{{Role: "user", Text: "connection pool exhausted"}}}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, sessions, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A quoted phrase alongside a fuzzy token exercises the phrase branch of
+	// the fuzzy candidate collection.
+	result, err := fuzzySearch(dir, m, search.Options{Query: `exhaustd "connection pool"`, All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Fuzzy && len(result.Sessions) != 0 {
+		t.Fatalf("unexpected result %#v", result)
+	}
+
+	// The full SearchDetailed path where postings match but the phrase filter
+	// rejects every record falls through to the fuzzy branch.
+	result, err = SearchDetailed(dir, search.Options{Query: `"pool connection"`, All: true})
+	if err != nil || len(result.Sessions) != 0 {
+		t.Fatalf("reversed phrase result=%#v err=%v", result, err)
 	}
 }

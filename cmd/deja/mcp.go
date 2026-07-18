@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -163,9 +164,13 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
 		return "", 0, err
 	}
-	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, mcpProgress())
+	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), o, mcpProgress())
 	if err != nil {
 		return "", 0, err
+	}
+	ss := result.Sessions
+	if result.Fuzzy {
+		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
@@ -179,6 +184,9 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 	}
 	var b strings.Builder
 	served := 0
+	if result.Fuzzy {
+		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	}
 	fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
 	for i, h := range hits {
 		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1, h.Session.Harness, h.Session.Project, h.Session.ID, h.Count)
@@ -221,9 +229,13 @@ func recallContextResult(q, harness string) (string, int, error) {
 	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
 		return "", 0, err
 	}
-	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, mcpProgress())
+	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), o, mcpProgress())
 	if err != nil {
 		return "", 0, err
+	}
+	ss := result.Sessions
+	if result.Fuzzy {
+		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
@@ -242,4 +254,17 @@ func mcpProgress() io.Writer {
 		return os.Stderr
 	}
 	return io.Discard
+}
+
+func fuzzySummary(variants map[string][]string) []string {
+	var out []string
+	for token, values := range variants {
+		for _, value := range values {
+			if value != token {
+				out = append(out, token+" -> "+value)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
