@@ -73,6 +73,14 @@
         "<tmp>/qwen/projects"
       ],
       "files": 0
+    },
+    {
+      "name": "deja",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.local/share/deja/notes.jsonl"
+      ],
+      "files": 0
     }
   ],
   "index": {

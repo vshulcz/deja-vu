@@ -25,6 +25,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Stats** | `deja stats` — your agent work, wrapped: harnesses, top projects, activity sparkline |
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
+| **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
 
 One binary. No models to download, no services to run, nothing leaves your machine unless you sync or share it. (opencode and Cursor IDE indexing shell out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros; Cursor CLI transcripts do not need it.)
 
@@ -83,6 +84,7 @@ $ deja "jwt refresh token"
 | `deja resume <id> [--exec]` | Reopen a found session in its native harness (`claude --resume`, `codex resume`, `opencode -s`, `grok --resume`). |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
+| `deja remember "text" [--project name]` | Store an explicit fact in the notes source. |
 | `deja warmup` | Build/refresh the index without searching — handy in cron or shell startup. |
 | `deja index [--rebuild]` | Same as warmup; `--rebuild` forces a full rebuild. Cold builds narrate per-harness progress. |
 | `deja update` | Download the latest GitHub release, verify its checksum, and replace the current binary. |
@@ -176,6 +178,7 @@ are indexed locally. Cite what you reuse.
 | `recall` | `query`, `harness?`, `limit?` | Dense matching snippets, ≤4KB — cheap on context. |
 | `recall_context` | `query`, `harness?` | Markdown digest of the best-matching session. |
 | `blame` | `path`, `harness?`, `project?`, `since?`, `limit?` | Sessions that discussed a file, with titles and matched context. |
+| `remember` | `text`, `project?` | Stores a durable decision or conclusion for later recall. |
 
 With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup.
 

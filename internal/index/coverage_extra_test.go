@@ -32,6 +32,7 @@ func hermeticIndexEnv(t *testing.T) string {
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "antigravity"))
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	return tmp
 }
 
@@ -391,6 +392,10 @@ func TestDefaultDirQueriesFiltersAndCorruptBucketBranches(t *testing.T) {
 
 func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
+	notes := os.Getenv("DEJA_NOTES_FILE")
+	if err := os.WriteFile(notes, []byte(`{"ts":"2026-01-02T03:04:05Z","project":"notes-app","text":"first durable note"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	claude := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "proj", "s.jsonl")
 	codexHist := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "history.jsonl")
 	codexRoll := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "01", "02", "rollout-2026-01-02T00-00-00-r.jsonl")
@@ -400,7 +405,7 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 	cursorDB := filepath.Join(os.Getenv("DEJA_CURSOR_ROOT"), "globalStorage", "state.vscdb")
 	cursorTr := filepath.Join(os.Getenv("DEJA_CURSOR_CLI_ROOT"), "projects", "p", "agent-transcripts", "c", "c.jsonl")
 	ag := filepath.Join(os.Getenv("DEJA_ANTIGRAVITY_ROOT"), "brain", "traj", ".system_generated", "logs", "transcript.jsonl")
-	for _, p := range []string{claude, codexHist, codexRoll, aider, gemini, cursorDB, cursorTr, ag, os.Getenv("DEJA_OPENCODE_DB")} {
+	for _, p := range []string{claude, codexHist, codexRoll, aider, gemini, cursorDB, cursorTr, ag, os.Getenv("DEJA_OPENCODE_DB"), notes} {
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -409,7 +414,7 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 		}
 	}
 	files := currentFiles("")
-	for _, p := range []string{claude, codexHist, codexRoll, aider, gemini, cursorDB, cursorTr, ag, os.Getenv("DEJA_OPENCODE_DB")} {
+	for _, p := range []string{claude, codexHist, codexRoll, aider, gemini, cursorDB, cursorTr, ag, os.Getenv("DEJA_OPENCODE_DB"), notes} {
 		if _, ok := files[p]; !ok {
 			t.Fatalf("currentFiles missing %s in %#v", p, files)
 		}
@@ -439,6 +444,37 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 	}
 	if _, err := scanRecords(filepath.Join(tmp, "missing-index"), Manifest{}, search.Options{}, nil); err == nil {
 		t.Fatal("scanRecords missing records returned nil")
+	}
+}
+
+func TestNotesIncrementalIndex(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	notes := os.Getenv("DEJA_NOTES_FILE")
+	if err := os.WriteFile(notes, []byte(`{"ts":"2026-01-02T03:04:05Z","project":"notes-app","text":"first durable note"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "notes-index")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	var progress strings.Builder
+	if got := loadProgress("deja", &progress); len(got) != 1 || !strings.Contains(progress.String(), "notes") {
+		t.Fatalf("notes loader=%#v progress=%q", got, progress.String())
+	}
+	if got, err := Search(dir, search.Options{Query: "first", All: true}); err != nil || len(got) != 1 || got[0].Harness != "deja" {
+		t.Fatalf("first note=%#v err=%v", got, err)
+	}
+	f, err := os.OpenFile(notes, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString(`{"ts":"2026-01-02T04:04:05Z","project":"notes-app","text":"second durable note"}` + "\n")
+	_ = f.Close()
+	if err := EnsureForSearch(dir, search.Options{All: true}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Search(dir, search.Options{Query: "second", All: true}); err != nil || len(got) != 1 {
+		t.Fatalf("second note=%#v err=%v", got, err)
 	}
 }
 

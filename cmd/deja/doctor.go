@@ -126,6 +126,7 @@ func doctorHarnesses(w io.Writer) {
 
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
 	printRow("qwen", qwenRoot, doctorExists(qwenRoot), doctorCount(len(sources.QwenSessionFiles()), "file"))
+	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
 }
 
 func doctorSQLiteDetail(db string, sqlite bool) string {
