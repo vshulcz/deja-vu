@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -84,6 +85,11 @@ func handleMCP(req rpcRequest) (any, int, string) {
 				"description": "Return a markdown digest (~8KB) of the best prior session. Call before debugging or re-implementing; query with an error string, function name, or flag. Optionally filter by harness (claude, codex, opencode, aider, gemini, cursor, antigravity, grok, qwen).",
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
 			},
+			{
+				"name":        "blame",
+				"description": "Before changing a file, see why it is the way it is. Find prior sessions that discussed a path, with the most specific mentions first.",
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string", "description": "Absolute, relative, or bare filename."}, "harness": map[string]any{"type": "string"}, "project": map[string]any{"type": "string"}, "since": map[string]any{"type": "string", "description": "Age such as 30d or 24h."}, "limit": map[string]any{"type": "number"}, "all": map[string]any{"type": "boolean"}}, "required": []string{"path"}},
+			},
 		}}, 0, ""
 	case "tools/call":
 		var p struct {
@@ -146,9 +152,52 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 			usage.RecordResult(index.DefaultDir(), usage.KindContext, len(text), sessions, sessions == 0)
 		}
 		return text, err
+	case "blame":
+		var a struct {
+			Path    string `json:"path"`
+			Harness string `json:"harness"`
+			Project string `json:"project"`
+			Since   string `json:"since"`
+			Limit   int    `json:"limit"`
+			All     bool   `json:"all"`
+		}
+		if err := json.Unmarshal(raw, &a); err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(a.Path) == "" {
+			return "", fmt.Errorf("path required")
+		}
+		var since time.Duration
+		if a.Since != "" {
+			var err error
+			since, err = parseDur(a.Since)
+			if err != nil {
+				return "", err
+			}
+		}
+		return blameTextResult(search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, a.Limit)
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
 	}
+}
+
+func blameTextResult(o search.BlameOptions, path string, limit int) (string, error) {
+	target, err := search.ResolveBlamePath(path)
+	if err != nil {
+		return "", err
+	}
+	hits, err := findBlameHits(target, o, mcpProgress())
+	if err != nil {
+		return "", err
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if !o.All && len(hits) > limit {
+		hits = hits[:limit]
+	}
+	b, err := json.Marshal(hits)
+	return string(b), err
 }
 
 func recallText(q, harness string, limit, budget int) (string, error) {

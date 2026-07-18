@@ -74,6 +74,7 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <query>` | Search all histories. Multi-word = AND, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; a zero-result query also tries close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
+| `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
@@ -113,6 +114,12 @@ Context piping without MCP:
 
 ```sh
 claude "Prior context: $(deja ctx 'database migration')"
+```
+
+Before changing a file, inspect its history:
+
+```sh
+deja blame cmd/deja/main.go
 ```
 
 ## Semantic recall (optional)
@@ -168,6 +175,7 @@ are indexed locally. Cite what you reuse.
 | --- | --- | --- |
 | `recall` | `query`, `harness?`, `limit?` | Dense matching snippets, ≤4KB — cheap on context. |
 | `recall_context` | `query`, `harness?` | Markdown digest of the best-matching session. |
+| `blame` | `path`, `harness?`, `project?`, `since?`, `limit?` | Sessions that discussed a file, with titles and matched context. |
 
 With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup.
 

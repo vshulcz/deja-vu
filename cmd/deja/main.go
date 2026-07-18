@@ -187,6 +187,9 @@ func run(args []string) error {
 		search.PrintContext(os.Stdout, hits[0].Session, q)
 		return nil
 	}
+	if args[0] == "blame" {
+		return runBlame(args[1:])
+	}
 	if args[0] == "last" {
 		n, o, err := parseLast(args[1:])
 		if err != nil {
@@ -408,6 +411,87 @@ func parseSearch(args []string) (search.Options, error) {
 	}
 	return o, nil
 }
+
+func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
+	o := search.BlameOptions{}
+	jsonOutput := false
+	var path string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch a {
+		case "--json":
+			jsonOutput = true
+		case "--all":
+			o.All = true
+		case "--harness", "--project", "--since":
+			if i+1 >= len(args) {
+				return "", o, false, fmt.Errorf("%s needs value", a)
+			}
+			i++
+			switch a {
+			case "--harness":
+				o.Harness = args[i]
+			case "--project":
+				o.Project = args[i]
+			case "--since":
+				d, err := parseDur(args[i])
+				if err != nil {
+					return "", o, false, err
+				}
+				o.Since = d
+			}
+		default:
+			if strings.HasPrefix(a, "-") {
+				return "", o, false, fmt.Errorf("blame: unknown flag %q", a)
+			}
+			if path != "" {
+				return "", o, false, fmt.Errorf("blame accepts one path")
+			}
+			path = a
+		}
+	}
+	if path == "" {
+		return "", o, false, fmt.Errorf("blame needs path")
+	}
+	return path, o, jsonOutput, nil
+}
+
+func runBlame(args []string) error {
+	path, o, jsonOutput, err := parseBlame(args)
+	if err != nil {
+		return err
+	}
+	target, err := search.ResolveBlamePath(path)
+	if err != nil {
+		return err
+	}
+	hits, err := findBlameHits(target, o, os.Stderr)
+	if err != nil {
+		return fmt.Errorf("blame search: %w", err)
+	}
+	if jsonOutput {
+		search.PrintBlame(os.Stdout, hits, true)
+		return nil
+	}
+	if len(hits) == 0 {
+		fmt.Fprintf(os.Stderr, "deja: no sessions mention %s; run deja index if the index is stale\n", target.Base)
+		return nil
+	}
+	search.PrintBlame(os.Stdout, hits, false)
+	return nil
+}
+
+func findBlameHits(target search.BlameTarget, o search.BlameOptions, progress io.Writer) ([]search.BlameHit, error) {
+	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
+	if err := index.EnsureForSearch(index.DefaultDir(), query, false, progress); err != nil {
+		return nil, err
+	}
+	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), query, progress)
+	if err != nil {
+		return nil, err
+	}
+	return search.Blame(result.Sessions, target, o), nil
+}
 func parseDur(s string) (time.Duration, error) {
 	if strings.HasSuffix(s, "d") {
 		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
@@ -533,6 +617,7 @@ Usage:
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
   deja ctx <query|id-prefix>
+  deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]

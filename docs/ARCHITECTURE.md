@@ -57,6 +57,11 @@ scoring. `--role` is applied while reading candidate records.
 
 Regex search scans records because arbitrary regex cannot use token postings safely.
 
+`deja blame` retrieves candidates using the basename stem through the existing token
+postings, then verifies the basename as a path component or standalone word in the
+candidate text. Full and longer suffix path mentions outrank bare basenames; mention
+counts are blended with recency and an absolute project-root match receives a boost.
+
 ## Sync format
 
 `deja sync export <dir>` reads `records.bin` and writes JSONL batch files named `deja-sync-<source-hash>-<timestamp>.jsonl`. Each line is one object:
