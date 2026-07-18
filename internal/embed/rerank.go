@@ -32,9 +32,18 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 			min = h.Score
 		}
 	}
+	// Only candidate sessions need a similarity; skipping the rest keeps the
+	// pass proportional to the result page, not the corpus.
+	wanted := make(map[string]bool, limit)
+	for _, h := range hits[:limit] {
+		wanted[h.Session.Harness+":"+h.Session.ID] = true
+	}
 	cosines := make(map[string]float64)
 	seen := make(map[string]bool)
 	for _, v := range sidecar.Vectors {
+		if !wanted[v.Key] {
+			continue
+		}
 		c := Cosine(q[0], v.Values)
 		if !seen[v.Key] || c > cosines[v.Key] {
 			cosines[v.Key], seen[v.Key] = c, true
