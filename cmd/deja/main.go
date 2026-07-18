@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -223,9 +224,15 @@ func run(args []string) error {
 		return fmt.Errorf("ensure: %w", err)
 	}
 	maybeFirstIndexGreeting()
-	ss, err := index.SearchWithRecovery(index.DefaultDir(), o, os.Stderr)
+	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
+	}
+	ss := result.Sessions
+	if result.Fuzzy {
+		printFuzzy(os.Stderr, result.Variants)
+		o.Fuzzy = true
+		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
@@ -240,6 +247,21 @@ func run(args []string) error {
 
 func printNoMatches(w io.Writer, q string, n int) {
 	fmt.Fprintf(w, "deja: no matches for %q (searched %d sessions across claude/codex/opencode/aider/gemini/cursor/antigravity/grok/qwen) — try fewer words or --re\n", q, n)
+}
+
+func printFuzzy(w io.Writer, variants map[string][]string) {
+	keys := make([]string, 0, len(variants))
+	for token := range variants {
+		keys = append(keys, token)
+	}
+	sort.Strings(keys)
+	for _, token := range keys {
+		for _, variant := range variants[token] {
+			if variant != token {
+				fmt.Fprintf(w, "deja: no exact match, trying close spellings: %s -> %s\n", token, variant)
+			}
+		}
+	}
 }
 
 func findByPrefix(p string) (model.Session, bool, error) {
@@ -521,6 +543,8 @@ Usage:
 
 Examples:
   deja "jwt refresh token bug"
+  deja '"connection pool exhausted"'
+  deja "conection"  # zero exact results try close spellings
   deja --harness claude --since 30d "panic in indexer"
   deja last 20 --harness codex
   deja last --project api-gateway

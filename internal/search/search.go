@@ -31,7 +31,8 @@ type Options struct {
 	Regex                  bool
 	Harness, Project, Role string
 	Since                  time.Duration
-	All, JSON              bool
+	All, JSON, Fuzzy       bool
+	FuzzyVariants          map[string][]string `json:"-"`
 }
 type Hit struct {
 	Session  model.Session `json:"session"`
@@ -56,7 +57,7 @@ type bm25Document struct {
 func Run(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
 	qlow := strings.ToLower(o.Query)
-	qtoks := queryTokens(o.Query)
+	qtoks, phrases := QueryParts(o.Query)
 	if o.Regex {
 		var err error
 		re, err = regexp.Compile("(?i)" + o.Query)
@@ -97,9 +98,21 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 				c = len(re.FindAllStringIndex(m.Text, -1))
 			} else {
 				low := strings.ToLower(m.Text)
-				c = countAllTokens(low, qtoks)
-				if len(qtoks) == 1 && c == 0 && strings.Contains(low, qlow) {
-					c = strings.Count(low, qlow)
+				if !MatchesParts(m.Text, qtoks, phrases, o.FuzzyVariants) {
+					c = 0
+				} else if len(qtoks) <= 1 && len(phrases) == 0 && o.FuzzyVariants == nil {
+					if strings.Contains(low, qlow) {
+						c = strings.Count(low, qlow)
+					}
+				} else {
+					if o.FuzzyVariants != nil {
+						c = countAllVariants(low, qtoks, o.FuzzyVariants)
+					} else {
+						c = countAllTokens(low, qtoks)
+					}
+					for _, phrase := range phrases {
+						c += strings.Count(low, phrase)
+					}
 				}
 			}
 			if c > 0 {
@@ -248,7 +261,14 @@ func mergeSessions(in []model.Session) []model.Session {
 
 func Print(w io.Writer, hits []Hit, o Options) {
 	if o.JSON {
-		_ = json.NewEncoder(w).Encode(hits)
+		if o.Fuzzy {
+			_ = json.NewEncoder(w).Encode(struct {
+				Hits  []Hit `json:"hits"`
+				Fuzzy bool  `json:"fuzzy"`
+			}{hits, true})
+		} else {
+			_ = json.NewEncoder(w).Encode(hits)
+		}
 		return
 	}
 	color := colorOK(w)
@@ -399,6 +419,21 @@ func countAllTokens(low string, toks []string) int {
 			return 0
 		}
 		total += c
+	}
+	return total
+}
+
+func countAllVariants(low string, toks []string, variants map[string][]string) int {
+	total := 0
+	for _, tok := range toks {
+		count := strings.Count(low, tok)
+		for _, variant := range variants[tok] {
+			count += strings.Count(low, variant)
+		}
+		if count == 0 {
+			return 0
+		}
+		total += count
 	}
 	return total
 }

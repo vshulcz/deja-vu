@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -149,6 +150,12 @@ type posting struct {
 	Sid uint32
 }
 
+type SearchResult struct {
+	Sessions []model.Session
+	Fuzzy    bool
+	Variants map[string][]string
+}
+
 func DefaultDir() string {
 	if v := os.Getenv("DEJA_INDEX_DIR"); v != "" {
 		return v
@@ -202,20 +209,25 @@ func EnsureForSearch(dir string, o search.Options, force bool, progress io.Write
 }
 
 func Search(dir string, o search.Options) ([]model.Session, error) {
+	r, err := SearchDetailed(dir, o)
+	return r.Sessions, err
+}
+
+func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	unlock, err := lockDir(dir)
 	if err != nil {
-		return nil, err
+		return SearchResult{}, err
 	}
 	defer unlock()
 	m, err := readManifest(dir)
 	if err != nil {
-		return nil, fmt.Errorf("manifest: %w", err)
+		return SearchResult{}, fmt.Errorf("manifest: %w", err)
 	}
 	if !recordsIntact(dir, m) {
-		return nil, fmt.Errorf("%w: records.bin truncated", errCorruptIndex)
+		return SearchResult{}, fmt.Errorf("%w: records.bin truncated", errCorruptIndex)
 	}
 	var posts []posting
 	usedPostings := false
@@ -224,7 +236,7 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 			usedPostings = true
 			posts, err = intersectPostings(dir, retrievalKeys(keys))
 			if err != nil {
-				return nil, fmt.Errorf("postings: %w", err)
+				return SearchResult{}, fmt.Errorf("postings: %w", err)
 			}
 			if len(posts) == 0 {
 				// grep expectation: "code" should find "opencode". Expand each query
@@ -232,39 +244,58 @@ func Search(dir string, o search.Options) ([]model.Session, error) {
 				// no record scan), then intersect.
 				posts, err = intersectSubstringPostings(dir, tokens(o.Query))
 				if err != nil {
-					return nil, fmt.Errorf("substr postings: %w", err)
+					return SearchResult{}, fmt.Errorf("substr postings: %w", err)
 				}
 			}
 		}
 	}
 	if len(posts) == 0 {
 		if usedPostings {
-			return nil, nil
+			if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
+				return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
+			} else if result.Fuzzy {
+				return result, nil
+			}
+			return SearchResult{}, nil
 		}
-		return scanRecords(dir, m, o, nil)
+		ss, err := scanRecords(dir, m, o, nil)
+		return SearchResult{Sessions: ss}, err
 	}
 	posts = cutPostingsBySession(posts, m, o)
 	if len(posts) == 0 {
-		return nil, nil
+		return SearchResult{}, nil
 	}
-	return scanRecords(dir, m, o, postingOffsets(posts))
+	ss, err := scanRecords(dir, m, o, postingOffsets(posts))
+	if err == nil && len(ss) == 0 {
+		if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
+			return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
+		} else if result.Fuzzy {
+			return result, nil
+		}
+	}
+	return SearchResult{Sessions: ss}, err
 }
 
 // SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
 // mid-append) triggers one full rebuild instead of erroring until the user
 // runs --rebuild by hand.
 func SearchWithRecovery(dir string, o search.Options, progress io.Writer) ([]model.Session, error) {
-	ss, err := Search(dir, o)
+	r, err := SearchWithRecoveryDetailed(dir, o, progress)
+	return r.Sessions, err
+}
+
+func SearchWithRecoveryDetailed(dir string, o search.Options, progress io.Writer) (SearchResult, error) {
+	r, err := SearchDetailed(dir, o)
 	if err == nil || !IsCorrupt(err) {
-		return ss, err
+		return r, err
 	}
 	if progress != nil {
 		fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
 	}
 	if rerr := EnsureForSearch(dir, o, true, progress); rerr != nil {
-		return nil, rerr
+		return SearchResult{}, rerr
 	}
-	return Search(dir, o)
+	return SearchDetailed(dir, o)
 }
 
 func Recent(dir string, n int) ([]model.Session, error) {
@@ -1506,6 +1537,10 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 }
 
 func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]model.Session, error) {
+	return scanRecordsWithVariants(dir, m, o, offsets, nil)
+}
+
+func scanRecordsWithVariants(dir string, m Manifest, o search.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	add := func(r Record) {
 		meta, ok := m.Sessions[r.Key]
@@ -1540,12 +1575,16 @@ func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]m
 		defer func() { _ = f.Close() }()
 		offsets = sortedUniqueOffsets(offsets)
 		for _, off := range offsets {
-			if r, err := readRecordAt(f, off); err == nil && recordMatchesQuery(r, o) {
+			if r, err := readRecordAt(f, off); err == nil && recordMatchesQueryVariants(r, o, variants) {
 				add(r)
 			}
 		}
 	} else {
-		if err := eachRecord(filepath.Join(dir, "records.bin"), add); err != nil {
+		if err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+			if recordMatchesQueryVariants(r, o, variants) {
+				add(r)
+			}
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -1892,6 +1931,203 @@ func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
 	return out, nil
 }
 
+func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
+	if !hasFuzzyToken(terms) {
+		return nil, nil, nil
+	}
+	catalog, err := tokenCatalog(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	perToken := make([]map[int64]posting, len(terms))
+	variants := map[string][]string{}
+	for i, term := range terms {
+		matches := closeTokens(term, catalog)
+		if len(matches) == 0 {
+			return nil, nil, nil
+		}
+		variants[term] = matches
+		perToken[i] = map[int64]posting{}
+		for _, variant := range matches {
+			posts, err := postingsFor(dir, "t"+variant)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, p := range posts {
+				perToken[i][p.Off] = p
+			}
+		}
+	}
+	if len(phrases) > 0 {
+		// Phrase text is verified from records; its tokens still participate in
+		// the same fuzzy candidate intersection above.
+	}
+	return intersectPostingMaps(perToken), variants, nil
+}
+
+func fuzzySearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
+	terms, phrases := search.QueryParts(o.Query)
+	posts, variants, err := fuzzyPostings(dir, terms, phrases)
+	if err != nil || len(posts) == 0 {
+		return SearchResult{}, err
+	}
+	posts = cutPostingsBySession(posts, m, o)
+	if len(posts) == 0 {
+		return SearchResult{}, nil
+	}
+	ss, err := scanRecordsWithVariants(dir, m, o, postingOffsets(posts), variants)
+	if err != nil || len(ss) == 0 {
+		return SearchResult{}, err
+	}
+	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants}, nil
+}
+
+func hasFuzzyToken(terms []string) bool {
+	for _, term := range terms {
+		if len([]rune(term)) >= 4 {
+			return true
+		}
+	}
+	return false
+}
+
+func tokenCatalog(dir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(filepath.Join(dir, "buckets"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]bool{}, nil
+		}
+		return nil, err
+	}
+	catalog := map[string]bool{}
+	for _, de := range entries {
+		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+			continue
+		}
+		header, f, err := openBucketDir(filepath.Join(dir, "buckets", de.Name()))
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range header {
+			catalog[strings.TrimPrefix(entry.tok, "t")] = true
+		}
+		_ = f.Close()
+	}
+	return catalog, nil
+}
+
+func closeTokens(query string, catalog map[string]bool) []string {
+	type match struct {
+		token    string
+		distance int
+	}
+	var matches []match
+	limit := 1
+	if len([]rune(query)) >= 8 {
+		limit = 2
+	}
+	for token := range catalog {
+		d := damerauDistance(query, token, limit)
+		if d <= limit {
+			matches = append(matches, match{token: token, distance: d})
+		}
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].distance == matches[j].distance {
+			return matches[i].token < matches[j].token
+		}
+		return matches[i].distance < matches[j].distance
+	})
+	if len(matches) > 8 {
+		matches = matches[:8]
+	}
+	out := make([]string, len(matches))
+	for i, m := range matches {
+		out[i] = m.token
+	}
+	return out
+}
+
+func damerauDistance(a, b string, max int) int {
+	if len(a) <= 64 && len(b) <= 64 && utf8.ValidString(a) && utf8.ValidString(b) && utf8.RuneCountInString(a) == len(a) && utf8.RuneCountInString(b) == len(b) {
+		var prev, prevPrev, cur [65]int
+		for j := 0; j <= len(b); j++ {
+			prev[j] = j
+		}
+		for i := 1; i <= len(a); i++ {
+			cur[0] = i
+			for j := 1; j <= len(b); j++ {
+				cost := 0
+				if a[i-1] != b[j-1] {
+					cost = 1
+				}
+				cur[j] = min(cur[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
+				if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+					cur[j] = min(cur[j], prevPrev[j-2]+1)
+				}
+			}
+			prevPrev, prev, cur = prev, cur, prevPrev
+		}
+		return prev[len(b)]
+	}
+	return damerauDistanceRunes(a, b, max)
+}
+
+func damerauDistanceRunes(a, b string, max int) int {
+	ar, br := []rune(a), []rune(b)
+	if abs(len(ar)-len(br)) > max {
+		return max + 1
+	}
+	prev := make([]int, len(br)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	prevPrev := append([]int(nil), prev...)
+	for i := 1; i <= len(ar); i++ {
+		cur := make([]int, len(br)+1)
+		cur[0] = i
+		for j := 1; j <= len(br); j++ {
+			cost := 0
+			if ar[i-1] != br[j-1] {
+				cost = 1
+			}
+			cur[j] = min(cur[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
+			if i > 1 && j > 1 && ar[i-1] == br[j-2] && ar[i-2] == br[j-1] {
+				cur[j] = min(cur[j], prevPrev[j-2]+1)
+			}
+		}
+		prevPrev, prev = prev, cur
+	}
+	return prev[len(br)]
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+func intersectPostingMaps(sets []map[int64]posting) []posting {
+	if len(sets) == 0 {
+		return nil
+	}
+	set := sets[0]
+	for _, next := range sets[1:] {
+		for off := range set {
+			if _, ok := next[off]; !ok {
+				delete(set, off)
+			}
+		}
+	}
+	out := make([]posting, 0, len(set))
+	for _, p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
+}
+
 func tokens(s string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -1949,20 +2185,18 @@ func queryKeys(s string) []string {
 }
 
 func recordMatchesQuery(r Record, o search.Options) bool {
+	return recordMatchesQueryVariants(r, o, nil)
+}
+
+func recordMatchesQueryVariants(r Record, o search.Options, variants map[string][]string) bool {
 	if o.Regex {
 		return true
 	}
-	toks := tokens(o.Query)
-	if len(toks) == 0 {
+	terms, phrases := search.QueryParts(o.Query)
+	if len(terms) == 0 && len(phrases) == 0 {
 		return true
 	}
-	text := strings.ToLower(r.Text)
-	for _, tok := range toks {
-		if !strings.Contains(text, tok) {
-			return false
-		}
-	}
-	return true
+	return search.MatchesParts(r.Text, terms, phrases, variants)
 }
 
 func bucket(tok string) string {

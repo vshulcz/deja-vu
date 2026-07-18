@@ -378,6 +378,22 @@ func TestParseSearchAndSmallHelpers(t *testing.T) {
 	}
 }
 
+func TestFuzzyOutputIsDeterministic(t *testing.T) {
+	var b strings.Builder
+	printFuzzy(&b, map[string][]string{"zebra": {"zebar"}, "alpha": {"alpha", "alphi"}})
+	if got, want := b.String(), "deja: no exact match, trying close spellings: alpha -> alphi\n"+"deja: no exact match, trying close spellings: zebra -> zebar\n"; got != want {
+		t.Fatalf("fuzzy output=%q want=%q", got, want)
+	}
+	if got := fuzzySummary(map[string][]string{"b": {"a"}, "a": {"a", "c"}}); strings.Join(got, ",") != "a -> c,b -> a" {
+		t.Fatalf("fuzzy summary=%v", got)
+	}
+	var empty strings.Builder
+	printFuzzy(&empty, nil)
+	if empty.Len() != 0 || fuzzySummary(nil) != nil {
+		t.Fatal("empty fuzzy output was not empty")
+	}
+}
+
 func TestPrintNoMatchesHelpfulMessage(t *testing.T) {
 	var b bytes.Buffer
 	printNoMatches(&b, "jwt refresh token", 3)

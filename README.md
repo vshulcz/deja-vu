@@ -72,7 +72,7 @@ $ deja "jwt refresh token"
 
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search all histories. Multi-word = AND, substrings match (`code` finds `opencode`). `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
+| `deja <query>` | Search all histories. Multi-word = AND, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; a zero-result query also tries close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
