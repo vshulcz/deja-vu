@@ -44,11 +44,16 @@ Search flow:
 1. Tokenize the query.
 2. Read posting lists from the token buckets.
 3. Intersect posting lists for multi-word searches.
-4. Aggregate posting counts per session and pre-rank by count × recency using session metadata.
-5. Read matching records from `records.bin` only for the top sessions (`--all` keeps all candidates).
-6. Group records back into sessions and rank in `internal/search`.
+4. Filter postings by session metadata and read every matching candidate record.
+5. Group records back into sessions and score them in `internal/search` with BM25
+   (`k1=1.2`, `b=0.75`). Document frequency and document length are measured
+   over the candidate records at search time. User-message term contributions
+   receive a 1.3 multiplier, and the score is multiplied by `1/(1+age_days)`.
+6. Sort by score, then updated time descending, then session ID ascending; the
+   normal result limit is applied after ranking.
 
-`--harness`, `--project`, and `--since` are applied during pre-rank from session metadata. `--role` needs record data, so it is applied after the pre-rank cut; pre-rank counts may include other roles.
+`--harness`, `--project`, and `--since` are applied from session metadata before
+scoring. `--role` is applied while reading candidate records.
 
 Regex search scans records because arbitrary regex cannot use token postings safely.
 

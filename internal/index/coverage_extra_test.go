@@ -268,8 +268,8 @@ func TestDefaultDirQueriesFiltersAndCorruptBucketBranches(t *testing.T) {
 		many = append(many, posting{Off: int64(i), Sid: uint32(i)})
 		manyManifest.Sessions[fmt.Sprintf("h:%d", i)] = SessionMeta{ID: fmt.Sprint(i), Harness: "h", Project: "p", Ord: uint32(i), Updated: time.Now().Add(time.Duration(i) * time.Second)}
 	}
-	if got := cutPostingsBySession(many, manyManifest, search.Options{}); len(got) != 15 {
-		t.Fatalf("top15 cut len=%d", len(got))
+	if got := cutPostingsBySession(many, manyManifest, search.Options{}); len(got) != 20 {
+		t.Fatalf("candidate cut len=%d", len(got))
 	}
 
 	for name, data := range map[string][]byte{

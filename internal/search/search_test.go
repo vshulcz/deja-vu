@@ -3,6 +3,7 @@ package search
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -29,6 +30,77 @@ func TestSearchRanksAndFilters(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].Session.ID != "b" {
 		t.Fatalf("bad filter: %#v", hits)
+	}
+}
+
+func TestRunBM25Signals(t *testing.T) {
+	now := time.Now()
+	session := func(id, role, text string, updated time.Time) model.Session {
+		return model.Session{ID: id, Harness: "claude", Project: "p", Updated: updated, Messages: []model.Message{{Role: role, Text: text}}}
+	}
+	tests := []struct {
+		name  string
+		query string
+		ss    []model.Session
+		want  string
+	}{
+		{"term frequency", "needle", []model.Session{
+			session("padding", "user", "needle "+strings.Repeat("padding ", 100), now),
+			session("frequency", "user", "needle needle needle", now),
+		}, "frequency"},
+		{"rare term", "common rare", []model.Session{
+			session("common", "user", "common rare common common", now),
+			session("rare", "user", "common rare", now),
+			session("noise", "user", "common common", now),
+		}, "rare"},
+		{"user role", "needle", []model.Session{
+			session("assistant", "assistant", "needle", now),
+			session("user", "user", "needle", now),
+		}, "user"},
+		{"recency", "needle", []model.Session{
+			session("new", "user", "needle", now),
+			session("old", "user", "needle", now.Add(-24*time.Hour)),
+		}, "new"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hits, err := Run(tc.ss, Options{Query: tc.query, All: true})
+			if err != nil || len(hits) < 2 || hits[0].Session.ID != tc.want {
+				t.Fatalf("hits=%#v err=%v", hits, err)
+			}
+		})
+	}
+}
+
+func TestRunBM25DeterministicIDTieBreak(t *testing.T) {
+	when := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	ss := []model.Session{
+		{ID: "z", Updated: when, Messages: []model.Message{{Role: "user", Text: "needle"}}},
+		{ID: "a", Updated: when, Messages: []model.Message{{Role: "user", Text: "needle"}}},
+	}
+	for i := 0; i < 5; i++ {
+		hits, err := Run(ss, Options{Query: "needle", All: true})
+		if err != nil || len(hits) != 2 || hits[0].Session.ID != "a" || hits[1].Session.ID != "z" {
+			t.Fatalf("iteration %d hits=%#v err=%v", i, hits, err)
+		}
+	}
+}
+
+func TestBM25HelperSignals(t *testing.T) {
+	now := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	if got := freshnessDecay(time.Time{}, now); got != 0 {
+		t.Fatalf("zero decay=%v", got)
+	}
+	if got := freshnessDecay(now.Add(time.Hour), now); got != 1 {
+		t.Fatalf("future decay=%v", got)
+	}
+	if got := freshnessDecay(now.Add(-24*time.Hour), now); got != 0.5 {
+		t.Fatalf("one-day decay=%v", got)
+	}
+	counts := make([]int, 2)
+	userCounts := make([]int, 2)
+	if got := countDocumentWords("one needle, needle-two", []string{"needle", "needle-two"}, counts, userCounts, true); got != 3 || counts[0] != 1 || counts[1] != 1 || userCounts[1] != 1 {
+		t.Fatalf("word counts len=%d counts=%v user=%v", got, counts, userCounts)
 	}
 }
 
@@ -352,5 +424,21 @@ func TestSnippetPrefersProseOverToolDump(t *testing.T) {
 	}
 	if !strings.Contains(hits[0].Snippets[0], "migration strategy") {
 		t.Fatalf("missing prose snippet: %#v", hits[0].Snippets[0])
+	}
+}
+
+func BenchmarkBM25Scoring1000Candidates(b *testing.B) {
+	now := time.Now()
+	documents := make([]bm25Document, 1000)
+	for i := range documents {
+		documents[i] = bm25Document{hit: Hit{Session: model.Session{ID: fmt.Sprintf("session-%04d", i), Updated: now}}, termCount: []int{1, 1}, userCount: []int{1, 1}, length: 6}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hits := scoreBM25(documents, []int{1000, 1000}, 1000, 6, false)
+		if len(hits) != len(documents) {
+			b.Fatalf("hits=%d", len(hits))
+		}
 	}
 }
