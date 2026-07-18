@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -89,6 +90,11 @@ func handleMCP(req rpcRequest) (any, int, string) {
 				"name":        "blame",
 				"description": "Before changing a file, see why it is the way it is. Find prior sessions that discussed a path, with the most specific mentions first.",
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string", "description": "Absolute, relative, or bare filename."}, "harness": map[string]any{"type": "string"}, "project": map[string]any{"type": "string"}, "since": map[string]any{"type": "string", "description": "Age such as 30d or 24h."}, "limit": map[string]any{"type": "number"}, "all": map[string]any{"type": "boolean"}}, "required": []string{"path"}},
+			},
+			{
+				"name":        "remember",
+				"description": "Store a durable decision or conclusion for later recall. Do not store transcripts or routine conversation; text is required and project is optional.",
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}}, "required": []string{"text"}},
 			},
 		}}, 0, ""
 	case "tools/call":
@@ -176,6 +182,27 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 			}
 		}
 		return blameTextResult(search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, a.Limit)
+	case "remember":
+		var a struct {
+			Text    string `json:"text"`
+			Project string `json:"project"`
+		}
+		if err := json.Unmarshal(raw, &a); err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(a.Text) == "" {
+			return "", fmt.Errorf("text required")
+		}
+		if strings.TrimSpace(a.Project) == "" {
+			a.Project = "notes"
+		}
+		if err := sources.AppendNote(a.Project, a.Text, time.Now()); err != nil {
+			return "", err
+		}
+		if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, mcpProgress()); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Remembered under %s.", strings.TrimSpace(a.Project)), nil
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
 	}

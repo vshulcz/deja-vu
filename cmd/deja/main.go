@@ -114,6 +114,9 @@ func run(args []string) error {
 	if args[0] == "stats" {
 		return runStats(args[1:])
 	}
+	if args[0] == "remember" {
+		return runRemember(args[1:])
+	}
 	if args[0] == "mcp" {
 		return serveMCP(os.Stdin, os.Stdout)
 	}
@@ -522,6 +525,7 @@ func printSources() {
 		{"antigravity", antigravityLocation, antigravityRoots, sources.LoadAntigravity},
 		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.LoadGrok},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.LoadQwen},
+		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, sources.LoadNotes},
 	}
 	for _, it := range items {
 		var size int64
@@ -628,7 +632,8 @@ Usage:
 	deja index [--rebuild]
 	deja embed
   deja statusline
-  deja stats [--json] [--card [path]]
+	deja stats [--json] [--card [path]]
+	deja remember "text" [--project name]
   deja mcp
   deja version
   deja update

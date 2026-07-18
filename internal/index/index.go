@@ -632,6 +632,17 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", hl.name, len(got), msgs)
 		}
 	}
+	if h == "" || h == "deja" {
+		got := sources.LoadNotes()
+		ss = append(ss, got...)
+		if progress != nil && len(got) > 0 && !SuppressHarnessNarration {
+			msgs := 0
+			for _, s := range got {
+				msgs += len(s.Messages)
+			}
+			fmt.Fprintf(progress, "deja: notes: %d sessions, %d messages\n", len(got), msgs)
+		}
+	}
 	return ss
 }
 
@@ -1194,7 +1205,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			return false
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode", "cursor-db":
+		case "claude", "codex", "codex-history", "opencode", "cursor-db", "deja":
 		default:
 			return false
 		}
@@ -1350,6 +1361,8 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 		return sources.ParseGrokFile(p)
 	case "qwen":
 		return sources.ParseQwenFile(p)
+	case "deja":
+		return sources.ParseNotesFile(p)
 	default:
 		return nil, nil
 	}
@@ -1367,6 +1380,8 @@ func parseAppendedFile(harness, p string, old FileState) ([]model.Session, error
 		return sources.ParseCodexHistoryFromOffset(p, from)
 	case "qwen":
 		return sources.ParseQwenFileFromOffset(p, from)
+	case "deja":
+		return sources.ParseNotesFileFromOffset(p, from)
 	case "codex":
 		return sources.ParseCodexRolloutFromOffset(p, from)
 	case "opencode":
@@ -1421,6 +1436,9 @@ func harnessForPath(p string) string {
 	}
 	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(sources.QwenRoot(), "projects")) {
 		return "qwen"
+	}
+	if p == sources.NotesFile() {
+		return "deja"
 	}
 	return ""
 }
@@ -1503,6 +1521,9 @@ func currentFiles(h string) map[string]FileState {
 		for _, p := range sources.QwenSessionFiles() {
 			paths[p] = true
 		}
+	}
+	if h == "" || h == "deja" {
+		paths[sources.NotesFile()] = true
 	}
 	out := map[string]FileState{}
 	for p := range paths {

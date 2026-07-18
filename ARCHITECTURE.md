@@ -1,5 +1,14 @@
 # Architecture
 
+## Notes source
+
+Explicit notes are stored as one JSON object per line in
+`~/.local/share/deja/notes.jsonl`, or under `XDG_DATA_HOME`; `DEJA_NOTES_FILE`
+overrides the path. Each record contains an RFC3339 `ts`, `project`, and
+`text`. Notes are grouped into one user-message session per project and UTC
+calendar day, then redacted and indexed like every other source. The file is
+primary data; the index remains a rebuildable cache.
+
 ## Semantic sidecar
 
 `deja embed` writes `<index-dir>.vectors.bin`. The file begins with `DJV1`, a

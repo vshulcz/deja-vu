@@ -41,6 +41,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_QWEN_ROOT",
 		"DEJA_INCLUDE_SUBAGENTS", "DEJA_OPENCODE_DB", "GEMINI_CLI_HOME",
 		"GROK_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
+		"DEJA_NOTES_FILE",
 	} {
 		t.Setenv(key, "")
 	}
