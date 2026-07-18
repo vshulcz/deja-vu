@@ -15,7 +15,11 @@ need() {
 
 yes=0
 for arg in "$@"; do
-  [ "$arg" = "--yes" ] && yes=1 || fail "unknown option: $arg"
+  if [ "$arg" = "--yes" ]; then
+    yes=1
+  else
+    fail "unknown option: $arg"
+  fi
 done
 
 need curl
