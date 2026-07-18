@@ -67,8 +67,24 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 	fmt.Fprintln(w)
 	doctorIndex(w)
 	fmt.Fprintln(w)
+	if report.Embed != nil {
+		doctorEmbed(w, *report.Embed)
+	} else {
+		doctorEmbed(w, doctorEmbedReport{State: "unavailable"})
+	}
+	fmt.Fprintln(w)
 	doctorVersion(w, func() (string, bool) { return report.Version.Latest, report.Version.Latest != "" })
 	return nil
+}
+
+func doctorEmbed(w io.Writer, r doctorEmbedReport) {
+	fmt.Fprintln(w, "Embedding:")
+	if r.Model == "" {
+		fmt.Fprintf(w, "  endpoint   %s\n", r.State)
+		return
+	}
+	fmt.Fprintf(w, "  endpoint   %s/model=%s/dim=%d\n", r.State, r.Model, r.Dim)
+	fmt.Fprintf(w, "  sidecar    coverage=%.1f%%\n", r.Coverage)
 }
 
 func doctorHarnesses(w io.Writer) {

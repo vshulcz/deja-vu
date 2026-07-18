@@ -176,6 +176,9 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 	if err != nil {
 		return "", 0, err
 	}
+	if os.Getenv("DEJA_EMBED") != "off" {
+		hits = maybeRerank(hits, o, os.Stderr)
+	}
 	if len(hits) == 0 {
 		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
 	}

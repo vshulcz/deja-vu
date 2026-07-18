@@ -105,6 +105,9 @@ func run(args []string) error {
 		maybeFirstIndexGreeting()
 		return nil
 	}
+	if args[0] == "embed" {
+		return runEmbed(args[1:])
+	}
 	if args[0] == "statusline" {
 		return runStatusline(os.Stdin, os.Stdout)
 	}
@@ -238,6 +241,9 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
+	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
+		hits = maybeRerank(hits, o, os.Stderr)
+	}
 	if len(hits) == 0 {
 		printNoMatches(os.Stderr, o.Query, len(ss))
 	}
@@ -370,6 +376,8 @@ func parseSearch(args []string) (search.Options, error) {
 			o.Regex = true
 		case "--all":
 			o.All = true
+		case "--no-embed":
+			o.NoEmbed = true
 		case "--harness", "--project", "--since", "--role":
 			if i+1 >= len(args) {
 				return o, fmt.Errorf("%s needs value", a)
@@ -532,7 +540,8 @@ Usage:
   deja sources
   deja doctor [--json]
   deja warmup
-  deja index [--rebuild]
+	deja index [--rebuild]
+	deja embed
   deja statusline
   deja stats [--json] [--card [path]]
   deja mcp

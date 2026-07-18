@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -37,6 +38,14 @@ type doctorReport struct {
 	MCP     []doctorMCPStatus   `json:"mcp"`
 	SQLite3 doctorComponent     `json:"sqlite3"`
 	Version doctorVersionReport `json:"version"`
+	Embed   *doctorEmbedReport  `json:"embed,omitempty"`
+}
+
+type doctorEmbedReport struct {
+	State    string  `json:"state"`
+	Model    string  `json:"model,omitempty"`
+	Dim      int     `json:"dim,omitempty"`
+	Coverage float64 `json:"coverage"`
 }
 
 type doctorMCPStatus struct {
@@ -70,7 +79,28 @@ func collectDoctorReport(lookup doctorVersionLookup) doctorReport {
 		report.SQLite3.State = "ok"
 	}
 	report.Version = collectDoctorVersion(lookup)
+	report.Embed = collectDoctorEmbed()
 	return report
+}
+
+func collectDoctorEmbed() *doctorEmbedReport {
+	r := &doctorEmbedReport{State: "unavailable"}
+	reachable := false
+	if c, err := embed.New(); err == nil {
+		r.State, r.Model, reachable = "reachable", c.Model, true
+	}
+	s, err := embed.Read(index.DefaultDir())
+	if err != nil {
+		if !reachable {
+			return nil
+		}
+		return r
+	}
+	r.Model, r.Dim = s.Model, s.Dim
+	if records, err := index.ReadRecords(index.DefaultDir()); err == nil && len(records) > 0 {
+		r.Coverage = float64(s.Covered) / float64(len(records)) * 100
+	}
+	return r
 }
 
 func doctorStoreChecks() []doctorStoreCheck {
