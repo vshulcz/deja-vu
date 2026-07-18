@@ -25,6 +25,7 @@ func hermeticEnv(t *testing.T) string {
 	home := filepath.Join(tmp, "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))

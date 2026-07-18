@@ -21,6 +21,8 @@ func TestMain(m *testing.M) {
 		"GEMINI_CLI_HOME":         "",
 		"CURSOR_CONFIG_DIR":       "",
 		"AIDER_CHAT_HISTORY_FILE": "",
+		"XDG_CONFIG_HOME":         "",
+		"XDG_DATA_HOME":           "",
 		"DEJA_CLAUDE_ROOT":        filepath.Join(root, "claude"),
 		"DEJA_CODEX_ROOT":         filepath.Join(root, "codex"),
 		"DEJA_OPENCODE_DB":        filepath.Join(root, "opencode.db"),
