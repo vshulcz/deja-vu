@@ -3,6 +3,7 @@ package search
 import (
 	"bytes"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 
 func TestBlamePathResolutionAndMatching(t *testing.T) {
 	target, err := ResolveBlamePath("cmd/deja/main.go")
-	if err != nil || target.Base != "main.go" || target.Stem != "main" || !strings.HasSuffix(target.FullPath, "/cmd/deja/main.go") {
+	if err != nil || target.Base != "main.go" || target.Stem != "main" || !strings.HasSuffix(filepath.ToSlash(target.FullPath), "/cmd/deja/main.go") {
 		t.Fatalf("target=%#v err=%v", target, err)
 	}
 	if _, err := ResolveBlamePath(""); err == nil {
@@ -76,7 +77,10 @@ func TestBlameHelpersAndSince(t *testing.T) {
 	if !pathComponentOrWord("/main.go/", 1, 8) || pathComponentOrWord("xmain.go", 1, 8) || pathComponentOrWord("main.got", 0, 7) {
 		t.Fatalf("boundary checks failed: slash=%v prefix=%v suffix=%v", pathComponentOrWord("/main.go/", 1, 8), pathComponentOrWord("xmain.go", 1, 8), pathComponentOrWord("main.got", 0, 7))
 	}
-	if !projectContainsFile("/repo", "/repo/main.go") || projectContainsFile("relative", "/repo/main.go") || projectContainsFile("/other", "/repo/main.go") {
+	repo := t.TempDir()
+	inRepo := filepath.Join(repo, "main.go")
+	other := filepath.Join(repo, "..", "elsewhere")
+	if !projectContainsFile(repo, inRepo) || projectContainsFile("relative", inRepo) || projectContainsFile(filepath.Clean(other), inRepo) {
 		t.Fatal("project root checks failed")
 	}
 	now := time.Now()
