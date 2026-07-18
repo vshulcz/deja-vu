@@ -23,17 +23,18 @@ func NotesFile() string {
 	if p := os.Getenv("DEJA_NOTES_FILE"); p != "" {
 		return p
 	}
+	// An explicit XDG_DATA_HOME wins on every platform so relocation and
+	// hermetic tests behave the same everywhere.
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, "deja", "notes.jsonl")
+	}
 	if runtime.GOOS == "windows" {
 		if dir, err := os.UserConfigDir(); err == nil && dir != "" {
 			return filepath.Join(dir, "deja", "notes.jsonl")
 		}
 		return filepath.Join(Home(), "AppData", "Roaming", "deja", "notes.jsonl")
 	}
-	dir := os.Getenv("XDG_DATA_HOME")
-	if dir == "" {
-		dir = filepath.Join(Home(), ".local", "share")
-	}
-	return filepath.Join(dir, "deja", "notes.jsonl")
+	return filepath.Join(Home(), ".local", "share", "deja", "notes.jsonl")
 }
 
 func AppendNote(project, text string, now time.Time) error {

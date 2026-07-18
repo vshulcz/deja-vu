@@ -78,7 +78,7 @@
       "name": "deja",
       "state": "missing",
       "paths": [
-        "<tmp>/home/.local/share/deja/notes.jsonl"
+        "<tmp>/notes.jsonl"
       ],
       "files": 0
     }
