@@ -198,6 +198,7 @@ type posting struct {
 type SearchResult struct {
 	Sessions []model.Session
 	Fuzzy    bool
+	Stemmed  bool
 	Variants map[string][]string
 }
 
@@ -296,6 +297,11 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 	}
 	if len(posts) == 0 {
 		if usedPostings {
+			if result, ferr := stemSearch(dir, m, o); ferr != nil {
+				return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
+			} else if result.Stemmed {
+				return result, nil
+			}
 			if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
 				return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
 			} else if result.Fuzzy {
@@ -312,6 +318,11 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 	}
 	ss, err := scanRecords(dir, m, o, postingOffsets(posts))
 	if err == nil && len(ss) == 0 {
+		if result, ferr := stemSearch(dir, m, o); ferr != nil {
+			return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
+		} else if result.Stemmed {
+			return result, nil
+		}
 		if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
 			return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
 		} else if result.Fuzzy {
@@ -2094,6 +2105,147 @@ func fuzzySearch(dir string, m Manifest, o search.Options) (SearchResult, error)
 		return SearchResult{}, err
 	}
 	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants}, nil
+}
+
+func stemSearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
+	terms, phrases := search.QueryParts(o.Query)
+	posts, variants, err := stemPostings(dir, terms, phrases)
+	if err != nil || len(posts) == 0 {
+		return SearchResult{}, err
+	}
+	posts = cutPostingsBySession(posts, m, o)
+	if len(posts) == 0 {
+		return SearchResult{}, nil
+	}
+	ss, err := scanRecordsWithVariants(dir, m, o, postingOffsets(posts), variants)
+	if err != nil || len(ss) == 0 {
+		return SearchResult{}, err
+	}
+	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants}, nil
+}
+
+func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
+	if !hasStemToken(terms) {
+		return nil, nil, nil
+	}
+	catalog, err := tokenCatalog(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	perToken := make([]map[int64]posting, len(terms))
+	variants := map[string][]string{}
+	for i, term := range terms {
+		matches := stemMatches(term, catalog)
+		if len(matches) == 0 {
+			return nil, nil, nil
+		}
+		variants[term] = matches
+		perToken[i] = map[int64]posting{}
+		for _, variant := range matches {
+			posts, err := postingsFor(dir, "t"+variant)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, p := range posts {
+				perToken[i][p.Off] = p
+			}
+		}
+	}
+	_ = phrases
+	return intersectPostingMaps(perToken), variants, nil
+}
+
+func hasStemToken(terms []string) bool {
+	for _, term := range terms {
+		if len([]rune(term)) >= 5 {
+			return true
+		}
+	}
+	return false
+}
+
+func stemMatches(term string, catalog map[string]bool) []string {
+	if len([]rune(term)) < 5 {
+		if catalog[term] {
+			return []string{term}
+		}
+		return nil
+	}
+	forms := suffixForms(term)
+	matches := make([]string, 0, 8)
+	for _, form := range forms {
+		if catalog[form] {
+			matches = append(matches, form)
+		}
+	}
+	if len(matches) > 8 {
+		matches = matches[:8]
+	}
+	return matches
+}
+
+func suffixForms(word string) []string {
+	seen := map[string]bool{word: true}
+	type candidate struct {
+		word  string
+		depth int
+	}
+	queue := []candidate{{word: word}}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current.depth == 2 {
+			continue
+		}
+		for _, form := range oneSuffixStep(current.word) {
+			if form != "" && !seen[form] {
+				seen[form] = true
+				queue = append(queue, candidate{word: form, depth: current.depth + 1})
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for form := range seen {
+		out = append(out, form)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func oneSuffixStep(word string) []string {
+	var out []string
+	add := func(form string) {
+		if len(form) >= 3 && form != word {
+			out = append(out, form)
+		}
+	}
+	switch {
+	case strings.HasSuffix(word, "tion"):
+		add(strings.TrimSuffix(word, "tion") + "te")
+	case strings.HasSuffix(word, "ing"):
+		base := strings.TrimSuffix(word, "ing")
+		add(base)
+		add(base + "e")
+	case strings.HasSuffix(word, "ed"):
+		base := strings.TrimSuffix(word, "ed")
+		add(base)
+		add(base + "e")
+	case strings.HasSuffix(word, "ment"):
+		base := strings.TrimSuffix(word, "ment")
+		add(base)
+		add(base + "e")
+	case strings.HasSuffix(word, "es"):
+		add(strings.TrimSuffix(word, "es"))
+	case strings.HasSuffix(word, "s"):
+		add(strings.TrimSuffix(word, "s"))
+	}
+	if strings.HasSuffix(word, "e") {
+		base := strings.TrimSuffix(word, "e")
+		add(base + "ing")
+		add(base + "ed")
+		add(strings.TrimSuffix(word, "te") + "tion")
+	}
+	return out
 }
 
 func hasFuzzyToken(terms []string) bool {

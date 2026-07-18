@@ -247,7 +247,10 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 		return "", 0, err
 	}
 	ss := result.Sessions
-	if result.Fuzzy {
+	if result.Stemmed {
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Fuzzy {
 		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)
@@ -265,7 +268,9 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 	}
 	var b strings.Builder
 	served := 0
-	if result.Fuzzy {
+	if result.Stemmed {
+		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	} else if result.Fuzzy {
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	}
 	fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
@@ -315,7 +320,10 @@ func recallContextResult(q, harness string) (string, int, error) {
 		return "", 0, err
 	}
 	ss := result.Sessions
-	if result.Fuzzy {
+	if result.Stemmed {
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Fuzzy {
 		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)

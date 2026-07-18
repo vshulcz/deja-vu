@@ -394,6 +394,14 @@ func TestFuzzyOutputIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestStemmedOutputIsDeterministic(t *testing.T) {
+	var b strings.Builder
+	printStemmed(&b, map[string][]string{"rotation": {"rotate", "rotated"}, "jwt": {"jwt"}})
+	if got, want := b.String(), "deja: no exact match, trying word forms: rotation -> rotate\n"+"deja: no exact match, trying word forms: rotation -> rotated\n"; got != want {
+		t.Fatalf("stemmed output=%q want=%q", got, want)
+	}
+}
+
 func TestPrintNoMatchesHelpfulMessage(t *testing.T) {
 	var b bytes.Buffer
 	printNoMatches(&b, "jwt refresh token", 3)

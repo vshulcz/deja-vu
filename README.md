@@ -86,7 +86,7 @@ $ deja "jwt refresh token"
 
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search all histories. Multi-word = AND, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; a zero-result query also tries close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
+| `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; zero-result queries try word forms before close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
@@ -102,6 +102,8 @@ $ deja "jwt refresh token"
 | `deja index [--rebuild]` | Same as warmup; `--rebuild` forces a full rebuild. Cold builds narrate per-harness progress. |
 | `deja update` | Download the latest GitHub release, verify its checksum, and replace the current binary. |
 | `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
+
+Stemmed JSON searches set `"stemmed": true` and include the catalog variants used.
 
 ### Share your stats
 

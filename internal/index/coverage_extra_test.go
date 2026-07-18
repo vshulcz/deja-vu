@@ -73,6 +73,85 @@ func BenchmarkFuzzyTokenEnumeration(b *testing.B) {
 	}
 }
 
+func BenchmarkStemTokenEnumeration(b *testing.B) {
+	catalog := make(map[string]bool, 50000)
+	for i := 0; i < 50000; i++ {
+		catalog[fmt.Sprintf("synthetic-token-%05d", i)] = true
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = stemMatches("synthetic-token-12345", catalog)
+	}
+}
+
+func TestREADMEQueryUsesStopWordsAndWordForms(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "readme-index")
+	when := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	ss := []model.Session{{ID: "jwt", Harness: "claude", Project: "p", Updated: when, Messages: []model.Message{{Role: "user", Text: "rotated the jwt refresh token", Time: when}}}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	result, err := SearchDetailed(dir, search.Options{Query: "have we dealt with jwt refresh rotation before", All: true})
+	if err != nil || !result.Stemmed || len(result.Sessions) != 1 || result.Sessions[0].ID != "jwt" {
+		t.Fatalf("README query result=%#v err=%v", result, err)
+	}
+	if len(result.Variants["rotation"]) == 0 {
+		t.Fatalf("missing rotation variants: %#v", result.Variants)
+	}
+}
+
+func TestSuffixForms(t *testing.T) {
+	tests := map[string][]string{
+		"rotation":   {"rotate", "rotated", "rotating"},
+		"rotated":    {"rotate", "rotation", "rotating"},
+		"tokens":     {"token"},
+		"deployment": {"deploy"},
+	}
+	for word, want := range tests {
+		got := suffixForms(word)
+		for _, form := range want {
+			if !containsString(got, form) {
+				t.Errorf("suffixForms(%q)=%v, missing %q", word, got, form)
+			}
+		}
+	}
+}
+
+func TestStemMatchCapsAndShortTerms(t *testing.T) {
+	catalog := map[string]bool{"token": true}
+	if got := stemMatches("to", catalog); len(got) != 0 {
+		t.Fatalf("short unmatched stem=%v", got)
+	}
+	if got := stemMatches("token", catalog); len(got) != 1 || got[0] != "token" {
+		t.Fatalf("short exact stem=%v", got)
+	}
+	for i := 0; i < 12; i++ {
+		catalog[fmt.Sprintf("rotate-form-%02d", i)] = true
+	}
+	if got := stemMatches("rotate", catalog); len(got) > 8 {
+		t.Fatalf("stem cap=%v", got)
+	}
+	if posts, variants, err := stemPostings(t.TempDir(), []string{"tiny"}, nil); err != nil || posts != nil || variants != nil {
+		t.Fatalf("short stem postings=%v %v err=%v", posts, variants, err)
+	}
+	if result, err := stemSearch(t.TempDir(), Manifest{}, search.Options{Query: "rotation"}); err != nil || result.Stemmed {
+		t.Fatalf("empty stem search=%#v err=%v", result, err)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestFuzzyHelperCapsAndDistanceRules(t *testing.T) {
 	catalog := map[string]bool{"abcdefgh": true, "abcdefgi": true, "abcdxfgh": true, "abcdefghij": true}
 	got := closeTokens("abcdefgh", catalog)
