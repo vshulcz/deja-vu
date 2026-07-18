@@ -245,6 +245,7 @@ func run(args []string) error {
 		return fmt.Errorf("search: %w", err)
 	}
 	ss := result.Sessions
+	o.Tier = result.Tier
 	if result.Stemmed {
 		printStemmed(os.Stderr, result.Variants)
 		o.Stemmed = true
@@ -252,6 +253,9 @@ func run(args []string) error {
 	} else if result.Fuzzy {
 		printFuzzy(os.Stderr, result.Variants)
 		o.Fuzzy = true
+		o.FuzzyVariants = result.Variants
+	}
+	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)

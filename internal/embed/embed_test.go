@@ -293,7 +293,7 @@ func TestSemanticSearchFiltersRanksAndCaps(t *testing.T) {
 		{Offset: records[0].Offset, Key: records[0].Record.Key, Values: []float32{1, 0}},
 		{Offset: records[1].Offset, Key: records[1].Record.Key, Values: []float32{0, 1}},
 	}}, &Client{URL: ts.URL})
-	if err != nil || len(hits) != 1 || hits[0].Session.ID != "a" || hits[0].Count != 0 || hits[0].Score != 1 || !strings.Contains(hits[0].Snippets[0], "semantic answer") {
+	if err != nil || len(hits) != 1 || hits[0].Session.ID != "a" || hits[0].Count != 0 || hits[0].Score != 1 || hits[0].Tier != search.TierSemantic || hits[0].TierDetail != "1.00" || !strings.Contains(hits[0].Snippets[0], "semantic answer") {
 		t.Fatalf("semantic hits=%#v err=%v", hits, err)
 	}
 	if _, err := SemanticSearch(context.Background(), dir, search.Options{Query: "q", All: true}, Sidecar{}, &Client{URL: "http://127.0.0.1:1", HTTP: &http.Client{}}); err == nil {

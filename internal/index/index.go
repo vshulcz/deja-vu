@@ -200,6 +200,7 @@ type SearchResult struct {
 	Fuzzy    bool
 	Stemmed  bool
 	Variants map[string][]string
+	Tier     string
 }
 
 func DefaultDir() string {
@@ -276,6 +277,8 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 		return SearchResult{}, fmt.Errorf("%w: records.bin truncated", errCorruptIndex)
 	}
 	var posts []posting
+	var fallbackVariants map[string][]string
+	fallbackTier := search.TierExact
 	usedPostings := false
 	if !o.Regex {
 		if keys := queryKeys(o.Query); len(keys) > 0 {
@@ -288,9 +291,14 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 				// grep expectation: "code" should find "opencode". Expand each query
 				// token to all indexed tokens containing it (bucket directories only,
 				// no record scan), then intersect.
-				posts, err = intersectSubstringPostings(dir, tokens(o.Query))
+				var variants map[string][]string
+				posts, variants, err = intersectSubstringPostingsDetailed(dir, tokens(o.Query))
 				if err != nil {
 					return SearchResult{}, fmt.Errorf("substr postings: %w", err)
+				}
+				if len(posts) > 0 {
+					fallbackVariants = variants
+					fallbackTier = search.TierClose
 				}
 			}
 		}
@@ -310,7 +318,7 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 			return SearchResult{}, nil
 		}
 		ss, err := scanRecords(dir, m, o, nil)
-		return SearchResult{Sessions: ss}, err
+		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
 	}
 	posts = cutPostingsBySession(posts, m, o)
 	if len(posts) == 0 {
@@ -329,7 +337,7 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 			return result, nil
 		}
 	}
-	return SearchResult{Sessions: ss}, err
+	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
 }
 
 // SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
@@ -1993,8 +2001,13 @@ func intersectPostings(dir string, keys []string) ([]posting, error) {
 }
 
 func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
+	posts, _, err := intersectSubstringPostingsDetailed(dir, bare)
+	return posts, err
+}
+
+func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, map[string][]string, error) {
 	if len(bare) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if len(bare) > 3 {
 		bare = bare[:3] // longest-first; keep the expansion bounded
@@ -2002,11 +2015,12 @@ func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
 	buckets, err := os.ReadDir(filepath.Join(dir, "buckets"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	perTok := make([]map[int64]posting, len(bare))
+	variants := make(map[string][]string, len(bare))
 	for i := range perTok {
 		perTok[i] = map[int64]posting{}
 	}
@@ -2025,6 +2039,7 @@ func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
 				if !strings.Contains(tok, b) {
 					continue
 				}
+				variants[b] = append(variants[b], tok)
 				buf := make([]byte, e.n)
 				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
 					continue
@@ -2046,7 +2061,7 @@ func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
 		}
 		set = next
 		if len(set) == 0 {
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 	out := make([]posting, 0, len(set))
@@ -2054,7 +2069,10 @@ func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
-	return out, nil
+	for token := range variants {
+		sort.Strings(variants[token])
+	}
+	return out, variants, nil
 }
 
 func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
@@ -2104,7 +2122,7 @@ func fuzzySearch(dir string, m Manifest, o search.Options) (SearchResult, error)
 	if err != nil || len(ss) == 0 {
 		return SearchResult{}, err
 	}
-	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants}, nil
+	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants, Tier: search.TierClose}, nil
 }
 
 func stemSearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
@@ -2121,7 +2139,7 @@ func stemSearch(dir string, m Manifest, o search.Options) (SearchResult, error) 
 	if err != nil || len(ss) == 0 {
 		return SearchResult{}, err
 	}
-	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants}, nil
+	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants, Tier: search.TierClose}, nil
 }
 
 func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
