@@ -117,6 +117,8 @@ func TestTextKeepsOrdinaryProse(t *testing.T) {
 		"the secret to success is grit",
 		"password reset link sent to your inbox",
 		"authorization is pending review",
+		"rebase the xai-oauth-correction-loop-retry branch first",
+		"see docs/xai-rate-limit-troubleshooting-notes.md for details",
 	} {
 		out, counts := Text(s)
 		if out != s || counts.Total() != 0 {
