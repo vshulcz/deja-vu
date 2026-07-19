@@ -606,3 +606,14 @@ func TestTierLabelVocabulary(t *testing.T) {
 		t.Fatalf("semantic label = %q", got)
 	}
 }
+
+func TestVariantDetailSkipsSelfMatch(t *testing.T) {
+	// A token matching itself must not be reported as a variant.
+	if d := variantDetail("connection pool", []string{"connection"}, map[string][]string{"connection": {"connection"}}); d != "" {
+		t.Fatalf("self-match reported as variant: %q", d)
+	}
+	// A real variant is still reported.
+	if d := variantDetail("the pool was exhausted", []string{"exhaustion"}, map[string][]string{"exhaustion": {"exhausted"}}); d != "exhaustion->exhausted" {
+		t.Fatalf("real variant detail = %q", d)
+	}
+}
