@@ -109,10 +109,16 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		cur = nil
 	}
 
-	s := bufio.NewScanner(f)
-	s.Buffer(make([]byte, 64*1024), 8*1024*1024)
-	for s.Scan() {
-		line := strings.TrimRight(s.Text(), " \t")
+	// Unbounded line reader: a single pasted blob can exceed any fixed
+	// scanner cap, which would silently drop every session after it. Read
+	// line by line with no cap, matching the other parsers.
+	r := bufio.NewReader(f)
+	for {
+		raw, readErr := r.ReadString('\n')
+		if raw == "" && readErr != nil {
+			break
+		}
+		line := strings.TrimRight(raw, " \t\r\n")
 		if !inFence && strings.HasPrefix(line, aiderSessionMark) {
 			endSession()
 			idx++
@@ -162,9 +168,6 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		}
 	}
 	endSession()
-	if err := s.Err(); err != nil {
-		return out, err
-	}
 	return out, nil
 }
 

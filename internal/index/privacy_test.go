@@ -195,3 +195,34 @@ func TestRebuildHonorsTombstonedLoadedSession(t *testing.T) {
 		t.Fatalf("tombstoned search=%#v err=%v", got, err)
 	}
 }
+
+func TestUnforgetDoesNotOverMatchHarness(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+	if err := writeTombstones(map[string]bool{"claude:abc": true, "codex:abc": true, "cursor:xyz": true}); err != nil {
+		t.Fatal(err)
+	}
+	// A bare "c" is an id-prefix: it must NOT resurrect whole harnesses.
+	if err := Unforget("c"); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(Tombstones()); got != 3 {
+		t.Fatalf("bare prefix c wrongly matched harnesses: %v", Tombstones())
+	}
+	// An id-prefix that really matches an id works.
+	if err := Unforget("ab"); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(Tombstones()); got != 1 {
+		t.Fatalf("id-prefix ab: %v", Tombstones())
+	}
+	// A harness-scoped prefix still works.
+	if err := Unforget("cursor:"); err != nil {
+		t.Fatal(err)
+	}
+	if len(Tombstones()) != 0 {
+		t.Fatalf("harness scope left: %v", Tombstones())
+	}
+}
