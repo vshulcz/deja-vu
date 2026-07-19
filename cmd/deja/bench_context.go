@@ -240,6 +240,7 @@ func printContextReport(w io.Writer, report contextReport) {
 	fmt.Fprintln(w, "arm           median tokens  p10-p90       median coverage  negative median")
 	for _, name := range []string{"deja-recall", "full-history", "naive-grep", "cold"} {
 		r := report.Arms[name]
-		fmt.Fprintf(w, "%-13s %-14.0f %.0f-%.0f       %.2f             %.0f\n", name, r.MedianTokens, r.P10Tokens, r.P90Tokens, r.MedianCoverage, r.NegativeMedian)
+		span := fmt.Sprintf("%.0f-%.0f", r.P10Tokens, r.P90Tokens)
+		fmt.Fprintf(w, "%-13s %-14.0f %-13s %-16.2f %.0f\n", name, r.MedianTokens, span, r.MedianCoverage, r.NegativeMedian)
 	}
 }

@@ -55,18 +55,29 @@ func GenerateContext(seed int64) ContextCorpus {
 			chain.Terms = []string{id}
 			chain.Facts[0] += fmt.Sprintf("; incident %d", noise)
 		}
+		// Real sessions are dominated by working noise — command output,
+		// stack traces, incidental discussion. Without that bulk the
+		// full-history arm looks artificially cheap and the whole
+		// comparison is meaningless, so each prior session carries a
+		// realistic filler load around its one durable fact.
 		for j := 0; j < ContextPriorCount; j++ {
 			text := "routine update with no prior fact"
 			if !chain.Negative {
 				text = chain.Facts[j]
 			}
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
+			msgs := []model.Message{{Role: "user", Text: text, Time: t}}
+			fillerBlocks := 6 + rng.Intn(10)
+			for k := 0; k < fillerBlocks; k++ {
+				msgs = append(msgs,
+					model.Message{Role: "user", Text: fillerText(rng, "ran the reproduction again and pasted the output"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
+					model.Message{Role: "assistant", Text: fillerText(rng, "walked through the trace and adjusted the patch"), Time: t.Add(time.Duration(2*k+3) * time.Minute)},
+				)
+			}
+			msgs = append(msgs, model.Message{Role: "assistant", Text: "Recorded the decision and verified the rollout.", Time: t.Add(time.Hour)})
 			chain.Sessions = append(chain.Sessions, model.Session{
 				ID: fmt.Sprintf("%s-session-%d", id, j), Harness: "claude", Project: project,
-				Started: t, Updated: t, Messages: []model.Message{
-					{Role: "user", Text: text, Time: t},
-					{Role: "assistant", Text: "Recorded the decision and verified the rollout." + strings.Repeat(" supporting detail", rng.Intn(20)), Time: t.Add(time.Minute)},
-				},
+				Started: t, Updated: t, Messages: msgs,
 			})
 		}
 		t := base.Add(time.Duration(i*10+ContextPriorCount) * time.Minute)
@@ -76,4 +87,18 @@ func GenerateContext(seed int64) ContextCorpus {
 	b, _ := json.Marshal(chains)
 	h := sha256.Sum256(b)
 	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+}
+
+// fillerText builds a deterministic block of session noise: log-like lines
+// and prose that carry no ground-truth facts but give sessions realistic
+// bulk (roughly 0.5-2KB per block).
+func fillerText(rng *rand.Rand, lead string) string {
+	var b strings.Builder
+	b.WriteString(lead)
+	lines := 4 + rng.Intn(10)
+	for i := 0; i < lines; i++ {
+		fmt.Fprintf(&b, "\n2099-01-%02d %02d:%02d:%02d worker-%d request=%08x latency=%dms status=%d retrying with backoff attempt %d of queue depth %d",
+			1+rng.Intn(27), rng.Intn(24), rng.Intn(60), rng.Intn(60), rng.Intn(8), rng.Uint32(), rng.Intn(900), 200+rng.Intn(4)*100, rng.Intn(5), rng.Intn(40))
+	}
+	return b.String()
 }

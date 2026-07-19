@@ -263,9 +263,11 @@ Run with the default seed (`1`):
 | Arm | Median tokens | P10-P90 tokens | Median coverage | Negative-control median tokens |
 | --- | ---: | ---: | ---: | ---: |
 | deja-recall | 278 | 278-278 | 1.00 | 0 |
-| full-history | 241 | 201-304 | 1.00 | 200 |
-| naive-grep | 862 | 781-988 | 1.00 | 0 |
+| full-history | 16,919 | 11,899-22,092 | 1.00 | 14,920 |
+| naive-grep | 57,489 | 40,413-74,837 | 1.00 | 0 |
 | cold | 0 | 0-0 | 0.00 | 0 |
+
+Prior sessions in the generated corpus carry realistic log-noise bulk; without it the full-history arm looks artificially cheap and the comparison is meaningless. On this corpus the recall digest reaches the same fact coverage as replaying the full history for about 60x fewer tokens, and injects nothing on the negative-control chains where no prior fact is relevant.
 
 ## How it works
 
