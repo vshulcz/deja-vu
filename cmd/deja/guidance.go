@@ -29,6 +29,8 @@ func guidancePath(harness string) string {
 		return filepath.Join(antigravityConfigHome(), "skills", "deja-history", "SKILL.md")
 	case "copilot":
 		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
+	case "pi":
+		return filepath.Join(sources.PiConfigDir(), "skills", "deja-history", "SKILL.md")
 	case "qwen":
 		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
 	case "codex":
@@ -50,11 +52,27 @@ func opencodeConfigHome() string {
 }
 
 func guidanceText(harness string) string {
-	if harness == "claude-code" || harness == "claude" || harness == "antigravity" || harness == "copilot" {
+	if harness == "claude-code" || harness == "claude" || harness == "antigravity" || harness == "copilot" || harness == "pi" {
 		body := guidanceBody
 		if harness == "copilot" {
 			body = "deja does not index Copilot history. It is a consumer: use the deja MCP tools to search memory from the other harnesses.\n\n" + guidanceBody
 		}
+		if harness == "pi" {
+			body = `If the deja MCP tools are available (via pi-mcp-adapter), use them:
+
+- recall: search history with a specific error, function, or decision.
+- recall_context: get a concise digest of the best matching session.
+
+If MCP is not available, use the deja CLI via bash instead:
+
+- Search: bash("deja 'connection pool exhausted'")
+- Context: bash("deja context 'connection pool exhausted'")
+- Blame: bash("deja blame src/db.go")
+- Remember: bash("deja remember 'we use advisory locks because redis lost messages'")
+
+Example: for "what did we decide about token refresh?", try recall first; if unavailable, run bash("deja 'token refresh decision'").`
+		}
+
 		return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
 	}
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
@@ -70,7 +88,7 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	var next []byte
-	if harness == "claude-code" || harness == "claude" || harness == "antigravity" || harness == "copilot" {
+	if harness == "claude-code" || harness == "claude" || harness == "antigravity" || harness == "copilot" || harness == "pi" {
 		if uninstall {
 			if len(old) == 0 {
 				return installResult{Path: path, Action: "unchanged"}, nil

@@ -72,6 +72,14 @@
       "fixture_paths": ["fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl"],
       "parser_source": "internal/sources/qwen.go",
       "last_verified": "2026-07-17"
+    },
+    {
+      "id": "pi",
+      "store_paths": ["${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl"],
+      "format_kind": "jsonl",
+      "fixture_paths": ["fixtures/registry/pi/session.jsonl"],
+      "parser_source": "internal/sources/pi.go",
+      "last_verified": "2026-07-19"
     }
   ]
 }

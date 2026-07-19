@@ -173,6 +173,9 @@ func doctorHarnesses(w io.Writer) {
 
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
 	printRow("qwen", qwenRoot, doctorExists(qwenRoot), doctorCount(len(sources.QwenSessionFiles()), "file"))
+
+	piRoot := sources.PiRoot()
+	printRow("pi", piRoot, doctorExists(piRoot), doctorCount(len(sources.PiSessionFiles()), "file"))
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
 }
 
@@ -270,6 +273,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"antigravity", filepath.Join(antigravityConfigHome(), "mcp_config.json"), doctorJSONWired("mcpServers")},
 		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
 		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers")},
+		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"copilot", guidancePath("copilot"), doctorFileWired},
 	}
 }

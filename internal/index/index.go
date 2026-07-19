@@ -637,6 +637,7 @@ var harnessLoaders = []struct {
 	{"antigravity", sources.LoadAntigravity},
 	{"grok", sources.LoadGrok},
 	{"qwen", sources.LoadQwen},
+	{"pi", sources.LoadPi},
 }
 
 func load(h string) []model.Session { return loadProgress(h, nil) }
@@ -1275,7 +1276,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			return false
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode", "cursor-db", "deja":
+		case "claude", "codex", "codex-history", "opencode", "cursor-db", "deja", "pi":
 		default:
 			return false
 		}
@@ -1432,6 +1433,8 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 		return sources.ParseGrokFile(p)
 	case "qwen":
 		return sources.ParseQwenFile(p)
+	case "pi":
+		return sources.ParsePiFile(p)
 	case "deja":
 		return sources.ParseNotesFile(p)
 	default:
@@ -1451,6 +1454,8 @@ func parseAppendedFile(harness, p string, old FileState) ([]model.Session, error
 		return sources.ParseCodexHistoryFromOffset(p, from)
 	case "qwen":
 		return sources.ParseQwenFileFromOffset(p, from)
+	case "pi":
+		return sources.ParsePiFileFromOffset(p, from)
 	case "deja":
 		return sources.ParseNotesFileFromOffset(p, from)
 	case "codex":
@@ -1507,6 +1512,9 @@ func harnessForPath(p string) string {
 	}
 	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(sources.QwenRoot(), "projects")) {
 		return "qwen"
+	}
+	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, sources.PiRoot()) {
+		return "pi"
 	}
 	if p == sources.NotesFile() {
 		return "deja"
@@ -1590,6 +1598,11 @@ func currentFiles(h string) map[string]FileState {
 	}
 	if h == "" || h == "qwen" {
 		for _, p := range sources.QwenSessionFiles() {
+			paths[p] = true
+		}
+	}
+	if h == "" || h == "pi" {
+		for _, p := range sources.PiSessionFiles() {
 			paths[p] = true
 		}
 	}

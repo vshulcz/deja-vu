@@ -554,6 +554,8 @@ func harnessTag(h string, color bool) string {
 		return cGreen + tag + cReset + cBold
 	case "opencode":
 		return cBlue + tag + cReset + cBold
+	case "pi":
+		return cGreen + tag + cReset + cBold
 	}
 	return tag
 }

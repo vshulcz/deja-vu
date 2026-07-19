@@ -1,0 +1,5 @@
+{"type":"session","version":3,"id":"reg-pi-001","timestamp":"2026-07-17T10:00:00Z","cwd":"/workspace/registry-demo"}
+{"type":"model_change","id":"mc1","parentId":null,"timestamp":"2026-07-17T10:00:01Z","provider":"anthropic","modelId":"claude-sonnet-4"}
+{"type":"thinking_level_change","id":"tl1","parentId":"mc1","timestamp":"2026-07-17T10:00:01Z","thinkingLevel":"medium"}
+{"type":"message","id":"u1","parentId":"tl1","timestamp":"2026-07-17T10:00:05Z","message":{"role":"user","content":[{"type":"text","text":"registry conformance question"}],"timestamp":1784386805000}}
+{"type":"message","id":"a1","parentId":"u1","timestamp":"2026-07-17T10:00:10Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"reasoning"},{"type":"text","text":"registry conformance answer"}],"api":"anthropic","model":"claude-sonnet-4","usage":{"input":5,"output":10},"stopReason":"endTurn","timestamp":1784386810000}}
