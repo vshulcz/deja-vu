@@ -135,3 +135,39 @@ func TestDisabledEscapeHatch(t *testing.T) {
 		t.Fatalf("escape hatch failed: out=%q counts=%#v", out, counts)
 	}
 }
+
+func TestRedactionGapFixes(t *testing.T) {
+	leaks := map[string]string{
+		"empty-user redis url":  "redis://:s3cr3tpassword@cache.example.com:6379",
+		"empty-user pg url":     "postgres://:mypassword123456@db:5432/app",
+		"http basic auth":       "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQxMjM0",
+		"proxy basic auth":      "Proxy-Authorization: Basic YWJjZGVmZ2hpamtsbW5vcA==",
+		"pgp armored key block": "-----BEGIN PGP PRIVATE KEY BLOCK-----\nabcdefghij\n-----END PGP PRIVATE KEY BLOCK-----",
+	}
+	for name, in := range leaks {
+		if out, c := Text(in); out == in || c.Total() == 0 {
+			t.Errorf("%s: not redacted: %q", name, out)
+		}
+	}
+	realKeys := []string{
+		"sk-abcdefghijklmnopqrstuvwxyz012345",
+		"sk-proj-abcdefghijklmnopqrstuvwxyz012345",
+		"sk-ant-api03-abcdefghijklmnopqrstuvwxyz012345",
+		"postgres://user:passw0rd1234567@host:5432/db",
+	}
+	for _, in := range realKeys {
+		if out, _ := Text(in); out == in {
+			t.Errorf("real secret missed: %q", in)
+		}
+	}
+	prose := []string{
+		"sk-my-really-long-feature-branch-name-here",
+		"rebased the xai-oauth-correction-loop-retry branch",
+		"just a basic english sentence with no secrets",
+	}
+	for _, in := range prose {
+		if out, c := Text(in); out != in || c.Total() != 0 {
+			t.Errorf("false positive on prose: %q -> %q", in, out)
+		}
+	}
+}

@@ -30,19 +30,19 @@ var (
 	// delimiter ("api_key": "..."). Tolerate both so env-var and JSON forms are
 	// caught, not just a bare `api_key=`.
 	genericKVRE  = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
-	bearerRE     = regexp.MustCompile(`(?i)\b(Bearer)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
-	pemPrivateRE = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`)
+	bearerRE     = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	pemPrivateRE = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
 	// sk-<alnum> keys. xai- stays alphanumeric-only: real xAI keys have no
 	// internal hyphens, and allowing them makes every long kebab-case slug
 	// that happens to start with "xai-" (branch names, doc titles) a false
 	// positive.
-	providerRE = regexp.MustCompile(`\b(gh[opsur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
+	providerRE = regexp.MustCompile(`\b(gh[opsur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]*[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
 	jwtRE      = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b`)
 	// Password is greedy so a password containing '@' (user:p@ss@host) splits on
 	// the last '@' and is redacted whole, not just up to the first '@'.
-	connURLRE = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://)([^\s/@:]+):([^\s]+)@([^\s]+)`) // scheme://user:pass@host
+	connURLRE = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://)([^\s/@:]*):([^\s]+)@([^\s]+)`) // scheme://[user]:pass@host
 )
 
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
@@ -86,7 +86,7 @@ func Text(s string) (string, Counts) {
 	if strings.Contains(s, "AKIA") || strings.Contains(s, "ASIA") {
 		s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", counts)
 	}
-	if strings.Contains(lower, "bearer") {
+	if strings.Contains(lower, "bearer") || strings.Contains(lower, "basic ") {
 		s = replaceSubmatch(s, bearerRE, "bearer-token", counts, func(m []string) string {
 			return m[1] + m[2] + "[redacted:bearer-token]"
 		})

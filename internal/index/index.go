@@ -545,11 +545,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
 				}
-				text := msg.Text
-				if len(text) > maxIndexedText {
-					text = text[:maxIndexedText]
-				}
-				text = redactForIngest(&m, s.Path, text)
+				text := redactForIngest(&m, s.Path, msg.Text)
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -730,11 +726,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			}
 			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			for _, msg := range s.Messages {
-				text := msg.Text
-				if len(text) > maxIndexedText {
-					text = text[:maxIndexedText]
-				}
-				text = redactForIngest(&m, s.Path, text)
+				text := redactForIngest(&m, s.Path, msg.Text)
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -975,7 +967,12 @@ func recordsForKey(path, key string) ([]Record, error) {
 }
 
 func redactForIngest(m *Manifest, sourcePath, text string) string {
+	// Redact the full text before capping: a secret straddling the cap
+	// boundary would otherwise lose its closing marker and store raw.
 	redacted, counts := redact.Text(text)
+	if len(redacted) > maxIndexedText {
+		redacted = redacted[:maxIndexedText]
+	}
 	n := counts.Total()
 	if n == 0 || m == nil {
 		return redacted
@@ -1240,11 +1237,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 				continue
 			}
-			text := msg.Text
-			if len(text) > maxIndexedText {
-				text = text[:maxIndexedText]
-			}
-			text = redactForIngest(&m, s.Path, text)
+			text := redactForIngest(&m, s.Path, msg.Text)
 			if err := addRec(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time}); err != nil {
 				_ = rw.Close()
 				return err
@@ -1358,11 +1351,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
-				text := msg.Text
-				if len(text) > maxIndexedText {
-					text = text[:maxIndexedText]
-				}
-				text = redactForIngest(&m, s.Path, text)
+				text := redactForIngest(&m, s.Path, msg.Text)
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return filesTouched, messages, err
