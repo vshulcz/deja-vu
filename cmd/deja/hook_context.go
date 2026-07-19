@@ -29,17 +29,44 @@ type sessionStartHookResponse struct {
 	} `json:"hookSpecificOutput"`
 }
 
+type precompactHookInput struct {
+	SessionID      string `json:"session_id"`
+	TranscriptPath string `json:"transcript_path"`
+	CWD            string `json:"cwd"`
+	HookEventName  string `json:"hook_event_name"`
+	Trigger        string `json:"trigger"`
+}
+
+// runHookPrecompact is deliberately best effort: Claude must be able to
+// compact even when the input is incomplete or the index cannot start.
+func runHookPrecompact() {
+	var input precompactHookInput
+	_ = json.NewDecoder(os.Stdin).Decode(&input)
+	requestWarmup(index.DefaultDir())
+}
+
 // runHookContext prints session-start context. plain=false emits the Claude
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).
 func runHookContext(plain bool) error {
+	// SessionStart fires for startup, resume, clear and compact; the payload
+	// says which. After a compaction the model just lost its working context,
+	// so the lead line changes to say the memory below survived it.
+	var input struct {
+		Source string `json:"source"`
+	}
+	_ = json.NewDecoder(os.Stdin).Decode(&input)
 	digest, sessions := hookDigestResult()
 	if digest == "" {
 		return nil
 	}
 	// One actionable line so injected memory leads somewhere: models that see
 	// bare data tend to ignore it.
-	digest = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting.\n" + digest
+	lead := "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting.\n"
+	if input.Source == "compact" {
+		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
+	}
+	digest = lead + digest
 	digest = frameRecall(digest)
 	usage.RecordResult(index.DefaultDir(), usage.KindHook, len(digest), sessions, false)
 	if plain {

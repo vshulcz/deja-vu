@@ -37,7 +37,7 @@ func AutoRecallDigest(ss []model.Session, budget int) string {
 		if b.Len() >= budget {
 			break
 		}
-		section := autoRecallSession(s)
+		section := autoRecallSession(s, time.Now(), false)
 		if section == "" {
 			continue
 		}
@@ -88,7 +88,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		if mode == RecallSafe && !projectMatches(s.Project, o.ProjectNames) {
 			continue
 		}
-		section := autoRecallSession(s)
+		section := autoRecallSession(s, o.Now, true)
 		if section == "" || (mode == RecallSafe && relevanceWords(s) < 3) {
 			continue
 		}
@@ -170,7 +170,7 @@ func nearDuplicate(candidate map[string]bool, prior []map[string]bool) bool {
 	return false
 }
 
-func autoRecallSession(s model.Session) string {
+func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 	var problem string
 	var conclusions []string
 	for _, m := range s.Messages {
@@ -192,12 +192,17 @@ func autoRecallSession(s model.Session) string {
 	if problem == "" && len(conclusions) == 0 {
 		return ""
 	}
-	date := ""
-	if !s.Updated.IsZero() {
-		date = " · " + s.Updated.Format("2006-01-02")
-	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "- **%s** `%s`%s\n", s.Project, short(s.ID), date)
+	if provenance {
+		fmt.Fprintf(&b, "✓ recalled from %s session · %s\n", s.Harness, relativeDay(s.Updated, now))
+		fmt.Fprintf(&b, "  - Session: **%s** `%s`\n", s.Project, short(s.ID))
+	} else {
+		date := ""
+		if !s.Updated.IsZero() {
+			date = " · " + s.Updated.Format("2006-01-02")
+		}
+		fmt.Fprintf(&b, "- **%s** `%s`%s\n", s.Project, short(s.ID), date)
+	}
 	if problem != "" {
 		fmt.Fprintf(&b, "  - User: %s\n", problem)
 	}
@@ -205,6 +210,35 @@ func autoRecallSession(s model.Session) string {
 		fmt.Fprintf(&b, "  - Assistant: %s\n", c)
 	}
 	return b.String()
+}
+
+func relativeDay(updated, now time.Time) string {
+	if updated.IsZero() {
+		return "unknown date"
+	}
+	location := now.Location()
+	updatedDate := updated.In(location)
+	nowDate := now.In(location)
+	y, m, d := nowDate.Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, location)
+	uy, um, ud := updatedDate.Date()
+	updatedDay := time.Date(uy, um, ud, 0, 0, 0, 0, location)
+	calendarDay := func(t time.Time) time.Time {
+		y, m, d := t.Date()
+		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	}
+	days := int(calendarDay(today).Sub(calendarDay(updatedDay)) / (24 * time.Hour))
+	switch days {
+	case 0:
+		return "today"
+	case 1:
+		return "yesterday"
+	default:
+		if days < 0 {
+			return "today"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	}
 }
 
 func noiseMessage(s string) bool {

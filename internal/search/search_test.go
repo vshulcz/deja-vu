@@ -512,6 +512,31 @@ func TestBuildAutoRecallPolicy(t *testing.T) {
 	}
 }
 
+func TestAutoRecallProvenanceDates(t *testing.T) {
+	now := time.Date(2026, 7, 19, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name string
+		when time.Time
+		want string
+	}{
+		{"today", now, "today"},
+		{"yesterday", now.AddDate(0, 0, -1), "yesterday"},
+		{"days", now.AddDate(0, 0, -4), "4 days ago"},
+		{"future", now.AddDate(0, 0, 1), "today"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := model.Session{ID: tc.name, Harness: "claude", Project: "p", Updated: tc.when, Messages: []model.Message{{Role: "user", Text: "enough useful context"}}}
+			got := BuildAutoRecall([]model.Session{s}, AutoRecallOptions{Mode: RecallAggressive, Now: now})
+			if !strings.Contains(got.Text, "✓ recalled from claude session · "+tc.want) {
+				t.Fatalf("provenance = %q", got.Text)
+			}
+		})
+	}
+	if got := relativeDay(time.Time{}, now); got != "unknown date" {
+		t.Fatalf("zero date = %q", got)
+	}
+}
+
 func TestSnippetPrefersProseOverToolDump(t *testing.T) {
 	text := "netcat output noise needle\n1: package main\n2: func main() {}\nUser asked about needle migration strategy and we concluded use small batches."
 	hits, err := Run([]model.Session{{ID: "s", Harness: "claude", Project: "p", Updated: time.Now(), Messages: []model.Message{{Role: "assistant", Text: text}}}}, Options{Query: "needle"})

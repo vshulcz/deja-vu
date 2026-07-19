@@ -20,7 +20,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | --- | --- |
 | **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses |
-| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask |
+| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask; Claude Code also captures the current transcript before compaction |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
 | **Stats** | `deja stats` — your agent work, wrapped: harnesses, top projects, activity sparkline |
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
@@ -200,7 +200,7 @@ are indexed locally. Cite what you reuse.
 | `blame` | `path`, `harness?`, `project?`, `since?`, `limit?` | Sessions that discussed a file, with titles and matched context. |
 | `remember` | `text`, `project?` | Stores a durable decision or conclusion for later recall. |
 
-With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup.
+With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup. Because SessionStart also fires after every context compaction, the same memory is re-injected right after Claude Code compacts — and a PreCompact hook captures the transcript into the index beforehand.
 
 ## Security
 
