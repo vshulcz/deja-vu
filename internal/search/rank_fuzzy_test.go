@@ -9,12 +9,12 @@ import (
 func TestFuzzyHitsScoreByFrequency(t *testing.T) {
 	ts := time.Now().Add(-time.Hour) // same recency for both -> isolates BM25
 	dense := model.Session{ID: "dense", Updated: ts, Messages: []model.Message{
-		{Role: "user", Text: "receive receive receive the packet, receive again"},
+		{Role: "user", Text: "frobnicator frobnicator frobnicator crashed, frobnicator again"},
 	}}
 	sparse := model.Session{ID: "sparse", Updated: ts, Messages: []model.Message{
-		{Role: "user", Text: "receive one packet"},
+		{Role: "user", Text: "frobnicator crashed once"},
 	}}
-	o := Options{Query: "recieve", All: true, FuzzyVariants: map[string][]string{"recieve": {"receive"}}}
+	o := Options{Query: "frobnicatr", All: true, FuzzyVariants: map[string][]string{"frobnicatr": {"frobnicator"}}}
 	hits, err := Run([]model.Session{sparse, dense}, o)
 	if err != nil || len(hits) != 2 {
 		t.Fatalf("hits=%d err=%v", len(hits), err)
