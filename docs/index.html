@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deja-vu — your agents already solved this. deja finds it.</title>
@@ -100,7 +101,24 @@ a:hover{text-decoration:underline}
 .agent:hover .disc{color:#c9c5e8}
 .agent .mono{font-family:var(--mono);font-size:.82rem;font-weight:700;color:#9aa0b5}
 .agent .nm{font-size:.72rem;color:#8a87a0}
+
+.proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px}
+@media(max-width:700px){.proof-grid{grid-template-columns:1fr}}
+.proof-cell{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 22px;text-align:center}
+.proof-cell .big{font-size:2.6rem;font-weight:800;letter-spacing:-.02em;line-height:1}
+.proof-cell .cap2{color:var(--dim);font-size:.9rem;margin-top:10px}
+.js .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.js .reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+.docs-teaser{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:6px}
+@media(max-width:760px){.docs-teaser{grid-template-columns:repeat(2,1fr)}}
+.docs-teaser a{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px;color:var(--ink);font-weight:600;font-size:.95rem;transition:border-color .2s}
+.docs-teaser a:hover{border-color:var(--a1);text-decoration:none}
+.docs-teaser a span{display:block;color:var(--dim);font-weight:400;font-size:.83rem;margin-top:4px}
 </style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Linux, Windows","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","description":"Local searchable memory over your coding-agent session histories, served back via MCP recall.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","codeRepository":"https://github.com/vshulcz/deja-vu","author":{"@type":"Person","name":"vshulcz"}}
+</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -110,13 +128,13 @@ a:hover{text-decoration:underline}
   <span class="brand"><img src="assets/favicon.svg" alt="">deja-vu</span>
   <span class="spacer"></span>
   <a href="#install">Install</a>
-  <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Docs</a>
+  <a href="guide/getting-started.html">Docs</a>
   <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
 </nav>
 
 <header>
   <h1>Your agents already solved this.<br><span class="grad">deja finds it.</span></h1>
-  <p class="sub">Eight coding agents write every session to disk — gigabytes of solved problems nobody can search. <code>deja</code> turns them into a memory layer: search, agent recall, auto-context, redaction, stats, share and sync. One zero-dependency binary.</p>
+  <p class="sub">Ten coding agents write every session to disk — gigabytes of solved problems nobody can search. <code>deja</code> turns them into a memory layer: search, agent recall, auto-context, redaction, stats, share and sync. One zero-dependency binary.</p>
   <div class="cta">
     <a class="btn primary" href="#install">Get started</a>
     <a class="btn" href="https://github.com/vshulcz/deja-vu">Star on GitHub</a>
@@ -158,7 +176,17 @@ a:hover{text-decoration:underline}
   </div>
 </section>
 
-<section>
+<section class="reveal" id="proof">
+  <h2>Measured, not claimed</h2>
+  <p class="lead">Reaching the context a task needs, with deja recall vs replaying the whole history — a seeded benchmark anyone can run with <code style="font-family:var(--mono)">deja bench context</code>.</p>
+  <div class="proof-grid">
+    <div class="proof-cell"><div class="big grad">~60&times;</div><div class="cap2">fewer tokens to working context than replaying history, at equal fact coverage</div></div>
+    <div class="proof-cell"><div class="big grad">~12 ms</div><div class="cap2">typical warm search over gigabytes of history</div></div>
+    <div class="proof-cell"><div class="big grad">10</div><div class="cap2">coding agents indexed into one retroactive memory</div></div>
+  </div>
+  <p style="text-align:center;margin-top:20px"><a class="btn" href="guide/benchmarks.html">How it's measured →</a></p>
+</section>
+<section class="reveal">
   <div class="features">
     <div class="card">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 12l-4-3M21 12l-4 2"/></svg></div>
@@ -223,6 +251,21 @@ a:hover{text-decoration:underline}
   </div>
 </section>
 
+<section class="reveal" id="docs">
+  <h2>Documentation</h2>
+  <p class="lead">Not just a landing page — a real guide from install to internals.</p>
+  <div class="docs-teaser">
+    <a href="guide/getting-started.html">Getting started<span>Install, index, first search</span></a>
+    <a href="guide/agents.html">Agents &amp; MCP<span>recall, blame, remember, auto-recall</span></a>
+    <a href="guide/search.html">Search<span>phrases, fuzzy, semantic, tiers</span></a>
+    <a href="guide/commands.html">CLI reference<span>every subcommand and flag</span></a>
+    <a href="guide/harnesses.html">Harnesses<span>ten agents, and adding one</span></a>
+    <a href="guide/privacy.html">Privacy<span>redaction, forget, exclude</span></a>
+    <a href="guide/benchmarks.html">Benchmarks<span>the ~60&times; number, reproducible</span></a>
+    <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture<span>index format, internals</span></a>
+  </div>
+</section>
+
 <section>
   <h2>How it works</h2>
   <p class="how">
@@ -244,6 +287,8 @@ document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{
   navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent.trim());
   const t=b.textContent;b.textContent='copied';setTimeout(()=>b.textContent=t,1200);
 }));
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 </script>
 </body>
 </html>

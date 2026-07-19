@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://vshulcz.github.io/deja-vu/sitemap.xml

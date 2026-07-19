@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benchmarks — deja-vu docs</title>
+<meta name="description" content="Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Benchmarks — deja-vu docs">
+<meta property="og:description" content="Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/favicon.svg" alt="">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents & MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html" aria-current="page">Benchmarks</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.md">Format registry</a></aside>
+<article>
+
+<h1>Benchmarks</h1>
+<p>Both benchmarks are seeded, run in seconds, never touch your real index, and print whatever the numbers are. The corpus generators are ordinary reviewed Go — audit what "relevant" means before trusting any figure.</p>
+<h2>Recall quality</h2>
+<pre>deja bench recall</pre>
+<p>Builds a seeded multi-session corpus and query set, runs them through the real search pipeline, and reports recall@5/@10 with median latency (plus a hybrid column when an embedding endpoint is up). CI fails if recall regresses.</p>
+<h2>Context readiness</h2>
+<pre>deja bench context</pre>
+<p>The interesting number. Across seeded multi-session task chains, it compares four ways to assemble the context a task needs — deja recall, replaying full history, naive grep, and cold — reporting median tokens with spread and verbatim fact coverage. On the default corpus, deja reaches the same fact coverage as replaying the full history for roughly <b>60× fewer tokens</b>, and injects nothing on the negative-control chains where no prior fact is relevant.</p>
+<div class="note">The comparison is ablation-matched (same pipeline, memory on/off) with naive baselines, so the number isolates deja's contribution rather than "more context helps". Run it and read the distribution.</div>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
