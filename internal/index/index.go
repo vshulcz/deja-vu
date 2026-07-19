@@ -27,6 +27,11 @@ import (
 const version = 10
 const maxIndexedText = 64 * 1024
 
+// maxRecordSize bounds a single serialized record. A record is one message
+// (text capped at maxIndexedText) plus small metadata, so anything larger is
+// a corrupt length prefix — reject it rather than allocate up to 4 GiB.
+const maxRecordSize = 8 << 20
+
 var bucketMagic = []byte("DJB1")
 
 // errCorruptIndex marks unreadable index structures (e.g. a bucket file cut
@@ -1910,7 +1915,11 @@ func readRecord(r io.Reader) (Record, error) {
 	if _, err := io.ReadFull(r, hdr[:]); err != nil {
 		return Record{}, err
 	}
-	b := make([]byte, binary.LittleEndian.Uint32(hdr[:]))
+	n := binary.LittleEndian.Uint32(hdr[:])
+	if n > maxRecordSize {
+		return Record{}, fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+	}
+	b := make([]byte, n)
 	if _, err := io.ReadFull(r, b); err != nil {
 		return Record{}, err
 	}
