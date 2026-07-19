@@ -141,10 +141,12 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 			result.Messages++
 		}
 	}
-	if err := rebuildWithTombstones(dir, "", "", currentFiles(""), nil, dead); err != nil {
+	// Persist tombstones before the rebuild: a crash between the two must
+	// leave sessions forgotten, not resurrect them on the next index pass.
+	if err := writeTombstones(dead); err != nil {
 		return result, err
 	}
-	return result, writeTombstones(dead)
+	return result, rebuildWithTombstones(dir, "", "", currentFiles(""), nil, dead)
 }
 
 func readRecordsForForget(dir string) []OffsetRecord {
@@ -167,8 +169,22 @@ func Tombstones() []string {
 
 func Unforget(prefix string) error {
 	set := readTombstones()
+	// A prefix containing ':' is a key/harness-scoped prefix (claude:abc,
+	// z:); a bare prefix is an id-prefix symmetric with forget --session, so
+	// "c" cannot resurrect every claude/codex/cursor session at once.
+	scoped := strings.ContainsRune(prefix, ':')
 	for key := range set {
-		if key == prefix || strings.HasSuffix(key, ":"+prefix) || strings.HasPrefix(key, prefix) {
+		var match bool
+		if scoped {
+			match = strings.HasPrefix(key, prefix)
+		} else {
+			id := key
+			if i := strings.IndexByte(key, ':'); i >= 0 {
+				id = key[i+1:]
+			}
+			match = key == prefix || strings.HasPrefix(id, prefix)
+		}
+		if match {
 			delete(set, key)
 		}
 	}

@@ -702,6 +702,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		_ = rf.Close()
 		return err
 	}
+	seenMsgs := msgSeen{}
 	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -726,6 +727,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			}
 			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			for _, msg := range s.Messages {
+				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
+					continue
+				}
 				text := redactForIngest(&m, s.Path, msg.Text)
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {

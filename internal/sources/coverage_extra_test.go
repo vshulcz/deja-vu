@@ -336,12 +336,20 @@ func TestMoreSourceEdgeBranches(t *testing.T) {
 	if ss, err := ParseAiderFile(hist); err != nil || len(ss) != 1 || ss[0].Messages[0].Role != "assistant" {
 		t.Fatalf("aider fence-first ss=%#v err=%v", ss, err)
 	}
-	tooLong := filepath.Join(tmp, "too-long.md")
-	if err := os.WriteFile(tooLong, []byte("# aider chat started at 2026-01-01 00:00:00\n"+strings.Repeat("x", 9*1024*1024)), 0o644); err != nil {
+	// A single line larger than any fixed scanner cap must be read, not drop
+	// every session after it. The huge user line parses and a later session
+	// still appears.
+	huge := filepath.Join(tmp, "huge-line.md")
+	content := "# aider chat started at 2026-01-01 00:00:00\n#### " + strings.Repeat("x", 9*1024*1024) + "\n# aider chat started at 2026-01-02 00:00:00\n#### later question\n"
+	if err := os.WriteFile(huge, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ParseAiderFile(tooLong); err == nil {
-		t.Fatal("aider scanner error branch not hit")
+	ss, err := ParseAiderFile(huge)
+	if err != nil {
+		t.Fatalf("aider huge line errored: %v", err)
+	}
+	if len(ss) != 2 {
+		t.Fatalf("aider huge line dropped sessions: got %d, want 2", len(ss))
 	}
 
 	claude := filepath.Join(tmp, "claude.jsonl")
