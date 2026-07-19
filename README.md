@@ -200,7 +200,7 @@ are indexed locally. Cite what you reuse.
 | `blame` | `path`, `harness?`, `project?`, `since?`, `limit?` | Sessions that discussed a file, with titles and matched context. |
 | `remember` | `text`, `project?` | Stores a durable decision or conclusion for later recall. |
 
-With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup.
+With `--auto`, a SessionStart hook also feeds the current project's recent memory in automatically — read-only, capped at 2KB, and it never delays or breaks agent startup. Because SessionStart also fires after every context compaction, the same memory is re-injected right after Claude Code compacts — and a PreCompact hook captures the transcript into the index beforehand.
 
 ## Security
 
