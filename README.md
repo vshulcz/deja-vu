@@ -63,6 +63,8 @@ deja install --all     # MCP recall for every agent it finds on this machine
 deja install --auto    # same, plus session-start auto-recall where supported
 ```
 
+On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
+
 Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, Gemini CLI, Qwen, Copilot, and OpenCode use their corresponding guidance files (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Cursor and Grok have no documented user-level guidance location and are skipped.
 
 Install reports whether it found local history and builds the first index immediately when history is present.
