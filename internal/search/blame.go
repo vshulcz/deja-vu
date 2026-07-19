@@ -33,6 +33,7 @@ type BlameHit struct {
 	Count    int           `json:"count"`
 	Snippets []string      `json:"snippets"`
 	Score    float64       `json:"score"`
+	Tier     string        `json:"tier"`
 }
 
 func ResolveBlamePath(name string) (BlameTarget, error) {
@@ -74,7 +75,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		if !cut.IsZero() && session.Updated.Before(cut) {
 			continue
 		}
-		hit := BlameHit{Session: session, Title: sessionTitle(session)}
+		hit := BlameHit{Session: session, Title: sessionTitle(session), Tier: TierExact}
 		specificity := 0.0
 		for _, message := range session.Messages {
 			count, level := mentionScore(message.Text, base, forms)
@@ -212,6 +213,11 @@ func sessionTitle(s model.Session) string {
 }
 
 func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
+	for i := range hits {
+		if hits[i].Tier == "" {
+			hits[i].Tier = TierExact
+		}
+	}
 	if jsonOutput {
 		_ = json.NewEncoder(w).Encode(hits)
 		return

@@ -52,13 +52,20 @@ func TestPhraseAndFuzzyIndexedSearch(t *testing.T) {
 		t.Fatalf("phrase result=%#v err=%v", result, err)
 	}
 	result, err = SearchDetailed(dir, search.Options{Query: "exhaustd", All: true})
-	if err != nil || !result.Fuzzy || len(result.Sessions) != 2 {
+	if err != nil || !result.Fuzzy || result.Tier != search.TierClose || len(result.Sessions) != 2 {
 		t.Fatalf("fuzzy result=%#v err=%v", result, err)
 	}
-	o := search.Options{Query: "exhaustd", All: true, FuzzyVariants: result.Variants}
+	o := search.Options{Query: "exhaustd", All: true, Tier: result.Tier, FuzzyVariants: result.Variants}
 	hits, err := search.Run(result.Sessions, o)
 	if err != nil || len(hits) != 2 || hits[0].Count == 0 {
 		t.Fatalf("fuzzy pipeline hits=%#v err=%v", hits, err)
+	}
+	if hits[0].Tier != search.TierClose || hits[0].TierDetail == "" {
+		t.Fatalf("fuzzy tier=%#v", hits)
+	}
+	result, err = SearchDetailed(dir, search.Options{Query: "haust", All: true})
+	if err != nil || result.Tier != search.TierClose || len(result.Variants["haust"]) == 0 {
+		t.Fatalf("substring tier=%#v err=%v", result, err)
 	}
 }
 

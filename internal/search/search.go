@@ -35,12 +35,22 @@ type Options struct {
 	NoEmbed                   bool
 	Semantic                  bool                `json:"-"`
 	FuzzyVariants             map[string][]string `json:"-"`
+	Tier                      string              `json:"-"`
 }
+
+const (
+	TierExact    = "exact"
+	TierClose    = "close"
+	TierSemantic = "semantic"
+)
+
 type Hit struct {
-	Session  model.Session `json:"session"`
-	Count    int           `json:"count"`
-	Snippets []string      `json:"snippets"`
-	Score    float64       `json:"score"`
+	Session    model.Session `json:"session"`
+	Count      int           `json:"count"`
+	Snippets   []string      `json:"snippets"`
+	Score      float64       `json:"score"`
+	Tier       string        `json:"tier"`
+	TierDetail string        `json:"tier_detail,omitempty"`
 }
 
 const (
@@ -86,7 +96,11 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 		if !cut.IsZero() && s.Updated.Before(cut) {
 			continue
 		}
-		doc := bm25Document{hit: Hit{Session: s}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
+		tier := o.Tier
+		if tier == "" {
+			tier = TierExact
+		}
+		doc := bm25Document{hit: Hit{Session: s, Tier: tier}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
 		if len(qtoks) == 0 {
 			doc.termCount = []int{0}
 			doc.userCount = []int{0}
@@ -119,6 +133,9 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 			}
 			if c > 0 {
 				doc.hit.Count += c
+				if doc.hit.Tier == TierClose && doc.hit.TierDetail == "" {
+					doc.hit.TierDetail = variantDetail(m.Text, qtoks, o.FuzzyVariants)
+				}
 				if len(doc.hit.Snippets) < 3 {
 					doc.hit.Snippets = append(doc.hit.Snippets, snippet(m.Text, o.Query, re))
 				}
@@ -262,6 +279,11 @@ func mergeSessions(in []model.Session) []model.Session {
 }
 
 func Print(w io.Writer, hits []Hit, o Options) {
+	for i := range hits {
+		if hits[i].Tier == "" {
+			hits[i].Tier = TierExact
+		}
+	}
 	if o.JSON {
 		if o.Semantic {
 			_ = json.NewEncoder(w).Encode(struct {
@@ -291,14 +313,36 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			d = relativeDate(h.Session.Updated)
 		}
 		if color {
-			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s\n", cBold, harnessTag(h.Session.Harness, true), h.Session.Project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, short(h.Session.ID), cDim+"— "+cReset, cBold, h.Count, cReset)
+			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), h.Session.Project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, short(h.Session.ID), cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))
 		} else {
-			fmt.Fprintf(w, "[%s] %-10s · %s · %s — %d matches\n", h.Session.Harness, h.Session.Project, d, short(h.Session.ID), h.Count)
+			fmt.Fprintf(w, "[%s] %-10s · %s · %s — %d matches%s\n", h.Session.Harness, h.Session.Project, d, short(h.Session.ID), h.Count, tierLabel(h))
 		}
 		for _, sn := range h.Snippets {
 			fmt.Fprintf(w, "  %s\n", highlight(sn, o.Query, o.Regex, color))
 		}
 	}
+}
+
+func tierLabel(h Hit) string {
+	if h.Tier == "" || h.Tier == TierExact {
+		return ""
+	}
+	if h.TierDetail == "" {
+		return " · " + h.Tier
+	}
+	return " · " + h.Tier + " (" + h.TierDetail + ")"
+}
+
+func variantDetail(text string, terms []string, variants map[string][]string) string {
+	low := strings.ToLower(text)
+	for _, term := range terms {
+		for _, variant := range variants[term] {
+			if strings.Contains(low, variant) {
+				return term + "->" + variant
+			}
+		}
+	}
+	return ""
 }
 
 func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {

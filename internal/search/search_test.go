@@ -342,6 +342,29 @@ func TestFuzzyMatchingUsesVariants(t *testing.T) {
 	if err != nil || len(hits) != 1 || hits[0].Count == 0 {
 		t.Fatalf("fuzzy hits=%#v err=%v", hits, err)
 	}
+	if hits[0].Tier != TierExact {
+		t.Fatalf("direct search tier=%q", hits[0].Tier)
+	}
+	hits, err = Run([]model.Session{{ID: "close", Updated: time.Now(), Messages: []model.Message{{Text: "connection exhausted"}}}}, Options{
+		Query: "connecton exhaustd", All: true, Tier: TierClose,
+		FuzzyVariants: map[string][]string{"connecton": {"connection"}, "exhaustd": {"exhausted"}},
+	})
+	if err != nil || len(hits) != 1 || hits[0].TierDetail != "connecton->connection" {
+		t.Fatalf("close tier=%#v err=%v", hits, err)
+	}
+}
+
+func TestPrintAlwaysEmitsTierAndLabelsFallback(t *testing.T) {
+	var b bytes.Buffer
+	Print(&b, []Hit{{Count: 1}}, Options{JSON: true})
+	if !strings.Contains(b.String(), `"tier":"exact"`) {
+		t.Fatalf("exact JSON=%q", b.String())
+	}
+	b.Reset()
+	Print(&b, []Hit{{Count: 1, Tier: TierClose, TierDetail: "rotaton->rotation"}}, Options{})
+	if !strings.Contains(b.String(), "close (rotaton->rotation)") {
+		t.Fatalf("close output=%q", b.String())
+	}
 }
 
 func BenchmarkPhraseVerification(b *testing.B) {
@@ -516,5 +539,20 @@ func BenchmarkBM25Scoring1000Candidates(b *testing.B) {
 		if len(hits) != len(documents) {
 			b.Fatalf("hits=%d", len(hits))
 		}
+	}
+}
+
+func TestTierLabelVocabulary(t *testing.T) {
+	if got := tierLabel(Hit{}); got != "" {
+		t.Fatalf("empty tier label = %q", got)
+	}
+	if got := tierLabel(Hit{Tier: TierExact}); got != "" {
+		t.Fatalf("exact tier label = %q", got)
+	}
+	if got := tierLabel(Hit{Tier: TierClose}); got != " · close" {
+		t.Fatalf("close no-detail label = %q", got)
+	}
+	if got := tierLabel(Hit{Tier: TierSemantic, TierDetail: "0.71"}); got != " · semantic (0.71)" {
+		t.Fatalf("semantic label = %q", got)
 	}
 }

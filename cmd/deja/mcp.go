@@ -251,10 +251,14 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 		return "", 0, err
 	}
 	ss := result.Sessions
+	o.Tier = result.Tier
 	if result.Stemmed {
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
 	} else if result.Fuzzy {
+		o.FuzzyVariants = result.Variants
+	}
+	if o.Tier == search.TierClose && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
 	hits, err := search.Run(ss, o)
@@ -287,6 +291,9 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 			fmt.Fprintf(&b, " · updated %s", h.Session.Updated.Format("2006-01-02"))
 		}
 		fmt.Fprintln(&b)
+		if h.Tier != search.TierExact {
+			fmt.Fprintf(&b, "[%s]\n", h.Tier)
+		}
 		for _, sn := range h.Snippets {
 			fmt.Fprintf(&b, "- %s\n", sn)
 		}
@@ -327,23 +334,35 @@ func recallContextResult(q, harness string) (string, int, error) {
 		return "", 0, err
 	}
 	ss := result.Sessions
+	o.Tier = result.Tier
 	if result.Stemmed {
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
 	} else if result.Fuzzy {
 		o.FuzzyVariants = result.Variants
 	}
+	if o.Tier == search.TierClose && o.FuzzyVariants == nil {
+		o.FuzzyVariants = result.Variants
+	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
 		return "", 0, err
 	}
-	hits, _ = maybeSemantic(hits, o, os.Stderr)
+	var semantic bool
+	hits, semantic = maybeSemantic(hits, o, os.Stderr)
+	if semantic {
+		o.Tier = search.TierSemantic
+	}
 	if len(hits) == 0 {
 		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, hits[0].Session, q)
-	return b.String(), 1, nil
+	text := b.String()
+	if hits[0].Tier != search.TierExact {
+		text = "[" + hits[0].Tier + "]\n" + text
+	}
+	return text, 1, nil
 }
 
 func mcpProgress() io.Writer {

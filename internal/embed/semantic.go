@@ -2,6 +2,7 @@ package embed
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -65,10 +66,12 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 	out := make([]search.Hit, 0, len(best))
 	for _, found := range best {
 		out = append(out, search.Hit{
-			Session:  found.session,
-			Count:    0,
-			Snippets: []string{search.Snippet(found.record.Text, o.Query)},
-			Score:    found.score,
+			Session:    found.session,
+			Count:      0,
+			Snippets:   []string{search.Snippet(found.record.Text, o.Query)},
+			Score:      found.score,
+			Tier:       search.TierSemantic,
+			TierDetail: fmt.Sprintf("%.2f", found.score),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

@@ -105,6 +105,8 @@ $ deja "jwt refresh token"
 
 Stemmed JSON searches set `"stemmed": true` and include the catalog variants used.
 
+Search hits carry `exact`, `close`, or `semantic` confidence tiers; close hits include the matched variant and semantic hits include cosine.
+
 ### Share your stats
 
 Run `deja stats --card` to write a self-contained `deja-stats.svg` for a README or social post.
