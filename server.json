@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.vshulcz/deja-vu",
-  "description": "Local memory layer over your coding-agent histories: search, recall, blame and notes across Claude Code, Codex, Cursor, opencode, aider, Gemini CLI, Antigravity, Grok Build and Qwen Code. Zero-dependency binary, nothing leaves the machine.",
+  "description": "Local searchable memory over your coding-agent session histories, served back via MCP recall.",
   "repository": {
     "url": "https://github.com/vshulcz/deja-vu",
     "source": "github"
