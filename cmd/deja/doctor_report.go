@@ -22,8 +22,9 @@ type doctorStore struct {
 }
 
 type doctorComponent struct {
-	State string `json:"state"`
-	Path  string `json:"path,omitempty"`
+	State       string `json:"state"`
+	Path        string `json:"path,omitempty"`
+	StaleStores int    `json:"stale_stores,omitempty"`
 }
 
 type doctorVersionReport struct {
@@ -64,15 +65,13 @@ type doctorStoreCheck struct {
 func collectDoctorReport(lookup doctorVersionLookup) doctorReport {
 	stores := doctorStoreChecks()
 	report := doctorReport{Stores: make([]doctorStore, 0, len(stores))}
-	var newest time.Time
+	storeMods := make([]time.Time, 0, len(stores))
 	for _, check := range stores {
 		store, mod := inspectDoctorStore(check)
 		report.Stores = append(report.Stores, store)
-		if mod.After(newest) {
-			newest = mod
-		}
+		storeMods = append(storeMods, mod)
 	}
-	report.Index = inspectDoctorIndex(newest)
+	report.Index = inspectDoctorIndex(storeMods)
 	report.MCP = collectDoctorMCP()
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
@@ -209,14 +208,20 @@ func newestDoctorFile(files []string) (string, time.Time) {
 	return newest, newestMod
 }
 
-func inspectDoctorIndex(newestStore time.Time) doctorComponent {
+func inspectDoctorIndex(storeMods []time.Time) doctorComponent {
 	dir := index.DefaultDir()
 	result := doctorComponent{State: "missing", Path: dir}
 	if !index.HasManifest(dir) {
 		return result
 	}
 	result.State = "ok"
-	if fi, err := os.Stat(filepath.Join(dir, "manifest.gob")); err == nil && newestStore.After(fi.ModTime()) {
+	builtAt := index.ManifestBuiltAt(dir)
+	for _, mod := range storeMods {
+		if !mod.IsZero() && mod.After(builtAt) {
+			result.StaleStores++
+		}
+	}
+	if result.StaleStores > 0 {
 		result.State = "stale"
 	}
 	return result

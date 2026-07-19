@@ -185,7 +185,7 @@ func TestDoctorJSONGolden(t *testing.T) {
 
 func TestDoctorIndexStates(t *testing.T) {
 	hermeticEnv(t)
-	if got := inspectDoctorIndex(time.Time{}).State; got != "missing" {
+	if got := inspectDoctorIndex(nil).State; got != "missing" {
 		t.Fatalf("missing index state = %q", got)
 	}
 	dir := os.Getenv("DEJA_INDEX_DIR")
@@ -202,18 +202,44 @@ func TestDoctorIndexStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name   string
-		newest time.Time
-		want   string
+		name      string
+		storeMods []time.Time
+		want      string
+		stale     int
 	}{
-		{"ok", manifestTime.Add(-time.Minute), "ok"},
-		{"stale", manifestTime.Add(time.Minute), "stale"},
+		{"ok", []time.Time{manifestTime.Add(-time.Minute)}, "ok", 0},
+		{"stale-one", []time.Time{manifestTime.Add(time.Minute)}, "stale", 1},
+		{"stale-two", []time.Time{manifestTime.Add(time.Minute), manifestTime.Add(2 * time.Minute)}, "stale", 2},
+		{"mixed", []time.Time{manifestTime.Add(-time.Minute), manifestTime.Add(time.Minute), time.Time{}}, "stale", 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := inspectDoctorIndex(tc.newest).State; got != tc.want {
-				t.Fatalf("state = %q, want %q", got, tc.want)
+			got := inspectDoctorIndex(tc.storeMods)
+			if got.State != tc.want {
+				t.Fatalf("state = %q, want %q", got.State, tc.want)
+			}
+			if got.StaleStores != tc.stale {
+				t.Fatalf("stale stores = %d, want %d", got.StaleStores, tc.stale)
 			}
 		})
+	}
+}
+
+func TestDoctorIndexFreshnessOutput(t *testing.T) {
+	var out bytes.Buffer
+	doctorIndex(&out, doctorComponent{State: "ok", Path: "/tmp/index"})
+	if !strings.Contains(out.String(), "freshness up to date") {
+		t.Fatalf("fresh output = %q", out.String())
+	}
+	out.Reset()
+	doctorIndex(&out, doctorComponent{State: "stale", Path: "/tmp/index", StaleStores: 3})
+	got := out.String()
+	if !strings.Contains(got, "freshness 3 stores changed since last build") {
+		t.Fatalf("stale output = %q", got)
+	}
+	out.Reset()
+	doctorIndex(&out, doctorComponent{State: "stale", Path: "/tmp/index", StaleStores: 1})
+	if !strings.Contains(out.String(), "freshness 1 store changed since last build") {
+		t.Fatalf("singular stale output = %q", out.String())
 	}
 }
 

@@ -128,6 +128,33 @@ func TestReadRecordsAndGeneration(t *testing.T) {
 	}
 }
 
+func TestManifestBuiltAt(t *testing.T) {
+	dir := t.TempDir()
+	if got := ManifestBuiltAt(dir); !got.IsZero() {
+		t.Fatalf("missing manifest = %v, want zero", got)
+	}
+	builtAt := time.Unix(42, 0)
+	mtime := time.Unix(99, 0)
+	if err := writeManifest(dir, Manifest{Version: version, BuiltAt: builtAt, Sessions: map[string]SessionMeta{}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(filepath.Join(dir, "manifest.gob"), mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if got := ManifestBuiltAt(dir); !got.Equal(builtAt) {
+		t.Fatalf("BuiltAt = %v, want %v", got, builtAt)
+	}
+	if err := writeManifest(dir, Manifest{Version: version, Sessions: map[string]SessionMeta{}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(filepath.Join(dir, "manifest.gob"), mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	if got := ManifestBuiltAt(dir); !got.Equal(mtime) {
+		t.Fatalf("zero BuiltAt fallback = %v, want mtime %v", got, mtime)
+	}
+}
+
 func TestSyncExportImportSearchIdempotent(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")

@@ -418,6 +418,22 @@ func HasManifest(dir string) bool {
 	return err == nil
 }
 
+// ManifestBuiltAt returns when the index was last built. Older manifests may
+// omit BuiltAt; in that case manifest.gob's mtime is used.
+func ManifestBuiltAt(dir string) time.Time {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err == nil && !m.BuiltAt.IsZero() {
+		return m.BuiltAt
+	}
+	if fi, err := os.Stat(filepath.Join(dir, "manifest.gob")); err == nil {
+		return fi.ModTime()
+	}
+	return time.Time{}
+}
+
 func RecentProject(dir, project string, n int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()

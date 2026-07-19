@@ -75,7 +75,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 	fmt.Fprintln(w)
 	doctorHooks(w)
 	fmt.Fprintln(w)
-	doctorIndex(w)
+	doctorIndex(w, report.Index)
 	fmt.Fprintln(w)
 	if report.Embed != nil {
 		doctorEmbed(w, *report.Embed)
@@ -319,12 +319,15 @@ func doctorTOMLWired(path string) bool {
 	return strings.Contains(string(b), "[mcp_servers.deja]")
 }
 
-func doctorIndex(w io.Writer) {
+func doctorIndex(w io.Writer, idx doctorComponent) {
 	fmt.Fprintln(w, "Index:")
-	dir := index.DefaultDir()
+	dir := idx.Path
+	if dir == "" {
+		dir = index.DefaultDir()
+	}
 	fmt.Fprintf(w, "  location %s\n", dir)
 	fmt.Fprintf(w, "  exclusions %d active patterns\n", len(sources.ExclusionPatterns()))
-	if !index.HasManifest(dir) {
+	if idx.State == "missing" {
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return
 	}
@@ -333,6 +336,16 @@ func doctorIndex(w io.Writer) {
 		updated = fi.ModTime().Format("2006-01-02 15:04")
 	}
 	fmt.Fprintf(w, "  status   built (size=%s, updated=%s)\n", humanBytes(pathSize(dir)), updated)
+	switch idx.State {
+	case "stale":
+		if idx.StaleStores == 1 {
+			fmt.Fprintln(w, "  freshness 1 store changed since last build — run `deja index`")
+		} else {
+			fmt.Fprintf(w, "  freshness %d stores changed since last build — run `deja index`\n", idx.StaleStores)
+		}
+	default:
+		fmt.Fprintln(w, "  freshness up to date")
+	}
 }
 
 func doctorVersion(w io.Writer, lookup doctorVersionLookup) {

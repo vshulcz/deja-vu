@@ -99,10 +99,14 @@ func TestDoctorIndexBuiltBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	doctorIndex(&out)
+	report := collectDoctorReport(nil)
+	doctorIndex(&out, report.Index)
 	got := out.String()
 	if !strings.Contains(got, "status   built") || !strings.Contains(got, "size=") || !strings.Contains(got, "updated=") {
 		t.Fatalf("doctorIndex built = %q", got)
+	}
+	if !strings.Contains(got, "freshness up to date") {
+		t.Fatalf("doctorIndex freshness = %q", got)
 	}
 }
 
