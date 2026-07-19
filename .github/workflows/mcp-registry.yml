@@ -1,8 +1,11 @@
 name: MCP Registry
 
 on:
-  release:
-    types: [published]
+  # goreleaser creates the release with GITHUB_TOKEN, whose events do not
+  # trigger other workflows; key off the tag push instead, plus a manual run.
+  push:
+    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
