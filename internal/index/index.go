@@ -1208,7 +1208,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if recErr != nil {
 			return
 		}
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && harnessForPath(r.SourcePath) != "opencode") || replaceKeys[r.Key] {
+		// Shared-store harnesses (opencode, cursor) are parsed since a
+		// watermark, so their untouched sessions are NOT re-emitted on a
+		// change — they must be retained, not dropped, or they vanish.
+		// Superseded sessions are handled by replaceKeys.
+		h := harnessForPath(r.SourcePath)
+		sharedStore := h == "opencode" || h == "cursor-db"
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !sharedStore) || replaceKeys[r.Key] {
 			return
 		}
 		recErr = addRec(r)
