@@ -17,6 +17,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Antigravity](antigravity.md) | JSONL transcript |
 | [Grok Build](grok.md) | ACP update JSONL with JSON metadata |
 | [Qwen Code](qwen.md) | JSONL transcript |
+| [pi](pi.md) | JSONL transcript |
 
 ## Reporting drift
 

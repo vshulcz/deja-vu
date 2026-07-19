@@ -202,6 +202,7 @@ func existingTargets() []string {
 		"copilot":     filepath.Join(homeDir(), ".copilot"),
 		"grok":        sources.GrokRoot(),
 		"qwen":        sources.QwenConfigDir(),
+		"pi":          sources.PiConfigDir(),
 	}
 	var out []string
 	for name, p := range checks {
@@ -239,6 +240,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "copilot":
 		return installResult{Path: guidancePath("copilot"), Action: "guidance-only"}, nil
+	case "pi":
+		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":

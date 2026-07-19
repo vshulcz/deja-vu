@@ -75,6 +75,14 @@
       "files": 0
     },
     {
+      "name": "pi",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.pi/agent/sessions"
+      ],
+      "files": 0
+    },
+    {
       "name": "deja",
       "state": "missing",
       "paths": [
@@ -127,6 +135,11 @@
       "name": "qwen",
       "state": "config-missing",
       "path": "<tmp>/home/.qwen/settings.json"
+    },
+    {
+      "name": "pi",
+      "state": "config-missing",
+      "path": "<tmp>/home/.pi/agent/mcp.json"
     },
     {
       "name": "copilot",

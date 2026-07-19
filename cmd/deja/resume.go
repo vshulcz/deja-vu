@@ -111,6 +111,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
 		return sources.GrokCWDForSession(s.Path), "grok --resume " + s.ID, nil
+	case "pi":
+		return piProjectDirFor(s), "pi --resume " + s.ID, nil
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}
@@ -123,6 +125,19 @@ func claudeProjectDirFor(s model.Session) string {
 		return ""
 	}
 	base := sources.ClaudeProjectDirBase(s.Path)
+	if base == "" {
+		return ""
+	}
+	return sources.ResolveEncodedPath(base)
+}
+
+// piProjectDirFor recovers the original working directory from the
+// transcript location when the encoded project dir still exists on disk.
+func piProjectDirFor(s model.Session) string {
+	if s.Path == "" {
+		return ""
+	}
+	base := sources.PiProjectDirBase(s.Path)
 	if base == "" {
 		return ""
 	}

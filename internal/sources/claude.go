@@ -165,7 +165,13 @@ func resolveEncodedPath(base string) string {
 	if !strings.HasPrefix(base, "-") {
 		return ""
 	}
-	parts := strings.Split(strings.TrimPrefix(base, "-"), "-")
+	// pi uses "--" prefix/suffix (e.g. --Users-x-app--), Claude uses
+	// single "-" prefix. Strip both forms to get the segment list.
+	trimmed := strings.TrimPrefix(base, "-")
+	trimmed = strings.TrimPrefix(trimmed, "-")
+	trimmed = strings.TrimSuffix(trimmed, "-")
+	trimmed = strings.TrimSuffix(trimmed, "-")
+	parts := strings.Split(trimmed, "-")
 	if len(parts) == 0 || len(parts) > 24 {
 		return ""
 	}
