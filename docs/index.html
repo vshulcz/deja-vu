@@ -115,6 +115,18 @@ a:hover{text-decoration:underline}
 .docs-teaser a{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px;color:var(--ink);font-weight:600;font-size:.95rem;transition:border-color .2s}
 .docs-teaser a:hover{border-color:var(--a1);text-decoration:none}
 .docs-teaser a span{display:block;color:var(--dim);font-weight:400;font-size:.83rem;margin-top:4px}
+
+.chips{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin:24px auto 0;max-width:640px}
+.chip{background:#17162a;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:.82rem;color:var(--dim)}
+.chip b{color:var(--ink);font-weight:700}
+.demo-cap{text-align:center;color:var(--faint);font-size:.85rem;margin-top:14px}
+.glow{animation:drift 18s ease-in-out infinite alternate}
+@keyframes drift{from{transform:translateY(0)}to{transform:translateY(-24px)}}
+@media(prefers-reduced-motion:reduce){.glow{animation:none}}
+.card{transition:border-color .2s,transform .2s}
+.card:hover{border-color:#3a3756;transform:translateY(-3px)}
+.term{transition:box-shadow .3s}
+.term:hover{box-shadow:0 30px 90px #7c6cf033,0 24px 80px #00000077}
 </style>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Linux, Windows","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","description":"Local searchable memory over your coding-agent session histories, served back via MCP recall.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","codeRepository":"https://github.com/vshulcz/deja-vu","author":{"@type":"Person","name":"vshulcz"}}
@@ -134,10 +146,16 @@ a:hover{text-decoration:underline}
 
 <header>
   <h1>Your agents already solved this.<br><span class="grad">deja finds it.</span></h1>
-  <p class="sub">Ten coding agents write every session to disk — gigabytes of solved problems nobody can search. <code>deja</code> turns them into a memory layer: search, agent recall, auto-context, redaction, stats, share and sync. One zero-dependency binary.</p>
+  <p class="sub">Your agents forget everything between sessions. Every fix, every rejected approach, every decision — written to disk, never searched again. <code>deja</code> indexes it all and hands it back over MCP, so the agent recalls what it already figured out instead of re-solving it.</p>
   <div class="cta">
     <a class="btn primary" href="#install">Get started</a>
     <a class="btn" href="https://github.com/vshulcz/deja-vu">Star on GitHub</a>
+  </div>
+  <div class="chips">
+    <span class="chip"><b>10</b> coding agents</span>
+    <span class="chip"><b>~60&times;</b> fewer tokens to context</span>
+    <span class="chip"><b>0</b> config, 0 cloud</span>
+    <span class="chip">MIT &middot; fully local</span>
   </div>
   <div class="hero-install">
     <span class="p">$</span>
@@ -162,10 +180,11 @@ a:hover{text-decoration:underline}
 
 </header>
 
-<div class="term">
-  <div class="bar"><i></i><i></i><i></i><span>deja</span></div>
-  <img src="assets/demo.gif" alt="deja demo: searching agent session history from the terminal">
+<div class="term reveal">
+  <div class="bar"><i></i><i></i><i></i><span>~/api-gateway — deja</span></div>
+  <img src="assets/demo.gif" alt="deja demo: searching indexed coding-agent history — exact match, natural-language fallback, and blame on a file">
 </div>
+<p class="demo-cap">Real output. Retroactive: it searches sessions from before you installed it.</p>
 
 <section>
   <h2>Memory your agent actually uses</h2>
