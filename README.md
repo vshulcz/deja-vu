@@ -56,6 +56,14 @@ npx @vshulcz/deja-vu "query"                            # npm, no install
 brew install vshulcz/tap/deja-vu                        # Homebrew
 ```
 
+### Shell completion
+
+```sh
+deja completion bash >> ~/.bashrc
+deja completion zsh >> ~/.zshrc
+deja completion fish > ~/.config/fish/completions/deja.fish
+```
+
 Wire it into the agents you use (edits config, keeps a `.bak`):
 
 ```sh

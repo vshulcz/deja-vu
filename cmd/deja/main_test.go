@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -87,6 +88,67 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 			}
 			if !strings.Contains(out, tc.want) {
 				t.Fatalf("out %q does not contain %q", out, tc.want)
+			}
+		})
+	}
+}
+
+func TestCompletionScripts(t *testing.T) {
+	cases := []struct {
+		shell string
+		want  []string
+	}{
+		{"bash", []string{"complete -F _deja_completion deja", "install_targets=", "compgen -f"}},
+		{"zsh", []string{"#compdef deja", "compdef _deja deja", "install_targets="}},
+		{"fish", []string{"complete -c deja", "__fish_seen_subcommand_from blame", "-F"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.shell, func(t *testing.T) {
+			out, err := captureRun(t, "completion", tc.shell)
+			if err != nil {
+				t.Fatalf("run completion: %v", err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(out, want) {
+					t.Errorf("completion output missing %q", want)
+				}
+			}
+			for _, want := range []string{"blame", "stats", "sync", "harness", "claude-code", "fish"} {
+				if !strings.Contains(out, want) {
+					t.Errorf("completion output missing %q", want)
+				}
+			}
+		})
+	}
+	for _, args := range [][]string{{"completion"}, {"completion", "powershell"}} {
+		if _, err := captureRun(t, args...); err == nil {
+			t.Fatalf("run(%q) succeeded, want error", args)
+		}
+	}
+}
+
+func TestCompletionScriptsParseWhenShellIsAvailable(t *testing.T) {
+	cases := []struct {
+		shell string
+		args  []string
+	}{
+		{"bash", []string{"-n"}},
+		{"zsh", []string{"-n"}},
+		{"fish", []string{"-n"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.shell, func(t *testing.T) {
+			if _, err := exec.LookPath(tc.shell); err != nil {
+				t.Skipf("%s is not installed", tc.shell)
+			}
+			script := completionScripts[tc.shell]
+			path := filepath.Join(t.TempDir(), "deja-completion")
+			if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command(tc.shell, append(tc.args, path)...)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("%s rejected completion script: %v\n%s", tc.shell, err, out)
 			}
 		})
 	}

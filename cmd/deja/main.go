@@ -78,6 +78,9 @@ func run(args []string) error {
 		printSources()
 		return nil
 	}
+	if args[0] == "completion" {
+		return runCompletion(args[1:])
+	}
 	if args[0] == "doctor" {
 		return runDoctor(os.Stdout, args[1:], doctorLookup)
 	}
@@ -753,6 +756,7 @@ Usage:
   deja sync ssh <host> [--pull] [--full]
   deja last [n] [--project name] [--harness name]
   deja sources
+  deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
   deja forget --list | --unforget <id>
   deja doctor [--json]
