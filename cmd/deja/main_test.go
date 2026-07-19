@@ -285,7 +285,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if report.BusiestDay.Date != "2026-07-04" || report.BusiestDay.Messages != 3 {
 		t.Fatalf("busiest = %#v", report.BusiestDay)
 	}
-	if report.Recall.Recalls != 2 || report.Recall.Injections != 1 || report.Recall.InjectedSessions != 2 || report.Recall.EmptyResultRate != 0.5 {
+	if report.Recall.Recalls != 3 || report.Recall.Injections != 1 || report.Recall.InjectedSessions != 2 || report.Recall.EmptyResultRate != 0.5 {
 		t.Fatalf("recall = %#v", report.Recall)
 	}
 	byHarness := map[string]harnessStats{}
@@ -303,7 +303,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") || !strings.Contains(out, "Recalls served   2") {
+	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") || !strings.Contains(out, "Recalls served   3") {
 		t.Fatalf("NO_COLOR/plain output wrong: %q", out)
 	}
 }

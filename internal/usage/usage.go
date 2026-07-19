@@ -67,7 +67,7 @@ func RecordResult(indexDir, kind string, bytes, sessions int, empty bool) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty})
 	if err != nil {
 		return
@@ -117,14 +117,15 @@ func Totals(indexDir string) Summary {
 				empty++
 			}
 		case KindHook:
+			out.Recalls++
 			out.Injections++
 			out.InjectedSessions += e.Sessions
 			out.InjectedBytes += e.Bytes
 			out.Bytes += e.Bytes
 		}
 	}
-	if out.Recalls > 0 {
-		out.EmptyResultRate = float64(empty) / float64(out.Recalls)
+	if served := out.Recalls - out.Injections; served > 0 {
+		out.EmptyResultRate = float64(empty) / float64(served)
 	}
 	return out
 }
@@ -141,7 +142,7 @@ func read(p string) []Event {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []Event
 	s := bufio.NewScanner(f)
 	s.Buffer(make([]byte, 4096), 1<<20)

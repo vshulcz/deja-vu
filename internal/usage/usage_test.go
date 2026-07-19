@@ -71,7 +71,7 @@ func TestBackwardCompatibleEventsAndTotals(t *testing.T) {
 	RecordResult(dir, KindHook, 30, 2, false)
 	Record(dir, KindSearch, 100)
 	got := Totals(dir)
-	if got.Recalls != 2 || got.Injections != 1 || got.InjectedSessions != 2 || got.Bytes != 60 || got.InjectedBytes != 30 || got.EmptyResultRate != 0.5 {
+	if got.Recalls != 3 || got.Injections != 1 || got.InjectedSessions != 2 || got.Bytes != 60 || got.InjectedBytes != 30 || got.EmptyResultRate != 0.5 {
 		t.Fatalf("Totals = %#v", got)
 	}
 	if injected := InjectedToday(dir); injected != 30 {

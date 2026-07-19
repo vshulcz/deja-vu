@@ -90,7 +90,7 @@ $ deja "jwt refresh token"
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
-| `deja stats` | Totals, per-harness split, top projects, monthly sparkline. `--json` too. |
+| `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
 | `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
@@ -109,7 +109,7 @@ Search hits carry `exact`, `close`, or `semantic` confidence tiers; close hits i
 
 ### Share your stats
 
-Run `deja stats --card` to write a self-contained `deja-stats.svg` for a README or social post.
+Run `deja stats --card` to write a self-contained `deja-stats.svg` for a README or profile. The command prints an embed snippet; commit the SVG to your profile or repository if you want it there.
 
 Run `deja stats --html` to write a self-contained, browsable `deja-stats.html` timeline. The HTML export embeds metadata only: dates, harnesses, projects, message counts, and already-redacted first-user titles; it never includes message text.
 

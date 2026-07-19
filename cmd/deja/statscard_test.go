@@ -82,10 +82,11 @@ func TestStatsCardCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	abs, _ := filepath.Abs(path)
-	if strings.TrimSpace(out) != abs {
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 3 || lines[0] != abs || lines[1] != "![deja](deja-stats.svg)" {
 		t.Fatalf("card output = %q, want %q", out, abs)
 	}
-	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), ">deja</text>") {
+	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), "deja · agent history") {
 		t.Fatalf("card contents = %q, %v", b, err)
 	}
 }
@@ -101,5 +102,49 @@ func TestFilterStatsSessions(t *testing.T) {
 	}
 	if got := filterStatsSessions(ss, search.Options{Project: "missing", Since: 1}); len(got) != 0 {
 		t.Fatalf("missing project filter = %#v", got)
+	}
+}
+
+func TestStatsHeadlineAndRepeatQuestions(t *testing.T) {
+	ss := []model.Session{
+		{ID: "one", Messages: []model.Message{{Role: "user", Text: "How do I fix auth?"}, {Role: "user", Text: "How do I fix auth?"}}},
+		{ID: "two", Messages: []model.Message{{Role: "user", Text: "how do I fix auth"}}},
+		{ID: "three", Messages: []model.Message{{Role: "assistant", Text: "How do I fix auth?"}}},
+	}
+	if got := repeatQuestions(ss); got != 1 {
+		t.Fatalf("repeatQuestions = %d, want 1", got)
+	}
+	if got := statsHeadline(statsReport{TotalSessions: 1240, RepeatQuestions: 17}); got != "1,240 sessions indexed · 17 questions asked more than once" {
+		t.Fatalf("headline = %q", got)
+	}
+	if got := statsHeadline(statsReport{}); got != "" {
+		t.Fatalf("empty headline = %q", got)
+	}
+	if got := repeatQuestions([]model.Session{{Messages: []model.Message{
+		{Role: "user", Text: "<local-command-caveat>"},
+		{Role: "user", Text: "   "},
+	}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service now"}}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service"}}}}); got != 2 {
+		t.Fatalf("near-repeat questions = %d, want 2", got)
+	}
+	if closeQuestion([]string{"one"}, []string{"two"}) {
+		t.Fatal("unrelated questions considered close")
+	}
+}
+
+func TestStatsFlagValidation(t *testing.T) {
+	for _, args := range [][]string{
+		{"--html", "--html"},
+		{"--card", "--card"},
+		{"--redaction", "--card"},
+		{"--harness"},
+		{"--project"},
+		{"--since"},
+		{"--role"},
+		{"--since", "not-a-duration"},
+		{"--unknown"},
+	} {
+		if err := runStats(args); err == nil {
+			t.Fatalf("runStats(%#v) returned nil", args)
+		}
 	}
 }

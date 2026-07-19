@@ -26,17 +26,18 @@ const (
 )
 
 type statsReport struct {
-	TotalSessions int            `json:"total_sessions"`
-	TotalMessages int            `json:"total_messages"`
-	Harnesses     []harnessStats `json:"harnesses"`
-	TopProjects   []projectStats `json:"top_projects"`
-	Monthly       []monthStats   `json:"monthly"`
-	Sparkline     string         `json:"sparkline"`
-	DateRange     dateRangeStats `json:"date_range"`
-	Longest       sessionStat    `json:"longest_session"`
-	BusiestDay    dayStat        `json:"busiest_day"`
-	Recall        usage.Summary  `json:"recall"`
-	SidecarSize   int64          `json:"sidecar_size,omitempty"`
+	TotalSessions   int            `json:"total_sessions"`
+	TotalMessages   int            `json:"total_messages"`
+	RepeatQuestions int            `json:"repeat_questions,omitempty"`
+	Harnesses       []harnessStats `json:"harnesses"`
+	TopProjects     []projectStats `json:"top_projects"`
+	Monthly         []monthStats   `json:"monthly"`
+	Sparkline       string         `json:"sparkline"`
+	DateRange       dateRangeStats `json:"date_range"`
+	Longest         sessionStat    `json:"longest_session"`
+	BusiestDay      dayStat        `json:"busiest_day"`
+	Recall          usage.Summary  `json:"recall"`
+	SidecarSize     int64          `json:"sidecar_size,omitempty"`
 }
 
 type redactionReport struct {
@@ -165,6 +166,8 @@ func runStats(args []string) error {
 			return err
 		}
 		fmt.Fprintln(os.Stdout, path)
+		fmt.Fprintln(os.Stdout, "![deja](deja-stats.svg)")
+		fmt.Fprintln(os.Stdout, "Commit the SVG to your profile or repository if you want.")
 		return nil
 	}
 	if htmlPath != "" {
@@ -338,6 +341,7 @@ func buildStats(ss []model.Session, now time.Time) statsReport {
 		out.DateRange.Start = minT.Format("2006-01-02")
 		out.DateRange.End = maxT.Format("2006-01-02")
 	}
+	out.RepeatQuestions = repeatQuestions(ss)
 	return out
 }
 
@@ -353,6 +357,9 @@ func printStats(w io.Writer, r statsReport) {
 	}
 	fmt.Fprintf(w, "%sdeja stats%s\n", bold, reset)
 	fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
+	if headline := statsHeadline(r); headline != "" {
+		fmt.Fprintf(w, "%s%s%s\n\n", bold, headline, reset)
+	}
 	fmt.Fprintf(w, "Sessions  %s%d%s\n", bold, r.TotalSessions, reset)
 	fmt.Fprintf(w, "Messages  %s%d%s\n", bold, r.TotalMessages, reset)
 	fmt.Fprintf(w, "Range     %s → %s\n\n", valueOrDash(r.DateRange.Start), valueOrDash(r.DateRange.End))
@@ -397,63 +404,6 @@ func printStats(w io.Writer, r statsReport) {
 	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)
 }
 
-func considerTime(minT, maxT *time.Time, t time.Time) {
-	if t.IsZero() {
-		return
-	}
-	if minT.IsZero() || t.Before(*minT) {
-		*minT = t
-	}
-	if maxT.IsZero() || t.After(*maxT) {
-		*maxT = t
-	}
-}
-
-func firstMonth(t time.Time) time.Time {
-	y, m, _ := t.Date()
-	return time.Date(y, m, 1, 0, 0, 0, 0, t.Location())
-}
-
-func sparkline(months []monthStats) string {
-	blocks := []rune("▁▂▃▄▅▆▇█")
-	maxMessages := 0
-	for _, m := range months {
-		if m.Messages > maxMessages {
-			maxMessages = m.Messages
-		}
-	}
-	var b strings.Builder
-	for _, m := range months {
-		idx := 0
-		if maxMessages > 0 && m.Messages > 0 {
-			idx = ((m.Messages - 1) * (len(blocks) - 1) / maxMessages) + 1
-		}
-		b.WriteRune(blocks[idx])
-	}
-	return b.String()
-}
-
-func monthLabels(months []monthStats) string {
-	labels := make([]string, 0, len(months))
-	for _, m := range months {
-		if t, err := time.Parse("2006-01", m.Month); err == nil {
-			labels = append(labels, t.Format("Jan"))
-		}
-	}
-	return strings.Join(labels, " ")
-}
-
-func scaledBar(n, maxN, width int) int {
-	if n <= 0 || maxN <= 0 {
-		return 0
-	}
-	scaled := n * width / maxN
-	if scaled == 0 {
-		return 1
-	}
-	return scaled
-}
-
 func statTitle(s model.Session) string {
 	if s.Title != "" && !statNoise(s.Title) {
 		return s.Title
@@ -474,24 +424,6 @@ func statNoise(s string) bool {
 		}
 	}
 	return false
-}
-
-func valueOrDash(s string) string {
-	if s == "" {
-		return "-"
-	}
-	return s
-}
-
-func trimRunes(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	if n <= 1 {
-		return string(r[:n])
-	}
-	return string(r[:n-1]) + "…"
 }
 
 func statColorOK(w io.Writer) bool {
