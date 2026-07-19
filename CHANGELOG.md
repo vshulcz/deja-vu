@@ -19,10 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP tool descriptions rewritten around user trigger phrases, with read-only annotations; the injected digest opens with an actionable line.
 - deja bench context: a seeded, ablation-armed context-readiness experiment with coverage gates and negative controls.
 - A Dockerfile for directory checkers, and automatic publication of server.json to the MCP registry on release.
+- pi (pi.dev) as the tenth supported harness (contributed by @maxandersen).
 
 ### Fixed
-- recall_context no longer returns a header-only digest for multi-word queries and falls back to a session overview (community contribution).
-- The xai- redaction pattern no longer matches kebab-case prose (community contribution).
+- Incremental update no longer drops untouched Cursor sessions from the index.
+- The search/MCP build path dedups messages, so a session present in two stores is not double-indexed.
+- `deja forget` writes tombstones before rebuilding so a crash cannot resurrect forgotten sessions; `unforget` matches by id-prefix so a bare letter cannot revive whole harnesses.
+- The aider parser reads unbounded lines, so a multi-megabyte pasted blob no longer drops later sessions.
+- Fuzzy and word-form hits rank by relevance (BM25) instead of recency only; stop words no longer over-constrain natural-language queries.
+- Install writes the MCP command through `cmd /c` on Windows so stdio clients can spawn it.
+- `recall_context` no longer returns a header-only digest for multi-word queries (community contribution).
+- A corrupt record length prefix is rejected instead of allocating gigabytes.
+
+### Security
+- Redaction now covers HTTP Basic auth, `scheme://:password@host` URLs and PGP armored keys, runs before the size cap so a boundary-straddling secret is not stored raw, and the `sk-`/`xai-` rules no longer destroy kebab-case prose (the xai- fix is a community contribution).
 
 ## [0.13.0] - 2026-07-19
 
