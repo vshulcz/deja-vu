@@ -58,7 +58,7 @@
 <p>Builds a seeded multi-session corpus and query set, runs them through the real search pipeline, and reports recall@5/@10 with median latency (plus a hybrid column when an embedding endpoint is up). CI fails if recall regresses.</p>
 <h2>Context readiness</h2>
 <pre>deja bench context</pre>
-<p>The interesting number. Across seeded multi-session task chains, it compares four ways to assemble the context a task needs — deja recall, replaying full history, naive grep, and cold — reporting median tokens with spread and verbatim fact coverage. On the default corpus, deja reaches the same fact coverage as replaying the full history for roughly <b>60× fewer tokens</b>, and injects nothing on the negative-control chains where no prior fact is relevant.</p>
+<p>The interesting number. Across seeded multi-session task chains, it compares four ways to assemble the context a task needs — deja recall, replaying full history, naive grep, and cold — reporting median tokens with spread and verbatim fact coverage. On the default corpus, deja reaches the same fact coverage as grepping the raw logs for roughly <b>200× fewer tokens</b> — and about 60× fewer than replaying the matched sessions in full — while injecting nothing on the negative-control chains where no prior fact is relevant.</p>
 <div class="note">The comparison is ablation-matched (same pipeline, memory on/off) with naive baselines, so the number isolates deja's contribution rather than "more context helps". Run it and read the distribution.</div>
 
 </article>

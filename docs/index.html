@@ -162,14 +162,14 @@ a:hover{text-decoration:underline}
 
 <header>
   <h1>Your agents already solved this.<br><span class="grad">deja finds it.</span></h1>
-  <p class="sub">Your agents forget everything between sessions. Every fix, every rejected approach, every decision — written to disk, never searched again. <code>deja</code> indexes it all and hands it back over MCP, so the agent recalls what it already figured out instead of re-solving it.</p>
+  <p class="sub">Memory tools start empty and record forward. <code>deja</code> starts full: it indexes the sessions your agents already wrote to disk — months of history from before you installed it — hands it back over MCP so any agent recalls what any other solved, and follows you between machines over SSH.</p>
   <div class="cta">
     <a class="btn primary" href="#install">Get started</a>
     <a class="btn" href="https://github.com/vshulcz/deja-vu">Star on GitHub</a>
   </div>
   <div class="chips">
     <span class="chip"><b>10</b> coding agents</span>
-    <span class="chip"><b>~60&times;</b> fewer tokens to context</span>
+    <span class="chip"><b>0</b> capture step — indexes retroactively</span>
     <span class="chip"><b>0</b> config, 0 cloud</span>
     <span class="chip">MIT &middot; fully local</span>
   </div>
@@ -215,7 +215,7 @@ a:hover{text-decoration:underline}
   <h2>Measured, not claimed</h2>
   <p class="lead">Reaching the context a task needs, with deja recall vs replaying the whole history — a seeded benchmark anyone can run with <code style="font-family:var(--mono)">deja bench context</code>.</p>
   <div class="proof-grid">
-    <div class="proof-cell"><div class="big grad">~60&times;</div><div class="cap2">fewer tokens to working context than replaying history, at equal fact coverage</div></div>
+    <div class="proof-cell"><div class="big grad">~200&times;</div><div class="cap2">fewer tokens to working context than grepping the raw logs, at equal fact coverage</div></div>
     <div class="proof-cell"><div class="big grad">~12 ms</div><div class="cap2">typical warm search over gigabytes of history</div></div>
     <div class="proof-cell"><div class="big grad">10</div><div class="cap2">coding agents indexed into one retroactive memory</div></div>
   </div>
@@ -296,7 +296,7 @@ a:hover{text-decoration:underline}
     <a href="guide/commands.html">CLI reference<span>every subcommand and flag</span></a>
     <a href="guide/harnesses.html">Harnesses<span>ten agents, and adding one</span></a>
     <a href="guide/privacy.html">Privacy<span>redaction, forget, exclude</span></a>
-    <a href="guide/benchmarks.html">Benchmarks<span>the ~60&times; number, reproducible</span></a>
+    <a href="guide/benchmarks.html">Benchmarks<span>the ~200&times; number, reproducible</span></a>
     <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture<span>index format, internals</span></a>
   </div>
 </section>

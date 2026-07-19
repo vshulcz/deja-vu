@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/logo.svg" width="340" alt="deja-vu"></p>
 
-<p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Search 3.3&nbsp;GB of agent history in ~12&nbsp;ms &mdash; and reach working context for ~60&times; fewer tokens than replaying it. One zero-dependency binary, fully local.</p>
+<p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; searches 3.3&nbsp;GB in ~12&nbsp;ms, serves it back to any agent over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">vshulcz.github.io/deja-vu</a></p>
 
@@ -19,12 +19,12 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | Feature | What it does |
 | --- | --- |
 | **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it |
-| **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses |
+| **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
+| **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
 | **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask; Claude Code also captures the current transcript before compaction |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
 | **Stats** | `deja stats` — your agent work, wrapped: harnesses, top projects, activity sparkline |
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
-| **Sync** | `deja sync export/import` — move memory between machines, append-only, idempotent |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
 | **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
 | **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
@@ -278,7 +278,7 @@ Run with the default seed (`1`):
 | naive-grep | 57,489 | 40,413-74,837 | 1.00 | 0 |
 | cold | 0 | 0-0 | 0.00 | 0 |
 
-Prior sessions in the generated corpus carry realistic log-noise bulk; without it the full-history arm looks artificially cheap and the comparison is meaningless. On this corpus the recall digest reaches the same fact coverage as replaying the full history for about 60x fewer tokens, and injects nothing on the negative-control chains where no prior fact is relevant.
+Prior sessions in the generated corpus carry realistic log-noise bulk; without it the full-history arm looks artificially cheap and the comparison is meaningless. On this corpus the recall digest reaches the same fact coverage as grepping the raw logs for about 200x fewer tokens — and about 60x fewer than replaying the matched sessions in full — while injecting nothing on the negative-control chains where no prior fact is relevant.
 
 ## How it works
 
@@ -291,10 +291,10 @@ Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact cr
 **Does anything leave my machine?** Indexing and search are local. `deja update` downloads releases from GitHub, and user-invoked `deja sync ssh` transfers redacted batches through the system SSH client. Directory exports and shares go only to the destination you choose. See the [security model](docs/SECURITY-MODEL.md#data-flows) for the full data flow.
 
 **How is this different from cass?**
-[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, eight harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
+[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, ten harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
 
 **And from MemPalace / Mem0 / Letta?**
-Those are memory *platforms*: embeddings, vector stores, capture hooks or APIs that record going forward. deja has no capture step at all — it indexes what your agents already wrote to disk, including months of history from before you installed it. They can coexist.
+Those are memory *platforms*: a Python runtime, embedding models, a vector store, and capture hooks that only remember what happens after you adopt them. deja has no capture step and no stack — one binary over the logs your agents already wrote, so it knows your history from day one, including everything from before you installed it.
 
 **What about secrets already in my logs?** They stay in the original harness files (that's your agent's data), but they don't enter deja's index, digests, shares or sync exports.
 

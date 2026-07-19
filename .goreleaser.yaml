@@ -57,6 +57,7 @@ snapshot:
 
 changelog:
   sort: asc
+  format: "{{ .Message }}"
   groups:
     - title: Features
       regexp: '^feat(\(.+\))?:'

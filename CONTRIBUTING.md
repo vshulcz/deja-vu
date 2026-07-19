@@ -20,9 +20,11 @@ go test ./internal/sources/ -coverprofile=coverage.out
 go tool cover -func=coverage.out
 ```
 
-Replace `internal/sources` with each package changed. Do not add low-value tests
-only to move the number; explain a genuinely unreachable branch in the pull
-request instead.
+Replace `internal/sources` with each package changed. CI prints only the
+aggregate number, so the two commands above are how you check the figure review
+actually looks at — run them before opening the PR and there will be no
+surprises. Do not add low-value tests only to move the number; explain a
+genuinely unreachable branch in the pull request instead.
 
 ## Hermetic tests
 
