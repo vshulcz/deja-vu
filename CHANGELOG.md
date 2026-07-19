@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-07-19
+
+### Added
+- Semantic search fallback: on zero lexical results with a current embedding sidecar, the query is vector-searched against it; results carry a semantic flag.
+- Confidence tiers on every hit — exact, close (with the matched variant), semantic (with the cosine) — across CLI, JSON and MCP output.
+- Natural-language queries: query-time stop-word dropping and a morphological fallback, so the README's own example phrasing finds its session.
+- PreCompact capture and post-compaction re-injection: the transcript is indexed before Claude Code compacts, and the SessionStart digest re-anchors the model afterwards with visible per-session provenance.
+- Onboarding builds memory on install: install --auto/--all index detected stores on the spot, the SessionStart hook warms a missing index in the background, and install.sh offers a PATH line.
+- Personal headline metrics in stats and an embeddable SVG card (counts only, no project names) with a ready-to-paste markdown snippet.
+- MCP tool descriptions rewritten around user trigger phrases, with read-only annotations; the injected digest opens with an actionable line.
+- deja bench context: a seeded, ablation-armed context-readiness experiment with coverage gates and negative controls.
+- A Dockerfile for directory checkers, and automatic publication of server.json to the MCP registry on release.
+
+### Fixed
+- recall_context no longer returns a header-only digest for multi-word queries and falls back to a session overview (community contribution).
+- The xai- redaction pattern no longer matches kebab-case prose (community contribution).
+
 ## [0.13.0] - 2026-07-19
 
 ### Added
