@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — deja-vu docs</title>
+<meta name="description" content="deja is local by design: no background network, credentials redacted at index time, and forget/exclude controls over what is indexed and kept.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/privacy.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Privacy — deja-vu docs">
+<meta property="og:description" content="deja is local by design: no background network, credentials redacted at index time, and forget/exclude controls over what is indexed and kept.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/privacy.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/favicon.svg" alt="">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents & MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html" aria-current="page">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.md">Format registry</a></aside>
+<article>
+
+<h1>Privacy</h1>
+<p>deja indexes credential-bearing histories, so privacy is a first-order concern, not an afterthought.</p>
+<h2>Local by default</h2>
+<p>Indexing and search have no network path. The index and its usage sidecar never leave the machine. Network access happens only when you run <code>deja update</code>, <code>deja sync ssh</code>, or the <code>doctor</code> version check (which <code>--offline</code> disables).</p>
+<h2>Redaction</h2>
+<p>Secrets are stripped at index time — API keys, JWTs, PEM/PGP private-key blocks, bearer and HTTP Basic auth, provider tokens, and <code>scheme://user:pass@host</code> URLs — before anything is written. Redaction runs on the full message before any size cap, so a secret straddling the cap boundary can't slip through. Redacted output is what search, MCP recall, share and sync all serve.</p>
+<h2>Control what's kept</h2>
+<ul>
+<li><b>Exclude at ingest</b> — <code>~/.config/deja/exclude</code> patterns or <code>DEJA_EXCLUDE_PROJECTS</code> skip projects entirely.</li>
+<li><b>Forget</b> — <code>deja forget</code> removes sessions and records a tombstone so they don't come back on the next index; <code>--dry-run</code> to preview, <code>--unforget</code> to reverse.</li>
+<li><b>Redaction report</b> — <code>deja stats --redaction</code> shows what was masked, per rule and harness.</li>
+</ul>
+<p>Full details in the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">security model</a>.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

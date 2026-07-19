@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started — deja-vu docs</title>
+<meta name="description" content="Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Getting started — deja-vu docs">
+<meta property="og:description" content="Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/getting-started.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/favicon.svg" alt="">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html" aria-current="page">Getting started</a>
+<a href="agents.html">Agents & MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.md">Format registry</a></aside>
+<article>
+
+<h1>Getting started</h1>
+<p>deja is a single zero-dependency binary. It reads the session logs your coding agents already write, builds a local search index, and serves that memory back to the agents over MCP. Nothing leaves your machine.</p>
+<h2>Install</h2>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+# or
+brew install vshulcz/tap/deja-vu
+npm  install -g @vshulcz/deja-vu
+go   install github.com/vshulcz/deja-vu/cmd/deja@latest</pre>
+<h2>Search your history</h2>
+<p>The first search builds the index automatically from every agent history it finds — retroactively, including sessions from before you installed deja.</p>
+<pre>deja "connection pool exhausted"
+deja "have we dealt with jwt refresh rotation before"</pre>
+<div class="note">No <code>deja index</code> step is required — any search, recall, or install builds and refreshes the index as needed.</div>
+<h2>Wire it into your agents</h2>
+<pre>deja install --all      # MCP recall for every agent found on this machine
+deja install --auto     # same, plus session-start auto-recall where supported</pre>
+<p>After that, an agent can call <code>recall</code> the moment you reference past work — see <a href="agents.html">Agents &amp; MCP</a>. Confirm the wiring any time with <code>deja doctor</code>.</p>
+<h2>Optional: semantic recall</h2>
+<p>If you run a local embedding endpoint (Ollama, LM Studio), <code>deja embed</code> adds a vector sidecar so rephrased queries still match. Without one, deja works exactly as before. See <a href="search.html">Search</a>.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

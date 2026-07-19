@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search — deja-vu docs</title>
+<meta name="description" content="deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/search.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Search — deja-vu docs">
+<meta property="og:description" content="deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/search.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/favicon.svg" alt="">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents & MCP</a>
+<a href="search.html" aria-current="page">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.md">Format registry</a></aside>
+<article>
+
+<h1>Search</h1>
+<p>Search is lexical by default — fast, offline, no model required — with graceful fallbacks so natural phrasing still works.</p>
+<h2>Query forms</h2>
+<ul>
+<li><b>Tokens</b> — <code>deja connection pool</code> matches records containing both words (AND).</li>
+<li><b>Phrases</b> — <code>deja '"connection pool exhausted"'</code> requires the exact contiguous phrase.</li>
+<li><b>Regex</b> — <code>deja --re "timeout|deadline exceeded"</code>.</li>
+<li><b>Filters</b> — <code>--harness</code>, <code>--project</code>, <code>--since 30d</code>, <code>--role assistant</code>.</li>
+</ul>
+<h2>When nothing matches exactly</h2>
+<p>On zero results deja widens the net in order, and marks how each hit was found:</p>
+<ul>
+<li><b>Stop-word handling</b> — natural phrasing like "have we dealt with jwt refresh rotation" drops filler words so the content tokens drive the search.</li>
+<li><b>Word forms</b> — <code>rotation</code> ↔ <code>rotated</code> via suffix folding.</li>
+<li><b>Typos</b> — close spellings within edit distance.</li>
+<li><b>Semantic</b> — if a vector sidecar exists, a rephrased query with no shared words still matches.</li>
+</ul>
+<p>Each result carries a tier — <code>exact</code>, <code>close</code> (with the variant), or <code>semantic</code> (with the cosine) — in the CLI, JSON and MCP output.</p>
+<h2>Semantic recall</h2>
+<pre>deja embed          # build a vector sidecar from a local embedding endpoint
+deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
+<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. No endpoint, no semantic layer — search is unchanged.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

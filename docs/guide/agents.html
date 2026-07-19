@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents & MCP — deja-vu docs</title>
+<meta name="description" content="How deja gives your coding agents a searchable memory over MCP: recall, recall_context, blame, remember, and session-start auto-recall.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/agents.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Agents & MCP — deja-vu docs">
+<meta property="og:description" content="How deja gives your coding agents a searchable memory over MCP: recall, recall_context, blame, remember, and session-start auto-recall.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/agents.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/favicon.svg" alt="">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html" aria-current="page">Agents & MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.md">Format registry</a></aside>
+<article>
+
+<h1>Agents &amp; MCP</h1>
+<p>deja runs an MCP server (<code>deja mcp</code>, stdio) that exposes your indexed history to any MCP-capable agent. <code>deja install</code> wires it into the agents it detects.</p>
+<h2>Tools</h2>
+<table><thead><tr><th>Tool</th><th>What it does</th></tr></thead><tbody>
+<tr><td><code>recall</code></td><td>Search past sessions across every agent and return dense matches under ~4&nbsp;KB. Fires on phrases like "didn't we fix this before".</td></tr>
+<tr><td><code>recall_context</code></td><td>Return a full markdown digest of the single best-matching session — the problem, decision and outcome.</td></tr>
+<tr><td><code>blame</code></td><td>Given a file path, the prior sessions that discussed it, most specific first. git blame for the conversations behind the code.</td></tr>
+<tr><td><code>remember</code></td><td>Store a durable decision so a future session can recall it. Redacted and indexed like any other source.</td></tr>
+</tbody></table>
+<h2>Auto-recall</h2>
+<p><code>deja install --auto</code> adds a SessionStart hook (Claude Code, Codex, an opencode plugin). Relevant project memory is injected before you ask — read-only, capped at 2&nbsp;KB, framed as untrusted historical data so it never acts as an instruction. It also fires right after a context compaction, re-anchoring the model in what it just lost.</p>
+<h2>Windows</h2>
+<div class="note">On Windows, stdio MCP clients spawn through <code>cmd /c deja mcp</code>. <code>deja install</code> writes that form automatically.</div>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
