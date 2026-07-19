@@ -16,9 +16,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Resolve the release version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ref="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            ref="$(gh release view --repo "${GITHUB_REPOSITORY}" --json tagName -q .tagName)"
+          fi
+          echo "version=${ref#v}" >> "$GITHUB_OUTPUT"
       - name: Wait for the npm package to land
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ steps.ver.outputs.version }}"
           for _ in $(seq 1 30); do
             if curl -fsSL "https://registry.npmjs.org/@vshulcz/deja-vu/${version}" >/dev/null 2>&1; then
               exit 0
@@ -29,7 +39,7 @@ jobs:
           exit 1
       - name: Stamp the release version into server.json
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ steps.ver.outputs.version }}"
           python3 - "$version" <<'PY'
           import json, sys
           version = sys.argv[1]
