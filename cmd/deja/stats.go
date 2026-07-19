@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type statsReport struct {
 	Harnesses       []harnessStats `json:"harnesses"`
 	TopProjects     []projectStats `json:"top_projects"`
 	Monthly         []monthStats   `json:"monthly"`
+	Heatmap         heatmapStats   `json:"-"` // card-only presentation data; kept out of the stable --json schema
 	Sparkline       string         `json:"sparkline"`
 	DateRange       dateRangeStats `json:"date_range"`
 	Longest         sessionStat    `json:"longest_session"`
@@ -61,6 +63,20 @@ type projectStats struct {
 type monthStats struct {
 	Month    string `json:"month"`
 	Messages int    `json:"messages"`
+}
+
+// heatmapStats is a GitHub-style trailing-year grid: one column per week,
+// seven rows (Sun–Sat). A day count of -1 means the cell falls outside the
+// covered range and is not drawn.
+type heatmapStats struct {
+	Weeks  [][7]int    `json:"weeks"`
+	Max    int         `json:"max"`
+	Months []heatMonth `json:"months"`
+}
+
+type heatMonth struct {
+	Col   int    `json:"col"`
+	Label string `json:"label"`
 }
 
 type dateRangeStats struct {
@@ -145,13 +161,20 @@ func runStats(args []string) error {
 	if redaction && card {
 		return fmt.Errorf("stats: --redaction cannot combine with --card")
 	}
-	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
+	// A card is a shareable artifact, not a build log: keep the per-harness
+	// indexing chatter off stdout/stderr and show one quiet status line instead.
+	progress := io.Writer(os.Stderr)
+	if cardPath != "" {
+		fmt.Fprintln(os.Stderr, "deja: preparing your stats card …")
+		progress = io.Discard
+	}
+	if err := index.Ensure(index.DefaultDir(), "", false, progress); err != nil {
 		return err
 	}
 	if redaction {
 		return printRedactionReport(jsonOut)
 	}
-	ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, os.Stderr)
+	ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, progress)
 	if err != nil {
 		return err
 	}
@@ -165,9 +188,8 @@ func runStats(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, path)
-		fmt.Fprintln(os.Stdout, "![deja](deja-stats.svg)")
-		fmt.Fprintln(os.Stdout, "Commit the SVG to your profile or repository if you want.")
+		base := filepath.Base(path)
+		fmt.Fprintf(os.Stdout, "saved %s\n\nshare it — paste into a README or post:\n  ![deja](%s)\n", path, base)
 		return nil
 	}
 	if htmlPath != "" {
@@ -336,6 +358,7 @@ func buildStats(ss []model.Session, now time.Time) statsReport {
 		}
 	}
 	out.Monthly = months
+	out.Heatmap = buildHeatmap(byDay, now)
 	out.Sparkline = sparkline(months)
 	if !minT.IsZero() {
 		out.DateRange.Start = minT.Format("2006-01-02")
@@ -343,6 +366,40 @@ func buildStats(ss []model.Session, now time.Time) statsReport {
 	}
 	out.RepeatQuestions = repeatQuestions(ss)
 	return out
+}
+
+// buildHeatmap turns per-day message counts into a Sunday-aligned trailing-year
+// grid (~53 week columns) with month ticks, for the shareable stats card.
+func buildHeatmap(byDay map[string]int, now time.Time) heatmapStats {
+	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	start := end.AddDate(0, 0, -370)
+	for start.Weekday() != time.Sunday {
+		start = start.AddDate(0, 0, -1)
+	}
+	var hm heatmapStats
+	lastMonth := ""
+	for cur := start; !cur.After(end); {
+		var week [7]int
+		colDate := cur
+		for d := 0; d < 7; d++ {
+			if cur.After(end) {
+				week[d] = -1
+			} else {
+				c := byDay[cur.Format("2006-01-02")]
+				week[d] = c
+				if c > hm.Max {
+					hm.Max = c
+				}
+			}
+			cur = cur.AddDate(0, 0, 1)
+		}
+		if mon := colDate.Format("Jan"); mon != lastMonth {
+			hm.Months = append(hm.Months, heatMonth{Col: len(hm.Weeks), Label: mon})
+			lastMonth = mon
+		}
+		hm.Weeks = append(hm.Weeks, week)
+	}
+	return hm
 }
 
 func printStats(w io.Writer, r statsReport) {

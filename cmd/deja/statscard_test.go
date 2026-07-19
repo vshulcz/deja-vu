@@ -82,9 +82,8 @@ func TestStatsCardCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	abs, _ := filepath.Abs(path)
-	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if len(lines) != 3 || lines[0] != abs || lines[1] != "![deja](deja-stats.svg)" {
-		t.Fatalf("card output = %q, want %q", out, abs)
+	if !strings.Contains(out, "saved "+abs) || !strings.Contains(out, "![deja]("+filepath.Base(path)+")") {
+		t.Fatalf("card output = %q, want saved %q + share snippet", out, abs)
 	}
 	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), "deja · agent history") {
 		t.Fatalf("card contents = %q, %v", b, err)
