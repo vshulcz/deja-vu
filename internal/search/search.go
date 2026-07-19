@@ -376,14 +376,31 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	}
 	fmt.Fprintln(w)
 	qlow := strings.ToLower(query)
+	terms, phrases := QueryParts(query)
 	budget := 8000
+	written := printContextChunks(w, s, budget, func(m model.Message) (bool, bool) {
+		matched := qlow != "" && (strings.Contains(strings.ToLower(m.Text), qlow) || MatchesParts(m.Text, terms, phrases, nil))
+		return matched || m.Role == "user", matched
+	})
+	if written > 0 {
+		return
+	}
+	// The session can match with query terms spread across messages, so no
+	// single message qualifies above; show an overview instead of a bare header.
+	if qlow != "" {
+		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
+	}
+	printContextChunks(w, s, budget, func(m model.Message) (bool, bool) { return true, false })
+}
+
+func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok, matched bool)) int {
 	written := 0
 	for _, m := range s.Messages {
 		if written >= budget {
 			break
 		}
-		matched := qlow != "" && strings.Contains(strings.ToLower(m.Text), qlow)
-		if !matched && m.Role != "user" {
+		ok, matched := include(m)
+		if !ok {
 			continue
 		}
 		text := contextText(m.Text, matched)
@@ -401,6 +418,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		fmt.Fprint(w, chunk)
 		written += len(chunk)
 	}
+	return written
 }
 
 func Recent(ss []model.Session, n int) []model.Session {

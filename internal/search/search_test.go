@@ -216,6 +216,31 @@ func TestPrintSessionContextAndDigestBudgetEdges(t *testing.T) {
 	}
 }
 
+func TestPrintContextTokenMatchAndFallback(t *testing.T) {
+	s := model.Session{ID: "ctxtok", Harness: "claude", Project: "p", Messages: []model.Message{
+		{Role: "assistant", Text: "rotated the turso token and redeployed on vercel"},
+	}}
+	var b bytes.Buffer
+	// Tokens out of order relative to the query: the old full-phrase match
+	// dropped this message and returned a bare header.
+	PrintContext(&b, s, "turso vercel token")
+	if !strings.Contains(b.String(), "redeployed") {
+		t.Fatalf("token-matched assistant message missing: %q", b.String())
+	}
+	spread := model.Session{ID: "ctxspread", Harness: "claude", Project: "p", Messages: []model.Message{
+		{Role: "assistant", Text: "first we rotated the turso token"},
+		{Role: "assistant", Text: "then we redeployed on vercel"},
+	}}
+	b.Reset()
+	// Terms spread across messages: no single message qualifies, so the
+	// digest falls back to an overview instead of a header-only result.
+	PrintContext(&b, spread, "turso vercel")
+	out := b.String()
+	if !strings.Contains(out, "opening exchange") || !strings.Contains(out, "turso token") || !strings.Contains(out, "redeployed") {
+		t.Fatalf("fallback overview missing: %q", out)
+	}
+}
+
 func TestHighlightDateSnippetAndColorBranches(t *testing.T) {
 	if got := highlight("Needle and thread", "needle", false, true); !strings.Contains(got, cMatch+"Needle"+cReset) {
 		t.Fatalf("highlight literal=%q", got)
