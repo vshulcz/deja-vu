@@ -541,3 +541,18 @@ func BenchmarkBM25Scoring1000Candidates(b *testing.B) {
 		}
 	}
 }
+
+func TestTierLabelVocabulary(t *testing.T) {
+	if got := tierLabel(Hit{}); got != "" {
+		t.Fatalf("empty tier label = %q", got)
+	}
+	if got := tierLabel(Hit{Tier: TierExact}); got != "" {
+		t.Fatalf("exact tier label = %q", got)
+	}
+	if got := tierLabel(Hit{Tier: TierClose}); got != " · close" {
+		t.Fatalf("close no-detail label = %q", got)
+	}
+	if got := tierLabel(Hit{Tier: TierSemantic, TierDetail: "0.71"}); got != " · semantic (0.71)" {
+		t.Fatalf("semantic label = %q", got)
+	}
+}
