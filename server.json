@@ -1,26 +1,28 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.vshulcz/deja-vu",
-  "description": "Local memory for coding agents: search, MCP recall, auto-recall, secret redaction, SSH sync.",
+  "description": "Local memory layer over your coding-agent histories: search, recall, blame and notes across Claude Code, Codex, Cursor, opencode, aider, Gemini CLI, Antigravity, Grok Build and Qwen Code. Zero-dependency binary, nothing leaves the machine.",
   "repository": {
     "url": "https://github.com/vshulcz/deja-vu",
     "source": "github"
   },
-  "version": "0.7.1",
+  "version": "0.13.0",
   "packages": [
     {
       "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@vshulcz/deja-vu",
-      "version": "0.7.1",
+      "version": "0.13.0",
       "transport": {
         "type": "stdio"
       },
       "runtimeHint": "npx",
+      "runtimeArguments": [],
       "packageArguments": [
         {
           "type": "positional",
           "value": "mcp",
-          "description": "run the stdio MCP server"
+          "description": "Run the MCP server over stdio."
         }
       ]
     }

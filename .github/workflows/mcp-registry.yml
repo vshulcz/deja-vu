@@ -1,0 +1,48 @@
+name: MCP Registry
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Wait for the npm package to land
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for _ in $(seq 1 30); do
+            if curl -fsSL "https://registry.npmjs.org/@vshulcz/deja-vu/${version}" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "npm package ${version} not visible yet" >&2
+          exit 1
+      - name: Stamp the release version into server.json
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python3 - "$version" <<'PY'
+          import json, sys
+          version = sys.argv[1]
+          with open("server.json") as f:
+              manifest = json.load(f)
+          manifest["version"] = version
+          for pkg in manifest.get("packages", []):
+              pkg["version"] = version
+          with open("server.json", "w") as f:
+              json.dump(manifest, f, indent=2)
+          PY
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz
+          sudo mv mcp-publisher /usr/local/bin/
+      - name: Publish to the MCP registry
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish
