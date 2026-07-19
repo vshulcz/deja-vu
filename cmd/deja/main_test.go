@@ -592,6 +592,34 @@ func TestHookContextSyntheticFixtures(t *testing.T) {
 	}
 }
 
+func TestHookPrecompactIsQuietAndBestEffort(t *testing.T) {
+	withTempStores(t)
+	t.Setenv("DEJA_WARMUP_SENTINEL", filepath.Join(t.TempDir(), "guard"))
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.WriteString(`{"session_id":"s","transcript_path":"/missing.jsonl","trigger":"auto"}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = r
+	defer func() {
+		os.Stdin = oldStdin
+		_ = r.Close()
+	}()
+	out, err := captureRun(t, "hook-precompact")
+	if err != nil || out != "" {
+		t.Fatalf("hook output=%q err=%v", out, err)
+	}
+	if out, err := captureRun(t, "hook-precompact"); err != nil || out != "" {
+		t.Fatalf("malformed hook output=%q err=%v", out, err)
+	}
+}
+
 func TestInstallAutoClaudeHookIdempotentPreservesHooks(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
@@ -614,7 +642,7 @@ func TestInstallAutoClaudeHookIdempotentPreservesHooks(t *testing.T) {
 	}
 	b, _ = os.ReadFile(settingsPath)
 	s := string(b)
-	if strings.Count(s, "hook-context") != 1 || !strings.Contains(s, "/bin/user-hook") || !strings.Contains(s, `"Stop"`) {
+	if strings.Count(s, "hook-context") != 1 || strings.Count(s, "hook-precompact") != 1 || !strings.Contains(s, "/bin/user-hook") || !strings.Contains(s, `"Stop"`) {
 		t.Fatalf("bad auto settings: %s", s)
 	}
 	if _, err := os.Stat(settingsPath + ".bak"); err != nil {
@@ -624,14 +652,14 @@ func TestInstallAutoClaudeHookIdempotentPreservesHooks(t *testing.T) {
 		t.Fatalf("idempotent out=%q err=%v", out, err)
 	}
 	b, _ = os.ReadFile(settingsPath)
-	if strings.Count(string(b), "hook-context") != 1 {
+	if strings.Count(string(b), "hook-context") != 1 || strings.Count(string(b), "hook-precompact") != 1 {
 		t.Fatalf("duplicate hook: %s", b)
 	}
 	if out, err := captureRun(t, "uninstall", "--auto"); err != nil || !strings.Contains(out, "claude-auto:") {
 		t.Fatalf("uninstall --auto out=%q err=%v", out, err)
 	}
 	b, _ = os.ReadFile(settingsPath)
-	if strings.Contains(string(b), "hook-context") || !strings.Contains(string(b), "/bin/user-hook") {
+	if strings.Contains(string(b), "hook-context") || strings.Contains(string(b), "hook-precompact") || !strings.Contains(string(b), "/bin/user-hook") {
 		t.Fatalf("bad uninstall settings: %s", b)
 	}
 	b, _ = os.ReadFile(mcpPath)

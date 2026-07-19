@@ -29,6 +29,22 @@ type sessionStartHookResponse struct {
 	} `json:"hookSpecificOutput"`
 }
 
+type precompactHookInput struct {
+	SessionID      string `json:"session_id"`
+	TranscriptPath string `json:"transcript_path"`
+	CWD            string `json:"cwd"`
+	HookEventName  string `json:"hook_event_name"`
+	Trigger        string `json:"trigger"`
+}
+
+// runHookPrecompact is deliberately best effort: Claude must be able to
+// compact even when the input is incomplete or the index cannot start.
+func runHookPrecompact() {
+	var input precompactHookInput
+	_ = json.NewDecoder(os.Stdin).Decode(&input)
+	requestWarmup(index.DefaultDir())
+}
+
 // runHookContext prints session-start context. plain=false emits the Claude
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).

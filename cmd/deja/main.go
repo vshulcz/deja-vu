@@ -132,6 +132,10 @@ func run(args []string) error {
 		_ = runHookContext(plain)
 		return nil
 	}
+	if args[0] == "hook-precompact" {
+		runHookPrecompact()
+		return nil
+	}
 	if args[0] == "install" {
 		return runInstall(args[1:], false)
 	}

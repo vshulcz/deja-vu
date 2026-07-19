@@ -367,6 +367,7 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
+	nextRoot = updateClaudeHook(nextRoot, "PreCompact", exe+" hook-precompact", "manual|auto", uninstall)
 	next, err := json.MarshalIndent(nextRoot, "", "  ")
 	if err != nil {
 		return installResult{}, err
@@ -377,13 +378,17 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 }
 
 func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall bool) map[string]any {
+	root = updateClaudeHook(root, "SessionStart", exe+" hook-context", "", uninstall)
+	return root
+}
+
+func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall bool) map[string]any {
 	hooks, _ := root["hooks"].(map[string]any)
 	if hooks == nil {
 		hooks = map[string]any{}
 		root["hooks"] = hooks
 	}
-	cmd := exe + " hook-context"
-	entries, _ := hooks["SessionStart"].([]any)
+	entries, _ := hooks[event].([]any)
 	var out []any
 	found := false
 	for _, entryAny := range entries {
@@ -415,12 +420,16 @@ func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall boo
 		out = append(out, entry)
 	}
 	if !uninstall && !found {
-		out = append(out, map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd}}})
+		entry := map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd}}}
+		if matcher != "" {
+			entry["matcher"] = matcher
+		}
+		out = append(out, entry)
 	}
 	if len(out) == 0 {
-		delete(hooks, "SessionStart")
+		delete(hooks, event)
 	} else {
-		hooks["SessionStart"] = out
+		hooks[event] = out
 	}
 	if len(hooks) == 0 {
 		delete(root, "hooks")

@@ -73,6 +73,8 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 	fmt.Fprintln(w)
 	doctorMCP(w)
 	fmt.Fprintln(w)
+	doctorHooks(w)
+	fmt.Fprintln(w)
 	doctorIndex(w)
 	fmt.Fprintln(w)
 	if report.Embed != nil {
@@ -87,6 +89,39 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 		doctorVersion(w, func() (string, bool) { return report.Version.Latest, report.Version.Latest != "" })
 	}
 	return nil
+}
+
+func doctorHooks(w io.Writer) {
+	fmt.Fprintln(w, "Hooks:")
+	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", path)
+		return
+	}
+	var root map[string]any
+	if json.Unmarshal(b, &root) != nil {
+		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", path)
+		return
+	}
+	hooks, _ := root["hooks"].(map[string]any)
+	precompact := hookEventWired(hooks, "PreCompact", "hook-precompact")
+	status := "missing"
+	if precompact {
+		status = "wired"
+	}
+	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, path)
+}
+
+func hookEventWired(hooks map[string]any, event, command string) bool {
+	entries, _ := hooks[event].([]any)
+	for _, entryAny := range entries {
+		entry, _ := entryAny.(map[string]any)
+		if entry != nil && entryHasCommand(entry, command) {
+			return true
+		}
+	}
+	return false
 }
 
 func doctorEmbed(w io.Writer, r doctorEmbedReport) {

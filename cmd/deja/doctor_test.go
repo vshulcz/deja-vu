@@ -38,6 +38,13 @@ func TestDoctorFullReport(t *testing.T) {
 	if err := os.WriteFile(claudeJSON, []byte(`{"mcpServers":{"deja":{"command":"/bin/deja","args":["mcp"]}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	claudeSettings := filepath.Join(tmp, "home", ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(claudeSettings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(claudeSettings, []byte(`{"hooks":{"PreCompact":[{"matcher":"manual|auto","hooks":[{"type":"command","command":"/bin/deja hook-precompact"}]}]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	old := version
 	version = "1.0.0"
@@ -49,7 +56,7 @@ func TestDoctorFullReport(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{
-		"Harness stores:", "Tools:", "MCP wiring:", "Index:", "Version:",
+		"Harness stores:", "Tools:", "MCP wiring:", "Hooks:", "precompact", "Index:", "Version:",
 		"claude", "opencode", "aider", "gemini", "cursor", "antigravity", "grok",
 		"1 file", mcpLine("claude-code", "wired"), "config missing",
 		"not built", "current  1.0.0", "latest   v9.9.9", "update available",
