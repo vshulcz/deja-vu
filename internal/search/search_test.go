@@ -99,7 +99,7 @@ func TestBM25HelperSignals(t *testing.T) {
 	}
 	counts := make([]int, 2)
 	userCounts := make([]int, 2)
-	if got := countDocumentWords("one needle, needle-two", []string{"needle", "needle-two"}, counts, userCounts, true); got != 3 || counts[0] != 1 || counts[1] != 1 || userCounts[1] != 1 {
+	if got := countDocumentWords("one needle, needle-two", []string{"needle", "needle-two"}, nil, counts, userCounts, true); got != 3 || counts[0] != 1 || counts[1] != 1 || userCounts[1] != 1 {
 		t.Fatalf("word counts len=%d counts=%v user=%v", got, counts, userCounts)
 	}
 }

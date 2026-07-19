@@ -141,7 +141,7 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 				}
 			}
 			low := strings.ToLower(m.Text)
-			doc.length += countDocumentWords(low, qtoks, doc.termCount, doc.userCount, m.Role == "user")
+			doc.length += countDocumentWords(low, qtoks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
 			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qlow) {
 				n := strings.Count(low, qlow)
 				doc.termCount[0] += n
@@ -222,7 +222,7 @@ func freshnessDecay(updated, now time.Time) float64 {
 	return 1 / (1 + age)
 }
 
-func countDocumentWords(s string, terms []string, counts, userCounts []int, user bool) int {
+func countDocumentWords(s string, terms []string, variants map[string][]string, counts, userCounts []int, user bool) int {
 	length := 0
 	start := -1
 	for i := 0; i <= len(s); {
@@ -239,7 +239,19 @@ func countDocumentWords(s string, terms []string, counts, userCounts []int, user
 			word := s[start:i]
 			length++
 			for j, term := range terms {
-				if word == term {
+				matched := word == term
+				if !matched {
+					// A word matching a fuzzy/stem variant of this term counts
+					// toward its term frequency so BM25 ranks the hit instead of
+					// falling back to recency-only order.
+					for _, v := range variants[term] {
+						if word == v {
+							matched = true
+							break
+						}
+					}
+				}
+				if matched {
 					counts[j]++
 					if user {
 						userCounts[j]++

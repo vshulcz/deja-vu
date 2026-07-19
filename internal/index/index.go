@@ -2460,8 +2460,20 @@ func queryKeys(s string) []string {
 	if len(toks) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(toks))
+	// Drop stop words so retrievalKeys picks selective content tokens; a
+	// long stop word like "before" must not over-constrain the AND. If the
+	// query is all stop words, keep them (odd results beat none).
+	content := make([]string, 0, len(toks))
 	for _, tok := range toks {
+		if !search.IsStopWord(tok) {
+			content = append(content, tok)
+		}
+	}
+	if len(content) == 0 {
+		content = toks
+	}
+	out := make([]string, 0, len(content))
+	for _, tok := range content {
 		out = append(out, "t"+tok)
 	}
 	return out

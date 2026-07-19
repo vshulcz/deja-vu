@@ -53,6 +53,11 @@ func QueryParts(q string) (terms []string, phrases []string) {
 	return terms, phrases
 }
 
+// IsStopWord reports whether a token is a query-time stop word. Retrieval
+// key selection uses it so a long stop word like "before" cannot displace a
+// short content token in the AND intersection.
+func IsStopWord(term string) bool { return stopWords[term] }
+
 func withoutStopWords(terms []string) []string {
 	kept := make([]string, 0, len(terms))
 	for _, term := range terms {
