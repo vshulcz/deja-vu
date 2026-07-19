@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -109,5 +110,45 @@ func TestParsePiFileEmpty(t *testing.T) {
 	}
 	if len(ss) != 0 {
 		t.Fatalf("expected no sessions from metadata-only file, got %d", len(ss))
+	}
+}
+
+func TestPiDiscoveryAndProjectBase(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	t.Setenv("DEJA_PI_ROOT", "")
+	if got := PiRoot(); got != filepath.Join(root, ".pi", "agent", "sessions") {
+		t.Fatalf("default PiRoot = %q", got)
+	}
+	piRoot := filepath.Join(root, "pi-sessions")
+	t.Setenv("DEJA_PI_ROOT", piRoot)
+	proj := filepath.Join(piRoot, "--Users-max-app--")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(proj, "s.jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"session","id":"s1","timestamp":"2026-01-02T03:04:05Z"}
+{"type":"message","timestamp":"2026-01-02T03:04:06Z","message":{"role":"user","content":"pi discovery fact"}}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files := PiSessionFiles()
+	if len(files) != 1 || files[0] != path {
+		t.Fatalf("PiSessionFiles = %v", files)
+	}
+	ss := LoadPi()
+	if len(ss) != 1 || ss[0].ID != "s1" || ss[0].Harness != "pi" {
+		t.Fatalf("LoadPi = %#v", ss)
+	}
+	if !strings.HasSuffix(ss[0].Project, "app") {
+		t.Fatalf("pi project decode = %q, want …app", ss[0].Project)
+	}
+	if base := PiProjectDirBase(path); base != "--Users-max-app--" {
+		t.Fatalf("PiProjectDirBase = %q", base)
+	}
+	// A bare filename resolves to an empty encoded base.
+	if base := PiProjectDirBase("plain.jsonl"); base != "plain.jsonl" && base != "" {
+		t.Fatalf("bare PiProjectDirBase = %q", base)
 	}
 }
