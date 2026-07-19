@@ -25,3 +25,13 @@ func TestQueriesHaveRelevantSessions(t *testing.T) {
 		}
 	}
 }
+
+func TestContextGeneratorIsDeterministic(t *testing.T) {
+	a, b := GenerateContext(Seed), GenerateContext(Seed)
+	if a.Hash != b.Hash || len(a.Chains) != ContextChainCount+ContextNegativeCount {
+		t.Fatalf("context generator changed: %q/%q chains=%d", a.Hash, b.Hash, len(a.Chains))
+	}
+	if a.Hash == GenerateContext(Seed+1).Hash {
+		t.Fatal("different context seeds produced the same corpus")
+	}
+}

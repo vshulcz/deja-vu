@@ -34,6 +34,9 @@ type benchReport struct {
 }
 
 func runBench(args []string) error {
+	if len(args) > 0 && args[0] == "context" {
+		return runBenchContext(args[1:])
+	}
 	if len(args) < 1 || args[0] != "recall" || len(args) > 2 || (len(args) == 2 && args[1] != "--json") {
 		return fmt.Errorf("bench: usage: bench recall [--json]")
 	}
