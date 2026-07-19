@@ -349,6 +349,11 @@ func variantDetail(text string, terms []string, variants map[string][]string) st
 	low := strings.ToLower(text)
 	for _, term := range terms {
 		for _, variant := range variants[term] {
+			// A term that matched itself is an exact hit, not a variant —
+			// don't render "connection->connection" as the tier detail.
+			if variant == term {
+				continue
+			}
 			if strings.Contains(low, variant) {
 				return term + "->" + variant
 			}
