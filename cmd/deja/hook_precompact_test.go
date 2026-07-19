@@ -40,6 +40,9 @@ func TestHookContextCompactLead(t *testing.T) {
 	if !strings.Contains(out, "Context was just compacted") {
 		t.Fatalf("compact lead missing: %q", out)
 	}
+	if !strings.Contains(out, "✓ recalled from claude session") {
+		t.Fatalf("provenance marker missing: %q", out)
+	}
 
 	withHookStdin(t, `{"source":"startup"}`)
 	out = captureStdout(t, func() { _ = runHookContext(true) })
