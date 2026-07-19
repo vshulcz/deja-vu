@@ -90,9 +90,11 @@ func renderStatsCard(r statsReport) string {
 		fmt.Fprintf(&b, `<rect x="145" y="%d" width="%d" height="8" rx="4" fill="#3fb950"/>`+"\n", y+1, width)
 		cardText(&b, 255, y+9, 10, "700", fmt.Sprintf("%d", h.Sessions), "#c9d1d9")
 	}
-	if len(r.TopProjects) > 0 {
-		cardText(&b, 500, 312, 11, "700", "TOP PROJECT", "#8b949e", "letter-spacing=\"1.5\"")
-		cardText(&b, 500, 335, 13, "400", r.TopProjects[0].Project, "#c9d1d9")
+	// No project names on the card: it is meant to be committed to public
+	// READMEs, and project names are private. Show the active range instead.
+	if r.DateRange.Start != "" {
+		cardText(&b, 500, 312, 11, "700", "ACTIVE SINCE", "#8b949e", "letter-spacing=\"1.5\"")
+		cardText(&b, 500, 335, 13, "400", r.DateRange.Start, "#c9d1d9")
 	}
 	cardText(&b, 40, 410, 11, "400", "deja v"+version, "#8b949e")
 	b.WriteString("</g>\n</svg>\n")

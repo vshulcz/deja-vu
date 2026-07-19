@@ -41,7 +41,9 @@ func repeatQuestions(ss []model.Session) int {
 				continue
 			}
 			stem := questionStemFor(m.Text)
-			if stem == "" || seen[stem] {
+			// Short acknowledgements ("ok", "continue") repeat across every
+			// session; only substantial messages count as questions.
+			if stem == "" || len(strings.Fields(stem)) < 4 || seen[stem] {
 				continue
 			}
 			seen[stem] = true
