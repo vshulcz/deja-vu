@@ -33,7 +33,7 @@ type statsReport struct {
 	Harnesses       []harnessStats `json:"harnesses"`
 	TopProjects     []projectStats `json:"top_projects"`
 	Monthly         []monthStats   `json:"monthly"`
-	Heatmap         heatmapStats   `json:"heatmap"`
+	Heatmap         heatmapStats   `json:"-"` // card-only presentation data; kept out of the stable --json schema
 	Sparkline       string         `json:"sparkline"`
 	DateRange       dateRangeStats `json:"date_range"`
 	Longest         sessionStat    `json:"longest_session"`
