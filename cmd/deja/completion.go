@@ -35,7 +35,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]}"
     action="${COMP_WORDS[2]}"
 
-    local commands="blame bench completion ctx doctor embed forget hook-context hook-precompact index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup"
+    local commands="blame bench completion ctx doctor embed forget index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi deja"
     local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto"
 
