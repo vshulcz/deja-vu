@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -346,7 +347,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if uninstall {
 		delete(m, "deja")
 	} else {
-		m["deja"] = map[string]any{"type": "stdio", "command": exe, "args": []string{"mcp"}}
+		m["deja"] = mcpServerEntry(exe)
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -530,6 +531,21 @@ func antigravityConfigHome() string {
 
 // installCursor wires the MCP server into Cursor's global config
 // (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
+// mcpServerEntry is the JSON mcpServers value for deja. Windows stdio MCP
+// clients (Claude Code among them) spawn through cmd, so the entry uses the
+// cmd /c wrapper there; elsewhere it is the executable directly.
+func mcpServerEntry(exe string) map[string]any {
+	command, args := mcpCommandArgs(exe)
+	return map[string]any{"type": "stdio", "command": command, "args": args}
+}
+
+func mcpCommandArgs(exe string) (string, []string) {
+	if runtime.GOOS == "windows" {
+		return "cmd", []string{"/c", exe, "mcp"}
+	}
+	return exe, []string{"mcp"}
+}
+
 // mcpServers shape in their own files.
 func installCursor(exe string, uninstall bool) (installResult, error) {
 	return installMCPJSON(filepath.Join(sources.CursorCLIHome(), "mcp.json"), exe, uninstall)
@@ -551,7 +567,8 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	if uninstall {
 		delete(m, "deja")
 	} else {
-		m["deja"] = map[string]any{"command": exe, "args": []string{"mcp"}}
+		command, args := mcpCommandArgs(exe)
+		m["deja"] = map[string]any{"command": command, "args": args}
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
