@@ -256,6 +256,17 @@ deja bench recall --json
 
 The synthetic set is currently saturated by lexical search (recall@5 1.00 at ~0.7 ms median), so it serves as a regression floor for ranking changes rather than a bragging number; CI fails if recall drops. The corpus generator and the relevance labels are ordinary reviewed Go — audit what "relevant" means before trusting any figure, ours included. With a local embedding endpoint up, the same command reports the hybrid column.
 
+The context experiment is reproducible with `deja bench context --json`. It builds 30 seeded multi-session task chains and five negative controls, then compares deja-recall (the real index and SessionStart digest), full-history, naive substring grep, and cold context. Tokens are approximated as bytes/4. Coverage is the fraction of generator-defined ground-truth fact strings present verbatim; audit that generator before trusting the figures.
+
+Run with the default seed (`1`):
+
+| Arm | Median tokens | P10-P90 tokens | Median coverage | Negative-control median tokens |
+| --- | ---: | ---: | ---: | ---: |
+| deja-recall | 278 | 278-278 | 1.00 | 0 |
+| full-history | 241 | 201-304 | 1.00 | 200 |
+| naive-grep | 862 | 781-988 | 1.00 | 0 |
+| cold | 0 | 0-0 | 0.00 | 0 |
+
 ## How it works
 
 Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact credentials → `records.bin` + token buckets → `manifest.json` tracks per-file state so repeat runs only ingest what changed. The MCP server, stats, share and sync all read the same index. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
