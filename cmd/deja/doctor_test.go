@@ -210,7 +210,7 @@ func TestDoctorIndexStates(t *testing.T) {
 		{"ok", []time.Time{manifestTime.Add(-time.Minute)}, "ok", 0},
 		{"stale-one", []time.Time{manifestTime.Add(time.Minute)}, "stale", 1},
 		{"stale-two", []time.Time{manifestTime.Add(time.Minute), manifestTime.Add(2 * time.Minute)}, "stale", 2},
-		{"mixed", []time.Time{manifestTime.Add(-time.Minute), manifestTime.Add(time.Minute), time.Time{}}, "stale", 1},
+		{"mixed", []time.Time{manifestTime.Add(-time.Minute), manifestTime.Add(time.Minute), {}}, "stale", 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := inspectDoctorIndex(tc.storeMods)
