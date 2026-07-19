@@ -26,20 +26,43 @@ func renderStatsCard(r statsReport) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
 	b.WriteString(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">` + "\n")
-	b.WriteString(`<rect width="800" height="420" rx="24" fill="#0d1117"/>` + "\n")
-	b.WriteString(`<g font-family="` + statsCardFont + `" fill="#f0f6fc">` + "\n")
-	cardText(&b, 40, 54, 27, "700", statsHeadline(r), "#f0f6fc")
-	cardText(&b, 40, 80, 13, "400", "deja · agent history", "#f78166")
-	cardText(&b, 760, 80, 13, "400", valueOrDash(r.DateRange.Start)+" - "+valueOrDash(r.DateRange.End), "#8b949e", "text-anchor=\"end\"")
-	cardText(&b, 40, 112, 11, "400", "INDEXED WORK", "#8b949e", "letter-spacing=\"2\"")
-	cardText(&b, 40, 145, 28, "700", fmt.Sprintf("%d", r.TotalSessions), "#f0f6fc")
-	cardText(&b, 40, 163, 12, "400", "sessions", "#8b949e")
-	cardText(&b, 190, 145, 28, "700", fmt.Sprintf("%d", r.TotalMessages), "#f0f6fc")
-	cardText(&b, 190, 163, 12, "400", "messages", "#8b949e")
-	cardText(&b, 340, 145, 28, "700", fmt.Sprintf("%d", len(r.Harnesses)), "#f0f6fc")
-	cardText(&b, 340, 163, 12, "400", "harnesses", "#8b949e")
+	b.WriteString(`<defs>` +
+		`<linearGradient id="djHero" x1="0" y1="0" x2="1" y2="1">` +
+		`<stop offset="0" stop-color="#7c6cf0"/><stop offset="1" stop-color="#4ecdc4"/></linearGradient>` +
+		`<radialGradient id="djGlow" cx="0.5" cy="0.5" r="0.5">` +
+		`<stop offset="0" stop-color="#7c6cf0" stop-opacity="0.30"/>` +
+		`<stop offset="1" stop-color="#7c6cf0" stop-opacity="0"/></radialGradient>` +
+		`</defs>` + "\n")
+	b.WriteString(`<rect width="800" height="420" rx="24" fill="#0d0b16"/>` + "\n")
+	b.WriteString(`<circle cx="720" cy="30" r="220" fill="url(#djGlow)"/>` + "\n")
+	b.WriteString(`<rect x="1" y="1" width="798" height="418" rx="23" fill="none" stroke="#7c6cf0" stroke-opacity="0.18"/>` + "\n")
+	b.WriteString(`<g font-family="` + statsCardFont + `" fill="#e6e6f0">` + "\n")
+	// brand line (kept verbatim so the card is unmistakably deja) + active range
+	b.WriteString(`<circle cx="45" cy="48" r="7" fill="url(#djHero)"/>` + "\n")
+	cardText(&b, 62, 53, 15, "700", "deja · agent history", "#4ecdc4", "letter-spacing=\"0.5\"")
+	cardText(&b, 760, 53, 13, "400", valueOrDash(r.DateRange.Start)+" – "+valueOrDash(r.DateRange.End), "#78788c", "text-anchor=\"end\"")
+	// the shareable sentence — cap to two segments and size to fit the card width
+	head := statsHeadline(r)
+	if segs := strings.Split(head, " · "); len(segs) > 2 {
+		head = strings.Join(segs[:2], " · ")
+	}
+	headSize := 21
+	if n := len(head); n > 0 && 1200/n < headSize {
+		if headSize = 1200 / n; headSize < 14 {
+			headSize = 14
+		}
+	}
+	cardText(&b, 40, 92, headSize, "700", head, "#e6e6f0")
 
-	cardText(&b, 40, 201, 11, "700", "ACTIVITY / LAST 12 MONTHS", "#8b949e", "letter-spacing=\"1.5\"")
+	cardText(&b, 40, 124, 11, "700", "INDEXED WORK", "#78788c", "letter-spacing=\"2\"")
+	cardText(&b, 40, 160, 34, "800", formatStatNumber(r.TotalSessions), "url(#djHero)")
+	cardText(&b, 40, 180, 12, "400", "sessions", "#78788c")
+	cardText(&b, 210, 160, 30, "700", formatStatNumber(r.TotalMessages), "#e6e6f0")
+	cardText(&b, 210, 180, 12, "400", "messages", "#78788c")
+	cardText(&b, 380, 160, 30, "700", fmt.Sprintf("%d", len(r.Harnesses)), "#e6e6f0")
+	cardText(&b, 380, 180, 12, "400", "harnesses", "#78788c")
+
+	cardText(&b, 40, 214, 11, "700", "ACTIVITY / LAST 12 MONTHS", "#78788c", "letter-spacing=\"1.5\"")
 	maxMonth := 0
 	for _, m := range r.Monthly {
 		if m.Messages > maxMonth {
@@ -49,20 +72,20 @@ func renderStatsCard(r statsReport) string {
 	for i, m := range r.Monthly {
 		x := 40 + i*43
 		h := 8
-		opacity := 0.35
+		opacity := 0.30
 		if maxMonth > 0 && m.Messages > 0 {
 			h = 8 + 52*m.Messages/maxMonth
 			opacity = 0.35 + 0.65*float64(m.Messages)/float64(maxMonth)
 		}
-		fmt.Fprintf(&b, `<rect x="%d" y="%d" width="27" height="%d" rx="4" fill="#58a6ff" opacity="%.2f"/>`+"\n", x, 266-h, h, opacity)
+		fmt.Fprintf(&b, `<rect x="%d" y="%d" width="27" height="%d" rx="4" fill="url(#djHero)" opacity="%.2f"/>`+"\n", x, 278-h, h, opacity)
 		label := m.Month
 		if len(label) >= 7 {
 			label = label[5:]
 		}
-		cardText(&b, x+13, 287, 10, "400", label, "#8b949e", "text-anchor=\"middle\"")
+		cardText(&b, x+13, 299, 10, "400", label, "#78788c", "text-anchor=\"middle\"")
 	}
 
-	cardText(&b, 40, 312, 11, "700", "BY HARNESS", "#8b949e", "letter-spacing=\"1.5\"")
+	cardText(&b, 40, 324, 11, "700", "BY HARNESS", "#78788c", "letter-spacing=\"1.5\"")
 	harnesses := append([]harnessStats(nil), r.Harnesses...)
 	sort.SliceStable(harnesses, func(i, j int) bool {
 		if harnesses[i].Sessions == harnesses[j].Sessions {
@@ -70,12 +93,12 @@ func renderStatsCard(r statsReport) string {
 		}
 		return harnesses[i].Sessions > harnesses[j].Sessions
 	})
-	if len(harnesses) > 6 {
+	if len(harnesses) > 4 {
 		other := harnessStats{Harness: "other"}
-		for _, h := range harnesses[6:] {
+		for _, h := range harnesses[4:] {
 			other.Sessions += h.Sessions
 		}
-		harnesses = append(harnesses[:6], other)
+		harnesses = append(harnesses[:4], other)
 	}
 	maxHarness := 1
 	for _, h := range harnesses {
@@ -84,19 +107,20 @@ func renderStatsCard(r statsReport) string {
 		}
 	}
 	for i, h := range harnesses {
-		y := 322 + i*11
+		y := 334 + i*11
 		cardText(&b, 40, y+9, 10, "400", h.Harness, "#c9d1d9")
 		width := 100 * h.Sessions / maxHarness
-		fmt.Fprintf(&b, `<rect x="145" y="%d" width="%d" height="8" rx="4" fill="#3fb950"/>`+"\n", y+1, width)
+		fmt.Fprintf(&b, `<rect x="145" y="%d" width="%d" height="8" rx="4" fill="#4ecdc4"/>`+"\n", y+1, width)
 		cardText(&b, 255, y+9, 10, "700", fmt.Sprintf("%d", h.Sessions), "#c9d1d9")
 	}
 	// No project names on the card: it is meant to be committed to public
 	// READMEs, and project names are private. Show the active range instead.
 	if r.DateRange.Start != "" {
-		cardText(&b, 500, 312, 11, "700", "ACTIVE SINCE", "#8b949e", "letter-spacing=\"1.5\"")
-		cardText(&b, 500, 335, 13, "400", r.DateRange.Start, "#c9d1d9")
+		cardText(&b, 500, 324, 11, "700", "ACTIVE SINCE", "#78788c", "letter-spacing=\"1.5\"")
+		cardText(&b, 500, 347, 13, "400", r.DateRange.Start, "#c9d1d9")
 	}
-	cardText(&b, 40, 410, 11, "400", "deja v"+version, "#8b949e")
+	cardText(&b, 40, 405, 11, "400", "deja v"+version, "#78788c")
+	cardText(&b, 760, 405, 12, "700", "vshulcz.github.io/deja-vu", "#4ecdc4", "text-anchor=\"end\"")
 	b.WriteString("</g>\n</svg>\n")
 	return b.String()
 }
