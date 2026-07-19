@@ -32,7 +32,9 @@ func formatStatNumber(n int) string {
 
 // repeatQuestions is a corpus proxy because the usage sidecar does not store query text.
 func repeatQuestions(ss []model.Session) int {
-	stems := make([]questionStem, 0)
+	// Exact stem match only: questionStemFor already folds case and
+	// punctuation, and a pairwise similarity pass is quadratic in corpora
+	// with tens of thousands of user messages.
 	counts := map[string]int{}
 	for _, s := range ss {
 		seen := map[string]bool{}
@@ -47,31 +49,16 @@ func repeatQuestions(ss []model.Session) int {
 				continue
 			}
 			seen[stem] = true
-			if _, ok := counts[stem]; !ok {
-				stems = append(stems, questionStem{value: stem, tokens: strings.Fields(stem)})
-			}
 			counts[stem]++
 		}
 	}
 	count := 0
-	for _, stem := range stems {
-		if counts[stem.value] > 1 {
+	for _, n := range counts {
+		if n > 1 {
 			count++
-			continue
-		}
-		for _, other := range stems {
-			if stem.value != other.value && counts[other.value] == 1 && closeQuestion(stem.tokens, other.tokens) {
-				count++
-				break
-			}
 		}
 	}
 	return count
-}
-
-type questionStem struct {
-	value  string
-	tokens []string
 }
 
 func questionStemFor(text string) string {
@@ -87,27 +74,4 @@ func questionStemFor(text string) string {
 		}
 	}
 	return strings.Join(strings.Fields(b.String()), " ")
-}
-
-func closeQuestion(a, b []string) bool {
-	if len(a) == 0 || len(b) == 0 {
-		return false
-	}
-	seen := make(map[string]bool, len(a))
-	for _, token := range a {
-		seen[token] = true
-	}
-	common := 0
-	for _, token := range b {
-		if seen[token] {
-			common++
-		}
-	}
-	union := len(seen)
-	for _, token := range b {
-		if !seen[token] {
-			union++
-		}
-	}
-	return common*100 >= union*80
 }

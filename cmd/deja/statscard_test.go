@@ -120,14 +120,13 @@ func TestStatsHeadlineAndRepeatQuestions(t *testing.T) {
 	if got := statsHeadline(statsReport{}); got != "" {
 		t.Fatalf("empty headline = %q", got)
 	}
+	// Near-repeats with different wording no longer count: the metric is
+	// exact-stem only so it stays linear on large corpora.
 	if got := repeatQuestions([]model.Session{{Messages: []model.Message{
 		{Role: "user", Text: "<local-command-caveat>"},
 		{Role: "user", Text: "   "},
-	}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service now"}}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service"}}}}); got != 2 {
-		t.Fatalf("near-repeat questions = %d, want 2", got)
-	}
-	if closeQuestion([]string{"one"}, []string{"two"}) {
-		t.Fatal("unrelated questions considered close")
+	}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service now"}}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service"}}}}); got != 0 {
+		t.Fatalf("near-repeat questions = %d, want 0", got)
 	}
 }
 
