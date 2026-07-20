@@ -46,12 +46,17 @@ func runHandoff(args []string, stdout io.Writer) error {
 			prefix = args[i]
 		}
 	}
-	if target == "" {
-		return fmt.Errorf("handoff needs --to <agent>: %s", strings.Join(handoffTargets(), ", "))
+	pasteOnly := target == "" || target == "antigravity" || target == "cursor"
+	if !pasteOnly {
+		if _, ok := handoffCommand(target, ""); !ok {
+			return fmt.Errorf("don't know how to hand off to %q; targets: %s (or omit --to and paste the digest anywhere)", target, strings.Join(handoffTargets(), ", "))
+		}
 	}
-	argv, ok := handoffCommand(target, "")
-	if !ok {
-		return fmt.Errorf("don't know how to hand off to %q; targets: %s", target, strings.Join(handoffTargets(), ", "))
+	if pasteOnly && doExec {
+		if target == "" {
+			return fmt.Errorf("handoff --exec needs --to <agent>: %s", strings.Join(handoffTargets(), ", "))
+		}
+		return fmt.Errorf("%s has no CLI prompt entry — run `deja handoff --to %s` and paste the digest into a new chat", target, target)
 	}
 	s, err := handoffSource(prefix)
 	if err != nil {
@@ -60,11 +65,22 @@ func runHandoff(args []string, stdout io.Writer) error {
 	digest := handoffDigest(s, handoffBudget)
 	if !doExec {
 		printSanitized(stdout, digest)
-		fmt.Fprintf(os.Stderr, "\nhand it off:\n  %s \"$(deja handoff --to %s%s)\"\nor run it now: deja handoff --to %s%s --exec\n",
-			strings.Join(argv, " "), target, prefixArg(prefix), target, prefixArg(prefix))
+		if pasteOnly {
+			fmt.Fprintf(os.Stderr, "\npaste this into a new chat, or hand off directly: deja handoff --to <%s> [--exec]\n", strings.Join(handoffTargets(), "|"))
+		} else {
+			argv, _ := handoffCommand(target, "")
+			head := make([]string, 0, len(argv))
+			for _, a := range argv {
+				if a != "" {
+					head = append(head, a)
+				}
+			}
+			fmt.Fprintf(os.Stderr, "\nhand it off:\n  %s \"$(deja handoff --to %s%s)\"\nor run it now: deja handoff --to %s%s --exec\n",
+				strings.Join(head, " "), target, prefixArg(prefix), target, prefixArg(prefix))
+		}
 		return nil
 	}
-	argv, _ = handoffCommand(target, digest)
+	argv, _ := handoffCommand(target, digest)
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return fmt.Errorf("handoff: %s is not installed (looked for %q in PATH)", target, argv[0])
 	}
@@ -143,6 +159,7 @@ var agentArtifactMarkers = []string{
 	"no need to Read it back)",
 	"Called the Read tool with",
 	"[Request interrupted by user]",
+	"Comments on artifact URI:",
 }
 
 func isAgentArtifact(text string) bool {
@@ -152,6 +169,11 @@ func isAgentArtifact(text string) bool {
 		}
 	}
 	trimmed := strings.TrimSpace(text)
+	// Harness preambles injected as user turns: <environment_context>,
+	// <user_instructions> and similar XML-wrapped plumbing.
+	if strings.HasPrefix(trimmed, "<") && strings.Contains(trimmed, "</") {
+		return true
+	}
 	// ls dumps recorded under a user role.
 	if strings.HasPrefix(trimmed, "total ") && strings.Contains(trimmed, "rwx") {
 		return true
@@ -182,15 +204,21 @@ func isAgentArtifact(text string) bool {
 	return false
 }
 
-// handoffClean drops agent artifacts so the digest carries conversation, not
-// tool output replayed under a user role.
+// handoffClean drops agent artifacts and exact repeats so the digest carries
+// conversation, not tool output replayed under a user role.
 func handoffClean(s model.Session) model.Session {
 	out := s
 	out.Messages = nil
+	seen := map[string]bool{}
 	for _, m := range s.Messages {
 		if isAgentArtifact(m.Text) {
 			continue
 		}
+		key := m.Role + "\x00" + strings.TrimSpace(m.Text)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		out.Messages = append(out.Messages, m)
 	}
 	return out
@@ -262,7 +290,7 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 	case "codex":
 		return []string{"codex", prompt}, true
 	case "opencode":
-		return []string{"opencode", "run", prompt}, true
+		return []string{"opencode", "--prompt", prompt}, true
 	case "gemini":
 		return []string{"gemini", "-i", prompt}, true
 	case "qwen":

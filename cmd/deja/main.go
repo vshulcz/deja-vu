@@ -752,7 +752,7 @@ Usage:
   deja show <id-prefix>
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
-  deja handoff --to <agent> [id-prefix] [--exec]
+  deja handoff [--to <agent>] [id-prefix] [--exec]
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja sync export <dir> [--full]

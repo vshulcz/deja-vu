@@ -12,7 +12,6 @@ import (
 
 func TestHandoffFlagValidation(t *testing.T) {
 	for _, args := range [][]string{
-		{},
 		{"--to"},
 		{"--to", "notepad"},
 		{"--frobnicate"},
@@ -31,7 +30,7 @@ func TestHandoffCommandTable(t *testing.T) {
 	cases := map[string][]string{
 		"claude":   {"claude", "P"},
 		"codex":    {"codex", "P"},
-		"opencode": {"opencode", "run", "P"},
+		"opencode": {"opencode", "--prompt", "P"},
 		"gemini":   {"gemini", "-i", "P"},
 		"qwen":     {"qwen", "-i", "P"},
 		"aider":    {"aider", "--message", "P"},
@@ -106,6 +105,41 @@ func TestHandoffPrintsComposableDigest(t *testing.T) {
 	if !strings.Contains(out, "picking up work handed off from a claude session") ||
 		!strings.Contains(out, "long beta session") {
 		t.Fatalf("handoff output = %q", out)
+	}
+}
+
+func TestHandoffPasteModes(t *testing.T) {
+	withStatsStores(t)
+	// no --to: universal paste digest
+	out, err := captureRun(t, "handoff", "c3")
+	if err != nil || !strings.Contains(out, "picking up work handed off") {
+		t.Fatalf("bare handoff = %q, %v", out, err)
+	}
+	// GUI-only target prints the digest too
+	out, err = captureRun(t, "handoff", "--to", "antigravity", "c3")
+	if err != nil || !strings.Contains(out, "picking up work handed off") {
+		t.Fatalf("antigravity handoff = %q, %v", out, err)
+	}
+	// but cannot --exec
+	if err := runHandoff([]string{"--to", "antigravity", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
+		t.Fatalf("antigravity exec error = %v", err)
+	}
+	if err := runHandoff([]string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
+		t.Fatalf("bare exec error = %v", err)
+	}
+}
+
+func TestHandoffCleanDropsPreamblesAndRepeats(t *testing.T) {
+	s := model.Session{Messages: []model.Message{
+		{Role: "user", Text: "<environment_context><cwd>/x</cwd></environment_context>"},
+		{Role: "user", Text: "hi"},
+		{Role: "user", Text: "hi"},
+		{Role: "user", Text: "Comments on artifact URI: file:///brain/plan.md approved"},
+		{Role: "user", Text: "real question about retries"},
+	}}
+	got := handoffClean(s)
+	if len(got.Messages) != 2 || got.Messages[0].Text != "hi" || got.Messages[1].Text != "real question about retries" {
+		t.Fatalf("cleaned = %#v", got.Messages)
 	}
 }
 
