@@ -279,7 +279,7 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 		return SearchResult{}, fmt.Errorf("manifest: %w", err)
 	}
 	if !recordsIntact(dir, m) {
-		return SearchResult{}, fmt.Errorf("%w: records.bin truncated", errCorruptIndex)
+		return SearchResult{}, fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
 	}
 	var posts []posting
 	var fallbackVariants map[string][]string
@@ -591,8 +591,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
-	_ = os.RemoveAll(dir)
-	if err := os.Rename(tmp, dir); err != nil {
+	if err := swapIndexDir(dir, tmp); err != nil {
 		return err
 	}
 	summarizeBuild(initialBuild, len(m.Sessions), writtenMessages, ss)
@@ -778,8 +777,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
-	os.RemoveAll(dir)
-	if err := os.Rename(tmp, dir); err != nil {
+	if err := swapIndexDir(dir, tmp); err != nil {
 		return err
 	}
 	summarizeBuild(initialBuild, len(m.Sessions), writtenMessages, ss)
@@ -1287,8 +1285,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
-	os.RemoveAll(dir)
-	return os.Rename(tmp, dir)
+	return swapIndexDir(dir, tmp)
 }
 
 func canAppendIncremental(changed map[string]FileState, old map[string]FileState) bool {
@@ -1888,9 +1885,15 @@ func (rw *recordWriter) write(r Record) (int64, error) {
 
 func (rw *recordWriter) Close() error {
 	ferr := rw.w.Flush()
+	// The manifest stamps the record-log size on commit; sync data first so a
+	// crash cannot leave a manifest that promises records the disk never got.
+	serr := rw.f.Sync()
 	cerr := rw.f.Close()
 	if ferr != nil {
 		return ferr
+	}
+	if serr != nil {
+		return serr
 	}
 	return cerr
 }
@@ -2591,6 +2594,39 @@ func writeManifest(dir string, m Manifest) error {
 	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
 }
 
+// swapIndexDir replaces dir with tmp without a destructive window: the old
+// dir is parked as dir.old until the new one is in place, so a crash between
+// steps leaves a recoverable copy instead of nothing (#181).
+func swapIndexDir(dir, tmp string) error {
+	old := dir + ".old"
+	_ = os.RemoveAll(old)
+	if err := os.Rename(dir, old); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Rename(tmp, dir); err != nil {
+		// Put the previous index back rather than leaving nothing.
+		_ = os.Rename(old, dir)
+		return err
+	}
+	_ = os.RemoveAll(old)
+	return nil
+}
+
+// recoverIndexDir finishes an interrupted swapIndexDir: if the index dir is
+// missing but its .old sibling survives, restore it.
+func recoverIndexDir(dir string) {
+	if dir == "" {
+		return
+	}
+	if _, err := os.Stat(dir); err == nil {
+		_ = os.RemoveAll(dir + ".old")
+		return
+	}
+	if _, err := os.Stat(dir + ".old"); err == nil {
+		_ = os.Rename(dir+".old", dir)
+	}
+}
+
 // recordsIntact reports whether records.bin still holds everything the manifest
 // committed. A shorter file means a crash truncated the record log; the index
 // must rebuild rather than silently return fewer messages.
@@ -2602,7 +2638,9 @@ func recordsIntact(dir string, m Manifest) bool {
 	if err != nil {
 		return false
 	}
-	return fi.Size() >= m.RecordsSize
+	// Shorter: a crash truncated the log. Longer: a crash landed records the
+	// manifest never committed; re-appending them would duplicate messages.
+	return fi.Size() == m.RecordsSize
 }
 
 type bucketEntry struct {
@@ -2630,7 +2668,8 @@ func writeBucket(p string, data map[string][]posting) error {
 		entries = append(entries, bucketEntry{tok: tok, off: pos, n: uint32(len(b))})
 		pos += uint64(len(b))
 	}
-	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	tmp := p + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -2664,7 +2703,18 @@ func writeBucket(p string, data map[string][]posting) error {
 			return err
 		}
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	// Rename over the live bucket: readers see the old file or the new one,
+	// never a torn write (#181).
+	return os.Rename(tmp, p)
 }
 
 func readBucket(p string) (map[string][]posting, error) {
