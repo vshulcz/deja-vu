@@ -3,13 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/vshulcz/deja-vu/internal/model"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -26,7 +27,7 @@ func TestHookPromptInjectsOnRelevantHit(t *testing.T) {
 	}
 	t.Chdir(cwd)
 	in := strings.NewReader(`{"prompt":"long beta answer session"}`)
-	if err := runHookPrompt(in, &out); err != nil {
+	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
 		t.Fatal(err)
 	}
 	var resp struct {
@@ -62,7 +63,7 @@ func TestHookPromptSilentPaths(t *testing.T) {
 		"garbage":             `not json at all`,
 	} {
 		var out bytes.Buffer
-		if err := runHookPrompt(strings.NewReader(prompt), &out); err != nil {
+		if err := runHookPrompt(index.DefaultDir(), strings.NewReader(prompt), &out); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		if out.Len() != 0 {
@@ -98,7 +99,7 @@ func TestLimitHandoffTip(t *testing.T) {
 		t.Fatalf("recent: %v %v", recent, err)
 	}
 	t.Logf("newest: id=%s updated=%v msgs=%d", recent[0].ID, recent[0].Updated, len(recent[0].Messages))
-	tip := limitHandoffTip()
+	tip := limitHandoffTip(index.DefaultDir())
 	if !strings.Contains(tip, "usage limit") || !strings.Contains(tip, "deja handoff") {
 		t.Fatalf("tip = %q", tip)
 	}
@@ -110,16 +111,16 @@ func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		ss = append(ss, model.Session{ID: strconv.Itoa(i), Messages: []model.Message{{Role: "user", Text: "run ssh mini and check"}}})
 	}
-	tip := sshSyncTip(ss)
+	tip := sshSyncTip(index.DefaultDir(), ss)
 	if !strings.Contains(tip, "deja sync ssh") {
 		t.Fatalf("tip = %q", tip)
 	}
-	if again := sshSyncTip(ss); again != "" {
+	if again := sshSyncTip(index.DefaultDir(), ss); again != "" {
 		t.Fatalf("tip must show once, got %q", again)
 	}
 	// Below threshold: silent (fresh sentinel dir).
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "idx"))
-	if tip := sshSyncTip(ss[:2]); tip != "" {
+	if tip := sshSyncTip(index.DefaultDir(), ss[:2]); tip != "" {
 		t.Fatalf("below threshold tip = %q", tip)
 	}
 }
@@ -136,7 +137,7 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	t.Chdir(cwd)
 	in := `{"prompt":"long beta answer session","session_id":"agent-1"}`
 	var out bytes.Buffer
-	if err := runHookPrompt(strings.NewReader(in), &out); err != nil {
+	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), `If it helped, say: \"deja-vu recalled:`) {
@@ -144,7 +145,7 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	}
 	// Same session asks again: the same memory must not be re-injected.
 	var out2 bytes.Buffer
-	if err := runHookPrompt(strings.NewReader(in), &out2); err != nil {
+	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(in), &out2); err != nil {
 		t.Fatal(err)
 	}
 	if out2.Len() != 0 {
@@ -152,7 +153,7 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	}
 	// A different agent session still gets it.
 	var out3 bytes.Buffer
-	if err := runHookPrompt(strings.NewReader(`{"prompt":"the long beta session broke again","session_id":"agent-2"}`), &out3); err != nil {
+	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(`{"prompt":"the long beta session broke again","session_id":"agent-2"}`), &out3); err != nil {
 		t.Fatal(err)
 	}
 	if out3.Len() == 0 {

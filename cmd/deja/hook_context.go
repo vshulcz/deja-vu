@@ -43,16 +43,16 @@ type precompactHookInput struct {
 
 // runHookPrecompact is deliberately best effort: Claude must be able to
 // compact even when the input is incomplete or the index cannot start.
-func runHookPrecompact() {
+func runHookPrecompact(dir string) {
 	var input precompactHookInput
 	_ = json.NewDecoder(os.Stdin).Decode(&input)
-	requestWarmup(index.DefaultDir())
+	requestWarmup(dir)
 }
 
 // runHookContext prints session-start context. plain=false emits the Claude
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).
-func runHookContext(plain bool) error {
+func runHookContext(dir string, plain bool) error {
 	// SessionStart fires for startup, resume, clear and compact; the payload
 	// says which. After a compaction the model just lost its working context,
 	// so the lead line changes to say the memory below survived it.
@@ -60,7 +60,7 @@ func runHookContext(plain bool) error {
 		Source string `json:"source"`
 	}
 	_ = json.NewDecoder(os.Stdin).Decode(&input)
-	digest, sessions := hookDigestResult()
+	digest, sessions := hookDigestResult(dir)
 	if digest == "" {
 		return nil
 	}
@@ -71,11 +71,11 @@ func runHookContext(plain bool) error {
 		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
 	}
 	digest = lead + digest
-	if tip := limitHandoffTip(); tip != "" {
+	if tip := limitHandoffTip(dir); tip != "" {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
-	usage.RecordResult(index.DefaultDir(), usage.KindHook, len(digest), sessions, false)
+	usage.RecordResult(dir, usage.KindHook, len(digest), sessions, false)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -86,7 +86,7 @@ func runHookContext(plain bool) error {
 	// Announce only when the recalled set changed since the last announcement:
 	// injection is recency-ranked, so repeating the same receipt every session
 	// start is wallpaper, and wallpaper builds no habit.
-	if sessions > 0 && receiptIsNews(digest) {
+	if sessions > 0 && receiptIsNews(dir, digest) {
 		plural := ""
 		if sessions > 1 {
 			plural = "s"
@@ -103,11 +103,11 @@ func runHookContext(plain bool) error {
 
 // receiptIsNews reports whether this digest differs from the one last
 // announced (per index, 24h window). Best-effort: on any error, announce.
-func receiptIsNews(digest string) bool {
+func receiptIsNews(dir, digest string) bool {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(digest))
 	sum := fmt.Sprintf("%x", h.Sum64())
-	p := index.DefaultDir() + ".receipt"
+	p := dir + ".receipt"
 	if b, err := os.ReadFile(p); err == nil {
 		parts := strings.Fields(string(b))
 		if len(parts) == 2 && parts[0] == sum {
@@ -120,18 +120,17 @@ func receiptIsNews(digest string) bool {
 	return true
 }
 
-func hookDigest() string {
-	digest, _ := hookDigestResult()
+func hookDigest(dir string) string {
+	digest, _ := hookDigestResult(dir)
 	return digest
 }
 
-func hookDigestResult() (string, int) {
+func hookDigestResult(dir string) (string, int) {
 	defer func() { _ = recover() }()
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
 		return "", 0
 	}
-	dir := index.DefaultDir()
 	if !index.HasManifest(dir) {
 		requestWarmup(dir)
 		return "", 0
@@ -266,8 +265,8 @@ var limitMarkers = []string{
 // limitHandoffTip checks whether the newest indexed session ended on a usage
 // limit and, if so, suggests continuing in a different agent via handoff —
 // the cross-agent escape hatch is exactly what limits are for.
-func limitHandoffTip() string {
-	recent, err := index.Recent(index.DefaultDir(), 1)
+func limitHandoffTip(dir string) string {
+	recent, err := index.Recent(dir, 1)
 	if err != nil || len(recent) == 0 {
 		return ""
 	}
@@ -277,7 +276,7 @@ func limitHandoffTip() string {
 		return ""
 	}
 	// Recent returns metadata only; the tail scan needs the transcript.
-	if full, ok, err := findByPrefix(s.ID); err == nil && ok {
+	if full, ok, err := findByPrefix(dir, s.ID); err == nil && ok {
 		s = full
 	}
 	tail := s.Messages

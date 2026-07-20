@@ -17,7 +17,7 @@ var sshRunner = func(name string, args ...string) (string, error) {
 	return string(out), err
 }
 
-func runSyncSSH(args []string) error {
+func runSyncSSH(dir string, args []string) error {
 	host := ""
 	pull, full := false, false
 	for _, a := range args {
@@ -40,13 +40,13 @@ func runSyncSSH(args []string) error {
 		return fmt.Errorf("sync ssh needs a host (an ssh alias or user@host)")
 	}
 	if pull {
-		return syncSSHPull(host, full)
+		return syncSSHPull(dir, host, full)
 	}
-	return syncSSHPush(host, full)
+	return syncSSHPush(dir, host, full)
 }
 
-func syncSSHPush(host string, full bool) error {
-	if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, os.Stderr); err != nil {
+func syncSSHPush(dir, host string, full bool) error {
+	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		return err
 	}
 	tmp, err := os.MkdirTemp("", "deja-sync-")
@@ -60,10 +60,10 @@ func syncSSHPush(host string, full bool) error {
 	var commit func() error
 	var n int
 	if full {
-		n, err = index.ExportFull(index.DefaultDir(), tmp)
+		n, err = index.ExportFull(dir, tmp)
 		commit = func() error { return nil }
 	} else {
-		n, commit, err = index.ExportDeferred(index.DefaultDir(), tmp)
+		n, commit, err = index.ExportDeferred(dir, tmp)
 	}
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func syncSSHPush(host string, full bool) error {
 	return nil
 }
 
-func syncSSHPull(host string, full bool) error {
+func syncSSHPull(dir, host string, full bool) error {
 	rtmp, err := sshCapture(host, "mktemp -d")
 	if err != nil {
 		return err
@@ -139,7 +139,7 @@ func syncSSHPull(host string, full bool) error {
 		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, strings.TrimSpace(out), host)
 	}
 	cleanup()
-	n, err := index.Import(index.DefaultDir(), ltmp)
+	n, err := index.Import(dir, ltmp)
 	if err != nil {
 		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, host)
 	}
@@ -147,11 +147,11 @@ func syncSSHPull(host string, full bool) error {
 	return nil
 }
 
-func exportBatches(dir string, full bool) (int, error) {
+func exportBatches(dir, out string, full bool) (int, error) {
 	if full {
-		return index.ExportFull(index.DefaultDir(), dir)
+		return index.ExportFull(dir, out)
 	}
-	return index.Export(index.DefaultDir(), dir)
+	return index.Export(dir, out)
 }
 
 func sshCapture(host, cmd string) (string, error) {

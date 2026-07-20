@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/model"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -28,14 +29,13 @@ type promptHookInput struct {
 // when something genuinely matches. Empty output means stay silent — a hook
 // that talks every turn is wallpaper. It never builds or refreshes the index:
 // this path runs on every prompt and must stay ~milliseconds.
-func runHookPrompt(stdin io.Reader, stdout io.Writer) error {
+func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input promptHookInput
 	_ = json.NewDecoder(io.LimitReader(stdin, 1<<20)).Decode(&input)
 	terms := promptSearchTerms(input.Prompt)
 	if len(terms) < 2 {
 		return nil
 	}
-	dir := index.DefaultDir()
 	if !index.HasManifest(dir) {
 		return nil
 	}

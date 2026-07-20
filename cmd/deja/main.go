@@ -66,6 +66,7 @@ func loadFileSources() []model.Session {
 }
 
 func run(args []string) error {
+	dir := index.DefaultDir()
 	if len(args) == 0 {
 		printUsage()
 		return nil
@@ -75,18 +76,18 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "sources" {
-		printSources()
+		printSources(dir)
 		return nil
 	}
 	if args[0] == "completion" {
 		return runCompletion(args[1:])
 	}
 	if args[0] == "doctor" {
-		return runDoctor(os.Stdout, args[1:], doctorLookup)
+		return runDoctor(os.Stdout, args[1:], doctorLookup, dir)
 	}
 	if args[0] == "warmup" {
-		prepareFirstIndexGreeting()
-		if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
+		prepareFirstIndexGreeting(dir)
+		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 			return err
 		}
 		maybeFirstIndexGreeting()
@@ -101,8 +102,8 @@ func run(args []string) error {
 			}
 			return fmt.Errorf("index: unknown flag %q", a)
 		}
-		prepareFirstIndexGreeting()
-		if err := index.Ensure(index.DefaultDir(), "", force, os.Stderr); err != nil {
+		prepareFirstIndexGreeting(dir)
+		if err := index.Ensure(dir, "", force, os.Stderr); err != nil {
 			return err
 		}
 		clearWarmupSentinel()
@@ -110,43 +111,43 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "embed" {
-		return runEmbed(args[1:])
+		return runEmbed(dir, args[1:])
 	}
 	if args[0] == "bench" {
 		return runBench(args[1:])
 	}
 	if args[0] == "statusline" {
-		return runStatusline(os.Stdin, os.Stdout)
+		return runStatusline(dir, os.Stdin, os.Stdout)
 	}
 	if args[0] == "stats" {
-		return runStats(args[1:])
+		return runStats(dir, args[1:])
 	}
 	if args[0] == "remember" {
-		return runRemember(args[1:])
+		return runRemember(dir, args[1:])
 	}
 	if args[0] == "forget" {
-		return runForget(args[1:])
+		return runForget(dir, args[1:])
 	}
 	if args[0] == "mcp" {
-		return serveMCP(os.Stdin, os.Stdout)
+		return serveMCP(dir, os.Stdin, os.Stdout)
 	}
 	if args[0] == "hook-prompt" {
-		return runHookPrompt(os.Stdin, os.Stdout)
+		return runHookPrompt(dir, os.Stdin, os.Stdout)
 	}
 	if args[0] == "hook-context" {
 		plain := len(args) > 1 && args[1] == "--plain"
-		_ = runHookContext(plain)
+		_ = runHookContext(dir, plain)
 		return nil
 	}
 	if args[0] == "hook-precompact" {
-		runHookPrecompact()
+		runHookPrecompact(dir)
 		return nil
 	}
 	if args[0] == "install" {
-		return runInstall(args[1:], false)
+		return runInstall(dir, args[1:], false)
 	}
 	if args[0] == "uninstall" {
-		return runInstall(args[1:], true)
+		return runInstall(dir, args[1:], true)
 	}
 	if args[0] == "update" {
 		return runUpdate(args[1:], os.Stdout)
@@ -155,7 +156,7 @@ func run(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("show needs id-prefix")
 		}
-		s, ok, err := findByPrefix(args[1])
+		s, ok, err := findByPrefix(dir, args[1])
 		if err != nil {
 			return err
 		}
@@ -166,16 +167,16 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "share" {
-		return runShare(args[1:], os.Stdout)
+		return runShare(dir, args[1:], os.Stdout)
 	}
 	if args[0] == "resume" {
-		return runResume(args[1:], os.Stdout)
+		return runResume(dir, args[1:], os.Stdout)
 	}
 	if args[0] == "handoff" {
-		return runHandoff(args[1:], os.Stdout)
+		return runHandoff(dir, args[1:], os.Stdout)
 	}
 	if args[0] == "sync" {
-		return runSync(args[1:])
+		return runSync(dir, args[1:])
 	}
 	if args[0] == "ctx" {
 		if len(args) < 2 {
@@ -183,7 +184,7 @@ func run(args []string) error {
 		}
 		q := strings.Join(args[1:], " ")
 		if !strings.Contains(q, " ") && len(q) >= 6 {
-			s, ok, err := findByPrefix(q)
+			s, ok, err := findByPrefix(dir, q)
 			if err != nil {
 				return err
 			}
@@ -193,10 +194,10 @@ func run(args []string) error {
 			}
 		}
 		o := search.Options{Query: q, All: true}
-		if err := index.EnsureForSearch(index.DefaultDir(), o, false, os.Stderr); err != nil {
+		if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
 			return err
 		}
-		ss, err := index.SearchWithRecovery(index.DefaultDir(), o, os.Stderr)
+		ss, err := index.SearchWithRecovery(dir, o, os.Stderr)
 		if err != nil {
 			return err
 		}
@@ -211,14 +212,14 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "blame" {
-		return runBlame(args[1:])
+		return runBlame(dir, args[1:])
 	}
 	if args[0] == "last" {
 		n, o, err := parseLast(args[1:])
 		if err != nil {
 			return err
 		}
-		ss, err := recentMatching(n, o)
+		ss, err := recentMatching(dir, n, o)
 		if err != nil {
 			return err
 		}
@@ -248,12 +249,12 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	prepareFirstIndexGreeting()
-	if err := index.EnsureForSearch(index.DefaultDir(), o, force, os.Stderr); err != nil {
+	prepareFirstIndexGreeting(dir)
+	if err := index.EnsureForSearch(dir, o, force, os.Stderr); err != nil {
 		return fmt.Errorf("ensure: %w", err)
 	}
 	maybeFirstIndexGreeting()
-	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), o, os.Stderr)
+	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
@@ -276,10 +277,10 @@ func run(args []string) error {
 		return fmt.Errorf("run: %w", err)
 	}
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
-		hits = maybeRerank(hits, o, os.Stderr)
+		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
 	var semantic bool
-	hits, semantic = maybeSemantic(hits, o, os.Stderr)
+	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	o.Semantic = semantic
 	if len(hits) == 0 {
 		printNoMatches(os.Stderr, o.Query, len(ss))
@@ -328,9 +329,9 @@ func printFuzzy(w io.Writer, variants map[string][]string) {
 	}
 }
 
-func findByPrefix(p string) (model.Session, bool, error) {
-	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err == nil {
-		if s, ok, err := index.FindByPrefix(index.DefaultDir(), p); err == nil {
+func findByPrefix(dir, p string) (model.Session, bool, error) {
+	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
+		if s, ok, err := index.FindByPrefix(dir, p); err == nil {
 			return s, ok, nil
 		}
 	}
@@ -340,19 +341,19 @@ func findByPrefix(p string) (model.Session, bool, error) {
 	return s, ok, nil
 }
 
-func recent(n int) ([]model.Session, error) {
-	return recentMatching(n, search.Options{})
+func recent(dir string, n int) ([]model.Session, error) {
+	return recentMatching(dir, n, search.Options{})
 }
 
-func recentMatching(n int, o search.Options) ([]model.Session, error) {
-	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err == nil {
+func recentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
+	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if o.Role != "" {
-			ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, io.Discard)
+			ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard)
 			if err == nil {
 				ss = filterRecentSources(ss, o)
 				return search.Recent(ss, n), nil
 			}
-		} else if ss, err := index.RecentMatching(index.DefaultDir(), n, o); err == nil {
+		} else if ss, err := index.RecentMatching(dir, n, o); err == nil {
 			return ss, nil
 		}
 	}
@@ -546,7 +547,7 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 	return path, o, jsonOutput, nil
 }
 
-func runBlame(args []string) error {
+func runBlame(dir string, args []string) error {
 	path, o, jsonOutput, err := parseBlame(args)
 	if err != nil {
 		return err
@@ -555,7 +556,7 @@ func runBlame(args []string) error {
 	if err != nil {
 		return err
 	}
-	hits, err := findBlameHits(target, o, os.Stderr)
+	hits, err := findBlameHits(dir, target, o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
 	}
@@ -571,12 +572,12 @@ func runBlame(args []string) error {
 	return nil
 }
 
-func findBlameHits(target search.BlameTarget, o search.BlameOptions, progress io.Writer) ([]search.BlameHit, error) {
+func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, progress io.Writer) ([]search.BlameHit, error) {
 	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
-	if err := index.EnsureForSearch(index.DefaultDir(), query, false, progress); err != nil {
+	if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
 		return nil, err
 	}
-	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), query, progress)
+	result, err := index.SearchWithRecoveryDetailed(dir, query, progress)
 	if err != nil {
 		return nil, err
 	}
@@ -590,9 +591,9 @@ func parseDur(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-func printSources() {
+func printSources(dir string) {
 	redactions := map[string]int{}
-	if stats, err := index.Redactions(index.DefaultDir()); err == nil {
+	if stats, err := index.Redactions(dir); err == nil {
 		redactions = stats.Files
 	}
 	antigravityRoots := sources.AntigravityRoots()
@@ -683,7 +684,7 @@ func printSources() {
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
 
-func runForget(args []string) error {
+func runForget(dir string, args []string) error {
 	var o index.ForgetOptions
 	list := false
 	unforget := ""
@@ -730,7 +731,7 @@ func runForget(args []string) error {
 	if unforget != "" {
 		return index.Unforget(unforget)
 	}
-	result, err := index.Forget(index.DefaultDir(), o)
+	result, err := index.Forget(dir, o)
 	if err != nil {
 		return err
 	}

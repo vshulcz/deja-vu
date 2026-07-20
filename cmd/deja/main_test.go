@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -504,13 +505,13 @@ func TestParseSearchAndSmallHelpers(t *testing.T) {
 	if !strings.HasPrefix(got, "hello") || !strings.HasSuffix(got, "…") {
 		t.Fatalf("firstUserTitle=%q", got)
 	}
-	if err := runShare(nil, io.Discard); err == nil || !strings.Contains(err.Error(), "share needs") {
+	if err := runShare(index.DefaultDir(), nil, io.Discard); err == nil || !strings.Contains(err.Error(), "share needs") {
 		t.Fatalf("runShare missing args err=%v", err)
 	}
-	if err := runSync([]string{"export"}); err == nil || !strings.Contains(err.Error(), "sync needs") {
+	if err := runSync(index.DefaultDir(), []string{"export"}); err == nil || !strings.Contains(err.Error(), "sync needs") {
 		t.Fatalf("runSync missing args err=%v", err)
 	}
-	if err := runSync([]string{"bogus", t.TempDir()}); err == nil || !strings.Contains(err.Error(), "unknown sync") {
+	if err := runSync(index.DefaultDir(), []string{"bogus", t.TempDir()}); err == nil || !strings.Contains(err.Error(), "unknown sync") {
 		t.Fatalf("runSync unknown err=%v", err)
 	}
 	if got := shareMessageText("\x1b[31mhello\x1b[0m\n<local-command x>"); got != "hello" {
@@ -607,7 +608,7 @@ func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 		_, _ = pw.Write([]byte(in))
 		_ = pw.Close()
 	}()
-	if err := serveMCP(pr, &out); err != nil {
+	if err := serveMCP(index.DefaultDir(), pr, &out); err != nil {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
@@ -637,7 +638,7 @@ func TestMCPRecallContext(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
 	in := `{"jsonrpc":"2.0","id":"ctx","method":"tools/call","params":{"name":"recall_context","arguments":{"query":"frobnicator"}}}` + "\n"
 	var out bytes.Buffer
-	if err := serveMCP(strings.NewReader(in), &out); err != nil {
+	if err := serveMCP(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "\x1b[") || !strings.Contains(out.String(), "# deja context:") {
@@ -666,7 +667,7 @@ func TestMCPErrorAndNotificationPaths(t *testing.T) {
 		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"nope","arguments":{}}}`,
 	}, "\n") + "\n"
 	var out bytes.Buffer
-	if err := serveMCP(strings.NewReader(in), &out); err != nil {
+	if err := serveMCP(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
 	}
 	got := out.String()

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -51,7 +52,7 @@ func TestDoctorFullReport(t *testing.T) {
 	defer func() { version = old }()
 
 	var out bytes.Buffer
-	if err := runDoctor(&out, nil, stubLookup("9.9.9", true)); err != nil {
+	if err := runDoctor(&out, nil, stubLookup("9.9.9", true), index.DefaultDir()); err != nil {
 		t.Fatalf("runDoctor: %v", err)
 	}
 	got := out.String()
@@ -164,7 +165,7 @@ func TestDoctorJSONGolden(t *testing.T) {
 	defer func() { version = oldVersion }()
 
 	var out bytes.Buffer
-	if err := runDoctor(&out, []string{"--json"}, stubLookup("2.0.0", true)); err != nil {
+	if err := runDoctor(&out, []string{"--json"}, stubLookup("2.0.0", true), index.DefaultDir()); err != nil {
 		t.Fatal(err)
 	}
 	// JSON escapes windows separators as \\, which ToSlash would turn
@@ -185,7 +186,7 @@ func TestDoctorJSONGolden(t *testing.T) {
 
 func TestDoctorIndexStates(t *testing.T) {
 	hermeticEnv(t)
-	if got := inspectDoctorIndex(nil).State; got != "missing" {
+	if got := inspectDoctorIndex(index.DefaultDir(), nil).State; got != "missing" {
 		t.Fatalf("missing index state = %q", got)
 	}
 	dir := os.Getenv("DEJA_INDEX_DIR")
@@ -213,7 +214,7 @@ func TestDoctorIndexStates(t *testing.T) {
 		{"mixed", []time.Time{manifestTime.Add(-time.Minute), manifestTime.Add(time.Minute), {}}, "stale", 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := inspectDoctorIndex(tc.storeMods)
+			got := inspectDoctorIndex(index.DefaultDir(), tc.storeMods)
 			if got.State != tc.want {
 				t.Fatalf("state = %q, want %q", got.State, tc.want)
 			}
@@ -226,25 +227,25 @@ func TestDoctorIndexStates(t *testing.T) {
 
 func TestDoctorIndexFreshnessOutput(t *testing.T) {
 	var out bytes.Buffer
-	doctorIndex(&out, doctorComponent{State: "ok", Path: "/tmp/index"})
+	doctorIndex(&out, doctorComponent{State: "ok", Path: "/tmp/index"}, index.DefaultDir())
 	if !strings.Contains(out.String(), "freshness up to date") {
 		t.Fatalf("fresh output = %q", out.String())
 	}
 	out.Reset()
-	doctorIndex(&out, doctorComponent{State: "stale", Path: "/tmp/index", StaleStores: 3})
+	doctorIndex(&out, doctorComponent{State: "stale", Path: "/tmp/index", StaleStores: 3}, index.DefaultDir())
 	got := out.String()
 	if !strings.Contains(got, "freshness 3 stores changed since last build") {
 		t.Fatalf("stale output = %q", got)
 	}
 	out.Reset()
-	doctorIndex(&out, doctorComponent{State: "stale", Path: "/tmp/index", StaleStores: 1})
+	doctorIndex(&out, doctorComponent{State: "stale", Path: "/tmp/index", StaleStores: 1}, index.DefaultDir())
 	if !strings.Contains(out.String(), "freshness 1 store changed since last build") {
 		t.Fatalf("singular stale output = %q", out.String())
 	}
 }
 
 func TestDoctorRejectsUnknownFlag(t *testing.T) {
-	if err := runDoctor(io.Discard, []string{"--yaml"}, stubLookup("", false)); err == nil {
+	if err := runDoctor(io.Discard, []string{"--yaml"}, stubLookup("", false), index.DefaultDir()); err == nil {
 		t.Fatal("expected unknown flag error")
 	}
 }
@@ -404,7 +405,7 @@ func TestDoctorOfflineSkipsLookup(t *testing.T) {
 	err := runDoctor(&out, []string{"--offline"}, func() (string, bool) {
 		t.Fatal("offline doctor performed version lookup")
 		return "", false
-	})
+	}, index.DefaultDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +421,7 @@ func TestDoctorOfflineEnvironmentSkipsLookupInJSON(t *testing.T) {
 	if err := runDoctor(&out, []string{"--json"}, func() (string, bool) {
 		t.Fatal("offline doctor performed version lookup")
 		return "", false
-	}); err != nil {
+	}, index.DefaultDir()); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), `"state": "offline"`) {

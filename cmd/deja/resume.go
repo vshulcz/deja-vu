@@ -17,7 +17,7 @@ import (
 // runResume turns a found session into the command that reopens it in its
 // native harness. Prints the command by default; --exec runs it with the
 // terminal attached.
-func runResume(args []string, stdout io.Writer) error {
+func runResume(dir string, args []string, stdout io.Writer) error {
 	if len(args) < 1 {
 		return fmt.Errorf("resume needs id-prefix")
 	}
@@ -33,7 +33,7 @@ func runResume(args []string, stdout io.Writer) error {
 	if prefix == "" {
 		return fmt.Errorf("resume needs id-prefix")
 	}
-	s, ok, err := findByPrefix(prefix)
+	s, ok, err := findByPrefix(dir, prefix)
 	if err != nil {
 		return err
 	}

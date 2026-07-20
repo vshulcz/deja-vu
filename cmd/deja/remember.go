@@ -11,7 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-func runRemember(args []string) error {
+func runRemember(dir string, args []string) error {
 	var text, project string
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--project" {
@@ -43,7 +43,7 @@ func runRemember(args []string) error {
 	if err := sources.AppendNote(project, text, time.Now()); err != nil {
 		return err
 	}
-	if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, os.Stderr); err != nil {
+	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stdout, "deja: remembered under %s\n", strings.TrimSpace(project))

@@ -63,7 +63,7 @@ type doctorStoreCheck struct {
 	parse func(string) ([]model.Session, error)
 }
 
-func collectDoctorReport(lookup doctorVersionLookup) doctorReport {
+func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	stores := doctorStoreChecks()
 	report := doctorReport{Stores: make([]doctorStore, 0, len(stores))}
 	storeMods := make([]time.Time, 0, len(stores))
@@ -72,25 +72,25 @@ func collectDoctorReport(lookup doctorVersionLookup) doctorReport {
 		report.Stores = append(report.Stores, store)
 		storeMods = append(storeMods, mod)
 	}
-	report.Index = inspectDoctorIndex(storeMods)
-	report.Ingest = index.IngestHealth(index.DefaultDir())
+	report.Index = inspectDoctorIndex(dir, storeMods)
+	report.Ingest = index.IngestHealth(dir)
 	report.MCP = collectDoctorMCP()
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
 		report.SQLite3.State = "ok"
 	}
 	report.Version = collectDoctorVersion(lookup)
-	report.Embed = collectDoctorEmbed()
+	report.Embed = collectDoctorEmbed(dir)
 	return report
 }
 
-func collectDoctorEmbed() *doctorEmbedReport {
+func collectDoctorEmbed(dir string) *doctorEmbedReport {
 	r := &doctorEmbedReport{State: "unavailable"}
 	reachable := false
 	if c, err := embed.New(); err == nil {
 		r.State, r.Model, reachable = "reachable", c.Model, true
 	}
-	s, err := embed.Read(index.DefaultDir())
+	s, err := embed.Read(dir)
 	if err != nil {
 		if !reachable {
 			return nil
@@ -98,7 +98,7 @@ func collectDoctorEmbed() *doctorEmbedReport {
 		return r
 	}
 	r.Model, r.Dim = s.Model, s.Dim
-	if records, err := index.ReadRecords(index.DefaultDir()); err == nil && len(records) > 0 {
+	if records, err := index.ReadRecords(dir); err == nil && len(records) > 0 {
 		r.Coverage = float64(s.Covered) / float64(len(records)) * 100
 	}
 	return r
@@ -211,8 +211,7 @@ func newestDoctorFile(files []string) (string, time.Time) {
 	return newest, newestMod
 }
 
-func inspectDoctorIndex(storeMods []time.Time) doctorComponent {
-	dir := index.DefaultDir()
+func inspectDoctorIndex(dir string, storeMods []time.Time) doctorComponent {
 	result := doctorComponent{State: "missing", Path: dir}
 	if !index.HasManifest(dir) {
 		return result

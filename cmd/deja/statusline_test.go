@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 func TestStatuslineEmpty(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
 	var out bytes.Buffer
-	if err := runStatusline(strings.NewReader("{}"), &out); err != nil {
+	if err := runStatusline(index.DefaultDir(), strings.NewReader("{}"), &out); err != nil {
 		t.Fatal(err)
 	}
 	if got := out.String(); got != "deja · no recalls yet today · 0 B injected" {
@@ -49,7 +50,7 @@ func TestStatuslineMissingUsageFile(t *testing.T) {
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	var out bytes.Buffer
-	if err := runStatusline(strings.NewReader(""), &out); err != nil {
+	if err := runStatusline(index.DefaultDir(), strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
 	if got := out.String(); got != "deja · no recalls yet today · 0 B injected" {
@@ -64,7 +65,7 @@ func TestStatuslineCountsRecalls(t *testing.T) {
 	usage.Record(dir, usage.KindHook, 1024)
 	usage.Record(dir, usage.KindSearch, 4096) // human search, excluded
 	var out bytes.Buffer
-	if err := runStatusline(strings.NewReader(`{"session_id":"x"}`), &out); err != nil {
+	if err := runStatusline(index.DefaultDir(), strings.NewReader(`{"session_id":"x"}`), &out); err != nil {
 		t.Fatal(err)
 	}
 	got := out.String()
@@ -78,7 +79,7 @@ func TestStatuslineSingular(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	usage.Record(dir, usage.KindContext, 100)
 	var out bytes.Buffer
-	if err := runStatusline(strings.NewReader(""), &out); err != nil {
+	if err := runStatusline(index.DefaultDir(), strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "1 recall ·") {

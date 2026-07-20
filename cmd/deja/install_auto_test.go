@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/vshulcz/deja-vu/internal/index"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func TestInstallCodexHooksMergeAndUninstall(t *testing.T) {

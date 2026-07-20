@@ -53,12 +53,12 @@ func TestAutoRecallLocalOnly(t *testing.T) {
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", "/tmp/isoproj")
 
-	digest := hookDigest()
+	digest := hookDigest(index.DefaultDir())
 	if !strings.Contains(digest, "imported:") {
 		t.Fatalf("default digest should include imported session, got: %q", digest)
 	}
 	t.Setenv("DEJA_AUTORECALL_LOCAL_ONLY", "1")
-	digest = hookDigest()
+	digest = hookDigest(index.DefaultDir())
 	if strings.Contains(digest, "imported:") {
 		t.Fatalf("local-only digest leaked imported session: %q", digest)
 	}

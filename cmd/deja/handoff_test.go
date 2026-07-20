@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -16,8 +17,8 @@ func TestHandoffFlagValidation(t *testing.T) {
 		{"--to", "notepad"},
 		{"--frobnicate"},
 	} {
-		if err := runHandoff(args, discardWriter{}); err == nil {
-			t.Fatalf("runHandoff(%#v) returned nil", args)
+		if err := runHandoff(index.DefaultDir(), args, discardWriter{}); err == nil {
+			t.Fatalf("runHandoff(index.DefaultDir(), %#v) returned nil", args)
 		}
 	}
 }
@@ -123,10 +124,10 @@ func TestHandoffPasteModes(t *testing.T) {
 		t.Fatalf("antigravity handoff = %q, %v", out, err)
 	}
 	// but cannot --exec
-	if err := runHandoff([]string{"--to", "antigravity", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
+	if err := runHandoff(index.DefaultDir(), []string{"--to", "antigravity", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
 		t.Fatalf("antigravity exec error = %v", err)
 	}
-	if err := runHandoff([]string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
+	if err := runHandoff(index.DefaultDir(), []string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
 		t.Fatalf("bare exec error = %v", err)
 	}
 }
@@ -147,11 +148,11 @@ func TestHandoffCleanDropsPreamblesAndRepeats(t *testing.T) {
 
 func TestHandoffSourceErrors(t *testing.T) {
 	withStatsStores(t)
-	if _, err := handoffSource("nope-prefix"); err == nil || !strings.Contains(err.Error(), "no session matches") {
+	if _, err := handoffSource(index.DefaultDir(), "nope-prefix"); err == nil || !strings.Contains(err.Error(), "no session matches") {
 		t.Fatalf("bad prefix error = %v", err)
 	}
 	t.Chdir(t.TempDir())
-	if _, err := handoffSource(""); err == nil || !strings.Contains(err.Error(), "no indexed sessions for this project") {
+	if _, err := handoffSource(index.DefaultDir(), ""); err == nil || !strings.Contains(err.Error(), "no indexed sessions for this project") {
 		t.Fatalf("empty project error = %v", err)
 	}
 }
@@ -163,7 +164,7 @@ func TestHandoffSourcePicksNewestProjectSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	s, err := handoffSource("")
+	s, err := handoffSource(index.DefaultDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +177,7 @@ func TestHandoffSourcePicksNewestProjectSession(t *testing.T) {
 func TestHandoffExecMissingBinary(t *testing.T) {
 	withStatsStores(t)
 	t.Setenv("PATH", t.TempDir())
-	err := runHandoff([]string{"--to", "grok", "c3", "--exec"}, discardWriter{})
+	err := runHandoff(index.DefaultDir(), []string{"--to", "grok", "c3", "--exec"}, discardWriter{})
 	if err == nil || !strings.Contains(err.Error(), "not installed") {
 		t.Fatalf("exec missing binary error = %v", err)
 	}
@@ -204,13 +205,13 @@ func TestHandoffDigestHasPullPointer(t *testing.T) {
 
 func TestReceiptIsNewsDedupes(t *testing.T) {
 	hermeticEnv(t)
-	if !receiptIsNews("digest-a") {
+	if !receiptIsNews(index.DefaultDir(), "digest-a") {
 		t.Fatal("first announcement must be news")
 	}
-	if receiptIsNews("digest-a") {
+	if receiptIsNews(index.DefaultDir(), "digest-a") {
 		t.Fatal("same digest within 24h must be suppressed")
 	}
-	if !receiptIsNews("digest-b") {
+	if !receiptIsNews(index.DefaultDir(), "digest-b") {
 		t.Fatal("changed digest must be news again")
 	}
 }

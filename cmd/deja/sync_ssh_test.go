@@ -58,7 +58,7 @@ func TestSyncSSHPullFullAndScpFailure(t *testing.T) {
 		}
 		return "", nil
 	}
-	err := runSyncSSH([]string{"minihost", "--pull", "--full"})
+	err := runSyncSSH(index.DefaultDir(), []string{"minihost", "--pull", "--full"})
 	if err == nil || !strings.Contains(err.Error(), "scp: exit status 1: permission denied") {
 		t.Fatalf("err = %v", err)
 	}
@@ -85,7 +85,7 @@ func TestSyncSSHPush(t *testing.T) {
 		}
 		return "", nil
 	}
-	if err := runSyncSSH([]string{"minihost"}); err != nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"minihost"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(calls) != 3 {
@@ -116,13 +116,13 @@ func TestSyncSSHPushNothingNew(t *testing.T) {
 		}
 		return "deja: imported 1 records", nil
 	}
-	if err := runSyncSSH([]string{"minihost"}); err != nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"minihost"}); err != nil {
 		t.Fatal(err)
 	}
 	// Second push has nothing new: no ssh/scp calls at all.
 	sshRunner = full
 	calls = 0
-	if err := runSyncSSH([]string{"minihost"}); err != nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"minihost"}); err != nil {
 		t.Fatal(err)
 	}
 	if calls != 0 {
@@ -154,7 +154,7 @@ func TestSyncSSHPull(t *testing.T) {
 		}
 		return "", nil
 	}
-	if err := runSyncSSH([]string{"minihost", "--pull"}); err != nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"minihost", "--pull"}); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := index.Search(os.Getenv("DEJA_INDEX_DIR"), search.Options{Query: "pullneedle", All: true})
@@ -167,13 +167,13 @@ func TestSyncSSHPull(t *testing.T) {
 }
 
 func TestSyncSSHBadArgs(t *testing.T) {
-	if err := runSyncSSH(nil); err == nil {
+	if err := runSyncSSH(index.DefaultDir(), nil); err == nil {
 		t.Fatal("expected error for missing host")
 	}
-	if err := runSyncSSH([]string{"--evil"}); err == nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"--evil"}); err == nil {
 		t.Fatal("expected error for flag-looking host")
 	}
-	if err := runSyncSSH([]string{"a", "b"}); err == nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"a", "b"}); err == nil {
 		t.Fatal("expected error for two hosts")
 	}
 }
@@ -181,7 +181,7 @@ func TestSyncSSHBadArgs(t *testing.T) {
 func TestRunSyncExportImport(t *testing.T) {
 	setupLocalIndex(t)
 	out := filepath.Join(t.TempDir(), "export")
-	if err := runSync([]string{"export", "--full", out}); err != nil {
+	if err := runSync(index.DefaultDir(), []string{"export", "--full", out}); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := os.ReadDir(out)
@@ -193,7 +193,7 @@ func TestRunSyncExportImport(t *testing.T) {
 	}
 	importDir := filepath.Join(t.TempDir(), "import.db")
 	t.Setenv("DEJA_INDEX_DIR", importDir)
-	if err := runSync([]string{"import", out}); err != nil {
+	if err := runSync(index.DefaultDir(), []string{"import", out}); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := index.Search(importDir, search.Options{Query: "sshneedle", All: true})

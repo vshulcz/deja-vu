@@ -99,8 +99,8 @@ func TestDoctorIndexBuiltBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	report := collectDoctorReport(nil)
-	doctorIndex(&out, report.Index)
+	report := collectDoctorReport(nil, index.DefaultDir())
+	doctorIndex(&out, report.Index, index.DefaultDir())
 	got := out.String()
 	if !strings.Contains(got, "status   built") || !strings.Contains(got, "size=") || !strings.Contains(got, "updated=") {
 		t.Fatalf("doctorIndex built = %q", got)
@@ -189,7 +189,7 @@ func TestRunResumeResumeCommandErrorBranch(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 
 	var out bytes.Buffer
-	err := runResume([]string{"histentry"}, &out)
+	err := runResume(index.DefaultDir(), []string{"histentry"}, &out)
 	if err == nil || !strings.Contains(err.Error(), "nothing to resume") {
 		t.Fatalf("expected resumeCommand history error, got %v", err)
 	}

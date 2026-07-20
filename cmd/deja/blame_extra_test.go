@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -21,10 +22,10 @@ func TestBlameErrorAndEmptyBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(squat, "index.db"))
-	if err := runBlame([]string{"parser.go"}); err == nil {
+	if err := runBlame(index.DefaultDir(), []string{"parser.go"}); err == nil {
 		t.Fatal("expected blame error for squatted index dir")
 	}
-	if _, err := blameTextResult(search.BlameOptions{}, "parser.go", 5); err == nil {
+	if _, err := blameTextResult(index.DefaultDir(), search.BlameOptions{}, "parser.go", 5); err == nil {
 		t.Fatal("expected MCP blame error for squatted index dir")
 	}
 	// Healthy empty index: the no-mentions message path.
@@ -33,7 +34,7 @@ func TestBlameErrorAndEmptyBranches(t *testing.T) {
 	if err != nil || out != "" {
 		t.Fatalf("blame on empty index: %v (out=%q)", err, out)
 	}
-	if s, err := blameTextResult(search.BlameOptions{}, "never-mentioned.go", 5); err != nil || s == "" {
+	if s, err := blameTextResult(index.DefaultDir(), search.BlameOptions{}, "never-mentioned.go", 5); err != nil || s == "" {
 		t.Fatalf("mcp empty = %q err=%v", s, err)
 	}
 }
@@ -44,12 +45,12 @@ func TestEmbedCommandBranches(t *testing.T) {
 	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "s.jsonl"), "s", []string{
 		`{"type":"user","sessionId":"s","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"embed me"}}`,
 	})
-	if err := runEmbed([]string{"--bogus"}); err == nil {
+	if err := runEmbed(index.DefaultDir(), []string{"--bogus"}); err == nil {
 		t.Fatal("expected unknown flag error")
 	}
 	// Dead endpoint with real records: the embed call must surface the error.
 	t.Setenv("DEJA_EMBED_URL", "http://127.0.0.1:1/api/embed")
-	if err := runEmbed(nil); err == nil {
+	if err := runEmbed(index.DefaultDir(), nil); err == nil {
 		t.Fatal("expected embed endpoint error")
 	}
 	// Squatted index dir: Ensure error path.
@@ -58,7 +59,7 @@ func TestEmbedCommandBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(squat, "i"))
-	if err := runEmbed(nil); err == nil {
+	if err := runEmbed(index.DefaultDir(), nil); err == nil {
 		t.Fatal("expected ensure error")
 	}
 }
@@ -68,20 +69,20 @@ func TestMaybeSemanticGuards(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "idx"))
 	hit := []search.Hit{{}}
 	// Existing hits pass through untouched.
-	if out, used := maybeSemantic(hit, search.Options{}, os.Stderr); used || len(out) != 1 {
+	if out, used := maybeSemantic(index.DefaultDir(), hit, search.Options{}, os.Stderr); used || len(out) != 1 {
 		t.Fatal("hits must pass through")
 	}
 	// NoEmbed and env opt-outs.
-	if _, used := maybeSemantic(nil, search.Options{NoEmbed: true}, os.Stderr); used {
+	if _, used := maybeSemantic(index.DefaultDir(), nil, search.Options{NoEmbed: true}, os.Stderr); used {
 		t.Fatal("NoEmbed must skip")
 	}
 	t.Setenv("DEJA_EMBED", "off")
-	if _, used := maybeSemantic(nil, search.Options{}, os.Stderr); used {
+	if _, used := maybeSemantic(index.DefaultDir(), nil, search.Options{}, os.Stderr); used {
 		t.Fatal("env off must skip")
 	}
 	t.Setenv("DEJA_EMBED", "")
 	// No sidecar at all.
-	if _, used := maybeSemantic(nil, search.Options{}, os.Stderr); used {
+	if _, used := maybeSemantic(index.DefaultDir(), nil, search.Options{}, os.Stderr); used {
 		t.Fatal("missing sidecar must skip")
 	}
 }
@@ -109,17 +110,17 @@ func TestMaybeSemanticSidecarBranches(t *testing.T) {
 	}))
 	defer srv.Close()
 	t.Setenv("DEJA_EMBED_URL", srv.URL+"/api/embed")
-	if err := runEmbed(nil); err != nil {
+	if err := runEmbed(index.DefaultDir(), nil); err != nil {
 		t.Fatal(err)
 	}
 	// Sidecar current: fallback fires.
-	out, used := maybeSemantic(nil, search.Options{Query: "totally different words"}, os.Stderr)
+	out, used := maybeSemantic(index.DefaultDir(), nil, search.Options{Query: "totally different words"}, os.Stderr)
 	if !used || len(out) == 0 {
 		t.Fatalf("semantic fallback did not fire: used=%v out=%d", used, len(out))
 	}
 	// Dead endpoint with a valid sidecar: query embed fails, silent skip.
 	t.Setenv("DEJA_EMBED_URL", "http://127.0.0.1:1/api/embed")
-	if _, used := maybeSemantic(nil, search.Options{Query: "anything"}, os.Stderr); used {
+	if _, used := maybeSemantic(index.DefaultDir(), nil, search.Options{Query: "anything"}, os.Stderr); used {
 		t.Fatal("dead endpoint must skip")
 	}
 	t.Setenv("DEJA_EMBED_URL", srv.URL+"/api/embed")
@@ -130,7 +131,7 @@ func TestMaybeSemanticSidecarBranches(t *testing.T) {
 	if err := run([]string{"index", "--rebuild"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, used := maybeSemantic(nil, search.Options{Query: "anything"}, os.Stderr); used {
+	if _, used := maybeSemantic(index.DefaultDir(), nil, search.Options{Query: "anything"}, os.Stderr); used {
 		t.Fatal("stale sidecar generation must skip")
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -92,7 +93,7 @@ func TestRunResumePrintAndErrors(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 
 	var out bytes.Buffer
-	if err := runResume([]string{"resume"}, &out); err != nil {
+	if err := runResume(index.DefaultDir(), []string{"resume"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	if got := out.String(); !strings.Contains(got, "claude --resume resume123") {
@@ -110,7 +111,7 @@ func TestRunResumePrintAndErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var discard bytes.Buffer
-			err := runResume(tc.args, &discard)
+			err := runResume(index.DefaultDir(), tc.args, &discard)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
 			}

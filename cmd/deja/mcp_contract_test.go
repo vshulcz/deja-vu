@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // driveMCP feeds line-delimited JSON-RPC requests through serveMCP (the exact
@@ -17,7 +19,7 @@ func driveMCP(t *testing.T, requests ...string) []map[string]any {
 	t.Helper()
 	in := strings.Join(requests, "\n") + "\n"
 	var out bytes.Buffer
-	if err := serveMCP(strings.NewReader(in), &out); err != nil {
+	if err := serveMCP(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
 		t.Fatalf("serveMCP: %v", err)
 	}
 	var resp []map[string]any
@@ -154,7 +156,7 @@ func TestMCPToolContract(t *testing.T) {
 		// Check raw wire bytes: parsing into map[string]any would itself round the
 		// id to float64, so assert on the encoded response string.
 		var out bytes.Buffer
-		if err := serveMCP(strings.NewReader(`{"jsonrpc":"2.0","id":9007199254740993,"method":"tools/list","params":{}}`+"\n"), &out); err != nil {
+		if err := serveMCP(index.DefaultDir(), strings.NewReader(`{"jsonrpc":"2.0","id":9007199254740993,"method":"tools/list","params":{}}`+"\n"), &out); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(out.String(), `"id":9007199254740993`) {

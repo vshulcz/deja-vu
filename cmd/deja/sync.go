@@ -8,13 +8,13 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-func runSync(args []string) error {
+func runSync(dir string, args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("sync needs export <dir>, import <dir>, or ssh <host>")
 	}
 	switch args[0] {
 	case "ssh":
-		return runSyncSSH(args[1:])
+		return runSyncSSH(dir, args[1:])
 	case "export":
 		full := false
 		rest := args[1:]
@@ -29,15 +29,15 @@ func runSync(args []string) error {
 		if out == "" {
 			return fmt.Errorf("sync export needs a target dir")
 		}
-		if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, os.Stderr); err != nil {
+		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 			return err
 		}
 		var n int
 		var err error
 		if full {
-			n, err = index.ExportFull(index.DefaultDir(), out)
+			n, err = index.ExportFull(dir, out)
 		} else {
-			n, err = index.Export(index.DefaultDir(), out)
+			n, err = index.Export(dir, out)
 		}
 		if err != nil {
 			return err
@@ -45,7 +45,7 @@ func runSync(args []string) error {
 		fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
 		return nil
 	case "import":
-		n, err := index.Import(index.DefaultDir(), args[1])
+		n, err := index.Import(dir, args[1])
 		if err != nil {
 			return err
 		}

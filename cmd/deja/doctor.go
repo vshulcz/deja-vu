@@ -41,7 +41,7 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 
 // runDoctor prints a self-diagnosis report. Diagnosis itself never fails, so
 // both human and JSON reports keep exit status 0.
-func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
+func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir string) error {
 	jsonOutput := false
 	offline := os.Getenv("DEJA_OFFLINE") == "1"
 	for _, arg := range args {
@@ -57,7 +57,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 	if offline {
 		lookup = nil
 	}
-	report := collectDoctorReport(lookup)
+	report := collectDoctorReport(lookup, dir)
 	if jsonOutput {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
@@ -76,7 +76,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup) error {
 	fmt.Fprintln(w)
 	doctorHooks(w)
 	fmt.Fprintln(w)
-	doctorIndex(w, report.Index)
+	doctorIndex(w, report.Index, dir)
 	fmt.Fprintln(w)
 	if report.Embed != nil {
 		doctorEmbed(w, *report.Embed)
@@ -322,13 +322,13 @@ func doctorTOMLWired(path string) bool {
 	return strings.Contains(string(b), "[mcp_servers.deja]")
 }
 
-func doctorIndex(w io.Writer, idx doctorComponent) {
+func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	fmt.Fprintln(w, "Index:")
-	dir := idx.Path
-	if dir == "" {
-		dir = index.DefaultDir()
+	loc := idx.Path
+	if loc == "" {
+		loc = dir
 	}
-	fmt.Fprintf(w, "  location %s\n", dir)
+	fmt.Fprintf(w, "  location %s\n", loc)
 	fmt.Fprintf(w, "  exclusions %d active patterns\n", len(sources.ExclusionPatterns()))
 	if idx.State == "missing" {
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")

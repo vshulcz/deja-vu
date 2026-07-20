@@ -35,7 +35,7 @@ func isNotification(id json.RawMessage) bool {
 
 const mcpMaxFrame = 10 * 1024 * 1024
 
-func serveMCP(r io.Reader, w io.Writer) error {
+func serveMCP(dir string, r io.Reader, w io.Writer) error {
 	br := bufio.NewReaderSize(r, 64*1024)
 	enc := json.NewEncoder(w)
 	for {
@@ -49,7 +49,7 @@ func serveMCP(r io.Reader, w io.Writer) error {
 			if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
 				writeRPCError(enc, nil, -32700, "parse error")
 			} else if !isNotification(req.ID) {
-				result, code, msg := handleMCP(req)
+				result, code, msg := handleMCP(dir, req)
 				if code != 0 {
 					writeRPCError(enc, req.ID, code, msg)
 				} else if eerr := enc.Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result}); eerr != nil {
@@ -88,7 +88,7 @@ func readMCPLine(br *bufio.Reader, max int) (line []byte, overlong bool, err err
 	}
 }
 
-func handleMCP(req rpcRequest) (any, int, string) {
+func handleMCP(dir string, req rpcRequest) (any, int, string) {
 	switch req.Method {
 	case "initialize":
 		return map[string]any{
@@ -131,7 +131,7 @@ func handleMCP(req rpcRequest) (any, int, string) {
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			return nil, -32602, "invalid params"
 		}
-		text, err := callMCPTool(p.Name, p.Arguments)
+		text, err := callMCPTool(dir, p.Name, p.Arguments)
 		if err != nil {
 			return nil, -32602, err.Error()
 		}
@@ -149,7 +149,7 @@ func toolText(text string) map[string]any {
 	return map[string]any{"content": []map[string]string{{"type": "text", "text": text}}}
 }
 
-func callMCPTool(name string, raw json.RawMessage) (string, error) {
+func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	switch name {
 	case "recall":
 		var a struct {
@@ -163,10 +163,10 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, err := recallTextResult(a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
+		text, sessions, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
 		if err == nil {
 			text = frameRecall(text)
-			usage.RecordResult(index.DefaultDir(), usage.KindRecall, len(text), sessions, sessions == 0)
+			usage.RecordResult(dir, usage.KindRecall, len(text), sessions, sessions == 0)
 		}
 		return text, err
 	case "recall_context":
@@ -180,10 +180,10 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, err := recallContextResult(a.Query, a.Harness)
+		text, sessions, err := recallContextResult(dir, a.Query, a.Harness)
 		if err == nil {
 			text = frameRecall(text)
-			usage.RecordResult(index.DefaultDir(), usage.KindContext, len(text), sessions, sessions == 0)
+			usage.RecordResult(dir, usage.KindContext, len(text), sessions, sessions == 0)
 		}
 		return text, err
 	case "blame":
@@ -209,7 +209,7 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 				return "", err
 			}
 		}
-		return blameTextResult(search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
+		return blameTextResult(dir, search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
 	case "remember":
 		var a struct {
 			Text    string `json:"text"`
@@ -227,7 +227,7 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if err := sources.AppendNote(a.Project, a.Text, time.Now()); err != nil {
 			return "", err
 		}
-		if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, mcpProgress()); err != nil {
+		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, mcpProgress()); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("Remembered under %s.", strings.TrimSpace(a.Project)), nil
@@ -236,12 +236,12 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 	}
 }
 
-func blameTextResult(o search.BlameOptions, path string, limit int) (string, error) {
+func blameTextResult(dir string, o search.BlameOptions, path string, limit int) (string, error) {
 	target, err := search.ResolveBlamePath(path)
 	if err != nil {
 		return "", err
 	}
-	hits, err := findBlameHits(target, o, mcpProgress())
+	hits, err := findBlameHits(dir, target, o, mcpProgress())
 	if err != nil {
 		return "", err
 	}
@@ -255,20 +255,20 @@ func blameTextResult(o search.BlameOptions, path string, limit int) (string, err
 	return string(b), err
 }
 
-func recallText(q, harness string, limit, budget int) (string, error) {
-	text, _, err := recallTextResult(q, harness, limit, budget)
+func recallText(dir, q, harness string, limit, budget int) (string, error) {
+	text, _, err := recallTextResult(dir, q, harness, limit, budget)
 	return text, err
 }
 
-func recallTextResult(q, harness string, limit, budget int) (string, int, error) {
+func recallTextResult(dir, q, harness string, limit, budget int) (string, int, error) {
 	if limit <= 0 {
 		limit = 5
 	}
 	o := search.Options{Query: q, Harness: harness, All: true}
-	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
+	if err := index.EnsureForSearch(dir, o, false, mcpProgress()); err != nil {
 		return "", 0, err
 	}
-	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), o, mcpProgress())
+	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, err
 	}
@@ -288,10 +288,10 @@ func recallTextResult(q, harness string, limit, budget int) (string, int, error)
 		return "", 0, err
 	}
 	if os.Getenv("DEJA_EMBED") != "off" {
-		hits = maybeRerank(hits, o, os.Stderr)
+		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
 	var semantic bool
-	hits, semantic = maybeSemantic(hits, o, os.Stderr)
+	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	o.Semantic = semantic
 	if len(hits) == 0 {
 		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
@@ -341,17 +341,17 @@ func trimUTF8(s string, budget int) string {
 	return s[:budget]
 }
 
-func recallContext(q string) (string, error) {
-	text, _, err := recallContextResult(q, "")
+func recallContext(dir, q string) (string, error) {
+	text, _, err := recallContextResult(dir, q, "")
 	return text, err
 }
 
-func recallContextResult(q, harness string) (string, int, error) {
+func recallContextResult(dir, q, harness string) (string, int, error) {
 	o := search.Options{Query: q, Harness: harness, All: true}
-	if err := index.EnsureForSearch(index.DefaultDir(), o, false, mcpProgress()); err != nil {
+	if err := index.EnsureForSearch(dir, o, false, mcpProgress()); err != nil {
 		return "", 0, err
 	}
-	result, err := index.SearchWithRecoveryDetailed(index.DefaultDir(), o, mcpProgress())
+	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, err
 	}
@@ -371,7 +371,7 @@ func recallContextResult(q, harness string) (string, int, error) {
 		return "", 0, err
 	}
 	var semantic bool
-	hits, semantic = maybeSemantic(hits, o, os.Stderr)
+	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	if semantic {
 		o.Tier = search.TierSemantic
 	}

@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/index"
-	"github.com/vshulcz/deja-vu/internal/model"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 func considerTime(minT, maxT *time.Time, t time.Time) {
@@ -88,8 +88,8 @@ func trimRunes(s string, n int) string {
 // working across machines — many sessions mentioning ssh is the signal that
 // their memory is fragmented over hosts. One-time: a sentinel next to the
 // index suppresses repeats, and any sync usage counts as "already knows".
-func sshSyncTip(ss []model.Session) string {
-	sentinel := index.DefaultDir() + ".synctip"
+func sshSyncTip(dir string, ss []model.Session) string {
+	sentinel := dir + ".synctip"
 	if _, err := os.Stat(sentinel); err == nil {
 		return ""
 	}

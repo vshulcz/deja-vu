@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func withHookStdin(t *testing.T, payload string) {
@@ -36,7 +38,7 @@ func TestHookContextCompactLead(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "/tmp/p")
 
 	withHookStdin(t, `{"source":"compact","session_id":"x"}`)
-	out := captureStdout(t, func() { _ = runHookContext(true) })
+	out := captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), true) })
 	if !strings.Contains(out, "Context was just compacted") {
 		t.Fatalf("compact lead missing: %q", out)
 	}
@@ -45,14 +47,14 @@ func TestHookContextCompactLead(t *testing.T) {
 	}
 
 	withHookStdin(t, `{"source":"startup"}`)
-	out = captureStdout(t, func() { _ = runHookContext(true) })
+	out = captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), true) })
 	if strings.Contains(out, "Context was just compacted") || !strings.Contains(out, "recent history") {
 		t.Fatalf("startup lead wrong: %q", out)
 	}
 
 	// Malformed stdin must not break the hook.
 	withHookStdin(t, `{not json`)
-	out = captureStdout(t, func() { _ = runHookContext(true) })
+	out = captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), true) })
 	if out == "" {
 		t.Fatal("hook produced nothing on malformed stdin")
 	}
@@ -69,13 +71,13 @@ func TestRunHookPrecompactParsesAndGuards(t *testing.T) {
 
 	payload, _ := json.Marshal(map[string]any{"session_id": "abc", "trigger": "auto"})
 	withHookStdin(t, string(payload))
-	runHookPrecompact()
+	runHookPrecompact(index.DefaultDir())
 	if spawned != 1 {
 		t.Fatalf("spawned=%d, want 1", spawned)
 	}
 	// Malformed stdin still triggers the guarded warmup path.
 	withHookStdin(t, "garbage")
-	runHookPrecompact()
+	runHookPrecompact(index.DefaultDir())
 	if spawned != 1 {
 		t.Fatalf("sentinel must suppress the second spawn, got %d", spawned)
 	}
