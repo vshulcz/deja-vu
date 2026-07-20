@@ -90,7 +90,9 @@ func TestInstallGrokTOML(t *testing.T) {
 		t.Fatalf("grok install: %#v %v", r, err)
 	}
 	b, _ := os.ReadFile(cfg)
-	if !strings.Contains(string(b), "[mcp_servers.deja]") || !strings.Contains(string(b), `command = "/bin/deja"`) {
+	// The exe lands in command= on unix and inside args=[...] behind the cmd /c
+	// shim on Windows; assert its presence either way.
+	if !strings.Contains(string(b), "[mcp_servers.deja]") || !strings.Contains(string(b), "/bin/deja") {
 		t.Fatalf("grok config: %s", b)
 	}
 	// merge into an existing config without touching other sections
