@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Handoff/resume commands corrected against the real installed CLIs: cursor handoff uses positional prompt (no `chat` subcommand exists), pi resume uses `--session`, and grok is marked non-resumable (it has no session flags).
 - Per-prompt recall (UserPromptSubmit) now ranks THIS project's sessions by IDF-weighted overlap with the prompt instead of reconstructing an AND query — natural prompts are full of filler that poisoned the old query builder into empty or wrong hits. Excludes the current/too-fresh sessions, dedupes per agent session, and appends a ready citation line.
 - `deja stats` counts how often agents actually said "deja-vu recalled" — a telemetry-free measure of memory credited aloud, closed by deja re-indexing those transcripts.
 - Ingestion health: malformed JSONL lines and failed file parses are counted per harness, persisted in the manifest, and surfaced in `deja doctor` (details in `--json`). Tolerated loss now leaves evidence instead of disappearing.

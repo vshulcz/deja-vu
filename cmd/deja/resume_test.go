@@ -33,7 +33,7 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
 		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
-		{"grok with dir", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, real, "grok --resume 019f-grok", ""},
+		{"grok has no resume", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, "", "", "grok has no session resume"},
 		{"imported", model.Session{Harness: "claude", ID: "imported-9f5", Project: "imported:my-app"}, "", "", "another machine"},
 		{"unknown harness", model.Session{Harness: "mystery", ID: "x"}, "", "", "don't know how"},
 	}
@@ -59,14 +59,14 @@ func TestResumeCommandPerHarness(t *testing.T) {
 
 func TestFormatResumeCommand(t *testing.T) {
 	dir := filepath.Join("tmp", "project's dir")
-	got := formatResumeCommand(dir, "grok --resume 019f")
+	got := formatResumeCommand(dir, "claude --resume 019f")
 	if runtime.GOOS == "windows" {
-		if !strings.HasPrefix(got, "powershell.exe -NoProfile") || !strings.Contains(got, "project''s dir") || !strings.Contains(got, "-ErrorAction Stop") || !strings.Contains(got, "grok --resume 019f") {
+		if !strings.HasPrefix(got, "powershell.exe -NoProfile") || !strings.Contains(got, "project''s dir") || !strings.Contains(got, "-ErrorAction Stop") || !strings.Contains(got, "claude --resume 019f") {
 			t.Fatalf("Windows resume command = %q", got)
 		}
 		return
 	}
-	want := "cd " + shellQuote(dir) + " && grok --resume 019f"
+	want := "cd " + shellQuote(dir) + " && claude --resume 019f"
 	if got != want {
 		t.Fatalf("resume command = %q, want %q", got, want)
 	}

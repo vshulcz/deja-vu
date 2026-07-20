@@ -341,7 +341,7 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 	case "grok":
 		return []string{"grok", prompt}, true
 	case "cursor":
-		return []string{"cursor-agent", "chat", prompt}, true
+		return []string{"cursor-agent", prompt}, true
 	case "copilot":
 		return []string{"copilot", "-p", prompt}, true
 	default:
