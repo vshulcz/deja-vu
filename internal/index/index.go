@@ -862,23 +862,6 @@ func importedSessions(dir string) importedState {
 	return out
 }
 
-var harnessLoaders = []struct {
-	name string
-	load func() []model.Session
-}{
-	{"claude", sources.LoadClaude},
-	{"codex", sources.LoadCodex},
-	{"opencode", sources.LoadOpencode},
-	{"aider", sources.LoadAider},
-	{"gemini", sources.LoadGemini},
-	{"cursor", sources.LoadCursor},
-	{"antigravity", sources.LoadAntigravity},
-	{"grok", sources.LoadGrok},
-	{"qwen", sources.LoadQwen},
-	{"pi", sources.LoadPi},
-	{"copilot", sources.LoadCopilot},
-}
-
 func load(h string) []model.Session { return loadProgress(h, nil) }
 
 // loadProgress narrates a full rebuild per harness: a cold pass over a large
@@ -899,29 +882,23 @@ func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss 
 
 func loadProgress(h string, progress io.Writer) []model.Session {
 	var ss []model.Session
-	for _, hl := range harnessLoaders {
-		if h != "" && h != hl.name {
+	for _, hr := range sources.Registry() {
+		if h != "" && h != hr.Name {
 			continue
 		}
-		got := safeLoad(hl.name, hl.load, progress)
+		got := safeLoad(hr.Name, hr.Load, progress)
 		ss = append(ss, got...)
 		if progress != nil && len(got) > 0 && !SuppressHarnessNarration {
 			msgs := 0
 			for _, s := range got {
 				msgs += len(s.Messages)
 			}
-			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", hl.name, len(got), msgs)
-		}
-	}
-	if h == "" || h == "deja" {
-		got := sources.LoadNotes()
-		ss = append(ss, got...)
-		if progress != nil && len(got) > 0 && !SuppressHarnessNarration {
-			msgs := 0
-			for _, s := range got {
-				msgs += len(s.Messages)
+			// "deja" is the notes pseudo-source; it narrates as "notes".
+			label := hr.Name
+			if label == "deja" {
+				label = "notes"
 			}
-			fmt.Fprintf(progress, "deja: notes: %d sessions, %d messages\n", len(got), msgs)
+			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", label, len(got), msgs)
 		}
 	}
 	return ss
@@ -1671,45 +1648,24 @@ func sameFile(a, b FileState) bool {
 		a.CWDSize == b.CWDSize && a.CWDMTime == b.CWDMTime
 }
 
+// kindForPath returns the registry FileKind whose Match accepts p.
+func kindForPath(p string) (sources.FileKind, bool) {
+	for _, h := range sources.Registry() {
+		for _, k := range h.Kinds {
+			if k.Match(p) {
+				return k, true
+			}
+		}
+	}
+	return sources.FileKind{}, false
+}
+
 func parseChangedFile(harness, p string, old FileState) ([]model.Session, error) {
-	switch harnessForPath(p) {
-	case "claude":
-		return sources.ParseClaudeFile(p)
-	case "codex-history":
-		return sources.ParseCodexHistory(p)
-	case "codex":
-		return sources.ParseCodexRollout(p)
-	case "opencode":
-		if old.LastUpdated > 0 {
-			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
-		}
-		return sources.ParseOpencodeDB(p)
-	case "cursor-db":
-		if old.LastUpdated > 0 {
-			return sources.ParseCursorDBSince(p, time.Unix(0, old.LastUpdated))
-		}
-		return sources.ParseCursorDB(p)
-	case "aider":
-		return sources.ParseAiderFile(p)
-	case "gemini":
-		return sources.ParseGeminiFile(p)
-	case "cursor":
-		return sources.ParseCursorTranscript(p)
-	case "antigravity":
-		return sources.ParseAntigravityFile(p)
-	case "grok":
-		return sources.ParseGrokFile(p)
-	case "qwen":
-		return sources.ParseQwenFile(p)
-	case "pi":
-		return sources.ParsePiFile(p)
-	case "copilot":
-		return sources.ParseCopilotFile(p)
-	case "deja":
-		return sources.ParseNotesFile(p)
-	default:
+	k, ok := kindForPath(p)
+	if !ok {
 		return nil, nil
 	}
+	return k.Parse(p, old.LastUpdated)
 }
 
 func parseAppendedFile(harness, p string, old FileState) (ss []model.Session, err error) {
@@ -1718,89 +1674,20 @@ func parseAppendedFile(harness, p string, old FileState) (ss []model.Session, er
 			ss, err = nil, fmt.Errorf("parser panic on %s: %v", p, r)
 		}
 	}()
+	k, ok := kindForPath(p)
+	if !ok || k.ParseFrom == nil {
+		return nil, nil
+	}
 	from := old.SafeSize
 	if from == 0 || from > old.Size {
 		from = old.Size
 	}
-	switch harnessForPath(p) {
-	case "claude":
-		return sources.ParseClaudeFileFromOffset(p, from)
-	case "codex-history":
-		return sources.ParseCodexHistoryFromOffset(p, from)
-	case "qwen":
-		return sources.ParseQwenFileFromOffset(p, from)
-	case "pi":
-		return sources.ParsePiFileFromOffset(p, from)
-	case "copilot":
-		return sources.ParseCopilotFileFromOffset(p, from)
-	case "deja":
-		return sources.ParseNotesFileFromOffset(p, from)
-	case "codex":
-		return sources.ParseCodexRolloutFromOffset(p, from)
-	case "opencode":
-		if old.LastUpdated > 0 {
-			return sources.ParseOpencodeDBSince(p, time.Unix(0, old.LastUpdated))
-		}
-		return sources.ParseOpencodeDB(p)
-	case "cursor-db":
-		if old.LastUpdated > 0 {
-			return sources.ParseCursorDBSince(p, time.Unix(0, old.LastUpdated))
-		}
-		return sources.ParseCursorDB(p)
-	default:
-		return nil, nil
-	}
+	return k.ParseFrom(p, from, old.LastUpdated)
 }
 
-func harnessForPath(p string) string {
-	if p == sources.OpencodeDB() {
-		return "opencode"
-	}
-	if filepath.Base(p) == "history.jsonl" && strings.HasPrefix(p, sources.CodexRoot()) {
-		return "codex-history"
-	}
-	if strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-") && strings.HasPrefix(p, filepath.Join(sources.CodexRoot(), "sessions")) {
-		return "codex"
-	}
-	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, sources.ClaudeRoot()) {
-		return "claude"
-	}
-	if filepath.Base(p) == ".aider.chat.history.md" {
-		return "aider"
-	}
-	if strings.HasPrefix(p, filepath.Join(sources.GeminiRoot(), "tmp")) && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
-		return "gemini"
-	}
-	if filepath.Base(p) == "state.vscdb" && strings.HasPrefix(p, sources.CursorUserRoot()) {
-		return "cursor-db"
-	}
-	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(sources.CursorCLIRoot(), "projects")) {
-		return "cursor"
-	}
-	if filepath.Base(p) == "transcript.jsonl" {
-		for _, root := range sources.AntigravityRoots() {
-			if strings.HasPrefix(p, root+string(filepath.Separator)) {
-				return "antigravity"
-			}
-		}
-	}
-	if filepath.Base(p) == "updates.jsonl" && strings.HasPrefix(p, filepath.Join(sources.GrokRoot(), "sessions")) {
-		return "grok"
-	}
-	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, filepath.Join(sources.QwenRoot(), "projects")) {
-		return "qwen"
-	}
-	if strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, sources.PiRoot()) {
-		return "pi"
-	}
-	if filepath.Base(p) == "events.jsonl" && strings.HasPrefix(p, sources.CopilotRoot()) {
-		return "copilot"
-	}
-	if p == sources.NotesFile() {
-		return "deja"
-	}
-	return ""
-}
+// harnessForPath reports the fine-grained source kind for a path (claude,
+// codex-history, cursor-db, ...) via the sources registry, or "" if none.
+func harnessForPath(p string) string { return sources.KindForPath(p) }
 
 func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
@@ -1828,71 +1715,13 @@ func setStoreLastUpdated(files map[string]FileState, sessions map[string]Session
 
 func currentFiles(h string) map[string]FileState {
 	paths := map[string]bool{}
-	addWalk := func(root string, pred func(string) bool) {
-		_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-			if err == nil && d.Type()&os.ModeSymlink == 0 && !d.IsDir() && pred(p) {
-				paths[p] = true
-			}
-			return nil
-		})
-	}
-	if h == "" || h == "claude" {
-		addWalk(sources.ClaudeRoot(), sources.ClaudeFileWanted)
-	}
-	if h == "" || h == "codex" {
-		addWalk(filepath.Join(sources.CodexRoot(), "sessions"), func(p string) bool {
-			return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-")
-		})
-		paths[filepath.Join(sources.CodexRoot(), "history.jsonl")] = true
-	}
-	if h == "" || h == "opencode" {
-		paths[sources.OpencodeDB()] = true
-	}
-	if h == "" || h == "aider" {
-		for _, p := range sources.AiderFiles() {
+	for _, hr := range sources.Registry() {
+		if h != "" && h != hr.Name {
+			continue
+		}
+		for _, p := range hr.Files() {
 			paths[p] = true
 		}
-	}
-	if h == "" || h == "gemini" {
-		for _, p := range sources.GeminiChatFiles() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "cursor" {
-		for _, p := range sources.CursorDBs() {
-			paths[p] = true
-		}
-		for _, p := range sources.CursorTranscripts() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "antigravity" {
-		for _, p := range sources.AntigravityTranscripts() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "grok" {
-		for _, p := range sources.GrokSessionFiles() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "qwen" {
-		for _, p := range sources.QwenSessionFiles() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "pi" {
-		for _, p := range sources.PiSessionFiles() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "copilot" {
-		for _, p := range sources.CopilotSessionFiles() {
-			paths[p] = true
-		}
-	}
-	if h == "" || h == "deja" {
-		paths[sources.NotesFile()] = true
 	}
 	out := map[string]FileState{}
 	for p := range paths {

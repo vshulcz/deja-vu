@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -73,11 +72,25 @@ func TestFormatRegistryConformance(t *testing.T) {
 		})
 	}
 
-	loaders := harnessLoaderIDs(t, filepath.Join(root, "internal", "index", "index.go"))
+	loaders := registryHarnessIDs()
 	sort.Strings(registered)
 	if strings.Join(registered, ",") != strings.Join(loaders, ",") {
-		t.Fatalf("registry harnesses = %v, harnessLoaders = %v", registered, loaders)
+		t.Fatalf("format registry harnesses = %v, source registry = %v", registered, loaders)
 	}
+}
+
+// registryHarnessIDs lists the real harnesses in the source registry (excluding
+// the notes pseudo-source) to compare against the published format registry.
+func registryHarnessIDs() []string {
+	var ids []string
+	for _, h := range Registry() {
+		if h.Name == "deja" {
+			continue
+		}
+		ids = append(ids, h.Name)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func readFormatRegistry(t *testing.T, path string) formatRegistry {
@@ -176,23 +189,4 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 			}
 		}
 	}
-}
-
-func harnessLoaderIDs(t *testing.T, path string) []string {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	re := regexp.MustCompile(`\{"([a-z0-9-]+)", sources\.Load[A-Za-z]+\}`)
-	matches := re.FindAllSubmatch(b, -1)
-	ids := make([]string, 0, len(matches))
-	for _, match := range matches {
-		ids = append(ids, string(match[1]))
-	}
-	if len(ids) == 0 {
-		t.Fatal("no harnessLoaders entries found")
-	}
-	sort.Strings(ids)
-	return ids
 }
