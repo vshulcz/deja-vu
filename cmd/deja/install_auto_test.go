@@ -173,7 +173,7 @@ func TestPrintInstallProofListsDistinctProjects(t *testing.T) {
 	b, _ := io.ReadAll(r)
 	out := string(b)
 	if !strings.Contains(out, "deja already knows this machine:") ||
-		!strings.Contains(out, "tmp/beta") || !strings.Contains(out, "gamma") {
+		!strings.Contains(out, filepath.Join("tmp", "beta")) || !strings.Contains(out, "gamma") {
 		t.Fatalf("proof output = %q", out)
 	}
 	// One line per project, newest first, capped at three.
