@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 const (
@@ -26,23 +27,25 @@ const (
 	cMatch  = "\x1b[48;5;236;38;5;230m"
 )
 
-type Options struct {
-	Query                     string
-	Regex                     bool
-	Harness, Project, Role    string
-	Since                     time.Duration
-	All, JSON, Fuzzy, Stemmed bool
-	NoEmbed                   bool
-	Semantic                  bool                `json:"-"`
-	FuzzyVariants             map[string][]string `json:"-"`
-	Tier                      string              `json:"-"`
-}
+// Options and the tier names live in internal/query so packages below
+// search (index) can use them without importing the ranking engine.
+type Options = query.Options
 
 const (
-	TierExact    = "exact"
-	TierClose    = "close"
-	TierSemantic = "semantic"
+	TierExact    = query.TierExact
+	TierClose    = query.TierClose
+	TierSemantic = query.TierSemantic
 )
+
+func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
+
+func IsStopWord(term string) bool { return query.IsStopWord(term) }
+
+func MatchesQuery(text, q string) bool { return query.MatchesQuery(text, q) }
+
+func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
+	return query.MatchesParts(text, terms, phrases, variants)
+}
 
 type Hit struct {
 	Session    model.Session `json:"session"`
@@ -460,7 +463,7 @@ func snippet(s, q string, re *regexp.Regexp) string {
 		low := strings.ToLower(s)
 		b := strings.Index(low, strings.ToLower(q))
 		if b < 0 {
-			for _, tok := range queryTokens(q) {
+			for _, tok := range query.Tokens(q) {
 				if p := strings.Index(low, tok); p >= 0 && (b < 0 || p < b) {
 					b = p
 				}
@@ -491,20 +494,6 @@ func snippet(s, q string, re *regexp.Regexp) string {
 
 // Snippet formats a message for search results, including semantic matches.
 func Snippet(s, q string) string { return snippet(s, q, nil) }
-
-func queryTokens(s string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, tok := range strings.Fields(strings.ToLower(s)) {
-		tok = strings.Trim(tok, "\t\n\r .,;:!?()[]{}<>\"'`")
-		if len(tok) < 2 || seen[tok] {
-			continue
-		}
-		seen[tok] = true
-		out = append(out, tok)
-	}
-	return out
-}
 
 func countAllTokens(low string, toks []string) int {
 	total := 0
@@ -551,7 +540,7 @@ func highlight(s, q string, isRe bool, color bool) string {
 	if strings.Contains(strings.ToLower(s), strings.ToLower(q)) {
 		return regexp.MustCompile(`(?i)`+regexp.QuoteMeta(q)).ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
 	}
-	toks := queryTokens(q)
+	toks := query.Tokens(q)
 	if len(toks) == 0 {
 		return s
 	}

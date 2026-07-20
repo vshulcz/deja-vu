@@ -14,8 +14,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
-	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -114,7 +114,7 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	return updateIndex(dir, "", "", want, force, progress)
 }
 
-func EnsureForSearch(dir string, o search.Options, force bool, progress io.Writer) error {
+func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -306,7 +306,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	return ss
 }
 
-func rebuildForSearch(dir string, o search.Options, scope string, files map[string]FileState, progress io.Writer) error {
+func rebuildForSearch(dir string, o query.Options, scope string, files map[string]FileState, progress io.Writer) error {
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {

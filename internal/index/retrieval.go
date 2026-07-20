@@ -14,15 +14,15 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
-func Search(dir string, o search.Options) ([]model.Session, error) {
+func Search(dir string, o query.Options) ([]model.Session, error) {
 	r, err := SearchDetailed(dir, o)
 	return r.Sessions, err
 }
 
-func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
+func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -40,7 +40,7 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 	}
 	var posts []posting
 	var fallbackVariants map[string][]string
-	fallbackTier := search.TierExact
+	fallbackTier := query.TierExact
 	usedPostings := false
 	if !o.Regex {
 		if keys := queryKeys(o.Query); len(keys) > 0 {
@@ -60,7 +60,7 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 				}
 				if len(posts) > 0 {
 					fallbackVariants = variants
-					fallbackTier = search.TierClose
+					fallbackTier = query.TierClose
 				}
 			}
 		}
@@ -195,7 +195,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 
 // loadSessionRecords materializes one session's transcript from the index.
 func loadSessionRecords(dir string, m Manifest, meta SessionMeta) (model.Session, error) {
-	ss, err := scanRecords(dir, m, search.Options{All: true}, nil)
+	ss, err := scanRecords(dir, m, query.Options{All: true}, nil)
 	if err != nil {
 		return model.Session{}, err
 	}
@@ -237,7 +237,7 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 		if err != nil {
 			return nil, "", fmt.Errorf("postings: %w", err)
 		}
-		o := search.Options{Query: q}
+		o := query.Options{Query: q}
 		posts = cutPostingsBySession(posts, m, o)
 		if len(posts) == 0 {
 			continue
@@ -257,12 +257,12 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 // SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
 // mid-append) triggers one full rebuild instead of erroring until the user
 // runs --rebuild by hand.
-func SearchWithRecovery(dir string, o search.Options, progress io.Writer) ([]model.Session, error) {
+func SearchWithRecovery(dir string, o query.Options, progress io.Writer) ([]model.Session, error) {
 	r, err := SearchWithRecoveryDetailed(dir, o, progress)
 	return r.Sessions, err
 }
 
-func SearchWithRecoveryDetailed(dir string, o search.Options, progress io.Writer) (SearchResult, error) {
+func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer) (SearchResult, error) {
 	r, err := SearchDetailed(dir, o)
 	if err == nil || !IsCorrupt(err) {
 		return r, err
@@ -277,10 +277,10 @@ func SearchWithRecoveryDetailed(dir string, o search.Options, progress io.Writer
 }
 
 func Recent(dir string, n int) ([]model.Session, error) {
-	return RecentMatching(dir, n, search.Options{})
+	return RecentMatching(dir, n, query.Options{})
 }
 
-func RecentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
+func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -390,11 +390,11 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	return s, true, nil
 }
 
-func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]model.Session, error) {
+func scanRecords(dir string, m Manifest, o query.Options, offsets []int64) ([]model.Session, error) {
 	return scanRecordsWithVariants(dir, m, o, offsets, nil)
 }
 
-func scanRecordsWithVariants(dir string, m Manifest, o search.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
+func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	add := func(r Record) {
 		meta, ok := m.Sessions[r.Key]
@@ -449,7 +449,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o search.Options, offsets [
 	return out, nil
 }
 
-func cutPostingsBySession(posts []posting, m Manifest, o search.Options) []posting {
+func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []posting {
 	metaByOrd := sessionMetaByOrd(m)
 	// Keep the complete posting-derived candidate set. Ranking needs the
 	// candidate records to calculate BM25 document frequency and length.
@@ -473,7 +473,7 @@ func sessionMetaByOrd(m Manifest) map[uint32]SessionMeta {
 	return out
 }
 
-func sessionMetaMatches(meta SessionMeta, o search.Options) bool {
+func sessionMetaMatches(meta SessionMeta, o query.Options) bool {
 	if o.Harness != "" && meta.Harness != o.Harness {
 		return false
 	}
@@ -680,8 +680,8 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 	return intersectPostingMaps(perToken), variants, nil
 }
 
-func fuzzySearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
-	terms, phrases := search.QueryParts(o.Query)
+func fuzzySearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	terms, phrases := query.QueryParts(o.Query)
 	posts, variants, err := fuzzyPostings(dir, terms, phrases)
 	if err != nil || len(posts) == 0 {
 		return SearchResult{}, err
@@ -694,11 +694,11 @@ func fuzzySearch(dir string, m Manifest, o search.Options) (SearchResult, error)
 	if err != nil || len(ss) == 0 {
 		return SearchResult{}, err
 	}
-	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants, Tier: search.TierClose}, nil
+	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants, Tier: query.TierClose}, nil
 }
 
-func stemSearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
-	terms, phrases := search.QueryParts(o.Query)
+func stemSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	terms, phrases := query.QueryParts(o.Query)
 	posts, variants, err := stemPostings(dir, terms, phrases)
 	if err != nil || len(posts) == 0 {
 		return SearchResult{}, err
@@ -711,7 +711,7 @@ func stemSearch(dir string, m Manifest, o search.Options) (SearchResult, error) 
 	if err != nil || len(ss) == 0 {
 		return SearchResult{}, err
 	}
-	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants, Tier: search.TierClose}, nil
+	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants, Tier: query.TierClose}, nil
 }
 
 func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
@@ -1038,7 +1038,7 @@ func queryKeys(s string) []string {
 	// query is all stop words, keep them (odd results beat none).
 	content := make([]string, 0, len(toks))
 	for _, tok := range toks {
-		if !search.IsStopWord(tok) {
+		if !query.IsStopWord(tok) {
 			content = append(content, tok)
 		}
 	}
@@ -1052,19 +1052,19 @@ func queryKeys(s string) []string {
 	return out
 }
 
-func recordMatchesQuery(r Record, o search.Options) bool {
+func recordMatchesQuery(r Record, o query.Options) bool {
 	return recordMatchesQueryVariants(r, o, nil)
 }
 
-func recordMatchesQueryVariants(r Record, o search.Options, variants map[string][]string) bool {
+func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][]string) bool {
 	if o.Regex {
 		return true
 	}
-	terms, phrases := search.QueryParts(o.Query)
+	terms, phrases := query.QueryParts(o.Query)
 	if len(terms) == 0 && len(phrases) == 0 {
 		return true
 	}
-	return search.MatchesParts(r.Text, terms, phrases, variants)
+	return query.MatchesParts(r.Text, terms, phrases, variants)
 }
 
 func bucket(tok string) string {

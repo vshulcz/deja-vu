@@ -1,12 +1,13 @@
 package index
 
 import (
-	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/search"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 func TestStopWordsDoNotConstrainRetrieval(t *testing.T) {

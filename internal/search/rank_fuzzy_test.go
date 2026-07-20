@@ -1,9 +1,10 @@
 package search
 
 import (
-	"github.com/vshulcz/deja-vu/internal/model"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 func TestFuzzyHitsScoreByFrequency(t *testing.T) {

@@ -1,7 +1,10 @@
-package search
+// Package query parses search queries and matches text against them.
+// It is a leaf: index and search both build on it.
+package query
 
 import (
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -18,11 +21,29 @@ var stopWords = map[string]bool{
 
 // QueryParts separates ordinary terms from quoted phrases without changing
 // the query syntax used by callers.
+type Options struct {
+	Query                     string
+	Regex                     bool
+	Harness, Project, Role    string
+	Since                     time.Duration
+	All, JSON, Fuzzy, Stemmed bool
+	NoEmbed                   bool
+	Semantic                  bool                `json:"-"`
+	FuzzyVariants             map[string][]string `json:"-"`
+	Tier                      string              `json:"-"`
+}
+
+const (
+	TierExact    = "exact"
+	TierClose    = "close"
+	TierSemantic = "semantic"
+)
+
 func QueryParts(q string) (terms []string, phrases []string) {
 	start := -1
 	var plain strings.Builder
 	flushPlain := func() {
-		terms = appendUnique(terms, queryTokens(plain.String())...)
+		terms = appendUnique(terms, Tokens(plain.String())...)
 		plain.Reset()
 	}
 	for i, r := range q {
@@ -40,13 +61,13 @@ func QueryParts(q string) (terms []string, phrases []string) {
 		content := q[start+1 : i]
 		if hasLetterOrDigit(content) {
 			phrases = appendUnique(phrases, strings.ToLower(strings.TrimSpace(content)))
-			terms = appendUnique(terms, queryTokens(content)...)
+			terms = appendUnique(terms, Tokens(content)...)
 		}
 		start = -1
 	}
 	if start >= 0 {
 		// An unfinished quote is just whitespace, as it was before phrases.
-		return withoutStopWords(queryTokens(q)), nil
+		return withoutStopWords(Tokens(q)), nil
 	}
 	flushPlain()
 	terms = withoutStopWords(terms)
@@ -118,4 +139,19 @@ func MatchesParts(text string, terms, phrases []string, variants map[string][]st
 		}
 	}
 	return len(terms) > 0 || len(phrases) > 0
+}
+
+// Tokens lowercases and dedupes whitespace-separated query tokens.
+func Tokens(s string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, tok := range strings.Fields(strings.ToLower(s)) {
+		tok = strings.Trim(tok, "\t\n\r .,;:!?()[]{}<>\"'`")
+		if len(tok) < 2 || seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	return out
 }
