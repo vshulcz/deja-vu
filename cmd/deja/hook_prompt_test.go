@@ -131,3 +131,47 @@ func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
 		t.Fatalf("below threshold tip = %q", tip)
 	}
 }
+
+func TestHookPromptCitationAndDedupe(t *testing.T) {
+	withStatsStores(t)
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	in := `{"prompt":"the long beta session broke again","session_id":"agent-1"}`
+	var out bytes.Buffer
+	if err := runHookPrompt(strings.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `If it helped, say: \"deja-vu recalled:`) {
+		t.Fatalf("citation line missing: %q", out.String())
+	}
+	// Same session asks again: the same memory must not be re-injected.
+	var out2 bytes.Buffer
+	if err := runHookPrompt(strings.NewReader(in), &out2); err != nil {
+		t.Fatal(err)
+	}
+	if out2.Len() != 0 {
+		t.Fatalf("repeat injection for same session: %q", out2.String())
+	}
+	// A different agent session still gets it.
+	var out3 bytes.Buffer
+	if err := runHookPrompt(strings.NewReader(`{"prompt":"the long beta session broke again","session_id":"agent-2"}`), &out3); err != nil {
+		t.Fatal(err)
+	}
+	if out3.Len() == 0 {
+		t.Fatal("fresh session should still receive the memory")
+	}
+}
+
+func TestAgentCreditsCountedFromIndex(t *testing.T) {
+	now := time.Now()
+	ss := []model.Session{{ID: "a", Messages: []model.Message{
+		{Role: "assistant", Text: "deja-vu recalled: jwt fix — reusing it.", Time: now},
+		{Role: "assistant", Text: "deja-vu recalled: old one", Time: now.Add(-9 * 24 * time.Hour)},
+		{Role: "user", Text: "deja-vu recalled should not count from users"},
+	}}}
+	r := buildStats(ss, now)
+	if r.AgentCredits != 2 || r.WeekCredits != 1 {
+		t.Fatalf("credits = %d/%d, want 2/1", r.AgentCredits, r.WeekCredits)
+	}
+}

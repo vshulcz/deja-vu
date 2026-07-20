@@ -193,6 +193,8 @@ var agentArtifactMarkers = []string{
 	"Called the Read tool with",
 	"[Request interrupted by user]",
 	"Comments on artifact URI:",
+	"idle_notification",
+	`{"type":`,
 }
 
 func isAgentArtifact(text string) bool {

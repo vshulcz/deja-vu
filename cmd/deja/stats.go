@@ -43,6 +43,8 @@ type statsReport struct {
 	WeekBytes       int            `json:"week_bytes"`
 	WeekInjected    int            `json:"week_injected"`
 	HandoffsIn      int            `json:"handoffs_received"`
+	AgentCredits    int            `json:"agent_credits"`
+	WeekCredits     int            `json:"week_agent_credits"`
 	SidecarSize     int64          `json:"sidecar_size,omitempty"`
 }
 
@@ -374,7 +376,20 @@ func buildStats(ss []model.Session, now time.Time) statsReport {
 		out.DateRange.End = maxT.Format("2006-01-02")
 	}
 	out.RepeatQuestions = repeatQuestions(ss)
+	weekCut := now.Add(-7 * 24 * time.Hour)
 	for _, s := range ss {
+		for _, msg := range s.Messages {
+			// The attribution loop: agents saying "deja-vu recalled" end up in
+			// the very transcripts deja indexes, so the next pass can count how
+			// often memory was credited out loud — a measured magic metric with
+			// zero telemetry.
+			if msg.Role == "assistant" && strings.Contains(msg.Text, "deja-vu recalled") {
+				out.AgentCredits++
+				if !msg.Time.IsZero() && msg.Time.After(weekCut) {
+					out.WeekCredits++
+				}
+			}
+		}
 		for _, msg := range s.Messages {
 			if msg.Role != "user" {
 				continue
@@ -478,6 +493,9 @@ func printStats(w io.Writer, r statsReport) {
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
 	fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
 	fmt.Fprintf(w, "  This week        %d recalls by your agents · %s re-used (plus %d auto-injections)\n", r.WeekRecalls, humanBytes(int64(r.WeekBytes)), r.WeekInjected)
+	if r.AgentCredits > 0 {
+		fmt.Fprintf(w, "  Credited aloud   agents said \"deja-vu recalled\" %d times (%d this week)\n", r.AgentCredits, r.WeekCredits)
+	}
 	if r.HandoffsIn > 0 {
 		fmt.Fprintf(w, "  Handoffs         %d sessions started from a handoff\n", r.HandoffsIn)
 	}
