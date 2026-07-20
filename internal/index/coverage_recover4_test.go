@@ -437,9 +437,10 @@ func TestExportRecordsErrorBranches(t *testing.T) {
 
 	dir3 := filepath.Join(tmp, "idx3")
 	writeTinyIndex(t, dir3)
-	// A directory squatting on sessions.gob.tmp makes writeGobAtomic fail
-	// regardless of directory permissions (lockDir re-tightens those).
-	if err := os.MkdirAll(filepath.Join(dir3, "sessions.gob.tmp", "block"), 0o700); err != nil {
+	// A directory squatting on manifest.gob.tmp makes writeGobAtomic fail
+	// regardless of directory permissions (lockDir re-tightens those). The
+	// watermark commit writes only manifest.gob, never sessions.gob.
+	if err := os.MkdirAll(filepath.Join(dir3, "manifest.gob.tmp", "block"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Export(dir3, filepath.Join(tmp, "out3")); err == nil {

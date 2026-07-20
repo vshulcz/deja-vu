@@ -54,7 +54,17 @@ func syncSSHPush(host string, full bool) error {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	n, err := exportBatches(tmp, full)
+	// Watermarks advance only after the remote import succeeds: acknowledged
+	// delivery, so a failed scp or remote error cannot silently drop records
+	// from every later push.
+	var commit func() error
+	var n int
+	if full {
+		n, err = index.ExportFull(index.DefaultDir(), tmp)
+		commit = func() error { return nil }
+	} else {
+		n, commit, err = index.ExportDeferred(index.DefaultDir(), tmp)
+	}
 	if err != nil {
 		return err
 	}
@@ -82,6 +92,9 @@ func syncSSHPush(host string, full bool) error {
 	out = strings.TrimSpace(out)
 	if err != nil {
 		return fmt.Errorf("remote import: %v: %s", err, out)
+	}
+	if err := commit(); err != nil {
+		return fmt.Errorf("delivered, but recording watermarks failed (next push may resend; harmless — import dedupes): %w", err)
 	}
 	if out != "" {
 		fmt.Fprintf(os.Stdout, "%s: %s\n", host, out)
@@ -123,12 +136,12 @@ func syncSSHPull(host string, full bool) error {
 	defer os.RemoveAll(ltmp)
 	if out, err := sshRunner("scp", "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/"); err != nil {
 		cleanup()
-		return fmt.Errorf("scp: %v: %s", err, strings.TrimSpace(out))
+		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, strings.TrimSpace(out), host)
 	}
 	cleanup()
 	n, err := index.Import(index.DefaultDir(), ltmp)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, host)
 	}
 	fmt.Fprintf(os.Stdout, "deja: imported %d records\n", n)
 	return nil

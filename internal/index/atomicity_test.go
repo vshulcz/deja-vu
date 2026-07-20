@@ -142,3 +142,46 @@ func TestIngestHealthPersistedToManifest(t *testing.T) {
 		t.Fatalf("ingest health = %#v, want claude malformed=1", h)
 	}
 }
+
+func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-tmp-x")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := `{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"watermark ack test"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(tmp, "out")
+	n, commit, err := ExportDeferred(dir, out)
+	if err != nil || n != 1 {
+		t.Fatalf("deferred export = %d, %v", n, err)
+	}
+	// Not committed: a re-export must still see the record.
+	n2, commit2, err := ExportDeferred(dir, filepath.Join(tmp, "out2"))
+	if err != nil || n2 != 1 {
+		t.Fatalf("pre-ack re-export = %d, %v — watermark advanced before ack", n2, err)
+	}
+	_ = commit2
+	if err := commit(); err != nil {
+		t.Fatal(err)
+	}
+	// Committed: nothing new.
+	n3, _, err := ExportDeferred(dir, filepath.Join(tmp, "out3"))
+	if err != nil || n3 != 0 {
+		t.Fatalf("post-ack export = %d, %v — watermark not persisted", n3, err)
+	}
+	// Sessions must survive the core-only manifest write.
+	ss, err := Recent(dir, 5)
+	if err != nil || len(ss) == 0 {
+		t.Fatalf("sessions clobbered by watermark commit: %v, %v", ss, err)
+	}
+}

@@ -38,21 +38,37 @@ func ExportFull(dir, outDir string) (int, error) {
 	return exportRecords(dir, outDir, true)
 }
 
+// ExportDeferred writes batches like Export but does not advance the
+// watermarks; the returned commit persists them once the receiver has
+// acknowledged the batch. Watermarked sync must be acknowledged delivery:
+// advancing on a failed transport silently drops records from the next push.
+func ExportDeferred(dir, outDir string) (int, func() error, error) {
+	return exportRecordsDeferred(dir, outDir, false)
+}
+
 func exportRecords(dir, outDir string, full bool) (int, error) {
+	n, commit, err := exportRecordsDeferred(dir, outDir, full)
+	if err != nil {
+		return n, err
+	}
+	return n, commit()
+}
+
+func exportRecordsDeferred(dir, outDir string, full bool) (int, func() error, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	unlock, err := lockDir(dir)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	defer unlock()
 	m, err := readManifest(dir)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if err := os.MkdirAll(outDir, 0o700); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if m.ExportWatermarks == nil {
 		m.ExportWatermarks = map[string]int64{}
@@ -85,7 +101,7 @@ func exportRecords(dir, outDir string, full bool) (int, error) {
 		}
 	})
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	total := 0
 	for source, recs := range bySource {
@@ -95,27 +111,41 @@ func exportRecords(dir, outDir string, full bool) (int, error) {
 		name := fmt.Sprintf("deja-sync-%s-%d.jsonl", shortHash(source), time.Now().UnixNano())
 		f, err := os.Create(filepath.Join(outDir, name))
 		if err != nil {
-			return total, err
+			return total, nil, err
 		}
 		enc := json.NewEncoder(f)
 		for _, rec := range recs {
 			if err := enc.Encode(rec); err != nil {
 				_ = f.Close()
-				return total, err
+				return total, nil, err
 			}
 			total++
 		}
 		if err := f.Close(); err != nil {
-			return total, err
+			return total, nil, err
 		}
 	}
-	for source, wm := range nextWatermarks {
-		m.ExportWatermarks[source] = wm
+	commit := func() error {
+		unlock, err := lockDir(dir)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+		cur, err := readManifest(dir)
+		if err != nil {
+			return err
+		}
+		if cur.ExportWatermarks == nil {
+			cur.ExportWatermarks = map[string]int64{}
+		}
+		for source, wm := range nextWatermarks {
+			if wm > cur.ExportWatermarks[source] {
+				cur.ExportWatermarks[source] = wm
+			}
+		}
+		return writeManifestOnly(dir, cur)
 	}
-	if err := writeManifest(dir, m); err != nil {
-		return total, err
-	}
-	return total, nil
+	return total, commit, nil
 }
 
 func Import(dir, inDir string) (int, error) {
