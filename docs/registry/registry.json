@@ -170,7 +170,7 @@
       "capabilities": {
         "mcp": true,
         "auto": false,
-        "resume": true,
+        "resume": false,
         "handoff": "exec",
         "prereq": ""
       }
