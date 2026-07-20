@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -211,7 +212,7 @@ func TestStatsHelperBranches(t *testing.T) {
 		sessions = append(sessions, model.Session{ID: p, Harness: "claude", Project: p, Updated: now.Add(time.Duration(i) * time.Hour), Messages: []model.Message{{Role: "user", Text: p, Time: now}}})
 	}
 	sessions = append(sessions, model.Session{ID: "empty-project", Harness: "aider", Title: "<local-command noisy>", Messages: []model.Message{{Role: "assistant", Text: "skip"}}})
-	r := buildStats(sessions, now)
+	r := stats.Build(sessions, now)
 	if len(r.TopProjects) != 5 || r.TopProjects[0].Project != "-" || r.TopProjects[1].Project != "a" || r.DateRange.Start != "2026-07-16" {
 		t.Fatalf("stats = %#v", r)
 	}
@@ -225,8 +226,8 @@ func TestStatsHelperBranches(t *testing.T) {
 			t.Fatalf("statHarnessTag(%q)", h)
 		}
 	}
-	if statTitle(model.Session{Title: "good"}) != "good" || statTitle(model.Session{Messages: []model.Message{{Role: "user", Text: "<bash-noise"}}}) != "" {
-		t.Fatal("statTitle branches failed")
+	if stats.Title(model.Session{Title: "good"}) != "good" || stats.Title(model.Session{Messages: []model.Message{{Role: "user", Text: "<bash-noise"}}}) != "" {
+		t.Fatal("stats.Title branches failed")
 	}
 	if err := runStats(index.DefaultDir(), []string{"--bad"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("runStats bad flag err=%v", err)
@@ -531,7 +532,7 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 		t.Fatal("closed file reported color")
 	}
 	var b bytes.Buffer
-	printStats(&b, statsReport{Harnesses: []harnessStats{{Harness: strings.Repeat("h", 20), Sessions: 1}}, TopProjects: []projectStats{{Project: "p", Sessions: 0}}, Monthly: []monthStats{{Month: "bad"}}})
+	printStats(&b, stats.Report{Harnesses: []stats.HarnessStats{{Harness: strings.Repeat("h", 20), Sessions: 1}}, TopProjects: []stats.ProjectStats{{Project: "p", Sessions: 0}}, Monthly: []stats.MonthStats{{Month: "bad"}}})
 	if !strings.Contains(b.String(), "deja stats") {
 		t.Fatalf("stats output = %q", b.String())
 	}

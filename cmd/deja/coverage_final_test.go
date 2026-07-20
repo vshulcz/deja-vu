@@ -11,6 +11,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 // --- install.go ---
@@ -139,10 +140,10 @@ func TestPrintStatsColorEnabledBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = devNull.Close() }()
-	r := statsReport{
-		Harnesses:   []harnessStats{{Harness: "claude", Sessions: 1, Messages: 2}},
-		TopProjects: []projectStats{{Project: "p", Sessions: 1}},
-		Monthly:     []monthStats{{Month: "2026-01", Messages: 1}},
+	r := stats.Report{
+		Harnesses:   []stats.HarnessStats{{Harness: "claude", Sessions: 1, Messages: 2}},
+		TopProjects: []stats.ProjectStats{{Project: "p", Sessions: 1}},
+		Monthly:     []stats.MonthStats{{Month: "2026-01", Messages: 1}},
 	}
 	printStats(devNull, r)
 }

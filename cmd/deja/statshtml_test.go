@@ -10,10 +10,11 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 func TestStatsHTMLMetadataEscapingAndPrivacy(t *testing.T) {
-	report := statsReport{TotalSessions: 1, TotalMessages: 2, Harnesses: []harnessStats{{Harness: "claude"}}, DateRange: dateRangeStats{Start: "2026-01-01", End: "2026-01-02"}, Monthly: []monthStats{{Month: "2026-01", Messages: 2}}}
+	report := stats.Report{TotalSessions: 1, TotalMessages: 2, Harnesses: []stats.HarnessStats{{Harness: "claude"}}, DateRange: stats.DateRangeStats{Start: "2026-01-01", End: "2026-01-02"}, Monthly: []stats.MonthStats{{Month: "2026-01", Messages: 2}}}
 	sessions := []model.Session{{Harness: "claude", Project: `<script>alert(1)</script>`, Title: "redacted title", Updated: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), Messages: []model.Message{{Role: "user", Text: "secret message body"}}}}
 	page, err := newStatsHTMLPage(report, sessions)
 	if err != nil {
@@ -44,25 +45,25 @@ func TestStatsHTMLCapAndWrite(t *testing.T) {
 	for i := range sessions {
 		sessions[i] = model.Session{Harness: "h", Project: "p", Updated: time.Date(2020, 1, 1, 0, 0, i, 0, time.UTC)}
 	}
-	page, err := newStatsHTMLPage(statsReport{}, sessions)
+	page, err := newStatsHTMLPage(stats.Report{}, sessions)
 	if err != nil || !page.Truncated || page.SessionCount != statsHTMLCap {
 		t.Fatalf("cap page=%#v err=%v", page, err)
 	}
 	path := filepath.Join(t.TempDir(), "timeline.html")
-	written, err := writeStatsHTML(path, statsReport{}, sessions[:1])
+	written, err := writeStatsHTML(path, stats.Report{}, sessions[:1])
 	if err != nil || written != path {
 		t.Fatalf("write HTML=%q err=%v", written, err)
 	}
 	if b, err := os.ReadFile(path); err != nil || !strings.HasPrefix(string(b), "<!doctype html>") {
 		t.Fatalf("HTML file err=%v content=%q", err, b)
 	}
-	if _, err := writeStatsHTML(filepath.Join(path, "nested.html"), statsReport{}, nil); err == nil {
+	if _, err := writeStatsHTML(filepath.Join(path, "nested.html"), stats.Report{}, nil); err == nil {
 		t.Fatal("expected path error")
 	}
 }
 
 func TestStatsHTMLHelpers(t *testing.T) {
-	months := []monthStats{{Messages: 0}, {Messages: 10}}
+	months := []stats.MonthStats{{Messages: 0}, {Messages: 10}}
 	if barHeight(0, months) != 4 || barHeight(5, months) != 56 || monthShort("2026-02") != "02" || monthShort("x") != "x" {
 		t.Fatal("unexpected HTML helper output")
 	}
@@ -100,7 +101,7 @@ func TestStatsHTMLEdgeBranches(t *testing.T) {
 		{ID: "b", Harness: "claude", Started: started, Messages: []model.Message{{Role: "user", Text: "hello"}}},
 		{ID: "a", Harness: "claude", Started: started},
 	}
-	page, err := newStatsHTMLPage(statsReport{}, sessions)
+	page, err := newStatsHTMLPage(stats.Report{}, sessions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func TestStatsHTMLEdgeBranches(t *testing.T) {
 	if err := os.WriteFile(squat, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := writeStatsHTML(filepath.Join(squat, "out.html"), statsReport{}, nil); err == nil {
+	if _, err := writeStatsHTML(filepath.Join(squat, "out.html"), stats.Report{}, nil); err == nil {
 		t.Fatal("expected write error")
 	}
 }

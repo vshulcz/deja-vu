@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 const statsHTMLCap = 5000
@@ -28,13 +29,13 @@ type statsHTMLPage struct {
 	Harnesses     int
 	DateStart     string
 	DateEnd       string
-	Monthly       []monthStats
+	Monthly       []stats.MonthStats
 	SessionsJSON  template.JS
 	SessionCount  int
 	Truncated     bool
 }
 
-func writeStatsHTML(path string, report statsReport, sessions []model.Session) (string, error) {
+func writeStatsHTML(path string, report stats.Report, sessions []model.Session) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("stats html path: %w", err)
@@ -53,7 +54,7 @@ func writeStatsHTML(path string, report statsReport, sessions []model.Session) (
 	return abs, nil
 }
 
-func newStatsHTMLPage(report statsReport, sessions []model.Session) (statsHTMLPage, error) {
+func newStatsHTMLPage(report stats.Report, sessions []model.Session) (statsHTMLPage, error) {
 	sessions = append([]model.Session(nil), sessions...)
 	sort.SliceStable(sessions, func(i, j int) bool {
 		left := sessions[i].Updated
@@ -81,7 +82,7 @@ func newStatsHTMLPage(report statsReport, sessions []model.Session) (statsHTMLPa
 		}
 		rows = append(rows, htmlSession{
 			Date: date.Format("2006-01-02"), Harness: s.Harness, Project: project,
-			Title: statTitle(s), Messages: len(s.Messages),
+			Title: stats.Title(s), Messages: len(s.Messages),
 		})
 	}
 	truncated := len(rows) > statsHTMLCap
@@ -117,7 +118,7 @@ const sessions={{.SessionsJSON}};const tbody=document.getElementById('sessions')
 function esc(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML}function render(){const q=input.value.toLowerCase().trim();tbody.innerHTML='';let n=0;sessions.forEach((s,i)=>{const hay=[s.date,s.harness,s.project,s.title].join(' ').toLowerCase();if(q&&!hay.includes(q))return;n++;const row=document.createElement('tr');row.innerHTML='<td>'+esc(s.date)+'</td><td><span class="badge clickable" data-value="'+esc(s.harness)+'">'+esc(s.harness)+'</span></td><td><span class="clickable" data-value="'+esc(s.project)+'">'+esc(s.project)+'</span></td><td class="title">'+esc(s.title||'-')+'</td><td>'+s.messages+'</td>';row.querySelectorAll('.clickable').forEach(e=>e.onclick=()=>{input.value=e.dataset.value;render()});tbody.appendChild(row)});empty.hidden=n!==0}input.oninput=render;render();
 </script></body></html>`))
 
-func barHeight(n int, months []monthStats) int {
+func barHeight(n int, months []stats.MonthStats) int {
 	max := 1
 	for _, m := range months {
 		if m.Messages > max {

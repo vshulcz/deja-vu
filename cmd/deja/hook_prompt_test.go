@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/stats"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -168,7 +169,7 @@ func TestAgentCreditsCountedFromIndex(t *testing.T) {
 		{Role: "assistant", Text: "deja-vu recalled: old one", Time: now.Add(-9 * 24 * time.Hour)},
 		{Role: "user", Text: "deja-vu recalled should not count from users"},
 	}}}
-	r := buildStats(ss, now)
+	r := stats.Build(ss, now)
 	if r.AgentCredits != 2 || r.WeekCredits != 1 {
 		t.Fatalf("credits = %d/%d, want 2/1", r.AgentCredits, r.WeekCredits)
 	}

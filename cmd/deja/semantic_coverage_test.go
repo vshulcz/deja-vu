@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 func TestEmbedCommandBuildsSemanticSidecar(t *testing.T) {
@@ -153,11 +154,11 @@ func TestDoctorEmbedAndStatsFilters(t *testing.T) {
 		{Harness: "claude", Project: "Alpha", Updated: now, Messages: []model.Message{{Role: "user"}}},
 		{Harness: "codex", Project: "Beta", Updated: now.Add(-time.Hour), Messages: []model.Message{{Role: "assistant"}}},
 	}
-	got := filterStatsSessions(ss, search.Options{Harness: "claude", Project: "alp", Since: time.Minute, Role: "user"})
+	got := stats.Filter(ss, search.Options{Harness: "claude", Project: "alp", Since: time.Minute, Role: "user"})
 	if len(got) != 1 || len(got[0].Messages) != 1 || got[0].Messages[0].Role != "user" {
 		t.Fatalf("filtered stats=%#v", got)
 	}
-	if got := filterStatsSessions(ss, search.Options{Role: "system"}); len(got) != 0 {
+	if got := stats.Filter(ss, search.Options{Role: "system"}); len(got) != 0 {
 		t.Fatalf("role filter retained sessions=%#v", got)
 	}
 	for _, args := range [][]string{{"--since"}, {"--since", "bad"}, {"--card", "--card"}} {
