@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-21
+
 ### Added
 - Handoff/resume commands corrected against the real installed CLIs: cursor handoff uses positional prompt (no `chat` subcommand exists), pi resume uses `--session`, and grok is marked non-resumable (it has no session flags).
 - Per-prompt recall (UserPromptSubmit) now ranks THIS project's sessions by IDF-weighted overlap with the prompt instead of reconstructing an AND query — natural prompts are full of filler that poisoned the old query builder into empty or wrong hits. Excludes the current/too-fresh sessions, dedupes per agent session, and appends a ready citation line.
@@ -24,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SSH sync push is acknowledged delivery: export watermarks advance only after the remote import succeeds, so a failed transfer no longer silently drops that batch from every later push. Pull failures after the remote export now print the exact recovery command.
 - One malformed session file no longer aborts a full rebuild or an incremental pass: parsers are panic-guarded per file and per harness.
 - Crash-hardening for in-place index writes (#181): bucket files are replaced atomically, the record log is fsynced before the manifest stamps its size, an uncommitted record tail now triggers a rebuild instead of silently duplicating messages, and full rebuilds keep the previous index recoverable through the rename window.
+- MCP recall/blame accept a fractional `limit`: a client that serializes `5` as `5.0` used to get a `-32602` error and no results at all.
+- MCP server hardening: large JSON-RPC ids are echoed back exactly instead of being rounded through float64, and a single oversized frame is skipped rather than tearing down the whole stdio session.
+- `manifest.gob`/`sessions.gob` are fsynced before the rename, closing a crash window that could leave a torn manifest even though the rest of the index writes durably.
+- A session file caught mid-write (torn first line) is fully re-indexed on the next pass instead of resuming an append mid-line, so its first message is no longer dropped.
+- `deja install` writes the Windows `cmd /c` shim for Codex and Grok `config.toml`, matching the JSON-based installers.
 
 ### Added
 - Recall receipt: when auto-recall injects real context, the SessionStart hook now surfaces a one-line notice ("deja: recalled N prior sessions…") instead of working silently; `deja stats` and the statusline report the trailing-week recall count and re-used context volume.
