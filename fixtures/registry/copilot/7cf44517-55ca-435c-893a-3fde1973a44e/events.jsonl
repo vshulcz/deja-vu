@@ -1,0 +1,7 @@
+{"type":"session.start","data":{"sessionId":"7cf44517-55ca-435c-893a-3fde1973a44e","version":1,"producer":"copilot-agent","copilotVersion":"1.0.71","startTime":"2026-07-20T05:13:54.687Z","context":{"cwd":"/Users/x/coding/gateway"}},"id":"4516b906-e4d1-4709-ab23-562c64fdfabc","timestamp":"2026-07-20T05:13:54.707Z","parentId":null}
+{"type":"session.model_change","data":{"newModel":"gpt-5-mini","reasoningEffort":null},"id":"ad191172-fe1f-45cc-8751-b582c5e0526c","timestamp":"2026-07-20T05:13:58.117Z","parentId":"4516b906-e4d1-4709-ab23-562c64fdfabc"}
+{"type":"system.message","data":{"role":"system","content":"You are the GitHub Copilot CLI"},"id":"s1","timestamp":"2026-07-20T05:13:58.500Z","parentId":null}
+{"type":"user.message","data":{"content":"why is the connection pool exhausted"},"id":"u1","timestamp":"2026-07-20T05:13:58.653Z","parentId":null}
+{"type":"assistant.turn_start","data":{},"id":"t1","timestamp":"2026-07-20T05:13:58.678Z","parentId":null}
+{"type":"assistant.message","data":{"content":"the metrics poller leaks rows; add rows.Close in the scan loop"},"id":"a1","timestamp":"2026-07-20T05:14:00.973Z","parentId":null}
+{"type":"session.shutdown","data":{},"id":"e1","timestamp":"2026-07-20T05:14:01.029Z","parentId":null}

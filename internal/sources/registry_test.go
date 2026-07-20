@@ -147,6 +147,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseQwenFile(path)
 	case "pi":
 		sessions, err = ParsePiFile(path)
+	case "copilot":
+		sessions, err = ParseCopilotFile(path)
 	default:
 		t.Fatalf("no conformance parser for %q", id)
 	}
