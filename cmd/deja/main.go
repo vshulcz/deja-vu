@@ -574,6 +574,7 @@ func printSources() {
 		{"antigravity", antigravityLocation, antigravityRoots, sources.LoadAntigravity},
 		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.LoadGrok},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.LoadQwen},
+		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.LoadCopilot},
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, sources.LoadNotes},
 	}
 	for _, it := range items {
