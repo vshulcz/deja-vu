@@ -593,8 +593,8 @@ func parseDur(s string) (time.Duration, error) {
 
 func printSources(dir string) {
 	redactions := map[string]int{}
-	if stats, err := index.Redactions(dir); err == nil {
-		redactions = stats.Files
+	if red, err := index.Redactions(dir); err == nil {
+		redactions = red.Files
 	}
 	antigravityRoots := sources.AntigravityRoots()
 	antigravityLocation := strings.Join(antigravityRoots, string(os.PathListSeparator))

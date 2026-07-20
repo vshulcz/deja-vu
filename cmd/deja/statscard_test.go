@@ -13,19 +13,20 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 func TestRenderStatsCardDeterministicAndEscaped(t *testing.T) {
-	r := statsReport{
+	r := stats.Report{
 		TotalSessions: 9,
 		TotalMessages: 27,
-		Harnesses: []harnessStats{
+		Harnesses: []stats.HarnessStats{
 			{Harness: "<&>", Sessions: 4}, {Harness: "codex", Sessions: 3},
 			{Harness: "a", Sessions: 2},
 		},
-		TopProjects: []projectStats{{Project: "<&>", Sessions: 2}},
-		Monthly:     []monthStats{{Month: "2026-07", Messages: 4}},
-		DateRange:   dateRangeStats{Start: "2026-01-01", End: "2026-07-01"},
+		TopProjects: []stats.ProjectStats{{Project: "<&>", Sessions: 2}},
+		Monthly:     []stats.MonthStats{{Month: "2026-07", Messages: 4}},
+		DateRange:   stats.DateRangeStats{Start: "2026-01-01", End: "2026-07-01"},
 	}
 	one := renderStatsCard(r)
 	if one != renderStatsCard(r) {
@@ -49,7 +50,7 @@ func TestRenderStatsCardDeterministicAndEscaped(t *testing.T) {
 }
 
 func TestRenderStatsCardHarnessAggregation(t *testing.T) {
-	r := statsReport{Harnesses: []harnessStats{
+	r := stats.Report{Harnesses: []stats.HarnessStats{
 		{Harness: "z", Sessions: 1}, {Harness: "y", Sessions: 2}, {Harness: "x", Sessions: 3},
 		{Harness: "w", Sessions: 4}, {Harness: "v", Sessions: 5}, {Harness: "u", Sessions: 6}, {Harness: "t", Sessions: 7},
 	}}
@@ -61,7 +62,7 @@ func TestRenderStatsCardHarnessAggregation(t *testing.T) {
 
 func TestWriteStatsCardAndStatsFlagConflict(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "card.svg")
-	written, err := writeStatsCard(path, statsReport{Monthly: []monthStats{{Month: "2026-01"}}})
+	written, err := writeStatsCard(path, stats.Report{Monthly: []stats.MonthStats{{Month: "2026-01"}}})
 	if err != nil || written != path {
 		t.Fatalf("writeStatsCard = %q, %v", written, err)
 	}
@@ -71,7 +72,7 @@ func TestWriteStatsCardAndStatsFlagConflict(t *testing.T) {
 	if err := runStats(index.DefaultDir(), []string{"--card", "--json"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
 		t.Fatalf("conflict error = %v", err)
 	}
-	if _, err := writeStatsCard(filepath.Join(path, "nested.svg"), statsReport{}); err == nil {
+	if _, err := writeStatsCard(filepath.Join(path, "nested.svg"), stats.Report{}); err == nil {
 		t.Fatal("expected path error")
 	}
 }
@@ -97,11 +98,11 @@ func TestFilterStatsSessions(t *testing.T) {
 		{Harness: "claude", Project: "alpha", Messages: []model.Message{{Role: "user"}, {Role: "assistant"}}},
 		{Harness: "codex", Project: "beta", Messages: []model.Message{{Role: "user"}}},
 	}
-	got := filterStatsSessions(ss, search.Options{Harness: "claude", Role: "user"})
+	got := stats.Filter(ss, search.Options{Harness: "claude", Role: "user"})
 	if len(got) != 1 || len(got[0].Messages) != 1 || got[0].Messages[0].Role != "user" {
 		t.Fatalf("filtered sessions = %#v", got)
 	}
-	if got := filterStatsSessions(ss, search.Options{Project: "missing", Since: 1}); len(got) != 0 {
+	if got := stats.Filter(ss, search.Options{Project: "missing", Since: 1}); len(got) != 0 {
 		t.Fatalf("missing project filter = %#v", got)
 	}
 }
@@ -112,18 +113,18 @@ func TestStatsHeadlineAndRepeatQuestions(t *testing.T) {
 		{ID: "two", Messages: []model.Message{{Role: "user", Text: "how do I fix auth"}}},
 		{ID: "three", Messages: []model.Message{{Role: "assistant", Text: "How do I fix auth?"}}},
 	}
-	if got := repeatQuestions(ss); got != 1 {
-		t.Fatalf("repeatQuestions = %d, want 1", got)
+	if got := stats.RepeatQuestions(ss); got != 1 {
+		t.Fatalf("stats.RepeatQuestions = %d, want 1", got)
 	}
-	if got := statsHeadline(statsReport{TotalSessions: 1240, RepeatQuestions: 17}); got != "1,240 sessions indexed · 17 questions asked more than once" {
+	if got := statsHeadline(stats.Report{TotalSessions: 1240, RepeatQuestions: 17}); got != "1,240 sessions indexed · 17 questions asked more than once" {
 		t.Fatalf("headline = %q", got)
 	}
-	if got := statsHeadline(statsReport{}); got != "" {
+	if got := statsHeadline(stats.Report{}); got != "" {
 		t.Fatalf("empty headline = %q", got)
 	}
 	// Near-repeats with different wording no longer count: the metric is
 	// exact-stem only so it stays linear on large corpora.
-	if got := repeatQuestions([]model.Session{{Messages: []model.Message{
+	if got := stats.RepeatQuestions([]model.Session{{Messages: []model.Message{
 		{Role: "user", Text: "<local-command-caveat>"},
 		{Role: "user", Text: "   "},
 	}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service now"}}}, {Messages: []model.Message{{Role: "user", Text: "fix auth timeout in service"}}}}); got != 0 {
@@ -155,7 +156,7 @@ func TestHandoffsReceivedCountedFromIndex(t *testing.T) {
 		{ID: "n1", Messages: []model.Message{{Role: "user", Text: "ordinary question"}}},
 		{ID: "n2", Messages: []model.Message{{Role: "assistant", Text: "picking up work handed off from a"}, {Role: "user", Text: "hi"}}},
 	}
-	r := buildStats(ss, time.Now())
+	r := stats.Build(ss, time.Now())
 	if r.HandoffsIn != 1 {
 		t.Fatalf("HandoffsIn = %d, want 1", r.HandoffsIn)
 	}

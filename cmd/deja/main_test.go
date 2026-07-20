@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -413,7 +414,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var report statsReport
+	var report stats.Report
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
@@ -435,7 +436,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if report.Recall.Recalls != 3 || report.Recall.Injections != 1 || report.Recall.InjectedSessions != 2 || report.Recall.EmptyResultRate != 0.5 {
 		t.Fatalf("recall = %#v", report.Recall)
 	}
-	byHarness := map[string]harnessStats{}
+	byHarness := map[string]stats.HarnessStats{}
 	for _, h := range report.Harnesses {
 		byHarness[h.Harness] = h
 	}
@@ -464,7 +465,7 @@ func TestBuildStatsMonthlyDistribution(t *testing.T) {
 			{Role: "user", Text: "jul", Time: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)},
 		},
 	}}
-	report := buildStats(ss, time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC))
+	report := stats.Build(ss, time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC))
 	if len(report.Monthly) != 12 || report.Monthly[0].Month != "2025-08" || report.Monthly[11].Month != "2026-07" {
 		t.Fatalf("months = %#v", report.Monthly)
 	}

@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 const statsCardFont = "ui-monospace, SFMono-Regular, Menlo, monospace"
 
-func writeStatsCard(path string, report statsReport) (string, error) {
+func writeStatsCard(path string, report stats.Report) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("stats card path: %w", err)
@@ -22,7 +24,7 @@ func writeStatsCard(path string, report statsReport) (string, error) {
 	return abs, nil
 }
 
-func renderStatsCard(r statsReport) string {
+func renderStatsCard(r stats.Report) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
 	b.WriteString(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">` + "\n")
@@ -56,7 +58,7 @@ func renderStatsCard(r statsReport) string {
 
 	// top agents, right column
 	cardText(&b, 470, 276, 11, "700", "TOP AGENTS", "#78788c", "letter-spacing=\"1.5\"")
-	harnesses := append([]harnessStats(nil), r.Harnesses...)
+	harnesses := append([]stats.HarnessStats(nil), r.Harnesses...)
 	sort.SliceStable(harnesses, func(i, j int) bool {
 		if harnesses[i].Sessions == harnesses[j].Sessions {
 			return harnesses[i].Harness < harnesses[j].Harness
@@ -64,7 +66,7 @@ func renderStatsCard(r statsReport) string {
 		return harnesses[i].Sessions > harnesses[j].Sessions
 	})
 	if len(harnesses) > 4 {
-		other := harnessStats{Harness: "other"}
+		other := stats.HarnessStats{Harness: "other"}
 		for _, h := range harnesses[4:] {
 			other.Sessions += h.Sessions
 		}
@@ -91,7 +93,7 @@ func renderStatsCard(r statsReport) string {
 }
 
 // cardPunchline picks one personal, shareable sentence for the card hero.
-func cardPunchline(r statsReport) string {
+func cardPunchline(r stats.Report) string {
 	switch {
 	case r.WeekRecalls > 0:
 		return fmt.Sprintf("deja handed your agents memory %s times this week.", formatStatNumber(r.WeekRecalls))
@@ -107,7 +109,7 @@ func cardPunchline(r statsReport) string {
 }
 
 // renderHeatmap draws a GitHub-style week-by-day grid with month ticks.
-func renderHeatmap(b *strings.Builder, hm heatmapStats, x0, y0 int) {
+func renderHeatmap(b *strings.Builder, hm stats.HeatmapStats, x0, y0 int) {
 	const step = 13
 	for _, mt := range hm.Months {
 		cardText(b, x0+mt.Col*step, y0-6, 10, "400", mt.Label, "#78788c")

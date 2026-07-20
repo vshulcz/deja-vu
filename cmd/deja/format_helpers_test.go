@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
 func TestShareFilteringHelpers(t *testing.T) {
@@ -53,29 +54,29 @@ func TestShareFilteringHelpers(t *testing.T) {
 }
 
 func TestStatsFormattingHelpers(t *testing.T) {
-	if got := trimRunes("abcdef", 3); got != "ab…" {
-		t.Fatalf("trimRunes = %q", got)
+	if got := stats.TrimRunes("abcdef", 3); got != "ab…" {
+		t.Fatalf("stats.TrimRunes = %q", got)
 	}
-	if got := trimRunes("abcdef", 1); got != "a" {
-		t.Fatalf("trimRunes n=1 = %q", got)
+	if got := stats.TrimRunes("abcdef", 1); got != "a" {
+		t.Fatalf("stats.TrimRunes n=1 = %q", got)
 	}
-	if got := scaledBar(1, 100, 10); got != 1 {
-		t.Fatalf("scaledBar = %d", got)
+	if got := stats.ScaledBar(1, 100, 10); got != 1 {
+		t.Fatalf("stats.ScaledBar = %d", got)
 	}
-	if got := scaledBar(0, 100, 10); got != 0 {
-		t.Fatalf("scaledBar zero = %d", got)
+	if got := stats.ScaledBar(0, 100, 10); got != 0 {
+		t.Fatalf("stats.ScaledBar zero = %d", got)
 	}
 	if valueOrDash("") != "-" || valueOrDash("x") != "x" {
 		t.Fatal("valueOrDash mismatch")
 	}
-	if !statNoise("<local-command x>") || statNoise("real title") {
-		t.Fatal("statNoise mismatch")
+	if !stats.Noise("<local-command x>") || stats.Noise("real title") {
+		t.Fatal("stats.Noise mismatch")
 	}
-	if got := statTitle(model.Session{Title: "<command-noise>", Messages: []model.Message{{Role: "assistant", Text: "skip"}, {Role: "user", Text: strings.Repeat("word ", 20)}}}); !strings.HasSuffix(got, "…") {
-		t.Fatalf("statTitle = %q", got)
+	if got := stats.Title(model.Session{Title: "<command-noise>", Messages: []model.Message{{Role: "assistant", Text: "skip"}, {Role: "user", Text: strings.Repeat("word ", 20)}}}); !strings.HasSuffix(got, "…") {
+		t.Fatalf("stats.Title = %q", got)
 	}
-	if got := statTitle(model.Session{Title: "Clean title"}); got != "Clean title" {
-		t.Fatalf("statTitle title = %q", got)
+	if got := stats.Title(model.Session{Title: "Clean title"}); got != "Clean title" {
+		t.Fatalf("stats.Title title = %q", got)
 	}
 	if got := statHarnessTag("claude", true); !strings.Contains(got, "[claude]") || !strings.Contains(got, statOrange) {
 		t.Fatalf("claude tag = %q", got)
