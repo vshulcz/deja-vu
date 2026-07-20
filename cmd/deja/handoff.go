@@ -63,6 +63,16 @@ func runHandoff(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// Source receipt: the user must always see WHAT is being handed off —
+	// wrong-project or stale handoffs should be obvious before they land.
+	age := "unknown age"
+	if !s.Updated.IsZero() {
+		age = humanAge(time.Since(s.Updated))
+	}
+	fmt.Fprintf(os.Stderr, "deja: handing off %s · %s · %s · %s\n", s.Harness, s.Project, short(s.ID), age)
+	if !s.Updated.IsZero() && time.Since(s.Updated) > 7*24*time.Hour {
+		fmt.Fprintf(os.Stderr, "deja: note — this session is %s old; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
+	}
 	digest := handoffDigest(s, handoffBudget)
 	usage.Record(index.DefaultDir(), usage.KindHandoff, len(digest))
 	if !doExec {
@@ -96,6 +106,17 @@ func runHandoff(args []string, stdout io.Writer) error {
 	return c.Run()
 }
 
+func humanAge(d time.Duration) string {
+	switch {
+	case d < time.Hour:
+		return fmt.Sprintf("%dm old", int(d.Minutes()))
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%dh old", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd old", int(d.Hours()/24))
+	}
+}
+
 func prefixArg(prefix string) string {
 	if prefix == "" {
 		return ""
@@ -124,17 +145,22 @@ func handoffSource(prefix string) (model.Session, error) {
 		return model.Session{}, err
 	}
 	var newest model.Session
+	distinct := map[string]bool{}
 	for _, name := range projectNameCandidates(cwd) {
 		ss, err := index.RecentProject(index.DefaultDir(), name, 1)
 		if err != nil || len(ss) == 0 {
 			continue
 		}
+		distinct[ss[0].ID] = true
 		if ss[0].Updated.After(newest.Updated) {
 			newest = ss[0]
 		}
 	}
 	if newest.ID == "" {
 		return model.Session{}, fmt.Errorf("no indexed sessions for this project — pass a session id-prefix (see `deja last`)")
+	}
+	if len(distinct) > 1 {
+		fmt.Fprintf(os.Stderr, "deja: %d different sessions match this directory's project names — picked the newest; pass an id-prefix to choose (see `deja last`)\n", len(distinct))
 	}
 	return newest, nil
 }
