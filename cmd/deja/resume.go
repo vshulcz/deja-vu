@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -78,17 +79,17 @@ var resumeIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 func resumeCommand(s model.Session) (string, string, error) {
 	if strings.HasPrefix(s.Project, "imported:") {
-		return "", "", fmt.Errorf("session %s was synced from another machine — resume it there", short(s.ID))
+		return "", "", fmt.Errorf("session %s was synced from another machine — resume it there", digest.Short(s.ID))
 	}
 	if !resumeIDPattern.MatchString(s.ID) {
-		return "", "", fmt.Errorf("session id %q contains characters deja will not place in a command", short(s.ID))
+		return "", "", fmt.Errorf("session id %q contains characters deja will not place in a command", digest.Short(s.ID))
 	}
 	switch s.Harness {
 	case "claude":
 		return claudeProjectDirFor(s), "claude --resume " + s.ID, nil
 	case "codex":
 		if s.Project == "history" {
-			return "", "", fmt.Errorf("session %s is a one-off codex exec entry, nothing to resume", short(s.ID))
+			return "", "", fmt.Errorf("session %s is a one-off codex exec entry, nothing to resume", digest.Short(s.ID))
 		}
 		return "", "codex resume " + s.ID, nil
 	case "opencode":
@@ -144,11 +145,4 @@ func piProjectDirFor(s model.Session) string {
 		return ""
 	}
 	return sources.ResolveEncodedPath(base)
-}
-
-func short(s string) string {
-	if len(s) > 12 {
-		return s[:12]
-	}
-	return s
 }

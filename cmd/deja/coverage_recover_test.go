@@ -156,11 +156,11 @@ func TestMaybeFirstIndexGreetingPrints(t *testing.T) {
 	// there is nothing to assert on, but the branch executes.
 	maybeFirstIndexGreeting()
 
-	// A zero-message initial build short circuits before printing.
+	// A zero-message initial build digest.Short circuits before printing.
 	index.LastBuild = index.BuildSummary{Initial: true, Sessions: 1, Messages: 0, Harnesses: 1}
 	maybeFirstIndexGreeting()
 
-	// Non-initial build must short circuit before printing.
+	// Non-initial build must digest.Short circuit before printing.
 	index.LastBuild = index.BuildSummary{Initial: false, Sessions: 1, Messages: 1, Harnesses: 1}
 	maybeFirstIndexGreeting()
 }

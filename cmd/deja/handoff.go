@@ -5,13 +5,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -69,11 +68,11 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	if !s.Updated.IsZero() {
 		age = humanAge(time.Since(s.Updated))
 	}
-	fmt.Fprintf(os.Stderr, "deja: handing off %s · %s · %s · %s\n", s.Harness, s.Project, short(s.ID), age)
+	fmt.Fprintf(os.Stderr, "deja: handing off %s · %s · %s · %s\n", s.Harness, s.Project, digest.Short(s.ID), age)
 	if !s.Updated.IsZero() && time.Since(s.Updated) > 7*24*time.Hour {
 		fmt.Fprintf(os.Stderr, "deja: note — this session is %s old; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
 	}
-	digest := handoffDigest(s, handoffBudget)
+	digest := digest.Handoff(s, handoffBudget)
 	usage.Record(dir, usage.KindHandoff, len(digest))
 	if !doExec {
 		printSanitized(stdout, digest)
@@ -146,7 +145,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	}
 	var newest model.Session
 	distinct := map[string]bool{}
-	for _, name := range projectNameCandidates(cwd) {
+	for _, name := range digest.ProjectNameCandidates(cwd) {
 		ss, err := index.RecentProject(dir, name, 1)
 		if err != nil || len(ss) == 0 {
 			continue
@@ -163,161 +162,6 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		fmt.Fprintf(os.Stderr, "deja: %d different sessions match this directory's project names — picked the newest; pass an id-prefix to choose (see `deja last`)\n", len(distinct))
 	}
 	return newest, nil
-}
-
-func projectNameCandidates(cwd string) []string {
-	names := []string{sources.ClaudeProjectName(cwd)}
-	if base := filepath.Base(cwd); base != "" {
-		if two := filepath.Join(filepath.Base(filepath.Dir(cwd)), base); two != names[0] {
-			names = append(names, two)
-		}
-		if base != names[0] {
-			names = append(names, base)
-		}
-	}
-	return names
-}
-
-// agentArtifactMarkers flag transcript entries that are tool output or
-// harness plumbing recorded under a user/assistant role — noise that would
-// bury the actual problem statement in a handoff.
-var agentArtifactMarkers = []string{
-	"<system-reminder>",
-	"</teammate-message>",
-	"<task-notification>",
-	"<command-name>",
-	"Bash completed with no output",
-	"Shell cwd was reset",
-	"tool_use_error",
-	"no need to Read it back)",
-	"Called the Read tool with",
-	"[Request interrupted by user]",
-	"Comments on artifact URI:",
-	"idle_notification",
-	`{"type":`,
-}
-
-func isAgentArtifact(text string) bool {
-	for _, m := range agentArtifactMarkers {
-		if strings.Contains(text, m) {
-			return true
-		}
-	}
-	trimmed := strings.TrimSpace(text)
-	// Harness preambles injected as user turns: <environment_context>,
-	// <user_instructions> and similar XML-wrapped plumbing.
-	if strings.HasPrefix(trimmed, "<") && strings.Contains(trimmed, "</") {
-		return true
-	}
-	// ls dumps recorded under a user role.
-	if strings.HasPrefix(trimmed, "total ") && strings.Contains(trimmed, "rwx") {
-		return true
-	}
-	// Tool echoes: file writes, diffs, command transcripts.
-	for _, p := range []string{"File created successfully at:", "The file ", "diff --git ", "$ "} {
-		if strings.HasPrefix(trimmed, p) {
-			return true
-		}
-	}
-	// Long dumps with almost no prose: measure letters vs symbols/digits in
-	// the first few hundred bytes — listings and tables sit far below prose.
-	if len(trimmed) > 400 {
-		letters, others := 0, 0
-		for _, r := range trimmed[:400] {
-			switch {
-			case r == ' ':
-			case ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z') || r >= 0x400: // latin + cyrillic
-				letters++
-			default:
-				others++
-			}
-		}
-		if others > letters {
-			return true
-		}
-	}
-	return false
-}
-
-// handoffClean drops agent artifacts and exact repeats so the digest carries
-// conversation, not tool output replayed under a user role.
-func handoffClean(s model.Session) model.Session {
-	out := s
-	out.Messages = nil
-	seen := map[string]bool{}
-	for _, m := range s.Messages {
-		if isAgentArtifact(m.Text) {
-			continue
-		}
-		key := m.Role + "\x00" + strings.TrimSpace(m.Text)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		out.Messages = append(out.Messages, m)
-	}
-	return out
-}
-
-// handoffDigest is the package the target agent starts from: framing header,
-// the user's problem statements, key conclusions, and the tail of the
-// conversation — the "where it stopped" part a plain summary loses.
-func handoffDigest(s model.Session, budget int) string {
-	s = handoffClean(s)
-	var b strings.Builder
-	date := "unknown"
-	if !s.Updated.IsZero() {
-		date = s.Updated.Format(time.RFC3339)
-	}
-	fmt.Fprintf(&b, "You are picking up work handed off from a %s session (project %s, %s). ", s.Harness, s.Project, date)
-	b.WriteString("Below is the packaged context: the problem, key conclusions so far, and where it stopped. Continue from there instead of re-deriving what is already done.\n\n")
-	body := shareDigest(s, budget*3/4)
-	// Drop the share header line; the framing above replaces it.
-	if i := strings.Index(body, "\n"); i > 0 && strings.HasPrefix(body, "# deja share:") {
-		body = strings.TrimSpace(body[i:])
-	}
-	b.WriteString(body)
-	if tail := handoffTail(s, budget-b.Len()); tail != "" {
-		b.WriteString("\n\n## Where it stopped\n\n")
-		b.WriteString(tail)
-	}
-	// The digest is a lossy slice by construction. Tell the receiving agent it
-	// can pull deeper instead of being stuck with the summary: push+pull, not
-	// one-shot push.
-	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.\n", short(s.ID), short(s.ID))
-	return strings.TrimSpace(b.String()) + "\n"
-}
-
-// handoffTail returns the last few substantive exchanges verbatim so the
-// target agent sees the live state, not just conclusions.
-func handoffTail(s model.Session, budget int) string {
-	if budget <= 0 {
-		return ""
-	}
-	var picked []model.Message
-	for i := len(s.Messages) - 1; i >= 0 && len(picked) < 4; i-- {
-		m := s.Messages[i]
-		if m.Role != "user" && m.Role != "assistant" {
-			continue
-		}
-		if noisyShareMessage(m.Text) || shareMessageText(m.Text) == "" {
-			continue
-		}
-		picked = append(picked, m)
-	}
-	var b strings.Builder
-	for i := len(picked) - 1; i >= 0; i-- {
-		m := picked[i]
-		chunk := fmt.Sprintf("**%s:** %s\n\n", m.Role, shareMessageText(m.Text))
-		if b.Len()+len(chunk) > budget {
-			chunk = utf8SafeCut(chunk, budget-b.Len())
-		}
-		b.WriteString(chunk)
-		if b.Len() >= budget {
-			break
-		}
-	}
-	return strings.TrimSpace(b.String())
 }
 
 // handoffCommand maps a target agent to the argv that opens it with an

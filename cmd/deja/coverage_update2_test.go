@@ -143,7 +143,7 @@ func TestExtractUpdateBinaryZipBranches(t *testing.T) {
 
 func TestExtractUpdateBinaryZipOversizedEntry(t *testing.T) {
 	if testing.Short() {
-		t.Skip("large-payload test skipped in -short mode")
+		t.Skip("large-payload test skipped in -digest.Short mode")
 	}
 	big := make([]byte, maxExecutable+1)
 	var buf bytes.Buffer
@@ -209,7 +209,7 @@ func TestExtractUpdateBinaryTarBranches(t *testing.T) {
 
 func TestExtractUpdateBinaryTarOversizedHeader(t *testing.T) {
 	if testing.Short() {
-		t.Skip("large-payload test skipped in -short mode")
+		t.Skip("large-payload test skipped in -digest.Short mode")
 	}
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
@@ -248,7 +248,7 @@ func TestReadUpdateBinaryDirectBranches(t *testing.T) {
 		t.Fatalf("empty branch = %v", err)
 	}
 	if testing.Short() {
-		t.Skip("large-payload test skipped in -short mode")
+		t.Skip("large-payload test skipped in -digest.Short mode")
 	}
 	big := make([]byte, maxExecutable+1)
 	if _, err := readUpdateBinary(bytes.NewReader(big), "name"); err == nil || !strings.Contains(err.Error(), "exceeds") {

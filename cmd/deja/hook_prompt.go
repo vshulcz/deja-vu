@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -47,7 +48,7 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND. n=8 to leave room after
 	// excluding the current/too-fresh sessions.
-	ranked, err := index.ProjectRelevant(dir, projectNameCandidates(cwd), terms, 8)
+	ranked, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return nil
 	}
@@ -75,7 +76,7 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	if strings.TrimSpace(digest) == "" {
 		return nil
 	}
-	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one short line what deja-vu recalled; otherwise ignore silently.\n"
+	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
 	out := frameRecall(lead + digest + citationLine(ss[0]))
 	usage.RecordResult(dir, usage.KindHook, len(out), len(ss), false)
 	var resp sessionStartHookResponse
@@ -90,7 +91,7 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 }
 
 // promptSearchTerms extracts the informative tokens from a natural-language
-// prompt: stop words and short fragments dropped, capped so the query stays
+// prompt: stop words and digest.Short fragments dropped, capped so the query stays
 // specific.
 func promptSearchTerms(prompt string) []string {
 	fields := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool {
@@ -118,8 +119,8 @@ func promptSearchTerms(prompt string) []string {
 func citationLine(s model.Session) string {
 	title := ""
 	for _, m := range s.Messages {
-		if m.Role == "user" && !isAgentArtifact(m.Text) {
-			tt := strings.TrimSpace(shareMessageText(m.Text))
+		if m.Role == "user" && !digest.IsAgentArtifact(m.Text) {
+			tt := strings.TrimSpace(digest.MessageText(m.Text))
 			if tt == "" || strings.HasPrefix(tt, "Exit code") {
 				continue
 			}

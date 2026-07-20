@@ -97,7 +97,7 @@ func TestDownloaderRedirectChainBranches(t *testing.T) {
 	srv = httptest.NewTLSServer(&mux)
 	defer srv.Close()
 
-	// Default client (no preexisting CheckRedirect): a short https->https
+	// Default client (no preexisting CheckRedirect): a digest.Short https->https
 	// chain succeeds, exercising the "return nil" fallthrough.
 	plain := newHTTPUpdateDownloader(srv.Client())
 	body, err := plain(srv.URL+"/start", 100, "chain")
