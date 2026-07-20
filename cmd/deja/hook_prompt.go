@@ -62,7 +62,9 @@ func runHookPrompt(stdin io.Reader, stdout io.Writer) error {
 // specific.
 func promptSearchTerms(prompt string) []string {
 	fields := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool {
-		return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400)
+		wordy := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') ||
+			r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400
+		return !wordy
 	})
 	var out []string
 	seen := map[string]bool{}
