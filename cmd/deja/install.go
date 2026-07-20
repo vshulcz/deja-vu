@@ -91,10 +91,10 @@ func runInstall(args []string, uninstall bool) error {
 		}
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
-		} else if t != "copilot" {
+		} else {
 			fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
 		}
-		if !uninstall && t != "copilot" && t != "statusline" {
+		if !uninstall && t != "statusline" {
 			mcpCount++
 		}
 		if !uninstall && strings.HasSuffix(t, "-auto") {
@@ -239,7 +239,7 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "copilot":
-		return installResult{Path: guidancePath("copilot"), Action: "guidance-only"}, nil
+		return installCopilotMCP(exe, uninstall)
 	case "pi":
 		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
 	case "opencode":
@@ -552,6 +552,38 @@ func mcpCommandArgs(exe string) (string, []string) {
 // mcpServers shape in their own files.
 func installCursor(exe string, uninstall bool) (installResult, error) {
 	return installMCPJSON(filepath.Join(sources.CursorCLIHome(), "mcp.json"), exe, uninstall)
+}
+
+// installCopilotMCP wires deja into GitHub Copilot CLI's MCP registry
+// (~/.copilot/mcp-config.json). Copilot's schema differs from the common
+// mcpServers shape: entries carry a type and an enabled-tools list.
+func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
+	path := filepath.Join(sources.Home(), ".copilot", "mcp-config.json")
+	old, _ := os.ReadFile(path)
+	var root map[string]any
+	if len(bytes.TrimSpace(old)) == 0 {
+		root = map[string]any{}
+	} else if err := json.Unmarshal(old, &root); err != nil {
+		return installResult{}, err
+	}
+	m, _ := root["mcpServers"].(map[string]any)
+	if m == nil {
+		m = map[string]any{}
+		root["mcpServers"] = m
+	}
+	if uninstall {
+		delete(m, "deja")
+	} else {
+		command, args := mcpCommandArgs(exe)
+		m["deja"] = map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}
+	}
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
 }
 
 func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {

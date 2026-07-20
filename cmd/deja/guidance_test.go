@@ -216,9 +216,28 @@ func TestInstallGuidanceEdgeBranches(t *testing.T) {
 	}
 }
 
-func TestCopilotInstallIsGuidanceOnly(t *testing.T) {
-	if result, err := installTarget("copilot", "/bin/deja", false); err != nil || result.Action != "guidance-only" || result.Path != guidancePath("copilot") {
+func TestCopilotInstallWritesMCPConfig(t *testing.T) {
+	tmp := hermeticEnv(t)
+	result, err := installTarget("copilot", "/bin/deja", false)
+	if err != nil || result.Action != "created" {
 		t.Fatalf("copilot MCP install = %#v, %v", result, err)
+	}
+	b, err := os.ReadFile(filepath.Join(tmp, "home", ".copilot", "mcp-config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"deja"`, `"type": "local"`, `"tools"`, `"mcp"`} {
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("mcp-config missing %s: %s", want, b)
+		}
+	}
+	// Uninstall removes only our entry.
+	if r, err := installTarget("copilot", "/bin/deja", true); err != nil || r.Action == "" {
+		t.Fatalf("copilot uninstall = %#v, %v", r, err)
+	}
+	b, _ = os.ReadFile(filepath.Join(tmp, "home", ".copilot", "mcp-config.json"))
+	if strings.Contains(string(b), `"deja"`) {
+		t.Fatalf("deja entry not removed: %s", b)
 	}
 }
 
