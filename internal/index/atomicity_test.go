@@ -209,7 +209,7 @@ func TestProjectRelevantRanksByIDFNotFiller(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A prompt full of filler plus the one rare term must rank s1 first.
-	got, err := ProjectRelevant(dir, []string{"tmp/app"}, []string{"need", "the", "quetzalcoatl"}, 2)
+	got, err := ProjectRelevant(dir, []string{"app"}, []string{"need", "the", "quetzalcoatl"}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
