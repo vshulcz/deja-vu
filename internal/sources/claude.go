@@ -162,7 +162,13 @@ func decodeProjectBase(base string) string {
 // at. Segments are re-joined with "/" or "-" and pruned by checking each
 // completed directory prefix on disk.
 func resolveEncodedPath(base string) string {
-	if !strings.HasPrefix(base, "-") {
+	// Windows encodes the drive root too: C:\Users\x\app becomes
+	// "C--Users-x-app". Peel the drive off and let the shared segment walk
+	// resolve the rest from "C:" instead of from an empty root.
+	root := ""
+	if drive, rest, ok := splitEncodedWindowsDrive(base); ok {
+		root, base = drive, rest
+	} else if !strings.HasPrefix(base, "-") {
 		return ""
 	}
 	// pi uses "--" prefix/suffix (e.g. --Users-x-app--), Claude uses
@@ -198,7 +204,21 @@ func resolveEncodedPath(base string) string {
 	if parts[0] == "" {
 		return ""
 	}
-	return try("", parts[0], 1)
+	return try(root, parts[0], 1)
+}
+
+// splitEncodedWindowsDrive recognises the "C--Users-x-app" form Claude Code
+// writes on Windows and returns the drive root ("C:") plus the remainder in
+// the unix-style encoding the resolver already understands ("-Users-x-app").
+func splitEncodedWindowsDrive(base string) (root, rest string, ok bool) {
+	if len(base) < 4 || base[1] != '-' || base[2] != '-' {
+		return "", "", false
+	}
+	c := base[0]
+	if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') {
+		return "", "", false
+	}
+	return string(c) + ":", base[2:], true
 }
 
 // ClaudeProjectName derives the display project name using the same rules as
