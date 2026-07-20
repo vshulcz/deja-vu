@@ -61,17 +61,28 @@ func writeTombstones(set map[string]bool) error {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	f, err := os.OpenFile(tombstonePath(), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	// Tombstones are privacy policy, not cache: a crash mid-write must never
+	// truncate the set and let a later rebuild resurrect forgotten sessions.
+	// Write a sibling temp file, fsync, then rename over the live one.
+	tmp := tombstonePath() + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
 	for _, key := range keys {
 		if _, err := fmt.Fprintln(f, key); err != nil {
+			_ = f.Close()
 			return err
 		}
 	}
-	return nil
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp, tombstonePath())
 }
 
 func filterTombstoned(ss []model.Session) []model.Session {

@@ -96,3 +96,25 @@ func TestWriteBucketLeavesNoTemp(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteTombstonesAtomicNoTemp(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmp)
+	if err := writeTombstones(map[string]bool{"claude:s1": true, "codex:s2": true}); err != nil {
+		t.Fatal(err)
+	}
+	got := Tombstones()
+	if !got["claude:s1"] || !got["codex:s2"] {
+		t.Fatalf("tombstones = %#v", got)
+	}
+	if _, err := os.Stat(tombstonePath() + ".tmp"); !os.IsNotExist(err) {
+		t.Fatal("temp file left behind")
+	}
+	// Overwrite shrinks the set — rename must fully replace, not append.
+	if err := writeTombstones(map[string]bool{"claude:s1": true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := Tombstones(); got["codex:s2"] || !got["claude:s1"] {
+		t.Fatalf("after shrink = %#v", got)
+	}
+}
