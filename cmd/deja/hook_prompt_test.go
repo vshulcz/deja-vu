@@ -3,8 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/vshulcz/deja-vu/internal/model"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -82,5 +87,47 @@ func TestPromptCandidatesOrderAndPairs(t *testing.T) {
 		if !strings.Contains(joined, pair) {
 			t.Fatalf("missing pair %q in %v", pair, got)
 		}
+	}
+}
+
+func TestLimitHandoffTip(t *testing.T) {
+	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-alpha", "lim.jsonl"), "lim", []string{
+		`{"type":"user","sessionId":"lim","timestamp":"` + now + `","message":{"role":"user","content":"continue please"}}`,
+		`{"type":"assistant","sessionId":"lim","timestamp":"` + now + `","message":{"role":"assistant","content":"You have reached your usage limit reached for today"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	recent, err := index.Recent(index.DefaultDir(), 1)
+	if err != nil || len(recent) == 0 {
+		t.Fatalf("recent: %v %v", recent, err)
+	}
+	t.Logf("newest: id=%s updated=%v msgs=%d", recent[0].ID, recent[0].Updated, len(recent[0].Messages))
+	tip := limitHandoffTip()
+	if !strings.Contains(tip, "usage limit") || !strings.Contains(tip, "deja handoff") {
+		t.Fatalf("tip = %q", tip)
+	}
+}
+
+func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
+	withStatsStores(t)
+	var ss []model.Session
+	for i := 0; i < 6; i++ {
+		ss = append(ss, model.Session{ID: strconv.Itoa(i), Messages: []model.Message{{Role: "user", Text: "run ssh mini and check"}}})
+	}
+	tip := sshSyncTip(ss)
+	if !strings.Contains(tip, "deja sync ssh") {
+		t.Fatalf("tip = %q", tip)
+	}
+	if again := sshSyncTip(ss); again != "" {
+		t.Fatalf("tip must show once, got %q", again)
+	}
+	// Below threshold: silent (fresh sentinel dir).
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "idx"))
+	if tip := sshSyncTip(ss[:2]); tip != "" {
+		t.Fatalf("below threshold tip = %q", tip)
 	}
 }
