@@ -419,21 +419,21 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 // materializes sessions for the first query that matches. Built for the
 // per-prompt hook, which fires on every user message and must stay fast: the
 // full Search pipeline per candidate would re-read the manifest each time.
-func FirstMatch(dir string, queries []string, limit int) ([]model.Session, error) {
+func FirstMatch(dir string, queries []string, limit int) ([]model.Session, string, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	unlock, err := lockDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer unlock()
 	m, err := readManifest(dir)
 	if err != nil {
-		return nil, fmt.Errorf("manifest: %w", err)
+		return nil, "", fmt.Errorf("manifest: %w", err)
 	}
 	if !recordsIntact(dir, m) {
-		return nil, fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
+		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
 	}
 	for _, q := range queries {
 		keys := queryKeys(q)
@@ -442,7 +442,7 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, error
 		}
 		posts, err := intersectPostings(dir, retrievalKeys(keys))
 		if err != nil {
-			return nil, fmt.Errorf("postings: %w", err)
+			return nil, "", fmt.Errorf("postings: %w", err)
 		}
 		o := search.Options{Query: q}
 		posts = cutPostingsBySession(posts, m, o)
@@ -456,9 +456,9 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, error
 		if len(ss) > limit {
 			ss = ss[:limit]
 		}
-		return ss, nil
+		return ss, q, nil
 	}
-	return nil, nil
+	return nil, "", nil
 }
 
 // SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
