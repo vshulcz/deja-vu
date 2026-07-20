@@ -39,23 +39,24 @@ func runHookPrompt(stdin io.Reader, stdout io.Writer) error {
 	if !index.HasManifest(dir) {
 		return nil
 	}
-	// Materialize a wider candidate set, rank it properly, then trim: the
-	// matched order of records is not relevance.
-	cand, matched, err := index.FirstMatch(dir, promptCandidates(terms), 8)
-	if err != nil || len(cand) == 0 {
-		return nil
+	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	if cwd == "" {
+		cwd, _ = os.Getwd()
 	}
-	hits, err := search.Run(cand, search.Options{Query: matched})
-	if err != nil || len(hits) == 0 {
+	// Rank THIS project's sessions by how well they match the prompt terms
+	// (IDF-weighted), rather than reconstructing an AND query — natural
+	// prompts are full of filler that poisons an AND. n=8 to leave room after
+	// excluding the current/too-fresh sessions.
+	ranked, err := index.ProjectRelevant(dir, projectNameCandidates(cwd), terms, 8)
+	if err != nil || len(ranked) == 0 {
 		return nil
 	}
 	ss := make([]model.Session, 0, 2)
 	seen := alreadyInjected(dir, input.SessionID)
-	for _, h := range hits {
-		s := h.Session
-		// Never recall the session being written right now, or work so fresh
-		// the user obviously remembers it — that is anti-magic.
-		if s.ID == input.SessionID || (!s.Updated.IsZero() && time.Since(s.Updated) < 45*time.Minute) {
+	for _, s := range ranked {
+		// Never recall the session being written right now, or work fresh
+		// enough the user still remembers it — that is anti-magic.
+		if s.ID == input.SessionID || (!s.Updated.IsZero() && time.Since(s.Updated) < 15*time.Minute) {
 			continue
 		}
 		if seen[s.ID] {
@@ -107,35 +108,6 @@ func promptSearchTerms(prompt string) []string {
 		out = append(out, f)
 		if len(out) == 6 {
 			break
-		}
-	}
-	return out
-}
-
-// promptCandidates orders the queries to try: the full AND, prefixes of the
-// longest terms, then pairs — a rare term that never co-occurs with the rest
-// must not poison every attempt. All candidates run under one index snapshot
-// via index.FirstMatch, so more candidates cost bucket reads, not manifest
-// reloads.
-func promptCandidates(terms []string) []string {
-	sorted := append([]string(nil), terms...)
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if len([]rune(sorted[j])) > len([]rune(sorted[i])) {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
-	if len(sorted) > 4 {
-		sorted = sorted[:4]
-	}
-	var out []string
-	for k := len(sorted); k >= 2; k-- {
-		out = append(out, strings.Join(sorted[:k], " "))
-	}
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			out = append(out, sorted[i]+" "+sorted[j])
 		}
 	}
 	return out
