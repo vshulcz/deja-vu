@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-07-21
+
+### Changed
+- Internal restructuring: index engine split into ingest/retrieval/manifest/store-IO files, stats and share/handoff digest building moved to internal packages, table-driven subcommand dispatch, index directory resolved once at startup. No user-facing behavior change.
+
 ## [0.14.0] - 2026-07-21
 
 ### Added
