@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -191,7 +192,7 @@ func TestShareDigestBudgetNoiseAndRunErrors(t *testing.T) {
 		{Role: "user", Text: long},
 		{Role: "assistant", Text: "file.go:18: grep output\nassistant conclusion is readable and should survive"},
 	}}
-	d := shareDigest(s, 180)
+	d := digest.Share(s, 180)
 	if !utf8.ValidString(d) || strings.Contains(d, "local-command") || strings.Contains(d, "file.go:18") || strings.Contains(d, strings.Repeat("é", 80)) {
 		t.Fatalf("bad digest len=%d valid=%v:\n%s", len(d), utf8.ValidString(d), d)
 	}
@@ -274,7 +275,7 @@ func TestResumeRemainingHarnessBranches(t *testing.T) {
 		{model.Session{Harness: "gemini", ID: "g"}, "", "", "gemini sessions reopen"},
 		{model.Session{Harness: "cursor", ID: "c", Path: filepath.Join(tmp, "chat.jsonl")}, "", "", "CLI transcripts"},
 		{model.Session{Harness: "cursor", ID: "c", Path: filepath.Join(tmp, "workspace")}, "", "", "Cursor UI"},
-		{model.Session{Harness: "claude", ID: "short", Path: ""}, "", "claude --resume short", ""},
+		{model.Session{Harness: "claude", ID: "digest.Short", Path: ""}, "", "claude --resume digest.Short", ""},
 	}
 	for _, tc := range cases {
 		dir, cmd, err := resumeCommand(tc.s)
@@ -288,8 +289,8 @@ func TestResumeRemainingHarnessBranches(t *testing.T) {
 			t.Fatalf("%#v got dir=%q cmd=%q err=%v", tc.s, dir, cmd, err)
 		}
 	}
-	if got := short("tiny"); got != "tiny" {
-		t.Fatalf("short tiny = %q", got)
+	if got := digest.Short("tiny"); got != "tiny" {
+		t.Fatalf("digest.Short tiny = %q", got)
 	}
 }
 
@@ -476,8 +477,8 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 	if _, err := captureRun(t, "needle"); err == nil || !strings.Contains(err.Error(), "ensure:") {
 		t.Fatalf("ensure error err=%v", err)
 	}
-	if got := firstUserTitle(model.Session{Messages: []model.Message{{Role: "user", Text: " short title "}}}); got != "short title" {
-		t.Fatalf("short title = %q", got)
+	if got := firstUserTitle(model.Session{Messages: []model.Message{{Role: "user", Text: " digest.Short title "}}}); got != "digest.Short title" {
+		t.Fatalf("digest.Short title = %q", got)
 	}
 	if got := firstUserTitle(model.Session{Messages: []model.Message{{Role: "assistant", Text: "skip"}}}); got != "" {
 		t.Fatalf("empty title = %q", got)
@@ -501,7 +502,7 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 }
 
 func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
-	if got := shareDigest(model.Session{ID: "empty"}, 0); !strings.Contains(got, "# deja share: empty") {
+	if got := digest.Share(model.Session{ID: "empty"}, 0); !strings.Contains(got, "# deja share: empty") {
 		t.Fatalf("default share digest = %q", got)
 	}
 	msg := strings.Repeat("word ", 20) + "\n"
@@ -509,18 +510,17 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		many = append(many, msg)
 	}
-	if got := shareMessageText(strings.Join(many, "")); strings.Count(got, "word") > 16*20 {
-		t.Fatalf("shareMessageText did not cap lines: %q", got)
+	if got := digest.MessageText(strings.Join(many, "")); strings.Count(got, "word") > 16*20 {
+		t.Fatalf("digest.MessageText did not cap lines: %q", got)
 	}
 	for _, in := range []string{"", strings.Repeat("9", 90), strings.Repeat("x", 10)} {
-		_ = shareMessageText(in)
+		_ = digest.MessageText(in)
 	}
-	_ = looksLikeProse("")
-	if got := utf8SafeCut("abc", 10); got != "abc" {
-		t.Fatalf("utf8SafeCut no-op = %q", got)
+	if got := digest.UTF8SafeCut("abc", 10); got != "abc" {
+		t.Fatalf("digest.UTF8SafeCut no-op = %q", got)
 	}
-	if got := utf8SafeCut("abc", 0); got != "" {
-		t.Fatalf("utf8SafeCut zero = %q", got)
+	if got := digest.UTF8SafeCut("abc", 0); got != "" {
+		t.Fatalf("digest.UTF8SafeCut zero = %q", got)
 	}
 
 	closed, err := os.CreateTemp(t.TempDir(), "closed")
@@ -536,8 +536,8 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 	if !strings.Contains(b.String(), "deja stats") {
 		t.Fatalf("stats output = %q", b.String())
 	}
-	if got := short("123456789012345"); got != "123456789012" {
-		t.Fatalf("short long = %q", got)
+	if got := digest.Short("123456789012345"); got != "123456789012" {
+		t.Fatalf("digest.Short long = %q", got)
 	}
 	if got := claudeProjectDirFor(model.Session{Path: filepath.Join(t.TempDir(), "plain.jsonl")}); got != "" {
 		t.Fatalf("claudeProjectDirFor = %q", got)

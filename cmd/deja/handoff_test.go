@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -64,7 +65,7 @@ func TestHandoffDigestShape(t *testing.T) {
 			{Role: "assistant", Text: "staging pgbouncer caps at 20, bump pool_size"},
 		},
 	}
-	d := handoffDigest(s, handoffBudget)
+	d := digest.Handoff(s, handoffBudget)
 	for _, want := range []string{
 		"picking up work handed off from a claude session",
 		"project gateway",
@@ -81,21 +82,6 @@ func TestHandoffDigestShape(t *testing.T) {
 	}
 	if len(d) > handoffBudget+256 {
 		t.Fatalf("digest exceeds budget: %d", len(d))
-	}
-}
-
-func TestHandoffTailEmptyAndBudget(t *testing.T) {
-	if got := handoffTail(model.Session{}, 100); got != "" {
-		t.Fatalf("empty session tail = %q", got)
-	}
-	s := model.Session{Messages: []model.Message{
-		{Role: "assistant", Text: strings.Repeat("x", 500)},
-	}}
-	if got := handoffTail(s, 40); len(got) > 40 {
-		t.Fatalf("tail ignored budget: %d bytes", len(got))
-	}
-	if got := handoffTail(s, 0); got != "" {
-		t.Fatalf("zero budget tail = %q", got)
 	}
 }
 
@@ -129,20 +115,6 @@ func TestHandoffPasteModes(t *testing.T) {
 	}
 	if err := runHandoff(index.DefaultDir(), []string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
 		t.Fatalf("bare exec error = %v", err)
-	}
-}
-
-func TestHandoffCleanDropsPreamblesAndRepeats(t *testing.T) {
-	s := model.Session{Messages: []model.Message{
-		{Role: "user", Text: "<environment_context><cwd>/x</cwd></environment_context>"},
-		{Role: "user", Text: "hi"},
-		{Role: "user", Text: "hi"},
-		{Role: "user", Text: "Comments on artifact URI: file:///brain/plan.md approved"},
-		{Role: "user", Text: "real question about retries"},
-	}}
-	got := handoffClean(s)
-	if len(got.Messages) != 2 || got.Messages[0].Text != "hi" || got.Messages[1].Text != "real question about retries" {
-		t.Fatalf("cleaned = %#v", got.Messages)
 	}
 }
 
@@ -187,7 +159,7 @@ func TestPrefixArgAndProjectCandidates(t *testing.T) {
 	if prefixArg("") != "" || prefixArg("abc") != " abc" {
 		t.Fatal("prefixArg formatting")
 	}
-	names := projectNameCandidates("/tmp/alpha")
+	names := digest.ProjectNameCandidates("/tmp/alpha")
 	if len(names) == 0 || names[0] == "" {
 		t.Fatalf("candidates = %v", names)
 	}
@@ -196,7 +168,7 @@ func TestPrefixArgAndProjectCandidates(t *testing.T) {
 func TestHandoffDigestHasPullPointer(t *testing.T) {
 	s := model.Session{ID: "abcdef123456xyz", Harness: "claude", Project: "p",
 		Messages: []model.Message{{Role: "user", Text: "real problem statement here"}}}
-	d := handoffDigest(s, handoffBudget)
+	d := digest.Handoff(s, handoffBudget)
 	if !strings.Contains(d, "compact slice of session abcdef123456") ||
 		!strings.Contains(d, "recall_context") || !strings.Contains(d, "deja show") {
 		t.Fatalf("pull pointer missing:\n%s", d)

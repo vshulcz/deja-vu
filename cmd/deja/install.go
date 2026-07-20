@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -179,7 +180,7 @@ func printInstallProof(dir string) {
 			continue
 		}
 		if len(title) > 76 {
-			title = utf8SafeCut(title, 76) + "…"
+			title = digest.UTF8SafeCut(title, 76) + "…"
 		}
 		seenProject[s.Project] = true
 		date := ""

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -515,14 +516,14 @@ func TestParseSearchAndSmallHelpers(t *testing.T) {
 	if err := runSync(index.DefaultDir(), []string{"bogus", t.TempDir()}); err == nil || !strings.Contains(err.Error(), "unknown sync") {
 		t.Fatalf("runSync unknown err=%v", err)
 	}
-	if got := shareMessageText("\x1b[31mhello\x1b[0m\n<local-command x>"); got != "hello" {
-		t.Fatalf("shareMessageText=%q", got)
+	if got := digest.MessageText("\x1b[31mhello\x1b[0m\n<local-command x>"); got != "hello" {
+		t.Fatalf("digest.MessageText=%q", got)
 	}
-	if got := shareMessageText("```go\nfmt.Println(1)\n```"); !strings.Contains(got, "```go") {
+	if got := digest.MessageText("```go\nfmt.Println(1)\n```"); !strings.Contains(got, "```go") {
 		t.Fatalf("share code block=%q", got)
 	}
-	if got := utf8SafeCut("éclair", 1); got != "" {
-		t.Fatalf("utf8SafeCut=%q", got)
+	if got := digest.UTF8SafeCut("éclair", 1); got != "" {
+		t.Fatalf("digest.UTF8SafeCut=%q", got)
 	}
 }
 

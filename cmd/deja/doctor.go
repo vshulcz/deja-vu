@@ -16,7 +16,7 @@ import (
 )
 
 // doctorVersionLookup fetches the latest released version. It is injected so
-// tests can stub it — the real lookup talks to GitHub with a short budget.
+// tests can stub it — the real lookup talks to GitHub with a digest.Short budget.
 type doctorVersionLookup func() (latest string, ok bool)
 
 // doctorLookup is the dispatcher's lookup; overridable in tests so they never
