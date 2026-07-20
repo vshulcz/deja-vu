@@ -46,7 +46,7 @@ func runHandoff(args []string, stdout io.Writer) error {
 			prefix = args[i]
 		}
 	}
-	pasteOnly := target == "" || target == "antigravity" || target == "cursor"
+	pasteOnly := target == "" || target == "antigravity"
 	if !pasteOnly {
 		if _, ok := handoffCommand(target, ""); !ok {
 			return fmt.Errorf("don't know how to hand off to %q; targets: %s (or omit --to and paste the digest anywhere)", target, strings.Join(handoffTargets(), ", "))
@@ -301,11 +301,13 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"pi", prompt}, true
 	case "grok":
 		return []string{"grok", prompt}, true
+	case "cursor":
+		return []string{"cursor-agent", "chat", prompt}, true
 	default:
 		return nil, false
 	}
 }
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "gemini", "qwen", "aider", "pi", "grok"}
+	return []string{"claude", "codex", "opencode", "cursor", "gemini", "qwen", "aider", "pi", "grok"}
 }

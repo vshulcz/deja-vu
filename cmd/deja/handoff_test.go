@@ -36,6 +36,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		"aider":    {"aider", "--message", "P"},
 		"pi":       {"pi", "P"},
 		"grok":     {"grok", "P"},
+		"cursor":   {"cursor-agent", "chat", "P"},
 	}
 	for target, want := range cases {
 		argv, ok := handoffCommand(target, "P")
@@ -43,8 +44,8 @@ func TestHandoffCommandTable(t *testing.T) {
 			t.Fatalf("handoffCommand(%s) = %v, %v", target, argv, ok)
 		}
 	}
-	if _, ok := handoffCommand("cursor", "P"); ok {
-		t.Fatal("cursor has no CLI prompt entry point yet, must be rejected")
+	if _, ok := handoffCommand("antigravity", "P"); ok {
+		t.Fatal("antigravity has no CLI prompt entry point, must stay paste-only")
 	}
 	if len(handoffTargets()) != len(cases) {
 		t.Fatalf("handoffTargets() = %v out of sync with command table", handoffTargets())
