@@ -168,6 +168,9 @@ func run(args []string) error {
 	if args[0] == "resume" {
 		return runResume(args[1:], os.Stdout)
 	}
+	if args[0] == "handoff" {
+		return runHandoff(args[1:], os.Stdout)
+	}
 	if args[0] == "sync" {
 		return runSync(args[1:])
 	}
@@ -749,6 +752,7 @@ Usage:
   deja show <id-prefix>
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
+  deja handoff --to <agent> [id-prefix] [--exec]
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja sync export <dir> [--full]

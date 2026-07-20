@@ -35,7 +35,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]}"
     action="${COMP_WORDS[2]}"
 
-    local commands="blame bench completion ctx doctor embed forget index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup"
+    local commands="blame bench completion ctx doctor embed forget handoff index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi deja"
     local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto"
 
@@ -71,6 +71,13 @@ _deja_completion() {
             ;;
         forget)
             COMPREPLY=( $(compgen -W "--list --dry-run --session --project --before --unforget" -- "$cur") )
+            ;;
+        handoff)
+            if [[ "$prev" == "--to" ]]; then
+                COMPREPLY=( $(compgen -W "claude codex opencode gemini qwen aider pi grok" -- "$cur") )
+            else
+                COMPREPLY=( $(compgen -W "--to --exec" -- "$cur") )
+            fi
             ;;
         hook-context)
             COMPREPLY=( $(compgen -W "--plain" -- "$cur") )
@@ -140,6 +147,7 @@ _deja() {
     'doctor:diagnose local stores and wiring'
     'embed:build the semantic sidecar'
     'forget:remove indexed sessions'
+    'handoff:continue a session in another agent'
     'index:build or refresh the index'
     'install:wire deja into an agent'
     'last:list recent sessions'
@@ -186,6 +194,9 @@ _deja() {
       ;;
     forget)
       _arguments '--list[list tombstones]' '--dry-run[show changes without applying]' '--session=[session ID prefix]:session:' '--project=[project substring]:project:' '--before=[duration or date]:time:' '--unforget=[tombstone ID]:ID:'
+      ;;
+    handoff)
+      _arguments '--to=[target agent]:agent:(claude codex opencode gemini qwen aider pi grok)' '--exec[launch the target agent]' '1:session ID prefix:'
       ;;
     hook-context)
       _arguments '--plain[omit formatting]'
@@ -234,7 +245,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed forget index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup'
+complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed forget handoff index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
@@ -264,6 +275,8 @@ complete -c deja -n '__fish_seen_subcommand_from forget' -l session -r
 complete -c deja -n '__fish_seen_subcommand_from forget' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from forget' -l before -r
 complete -c deja -n '__fish_seen_subcommand_from forget' -l unforget -r
+complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a 'claude codex opencode gemini qwen aider pi grok'
+complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a 'claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto'
