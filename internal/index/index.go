@@ -1232,7 +1232,13 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 	// boundary would otherwise lose its closing marker and store raw.
 	redacted, counts := redact.Text(text)
 	if len(redacted) > maxIndexedText {
-		redacted = redacted[:maxIndexedText]
+		// Cut on a rune boundary so a multibyte rune straddling the cap is not
+		// split, leaving an invalid tail byte in the stored text.
+		cut := maxIndexedText
+		for cut > 0 && !utf8.RuneStart(redacted[cut]) {
+			cut--
+		}
+		redacted = redacted[:cut]
 	}
 	n := counts.Total()
 	if n == 0 || m == nil {
@@ -1531,6 +1537,14 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 	for p, f := range changed {
 		of, ok := old[p]
 		if !ok || f.Size <= of.Size {
+			return false
+		}
+		// A prior pass that indexed no complete line (a torn first line, or a lone
+		// line with no trailing newline) leaves SafeSize==0 with bytes on disk.
+		// Resuming an append from that ambiguous 0 would either re-read mid-line
+		// (dropping the first message) or duplicate an already-indexed lone line,
+		// so route these files through the full re-index path instead (#appendloss).
+		if of.SafeSize == 0 && of.Size > 0 {
 			return false
 		}
 		switch harnessForPath(p) {
@@ -3109,6 +3123,14 @@ func writeGobAtomic(p string, v any) error {
 		return err
 	}
 	if err := gob.NewEncoder(f).Encode(v); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+	// fsync before rename: manifest.gob is the freshness/RecordsSize authority and
+	// must land durably last, like records.bin and the buckets. Skipping it left a
+	// window where a crash after rename but before flush yields a torn manifest.
+	if err := f.Sync(); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
 		return err

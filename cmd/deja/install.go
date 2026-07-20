@@ -528,8 +528,19 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 
 func installCodex(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.CodexHome(), "config.toml")
-	block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = [\"mcp\"]\n", exe)
+	cmd, args := mcpCommandArgs(exe)
+	block := fmt.Sprintf("[mcp_servers.deja]\ntype = \"stdio\"\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
 	return installTOML(path, block, uninstall)
+}
+
+// tomlStringArray renders a Go string slice as a TOML inline array, e.g.
+// ["/c", "deja", "mcp"], so the Windows cmd /c shim survives the config write.
+func tomlStringArray(xs []string) string {
+	quoted := make([]string, len(xs))
+	for i, x := range xs {
+		quoted[i] = fmt.Sprintf("%q", x)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 // installGrok wires the MCP server into Grok Build's config.toml.
@@ -537,7 +548,8 @@ func installCodex(exe string, uninstall bool) (installResult, error) {
 // on passive events, so MCP is the deepest integration available.
 func installGrok(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.GrokHome(), "config.toml")
-	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = [\"mcp\"]\n", exe)
+	cmd, args := mcpCommandArgs(exe)
+	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
 	return installTOML(path, block, uninstall)
 }
 

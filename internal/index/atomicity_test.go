@@ -186,6 +186,26 @@ func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
 	}
 }
 
+// A file indexed while its first line was still torn records SafeSize==0 with
+// bytes on disk. The next pass must NOT resume an append from that ambiguous 0
+// (which drops the first message or duplicates a lone line) — it must fall back
+// to a full re-index (#appendloss).
+func TestAppendSkipsIncrementalWhenNothingWasComplete(t *testing.T) {
+	claude := filepath.Join(t.TempDir(), "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claude)
+	p := filepath.Join(claude, "-proj", "s1.jsonl") // harnessForPath -> "claude"
+	changed := map[string]FileState{p: {Path: p, Size: 120}}
+	old := map[string]FileState{p: {Path: p, Size: 40, SafeSize: 0}}
+	if canAppendIncremental(changed, old) {
+		t.Fatal("SafeSize==0 with bytes on disk must force full re-index, not append")
+	}
+	// A normal grown file with a real SafeSize still appends incrementally.
+	old[p] = FileState{Path: p, Size: 40, SafeSize: 40}
+	if !canAppendIncremental(changed, old) {
+		t.Fatal("a file with a complete prior line should still append incrementally")
+	}
+}
+
 func TestProjectRelevantRanksByIDFNotFiller(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")

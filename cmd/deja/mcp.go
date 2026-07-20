@@ -22,48 +22,70 @@ const mcpProtocolVersion = "2024-11-05"
 
 type rpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      any             `json:"id,omitempty"`
+	ID      json.RawMessage `json:"id,omitempty"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
+// isNotification reports whether a request omitted id (a JSON-RPC notification,
+// which must get no reply). A literal null id counts as absent too.
+func isNotification(id json.RawMessage) bool {
+	return len(id) == 0 || string(id) == "null"
+}
+
+const mcpMaxFrame = 10 * 1024 * 1024
+
 func serveMCP(r io.Reader, w io.Writer) error {
-	s := bufio.NewScanner(r)
-	// MCP messages are line-delimited JSON here. Allow large, but bounded, client lines.
-	s.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 	enc := json.NewEncoder(w)
-	for s.Scan() {
-		line := strings.TrimSpace(s.Text())
-		if line == "" {
-			continue
-		}
-		var req rpcRequest
-		if err := json.Unmarshal([]byte(line), &req); err != nil {
+	for {
+		line, overlong, err := readMCPLine(br, mcpMaxFrame)
+		if overlong {
+			// One oversized frame is reported as a parse error and skipped; the
+			// server keeps serving instead of tearing down the whole session.
 			writeRPCError(enc, nil, -32700, "parse error")
-			continue
+		} else if trimmed := strings.TrimSpace(string(line)); trimmed != "" {
+			var req rpcRequest
+			if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
+				writeRPCError(enc, nil, -32700, "parse error")
+			} else if !isNotification(req.ID) {
+				result, code, msg := handleMCP(req)
+				if code != 0 {
+					writeRPCError(enc, req.ID, code, msg)
+				} else if eerr := enc.Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result}); eerr != nil {
+					return eerr
+				}
+			}
 		}
-		if req.ID == nil {
-			// Notification. Do not reply.
-			continue
-		}
-		result, code, msg := handleMCP(req)
-		if code != 0 {
-			writeRPCError(enc, req.ID, code, msg)
-			continue
-		}
-		if err := enc.Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result}); err != nil {
-			return err
-		}
-	}
-	if err := s.Err(); err != nil {
-		// Oversized or malformed client frames are reported as JSON-RPC parse errors,
-		// then the stdio server exits gracefully instead of silently hard-stopping.
-		writeRPCError(enc, nil, -32700, "parse error")
-		if os.Getenv("DEJA_DEBUG") == "1" {
-			fmt.Fprintf(os.Stderr, "deja mcp scanner error: %v\n", err)
+		if err != nil {
+			if err != io.EOF && os.Getenv("DEJA_DEBUG") == "1" {
+				fmt.Fprintf(os.Stderr, "deja mcp read error: %v\n", err)
+			}
+			return nil
 		}
 	}
-	return nil
+}
+
+// readMCPLine reads one newline-delimited frame. A frame longer than max is
+// drained and reported via overlong=true rather than buffered whole, so a
+// hostile or corrupt client can't exhaust memory or kill the loop.
+func readMCPLine(br *bufio.Reader, max int) (line []byte, overlong bool, err error) {
+	for {
+		chunk, e := br.ReadSlice('\n')
+		if e == bufio.ErrBufferFull {
+			if len(line)+len(chunk) > max {
+				// Drain the rest of this overlong frame up to the next newline.
+				for e == bufio.ErrBufferFull {
+					_, e = br.ReadSlice('\n')
+				}
+				return nil, true, e
+			}
+			line = append(line, chunk...)
+			continue
+		}
+		line = append(line, chunk...)
+		return line, false, e
+	}
 }
 
 func handleMCP(req rpcRequest) (any, int, string) {
@@ -131,9 +153,9 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 	switch name {
 	case "recall":
 		var a struct {
-			Query   string `json:"query"`
-			Harness string `json:"harness"`
-			Limit   int    `json:"limit"`
+			Query   string  `json:"query"`
+			Harness string  `json:"harness"`
+			Limit   float64 `json:"limit"`
 		}
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return "", err
@@ -141,7 +163,7 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, err := recallTextResult(a.Query, a.Harness, a.Limit, 4096-recallFrameOverhead)
+		text, sessions, err := recallTextResult(a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
 		if err == nil {
 			text = frameRecall(text)
 			usage.RecordResult(index.DefaultDir(), usage.KindRecall, len(text), sessions, sessions == 0)
@@ -166,12 +188,12 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 		return text, err
 	case "blame":
 		var a struct {
-			Path    string `json:"path"`
-			Harness string `json:"harness"`
-			Project string `json:"project"`
-			Since   string `json:"since"`
-			Limit   int    `json:"limit"`
-			All     bool   `json:"all"`
+			Path    string  `json:"path"`
+			Harness string  `json:"harness"`
+			Project string  `json:"project"`
+			Since   string  `json:"since"`
+			Limit   float64 `json:"limit"`
+			All     bool    `json:"all"`
 		}
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return "", err
@@ -187,7 +209,7 @@ func callMCPTool(name string, raw json.RawMessage) (string, error) {
 				return "", err
 			}
 		}
-		return blameTextResult(search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, a.Limit)
+		return blameTextResult(search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
 	case "remember":
 		var a struct {
 			Text    string `json:"text"`

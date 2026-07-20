@@ -144,8 +144,8 @@ func TestInstallWriteAndJSONEdges(t *testing.T) {
 func TestMCPMalformedParamsOversizedAndToolErrors(t *testing.T) {
 	hermeticEnv(t)
 	for _, req := range []rpcRequest{
-		{ID: 1, Method: "tools/call", Params: json.RawMessage(`{"name":`)},
-		{ID: 2, Method: "tools/call", Params: json.RawMessage(`{"name":"recall","arguments":{"query":`)},
+		{ID: json.RawMessage(`1`), Method: "tools/call", Params: json.RawMessage(`{"name":`)},
+		{ID: json.RawMessage(`2`), Method: "tools/call", Params: json.RawMessage(`{"name":"recall","arguments":{"query":`)},
 	} {
 		_, code, msg := handleMCP(req)
 		if code != -32602 || msg == "" {
