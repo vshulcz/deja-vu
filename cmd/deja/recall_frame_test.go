@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -67,4 +68,26 @@ func TestInstallBackupAndNewConfigOwnerOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertMode(fresh, 0o600)
+}
+
+// The narration protocol must be present on every agent-facing surface, and
+// must carry the only-when-it-helped guard so it cannot become spam.
+func TestNarrationProtocolOnAllSurfaces(t *testing.T) {
+	if !strings.Contains(guidanceBody, "deja-vu recalled:") || !strings.Contains(guidanceBody, "Never credit recalls that did not help") {
+		t.Fatal("guidance missing narration protocol")
+	}
+	for _, m := range []string{"initialize", "tools/list"} {
+		_ = m
+	}
+	resp, _, _ := handleMCP(rpcRequest{Method: "tools/list"})
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(b), "deja-vu recalled"); n < 2 {
+		t.Fatalf("MCP tool descriptions carry narration %d times, want >=2 (recall + recall_context)", n)
+	}
+	if !strings.Contains(string(b), "Say nothing about recalls that did not help") {
+		t.Fatal("MCP narration missing the no-spam guard")
+	}
 }

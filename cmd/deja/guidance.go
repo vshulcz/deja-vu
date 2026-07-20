@@ -19,7 +19,9 @@ const guidanceBody = `Before re-deriving past work, search deja when the user re
 - recall: search history with a specific error, function, or decision.
 - recall_context: get a concise digest of the best matching session.
 
-Example: for "what did we decide about token refresh?", call recall with query "token refresh decision", then call recall_context if the result needs more detail.`
+Example: for "what did we decide about token refresh?", call recall with query "token refresh decision", then call recall_context if the result needs more detail.
+
+When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.`
 
 func guidancePath(harness string) string {
 	switch harness {

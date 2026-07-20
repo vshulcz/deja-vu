@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/vshulcz/deja-vu/internal/index"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,5 +156,28 @@ func TestInstallAutoWrappers(t *testing.T) {
 				t.Fatalf("uninstall result = %#v", r)
 			}
 		})
+	}
+}
+
+func TestPrintInstallProofListsDistinctProjects(t *testing.T) {
+	withStatsStores(t)
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	printInstallProof(index.DefaultDir())
+	_ = w.Close()
+	os.Stderr = old
+	b, _ := io.ReadAll(r)
+	out := string(b)
+	if !strings.Contains(out, "deja already knows this machine:") ||
+		!strings.Contains(out, "tmp/beta") || !strings.Contains(out, "gamma") {
+		t.Fatalf("proof output = %q", out)
+	}
+	// One line per project, newest first, capped at three.
+	if strings.Count(out, "[claude") > 2 {
+		t.Fatalf("projects not deduped: %q", out)
 	}
 }

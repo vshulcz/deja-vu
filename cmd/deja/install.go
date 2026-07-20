@@ -151,6 +151,56 @@ func installIndexWarmup(mcp, hooks, guidance int) {
 		fmt.Fprintln(os.Stderr, "index: already built")
 	}
 	fmt.Fprintln(os.Stderr, "try: deja \"something you fixed weeks ago\"")
+	printInstallProof(dir)
+}
+
+// printInstallProof shows the "starts full" moment right in the install: a
+// few real sessions deja already indexed from this machine's history, so the
+// value is visible before the first agent session ever runs.
+func printInstallProof(dir string) {
+	if !index.HasManifest(dir) {
+		return
+	}
+	recent, err := index.Recent(dir, 12)
+	if err != nil || len(recent) == 0 {
+		return
+	}
+	seenProject := map[string]bool{}
+	shown := 0
+	var lines []string
+	for _, s := range recent {
+		if seenProject[s.Project] || s.Project == "" || s.Project == "-" {
+			continue
+		}
+		title := firstUserTitle(s)
+		if title == "" {
+			title = s.Title
+		}
+		if title == "" {
+			continue
+		}
+		if len(title) > 76 {
+			title = utf8SafeCut(title, 76) + "…"
+		}
+		seenProject[s.Project] = true
+		date := ""
+		if !s.Updated.IsZero() {
+			date = s.Updated.Format("Jan 2")
+		}
+		lines = append(lines, fmt.Sprintf("  [%s · %s · %s] %s", s.Harness, s.Project, date, title))
+		shown++
+		if shown == 3 {
+			break
+		}
+	}
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "\ndeja already knows this machine:")
+	for _, l := range lines {
+		fmt.Fprintln(os.Stderr, l)
+	}
+	fmt.Fprintln(os.Stderr, "ask your agent about any of these — it will remember.")
 }
 
 // shortHome contracts the home directory to ~ for display.
