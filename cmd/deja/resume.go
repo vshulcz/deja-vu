@@ -113,6 +113,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return sources.GrokCWDForSession(s.Path), "grok --resume " + s.ID, nil
 	case "pi":
 		return piProjectDirFor(s), "pi --resume " + s.ID, nil
+	case "copilot":
+		return "", "copilot --resume=" + s.ID, nil
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}

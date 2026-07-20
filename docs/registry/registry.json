@@ -12,7 +12,15 @@
         "fixtures/registry/claude-code/session.jsonl"
       ],
       "parser_source": "internal/sources/claude.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Claude Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "codex",
@@ -26,7 +34,15 @@
         "fixtures/registry/codex/rollout-2026-07-17T09-00-00-registry-codex.jsonl"
       ],
       "parser_source": "internal/sources/codex.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Codex CLI",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "opencode",
@@ -40,7 +56,15 @@
         "fixtures/registry/opencode/opencode.sql"
       ],
       "parser_source": "internal/sources/opencode.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "opencode",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      }
     },
     {
       "id": "aider",
@@ -54,7 +78,15 @@
         "fixtures/registry/aider/.aider.chat.history.md"
       ],
       "parser_source": "internal/sources/aider.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "aider",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "resume": false,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "gemini",
@@ -67,7 +99,15 @@
         "fixtures/registry/gemini/session.jsonl"
       ],
       "parser_source": "internal/sources/gemini.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Gemini CLI",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": false,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "cursor",
@@ -83,7 +123,15 @@
         "fixtures/registry/cursor/projects/registry-demo/agent-transcripts/registry-cursor.jsonl"
       ],
       "parser_source": "internal/sources/cursor.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Cursor",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": false,
+        "handoff": "exec",
+        "prereq": "sqlite3 (IDE chats)"
+      }
     },
     {
       "id": "antigravity",
@@ -96,7 +144,15 @@
         "fixtures/registry/antigravity/brain/registry-antigravity/.system_generated/logs/transcript.jsonl"
       ],
       "parser_source": "internal/sources/antigravity.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Antigravity",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": true,
+        "handoff": "paste",
+        "prereq": ""
+      }
     },
     {
       "id": "grok",
@@ -109,7 +165,15 @@
         "fixtures/registry/grok/sessions/workspace%2Fregistry-demo/registry-grok/updates.jsonl"
       ],
       "parser_source": "internal/sources/grok.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Grok Build",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "qwen",
@@ -121,7 +185,15 @@
         "fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl"
       ],
       "parser_source": "internal/sources/qwen.go",
-      "last_verified": "2026-07-17"
+      "last_verified": "2026-07-17",
+      "display_name": "Qwen Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": false,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "pi",
@@ -133,7 +205,15 @@
         "fixtures/registry/pi/session.jsonl"
       ],
       "parser_source": "internal/sources/pi.go",
-      "last_verified": "2026-07-19"
+      "last_verified": "2026-07-19",
+      "display_name": "pi",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      }
     },
     {
       "id": "copilot",
@@ -145,7 +225,15 @@
         "fixtures/registry/copilot/7cf44517-55ca-435c-893a-3fde1973a44e/events.jsonl"
       ],
       "parser_source": "internal/sources/copilot.go",
-      "last_verified": "2026-07-20"
+      "last_verified": "2026-07-20",
+      "display_name": "Copilot CLI",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      }
     }
   ]
 }

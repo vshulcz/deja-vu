@@ -205,7 +205,7 @@ a:hover{text-decoration:underline}
 
 <section>
   <h2>Memory your agent actually uses</h2>
-  <p class="lead">After <code style="font-family:var(--mono);font-size:.9em">deja install --all</code>, every agent on your machine gets a <span style="font-family:var(--mono);font-size:.9em">recall</span> tool over MCP — add <span style="font-family:var(--mono);font-size:.9em">--auto</span> for session-start auto-recall where the agent supports it.</p>
+  <p class="lead">After <code style="font-family:var(--mono);font-size:.9em">deja install --all</code>, every agent with an MCP client gets a <span style="font-family:var(--mono);font-size:.9em">recall</span> tool (aider's CLI has none — its history is still indexed) — add <span style="font-family:var(--mono);font-size:.9em">--auto</span> for session-start auto-recall where the agent supports it.</p>
   <div class="chat">
     <div class="msg you"><span class="who">you</span><div class="bubble">have we dealt with jwt refresh rotation before? check your memory</div></div>
     <div class="msg ai"><span class="who">AI</span><div class="bubble"><div class="tool">→ recall("jwt refresh rotation")</div>Yes — three weeks ago in the <code>api-gateway</code> project (a Codex session). Login broke after key rotation: the jwks cache wasn't reloaded after <code>rotateKey</code>. You fixed it by reloading the cache and adding a clock-skew test. Want me to apply the same pattern here?</div></div>

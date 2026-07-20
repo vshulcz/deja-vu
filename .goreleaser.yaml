@@ -84,7 +84,7 @@ release:
     ```sh
     curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
     go install github.com/vshulcz/deja-vu/cmd/deja@{{ .Tag }}
-    brew install vshulcz/homebrew-tap/deja-vu
+    brew install vshulcz/tap/deja-vu
     ```
 
 # The tap repository (github.com/vshulcz/homebrew-tap) must exist before tagged releases run.

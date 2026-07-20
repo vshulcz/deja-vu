@@ -16,6 +16,10 @@ Parsers live in `internal/sources` and return `[]model.Session`.
 | Cursor | `cursor.go` | SQLite state stores plus CLI agent transcripts |
 | Antigravity | `antigravity.go` | JSONL transcripts under `~/.gemini/antigravity*` |
 | Grok Build | `grok.go` | ACP update streams and session summaries under `~/.grok/sessions` |
+| Qwen Code | `qwen.go` | JSONL chats under `~/.qwen/projects/*/chats` |
+| pi | `pi.go` | JSONL transcripts under `~/.pi/agent/sessions` |
+| Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state` |
+| deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
 

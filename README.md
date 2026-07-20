@@ -224,18 +224,21 @@ limits, trust assumptions, and release verification.
 
 ## Supported harnesses
 
-| Harness | Store | Status |
-| --- | --- | --- |
-| Claude Code | `~/.claude/projects/**/*.jsonl` | ✅ |
-| Codex CLI | `~/.codex/sessions/**` + `history.jsonl` | ✅ |
-| opencode | `~/.local/share/opencode/opencode.db` | ✅ |
-| aider | `.aider.chat.history.md` | ✅ |
-| Gemini CLI | `~/.gemini/tmp/*/chats/**` | ✅ |
-| Cursor | `state.vscdb` + `~/.cursor/projects/**/agent-transcripts/*.jsonl` | ✅ |
-| Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl` | ✅ |
-| Grok Build | `~/.grok/sessions/**/updates.jsonl` | ✅ |
-| Qwen Code | `~/.qwen/projects/**/chats/*.jsonl` | ✅ |
-| pi | `~/.pi/agent/sessions/**/*.jsonl` | ✅ |
+<!-- matrix:start -->
+| Harness | Store | MCP recall | Auto-recall | Resume | Handoff | Needs |
+| --- | --- | :-: | :-: | :-: | :-: | --- |
+| Claude Code | `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl`<br>`${DEJA_CLAUDE_ROOT}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
+| Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
+| opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | ✅ | ✅ | sqlite3 |
+| aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | — | — | — | ✅ | — |
+| Gemini CLI | `${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}`<br>`${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}` | ✅ | — | — | ✅ | — |
+| Cursor | `~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl`<br>`${DEJA_CURSOR_ROOT}`<br>`${DEJA_CURSOR_CLI_ROOT}` | ✅ | — | — | ✅ | sqlite3 (IDE chats) |
+| Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | — | ✅ | paste | — |
+| Grok Build | `${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl`<br>`${DEJA_GROK_ROOT}/sessions/**/updates.jsonl` | ✅ | — | ✅ | ✅ | — |
+| Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | — | — | ✅ | — |
+| pi | `${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl` | ✅ | — | ✅ | ✅ | — |
+| Copilot CLI | `${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl` | ✅ | — | ✅ | ✅ | — |
+<!-- matrix:end -->
 
 Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_QWEN_ROOT`, `DEJA_INDEX_DIR`. Each agent's own relocation variable is honored too: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GEMINI_CLI_HOME`, `CURSOR_CONFIG_DIR`, `GROK_HOME`, `AIDER_CHAT_HISTORY_FILE`, and `XDG_DATA_HOME` for opencode on Linux.
 

@@ -53,19 +53,21 @@
 
 <h1>Harnesses</h1>
 <p>deja indexes eleven coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
-<table><thead><tr><th>Harness</th><th>Store</th></tr></thead><tbody>
-<tr><td>Claude Code</td><td><code>~/.claude/projects/**</code></td></tr>
-<tr><td>Codex CLI</td><td><code>~/.codex/sessions/**</code>, <code>history.jsonl</code></td></tr>
-<tr><td>opencode</td><td>SQLite store</td></tr>
-<tr><td>Cursor</td><td><code>state.vscdb</code> + CLI transcripts</td></tr>
-<tr><td>Gemini CLI</td><td><code>~/.gemini/tmp/**</code></td></tr>
-<tr><td>aider</td><td><code>.aider.chat.history.md</code></td></tr>
-<tr><td>Antigravity</td><td><code>~/.gemini/antigravity*/**</code></td></tr>
-<tr><td>Grok Build</td><td><code>~/.grok/sessions/**</code></td></tr>
-<tr><td>Qwen Code</td><td><code>~/.qwen/projects/**/chats/*.jsonl</code></td></tr>
-<tr><td>pi</td><td><code>~/.pi/agent/sessions/**/*.jsonl</code></td></tr>
-<tr><td>Copilot CLI</td><td><code>~/.copilot/session-state/*/events.jsonl</code></td></tr>
-</tbody></table>
+<!-- matrix:start -->
+<table>
+<tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>
+<tr><td>Claude Code</td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code><br><code>${DEJA_CLAUDE_ROOT}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td>Codex CLI</td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code><br><code>${CODEX_HOME:-~/.codex}/history.jsonl</code><br><code>${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td>opencode</td><td><code>~/.local/share/opencode/opencode.db</code><br><code>${XDG_DATA_HOME}/opencode/opencode.db</code><br><code>${DEJA_OPENCODE_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3</td></tr>
+<tr><td>aider</td><td><code>~/.aider.chat.history.md</code><br><code>${AIDER_CHAT_HISTORY_FILE}</code><br><code>${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md</code></td><td>—</td><td>—</td><td>—</td><td>✅</td><td>—</td></tr>
+<tr><td>Gemini CLI</td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code><br><code>${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}</code></td><td>✅</td><td>—</td><td>—</td><td>✅</td><td>—</td></tr>
+<tr><td>Cursor</td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code><br><code>~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code><br><code>${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl</code><br><code>${DEJA_CURSOR_ROOT}</code><br><code>${DEJA_CURSOR_CLI_ROOT}</code></td><td>✅</td><td>—</td><td>—</td><td>✅</td><td>sqlite3 (IDE chats)</td></tr>
+<tr><td>Antigravity</td><td><code>~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl</code><br><code>${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl</code></td><td>✅</td><td>—</td><td>✅</td><td>paste</td><td>—</td></tr>
+<tr><td>Grok Build</td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code><br><code>${DEJA_GROK_ROOT}/sessions/**/updates.jsonl</code></td><td>✅</td><td>—</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td>Qwen Code</td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>✅</td><td>—</td><td>—</td><td>✅</td><td>—</td></tr>
+<tr><td>pi</td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>✅</td><td>—</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td>Copilot CLI</td><td><code>${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl</code></td><td>✅</td><td>—</td><td>✅</td><td>✅</td><td>—</td></tr>
+</table><!-- matrix:end -->
 <p>Each format is documented in the <a href="../registry/README.md">session format registry</a>, with synthetic fixtures and a conformance test that catches upstream drift.</p>
 <h2>Adding a harness</h2>
 <p>A new parser is one file in <code>internal/sources/</code> modeled on an existing one, plus wiring at the discovery, doctor, install and registry points. See the open harness issues on GitHub if you'd like to add yours.</p>
