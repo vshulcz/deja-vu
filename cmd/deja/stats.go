@@ -183,6 +183,7 @@ func runStats(args []string) error {
 		return err
 	}
 	report := buildStats(filterStatsSessions(ss, options), time.Now())
+	sshTip := sshSyncTip(ss)
 	report.Recall = usage.Totals(index.DefaultDir())
 	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(index.DefaultDir())
 	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
@@ -211,6 +212,9 @@ func runStats(args []string) error {
 		return enc.Encode(report)
 	}
 	printStats(os.Stdout, report)
+	if sshTip != "" {
+		fmt.Fprintln(os.Stdout, sshTip)
+	}
 	return nil
 }
 

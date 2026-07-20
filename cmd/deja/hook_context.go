@@ -71,6 +71,9 @@ func runHookContext(plain bool) error {
 		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
 	}
 	digest = lead + digest
+	if tip := limitHandoffTip(); tip != "" {
+		digest += "\n" + tip
+	}
 	digest = frameRecall(digest)
 	usage.RecordResult(index.DefaultDir(), usage.KindHook, len(digest), sessions, false)
 	if plain {
@@ -245,4 +248,49 @@ func startDetachedWarmup(exe, sentinel string) error {
 	cmd.Stdout = devNull
 	cmd.Stderr = cmd.Stdout
 	return startDetached(cmd)
+}
+
+// limitMarkers are the strings harnesses print when a session dies on quota.
+var limitMarkers = []string{
+	"usage limit reached",
+	"rate limit reached",
+	"You've reached your usage limit",
+	"usage limit will reset",
+	"quota exceeded",
+	"out of free quota",
+	"upgrade to continue",
+	"5-hour limit",
+	"weekly limit",
+}
+
+// limitHandoffTip checks whether the newest indexed session ended on a usage
+// limit and, if so, suggests continuing in a different agent via handoff —
+// the cross-agent escape hatch is exactly what limits are for.
+func limitHandoffTip() string {
+	recent, err := index.Recent(index.DefaultDir(), 1)
+	if err != nil || len(recent) == 0 {
+		return ""
+	}
+	s := recent[0]
+	// Only a fresh limit matters; an old one is stale advice.
+	if s.Updated.IsZero() || time.Since(s.Updated) > 6*time.Hour {
+		return ""
+	}
+	// Recent returns metadata only; the tail scan needs the transcript.
+	if full, ok, err := findByPrefix(s.ID); err == nil && ok {
+		s = full
+	}
+	tail := s.Messages
+	if len(tail) > 4 {
+		tail = tail[len(tail)-4:]
+	}
+	for _, m := range tail {
+		lower := strings.ToLower(m.Text)
+		for _, marker := range limitMarkers {
+			if strings.Contains(lower, strings.ToLower(marker)) {
+				return fmt.Sprintf("Note: the most recent %s session appears to have hit a usage limit. If that blocks the user again, suggest `deja handoff --to <agent>` — it packages the live context and continues the work in another agent.", s.Harness)
+			}
+		}
+	}
+	return ""
 }
