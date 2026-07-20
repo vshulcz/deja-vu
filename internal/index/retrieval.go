@@ -1,0 +1,1086 @@
+package index
+
+import (
+	"fmt"
+	"hash/fnv"
+	"io"
+	"math"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
+)
+
+func Search(dir string, o search.Options) ([]model.Session, error) {
+	r, err := SearchDetailed(dir, o)
+	return r.Sessions, err
+}
+
+func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return SearchResult{}, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return SearchResult{}, fmt.Errorf("manifest: %w", err)
+	}
+	if !recordsIntact(dir, m) {
+		return SearchResult{}, fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
+	}
+	var posts []posting
+	var fallbackVariants map[string][]string
+	fallbackTier := search.TierExact
+	usedPostings := false
+	if !o.Regex {
+		if keys := queryKeys(o.Query); len(keys) > 0 {
+			usedPostings = true
+			posts, err = intersectPostings(dir, retrievalKeys(keys))
+			if err != nil {
+				return SearchResult{}, fmt.Errorf("postings: %w", err)
+			}
+			if len(posts) == 0 {
+				// grep expectation: "code" should find "opencode". Expand each query
+				// token to all indexed tokens containing it (bucket directories only,
+				// no record scan), then intersect.
+				var variants map[string][]string
+				posts, variants, err = intersectSubstringPostingsDetailed(dir, tokens(o.Query))
+				if err != nil {
+					return SearchResult{}, fmt.Errorf("substr postings: %w", err)
+				}
+				if len(posts) > 0 {
+					fallbackVariants = variants
+					fallbackTier = search.TierClose
+				}
+			}
+		}
+	}
+	if len(posts) == 0 {
+		if usedPostings {
+			if result, ferr := stemSearch(dir, m, o); ferr != nil {
+				return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
+			} else if result.Stemmed {
+				return result, nil
+			}
+			if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
+				return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
+			} else if result.Fuzzy {
+				return result, nil
+			}
+			return SearchResult{}, nil
+		}
+		ss, err := scanRecords(dir, m, o, nil)
+		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
+	}
+	posts = cutPostingsBySession(posts, m, o)
+	if len(posts) == 0 {
+		return SearchResult{}, nil
+	}
+	ss, err := scanRecords(dir, m, o, postingOffsets(posts))
+	if err == nil && len(ss) == 0 {
+		if result, ferr := stemSearch(dir, m, o); ferr != nil {
+			return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
+		} else if result.Stemmed {
+			return result, nil
+		}
+		if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
+			return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
+		} else if result.Fuzzy {
+			return result, nil
+		}
+	}
+	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
+}
+
+// ProjectRelevant ranks the current project's sessions by how well they match
+// the prompt terms — without reconstructing an AND query, which poisons on
+// filler words. Each session scores the IDF-weighted sum of prompt terms it
+// contains (rare topical terms dominate; common filler barely moves it), from
+// bucket postings only. The best sessions are materialized with transcripts.
+func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, err
+	}
+	inProject := map[uint32]SessionMeta{}
+	for _, meta := range m.Sessions {
+		lp := strings.ToLower(meta.Project)
+		for _, want := range projects {
+			w := strings.ToLower(want)
+			if w != "" && (lp == w || strings.Contains(lp, w)) {
+				inProject[meta.Ord] = meta
+				break
+			}
+		}
+	}
+	if len(inProject) == 0 {
+		return nil, nil
+	}
+	totalDocs := float64(len(m.Sessions)) + 1
+	score := map[uint32]float64{}
+	for _, term := range terms {
+		keys := queryKeys(term)
+		if len(keys) == 0 {
+			continue
+		}
+		key := keys[0]
+		posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+		if err != nil || len(posts) == 0 {
+			continue
+		}
+		idf := math.Log(totalDocs / float64(len(posts)+1))
+		if idf <= 0 {
+			continue
+		}
+		hit := map[uint32]bool{}
+		for _, pp := range posts {
+			if _, ok := inProject[pp.Sid]; ok {
+				hit[pp.Sid] = true
+			}
+		}
+		for ord := range hit {
+			score[ord] += idf
+		}
+	}
+	type scored struct {
+		meta  SessionMeta
+		score float64
+	}
+	ranked := make([]scored, 0, len(score))
+	for ord, sc := range score {
+		if sc > 0 {
+			ranked = append(ranked, scored{inProject[ord], sc})
+		}
+	}
+	if len(ranked) == 0 {
+		return nil, nil
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].score == ranked[j].score {
+			return ranked[i].meta.Updated.After(ranked[j].meta.Updated)
+		}
+		return ranked[i].score > ranked[j].score
+	})
+	if n > 0 && len(ranked) > n {
+		ranked = ranked[:n]
+	}
+	out := make([]model.Session, 0, len(ranked))
+	for _, r := range ranked {
+		full, err := loadSessionRecords(dir, m, r.meta)
+		if err != nil || len(full.Messages) == 0 {
+			full = sessionFromMeta(r.meta)
+		}
+		out = append(out, full)
+	}
+	return out, nil
+}
+
+// loadSessionRecords materializes one session's transcript from the index.
+func loadSessionRecords(dir string, m Manifest, meta SessionMeta) (model.Session, error) {
+	ss, err := scanRecords(dir, m, search.Options{All: true}, nil)
+	if err != nil {
+		return model.Session{}, err
+	}
+	for _, s := range ss {
+		if s.ID == meta.ID && (meta.Harness == "" || s.Harness == meta.Harness) {
+			return s, nil
+		}
+	}
+	return sessionFromMeta(meta), nil
+}
+
+// FirstMatch tries candidate queries in order under ONE lock and manifest
+// read, probes each via exact posting intersection (bucket reads only), and
+// materializes sessions for the first query that matches. Built for the
+// per-prompt hook, which fires on every user message and must stay fast: the
+// full Search pipeline per candidate would re-read the manifest each time.
+func FirstMatch(dir string, queries []string, limit int) ([]model.Session, string, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, "", fmt.Errorf("manifest: %w", err)
+	}
+	if !recordsIntact(dir, m) {
+		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
+	}
+	for _, q := range queries {
+		keys := queryKeys(q)
+		if len(keys) == 0 {
+			continue
+		}
+		posts, err := intersectPostings(dir, retrievalKeys(keys))
+		if err != nil {
+			return nil, "", fmt.Errorf("postings: %w", err)
+		}
+		o := search.Options{Query: q}
+		posts = cutPostingsBySession(posts, m, o)
+		if len(posts) == 0 {
+			continue
+		}
+		ss, err := scanRecords(dir, m, o, postingOffsets(posts))
+		if err != nil || len(ss) == 0 {
+			continue
+		}
+		if len(ss) > limit {
+			ss = ss[:limit]
+		}
+		return ss, q, nil
+	}
+	return nil, "", nil
+}
+
+// SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
+// mid-append) triggers one full rebuild instead of erroring until the user
+// runs --rebuild by hand.
+func SearchWithRecovery(dir string, o search.Options, progress io.Writer) ([]model.Session, error) {
+	r, err := SearchWithRecoveryDetailed(dir, o, progress)
+	return r.Sessions, err
+}
+
+func SearchWithRecoveryDetailed(dir string, o search.Options, progress io.Writer) (SearchResult, error) {
+	r, err := SearchDetailed(dir, o)
+	if err == nil || !IsCorrupt(err) {
+		return r, err
+	}
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+	}
+	if rerr := EnsureForSearch(dir, o, true, progress); rerr != nil {
+		return SearchResult{}, rerr
+	}
+	return SearchDetailed(dir, o)
+}
+
+func Recent(dir string, n int) ([]model.Session, error) {
+	return RecentMatching(dir, n, search.Options{})
+}
+
+func RecentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.Session, 0, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		if !sessionMetaMatches(meta, o) {
+			continue
+		}
+		out = append(out, sessionFromMeta(meta))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
+	if n > 0 && len(out) > n {
+		out = out[:n]
+	}
+	return out, nil
+}
+
+// displayPath contracts the home directory to ~ in user-facing messages.
+func displayPath(p string) string {
+	if h, err := os.UserHomeDir(); err == nil && h != "" && strings.HasPrefix(p, h) {
+		return "~" + strings.TrimPrefix(p, h)
+	}
+	return p
+}
+
+func RecentProject(dir, project string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, err
+	}
+	project = strings.ToLower(project)
+	var metas []SessionMeta
+	for _, meta := range m.Sessions {
+		p := strings.ToLower(meta.Project)
+		if p == project || (project != "" && strings.Contains(p, project)) {
+			metas = append(metas, meta)
+		}
+	}
+	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	if n > 0 && len(metas) > n {
+		metas = metas[:n]
+	}
+	out := make([]model.Session, 0, len(metas))
+	for _, meta := range metas {
+		s := sessionFromMeta(meta)
+		recs, err := recordsForKey(filepath.Join(dir, "records.bin"), meta.Harness+":"+meta.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range recs {
+			s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+func FindByPrefix(dir, p string) (model.Session, bool, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	var matches []SessionMeta
+	for _, meta := range m.Sessions {
+		if strings.HasPrefix(meta.ID, p) {
+			matches = append(matches, meta)
+		}
+	}
+	if len(matches) == 0 {
+		return model.Session{}, false, nil
+	}
+	sort.Slice(matches, func(i, j int) bool { return matches[i].Updated.After(matches[j].Updated) })
+	meta := matches[0]
+	s := sessionFromMeta(meta)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), meta.Harness+":"+meta.ID)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	for _, r := range recs {
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	}
+	return s, true, nil
+}
+
+func scanRecords(dir string, m Manifest, o search.Options, offsets []int64) ([]model.Session, error) {
+	return scanRecordsWithVariants(dir, m, o, offsets, nil)
+}
+
+func scanRecordsWithVariants(dir string, m Manifest, o search.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
+	by := map[string]*model.Session{}
+	add := func(r Record) {
+		meta, ok := m.Sessions[r.Key]
+		if !ok {
+			return
+		}
+		if o.Harness != "" && meta.Harness != o.Harness {
+			return
+		}
+		if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
+			return
+		}
+		if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
+			return
+		}
+		if o.Role != "" && r.Role != o.Role {
+			return
+		}
+		s := by[r.Key]
+		if s == nil {
+			cp := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Title: meta.Title, Started: meta.Started, Updated: meta.Updated}
+			s = &cp
+			by[r.Key] = s
+		}
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	}
+	if len(offsets) > 0 {
+		f, err := os.Open(filepath.Join(dir, "records.bin"))
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = f.Close() }()
+		offsets = sortedUniqueOffsets(offsets)
+		for _, off := range offsets {
+			if r, err := readRecordAt(f, off); err == nil && recordMatchesQueryVariants(r, o, variants) {
+				add(r)
+			}
+		}
+	} else {
+		if err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+			if recordMatchesQueryVariants(r, o, variants) {
+				add(r)
+			}
+		}); err != nil {
+			return nil, err
+		}
+	}
+	out := make([]model.Session, 0, len(by))
+	for _, s := range by {
+		out = append(out, *s)
+	}
+	return out, nil
+}
+
+func cutPostingsBySession(posts []posting, m Manifest, o search.Options) []posting {
+	metaByOrd := sessionMetaByOrd(m)
+	// Keep the complete posting-derived candidate set. Ranking needs the
+	// candidate records to calculate BM25 document frequency and length.
+	out := make([]posting, 0, len(posts))
+	for _, p := range posts {
+		if meta, ok := metaByOrd[p.Sid]; ok && sessionMetaMatches(meta, o) {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func sessionMetaByOrd(m Manifest) map[uint32]SessionMeta {
+	out := make(map[uint32]SessionMeta, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		out[meta.Ord] = meta
+	}
+	return out
+}
+
+func sessionMetaMatches(meta SessionMeta, o search.Options) bool {
+	if o.Harness != "" && meta.Harness != o.Harness {
+		return false
+	}
+	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
+		return false
+	}
+	if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
+		return false
+	}
+	return true
+}
+
+func postingOffsets(posts []posting) []int64 {
+	out := make([]int64, 0, len(posts))
+	for _, p := range posts {
+		out = append(out, p.Off)
+	}
+	return out
+}
+
+func sortedUniqueOffsets(offsets []int64) []int64 {
+	out := append([]int64(nil), offsets...)
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	n := 0
+	for _, off := range out {
+		if n == 0 || out[n-1] != off {
+			out[n] = off
+			n++
+		}
+	}
+	return out[:n]
+}
+
+func sortedUniquePostings(posts []posting) []posting {
+	out := append([]posting(nil), posts...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Off == out[j].Off {
+			return out[i].Sid < out[j].Sid
+		}
+		return out[i].Off < out[j].Off
+	})
+	n := 0
+	for _, p := range out {
+		if n == 0 || out[n-1].Off != p.Off {
+			out[n] = p
+			n++
+		}
+	}
+	return out[:n]
+}
+
+func postingsFor(dir, tok string) ([]posting, error) {
+	return readBucketToken(filepath.Join(dir, "buckets", bucket(tok)+".bin"), tok)
+}
+
+func intersectPostings(dir string, keys []string) ([]posting, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	lists := make([][]posting, 0, len(keys))
+	for _, key := range keys {
+		list, err := postingsFor(dir, key)
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(list) == 0 {
+			return nil, nil
+		}
+		lists = append(lists, list)
+	}
+	sort.Slice(lists, func(i, j int) bool { return len(lists[i]) < len(lists[j]) })
+	set := make(map[int64]posting, len(lists[0]))
+	for _, p := range lists[0] {
+		set[p.Off] = p
+	}
+	for _, list := range lists[1:] {
+		next := make(map[int64]posting, min(len(set), len(list)))
+		for _, p := range list {
+			if _, ok := set[p.Off]; ok {
+				next[p.Off] = p
+			}
+		}
+		set = next
+		if len(set) == 0 {
+			return nil, nil
+		}
+	}
+	out := make([]posting, 0, len(set))
+	for _, p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out, nil
+}
+
+func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
+	posts, _, err := intersectSubstringPostingsDetailed(dir, bare)
+	return posts, err
+}
+
+func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, map[string][]string, error) {
+	if len(bare) == 0 {
+		return nil, nil, nil
+	}
+	if len(bare) > 3 {
+		bare = bare[:3] // longest-first; keep the expansion bounded
+	}
+	buckets, err := os.ReadDir(filepath.Join(dir, "buckets"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+	perTok := make([]map[int64]posting, len(bare))
+	variants := make(map[string][]string, len(bare))
+	for i := range perTok {
+		perTok[i] = map[int64]posting{}
+	}
+	for _, de := range buckets {
+		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+			continue
+		}
+		path := filepath.Join(dir, "buckets", de.Name())
+		entries, f, err := openBucketDir(path)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			tok := strings.TrimPrefix(e.tok, "t")
+			for i, b := range bare {
+				if !strings.Contains(tok, b) {
+					continue
+				}
+				variants[b] = append(variants[b], tok)
+				buf := make([]byte, e.n)
+				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
+					continue
+				}
+				for _, p := range decodePostings(buf) {
+					perTok[i][p.Off] = p
+				}
+			}
+		}
+		f.Close()
+	}
+	set := perTok[0]
+	for _, m := range perTok[1:] {
+		next := map[int64]posting{}
+		for off, p := range m {
+			if _, ok := set[off]; ok {
+				next[off] = p
+			}
+		}
+		set = next
+		if len(set) == 0 {
+			return nil, nil, nil
+		}
+	}
+	out := make([]posting, 0, len(set))
+	for _, p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	for token := range variants {
+		sort.Strings(variants[token])
+	}
+	return out, variants, nil
+}
+
+func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
+	if !hasFuzzyToken(terms) {
+		return nil, nil, nil
+	}
+	catalog, err := tokenCatalog(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	perToken := make([]map[int64]posting, len(terms))
+	variants := map[string][]string{}
+	for i, term := range terms {
+		matches := closeTokens(term, catalog)
+		if len(matches) == 0 {
+			return nil, nil, nil
+		}
+		variants[term] = matches
+		perToken[i] = map[int64]posting{}
+		for _, variant := range matches {
+			posts, err := postingsFor(dir, "t"+variant)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, p := range posts {
+				perToken[i][p.Off] = p
+			}
+		}
+	}
+	// Phrase text is verified from records; phrase tokens participate in the
+	// same fuzzy candidate intersection above, so phrases need no extra work.
+	_ = phrases
+	return intersectPostingMaps(perToken), variants, nil
+}
+
+func fuzzySearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
+	terms, phrases := search.QueryParts(o.Query)
+	posts, variants, err := fuzzyPostings(dir, terms, phrases)
+	if err != nil || len(posts) == 0 {
+		return SearchResult{}, err
+	}
+	posts = cutPostingsBySession(posts, m, o)
+	if len(posts) == 0 {
+		return SearchResult{}, nil
+	}
+	ss, err := scanRecordsWithVariants(dir, m, o, postingOffsets(posts), variants)
+	if err != nil || len(ss) == 0 {
+		return SearchResult{}, err
+	}
+	return SearchResult{Sessions: ss, Fuzzy: true, Variants: variants, Tier: search.TierClose}, nil
+}
+
+func stemSearch(dir string, m Manifest, o search.Options) (SearchResult, error) {
+	terms, phrases := search.QueryParts(o.Query)
+	posts, variants, err := stemPostings(dir, terms, phrases)
+	if err != nil || len(posts) == 0 {
+		return SearchResult{}, err
+	}
+	posts = cutPostingsBySession(posts, m, o)
+	if len(posts) == 0 {
+		return SearchResult{}, nil
+	}
+	ss, err := scanRecordsWithVariants(dir, m, o, postingOffsets(posts), variants)
+	if err != nil || len(ss) == 0 {
+		return SearchResult{}, err
+	}
+	return SearchResult{Sessions: ss, Stemmed: true, Variants: variants, Tier: search.TierClose}, nil
+}
+
+func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
+	if !hasStemToken(terms) {
+		return nil, nil, nil
+	}
+	catalog, err := tokenCatalog(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	perToken := make([]map[int64]posting, len(terms))
+	variants := map[string][]string{}
+	for i, term := range terms {
+		matches := stemMatches(term, catalog)
+		if len(matches) == 0 {
+			return nil, nil, nil
+		}
+		variants[term] = matches
+		perToken[i] = map[int64]posting{}
+		for _, variant := range matches {
+			posts, err := postingsFor(dir, "t"+variant)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, p := range posts {
+				perToken[i][p.Off] = p
+			}
+		}
+	}
+	_ = phrases
+	return intersectPostingMaps(perToken), variants, nil
+}
+
+func hasStemToken(terms []string) bool {
+	for _, term := range terms {
+		if len([]rune(term)) >= 5 {
+			return true
+		}
+	}
+	return false
+}
+
+func stemMatches(term string, catalog map[string]bool) []string {
+	if len([]rune(term)) < 5 {
+		if catalog[term] {
+			return []string{term}
+		}
+		return nil
+	}
+	forms := suffixForms(term)
+	matches := make([]string, 0, 8)
+	for _, form := range forms {
+		if catalog[form] {
+			matches = append(matches, form)
+		}
+	}
+	if len(matches) > 8 {
+		matches = matches[:8]
+	}
+	return matches
+}
+
+func suffixForms(word string) []string {
+	seen := map[string]bool{word: true}
+	type candidate struct {
+		word  string
+		depth int
+	}
+	queue := []candidate{{word: word}}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current.depth == 2 {
+			continue
+		}
+		for _, form := range oneSuffixStep(current.word) {
+			if form != "" && !seen[form] {
+				seen[form] = true
+				queue = append(queue, candidate{word: form, depth: current.depth + 1})
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for form := range seen {
+		out = append(out, form)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func oneSuffixStep(word string) []string {
+	var out []string
+	add := func(form string) {
+		if len(form) >= 3 && form != word {
+			out = append(out, form)
+		}
+	}
+	switch {
+	case strings.HasSuffix(word, "tion"):
+		add(strings.TrimSuffix(word, "tion") + "te")
+	case strings.HasSuffix(word, "ing"):
+		base := strings.TrimSuffix(word, "ing")
+		add(base)
+		add(base + "e")
+	case strings.HasSuffix(word, "ed"):
+		base := strings.TrimSuffix(word, "ed")
+		add(base)
+		add(base + "e")
+	case strings.HasSuffix(word, "ment"):
+		base := strings.TrimSuffix(word, "ment")
+		add(base)
+		add(base + "e")
+	case strings.HasSuffix(word, "es"):
+		add(strings.TrimSuffix(word, "es"))
+	case strings.HasSuffix(word, "s"):
+		add(strings.TrimSuffix(word, "s"))
+	}
+	if strings.HasSuffix(word, "e") {
+		base := strings.TrimSuffix(word, "e")
+		add(base + "ing")
+		add(base + "ed")
+		add(strings.TrimSuffix(word, "te") + "tion")
+	}
+	return out
+}
+
+func hasFuzzyToken(terms []string) bool {
+	for _, term := range terms {
+		if len([]rune(term)) >= 4 {
+			return true
+		}
+	}
+	return false
+}
+
+func tokenCatalog(dir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(filepath.Join(dir, "buckets"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]bool{}, nil
+		}
+		return nil, err
+	}
+	catalog := map[string]bool{}
+	for _, de := range entries {
+		if de.IsDir() || !strings.HasSuffix(de.Name(), ".bin") {
+			continue
+		}
+		header, f, err := openBucketDir(filepath.Join(dir, "buckets", de.Name()))
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range header {
+			catalog[strings.TrimPrefix(entry.tok, "t")] = true
+		}
+		_ = f.Close()
+	}
+	return catalog, nil
+}
+
+func closeTokens(query string, catalog map[string]bool) []string {
+	type match struct {
+		token    string
+		distance int
+	}
+	var matches []match
+	limit := 1
+	if len([]rune(query)) >= 8 {
+		limit = 2
+	}
+	for token := range catalog {
+		d := damerauDistance(query, token, limit)
+		if d <= limit {
+			matches = append(matches, match{token: token, distance: d})
+		}
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].distance == matches[j].distance {
+			return matches[i].token < matches[j].token
+		}
+		return matches[i].distance < matches[j].distance
+	})
+	if len(matches) > 8 {
+		matches = matches[:8]
+	}
+	out := make([]string, len(matches))
+	for i, m := range matches {
+		out[i] = m.token
+	}
+	return out
+}
+
+func damerauDistance(a, b string, max int) int {
+	if len(a) <= 64 && len(b) <= 64 && utf8.ValidString(a) && utf8.ValidString(b) && utf8.RuneCountInString(a) == len(a) && utf8.RuneCountInString(b) == len(b) {
+		var prev, prevPrev, cur [65]int
+		for j := 0; j <= len(b); j++ {
+			prev[j] = j
+		}
+		for i := 1; i <= len(a); i++ {
+			cur[0] = i
+			for j := 1; j <= len(b); j++ {
+				cost := 0
+				if a[i-1] != b[j-1] {
+					cost = 1
+				}
+				cur[j] = min(cur[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
+				if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+					cur[j] = min(cur[j], prevPrev[j-2]+1)
+				}
+			}
+			prevPrev, prev, cur = prev, cur, prevPrev
+		}
+		return prev[len(b)]
+	}
+	return damerauDistanceRunes(a, b, max)
+}
+
+func damerauDistanceRunes(a, b string, max int) int {
+	ar, br := []rune(a), []rune(b)
+	if abs(len(ar)-len(br)) > max {
+		return max + 1
+	}
+	prev := make([]int, len(br)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	prevPrev := append([]int(nil), prev...)
+	for i := 1; i <= len(ar); i++ {
+		cur := make([]int, len(br)+1)
+		cur[0] = i
+		for j := 1; j <= len(br); j++ {
+			cost := 0
+			if ar[i-1] != br[j-1] {
+				cost = 1
+			}
+			cur[j] = min(cur[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
+			if i > 1 && j > 1 && ar[i-1] == br[j-2] && ar[i-2] == br[j-1] {
+				cur[j] = min(cur[j], prevPrev[j-2]+1)
+			}
+		}
+		prevPrev, prev = prev, cur
+	}
+	return prev[len(br)]
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+func intersectPostingMaps(sets []map[int64]posting) []posting {
+	if len(sets) == 0 {
+		return nil
+	}
+	set := sets[0]
+	for _, next := range sets[1:] {
+		for off := range set {
+			if _, ok := next[off]; !ok {
+				delete(set, off)
+			}
+		}
+	}
+	out := make([]posting, 0, len(set))
+	for _, p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
+}
+
+func tokens(s string) []string {
+	seen := map[string]bool{}
+	var out []string
+	var b strings.Builder
+	flush := func() {
+		if b.Len() >= 2 {
+			t := b.String()
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+		}
+		b.Reset()
+	}
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			b.WriteRune(r)
+			if b.Len() > 64 {
+				flush()
+			}
+		} else {
+			flush()
+		}
+	}
+	flush()
+	sort.Slice(out, func(i, j int) bool { return len(out[i]) > len(out[j]) })
+	return out
+}
+
+func indexKeys(s string) []string {
+	var out []string
+	for _, tok := range tokens(s) {
+		out = append(out, "t"+tok)
+	}
+	return out
+}
+
+func retrievalKeys(keys []string) []string {
+	if len(keys) <= 3 {
+		return keys
+	}
+	return keys[:3] // tokens() sorts longest-first; long tokens are the most selective
+}
+
+func queryKeys(s string) []string {
+	toks := tokens(s)
+	if len(toks) == 0 {
+		return nil
+	}
+	// Drop stop words so retrievalKeys picks selective content tokens; a
+	// long stop word like "before" must not over-constrain the AND. If the
+	// query is all stop words, keep them (odd results beat none).
+	content := make([]string, 0, len(toks))
+	for _, tok := range toks {
+		if !search.IsStopWord(tok) {
+			content = append(content, tok)
+		}
+	}
+	if len(content) == 0 {
+		content = toks
+	}
+	out := make([]string, 0, len(content))
+	for _, tok := range content {
+		out = append(out, "t"+tok)
+	}
+	return out
+}
+
+func recordMatchesQuery(r Record, o search.Options) bool {
+	return recordMatchesQueryVariants(r, o, nil)
+}
+
+func recordMatchesQueryVariants(r Record, o search.Options, variants map[string][]string) bool {
+	if o.Regex {
+		return true
+	}
+	terms, phrases := search.QueryParts(o.Query)
+	if len(terms) == 0 && len(phrases) == 0 {
+		return true
+	}
+	return search.MatchesParts(r.Text, terms, phrases, variants)
+}
+
+func bucket(tok string) string {
+	if len(tok) >= 2 {
+		return safe(tok[:2])
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(tok))
+	return fmt.Sprintf("x%02x", h.Sum32()%256)
+}
+
+func safe(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			return r
+		}
+		return '_'
+	}, s)
+}
