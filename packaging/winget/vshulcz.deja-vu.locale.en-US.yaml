@@ -1,5 +1,5 @@
 PackageIdentifier: vshulcz.deja-vu
-PackageVersion: 0.13.1
+PackageVersion: 0.14.1
 PackageLocale: en-US
 Publisher: vshulcz
 PublisherUrl: https://github.com/vshulcz
@@ -7,7 +7,7 @@ PublisherSupportUrl: https://github.com/vshulcz/deja-vu/issues
 PackageName: deja-vu
 PackageUrl: https://github.com/vshulcz/deja-vu
 License: MIT
-LicenseUrl: https://github.com/vshulcz/deja-vu/blob/v0.13.1/LICENSE
+LicenseUrl: https://github.com/vshulcz/deja-vu/blob/v0.14.1/LICENSE
 ShortDescription: Persistent memory for coding agents
 Tags:
 - aider
@@ -17,6 +17,6 @@ Tags:
 - cursor
 - mcp
 - memory
-ReleaseNotesUrl: https://github.com/vshulcz/deja-vu/releases/tag/v0.13.1
+ReleaseNotesUrl: https://github.com/vshulcz/deja-vu/releases/tag/v0.14.1
 ManifestType: defaultLocale
 ManifestVersion: 1.12.0
