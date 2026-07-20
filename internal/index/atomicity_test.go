@@ -185,3 +185,35 @@ func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
 		t.Fatalf("sessions clobbered by watermark commit: %v, %v", ss, err)
 	}
 }
+
+func TestProjectRelevantRanksByIDFNotFiller(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// s1: rare topical term "quetzalcoatl". s2: only common filler "need the".
+	mk := func(id, text string) {
+		line := `{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("s1", "the quetzalcoatl migration and need the fix")
+	mk("s2", "need the report and need the update")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// A prompt full of filler plus the one rare term must rank s1 first.
+	got, err := ProjectRelevant(dir, []string{"app"}, []string{"need", "the", "quetzalcoatl"}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) == 0 || got[0].ID != "s1" {
+		t.Fatalf("ranking = %v, want s1 first (rare term dominates filler)", got)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -412,6 +413,111 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 		}
 	}
 	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
+}
+
+// ProjectRelevant ranks the current project's sessions by how well they match
+// the prompt terms — without reconstructing an AND query, which poisons on
+// filler words. Each session scores the IDF-weighted sum of prompt terms it
+// contains (rare topical terms dominate; common filler barely moves it), from
+// bucket postings only. The best sessions are materialized with transcripts.
+func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, err
+	}
+	inProject := map[uint32]SessionMeta{}
+	for _, meta := range m.Sessions {
+		lp := strings.ToLower(meta.Project)
+		for _, want := range projects {
+			w := strings.ToLower(want)
+			if w != "" && (lp == w || strings.Contains(lp, w)) {
+				inProject[meta.Ord] = meta
+				break
+			}
+		}
+	}
+	if len(inProject) == 0 {
+		return nil, nil
+	}
+	totalDocs := float64(len(m.Sessions)) + 1
+	score := map[uint32]float64{}
+	for _, term := range terms {
+		keys := queryKeys(term)
+		if len(keys) == 0 {
+			continue
+		}
+		key := keys[0]
+		posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+		if err != nil || len(posts) == 0 {
+			continue
+		}
+		idf := math.Log(totalDocs / float64(len(posts)+1))
+		if idf <= 0 {
+			continue
+		}
+		hit := map[uint32]bool{}
+		for _, pp := range posts {
+			if _, ok := inProject[pp.Sid]; ok {
+				hit[pp.Sid] = true
+			}
+		}
+		for ord := range hit {
+			score[ord] += idf
+		}
+	}
+	type scored struct {
+		meta  SessionMeta
+		score float64
+	}
+	ranked := make([]scored, 0, len(score))
+	for ord, sc := range score {
+		if sc > 0 {
+			ranked = append(ranked, scored{inProject[ord], sc})
+		}
+	}
+	if len(ranked) == 0 {
+		return nil, nil
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].score == ranked[j].score {
+			return ranked[i].meta.Updated.After(ranked[j].meta.Updated)
+		}
+		return ranked[i].score > ranked[j].score
+	})
+	if n > 0 && len(ranked) > n {
+		ranked = ranked[:n]
+	}
+	out := make([]model.Session, 0, len(ranked))
+	for _, r := range ranked {
+		full, err := loadSessionRecords(dir, m, r.meta)
+		if err != nil || len(full.Messages) == 0 {
+			full = sessionFromMeta(r.meta)
+		}
+		out = append(out, full)
+	}
+	return out, nil
+}
+
+// loadSessionRecords materializes one session's transcript from the index.
+func loadSessionRecords(dir string, m Manifest, meta SessionMeta) (model.Session, error) {
+	ss, err := scanRecords(dir, m, search.Options{All: true}, nil)
+	if err != nil {
+		return model.Session{}, err
+	}
+	for _, s := range ss {
+		if s.ID == meta.ID && (meta.Harness == "" || s.Harness == meta.Harness) {
+			return s, nil
+		}
+	}
+	return sessionFromMeta(meta), nil
 }
 
 // FirstMatch tries candidate queries in order under ONE lock and manifest

@@ -20,7 +20,12 @@ func TestHookPromptInjectsOnRelevantHit(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	in := strings.NewReader(`{"prompt":"the long beta session broke again"}`)
+	cwd := filepath.Join(t.TempDir(), "tmp", "beta")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	in := strings.NewReader(`{"prompt":"long beta answer session"}`)
 	if err := runHookPrompt(in, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -77,19 +82,6 @@ func TestPromptSearchTerms(t *testing.T) {
 	}
 }
 
-func TestPromptCandidatesOrderAndPairs(t *testing.T) {
-	got := promptCandidates([]string{"pool", "connection", "gateway"})
-	if got[0] != "connection gateway pool" {
-		t.Fatalf("first candidate = %q", got[0])
-	}
-	joined := strings.Join(got, "|")
-	for _, pair := range []string{"connection gateway", "connection pool", "gateway pool"} {
-		if !strings.Contains(joined, pair) {
-			t.Fatalf("missing pair %q in %v", pair, got)
-		}
-	}
-}
-
 func TestLimitHandoffTip(t *testing.T) {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -137,7 +129,12 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	in := `{"prompt":"the long beta session broke again","session_id":"agent-1"}`
+	cwd := filepath.Join(t.TempDir(), "tmp", "beta")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	in := `{"prompt":"long beta answer session","session_id":"agent-1"}`
 	var out bytes.Buffer
 	if err := runHookPrompt(strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
