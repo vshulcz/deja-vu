@@ -98,8 +98,8 @@ func TestCopilotDiscoveryAndProject(t *testing.T) {
 	for in, want := range map[string]string{
 		"/Users/x/coding/gateway": "coding/gateway",
 		"/gateway":                "gateway",
-		"/":                      "",
-		"":                       "",
+		"/":                       "",
+		"":                        "",
 	} {
 		if got := copilotProjectName(in); got != want {
 			t.Fatalf("copilotProjectName(%q) = %q, want %q", in, got, want)
