@@ -83,6 +83,14 @@
       "files": 0
     },
     {
+      "name": "copilot",
+      "state": "missing",
+      "paths": [
+        "<tmp>/copilot"
+      ],
+      "files": 0
+    },
+    {
       "name": "deja",
       "state": "missing",
       "paths": [

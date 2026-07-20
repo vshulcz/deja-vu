@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Harnesses — deja-vu docs</title>
-<meta name="description" content="The ten coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta name="description" content="The eleven coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Harnesses — deja-vu docs">
-<meta property="og:description" content="The ten coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta property="og:description" content="The eleven coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,12 +25,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Harnesses — deja-vu docs">
-<meta name="twitter:description" content="The ten coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta name="twitter:description" content="The eleven coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/favicon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The ten coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The eleven coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Harnesses","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"}]}</script>
 </head>
 <body>
@@ -52,7 +52,7 @@
 <article>
 
 <h1>Harnesses</h1>
-<p>deja indexes ten coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
+<p>deja indexes eleven coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
 <table><thead><tr><th>Harness</th><th>Store</th></tr></thead><tbody>
 <tr><td>Claude Code</td><td><code>~/.claude/projects/**</code></td></tr>
 <tr><td>Codex CLI</td><td><code>~/.codex/sessions/**</code>, <code>history.jsonl</code></td></tr>
@@ -64,6 +64,7 @@
 <tr><td>Grok Build</td><td><code>~/.grok/sessions/**</code></td></tr>
 <tr><td>Qwen Code</td><td><code>~/.qwen/projects/**/chats/*.jsonl</code></td></tr>
 <tr><td>pi</td><td><code>~/.pi/agent/sessions/**/*.jsonl</code></td></tr>
+<tr><td>Copilot CLI</td><td><code>~/.copilot/session-state/*/events.jsonl</code></td></tr>
 </tbody></table>
 <p>Each format is documented in the <a href="../registry/README.md">session format registry</a>, with synthetic fixtures and a conformance test that catches upstream drift.</p>
 <h2>Adding a harness</h2>

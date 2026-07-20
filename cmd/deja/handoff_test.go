@@ -37,6 +37,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		"pi":       {"pi", "P"},
 		"grok":     {"grok", "P"},
 		"cursor":   {"cursor-agent", "chat", "P"},
+		"copilot":  {"copilot", "-p", "P"},
 	}
 	for target, want := range cases {
 		argv, ok := handoffCommand(target, "P")

@@ -36,7 +36,7 @@ _deja_completion() {
     action="${COMP_WORDS[2]}"
 
     local commands="blame bench completion ctx doctor embed forget handoff index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup"
-    local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi deja"
+    local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja"
     local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto"
 
     if (( COMP_CWORD == 1 )); then
@@ -165,7 +165,7 @@ _deja() {
     'version:print the version'
     'warmup:build or refresh the index'
   )
-  harnesses=(claude codex opencode aider gemini cursor antigravity grok qwen pi deja)
+  harnesses=(claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja)
   install_targets=(claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto)
 
   if (( CURRENT == 2 )); then
@@ -250,7 +250,7 @@ complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
 complete -c deja -n '__deja_needs_command' -l no-embed -d 'Skip semantic reranking'
-complete -c deja -n '__deja_needs_command' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi deja'
+complete -c deja -n '__deja_needs_command' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja'
 complete -c deja -n '__deja_needs_command' -l project -r
 complete -c deja -n '__deja_needs_command' -l since -r
 complete -c deja -n '__deja_needs_command' -l role -r -a 'user assistant tool'
@@ -259,7 +259,7 @@ complete -c deja -n '__deja_needs_command' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l all
 complete -c deja -n '__fish_seen_subcommand_from blame' -l json
-complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi deja'
+complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -F
@@ -281,7 +281,7 @@ complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a 'claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidance
-complete -c deja -n '__fish_seen_subcommand_from last' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi deja'
+complete -c deja -n '__fish_seen_subcommand_from last' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja'
 complete -c deja -n '__fish_seen_subcommand_from last' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
@@ -289,7 +289,7 @@ complete -c deja -n '__fish_seen_subcommand_from stats' -l json
 complete -c deja -n '__fish_seen_subcommand_from stats' -l html -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l redaction
 complete -c deja -n '__fish_seen_subcommand_from stats' -l card -r
-complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi deja'
+complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja'
 complete -c deja -n '__fish_seen_subcommand_from stats' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l role -r -a 'user assistant tool'

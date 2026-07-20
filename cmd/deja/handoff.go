@@ -303,11 +303,13 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"grok", prompt}, true
 	case "cursor":
 		return []string{"cursor-agent", "chat", prompt}, true
+	case "copilot":
+		return []string{"copilot", "-p", prompt}, true
 	default:
 		return nil, false
 	}
 }
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "gemini", "qwen", "aider", "pi", "grok"}
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "aider", "pi", "grok"}
 }
