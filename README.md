@@ -104,7 +104,7 @@ $ deja "jwt refresh token"
 | `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
 | `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
-| `deja show <id>` / `deja last [n]` | Read one session / list recent ones. |
+| `deja show <id>` / `deja last [n]` | Read one session / list recent ones (`--project`, `--harness`, `--since`, `--role`). |
 | `deja resume <id> [--exec]` | Reopen a found session in its native harness (`claude --resume`, `codex resume`, `opencode -s`, `grok --resume`). |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |

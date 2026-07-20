@@ -343,7 +343,13 @@ func recent(n int) ([]model.Session, error) {
 
 func recentMatching(n int, o search.Options) ([]model.Session, error) {
 	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err == nil {
-		if ss, err := index.RecentMatching(index.DefaultDir(), n, o); err == nil {
+		if o.Role != "" {
+			ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, io.Discard)
+			if err == nil {
+				ss = filterRecentSources(ss, o)
+				return search.Recent(ss, n), nil
+			}
+		} else if ss, err := index.RecentMatching(index.DefaultDir(), n, o); err == nil {
 			return ss, nil
 		}
 	}
@@ -361,15 +367,25 @@ func parseLast(args []string) (int, search.Options, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
-		case "--harness", "--project":
+		case "--harness", "--project", "--since", "--role":
 			if i+1 >= len(args) {
 				return n, o, fmt.Errorf("%s needs value", a)
 			}
 			i++
-			if a == "--harness" {
-				o.Harness = args[i]
-			} else {
-				o.Project = args[i]
+			v := args[i]
+			switch a {
+			case "--harness":
+				o.Harness = v
+			case "--project":
+				o.Project = v
+			case "--role":
+				o.Role = v
+			default:
+				d, err := parseDur(v)
+				if err != nil {
+					return n, o, err
+				}
+				o.Since = d
 			}
 		default:
 			if strings.HasPrefix(a, "-") {
@@ -387,10 +403,14 @@ func parseLast(args []string) (int, search.Options, error) {
 }
 
 func filterRecentSources(ss []model.Session, o search.Options) []model.Session {
-	if o.Harness == "" && o.Project == "" {
+	if o.Harness == "" && o.Project == "" && o.Since <= 0 && o.Role == "" {
 		return ss
 	}
-	out := ss[:0]
+	cut := time.Time{}
+	if o.Since > 0 {
+		cut = time.Now().Add(-o.Since)
+	}
+	out := make([]model.Session, 0, len(ss))
 	project := strings.ToLower(o.Project)
 	for _, s := range ss {
 		if o.Harness != "" && s.Harness != o.Harness {
@@ -399,9 +419,24 @@ func filterRecentSources(ss []model.Session, o search.Options) []model.Session {
 		if project != "" && !strings.Contains(strings.ToLower(s.Project), project) {
 			continue
 		}
+		if !cut.IsZero() && s.Updated.Before(cut) {
+			continue
+		}
+		if o.Role != "" && !sessionHasRole(s, o.Role) {
+			continue
+		}
 		out = append(out, s)
 	}
 	return out
+}
+
+func sessionHasRole(s model.Session, role string) bool {
+	for _, m := range s.Messages {
+		if m.Role == role {
+			return true
+		}
+	}
+	return false
 }
 
 func firstUserTitle(s model.Session) string {
@@ -759,7 +794,7 @@ Usage:
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]
-  deja last [n] [--project name] [--harness name]
+  deja last [n] [--project name] [--harness name] [--since duration] [--role user|assistant|tool]
   deja sources
   deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
@@ -785,6 +820,7 @@ Examples:
   deja --harness claude --since 30d "panic in indexer"
   deja last 20 --harness codex
   deja last --project api-gateway
+  deja last --since 7d --role user
   deja --re "timeout|deadline exceeded"
   deja ctx "schema migration rollback" > deja-context.md
   deja install --all

@@ -210,10 +210,75 @@ func TestLastFiltersProjectAndHarness(t *testing.T) {
 	}
 }
 
+func TestLastFiltersSinceAndRole(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "alpha", "claude-alpha.jsonl"), "claude-alpha", []string{
+		`{"type":"user","sessionId":"claude-alpha","timestamp":"2026-01-03T10:00:00Z","message":{"role":"user","content":"alpha claude memory"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "claude-beta.jsonl"), "claude-beta", []string{
+		`{"type":"user","sessionId":"claude-beta","timestamp":"2026-01-02T10:00:00Z","message":{"role":"user","content":"beta claude memory"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "gamma", "claude-gamma.jsonl"), "claude-gamma", []string{
+		`{"type":"assistant","sessionId":"claude-gamma","timestamp":"2026-01-05T10:00:00Z","message":{"role":"assistant","content":"assistant-only memory"}}`,
+	})
+
+	out, err := captureRun(t, "last", "--since", "365000d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "alpha claude memory") || !strings.Contains(out, "beta claude memory") || !strings.Contains(out, "claude-gamma") {
+		t.Fatalf("since-filtered last output = %q", out)
+	}
+
+	out, err = captureRun(t, "last", "--since", "1d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "alpha claude memory") || strings.Contains(out, "beta claude memory") || strings.Contains(out, "claude-gamma") {
+		t.Fatalf("recent-only last output = %q", out)
+	}
+
+	out, err = captureRun(t, "last", "--since", "365000d", "--role", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "alpha claude memory") || !strings.Contains(out, "beta claude memory") || strings.Contains(out, "claude-gamma") {
+		t.Fatalf("role-filtered last output = %q", out)
+	}
+
+	out, err = captureRun(t, "last", "--role", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "alpha claude memory") || strings.Contains(out, "claude-gamma") {
+		t.Fatalf("role-only last output = %q", out)
+	}
+
+	out, err = captureRun(t, "last", "--since", "365000d", "--role", "assistant", "--project", "gamma")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "claude-gamma") || strings.Contains(out, "alpha claude memory") {
+		t.Fatalf("combined last filters output = %q", out)
+	}
+
+	if _, err := captureRun(t, "last", "--since"); err == nil || !strings.Contains(err.Error(), "--since needs value") {
+		t.Fatalf("missing last since value err=%v", err)
+	}
+	if _, err := captureRun(t, "last", "--role"); err == nil || !strings.Contains(err.Error(), "--role needs value") {
+		t.Fatalf("missing last role value err=%v", err)
+	}
+}
+
 func TestLastParserAndSourceFilters(t *testing.T) {
 	n, o, err := parseLast([]string{"25", "--harness", "codex", "--project", "api"})
 	if err != nil || n != 25 || o.Harness != "codex" || o.Project != "api" {
 		t.Fatalf("parseLast = n:%d options:%#v err:%v", n, o, err)
+	}
+	n, o, err = parseLast([]string{"5", "--since", "7d", "--role", "assistant"})
+	if err != nil || n != 5 || o.Since != 7*24*time.Hour || o.Role != "assistant" {
+		t.Fatalf("parseLast since/role = n:%d options:%#v err:%v", n, o, err)
 	}
 	n, o, err = parseLast([]string{"bad"})
 	if err != nil || n != 10 || o.Harness != "" || o.Project != "" {
@@ -225,11 +290,14 @@ func TestLastParserAndSourceFilters(t *testing.T) {
 	if _, _, err := parseLast([]string{"--harness"}); err == nil || !strings.Contains(err.Error(), "--harness needs value") {
 		t.Fatalf("parseLast missing harness err=%v", err)
 	}
+	if _, _, err := parseLast([]string{"--since", "bad"}); err == nil {
+		t.Fatalf("parseLast bad since err=%v", err)
+	}
 
 	sessions := []model.Session{
-		{ID: "c1", Harness: "codex", Project: "api-gateway"},
-		{ID: "c2", Harness: "claude", Project: "api-gateway"},
-		{ID: "c3", Harness: "codex", Project: "frontend"},
+		{ID: "c1", Harness: "codex", Project: "api-gateway", Updated: time.Now(), Messages: []model.Message{{Role: "user", Text: "hi"}}},
+		{ID: "c2", Harness: "claude", Project: "api-gateway", Updated: time.Now(), Messages: []model.Message{{Role: "assistant", Text: "ok"}}},
+		{ID: "c3", Harness: "codex", Project: "frontend", Updated: time.Now().Add(-48 * time.Hour), Messages: []model.Message{{Role: "user", Text: "old"}}},
 	}
 	if got := filterRecentSources(sessions, search.Options{}); len(got) != 3 {
 		t.Fatalf("unfiltered sources = %#v", got)
@@ -237,6 +305,22 @@ func TestLastParserAndSourceFilters(t *testing.T) {
 	got := filterRecentSources(sessions, search.Options{Harness: "codex", Project: "API"})
 	if len(got) != 1 || got[0].ID != "c1" {
 		t.Fatalf("filtered sources = %#v", got)
+	}
+	got = filterRecentSources(sessions, search.Options{Since: time.Hour})
+	if len(got) != 2 || got[0].ID != "c1" || got[1].ID != "c2" {
+		t.Fatalf("since-filtered sources = %#v", got)
+	}
+	got = filterRecentSources(sessions, search.Options{Role: "user"})
+	if len(got) != 2 || got[0].ID != "c1" || got[1].ID != "c3" {
+		t.Fatalf("role-filtered sources = %#v", got)
+	}
+	got = filterRecentSources(sessions, search.Options{Role: "assistant"})
+	if len(got) != 1 || got[0].ID != "c2" {
+		t.Fatalf("assistant role filter = %#v", got)
+	}
+	got = filterRecentSources([]model.Session{{ID: "empty", Messages: nil}}, search.Options{Role: "user"})
+	if len(got) != 0 {
+		t.Fatalf("empty messages role filter = %#v", got)
 	}
 }
 
