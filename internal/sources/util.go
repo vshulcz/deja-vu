@@ -109,6 +109,8 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 			d.UseNumber()
 			if d.Decode(&m) == nil {
 				fn(m)
+			} else if len(strings.TrimSpace(string(line))) > 0 {
+				diagMalformedLine(path)
 			}
 		}
 		if errors.Is(err, io.EOF) {
@@ -167,7 +169,8 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				ss, _ := safeParse(j.p, parse)
+				ss, err := safeParse(j.p, parse)
+				diagFileError(j.p, err)
 				outs <- struct {
 					i  int
 					ss []model.Session

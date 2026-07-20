@@ -241,6 +241,11 @@ func TestScanJSONLSkipsMalformedLines(t *testing.T) {
 	if len(ss) != 1 || len(ss[0].Messages) != 2 || ss[0].Messages[1].Text != "after bad" {
 		t.Fatalf("bad malformed-line parse: %#v", ss)
 	}
+	// Tolerated loss must leave evidence: the skip is counted, not silent.
+	malformed, _ := DiagSnapshot()
+	if malformed[p] != 1 {
+		t.Fatalf("malformed counter = %#v, want 1 for %s", malformed, p)
+	}
 }
 
 func TestSQLQuoteDoublesSingleQuotes(t *testing.T) {

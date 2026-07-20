@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Ingestion health: malformed JSONL lines and failed file parses are counted per harness, persisted in the manifest, and surfaced in `deja doctor` (details in `--json`). Tolerated loss now leaves evidence instead of disappearing.
 - Harness capability matrix (MCP / auto-recall / resume / handoff / prerequisites) generated from the format registry into README and the site; a conformance test pins the published matrix to actual code behavior.
 - `deja resume` reopens Copilot CLI sessions (`copilot --resume=<id>`).
 - Copilot CLI is now a full MCP target: `deja install` writes `~/.copilot/mcp-config.json` (verified live — Copilot calls deja's recall over MCP), replacing the guidance-only stub.

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -347,6 +348,18 @@ func doctorIndex(w io.Writer, idx doctorComponent) {
 		}
 	default:
 		fmt.Fprintln(w, "  freshness up to date")
+	}
+	health := index.IngestHealth(dir)
+	names := make([]string, 0, len(health))
+	for h, e := range health {
+		if e.MalformedLines > 0 || e.FailedFiles > 0 {
+			names = append(names, h)
+		}
+	}
+	sort.Strings(names)
+	for _, h := range names {
+		e := health[h]
+		fmt.Fprintf(w, "  ingest   %s: %d malformed lines skipped, %d files failed — see `deja doctor --json`\n", h, e.MalformedLines, e.FailedFiles)
 	}
 }
 

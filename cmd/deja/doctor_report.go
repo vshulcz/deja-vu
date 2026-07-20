@@ -34,12 +34,13 @@ type doctorVersionReport struct {
 }
 
 type doctorReport struct {
-	Stores  []doctorStore       `json:"stores"`
-	Index   doctorComponent     `json:"index"`
-	MCP     []doctorMCPStatus   `json:"mcp"`
-	SQLite3 doctorComponent     `json:"sqlite3"`
-	Version doctorVersionReport `json:"version"`
-	Embed   *doctorEmbedReport  `json:"embed,omitempty"`
+	Stores  []doctorStore                  `json:"stores"`
+	Index   doctorComponent                `json:"index"`
+	MCP     []doctorMCPStatus              `json:"mcp"`
+	SQLite3 doctorComponent                `json:"sqlite3"`
+	Version doctorVersionReport            `json:"version"`
+	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
+	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 }
 
 type doctorEmbedReport struct {
@@ -72,6 +73,7 @@ func collectDoctorReport(lookup doctorVersionLookup) doctorReport {
 		storeMods = append(storeMods, mod)
 	}
 	report.Index = inspectDoctorIndex(storeMods)
+	report.Ingest = index.IngestHealth(index.DefaultDir())
 	report.MCP = collectDoctorMCP()
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
