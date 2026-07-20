@@ -214,3 +214,15 @@ func TestReceiptIsNewsDedupes(t *testing.T) {
 		t.Fatal("changed digest must be news again")
 	}
 }
+
+func TestHumanAgeBuckets(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		30 * time.Minute: "30m old",
+		5 * time.Hour:    "5h old",
+		72 * time.Hour:   "3d old",
+	} {
+		if got := humanAge(d); got != want {
+			t.Fatalf("humanAge(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
