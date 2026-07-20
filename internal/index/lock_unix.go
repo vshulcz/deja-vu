@@ -10,6 +10,7 @@ import (
 )
 
 func lockDir(dir string) (func(), error) {
+	recoverIndexDir(dir)
 	lockPath := dir + ".lock"
 	// Tighten pre-existing indexes created before the 0700 default.
 	_ = os.Chmod(dir, 0o700)

@@ -316,9 +316,6 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.Sessions["claude:unposted"] = SessionMeta{ID: "unposted", Harness: "claude", Project: filepath.Join("deja", "vu"), Path: "manual", Updated: time.Now()}
-	if err := writeManifest(dir, m); err != nil {
-		t.Fatal(err)
-	}
 	rec, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -328,6 +325,11 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 		t.Fatal(err)
 	} else if closeErr != nil {
 		t.Fatal(closeErr)
+	}
+	// Manifest committed after the append: the size stamp covers the record,
+	// but no posting points at it — the full-scan bait stays in place.
+	if err := writeManifest(dir, m); err != nil {
+		t.Fatal(err)
 	}
 	ss, err = Search(dir, search.Options{Query: "jwt only refresh", Harness: "claude"})
 	if err != nil {
