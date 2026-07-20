@@ -119,7 +119,7 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -d -- "$cur") )
             fi
             ;;
-        ctx|embed|hook-precompact|mcp|share|show|sources|statusline|update|version|warmup)
+        ctx|embed|hook-precompact|hook-prompt|mcp|share|show|sources|statusline|update|version|warmup)
             COMPREPLY=()
             ;;
         *)
@@ -230,7 +230,7 @@ _deja() {
         _arguments '--pull[pull from the remote]' '--full[transfer all records]' '1:host:'
       fi
       ;;
-    ctx|embed|hook-precompact|mcp|share|show|sources|statusline|update|version|warmup)
+    ctx|embed|hook-precompact|hook-prompt|mcp|share|show|sources|statusline|update|version|warmup)
       ;;
     *)
       _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)' '--rebuild[force a full rebuild]'

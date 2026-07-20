@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
-	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -36,8 +35,8 @@ func runHookPrompt(stdin io.Reader, stdout io.Writer) error {
 	if !index.HasManifest(dir) {
 		return nil
 	}
-	ss := promptSearch(dir, terms)
-	if len(ss) == 0 {
+	ss, err := index.FirstMatch(dir, promptCandidates(terms), 2)
+	if err != nil || len(ss) == 0 {
 		return nil
 	}
 	digest := search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
@@ -80,34 +79,31 @@ func promptSearchTerms(prompt string) []string {
 	return out
 }
 
-// promptSearch ANDs the full term set first, then backs off to the three
-// longest terms — natural prompts rarely match six words verbatim.
-func promptSearch(dir string, terms []string) []model.Session {
-	if ss := quietSearch(dir, strings.Join(terms, " ")); len(ss) > 0 {
-		return ss
-	}
-	longest := append([]string(nil), terms...)
-	if len(longest) > 3 {
-		for i := 0; i < len(longest); i++ {
-			for j := i + 1; j < len(longest); j++ {
-				if len(longest[j]) > len(longest[i]) {
-					longest[i], longest[j] = longest[j], longest[i]
-				}
+// promptCandidates orders the queries to try: the full AND, prefixes of the
+// longest terms, then pairs — a rare term that never co-occurs with the rest
+// must not poison every attempt. All candidates run under one index snapshot
+// via index.FirstMatch, so more candidates cost bucket reads, not manifest
+// reloads.
+func promptCandidates(terms []string) []string {
+	sorted := append([]string(nil), terms...)
+	for i := 0; i < len(sorted); i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if len(sorted[j]) > len(sorted[i]) {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
 			}
 		}
-		longest = longest[:3]
-		return quietSearch(dir, strings.Join(longest, " "))
 	}
-	return nil
-}
-
-func quietSearch(dir, query string) []model.Session {
-	ss, err := index.Search(dir, search.Options{Query: query})
-	if err != nil || len(ss) == 0 {
-		return nil
+	if len(sorted) > 4 {
+		sorted = sorted[:4]
 	}
-	if len(ss) > 2 {
-		ss = ss[:2]
+	var out []string
+	for k := len(sorted); k >= 2; k-- {
+		out = append(out, strings.Join(sorted[:k], " "))
 	}
-	return ss
+	for i := 0; i < len(sorted); i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			out = append(out, sorted[i]+" "+sorted[j])
+		}
+	}
+	return out
 }

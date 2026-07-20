@@ -130,6 +130,9 @@ func run(args []string) error {
 	if args[0] == "mcp" {
 		return serveMCP(os.Stdin, os.Stdout)
 	}
+	if args[0] == "hook-prompt" {
+		return runHookPrompt(os.Stdin, os.Stdout)
+	}
 	if args[0] == "hook-context" {
 		plain := len(args) > 1 && args[1] == "--plain"
 		_ = runHookContext(plain)
@@ -754,6 +757,7 @@ Usage:
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
   deja handoff [--to <agent>] [id-prefix] [--exec]
+  deja hook-prompt   (UserPromptSubmit hook: relevance recall per prompt)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja sync export <dir> [--full]

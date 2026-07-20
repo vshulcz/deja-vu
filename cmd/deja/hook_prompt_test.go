@@ -71,3 +71,16 @@ func TestPromptSearchTerms(t *testing.T) {
 		t.Fatal("stop words must not produce terms")
 	}
 }
+
+func TestPromptCandidatesOrderAndPairs(t *testing.T) {
+	got := promptCandidates([]string{"pool", "connection", "gateway"})
+	if got[0] != "connection gateway pool" {
+		t.Fatalf("first candidate = %q", got[0])
+	}
+	joined := strings.Join(got, "|")
+	for _, pair := range []string{"connection gateway", "connection pool", "gateway pool"} {
+		if !strings.Contains(joined, pair) {
+			t.Fatalf("missing pair %q in %v", pair, got)
+		}
+	}
+}

@@ -414,6 +414,53 @@ func SearchDetailed(dir string, o search.Options) (SearchResult, error) {
 	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
 }
 
+// FirstMatch tries candidate queries in order under ONE lock and manifest
+// read, probes each via exact posting intersection (bucket reads only), and
+// materializes sessions for the first query that matches. Built for the
+// per-prompt hook, which fires on every user message and must stay fast: the
+// full Search pipeline per candidate would re-read the manifest each time.
+func FirstMatch(dir string, queries []string, limit int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, fmt.Errorf("manifest: %w", err)
+	}
+	if !recordsIntact(dir, m) {
+		return nil, fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
+	}
+	for _, q := range queries {
+		keys := queryKeys(q)
+		if len(keys) == 0 {
+			continue
+		}
+		posts, err := intersectPostings(dir, retrievalKeys(keys))
+		if err != nil {
+			return nil, fmt.Errorf("postings: %w", err)
+		}
+		o := search.Options{Query: q}
+		posts = cutPostingsBySession(posts, m, o)
+		if len(posts) == 0 {
+			continue
+		}
+		ss, err := scanRecords(dir, m, o, postingOffsets(posts))
+		if err != nil || len(ss) == 0 {
+			continue
+		}
+		if len(ss) > limit {
+			ss = ss[:limit]
+		}
+		return ss, nil
+	}
+	return nil, nil
+}
+
 // SearchWithRecovery is Search plus self-healing: a corrupt bucket (crash
 // mid-append) triggers one full rebuild instead of erroring until the user
 // runs --rebuild by hand.

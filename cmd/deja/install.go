@@ -422,6 +422,7 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	}
 	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
 	nextRoot = updateClaudeHook(nextRoot, "PreCompact", exe+" hook-precompact", "manual|auto", uninstall)
+	nextRoot = updateClaudeHook(nextRoot, "UserPromptSubmit", exe+" hook-prompt", "", uninstall)
 	next, err := json.MarshalIndent(nextRoot, "", "  ")
 	if err != nil {
 		return installResult{}, err
