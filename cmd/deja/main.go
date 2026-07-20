@@ -65,177 +65,163 @@ func loadFileSources() []model.Session {
 	return ss
 }
 
+type command func(dir string, rest []string) error
+
+var commands = map[string]command{
+	"version":         cmdVersion,
+	"--version":       cmdVersion,
+	"-version":        cmdVersion,
+	"sources":         func(dir string, _ []string) error { printSources(dir); return nil },
+	"completion":      func(_ string, rest []string) error { return runCompletion(rest) },
+	"doctor":          func(dir string, rest []string) error { return runDoctor(os.Stdout, rest, doctorLookup, dir) },
+	"warmup":          cmdWarmup,
+	"index":           cmdIndex,
+	"embed":           runEmbed,
+	"bench":           func(_ string, rest []string) error { return runBench(rest) },
+	"statusline":      func(dir string, _ []string) error { return runStatusline(dir, os.Stdin, os.Stdout) },
+	"stats":           runStats,
+	"remember":        runRemember,
+	"forget":          runForget,
+	"mcp":             func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
+	"hook-prompt":     func(dir string, _ []string) error { return runHookPrompt(dir, os.Stdin, os.Stdout) },
+	"hook-context":    cmdHookContext,
+	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
+	"install":         func(dir string, rest []string) error { return runInstall(dir, rest, false) },
+	"uninstall":       func(dir string, rest []string) error { return runInstall(dir, rest, true) },
+	"update":          func(_ string, rest []string) error { return runUpdate(rest, os.Stdout) },
+	"show":            cmdShow,
+	"share":           func(dir string, rest []string) error { return runShare(dir, rest, os.Stdout) },
+	"resume":          func(dir string, rest []string) error { return runResume(dir, rest, os.Stdout) },
+	"handoff":         func(dir string, rest []string) error { return runHandoff(dir, rest, os.Stdout) },
+	"sync":            runSync,
+	"ctx":             cmdCtx,
+	"blame":           runBlame,
+	"last":            cmdLast,
+}
+
 func run(args []string) error {
-	dir := index.DefaultDir()
 	if len(args) == 0 {
 		printUsage()
 		return nil
 	}
-	if args[0] == "version" || args[0] == "--version" || args[0] == "-version" {
-		fmt.Fprintf(os.Stdout, "deja %s\n", version)
-		return nil
+	dir := index.DefaultDir()
+	if cmd, ok := commands[args[0]]; ok {
+		return cmd(dir, args[1:])
 	}
-	if args[0] == "sources" {
-		printSources(dir)
-		return nil
+	return runSearch(dir, args)
+}
+
+func cmdVersion(_ string, _ []string) error {
+	fmt.Fprintf(os.Stdout, "deja %s\n", version)
+	return nil
+}
+
+func cmdWarmup(dir string, _ []string) error {
+	prepareFirstIndexGreeting(dir)
+	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+		return err
 	}
-	if args[0] == "completion" {
-		return runCompletion(args[1:])
-	}
-	if args[0] == "doctor" {
-		return runDoctor(os.Stdout, args[1:], doctorLookup, dir)
-	}
-	if args[0] == "warmup" {
-		prepareFirstIndexGreeting(dir)
-		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
-			return err
+	maybeFirstIndexGreeting()
+	return nil
+}
+
+func cmdIndex(dir string, rest []string) error {
+	force := false
+	for _, a := range rest {
+		if a == "--rebuild" || a == "-rebuild" {
+			force = true
+			continue
 		}
-		maybeFirstIndexGreeting()
-		return nil
+		return fmt.Errorf("index: unknown flag %q", a)
 	}
-	if args[0] == "index" {
-		force := false
-		for _, a := range args[1:] {
-			if a == "--rebuild" || a == "-rebuild" {
-				force = true
-				continue
-			}
-			return fmt.Errorf("index: unknown flag %q", a)
-		}
-		prepareFirstIndexGreeting(dir)
-		if err := index.Ensure(dir, "", force, os.Stderr); err != nil {
-			return err
-		}
-		clearWarmupSentinel()
-		maybeFirstIndexGreeting()
-		return nil
+	prepareFirstIndexGreeting(dir)
+	if err := index.Ensure(dir, "", force, os.Stderr); err != nil {
+		return err
 	}
-	if args[0] == "embed" {
-		return runEmbed(dir, args[1:])
+	clearWarmupSentinel()
+	maybeFirstIndexGreeting()
+	return nil
+}
+
+func cmdHookContext(dir string, rest []string) error {
+	plain := len(rest) > 0 && rest[0] == "--plain"
+	_ = runHookContext(dir, plain)
+	return nil
+}
+
+func cmdShow(dir string, rest []string) error {
+	if len(rest) < 1 {
+		return fmt.Errorf("show needs id-prefix")
 	}
-	if args[0] == "bench" {
-		return runBench(args[1:])
+	s, ok, err := findByPrefix(dir, rest[0])
+	if err != nil {
+		return err
 	}
-	if args[0] == "statusline" {
-		return runStatusline(dir, os.Stdin, os.Stdout)
+	if !ok {
+		return fmt.Errorf("no session matches %q", rest[0])
 	}
-	if args[0] == "stats" {
-		return runStats(dir, args[1:])
+	search.PrintSession(os.Stdout, s)
+	return nil
+}
+
+func cmdCtx(dir string, rest []string) error {
+	if len(rest) < 1 {
+		return fmt.Errorf("ctx needs query or id-prefix")
 	}
-	if args[0] == "remember" {
-		return runRemember(dir, args[1:])
-	}
-	if args[0] == "forget" {
-		return runForget(dir, args[1:])
-	}
-	if args[0] == "mcp" {
-		return serveMCP(dir, os.Stdin, os.Stdout)
-	}
-	if args[0] == "hook-prompt" {
-		return runHookPrompt(dir, os.Stdin, os.Stdout)
-	}
-	if args[0] == "hook-context" {
-		plain := len(args) > 1 && args[1] == "--plain"
-		_ = runHookContext(dir, plain)
-		return nil
-	}
-	if args[0] == "hook-precompact" {
-		runHookPrecompact(dir)
-		return nil
-	}
-	if args[0] == "install" {
-		return runInstall(dir, args[1:], false)
-	}
-	if args[0] == "uninstall" {
-		return runInstall(dir, args[1:], true)
-	}
-	if args[0] == "update" {
-		return runUpdate(args[1:], os.Stdout)
-	}
-	if args[0] == "show" {
-		if len(args) < 2 {
-			return fmt.Errorf("show needs id-prefix")
-		}
-		s, ok, err := findByPrefix(dir, args[1])
+	q := strings.Join(rest, " ")
+	if !strings.Contains(q, " ") && len(q) >= 6 {
+		s, ok, err := findByPrefix(dir, q)
 		if err != nil {
 			return err
 		}
-		if !ok {
-			return fmt.Errorf("no session matches %q", args[1])
+		if ok {
+			search.PrintContext(os.Stdout, s, "")
+			return nil
 		}
-		search.PrintSession(os.Stdout, s)
-		return nil
 	}
-	if args[0] == "share" {
-		return runShare(dir, args[1:], os.Stdout)
+	o := search.Options{Query: q, All: true}
+	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
+		return err
 	}
-	if args[0] == "resume" {
-		return runResume(dir, args[1:], os.Stdout)
+	ss, err := index.SearchWithRecovery(dir, o, os.Stderr)
+	if err != nil {
+		return err
 	}
-	if args[0] == "handoff" {
-		return runHandoff(dir, args[1:], os.Stdout)
+	hits, err := search.Run(ss, o)
+	if err != nil {
+		return err
 	}
-	if args[0] == "sync" {
-		return runSync(dir, args[1:])
+	if len(hits) == 0 {
+		return fmt.Errorf("no session matches %q", q)
 	}
-	if args[0] == "ctx" {
-		if len(args) < 2 {
-			return fmt.Errorf("ctx needs query or id-prefix")
-		}
-		q := strings.Join(args[1:], " ")
-		if !strings.Contains(q, " ") && len(q) >= 6 {
-			s, ok, err := findByPrefix(dir, q)
-			if err != nil {
-				return err
-			}
-			if ok {
-				search.PrintContext(os.Stdout, s, "")
-				return nil
-			}
-		}
-		o := search.Options{Query: q, All: true}
-		if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
-			return err
-		}
-		ss, err := index.SearchWithRecovery(dir, o, os.Stderr)
-		if err != nil {
-			return err
-		}
-		hits, err := search.Run(ss, o)
-		if err != nil {
-			return err
-		}
-		if len(hits) == 0 {
-			return fmt.Errorf("no session matches %q", q)
-		}
-		search.PrintContext(os.Stdout, hits[0].Session, q)
-		return nil
+	search.PrintContext(os.Stdout, hits[0].Session, q)
+	return nil
+}
+
+func cmdLast(dir string, rest []string) error {
+	n, o, err := parseLast(rest)
+	if err != nil {
+		return err
 	}
-	if args[0] == "blame" {
-		return runBlame(dir, args[1:])
+	ss, err := recentMatching(dir, n, o)
+	if err != nil {
+		return err
 	}
-	if args[0] == "last" {
-		n, o, err := parseLast(args[1:])
-		if err != nil {
-			return err
+	for _, s := range ss {
+		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, s.Updated.Format("2006-01-02"), s.ID)
+		title := s.Title
+		if title == "" {
+			title = firstUserTitle(s)
 		}
-		ss, err := recentMatching(dir, n, o)
-		if err != nil {
-			return err
+		if title != "" {
+			fmt.Printf(" %s", title)
 		}
-		for _, s := range ss {
-			fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, s.Updated.Format("2006-01-02"), s.ID)
-			title := s.Title
-			if title == "" {
-				title = firstUserTitle(s)
-			}
-			if title != "" {
-				fmt.Printf(" %s", title)
-			}
-			fmt.Println()
-		}
-		return nil
+		fmt.Println()
 	}
+	return nil
+}
+
+func runSearch(dir string, args []string) error {
 	force := false
 	var filtered []string
 	for _, a := range args {
