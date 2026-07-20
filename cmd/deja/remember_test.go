@@ -12,10 +12,10 @@ import (
 func TestRememberCLIAndMCP(t *testing.T) {
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(t.TempDir(), "notes.jsonl"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
-	if err := runRemember([]string{"--project", "cli-project", "durable cli decision"}); err != nil {
+	if err := runRemember(index.DefaultDir(), []string{"--project", "cli-project", "durable cli decision"}); err != nil {
 		t.Fatal(err)
 	}
-	result, err := callMCPTool("remember", []byte(`{"text":"durable mcp conclusion"}`))
+	result, err := callMCPTool(index.DefaultDir(), "remember", []byte(`{"text":"durable mcp conclusion"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRememberValidation(t *testing.T) {
 		t.Fatal("dispatch accepted missing text")
 	}
 	for _, args := range [][]string{{}, {""}, {"--project"}, {"--bad", "text"}, {"one", "two"}} {
-		if err := runRemember(args); err == nil {
+		if err := runRemember(index.DefaultDir(), args); err == nil {
 			t.Fatalf("args=%v accepted", args)
 		}
 	}
@@ -54,21 +54,21 @@ func TestRememberValidation(t *testing.T) {
 func TestRememberDefaultProjectAndAppendError(t *testing.T) {
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(t.TempDir(), "notes.jsonl"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
-	if err := runRemember([]string{"defaulted project note"}); err != nil {
+	if err := runRemember(index.DefaultDir(), []string{"defaulted project note"}); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_NOTES_FILE", t.TempDir())
-	if err := runRemember([]string{"cannot append"}); err == nil {
+	if err := runRemember(index.DefaultDir(), []string{"cannot append"}); err == nil {
 		t.Fatal("append to directory accepted")
 	}
 }
 
 func TestRememberMCPValidation(t *testing.T) {
-	if _, err := callMCPTool("remember", []byte("{")); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "remember", []byte("{")); err == nil {
 		t.Fatal("malformed remember arguments accepted")
 	}
 	t.Setenv("DEJA_NOTES_FILE", t.TempDir())
-	if _, err := callMCPTool("remember", []byte(`{"text":"stored"}`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "remember", []byte(`{"text":"stored"}`)); err == nil {
 		t.Fatal("MCP append error ignored")
 	}
 }

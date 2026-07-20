@@ -38,10 +38,10 @@ func TestEmbedCommandBuildsSemanticSidecar(t *testing.T) {
 	}))
 	defer ts.Close()
 	t.Setenv("DEJA_EMBED_URL", ts.URL)
-	if err := runEmbed([]string{"--bad"}); err == nil {
+	if err := runEmbed(index.DefaultDir(), []string{"--bad"}); err == nil {
 		t.Fatal("unknown embed flag should fail")
 	}
-	if err := runEmbed(nil); err != nil {
+	if err := runEmbed(index.DefaultDir(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if calls != 1 {
@@ -51,12 +51,12 @@ func TestEmbedCommandBuildsSemanticSidecar(t *testing.T) {
 	if err != nil || s.Covered != 1 || len(s.Vectors) != 1 || s.Vectors[0].Values[0] != 1 {
 		t.Fatalf("sidecar=%+v err=%v", s, err)
 	}
-	report := collectDoctorEmbed()
+	report := collectDoctorEmbed(index.DefaultDir())
 	if report == nil || report.State != "reachable" || report.Dim != 2 || report.Coverage != 100 {
 		t.Fatalf("doctor embedding report=%#v", report)
 	}
 	var notice bytes.Buffer
-	semanticHits, semantic := maybeSemantic(nil, search.Options{Query: "rephrased"}, os.Stderr)
+	semanticHits, semantic := maybeSemantic(index.DefaultDir(), nil, search.Options{Query: "rephrased"}, os.Stderr)
 	if !semantic || len(semanticHits) != 1 || semanticHits[0].Count != 0 {
 		t.Fatalf("semantic fallback hits=%#v semantic=%v", semanticHits, semantic)
 	}
@@ -74,11 +74,11 @@ func TestEmbedCommandBuildsSemanticSidecar(t *testing.T) {
 	}
 	_ = notice
 	hits := []search.Hit{{Session: model.Session{ID: "s", Harness: "claude"}, Score: 1}}
-	if got := maybeRerank(hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
+	if got := maybeRerank(index.DefaultDir(), hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
 		t.Fatalf("semantic rerank=%#v", got)
 	}
 	t.Setenv("DEJA_EMBED_URL", "http://127.0.0.1:1")
-	if got := maybeRerank(hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
+	if got := maybeRerank(index.DefaultDir(), hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
 		t.Fatalf("failed semantic rerank=%#v", got)
 	}
 	if err := os.WriteFile(filepath.Join(root, "new.jsonl"), []byte(`{"type":"user","sessionId":"new","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"new semantic"}}`+"\n"), 0o600); err != nil {
@@ -87,7 +87,7 @@ func TestEmbedCommandBuildsSemanticSidecar(t *testing.T) {
 	if err := index.Ensure(index.DefaultDir(), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := maybeRerank(hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
+	if got := maybeRerank(index.DefaultDir(), hits, search.Options{Query: "semantic"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
 		t.Fatalf("stale semantic rerank=%#v", got)
 	}
 }
@@ -106,7 +106,7 @@ func TestStatsJSONOutputIncludesSemanticSize(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Stdout = w
-	err = runStats([]string{"--json"})
+	err = runStats(index.DefaultDir(), []string{"--json"})
 	_ = w.Close()
 	os.Stdout = old
 	var out bytes.Buffer
@@ -118,11 +118,11 @@ func TestStatsJSONOutputIncludesSemanticSize(t *testing.T) {
 	if !strings.Contains(out.String(), `"sidecar_size": 7`) {
 		t.Fatalf("stats JSON=%s", out.String())
 	}
-	if err := runStats([]string{"--json", "--card"}); err == nil {
+	if err := runStats(index.DefaultDir(), []string{"--json", "--card"}); err == nil {
 		t.Fatal("stats output modes should be exclusive")
 	}
 	card := filepath.Join(tmp, "stats.svg")
-	if err := runStats([]string{"--card", card, "--harness", "claude", "--project", "none", "--since", "1h", "--role", "user"}); err != nil {
+	if err := runStats(index.DefaultDir(), []string{"--card", card, "--harness", "claude", "--project", "none", "--since", "1h", "--role", "user"}); err != nil {
 		t.Fatal(err)
 	}
 	if b, err := os.ReadFile(card); err != nil || !strings.Contains(string(b), "<svg") {
@@ -135,7 +135,7 @@ func TestMaybeRerankFallsBackWithoutSidecar(t *testing.T) {
 	hermeticEnv(t)
 	hits := []search.Hit{{Session: model.Session{ID: "s", Harness: "claude"}, Score: 1}}
 	var notice bytes.Buffer
-	if got := maybeRerank(hits, search.Options{Query: "q"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
+	if got := maybeRerank(index.DefaultDir(), hits, search.Options{Query: "q"}, os.Stderr); len(got) != 1 || got[0].Score != 1 {
 		t.Fatalf("missing sidecar rerank=%#v", got)
 	}
 	_ = notice
@@ -161,8 +161,8 @@ func TestDoctorEmbedAndStatsFilters(t *testing.T) {
 		t.Fatalf("role filter retained sessions=%#v", got)
 	}
 	for _, args := range [][]string{{"--since"}, {"--since", "bad"}, {"--card", "--card"}} {
-		if err := runStats(args); err == nil {
-			t.Fatalf("runStats(%v) accepted invalid arguments", args)
+		if err := runStats(index.DefaultDir(), args); err == nil {
+			t.Fatalf("runStats(index.DefaultDir(), %v) accepted invalid arguments", args)
 		}
 	}
 }

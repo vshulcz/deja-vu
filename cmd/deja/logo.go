@@ -100,8 +100,8 @@ func brandInfo() []string {
 
 // prepareFirstIndexGreeting silences the per-harness narration when the
 // greeting is about to show the same numbers in its info column.
-func prepareFirstIndexGreeting() {
-	if !index.HasManifest(index.DefaultDir()) && logoWanted(os.Stdout) {
+func prepareFirstIndexGreeting(dir string) {
+	if !index.HasManifest(dir) && logoWanted(os.Stdout) {
 		index.SuppressHarnessNarration = true
 	}
 }

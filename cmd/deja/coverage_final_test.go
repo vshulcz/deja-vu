@@ -56,7 +56,7 @@ func TestUpdateOpencodeJSONCEmptyUninstall(t *testing.T) {
 }
 
 func TestRunInstallBadTargetPropagatesError(t *testing.T) {
-	if err := runInstall([]string{"totally-unknown-target"}, false); err == nil || !strings.Contains(err.Error(), "unknown target") {
+	if err := runInstall(index.DefaultDir(), []string{"totally-unknown-target"}, false); err == nil || !strings.Contains(err.Error(), "unknown target") {
 		t.Fatalf("runInstall bad target err = %v", err)
 	}
 }
@@ -79,7 +79,7 @@ func TestRunInstallAutoPrintsLogoOnTTYLikeStdout(t *testing.T) {
 	os.Stdout = devNull
 	defer func() { os.Stdout = oldStdout }()
 
-	if err := runInstall([]string{"--auto"}, false); err != nil {
+	if err := runInstall(index.DefaultDir(), []string{"--auto"}, false); err != nil {
 		t.Fatalf("runInstall --auto err = %v", err)
 	}
 }
@@ -96,7 +96,7 @@ func TestPrintSourcesAntigravityFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Stdout = w
-	printSources()
+	printSources(index.DefaultDir())
 	_ = w.Close()
 	os.Stdout = oldStdout
 	b, _ := io.ReadAll(r)
@@ -113,7 +113,7 @@ func (alwaysErrWriter) Write(p []byte) (int, error) { return 0, fmt.Errorf("writ
 
 func TestServeMCPEncodeError(t *testing.T) {
 	req := `{"jsonrpc":"2.0","id":1,"method":"initialize"}` + "\n"
-	if err := serveMCP(strings.NewReader(req), alwaysErrWriter{}); err == nil || !strings.Contains(err.Error(), "write boom") {
+	if err := serveMCP(index.DefaultDir(), strings.NewReader(req), alwaysErrWriter{}); err == nil || !strings.Contains(err.Error(), "write boom") {
 		t.Fatalf("serveMCP encode error = %v", err)
 	}
 }
@@ -157,7 +157,7 @@ func TestRunSyncImportHardError(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "batch.jsonl"), []byte("not json\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := runSync([]string{"import", dir}); err == nil {
+	if err := runSync(index.DefaultDir(), []string{"import", dir}); err == nil {
 		t.Fatal("expected sync import decode error")
 	}
 }
@@ -179,7 +179,7 @@ func TestSyncSSHPushMkdirTempFailure(t *testing.T) {
 	setupLocalIndex(t)
 	badTmp := filepath.Join(t.TempDir(), "does-not-exist")
 	t.Setenv("TMPDIR", badTmp)
-	if err := syncSSHPush("host", false); err == nil {
+	if err := syncSSHPush(index.DefaultDir(), "host", false); err == nil {
 		t.Fatal("expected MkdirTemp failure with a missing TMPDIR")
 	}
 }
@@ -201,7 +201,7 @@ func TestSyncSSHPullMkdirTempFailure(t *testing.T) {
 	}
 	badTmp := filepath.Join(t.TempDir(), "does-not-exist")
 	t.Setenv("TMPDIR", badTmp)
-	if err := syncSSHPull("host", false); err == nil {
+	if err := syncSSHPull(index.DefaultDir(), "host", false); err == nil {
 		t.Fatal("expected MkdirTemp failure with a missing TMPDIR")
 	}
 }
@@ -237,7 +237,7 @@ func TestHookDigestHyphenatedProjectNameBranch(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chdir(oldwd) })
 
-	digest := hookDigest()
+	digest := hookDigest(index.DefaultDir())
 	if digest == "" {
 		t.Fatal("expected a non-empty digest for the hyphenated project fixture")
 	}

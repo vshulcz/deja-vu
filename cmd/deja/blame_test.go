@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func TestParseBlame(t *testing.T) {
@@ -41,29 +43,29 @@ func TestBlameCLIAndMCP(t *testing.T) {
 	if err != nil || !strings.Contains(out, `"session"`) || !strings.Contains(out, "parser.go") {
 		t.Fatalf("blame out=%q err=%v", out, err)
 	}
-	text, err := callMCPTool("blame", json.RawMessage(`{"path":"parser.go","harness":"claude","limit":1}`))
+	text, err := callMCPTool(index.DefaultDir(), "blame", json.RawMessage(`{"path":"parser.go","harness":"claude","limit":1}`))
 	if err != nil || !strings.Contains(text, `"session"`) {
 		t.Fatalf("mcp blame=%q err=%v", text, err)
 	}
-	if text, err := callMCPTool("blame", json.RawMessage(`{"path":"parser.go","all":true}`)); err != nil || !strings.Contains(text, `"session"`) {
+	if text, err := callMCPTool(index.DefaultDir(), "blame", json.RawMessage(`{"path":"parser.go","all":true}`)); err != nil || !strings.Contains(text, `"session"`) {
 		t.Fatalf("mcp all blame=%q err=%v", text, err)
 	}
-	if err := runBlame([]string{"parser.go"}); err != nil {
+	if err := runBlame(index.DefaultDir(), []string{"parser.go"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runBlame([]string{"missing.go"}); err != nil {
+	if err := runBlame(index.DefaultDir(), []string{"missing.go"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runBlame(nil); err == nil {
+	if err := runBlame(index.DefaultDir(), nil); err == nil {
 		t.Fatal("missing blame path accepted")
 	}
-	if _, err := callMCPTool("blame", json.RawMessage(`{"path":`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "blame", json.RawMessage(`{"path":`)); err == nil {
 		t.Fatal("malformed mcp blame accepted")
 	}
-	if _, err := callMCPTool("blame", json.RawMessage(`{"path":"x.go","since":"bad"}`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "blame", json.RawMessage(`{"path":"x.go","since":"bad"}`)); err == nil {
 		t.Fatal("bad mcp blame since accepted")
 	}
-	if _, err := callMCPTool("blame", json.RawMessage(`{"path":"   "}`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "blame", json.RawMessage(`{"path":"   "}`)); err == nil {
 		t.Fatal("empty mcp blame path accepted")
 	}
 	blocked := filepath.Join(t.TempDir(), "not-a-directory")
@@ -71,10 +73,10 @@ func TestBlameCLIAndMCP(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(blocked, "child"))
-	if err := runBlame([]string{"parser.go"}); err == nil {
+	if err := runBlame(index.DefaultDir(), []string{"parser.go"}); err == nil {
 		t.Fatal("blame accepted blocked index")
 	}
-	if _, err := callMCPTool("blame", json.RawMessage(`{"path":"parser.go"}`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "blame", json.RawMessage(`{"path":"parser.go"}`)); err == nil {
 		t.Fatal("mcp blame accepted blocked index")
 	}
 }

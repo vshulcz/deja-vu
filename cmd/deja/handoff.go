@@ -26,7 +26,7 @@ const handoffBudget = 6 * 1024
 // --exec launches the target agent directly with the digest as its first
 // prompt. The source is the newest session for the current project unless an
 // id-prefix picks one explicitly.
-func runHandoff(args []string, stdout io.Writer) error {
+func runHandoff(dir string, args []string, stdout io.Writer) error {
 	target := ""
 	prefix := ""
 	doExec := false
@@ -59,7 +59,7 @@ func runHandoff(args []string, stdout io.Writer) error {
 		}
 		return fmt.Errorf("%s has no CLI prompt entry — run `deja handoff --to %s` and paste the digest into a new chat", target, target)
 	}
-	s, err := handoffSource(prefix)
+	s, err := handoffSource(dir, prefix)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func runHandoff(args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: note — this session is %s old; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
 	}
 	digest := handoffDigest(s, handoffBudget)
-	usage.Record(index.DefaultDir(), usage.KindHandoff, len(digest))
+	usage.Record(dir, usage.KindHandoff, len(digest))
 	if !doExec {
 		printSanitized(stdout, digest)
 		if pasteOnly {
@@ -126,12 +126,12 @@ func prefixArg(prefix string) string {
 
 // handoffSource resolves the session being handed off: an explicit id-prefix,
 // or the newest indexed session for the project in the current directory.
-func handoffSource(prefix string) (model.Session, error) {
-	if err := index.Ensure(index.DefaultDir(), "", false, os.Stderr); err != nil {
+func handoffSource(dir, prefix string) (model.Session, error) {
+	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return model.Session{}, err
 	}
 	if prefix != "" {
-		s, ok, err := findByPrefix(prefix)
+		s, ok, err := findByPrefix(dir, prefix)
 		if err != nil {
 			return model.Session{}, err
 		}
@@ -147,7 +147,7 @@ func handoffSource(prefix string) (model.Session, error) {
 	var newest model.Session
 	distinct := map[string]bool{}
 	for _, name := range projectNameCandidates(cwd) {
-		ss, err := index.RecentProject(index.DefaultDir(), name, 1)
+		ss, err := index.RecentProject(dir, name, 1)
 		if err != nil || len(ss) == 0 {
 			continue
 		}

@@ -5,18 +5,17 @@ import (
 	"io"
 	"os"
 
-	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // runStatusline prints one line for a status bar: how much memory deja served
 // to agents today. It must stay fast and quiet — no index access, no locks —
 // because status bars call it constantly.
-func runStatusline(stdin io.Reader, stdout io.Writer) error {
+func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	drainStdin(stdin)
-	recalls, bytes, injected := usage.TodayWithInjections(index.DefaultDir())
+	recalls, bytes, injected := usage.TodayWithInjections(dir)
 	if recalls == 0 {
-		if wr, wb, _, _ := usage.Week(index.DefaultDir()); wr > 0 {
+		if wr, wb, _, _ := usage.Week(dir); wr > 0 {
 			fmt.Fprintf(stdout, "deja · quiet today · %d agent recalls, %s re-used this week", wr, humanBytes(int64(wb)))
 			return nil
 		}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -78,15 +79,15 @@ func TestStatsHTMLCommandAndConflicts(t *testing.T) {
 	if strings.TrimSpace(out) != abs {
 		t.Fatalf("HTML output=%q want=%q", out, abs)
 	}
-	if err := runStats([]string{"--html", "--json"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
+	if err := runStats(index.DefaultDir(), []string{"--html", "--json"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
 		t.Fatal("expected HTML/JSON conflict")
 	}
-	if err := runStats([]string{"--html", "--card"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
+	if err := runStats(index.DefaultDir(), []string{"--html", "--card"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
 		t.Fatal("expected HTML/card conflict")
 	}
 	for _, args := range [][]string{{"--html", "--html"}, {"--unknown"}} {
-		if err := runStats(args); err == nil {
-			t.Fatalf("runStats(%v) accepted invalid arguments", args)
+		if err := runStats(index.DefaultDir(), args); err == nil {
+			t.Fatalf("runStats(index.DefaultDir(), %v) accepted invalid arguments", args)
 		}
 	}
 }

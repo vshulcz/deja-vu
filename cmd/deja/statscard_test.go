@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -67,7 +68,7 @@ func TestWriteStatsCardAndStatsFlagConflict(t *testing.T) {
 	if b, err := os.ReadFile(path); err != nil || !bytes.HasPrefix(b, []byte("<?xml")) {
 		t.Fatalf("card file = %q, %v", b, err)
 	}
-	if err := runStats([]string{"--card", "--json"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
+	if err := runStats(index.DefaultDir(), []string{"--card", "--json"}); err == nil || !strings.Contains(err.Error(), "choose one output") {
 		t.Fatalf("conflict error = %v", err)
 	}
 	if _, err := writeStatsCard(filepath.Join(path, "nested.svg"), statsReport{}); err == nil {
@@ -142,8 +143,8 @@ func TestStatsFlagValidation(t *testing.T) {
 		{"--since", "not-a-duration"},
 		{"--unknown"},
 	} {
-		if err := runStats(args); err == nil {
-			t.Fatalf("runStats(%#v) returned nil", args)
+		if err := runStats(index.DefaultDir(), args); err == nil {
+			t.Fatalf("runStats(index.DefaultDir(), %#v) returned nil", args)
 		}
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func TestInstallStatuslineErrorAndUninstallIdempotent(t *testing.T) {
@@ -103,11 +105,11 @@ func TestInstallTargetErrorsAndAliases(t *testing.T) {
 		t.Fatalf("unknown target err = %v", err)
 	}
 	for _, args := range [][]string{nil, {"a", "b"}} {
-		if err := runInstall(args, false); err == nil || !strings.Contains(err.Error(), "install needs target") {
+		if err := runInstall(index.DefaultDir(), args, false); err == nil || !strings.Contains(err.Error(), "install needs target") {
 			t.Fatalf("install args %v err = %v", args, err)
 		}
 	}
-	if err := runInstall(nil, true); err == nil || !strings.Contains(err.Error(), "uninstall needs target") {
+	if err := runInstall(index.DefaultDir(), nil, true); err == nil || !strings.Contains(err.Error(), "uninstall needs target") {
 		t.Fatalf("uninstall err = %v", err)
 	}
 

@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
@@ -182,7 +184,7 @@ func TestInstallNoGuidanceOptOut(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
-	if err := runInstall([]string{"codex", "--no-guidance"}, false); err != nil {
+	if err := runInstall(index.DefaultDir(), []string{"codex", "--no-guidance"}, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".codex", "AGENTS.md")); !os.IsNotExist(err) {

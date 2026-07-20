@@ -14,11 +14,11 @@ import (
 
 const shareBudget = 6 * 1024
 
-func runShare(args []string, w io.Writer) error {
+func runShare(dir string, args []string, w io.Writer) error {
 	if len(args) < 1 {
 		return fmt.Errorf("share needs id-prefix")
 	}
-	s, ok, err := findByPrefix(args[0])
+	s, ok, err := findByPrefix(dir, args[0])
 	if err != nil {
 		return err
 	}

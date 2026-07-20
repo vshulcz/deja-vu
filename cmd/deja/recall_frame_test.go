@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -79,7 +80,7 @@ func TestNarrationProtocolOnAllSurfaces(t *testing.T) {
 	for _, m := range []string{"initialize", "tools/list"} {
 		_ = m
 	}
-	resp, _, _ := handleMCP(rpcRequest{Method: "tools/list"})
+	resp, _, _ := handleMCP(index.DefaultDir(), rpcRequest{Method: "tools/list"})
 	b, err := json.Marshal(resp)
 	if err != nil {
 		t.Fatal(err)

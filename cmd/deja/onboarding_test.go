@@ -61,7 +61,7 @@ func TestInstallHintSkippedWhenIndexExists(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := installIndexHint(); got != "" {
+	if got := installIndexHint(index.DefaultDir()); got != "" {
 		t.Fatalf("hint = %q, want empty", got)
 	}
 }
@@ -129,7 +129,7 @@ func TestHookMissingManifestRequestsWarmup(t *testing.T) {
 	oldSpawn := spawnWarmup
 	spawnWarmup = func(_, _ string) error { called = true; return nil }
 	defer func() { spawnWarmup = oldSpawn }()
-	if digest, sessions := hookDigestResult(); digest != "" || sessions != 0 {
+	if digest, sessions := hookDigestResult(index.DefaultDir()); digest != "" || sessions != 0 {
 		t.Fatalf("missing-manifest digest = %q, sessions=%d", digest, sessions)
 	}
 	if !called {
@@ -143,7 +143,7 @@ func TestHookContextMissingManifestStaysSilent(t *testing.T) {
 	oldSpawn := spawnWarmup
 	spawnWarmup = func(_, _ string) error { return nil }
 	defer func() { spawnWarmup = oldSpawn }()
-	if err := runHookContext(true); err != nil {
+	if err := runHookContext(index.DefaultDir(), true); err != nil {
 		t.Fatal(err)
 	}
 }

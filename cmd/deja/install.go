@@ -16,7 +16,7 @@ import (
 
 type installResult struct{ Path, Action string }
 
-func runInstall(args []string, uninstall bool) error {
+func runInstall(dir string, args []string, uninstall bool) error {
 	guidance := true
 	var targetArgs []string
 	for _, arg := range args {
@@ -102,7 +102,7 @@ func runInstall(args []string, uninstall bool) error {
 		}
 	}
 	if !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") {
-		installIndexWarmup(mcpCount, hookCount, guidanceCount)
+		installIndexWarmup(dir, mcpCount, hookCount, guidanceCount)
 	}
 	if banner {
 		info := append(brandInfo(), "")
@@ -115,7 +115,7 @@ func runInstall(args []string, uninstall bool) error {
 		for _, d := range done {
 			info = append(info, fmt.Sprintf("%-*s  %s%-9s%s %s", nameW, d.target, logoBold, d.action, logoReset, logoDim+d.path+logoReset))
 		}
-		if hint := installIndexHint(); hint != "" {
+		if hint := installIndexHint(dir); hint != "" {
 			info = append(info, "", hint)
 		}
 		printLogo(os.Stdout, info)
@@ -123,8 +123,7 @@ func runInstall(args []string, uninstall bool) error {
 	return nil
 }
 
-func installIndexWarmup(mcp, hooks, guidance int) {
-	dir := index.DefaultDir()
+func installIndexWarmup(dir string, mcp, hooks, guidance int) {
 	built := false
 	detected := 0
 	if !index.HasManifest(dir) {
@@ -211,8 +210,8 @@ func shortHome(p string) string {
 	return p
 }
 
-func installIndexHint() string {
-	if index.HasManifest(index.DefaultDir()) {
+func installIndexHint(dir string) string {
+	if index.HasManifest(dir) {
 		return ""
 	}
 	checks := doctorStoreChecks()

@@ -149,17 +149,17 @@ func TestMCPMalformedParamsOversizedAndToolErrors(t *testing.T) {
 		{ID: json.RawMessage(`1`), Method: "tools/call", Params: json.RawMessage(`{"name":`)},
 		{ID: json.RawMessage(`2`), Method: "tools/call", Params: json.RawMessage(`{"name":"recall","arguments":{"query":`)},
 	} {
-		_, code, msg := handleMCP(req)
+		_, code, msg := handleMCP(index.DefaultDir(), req)
 		if code != -32602 || msg == "" {
-			t.Fatalf("handleMCP(%#v) code=%d msg=%q", req, code, msg)
+			t.Fatalf("handleMCP(index.DefaultDir(), %#v) code=%d msg=%q", req, code, msg)
 		}
 	}
-	if _, err := callMCPTool("recall_context", json.RawMessage(`{"query":`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "recall_context", json.RawMessage(`{"query":`)); err == nil {
 		t.Fatal("expected recall_context json error")
 	}
 	var out bytes.Buffer
 	tooLarge := strings.Repeat("x", 10*1024*1024+1) + "\n"
-	if err := serveMCP(strings.NewReader(tooLarge), &out); err != nil {
+	if err := serveMCP(index.DefaultDir(), strings.NewReader(tooLarge), &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "parse error") {
@@ -169,10 +169,10 @@ func TestMCPMalformedParamsOversizedAndToolErrors(t *testing.T) {
 
 func TestMCPEmptyResultsCounted(t *testing.T) {
 	hermeticEnv(t)
-	if _, err := callMCPTool("recall", json.RawMessage(`{"query":"no-such-result"}`)); err != nil {
+	if _, err := callMCPTool(index.DefaultDir(), "recall", json.RawMessage(`{"query":"no-such-result"}`)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := callMCPTool("recall_context", json.RawMessage(`{"query":"no-such-result","harness":"claude"}`)); err != nil {
+	if _, err := callMCPTool(index.DefaultDir(), "recall_context", json.RawMessage(`{"query":"no-such-result","harness":"claude"}`)); err != nil {
 		t.Fatal(err)
 	}
 	got := usage.Totals(index.DefaultDir())
@@ -199,7 +199,7 @@ func TestShareDigestBudgetNoiseAndRunErrors(t *testing.T) {
 	if !strings.HasSuffix(b.String(), "\n") {
 		t.Fatalf("printSanitized no newline = %q", b.String())
 	}
-	if err := runShare([]string{"missing"}, io.Discard); err == nil || !strings.Contains(err.Error(), "no session matches") {
+	if err := runShare(index.DefaultDir(), []string{"missing"}, io.Discard); err == nil || !strings.Contains(err.Error(), "no session matches") {
 		t.Fatalf("runShare missing err = %v", err)
 	}
 }
@@ -228,7 +228,7 @@ func TestStatsHelperBranches(t *testing.T) {
 	if statTitle(model.Session{Title: "good"}) != "good" || statTitle(model.Session{Messages: []model.Message{{Role: "user", Text: "<bash-noise"}}}) != "" {
 		t.Fatal("statTitle branches failed")
 	}
-	if err := runStats([]string{"--bad"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+	if err := runStats(index.DefaultDir(), []string{"--bad"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("runStats bad flag err=%v", err)
 	}
 }
@@ -241,17 +241,17 @@ func TestRunSyncImportAndExportBranches(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(in, "batch.jsonl"), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := runSync([]string{"import", in}); err != nil {
+	if err := runSync(index.DefaultDir(), []string{"import", in}); err != nil {
 		t.Fatalf("sync import: %v", err)
 	}
 	out := t.TempDir()
-	if err := runSync([]string{"export", "--full", out}); err != nil {
+	if err := runSync(index.DefaultDir(), []string{"export", "--full", out}); err != nil {
 		t.Fatalf("sync export full: %v", err)
 	}
-	if err := runSync([]string{"export", out}); err != nil {
+	if err := runSync(index.DefaultDir(), []string{"export", out}); err != nil {
 		t.Fatalf("sync export: %v", err)
 	}
-	if err := runSync([]string{"export", "--full"}); err == nil || !strings.Contains(err.Error(), "target dir") {
+	if err := runSync(index.DefaultDir(), []string{"export", "--full"}); err == nil || !strings.Contains(err.Error(), "target dir") {
 		t.Fatalf("sync export missing target err=%v", err)
 	}
 }
@@ -303,10 +303,10 @@ func TestMainHelpersFallbackAndSourcesBranches(t *testing.T) {
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-fallback", "fallback123.jsonl"), "fallback123", []string{
 		`{"type":"user","sessionId":"fallback123","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"fallback needle"}}`,
 	})
-	if s, ok, err := findByPrefix("fallback"); err != nil || !ok || s.ID != "fallback123" {
+	if s, ok, err := findByPrefix(index.DefaultDir(), "fallback"); err != nil || !ok || s.ID != "fallback123" {
 		t.Fatalf("findByPrefix fallback = %#v %v %v", s, ok, err)
 	}
-	ss, err := recent(2)
+	ss, err := recent(index.DefaultDir(), 2)
 	if err != nil || len(ss) == 0 || ss[0].ID != "fallback123" {
 		t.Fatalf("recent fallback = %#v err=%v", ss, err)
 	}
@@ -345,11 +345,11 @@ func TestMCPRecallAndProgressBranches(t *testing.T) {
 	if mcpProgress() != os.Stderr {
 		t.Fatal("debug progress did not use stderr")
 	}
-	text, err := recallText("nomatch", "", 0, 30)
+	text, err := recallText(index.DefaultDir(), "nomatch", "", 0, 30)
 	if err != nil || !strings.Contains(text, "No prior deja sessions") {
 		t.Fatalf("recallText no match = %q err=%v", text, err)
 	}
-	ctx, err := recallContext("nomatch")
+	ctx, err := recallContext(index.DefaultDir(), "nomatch")
 	if err != nil || !strings.Contains(ctx, "No prior deja sessions") {
 		t.Fatalf("recallContext no match = %q err=%v", ctx, err)
 	}
@@ -392,7 +392,7 @@ func TestStatuslineOneRecallAndDrainBranches(t *testing.T) {
 	_, _ = pipeW.WriteString("session json")
 	_ = pipeW.Close()
 	var out bytes.Buffer
-	if err := runStatusline(pipeR, &out); err != nil {
+	if err := runStatusline(index.DefaultDir(), pipeR, &out); err != nil {
 		t.Fatal(err)
 	}
 	_ = pipeR.Close()
@@ -403,7 +403,7 @@ func TestStatuslineOneRecallAndDrainBranches(t *testing.T) {
 	indexDir := idx
 	usage.Record(indexDir, usage.KindRecall, 1536)
 	out.Reset()
-	if err := runStatusline(strings.NewReader("ignored"), &out); err != nil {
+	if err := runStatusline(index.DefaultDir(), strings.NewReader("ignored"), &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "1 recall") || !strings.Contains(out.String(), "1.5 KB") {
@@ -416,7 +416,7 @@ func TestSyncSSHErrorBranches(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) { return "", os.ErrPermission }
-	if err := runSyncSSH([]string{"host", "--pull"}); err == nil || !strings.Contains(err.Error(), "ssh host") {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host", "--pull"}); err == nil || !strings.Contains(err.Error(), "ssh host") {
 		t.Fatalf("pull mktemp err=%v", err)
 	}
 	if _, err := sshCapture("host", "cmd"); err == nil || !strings.Contains(err.Error(), "permission") {
@@ -432,7 +432,7 @@ func TestSyncSSHErrorBranches(t *testing.T) {
 		}
 		return "boom", os.ErrPermission
 	}
-	if err := runSyncSSH([]string{"host", "--pull"}); err == nil || !strings.Contains(err.Error(), "remote export") {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host", "--pull"}); err == nil || !strings.Contains(err.Error(), "remote export") {
 		t.Fatalf("pull remote export err=%v", err)
 	}
 }
@@ -548,14 +548,14 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(badIndex, "child"))
-	if err := runStats(nil); err == nil {
+	if err := runStats(index.DefaultDir(), nil); err == nil {
 		t.Fatal("expected stats ensure error")
 	}
-	if err := runSync([]string{"export", t.TempDir()}); err == nil {
+	if err := runSync(index.DefaultDir(), []string{"export", t.TempDir()}); err == nil {
 		t.Fatal("expected sync export ensure error")
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
-	if err := runSync([]string{"import", "["}); err == nil {
+	if err := runSync(index.DefaultDir(), []string{"import", "["}); err == nil {
 		t.Fatal("expected sync import error")
 	}
 }
@@ -577,18 +577,18 @@ func TestFallbackFindRecentAndMCPEnsureErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(blocked, "child"))
-	s, ok, err := findByPrefix("fallback2")
+	s, ok, err := findByPrefix(index.DefaultDir(), "fallback2")
 	if err != nil || !ok || s.ID != "fallback2" {
 		t.Fatalf("fallback find = %#v ok=%v err=%v", s, ok, err)
 	}
-	ss, err := recent(1)
+	ss, err := recent(index.DefaultDir(), 1)
 	if err != nil || len(ss) != 1 || ss[0].ID != "fallback2" {
 		t.Fatalf("fallback recent = %#v err=%v", ss, err)
 	}
-	if _, err := recallText("needle", "", 1, 100); err == nil {
+	if _, err := recallText(index.DefaultDir(), "needle", "", 1, 100); err == nil {
 		t.Fatal("expected recallText ensure error")
 	}
-	if _, err := recallContext("needle"); err == nil {
+	if _, err := recallContext(index.DefaultDir(), "needle"); err == nil {
 		t.Fatal("expected recallContext ensure error")
 	}
 }
@@ -636,7 +636,7 @@ func TestMoreErrorBranches(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) { return "", nil }
-	_ = runSyncSSH([]string{"host", "--pull"})
+	_ = runSyncSSH(index.DefaultDir(), []string{"host", "--pull"})
 }
 
 func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
@@ -649,7 +649,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 		}
 		return "", nil
 	}
-	if err := runSyncSSH([]string{"host"}); err == nil || !strings.Contains(err.Error(), "mktemp failed") {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host"}); err == nil || !strings.Contains(err.Error(), "mktemp failed") {
 		t.Fatalf("push mktemp err=%v", err)
 	}
 	// Mark exported so a new fixture is available for the remote-import branch.
@@ -663,7 +663,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 		}
 		return "", nil
 	}
-	if err := runSyncSSH([]string{"host"}); err == nil || !strings.Contains(err.Error(), "remote import") {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host"}); err == nil || !strings.Contains(err.Error(), "remote import") {
 		t.Fatalf("push remote import err=%v", err)
 	}
 	blocked := filepath.Join(t.TempDir(), "index-file")
@@ -671,7 +671,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(blocked, "child"))
-	if err := runSyncSSH([]string{"host"}); err == nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host"}); err == nil {
 		t.Fatal("expected push ensure error")
 	}
 }
@@ -776,7 +776,7 @@ func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Stdout = w
-	if err := runHookContext(true); err != nil {
+	if err := runHookContext(index.DefaultDir(), true); err != nil {
 		t.Fatal(err)
 	}
 	_ = w.Close()
@@ -789,10 +789,10 @@ func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 
 func TestMCPAdditionalBranches(t *testing.T) {
 	hermeticEnv(t)
-	if _, err := callMCPTool("recall", json.RawMessage(`{"query":`)); err == nil {
+	if _, err := callMCPTool(index.DefaultDir(), "recall", json.RawMessage(`{"query":`)); err == nil {
 		t.Fatal("expected recall json error")
 	}
-	if _, err := callMCPTool("recall_context", json.RawMessage(`{"query":"   "}`)); err == nil || !strings.Contains(err.Error(), "query required") {
+	if _, err := callMCPTool(index.DefaultDir(), "recall_context", json.RawMessage(`{"query":"   "}`)); err == nil || !strings.Contains(err.Error(), "query required") {
 		t.Fatalf("empty recall_context err=%v", err)
 	}
 	if got := trimUTF8("abc", 10); got != "abc" {
@@ -801,7 +801,7 @@ func TestMCPAdditionalBranches(t *testing.T) {
 	var out bytes.Buffer
 	t.Setenv("DEJA_DEBUG", "1")
 	tooLarge := "\n" + strings.Repeat("x", 10*1024*1024+1) + "\n"
-	if err := serveMCP(strings.NewReader(tooLarge), &out); err != nil {
+	if err := serveMCP(index.DefaultDir(), strings.NewReader(tooLarge), &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "parse error") {
@@ -810,7 +810,7 @@ func TestMCPAdditionalBranches(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
-	text, err := recallText("frobnicator", "claude", 1, 80)
+	text, err := recallText(index.DefaultDir(), "frobnicator", "claude", 1, 80)
 	if err != nil || len(text) > 80 || !strings.Contains(text, "deja recall") {
 		t.Fatalf("recallText limited len=%d text=%q err=%v", len(text), text, err)
 	}
@@ -833,7 +833,7 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 		}
 		return "", nil
 	}
-	if err := runSyncSSH([]string{"host", "--pull"}); err != nil {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host", "--pull"}); err != nil {
 		t.Fatal(err)
 	}
 	if !cleaned {
@@ -842,7 +842,7 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 	if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := exportBatches(t.TempDir(), true); err != nil {
+	if _, err := exportBatches(index.DefaultDir(), t.TempDir(), true); err != nil {
 		t.Fatal(err)
 	}
 	sshRunner = func(name string, args ...string) (string, error) {
@@ -854,7 +854,7 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 		}
 		return "", nil
 	}
-	if err := runSyncSSH([]string{"host", "--full"}); err == nil || !strings.Contains(err.Error(), "scp") {
+	if err := runSyncSSH(index.DefaultDir(), []string{"host", "--full"}); err == nil || !strings.Contains(err.Error(), "scp") {
 		t.Fatalf("push scp err=%v", err)
 	}
 }

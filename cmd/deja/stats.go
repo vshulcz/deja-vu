@@ -103,7 +103,7 @@ type dayStat struct {
 	Messages int    `json:"messages"`
 }
 
-func runStats(args []string) error {
+func runStats(dir string, args []string) error {
 	jsonOut := false
 	cardPath := ""
 	card := false
@@ -174,21 +174,21 @@ func runStats(args []string) error {
 		fmt.Fprintln(os.Stderr, "deja: preparing your stats card …")
 		progress = io.Discard
 	}
-	if err := index.Ensure(index.DefaultDir(), "", false, progress); err != nil {
+	if err := index.Ensure(dir, "", false, progress); err != nil {
 		return err
 	}
 	if redaction {
-		return printRedactionReport(jsonOut)
+		return printRedactionReport(dir, jsonOut)
 	}
-	ss, err := index.SearchWithRecovery(index.DefaultDir(), search.Options{All: true}, progress)
+	ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, progress)
 	if err != nil {
 		return err
 	}
 	report := buildStats(filterStatsSessions(ss, options), time.Now())
-	sshTip := sshSyncTip(ss)
-	report.Recall = usage.Totals(index.DefaultDir())
-	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(index.DefaultDir())
-	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
+	sshTip := sshSyncTip(dir, ss)
+	report.Recall = usage.Totals(dir)
+	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(dir)
+	if fi, e := os.Stat(embed.Path(dir)); e == nil {
 		report.SidecarSize = fi.Size()
 	}
 	if cardPath != "" {
@@ -220,13 +220,13 @@ func runStats(args []string) error {
 	return nil
 }
 
-func printRedactionReport(jsonOut bool) error {
-	stats, err := index.RedactionReport(index.DefaultDir())
+func printRedactionReport(dir string, jsonOut bool) error {
+	stats, err := index.RedactionReport(dir)
 	if err != nil {
 		return err
 	}
 	r := redactionReport{Total: stats.Total, ByHarness: stats.Rules, Tombstones: len(index.Tombstones())}
-	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
+	if fi, e := os.Stat(embed.Path(dir)); e == nil {
 		r.SidecarSize = fi.Size()
 	}
 	if jsonOut {
