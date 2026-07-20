@@ -125,6 +125,74 @@ type Manifest struct {
 	// A live index whose records.bin is shorter than this lost its tail to a
 	// torn write and must be treated as corrupt.
 	RecordsSize int64 `json:"records_size,omitempty"`
+	// IngestHealth records, per harness, what ingestion skipped on the pass
+	// that last touched it: malformed JSONL lines and files that failed to
+	// parse. Silent loss must be diagnosable (`deja doctor --json`).
+	IngestHealth map[string]HarnessIngest `json:"ingest_health,omitempty"`
+}
+
+// IngestHealth returns the per-harness ingestion health persisted by the
+// last indexing passes, or nil when the index has none recorded.
+func IngestHealth(dir string) map[string]HarnessIngest {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	return m.IngestHealth
+}
+
+// HarnessIngest is one harness's ingestion health from its last indexing pass.
+type HarnessIngest struct {
+	MalformedLines int    `json:"malformed_lines,omitempty"`
+	FailedFiles    int    `json:"failed_files,omitempty"`
+	LastError      string `json:"last_error,omitempty"`
+}
+
+// mergeIngestDiag folds the sources side-channel counters into the manifest,
+// keyed by harness. Harnesses untouched this pass keep their previous entry.
+func mergeIngestDiag(m *Manifest) {
+	malformed, failed := sources.DiagSnapshot()
+	if len(malformed) == 0 && len(failed) == 0 {
+		return
+	}
+	if m.IngestHealth == nil {
+		m.IngestHealth = map[string]HarnessIngest{}
+	}
+	touched := map[string]bool{}
+	for p := range malformed {
+		touched[harnessForPath(p)] = true
+	}
+	for p := range failed {
+		touched[harnessForPath(p)] = true
+	}
+	for h := range touched {
+		if h == "" {
+			continue
+		}
+		m.IngestHealth[h] = HarnessIngest{}
+	}
+	for p, n := range malformed {
+		h := harnessForPath(p)
+		if h == "" {
+			continue
+		}
+		e := m.IngestHealth[h]
+		e.MalformedLines += n
+		m.IngestHealth[h] = e
+	}
+	for p, msg := range failed {
+		h := harnessForPath(p)
+		if h == "" {
+			continue
+		}
+		e := m.IngestHealth[h]
+		e.FailedFiles++
+		e.LastError = msg
+		m.IngestHealth[h] = e
+	}
 }
 
 type manifestCore struct {
@@ -138,6 +206,7 @@ type manifestCore struct {
 	ExportWatermarks map[string]int64
 	ImportedRecords  map[string]bool
 	RecordsSize      int64
+	IngestHealth     map[string]HarnessIngest
 }
 
 type RedactionStats struct {
@@ -2589,7 +2658,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ImportedRecords: core.ImportedRecords, RecordsSize: core.RecordsSize, IngestHealth: core.IngestHealth, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -2603,7 +2672,8 @@ func readManifest(dir string) (Manifest, error) {
 // leaves the old manifest pointing at old data, and the next run reindexes
 // rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords}
+	mergeIngestDiag(&m)
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ImportedRecords: m.ImportedRecords, IngestHealth: m.IngestHealth}
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}

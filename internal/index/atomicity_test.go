@@ -118,3 +118,27 @@ func TestWriteTombstonesAtomicNoTemp(t *testing.T) {
 		t.Fatalf("after shrink = %#v", got)
 	}
 }
+
+func TestIngestHealthPersistedToManifest(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	dir := filepath.Join(tmp, "index.db")
+	proj := filepath.Join(claudeRoot, "-tmp-x")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"good line"}}` + "\n" +
+		`{"broken json` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	h := IngestHealth(dir)
+	if h["claude"].MalformedLines != 1 {
+		t.Fatalf("ingest health = %#v, want claude malformed=1", h)
+	}
+}
