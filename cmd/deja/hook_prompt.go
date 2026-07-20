@@ -152,7 +152,8 @@ func citationLine(s model.Session) string {
 				continue
 			}
 			r := []rune(tt)[0]
-			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x400) {
+			alpha := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x400
+			if !alpha {
 				continue
 			}
 			title = tt
