@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -130,6 +131,17 @@ func walkFiles(root string, pred func(string) bool) []string {
 	return out
 }
 
+// safeParse shields the index from a panicking parser: one malformed session
+// file must cost one file, not the whole build.
+func safeParse(path string, parse func(string) ([]model.Session, error)) (ss []model.Session, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ss, err = nil, fmt.Errorf("parser panic on %s: %v", path, r)
+		}
+	}()
+	return parse(path)
+}
+
 func parseFiles(files []string, parse func(string) ([]model.Session, error)) []model.Session {
 	files = append([]string(nil), files...)
 	sort.Strings(files)
@@ -155,7 +167,7 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				ss, _ := parse(j.p)
+				ss, _ := safeParse(j.p, parse)
 				outs <- struct {
 					i  int
 					ss []model.Session

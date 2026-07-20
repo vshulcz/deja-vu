@@ -661,13 +661,27 @@ func load(h string) []model.Session { return loadProgress(h, nil) }
 
 // loadProgress narrates a full rebuild per harness: a cold pass over a large
 // corpus takes seconds and used to look hung.
+// safeLoad shields a cold rebuild from a panicking harness loader: one broken
+// store costs that harness's sessions this pass, not the whole index.
+func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss []model.Session) {
+	defer func() {
+		if r := recover(); r != nil {
+			ss = nil
+			if progress != nil {
+				fmt.Fprintf(progress, "deja: %s: parser crashed (%v) — skipping this harness for now\n", name, r)
+			}
+		}
+	}()
+	return load()
+}
+
 func loadProgress(h string, progress io.Writer) []model.Session {
 	var ss []model.Session
 	for _, hl := range harnessLoaders {
 		if h != "" && h != hl.name {
 			continue
 		}
-		got := hl.load()
+		got := safeLoad(hl.name, hl.load, progress)
 		ss = append(ss, got...)
 		if progress != nil && len(got) > 0 && !SuppressHarnessNarration {
 			msgs := 0
@@ -1462,7 +1476,12 @@ func parseChangedFile(harness, p string, old FileState) ([]model.Session, error)
 	}
 }
 
-func parseAppendedFile(harness, p string, old FileState) ([]model.Session, error) {
+func parseAppendedFile(harness, p string, old FileState) (ss []model.Session, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ss, err = nil, fmt.Errorf("parser panic on %s: %v", p, r)
+		}
+	}()
 	from := old.SafeSize
 	if from == 0 || from > old.Size {
 		from = old.Size

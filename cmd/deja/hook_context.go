@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,7 +80,10 @@ func runHookContext(plain bool) error {
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "SessionStart"
 	resp.HookSpecificOutput.AdditionalContext = digest
-	if sessions > 0 {
+	// Announce only when the recalled set changed since the last announcement:
+	// injection is recency-ranked, so repeating the same receipt every session
+	// start is wallpaper, and wallpaper builds no habit.
+	if sessions > 0 && receiptIsNews(digest) {
 		plural := ""
 		if sessions > 1 {
 			plural = "s"
@@ -92,6 +96,25 @@ func runHookContext(plain bool) error {
 	}
 	fmt.Fprintln(os.Stdout, string(b))
 	return nil
+}
+
+// receiptIsNews reports whether this digest differs from the one last
+// announced (per index, 24h window). Best-effort: on any error, announce.
+func receiptIsNews(digest string) bool {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(digest))
+	sum := fmt.Sprintf("%x", h.Sum64())
+	p := index.DefaultDir() + ".receipt"
+	if b, err := os.ReadFile(p); err == nil {
+		parts := strings.Fields(string(b))
+		if len(parts) == 2 && parts[0] == sum {
+			if ts, err := strconv.ParseInt(parts[1], 10, 64); err == nil && time.Since(time.Unix(ts, 0)) < 24*time.Hour {
+				return false
+			}
+		}
+	}
+	_ = os.WriteFile(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	return true
 }
 
 func hookDigest() string {

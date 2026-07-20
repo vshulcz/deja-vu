@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -144,5 +145,17 @@ func TestStatsFlagValidation(t *testing.T) {
 		if err := runStats(args); err == nil {
 			t.Fatalf("runStats(%#v) returned nil", args)
 		}
+	}
+}
+
+func TestHandoffsReceivedCountedFromIndex(t *testing.T) {
+	ss := []model.Session{
+		{ID: "h1", Messages: []model.Message{{Role: "user", Text: "You are picking up work handed off from a claude session (project x)"}}},
+		{ID: "n1", Messages: []model.Message{{Role: "user", Text: "ordinary question"}}},
+		{ID: "n2", Messages: []model.Message{{Role: "assistant", Text: "picking up work handed off from a"}, {Role: "user", Text: "hi"}}},
+	}
+	r := buildStats(ss, time.Now())
+	if r.HandoffsIn != 1 {
+		t.Fatalf("HandoffsIn = %d, want 1", r.HandoffsIn)
 	}
 }

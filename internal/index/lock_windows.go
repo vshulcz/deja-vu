@@ -19,7 +19,6 @@ var (
 )
 
 func lockDir(dir string) (func(), error) {
-	recoverIndexDir(dir)
 	lockPath := dir + ".lock"
 	// Tighten pre-existing indexes created before the 0700 default.
 	_ = os.Chmod(dir, 0o700)
@@ -36,6 +35,9 @@ func lockDir(dir string) (func(), error) {
 		f.Close()
 		return nil, fmt.Errorf("lock index: %w", err)
 	}
+	// Under the lock: finish any swap interrupted mid-rename. Running this
+	// before the lock raced a concurrent swap's missing-dir window (#181).
+	recoverIndexDir(dir)
 	return func() {
 		_ = unlockFileEx(h, 0, 1, 0, &ol)
 		_ = f.Close()

@@ -12,6 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 const handoffBudget = 6 * 1024
@@ -63,6 +64,7 @@ func runHandoff(args []string, stdout io.Writer) error {
 		return err
 	}
 	digest := handoffDigest(s, handoffBudget)
+	usage.Record(index.DefaultDir(), usage.KindHandoff, len(digest))
 	if !doExec {
 		printSanitized(stdout, digest)
 		if pasteOnly {
@@ -79,6 +81,11 @@ func runHandoff(args []string, stdout io.Writer) error {
 				strings.Join(head, " "), target, prefixArg(prefix), target, prefixArg(prefix))
 		}
 		return nil
+	}
+	// A prompt can never start with "-" today, but keep the invariant explicit
+	// so a future digest change cannot turn the prompt into a flag.
+	if strings.HasPrefix(digest, "-") {
+		digest = " " + digest
 	}
 	argv, _ := handoffCommand(target, digest)
 	if _, err := exec.LookPath(argv[0]); err != nil {
@@ -246,6 +253,10 @@ func handoffDigest(s model.Session, budget int) string {
 		b.WriteString("\n\n## Where it stopped\n\n")
 		b.WriteString(tail)
 	}
+	// The digest is a lossy slice by construction. Tell the receiving agent it
+	// can pull deeper instead of being stuck with the summary: push+pull, not
+	// one-shot push.
+	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.\n", short(s.ID), short(s.ID))
 	return strings.TrimSpace(b.String()) + "\n"
 }
 

@@ -191,3 +191,26 @@ func TestPrefixArgAndProjectCandidates(t *testing.T) {
 		t.Fatalf("candidates = %v", names)
 	}
 }
+
+func TestHandoffDigestHasPullPointer(t *testing.T) {
+	s := model.Session{ID: "abcdef123456xyz", Harness: "claude", Project: "p",
+		Messages: []model.Message{{Role: "user", Text: "real problem statement here"}}}
+	d := handoffDigest(s, handoffBudget)
+	if !strings.Contains(d, "compact slice of session abcdef123456") ||
+		!strings.Contains(d, "recall_context") || !strings.Contains(d, "deja show") {
+		t.Fatalf("pull pointer missing:\n%s", d)
+	}
+}
+
+func TestReceiptIsNewsDedupes(t *testing.T) {
+	hermeticEnv(t)
+	if !receiptIsNews("digest-a") {
+		t.Fatal("first announcement must be news")
+	}
+	if receiptIsNews("digest-a") {
+		t.Fatal("same digest within 24h must be suppressed")
+	}
+	if !receiptIsNews("digest-b") {
+		t.Fatal("changed digest must be news again")
+	}
+}

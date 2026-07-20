@@ -41,6 +41,8 @@ type statsReport struct {
 	Recall          usage.Summary  `json:"recall"`
 	WeekRecalls     int            `json:"week_recalls"`
 	WeekBytes       int            `json:"week_bytes"`
+	WeekInjected    int            `json:"week_injected"`
+	HandoffsIn      int            `json:"handoffs_received"`
 	SidecarSize     int64          `json:"sidecar_size,omitempty"`
 }
 
@@ -182,7 +184,7 @@ func runStats(args []string) error {
 	}
 	report := buildStats(filterStatsSessions(ss, options), time.Now())
 	report.Recall = usage.Totals(index.DefaultDir())
-	report.WeekRecalls, report.WeekBytes = usage.Week(index.DefaultDir())
+	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(index.DefaultDir())
 	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
 		report.SidecarSize = fi.Size()
 	}
@@ -368,6 +370,17 @@ func buildStats(ss []model.Session, now time.Time) statsReport {
 		out.DateRange.End = maxT.Format("2006-01-02")
 	}
 	out.RepeatQuestions = repeatQuestions(ss)
+	for _, s := range ss {
+		for _, msg := range s.Messages {
+			if msg.Role != "user" {
+				continue
+			}
+			if strings.Contains(msg.Text, "picking up work handed off from a") {
+				out.HandoffsIn++
+			}
+			break // only the opening user turn marks a handoff-seeded session
+		}
+	}
 	return out
 }
 
@@ -460,7 +473,10 @@ func printStats(w io.Writer, r statsReport) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
 	fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
-	fmt.Fprintf(w, "  This week        %d recalls · %s of context re-used\n", r.WeekRecalls, humanBytes(int64(r.WeekBytes)))
+	fmt.Fprintf(w, "  This week        %d recalls by your agents · %s re-used (plus %d auto-injections)\n", r.WeekRecalls, humanBytes(int64(r.WeekBytes)), r.WeekInjected)
+	if r.HandoffsIn > 0 {
+		fmt.Fprintf(w, "  Handoffs         %d sessions started from a handoff\n", r.HandoffsIn)
+	}
 	fmt.Fprintf(w, "  Injections       %d · %d sessions · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, humanBytes(int64(r.Recall.InjectedBytes)))
 	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)
 }
