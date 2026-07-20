@@ -23,6 +23,9 @@ const warmupRetryAfter = 10 * time.Minute
 var spawnWarmup = startDetachedWarmup
 
 type sessionStartHookResponse struct {
+	// SystemMessage surfaces a one-line receipt in the user's UI when memory
+	// actually landed; silent success builds no habit.
+	SystemMessage      string `json:"systemMessage,omitempty"`
 	HookSpecificOutput struct {
 		HookEventName     string `json:"hookEventName"`
 		AdditionalContext string `json:"additionalContext"`
@@ -76,6 +79,13 @@ func runHookContext(plain bool) error {
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "SessionStart"
 	resp.HookSpecificOutput.AdditionalContext = digest
+	if sessions > 0 {
+		plural := ""
+		if sessions > 1 {
+			plural = "s"
+		}
+		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s from this project (~%dKB) — the agent starts already knowing them", sessions, plural, (len(digest)+1023)/1024)
+	}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil

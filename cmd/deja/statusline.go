@@ -16,6 +16,10 @@ func runStatusline(stdin io.Reader, stdout io.Writer) error {
 	drainStdin(stdin)
 	recalls, bytes, injected := usage.TodayWithInjections(index.DefaultDir())
 	if recalls == 0 {
+		if wr, wb := usage.Week(index.DefaultDir()); wr > 0 {
+			fmt.Fprintf(stdout, "deja · quiet today · %d recalls, %s re-used this week", wr, humanBytes(int64(wb)))
+			return nil
+		}
 		fmt.Fprint(stdout, "deja · no recalls yet today · 0 B injected")
 		return nil
 	}

@@ -39,6 +39,8 @@ type statsReport struct {
 	Longest         sessionStat    `json:"longest_session"`
 	BusiestDay      dayStat        `json:"busiest_day"`
 	Recall          usage.Summary  `json:"recall"`
+	WeekRecalls     int            `json:"week_recalls"`
+	WeekBytes       int            `json:"week_bytes"`
 	SidecarSize     int64          `json:"sidecar_size,omitempty"`
 }
 
@@ -180,6 +182,7 @@ func runStats(args []string) error {
 	}
 	report := buildStats(filterStatsSessions(ss, options), time.Now())
 	report.Recall = usage.Totals(index.DefaultDir())
+	report.WeekRecalls, report.WeekBytes = usage.Week(index.DefaultDir())
 	if fi, e := os.Stat(embed.Path(index.DefaultDir())); e == nil {
 		report.SidecarSize = fi.Size()
 	}
@@ -457,6 +460,7 @@ func printStats(w io.Writer, r statsReport) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
 	fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
+	fmt.Fprintf(w, "  This week        %d recalls · %s of context re-used\n", r.WeekRecalls, humanBytes(int64(r.WeekBytes)))
 	fmt.Fprintf(w, "  Injections       %d · %d sessions · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, humanBytes(int64(r.Recall.InjectedBytes)))
 	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)
 }

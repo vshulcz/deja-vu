@@ -638,6 +638,7 @@ func TestHookContextSyntheticFixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 	var resp struct {
+		SystemMessage      string `json:"systemMessage"`
 		HookSpecificOutput struct {
 			HookEventName     string `json:"hookEventName"`
 			AdditionalContext string `json:"additionalContext"`
@@ -649,6 +650,10 @@ func TestHookContextSyntheticFixtures(t *testing.T) {
 	digest := resp.HookSpecificOutput.AdditionalContext
 	if resp.HookSpecificOutput.HookEventName != "SessionStart" || !strings.Contains(digest, "Find frobnicator bug") || !strings.Contains(digest, "parser.go") {
 		t.Fatalf("bad hook response: %#v", resp)
+	}
+	// A non-trivial injection must come with a visible receipt.
+	if !strings.Contains(resp.SystemMessage, "deja: recalled") || !strings.Contains(resp.SystemMessage, "prior session") {
+		t.Fatalf("receipt = %q", resp.SystemMessage)
 	}
 	if len(digest) > 2000 {
 		t.Fatalf("digest too large: %d", len(digest))

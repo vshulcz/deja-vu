@@ -132,6 +132,20 @@ func Totals(indexDir string) Summary {
 
 // Today sums events since local midnight: agent recalls (recall, context,
 // hook) and the context bytes they served.
+// Week aggregates recall activity over the trailing seven days — the number
+// a user can point at to see what the memory actually did for them.
+func Week(indexDir string) (recalls int, bytes int) {
+	cut := time.Now().Add(-7 * 24 * time.Hour)
+	for _, e := range read(Path(indexDir)) {
+		if e.Time.Before(cut) || e.Empty {
+			continue
+		}
+		recalls++
+		bytes += e.Bytes
+	}
+	return recalls, bytes
+}
+
 func Today(indexDir string) (recalls int, bytes int) {
 	recalls, bytes, _ = TodayWithInjections(indexDir)
 	return recalls, bytes

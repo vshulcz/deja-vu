@@ -93,6 +93,8 @@ func renderStatsCard(r statsReport) string {
 // cardPunchline picks one personal, shareable sentence for the card hero.
 func cardPunchline(r statsReport) string {
 	switch {
+	case r.WeekRecalls > 0:
+		return fmt.Sprintf("deja handed your agents memory %s times this week.", formatStatNumber(r.WeekRecalls))
 	case r.RepeatQuestions > 0:
 		return fmt.Sprintf("You asked the same thing %s times — deja remembered.", formatStatNumber(r.RepeatQuestions))
 	case r.Recall.Recalls > 0:
