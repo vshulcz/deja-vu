@@ -283,7 +283,7 @@ Prior sessions in the generated corpus carry realistic log-noise bulk; without i
 
 ## How it works
 
-Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact credentials → `records.bin` + token buckets → `manifest.json` tracks per-file state so repeat runs only ingest what changed. The MCP server, stats, share and sync all read the same index. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact credentials → `records.bin` + token buckets → `manifest.gob` tracks per-file state so repeat runs only ingest what changed. The MCP server, stats, share and sync all read the same index. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 **Privacy:** indexing and search are local. Network is used only by `deja update`, `deja sync ssh`, and the `deja doctor` version check. Local files in, local cache out.
 
@@ -301,8 +301,7 @@ Those are memory *platforms*: a Python runtime, embedding models, a vector store
 
 **What about Windows?** Builds exist, CI runs the suite on Windows; macOS/Linux are the battle-tested paths. Field reports welcome: [#9](https://github.com/vshulcz/deja-vu/issues/9).
 
-**Can I exclude a project?** Not yet — planned as `--exclude` ([#8](https://github.com/vshulcz/deja-vu/issues/8)). Today you can point `DEJA_*_ROOT` at a filtered copy.
-
+**Can I exclude a project?** Yes: one case-insensitive pattern per line in `~/.config/deja/exclude` (XDG-aware) or comma-separated in `DEJA_EXCLUDE_PROJECTS`; see the Privacy section above.
 **How do I wipe everything?**
 
 ```sh

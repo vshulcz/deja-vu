@@ -176,6 +176,8 @@ func doctorHarnesses(w io.Writer) {
 
 	piRoot := sources.PiRoot()
 	printRow("pi", piRoot, doctorExists(piRoot), doctorCount(len(sources.PiSessionFiles()), "file"))
+	copilotRoot := sources.CopilotRoot()
+	printRow("copilot", copilotRoot, doctorExists(copilotRoot), doctorCount(len(sources.CopilotSessionFiles()), "file"))
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
 }
 
