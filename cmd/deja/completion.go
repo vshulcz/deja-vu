@@ -91,8 +91,10 @@ _deja_completion() {
         last)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--role" ]]; then
+                COMPREPLY=( $(compgen -W "user assistant tool" -- "$cur") )
             else
-                COMPREPLY=( $(compgen -W "--harness --project" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--harness --project --since --role" -- "$cur") )
             fi
             ;;
         remember)
@@ -208,7 +210,7 @@ _deja() {
       _arguments '--no-guidance[skip guidance files]' "1:target:($install_targets)"
       ;;
     last)
-      _arguments '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '1:count:'
+      _arguments '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)' '1:count:'
       ;;
     remember)
       _arguments '--project=[note project]:project:' '1:text:'
@@ -283,6 +285,8 @@ complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a 'claude-c
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidance
 complete -c deja -n '__fish_seen_subcommand_from last' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja'
 complete -c deja -n '__fish_seen_subcommand_from last' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from last' -l since -r
+complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a 'user assistant tool'
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
 complete -c deja -n '__fish_seen_subcommand_from stats' -l json
