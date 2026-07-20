@@ -103,7 +103,7 @@ func TestWriteTombstonesAtomicNoTemp(t *testing.T) {
 	if err := writeTombstones(map[string]bool{"claude:s1": true, "codex:s2": true}); err != nil {
 		t.Fatal(err)
 	}
-	got := Tombstones()
+	got := readTombstones()
 	if !got["claude:s1"] || !got["codex:s2"] {
 		t.Fatalf("tombstones = %#v", got)
 	}
@@ -114,7 +114,7 @@ func TestWriteTombstonesAtomicNoTemp(t *testing.T) {
 	if err := writeTombstones(map[string]bool{"claude:s1": true}); err != nil {
 		t.Fatal(err)
 	}
-	if got := Tombstones(); got["codex:s2"] || !got["claude:s1"] {
+	if got := readTombstones(); got["codex:s2"] || !got["claude:s1"] {
 		t.Fatalf("after shrink = %#v", got)
 	}
 }
