@@ -1232,10 +1232,15 @@ func splitCompound(word []rune, out *[]string) {
 }
 
 func retrievalKeys(keys []string) []string {
-	if len(keys) <= 3 {
+	// Fetch postings for up to 8 tokens: a bucket read is sub-millisecond and
+	// intersectPostings sorts the fetched lists rarest-first with an early
+	// exit, so more keys means a more selective AND, not a slower one. The old
+	// cap of 3 longest tokens guessed at rarity by length and guessed wrong on
+	// long-but-common words.
+	if len(keys) <= 8 {
 		return keys
 	}
-	return keys[:3] // tokens() sorts longest-first; long tokens are the most selective
+	return keys[:8]
 }
 
 func queryKeys(s string) []string {
