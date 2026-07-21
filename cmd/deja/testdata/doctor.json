@@ -76,6 +76,14 @@
       "files": 0
     },
     {
+      "name": "kimi",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.kimi-code/sessions"
+      ],
+      "files": 0
+    },
+    {
       "name": "pi",
       "state": "missing",
       "paths": [
@@ -144,6 +152,11 @@
       "name": "qwen",
       "state": "config-missing",
       "path": "<tmp>/home/.qwen/settings.json"
+    },
+    {
+      "name": "kimi",
+      "state": "config-missing",
+      "path": "<tmp>/home/.kimi-code/mcp.json"
     },
     {
       "name": "pi",

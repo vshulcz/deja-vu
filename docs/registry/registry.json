@@ -196,6 +196,27 @@
       }
     },
     {
+      "id": "kimi",
+      "store_paths": [
+        "${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl",
+        "${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/kimi/sessions/wd_demo_0123456789ab/session_fixture01/agents/main/wire.jsonl"
+      ],
+      "parser_source": "internal/sources/kimi.go",
+      "last_verified": "2026-07-21",
+      "display_name": "Kimi Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "resume": true,
+        "handoff": "paste",
+        "prereq": ""
+      }
+    },
+    {
       "id": "pi",
       "store_paths": [
         "${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl"

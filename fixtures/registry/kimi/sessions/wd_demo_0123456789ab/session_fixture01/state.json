@@ -1,0 +1,16 @@
+{
+  "createdAt": "2026-07-01T10:00:00.000Z",
+  "updatedAt": "2026-07-01T10:00:05.000Z",
+  "title": "Kimi fixture: jwks cache rotation needle",
+  "isCustomTitle": false,
+  "lastPrompt": "why does the jwks cache go stale after rotation?",
+  "workDir": "/home/example/work/demo-project",
+  "agents": {
+    "main": {
+      "homedir": "/home/example/.kimi-code/sessions/wd_demo_0123456789ab/session_fixture01/agents/main",
+      "type": "main",
+      "parentAgentId": null
+    }
+  },
+  "custom": {}
+}
