@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,6 +38,9 @@ func suggestFirstQuery(dir string) string {
 	total := float64(len(ss))
 	best := ""
 	bestScore := 0.0
+	// Newest first, so an IDF tie resolves to the most recent phrase instead
+	// of map iteration order.
+	sort.SliceStable(ss, func(i, j int) bool { return ss[i].Updated.After(ss[j].Updated) })
 	for _, s := range ss {
 		if s.Updated.Before(cut) {
 			continue
@@ -54,7 +58,7 @@ func suggestFirstQuery(dir string) string {
 					continue
 				}
 				score := math.Log(total/float64(df[a])) + math.Log(total/float64(df[b]))
-				if score > bestScore {
+				if score > bestScore+1e-9 {
 					bestScore = score
 					best = a + " " + b
 				}
