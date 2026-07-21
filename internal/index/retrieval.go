@@ -821,19 +821,23 @@ func hasStemToken(terms []string) bool {
 }
 
 func stemMatches(term string, catalog map[string]bool) []string {
+	var forms []string
 	if len([]rune(term)) < 5 {
-		var matches []string
 		for _, form := range []string{term, term + "s", term + "es", strings.TrimSuffix(term, "s")} {
-			if len(form) >= 3 && catalog[form] {
-				matches = append(matches, form)
+			if len(form) >= 3 {
+				forms = append(forms, form)
 			}
 		}
-		return matches
+	} else {
+		forms = suffixForms(term)
 	}
-	forms := suffixForms(term)
+	forms = append(forms, devSynonyms[term]...)
+	forms = append(forms, cyrSuffixForms(term)...)
 	matches := make([]string, 0, 8)
+	seen := map[string]bool{}
 	for _, form := range forms {
-		if catalog[form] {
+		if !seen[form] && catalog[form] {
+			seen[form] = true
 			matches = append(matches, form)
 		}
 	}
@@ -841,6 +845,72 @@ func stemMatches(term string, catalog map[string]bool) []string {
 		matches = matches[:8]
 	}
 	return matches
+}
+
+// devSynonyms is a small reviewed fold table for the abbreviations developers
+// actually type. Deterministic and shipped in the repo — no embeddings, no
+// guessing. Applied only in the stem tier (exact matches never consult it)
+// and narrated like any other variant.
+var devSynonyms = func() map[string][]string {
+	pairs := [][2]string{
+		{"auth", "authentication"}, {"auth", "authorization"},
+		{"db", "database"}, {"k8s", "kubernetes"},
+		{"env", "environment"}, {"config", "configuration"},
+		{"cfg", "config"}, {"repo", "repository"},
+		{"perm", "permission"}, {"cert", "certificate"},
+		{"dir", "directory"}, {"msg", "message"},
+		{"deps", "dependencies"}, {"prod", "production"},
+		{"param", "parameter"}, {"arg", "argument"},
+		{"docs", "documentation"}, {"err", "error"},
+		{"regex", "regexp"}, {"spec", "specification"},
+	}
+	m := map[string][]string{}
+	for _, p := range pairs {
+		m[p[0]] = append(m[p[0]], p[1])
+		m[p[1]] = append(m[p[1]], p[0])
+	}
+	return m
+}()
+
+// cyrEndings are common Russian inflection endings, longest first so the
+// stem strips greedily. A bounded fold, not a morphology engine.
+var cyrEndings = []string{
+	"иями", "ями", "ами", "ией", "иях", "ях", "ах", "ов", "ев", "ей",
+	"ой", "ий", "ия", "ию", "ии", "ие", "ый", "ая", "ое", "ые",
+	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о",
+}
+
+// cyrSuffixForms bridges Russian inflection: strip the longest known ending,
+// then re-attach each — миграция matches миграции and миграцию. ASCII terms
+// return nothing.
+func cyrSuffixForms(term string) []string {
+	runes := []rune(term)
+	if len(runes) < 5 {
+		return nil
+	}
+	cyr := false
+	for _, r := range runes {
+		if r >= 'а' && r <= 'я' || r == 'ё' {
+			cyr = true
+			break
+		}
+	}
+	if !cyr {
+		return nil
+	}
+	base := term
+	for _, end := range cyrEndings {
+		if strings.HasSuffix(term, end) && len([]rune(term))-len([]rune(end)) >= 4 {
+			base = strings.TrimSuffix(term, end)
+			break
+		}
+	}
+	forms := make([]string, 0, len(cyrEndings)+1)
+	forms = append(forms, base)
+	for _, end := range cyrEndings {
+		forms = append(forms, base+end)
+	}
+	return forms
 }
 
 func suffixForms(word string) []string {
