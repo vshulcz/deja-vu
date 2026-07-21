@@ -73,7 +73,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: note — this session is %s old; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
 	}
 	digest := digest.Handoff(s, handoffBudget)
-	usage.Record(dir, usage.KindHandoff, len(digest))
+	usage.RecordDigest(dir, usage.KindHandoff, digest, 1)
 	if !doExec {
 		printSanitized(stdout, digest)
 		if pasteOnly {

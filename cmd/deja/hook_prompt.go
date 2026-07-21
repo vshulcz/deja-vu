@@ -78,7 +78,7 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
 	out := frameRecall(lead + digest + citationLine(ss[0]))
-	usage.RecordResult(dir, usage.KindHook, len(out), len(ss), false)
+	usage.RecordDigest(dir, usage.KindHook, out, len(ss))
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out

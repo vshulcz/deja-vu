@@ -35,7 +35,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]}"
     action="${COMP_WORDS[2]}"
 
-    local commands="blame bench completion ctx doctor embed forget handoff index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup"
+    local commands="blame bench completion ctx doctor embed forget handoff index install last log mcp remember resume share show sources stats statusline sync uninstall update version warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja"
     local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto"
 
@@ -153,6 +153,7 @@ _deja() {
     'index:build or refresh the index'
     'install:wire deja into an agent'
     'last:list recent sessions'
+    'log:show what deja served to agents'
     'mcp:serve the MCP protocol'
     'remember:store a durable note'
     'resume:reopen a session'
@@ -247,7 +248,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed forget handoff index install last mcp remember resume share show sources stats statusline sync uninstall update version warmup'
+complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed forget handoff index install last log mcp remember resume share show sources stats statusline sync uninstall update version warmup'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'

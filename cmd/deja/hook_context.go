@@ -75,7 +75,7 @@ func runHookContext(dir string, plain bool) error {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
-	usage.RecordResult(dir, usage.KindHook, len(digest), sessions, false)
+	usage.RecordDigest(dir, usage.KindHook, digest, sessions)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
