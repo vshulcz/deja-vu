@@ -91,6 +91,21 @@ mark{background:transparent;color:var(--amber);text-decoration:underline;text-un
 
 /* ── hero boot ──────────────────────────────────────────── */
 header{padding:56px 0 8px}
+.neofetch{display:flex;gap:40px;align-items:center}
+pre.mark{
+  flex:none;font-size:11.5px;line-height:1.08;user-select:none;
+  filter:drop-shadow(0 0 10px rgba(95,135,215,.35));
+}
+pre.mark .c104{color:#8787d7}
+pre.mark .c68{color:#5f87d7}
+pre.mark .c74{color:#5fafd7}
+@keyframes markwipe{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0% 0)}}
+.js pre.mark{animation:markwipe 1.4s steps(15) .5s both}
+@media (prefers-reduced-motion: reduce){.js pre.mark{animation:none}}
+@media(max-width:760px){
+  .neofetch{flex-direction:column;align-items:flex-start;gap:18px}
+  pre.mark{font-size:8px}
+}
 .boot{font-size:.88rem;min-height:0}
 .boot .ln{white-space:pre-wrap}
 .boot .bar-h{color:var(--ph-dim)}
@@ -252,6 +267,22 @@ footer .spacer{flex:1}
 <div class="wrap">
 
 <header>
+  <div class="neofetch">
+  <pre class="mark" aria-hidden="true">           <i class="c104">▗</i><i class="c104">▄</i><i class="c68">▄</i><i class="c68">▟</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i>
+        <i class="c104">▄</i><i class="c104">▟</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i>
+      <i class="c104">▄</i><i class="c104">█</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i><i class="c68">▀</i><i class="c68">▀</i><i class="c68">▘</i>
+    <i class="c104">▗</i><i class="c104">█</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▀</i>
+   <i class="c104">▗</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i><i class="c68">▘</i>
+   <i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i>                    <i class="c74">▗</i><i class="c74">▄</i><i class="c74">▄</i><i class="c74">▟</i>
+  <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▘</i>        <i class="c68">▄</i><i class="c68">▄</i><i class="c68">▄</i><i class="c68">▄</i>       <i class="c74">▗</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>
+  <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i>        <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>    <i class="c74">▗</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>
+  <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▖</i>        <i class="c74">▀</i><i class="c74">▀</i><i class="c74">▀</i><i class="c74">▀</i>        <i class="c74">▜</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>
+   <i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▙</i>                    <i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i>
+   <i class="c68">▝</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▙</i><i class="c68">▖</i>                <i class="c74">▗</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▘</i>
+    <i class="c68">▝</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c74">▄</i>              <i class="c74">▄</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▘</i>
+      <i class="c68">▀</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▙</i><i class="c74">▄</i><i class="c74">▄</i><i class="c74">▖</i>    <i class="c74">▗</i><i class="c74">▄</i><i class="c74">▄</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▀</i>
+        <i class="c74">▀</i><i class="c74">▜</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▛</i><i class="c74">▀</i>
+           <i class="c74">▝</i><i class="c74">▀</i><i class="c74">▀</i><i class="c74">▜</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▛</i><i class="c74">▀</i><i class="c74">▀</i><i class="c74">▘</i></pre>
   <div class="boot type-seq" id="boot" aria-label="deja indexing existing agent history">
     <div class="ln"><span class="p">$</span> <span class="cmd">deja index</span></div>
     <div class="ln dim">scanning harness stores…</div>
@@ -261,6 +292,7 @@ footer .spacer{flex:1}
     <div class="ln bar-h">  8 more…      ▓▓░░░░░░░░░░░░   54 sessions</div>
     <div class="ln"><span class="ok">✓</span> 1,019 sessions · 3.3 GB · indexed in 9.6 s</div>
     <div class="ln dim">months of history from before you installed it — already searchable</div>
+  </div>
   </div>
 
   <div class="logo-block reveal" id="logoblk">
