@@ -1096,7 +1096,69 @@ func indexKeys(s string) []string {
 	for _, tok := range tokens(s) {
 		out = append(out, "t"+tok)
 	}
+	for _, part := range identifierParts(s) {
+		out = append(out, "t"+part)
+	}
 	return out
+}
+
+// identifierParts emits the lowered inner words of compound identifiers so
+// `deja "user profile"` finds getUserProfile and refresh_token_rotation.
+// It walks the original-cased text: case humps are gone after lowering.
+// Only words of 6+ runes with a real boundary produce parts, and only parts
+// of 3+ runes are kept — short fragments ride the substring tier instead.
+func identifierParts(s string) []string {
+	var out []string
+	var word []rune
+	flushWord := func() {
+		if len(word) >= 6 {
+			splitCompound(word, &out)
+		}
+		word = word[:0]
+	}
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			word = append(word, r)
+			if len(word) > 64 {
+				flushWord()
+			}
+			continue
+		}
+		flushWord()
+	}
+	flushWord()
+	return out
+}
+
+func splitCompound(word []rune, out *[]string) {
+	start := 0
+	boundaries := 0
+	emit := func(end int) {
+		if end-start >= 3 {
+			*out = append(*out, strings.ToLower(string(word[start:end])))
+		}
+		start = end
+	}
+	for i := 1; i < len(word); i++ {
+		c, p := word[i], word[i-1]
+		switch {
+		case c == '_' || c == '-':
+			emit(i)
+			start = i + 1
+			boundaries++
+		case unicode.IsUpper(c) && (unicode.IsLower(p) || unicode.IsDigit(p)):
+			// getUser | getUserById: hump boundary
+			emit(i)
+			boundaries++
+		case unicode.IsLower(c) && unicode.IsUpper(p) && i-1 > start:
+			// JSONData -> JSON | Data: break before the last upper
+			emit(i - 1)
+			boundaries++
+		}
+	}
+	if boundaries > 0 {
+		emit(len(word))
+	}
 }
 
 func retrievalKeys(keys []string) []string {
