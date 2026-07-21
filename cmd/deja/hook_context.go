@@ -60,7 +60,7 @@ func runHookContext(dir string, plain bool) error {
 		Source string `json:"source"`
 	}
 	_ = json.NewDecoder(os.Stdin).Decode(&input)
-	digest, sessions, raw := hookDigestResult(dir)
+	digest, sessions, raw, taskMatched := hookDigestResult(dir)
 	if digest == "" {
 		return nil
 	}
@@ -91,7 +91,13 @@ func runHookContext(dir string, plain bool) error {
 		if sessions > 1 {
 			plural = "s"
 		}
-		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s from this project (~%dKB) — the agent starts already knowing them%s", sessions, plural, (len(digest)+1023)/1024, serviceReceipt(dir))
+		// The receipt says why these sessions and not just "recent": when the
+		// working tree pointed at them, name the files that did it.
+		why := "from this project"
+		if len(taskMatched) > 0 {
+			why = "touching " + strings.Join(taskMatched, ", ")
+		}
+		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir))
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -121,26 +127,26 @@ func receiptIsNews(dir, digest string) bool {
 }
 
 func hookDigest(dir string) string {
-	digest, _, _ := hookDigestResult(dir)
+	digest, _, _, _ := hookDigestResult(dir)
 	return digest
 }
 
-func hookDigestResult(dir string) (string, int, int64) {
+func hookDigestResult(dir string) (string, int, int64, []string) {
 	defer func() { _ = recover() }()
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
-		return "", 0, 0
+		return "", 0, 0, nil
 	}
 	if !index.HasManifest(dir) {
 		requestWarmup(dir)
-		return "", 0, 0
+		return "", 0, 0, nil
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return "", 0, 0
+			return "", 0, 0, nil
 		}
 	}
 	names := []string{sources.ClaudeProjectName(cwd)}
@@ -165,8 +171,16 @@ func hookDigestResult(dir string) (string, int, int64) {
 			}
 		}
 	}
+	// The task signal decides how wide the candidate pool is: with changed
+	// files to match against, older sessions are worth considering; without
+	// it, recency alone decides and a small pool is enough.
+	taskFiles := changedTaskFiles(cwd)
+	perName := 3
+	if len(taskFiles) > 0 {
+		perName = 12
+	}
 	for _, name := range lookupNames {
-		got, err := index.RecentProject(dir, name, 3)
+		got, err := index.RecentProject(dir, name, perName)
 		if err != nil {
 			continue
 		}
@@ -183,14 +197,23 @@ func hookDigestResult(dir string) (string, int, int64) {
 		}
 	}
 	if len(ss) == 0 {
-		return "", 0, 0
+		return "", 0, 0, nil
 	}
-	sort.Slice(ss, func(i, j int) bool { return ss[i].Updated.After(ss[j].Updated) })
+	scores, matched := taskScores(ss, taskFiles)
+	sort.Slice(ss, func(i, j int) bool {
+		if scores[ss[i].Harness+":"+ss[i].ID] != scores[ss[j].Harness+":"+ss[j].ID] {
+			return scores[ss[i].Harness+":"+ss[i].ID] > scores[ss[j].Harness+":"+ss[j].ID]
+		}
+		return ss[i].Updated.After(ss[j].Updated)
+	})
 	if len(ss) > 12 {
 		ss = ss[:12]
 	}
-	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names})
-	return result.Text, result.Sessions, rawSize(ss)
+	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names, TaskScores: scores})
+	if result.Sessions == 0 {
+		matched = nil
+	}
+	return result.Text, result.Sessions, rawSize(ss), matched
 }
 
 func requestWarmup(dir string) {
