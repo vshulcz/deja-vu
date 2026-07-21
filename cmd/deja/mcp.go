@@ -95,7 +95,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 	case "initialize":
 		return map[string]any{
 			"protocolVersion": mcpProtocolVersion,
-			"capabilities":    map[string]any{"tools": map[string]any{}},
+			"capabilities":    map[string]any{"tools": map[string]any{}, "resources": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "deja", "version": version},
 		}, 0, ""
 	case "tools/list":
@@ -104,7 +104,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 				"name":        "recall",
 				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with the most specific token available: an exact error string, function name, file path, or flag (multiple words are ANDed). Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. Follow up with recall_context when one session looks right and you need its full story. Optionally filter by harness. When a result genuinely helps the task at hand — you reuse a fix, skip re-debugging, or confirm a prior decision — tell the user in one digest.Short line what deja-vu recalled and how you used it (e.g. \"deja-vu recalled: we hit this JWT skew in March — reusing that fix\"). Even a partial hint counts if it changed your approach. Say nothing about recalls that did not help.",
 				"annotations": map[string]any{"title": "Search past sessions", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}}, "required": []string{"query"}},
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}, "offset": map[string]any{"type": "number", "description": "Skip this many ranked matches — page through results without re-ranking."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "recall_context",
@@ -125,6 +125,16 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}}, "required": []string{"text"}},
 			},
 		}}, 0, ""
+	case "resources/list":
+		return mcpResourcesList(dir)
+	case "resources/read":
+		var p struct {
+			URI string `json:"uri"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil {
+			return nil, -32602, "invalid params"
+		}
+		return mcpResourceRead(dir, p.URI)
 	case "tools/call":
 		var p struct {
 			Name      string          `json:"name"`
@@ -158,6 +168,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Query   string  `json:"query"`
 			Harness string  `json:"harness"`
 			Limit   float64 `json:"limit"`
+			Offset  float64 `json:"offset"`
 		}
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return "", err
@@ -165,7 +176,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
+		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), 4096-recallFrameOverhead)
 		if err == nil {
 			text = frameRecall(text)
 			usage.RecordServedSessions(dir, usage.KindRecall, len(text), sessions, sessions == 0, raw, ids)
@@ -260,11 +271,11 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 }
 
 func recallText(dir, q, harness string, limit, budget int) (string, error) {
-	text, _, _, _, err := recallTextResult(dir, q, harness, limit, budget)
+	text, _, _, _, err := recallTextResult(dir, q, harness, limit, 0, budget)
 	return text, err
 }
 
-func recallTextResult(dir, q, harness string, limit, budget int) (string, int, int64, []string, error) {
+func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
 	if limit <= 0 {
 		limit = 5
 	}
@@ -301,7 +312,16 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, i
 	if len(hits) == 0 {
 		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, 0, nil, nil
 	}
+	total := len(hits)
+	if offset > 0 {
+		if offset >= total {
+			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", q, total, offset), 0, 0, nil, nil
+		}
+		hits = hits[offset:]
+	}
+	remaining := 0
 	if len(hits) > limit {
+		remaining = len(hits) - limit
 		hits = hits[:limit]
 	}
 	var b strings.Builder
@@ -311,7 +331,11 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, i
 	} else if result.Fuzzy {
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	}
-	fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
+	if offset > 0 {
+		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+len(hits), total)
+	} else {
+		fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
+	}
 	for i, h := range hits {
 		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1, h.Session.Harness, h.Session.Project, h.Session.ID, h.Count)
 		if !h.Session.Updated.IsZero() {
@@ -334,6 +358,9 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, i
 		if b.Len() >= budget {
 			break
 		}
+	}
+	if remaining > 0 {
+		fmt.Fprintf(&b, "\n%d more match(es) — call recall again with offset=%d.\n", remaining, offset+served)
 	}
 	out := b.String()
 	if len(out) > budget {

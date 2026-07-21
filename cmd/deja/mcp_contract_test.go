@@ -221,3 +221,69 @@ func TestMCPToolContract(t *testing.T) {
 		}
 	})
 }
+
+func TestMCPResourcesAndPagination(t *testing.T) {
+	tmp := hermeticEnv(t)
+	claude := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claude)
+	seedClaude(t, claude, "app", "sess-alpha", "the frobnicator crash in parser.go", "fixed the frobnicator")
+	seedClaude(t, claude, "app", "sess-beta", "another frobnicator regression today", "frobnicator again")
+
+	t.Run("resources list and read", func(t *testing.T) {
+		resp := driveMCP(t,
+			`{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}`)
+		resources := resp[0]["result"].(map[string]any)["resources"].([]any)
+		if len(resources) != 2 {
+			t.Fatalf("want 2 resources, got %d: %#v", len(resources), resources)
+		}
+		first := resources[0].(map[string]any)
+		uri, _ := first["uri"].(string)
+		if !strings.HasPrefix(uri, "deja://session/claude:") {
+			t.Fatalf("uri = %q", uri)
+		}
+		read := driveMCP(t, `{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"`+uri+`"}}`)
+		contents := read[0]["result"].(map[string]any)["contents"].([]any)
+		text := contents[0].(map[string]any)["text"].(string)
+		if !strings.Contains(text, "frobnicator") {
+			t.Fatalf("resource text wrong:\n%s", text)
+		}
+	})
+
+	t.Run("recall offset pages", func(t *testing.T) {
+		resp := driveMCP(t,
+			`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator","limit":1}}}`,
+			`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator","limit":1,"offset":1}}}`,
+			`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator","limit":1,"offset":9}}}`)
+		page1 := mcpToolText(t, resp[0])
+		page2 := mcpToolText(t, resp[1])
+		past := mcpToolText(t, resp[2])
+		if !strings.Contains(page1, "offset=1") {
+			t.Fatalf("page1 must advertise the next offset:\n%s", page1)
+		}
+		if !strings.Contains(page2, "matches 2-2 of 2") {
+			t.Fatalf("page2 header wrong:\n%s", page2)
+		}
+		id1, id2 := pageSessionID(page1), pageSessionID(page2)
+		if id1 == "" || id2 == "" || id1 == id2 {
+			t.Fatalf("pages must serve different sessions: %q vs %q", id1, id2)
+		}
+		if !strings.Contains(past, "No more matches") {
+			t.Fatalf("past-the-end page wrong:\n%s", past)
+		}
+	})
+}
+
+func mcpToolText(t *testing.T, resp map[string]any) string {
+	t.Helper()
+	content := resp["result"].(map[string]any)["content"].([]any)
+	return content[0].(map[string]any)["text"].(string)
+}
+
+func pageSessionID(page string) string {
+	for _, id := range []string{"sess-alpha", "sess-beta"} {
+		if strings.Contains(page, id) {
+			return id
+		}
+	}
+	return ""
+}
