@@ -43,6 +43,7 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 // both human and JSON reports keep exit status 0.
 func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir string) error {
 	jsonOutput := false
+	deep := false
 	offline := os.Getenv("DEJA_OFFLINE") == "1"
 	for _, arg := range args {
 		switch arg {
@@ -50,6 +51,8 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 			jsonOutput = true
 		case "--offline":
 			offline = true
+		case "--deep":
+			deep = true
 		default:
 			return fmt.Errorf("doctor: unknown flag %q", arg)
 		}
@@ -58,10 +61,22 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 		lookup = nil
 	}
 	report := collectDoctorReport(lookup, dir)
+	var deepReport *index.DeepReport
+	if deep {
+		dr, err := index.DeepVerify(dir)
+		if err != nil {
+			return fmt.Errorf("doctor: deep verify: %w", err)
+		}
+		deepReport = &dr
+		report.Deep = deepReport
+	}
 	if jsonOutput {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(report)
+		if err := enc.Encode(report); err != nil {
+			return err
+		}
+		return deepDriftErr(deepReport)
 	}
 	doctorHarnesses(w)
 	for _, store := range report.Stores {
@@ -89,7 +104,40 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	} else {
 		doctorVersion(w, func() (string, bool) { return report.Version.Latest, report.Version.Latest != "" })
 	}
-	return nil
+	if deepReport != nil {
+		fmt.Fprintln(w)
+		doctorDeep(w, *deepReport)
+	}
+	return deepDriftErr(deepReport)
+}
+
+// doctorDeep prints the source-vs-index proof. Everything above it is deja
+// trusting its own bookkeeping; this section is the recount.
+func doctorDeep(w io.Writer, r index.DeepReport) {
+	fmt.Fprintln(w, "Deep verification:")
+	fmt.Fprintf(w, "  checked  %s, %s, %s re-parsed, %s resolved\n",
+		doctorCount(r.FilesChecked, "source file"),
+		doctorCount(r.SessionsIndexed, "indexed session"),
+		doctorCount(r.SampledFiles, "sampled file"),
+		doctorCount(r.SampledPostings, "posting"))
+	if len(r.Stale) > 0 {
+		fmt.Fprintf(w, "  stale    %s changed since last pass — `deja index` will absorb them\n", doctorCount(len(r.Stale), "source"))
+	}
+	if r.Clean() {
+		fmt.Fprintln(w, "  status   index matches sources — no memory lost")
+		return
+	}
+	for _, f := range r.Findings {
+		fmt.Fprintf(w, "  drift    [%s] %s\n", f.Kind, f.Detail)
+	}
+	fmt.Fprintf(w, "  status   %s — run `deja index --rebuild`\n", doctorCount(len(r.Findings), "finding"))
+}
+
+func deepDriftErr(r *index.DeepReport) error {
+	if r == nil || r.Clean() {
+		return nil
+	}
+	return fmt.Errorf("doctor: index drift detected (%s) — run `deja index --rebuild`", doctorCount(len(r.Findings), "finding"))
 }
 
 func doctorHooks(w io.Writer) {

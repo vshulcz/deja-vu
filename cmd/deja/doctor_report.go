@@ -43,6 +43,7 @@ type doctorReport struct {
 	Version       doctorVersionReport            `json:"version"`
 	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
 	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
+	Deep          *index.DeepReport              `json:"deep,omitempty"`
 }
 
 type doctorEmbedReport struct {
