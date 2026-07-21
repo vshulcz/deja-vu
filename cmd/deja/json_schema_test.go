@@ -66,7 +66,7 @@ func TestJSONSchemaRequiredFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{`"schema_version"`, `"total_sessions"`, `"total_messages"`, `"harnesses"`, `"date_range"`} {
+	for _, key := range []string{`"schema_version"`, `"total_sessions"`, `"total_messages"`, `"harnesses"`, `"date_range"`, `"recalls_served"`} {
 		if !strings.Contains(out, key) {
 			t.Fatalf("stats json missing %s: %s", key, out)
 		}

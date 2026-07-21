@@ -30,7 +30,9 @@ Default exact search returns a JSON array of hits:
       "path": "/home/user/.claude/projects/.../session.jsonl",
       "started": "2026-01-02T03:04:05Z",
       "updated": "2026-01-02T03:10:00Z",
-      "messages": []
+      "messages": [
+        {"role": "user", "text": "why does the parser fail on …", "time": "2026-01-02T03:04:05Z"}
+      ]
     },
     "count": 2,
     "snippets": ["matched text …"],
@@ -82,9 +84,12 @@ Stemmed search may also include `variants`; semantic search sets `semantic`.
   },
   "busiest_day": {"date": "2026-07-04", "messages": 22},
   "recall": {
-    "recalls": 10,
+    "recalls_served": 10,
     "injections": 4,
+    "recall_sessions": 8,
     "injected_sessions": 3,
+    "bytes": 40960,
+    "injected_bytes": 12288,
     "empty_result_rate": 0.1
   },
   "week_recalls": 2,
@@ -115,7 +120,7 @@ Optional fields are omitted when zero or empty. The heatmap grid used by
   ],
   "index": {
     "state": "ok",
-    "path": "/home/user/.deja/index.db",
+    "path": "/home/user/.cache/deja/index.db",
     "stale_stores": 0
   },
   "mcp": [
@@ -160,8 +165,10 @@ Returns a JSON array of blame hits (same stability rules as exact search):
       "updated": "2026-01-02T03:10:00Z"
     },
     "title": "Fix parser edge case",
-    "tier": "exact",
-    "snippets": ["… parser.go …"]
+    "count": 3,
+    "snippets": ["… parser.go …"],
+    "score": 1.5,
+    "tier": "exact"
   }
 ]
 ```
