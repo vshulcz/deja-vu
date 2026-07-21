@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -75,7 +76,8 @@ func runHookContext(dir string, plain bool) error {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
-	usage.RecordDigest(dir, usage.KindHook, digest, sessions, raw)
+	polName := policy.Load().Describe(policy.ActivationAuto)
+	usage.RecordDigestPolicy(dir, usage.KindHook, digest, sessions, raw, polName)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -97,7 +99,13 @@ func runHookContext(dir string, plain bool) error {
 		if len(taskMatched) > 0 {
 			why = "touching " + strings.Join(taskMatched, ", ")
 		}
-		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir))
+		// A non-default policy is part of the receipt: the user should see
+		// that a rule, not chance, decided what memory crossed over.
+		polNote := ""
+		if polName != "local+imported" {
+			polNote = " · policy: " + polName
+		}
+		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote)
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -158,7 +166,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 			names = append(names, base)
 		}
 	}
-	localOnly := os.Getenv("DEJA_AUTORECALL_LOCAL_ONLY") == "1"
+	pol := policy.Load()
 	var ss []model.Session
 	seen := map[string]bool{}
 	lookupNames := names
@@ -185,7 +193,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 			continue
 		}
 		for _, s := range got {
-			if localOnly && strings.HasPrefix(s.Project, "imported:") {
+			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				continue
 			}
 			k := s.Harness + ":" + s.ID

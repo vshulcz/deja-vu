@@ -46,7 +46,11 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			enc.SetIndent("", "  ")
 			return enc.Encode(s)
 		}
-		fmt.Fprintf(w, "# %s · %s · %d sessions · %s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, humanBytes(int64(s.Bytes)))
+		pol := ""
+		if s.Policy != "" {
+			pol = " · policy: " + s.Policy
+		}
+		fmt.Fprintf(w, "# %s · %s · %d sessions · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, humanBytes(int64(s.Bytes)), pol)
 		fmt.Fprintln(w, s.Digest)
 		return nil
 	}
