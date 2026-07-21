@@ -722,27 +722,93 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 	if err != nil {
 		return nil, nil, err
 	}
-	perToken := make([]map[int64]posting, len(terms))
-	variants := map[string][]string{}
+	matchesPer := make([][]string, len(terms))
+	anchored := 0
 	for i, term := range terms {
-		matches := stemMatches(term, catalog)
-		if len(matches) == 0 {
-			return nil, nil, nil
+		matchesPer[i] = stemMatches(term, catalog)
+		if len(matchesPer[i]) > 0 {
+			anchored++
 		}
-		variants[term] = matches
-		perToken[i] = map[int64]posting{}
-		for _, variant := range matches {
+	}
+	if anchored == 0 {
+		return nil, nil, nil
+	}
+	// A token with no occurrences anywhere in the corpus cannot anchor the
+	// AND — natural-language queries are full of them. Drop such tokens when
+	// at least two anchored terms remain; the empty-string variant marks the
+	// token optional for the scan-time matcher.
+	variants := map[string][]string{}
+	type anchor struct {
+		term string
+		set  map[int64]posting
+	}
+	anchors := make([]anchor, 0, len(terms))
+	for i, term := range terms {
+		if len(matchesPer[i]) == 0 {
+			if anchored < 2 {
+				return nil, nil, nil
+			}
+			variants[term] = []string{""}
+			continue
+		}
+		variants[term] = matchesPer[i]
+		set := map[int64]posting{}
+		for _, variant := range matchesPer[i] {
 			posts, err := postingsFor(dir, "t"+variant)
 			if err != nil {
 				return nil, nil, err
 			}
 			for _, p := range posts {
-				perToken[i][p.Off] = p
+				set[p.Off] = p
+			}
+		}
+		anchors = append(anchors, anchor{term: term, set: set})
+	}
+	_ = phrases
+	sets := func(skip map[int]bool) []map[int64]posting {
+		out := make([]map[int64]posting, 0, len(anchors))
+		for i, a := range anchors {
+			if !skip[i] {
+				out = append(out, a.set)
+			}
+		}
+		return out
+	}
+	if posts := intersectPostingMaps(sets(nil)); len(posts) > 0 {
+		return posts, variants, nil
+	}
+	// Best-effort AND: no single session holds every anchored token. Natural
+	// queries carry filler ("why", "let") — try dropping up to two tokens,
+	// shortest first, and keep the first combination that matches anything.
+	if len(anchors) < 3 {
+		return nil, variants, nil
+	}
+	order := make([]int, len(anchors))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		return len(anchors[order[a]].term) < len(anchors[order[b]].term)
+	})
+	for _, i := range order {
+		if posts := intersectPostingMaps(sets(map[int]bool{i: true})); len(posts) > 0 {
+			variants[anchors[i].term] = []string{""}
+			return posts, variants, nil
+		}
+	}
+	if len(anchors) >= 4 {
+		for x := 0; x < len(order); x++ {
+			for y := x + 1; y < len(order); y++ {
+				i, j := order[x], order[y]
+				if posts := intersectPostingMaps(sets(map[int]bool{i: true, j: true})); len(posts) > 0 {
+					variants[anchors[i].term] = []string{""}
+					variants[anchors[j].term] = []string{""}
+					return posts, variants, nil
+				}
 			}
 		}
 	}
-	_ = phrases
-	return intersectPostingMaps(perToken), variants, nil
+	return nil, variants, nil
 }
 
 func hasStemToken(terms []string) bool {
@@ -756,10 +822,13 @@ func hasStemToken(terms []string) bool {
 
 func stemMatches(term string, catalog map[string]bool) []string {
 	if len([]rune(term)) < 5 {
-		if catalog[term] {
-			return []string{term}
+		var matches []string
+		for _, form := range []string{term, term + "s", term + "es", strings.TrimSuffix(term, "s")} {
+			if len(form) >= 3 && catalog[form] {
+				matches = append(matches, form)
+			}
 		}
-		return nil
+		return matches
 	}
 	forms := suffixForms(term)
 	matches := make([]string, 0, 8)
@@ -834,6 +903,15 @@ func oneSuffixStep(word string) []string {
 		add(base + "ing")
 		add(base + "ed")
 		add(strings.TrimSuffix(word, "te") + "tion")
+	}
+	// expansions: fail->fails, fail->failing/failed. The catalog filter keeps
+	// nonsense forms from ever reaching a lookup.
+	if !strings.HasSuffix(word, "s") {
+		add(word + "s")
+	}
+	if !strings.HasSuffix(word, "e") && !strings.HasSuffix(word, "ing") && !strings.HasSuffix(word, "ed") {
+		add(word + "ing")
+		add(word + "ed")
 	}
 	return out
 }
