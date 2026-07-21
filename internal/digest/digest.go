@@ -53,7 +53,7 @@ func Share(s model.Session, budget int) string {
 	}
 	var users, assistants []model.Message
 	for _, m := range s.Messages {
-		if noisyMessage(m.Text) {
+		if noisyMessage(m.Text) || IsAgentArtifact(m.Text) {
 			continue
 		}
 		switch m.Role {
@@ -63,8 +63,8 @@ func Share(s model.Session, budget int) string {
 			assistants = append(assistants, m)
 		}
 	}
-	appendSection("User problem statement(s)", users)
-	appendSection("Key assistant conclusions / code blocks", assistants)
+	appendSection("User problem statement(s)", dedupeStatus(users))
+	appendSection("Key assistant conclusions / code blocks", dedupeStatus(selectConclusions(assistants)))
 	return strings.TrimSpace(b.String()) + "\n"
 }
 
@@ -94,6 +94,8 @@ func MessageText(s string) string {
 var (
 	shareLineNumRE = regexp.MustCompile(`^\s*\d{1,6}\s`)            // "1 diff --git", numbered dumps
 	shareGrepRE    = regexp.MustCompile(`^\S+\.[a-z]{1,5}:\d+[:)]`) // path/file.go:18: grep output
+	shareShellRE   = regexp.MustCompile(`^\((eval|\w*sh)\):\d*:?`)  // zsh/bash error prefixes
+	shareDigitsRE  = regexp.MustCompile(`^[\d\s.,%-]+$`)            // bare number sequences
 )
 
 func looksLikeProse(line string) bool {
@@ -128,7 +130,36 @@ func looksLikeProse(line string) bool {
 }
 
 func noiseLine(line string) bool {
-	return shareLineNumRE.MatchString(line) || shareGrepRE.MatchString(line)
+	return shareLineNumRE.MatchString(line) || shareGrepRE.MatchString(line) ||
+		shareShellRE.MatchString(line) || shareDigitsRE.MatchString(line) ||
+		looksLikeListingDump(line)
+}
+
+// shareStopwords: a line of 8+ tokens with none of these is a path listing or
+// ls dump, not a sentence anyone wrote.
+var shareStopwords = map[string]bool{
+	"the": true, "a": true, "an": true, "is": true, "are": true, "to": true,
+	"of": true, "in": true, "on": true, "and": true, "or": true, "it": true,
+	"we": true, "i": true, "you": true, "not": true, "with": true, "for": true,
+	"и": true, "в": true, "на": true, "не": true, "что": true, "как": true,
+	"это": true, "у": true, "с": true, "по": true, "а": true, "но": true,
+}
+
+func looksLikeListingDump(line string) bool {
+	fields := strings.Fields(line)
+	if len(fields) < 8 {
+		return false
+	}
+	slashes := 0
+	for _, f := range fields {
+		if strings.ContainsRune(f, '/') {
+			slashes++
+		}
+		if shareStopwords[strings.ToLower(strings.Trim(f, ".,!?:;"))] {
+			return false
+		}
+	}
+	return true
 }
 
 func noisyMessage(s string) bool {
@@ -409,4 +440,61 @@ func Short(s string) string {
 		return s[:12]
 	}
 	return s
+}
+
+// decisionMarkers spot conclusion-bearing assistant messages in tool-heavy
+// sessions, where 95% of the transcript is status chatter around a few
+// sentences that actually explain what happened and why.
+var decisionMarkers = []string{
+	"root cause", "because", "the fix", "fixed", "decided", "instead of",
+	"turned out", "the problem was", "solution", "so the answer", "conclusion",
+	"works now", "passes now", "merged", "released", "chose", "won't work",
+}
+
+// selectConclusions keeps assistant messages that carry a decision marker,
+// plus the final message (the outcome), in transcript order. Conversational
+// sessions where nothing matches keep everything — the filter only kicks in
+// when it has something better to offer.
+func selectConclusions(ms []model.Message) []model.Message {
+	if len(ms) <= 2 {
+		return ms
+	}
+	var keep []model.Message
+	for i, m := range ms {
+		low := strings.ToLower(m.Text)
+		marked := false
+		for _, d := range decisionMarkers {
+			if strings.Contains(low, d) {
+				marked = true
+				break
+			}
+		}
+		if marked || strings.Contains(m.Text, "```") || i == len(ms)-1 {
+			keep = append(keep, m)
+		}
+	}
+	if len(keep) < 2 {
+		return ms
+	}
+	return keep
+}
+
+// dedupeStatus drops messages that repeat an earlier message's opening —
+// agent loops emit the same status line dozens of times and each survives
+// the noise filters individually.
+func dedupeStatus(ms []model.Message) []model.Message {
+	seen := map[string]bool{}
+	var out []model.Message
+	for _, m := range ms {
+		key := strings.ToLower(strings.Join(strings.Fields(m.Text), " "))
+		if r := []rune(key); len(r) > 60 {
+			key = string(r[:60])
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, m)
+	}
+	return out
 }
