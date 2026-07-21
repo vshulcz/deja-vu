@@ -21,6 +21,10 @@ type AutoRecallOptions struct {
 	Mode         string
 	ProjectNames []string
 	Now          time.Time
+	// TaskScores ranks sessions by overlap with what the repo is touching
+	// right now (harness:ID → matched-file count). Sessions the task points
+	// at outrank plain recency; zero or a nil map falls back to recency.
+	TaskScores map[string]int
 }
 
 type AutoRecallResult struct {
@@ -68,6 +72,11 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	}
 	candidates := append([]model.Session(nil), ss...)
 	sort.SliceStable(candidates, func(i, j int) bool {
+		ti := o.TaskScores[candidates[i].Harness+":"+candidates[i].ID]
+		tj := o.TaskScores[candidates[j].Harness+":"+candidates[j].ID]
+		if ti != tj {
+			return ti > tj
+		}
 		iRecent := !candidates[i].Updated.Before(o.Now.AddDate(0, 0, -90))
 		jRecent := !candidates[j].Updated.Before(o.Now.AddDate(0, 0, -90))
 		if iRecent != jRecent {
