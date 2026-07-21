@@ -80,6 +80,11 @@ type bm25Document struct {
 	termCount []int
 	userCount []int
 	length    int
+	// minWindow is the tightest character span containing every query token
+	// inside a single message; 0 means never seen together.
+	minWindow int
+	// titleHits counts query tokens found in the session title.
+	titleHits int
 }
 
 func Run(ss []model.Session, o Options) ([]Hit, error) {
@@ -117,6 +122,14 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 			tier = TierExact
 		}
 		doc := bm25Document{hit: Hit{Session: s, Tier: tier}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
+		if s.Title != "" && len(qtoks) > 0 {
+			titleLow := strings.ToLower(s.Title)
+			for _, tok := range qtoks {
+				if strings.Contains(titleLow, tok) {
+					doc.titleHits++
+				}
+			}
+		}
 		if len(qtoks) == 0 {
 			doc.termCount = []int{0}
 			doc.userCount = []int{0}
@@ -125,11 +138,11 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 			if o.Role != "" && m.Role != o.Role {
 				continue
 			}
+			low := strings.ToLower(m.Text)
 			c := 0
 			if re != nil {
 				c = len(re.FindAllStringIndex(m.Text, -1))
 			} else {
-				low := strings.ToLower(m.Text)
 				if !MatchesParts(m.Text, qtoks, phrases, o.FuzzyVariants) {
 					c = 0
 				} else if len(qtoks) <= 1 && len(phrases) == 0 && o.FuzzyVariants == nil {
@@ -155,8 +168,10 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 				if len(doc.hit.Snippets) < 3 {
 					doc.hit.Snippets = append(doc.hit.Snippets, snippet(m.Text, o.Query, re))
 				}
+				if w := tokenWindow(low, qtoks); w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
+					doc.minWindow = w
+				}
 			}
-			low := strings.ToLower(m.Text)
 			doc.length += countDocumentWords(low, qtoks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
 			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qlow) {
 				n := strings.Count(low, qlow)
@@ -181,7 +196,7 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 	if corpusDocuments > 0 {
 		avgLength = float64(corpusLength) / float64(corpusDocuments)
 	}
-	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks) == 0)
+	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks))
 	markEarlierAttempts(hits)
 	if !o.All && len(hits) > 15 {
 		hits = hits[:15]
@@ -251,7 +266,8 @@ func snippetOverlap(a, b map[string]bool) float64 {
 // RelativeDate is the human "3w ago" form used in listings and digests.
 func RelativeDate(t time.Time) string { return relativeDate(t) }
 
-func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, emptyQuery bool) []Hit {
+func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int) []Hit {
+	emptyQuery := queryTokenCount == 0
 	now := time.Now()
 	hits := make([]Hit, 0, len(documents))
 	for _, doc := range documents {
@@ -274,6 +290,8 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		if emptyQuery {
 			score = float64(doc.hit.Count)
 		}
+		score *= proximityBoost(doc.minWindow, queryTokenCount)
+		score *= titleBoost(doc.titleHits, queryTokenCount)
 		score *= freshnessDecay(doc.hit.Session.Updated, now)
 		doc.hit.Score = score
 		hits = append(hits, doc.hit)
@@ -299,6 +317,50 @@ func freshnessDecay(updated, now time.Time) float64 {
 		return 1
 	}
 	return 1 / (1 + age)
+}
+
+// tokenWindow returns the tightest character span of a message that contains
+// every query token at least once (first occurrences — an approximation that
+// costs nothing extra at scan time). 0 when some token is missing.
+func tokenWindow(low string, qtoks []string) int {
+	if len(qtoks) < 2 {
+		return 0
+	}
+	first, last := -1, -1
+	for _, tok := range qtoks {
+		i := strings.Index(low, tok)
+		if i < 0 {
+			return 0
+		}
+		if first < 0 || i < first {
+			first = i
+		}
+		if end := i + len(tok); end > last {
+			last = end
+		}
+	}
+	return last - first
+}
+
+// proximityBoost rewards documents where the query terms sit together: a
+// window under ~200 chars reads as one thought, a spread across kilobytes is
+// coincidence. Bounded at +35%.
+func proximityBoost(window, queryTokenCount int) float64 {
+	if window <= 0 || queryTokenCount < 2 {
+		return 1
+	}
+	span := float64(window)
+	boost := 1 + 0.35*(200/(200+span))
+	return boost
+}
+
+// titleBoost rewards query tokens appearing in the session title — the
+// strongest single relevance signal a session carries. Bounded at +40%.
+func titleBoost(titleHits, queryTokenCount int) float64 {
+	if titleHits == 0 || queryTokenCount == 0 {
+		return 1
+	}
+	return 1 + 0.4*float64(titleHits)/float64(queryTokenCount)
 }
 
 func countDocumentWords(s string, terms []string, variants map[string][]string, counts, userCounts []int, user bool) int {
