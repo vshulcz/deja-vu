@@ -290,3 +290,47 @@ func WornSessions(indexDir string) map[string]int {
 	}
 	return out
 }
+
+// ImpactReport assembles the measured proof that recall changes outcomes.
+// Every number is counted from recorded events on this machine — nothing is
+// modeled, sampled, or estimated.
+type ImpactReport struct {
+	Recalls       int   `json:"recalls"`        // agent-initiated, non-empty
+	Injections    int   `json:"injections"`     // session starts that began with memory
+	ServedBytes   int   `json:"served_bytes"`   // digest bytes actually returned
+	RawBytes      int64 `json:"raw_bytes"`      // source transcripts those digests distilled
+	ReusedTwice   int   `json:"reused_twice"`   // sessions agents recalled 2+ times
+	DejaVuMoments int   `json:"dejavu_moments"` // prompts matched to prior work, all time
+}
+
+// Impact counts across the whole usage log.
+func Impact(indexDir string) ImpactReport {
+	var r ImpactReport
+	worn := map[string]int{}
+	for _, e := range read(Path(indexDir)) {
+		switch e.Kind {
+		case KindRecall, KindContext:
+			if e.Empty {
+				continue
+			}
+			r.Recalls++
+			r.ServedBytes += e.Bytes
+			r.RawBytes += e.RawBytes
+			for _, id := range e.SessionIDs {
+				worn[id]++
+			}
+		case KindHook:
+			r.Injections++
+			r.ServedBytes += e.Bytes
+			r.RawBytes += e.RawBytes
+		case KindDejaVu:
+			r.DejaVuMoments++
+		}
+	}
+	for _, n := range worn {
+		if n >= 2 {
+			r.ReusedTwice++
+		}
+	}
+	return r
+}
