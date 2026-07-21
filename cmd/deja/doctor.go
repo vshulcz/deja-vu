@@ -382,6 +382,9 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	}
 	fmt.Fprintf(w, "  location %s\n", loc)
 	fmt.Fprintf(w, "  exclusions %d active patterns\n", len(sources.ExclusionPatterns()))
+	// A precise non-claim: users deciding what to trust deserve to read the
+	// boundary in the tool itself, not only in the security docs.
+	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
 	if idx.State == "missing" {
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return
