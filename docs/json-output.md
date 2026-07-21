@@ -38,7 +38,8 @@ Default exact search returns a JSON array of hits:
     "snippets": ["matched text …"],
     "score": 1.5,
     "tier": "exact",
-    "tier_detail": ""
+    "tier_detail": "",
+    "superseded": "2026-07-19"
   }
 ]
 ```
@@ -55,6 +56,8 @@ envelope with `schema_version`:
 ```
 
 Stemmed search may also include `variants`; semantic search sets `semantic`.
+`superseded` (added in 0.15, optional) carries the date of a newer same-project
+session whose matches overlap this hit — an earlier-attempt signal.
 
 ## `deja stats --json`
 

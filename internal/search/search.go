@@ -64,6 +64,9 @@ type Hit struct {
 	Score      float64       `json:"score"`
 	Tier       string        `json:"tier"`
 	TierDetail string        `json:"tier_detail,omitempty"`
+	// Superseded holds the date of a newer session in the same project whose
+	// matches overlap this one — a signal that this hit is an earlier attempt.
+	Superseded string `json:"superseded,omitempty"`
 }
 
 const (
@@ -179,11 +182,74 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 		avgLength = float64(corpusLength) / float64(corpusDocuments)
 	}
 	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks) == 0)
+	markEarlierAttempts(hits)
 	if !o.All && len(hits) > 15 {
 		hits = hits[:15]
 	}
 	return hits, nil
 }
+
+// markEarlierAttempts flags hits that look like older passes over the same
+// problem: same project, heavy overlap in what matched, and a newer session
+// above some margin. The old session stays in the results — history is the
+// product — but agents and readers see which one the project moved on to.
+func markEarlierAttempts(hits []Hit) {
+	n := len(hits)
+	if n > 50 {
+		n = 50
+	}
+	sets := make([]map[string]bool, n)
+	for i := 0; i < n; i++ {
+		set := map[string]bool{}
+		for _, sn := range hits[i].Snippets {
+			for _, w := range strings.Fields(strings.ToLower(sn)) {
+				if len(w) > 3 {
+					set[w] = true
+				}
+			}
+		}
+		sets[i] = set
+	}
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			if i == j || hits[i].Superseded != "" {
+				continue
+			}
+			a, b := hits[i], hits[j]
+			if a.Session.Project == "" || a.Session.Project != b.Session.Project {
+				continue
+			}
+			// b must be meaningfully newer than a
+			if !b.Session.Updated.After(a.Session.Updated.Add(24 * time.Hour)) {
+				continue
+			}
+			if snippetOverlap(sets[i], sets[j]) < 0.6 {
+				continue
+			}
+			hits[i].Superseded = b.Session.Updated.Format("2006-01-02")
+		}
+	}
+}
+
+func snippetOverlap(a, b map[string]bool) float64 {
+	if len(a) == 0 || len(b) == 0 {
+		return 0
+	}
+	small, large := a, b
+	if len(b) < len(a) {
+		small, large = b, a
+	}
+	shared := 0
+	for w := range small {
+		if large[w] {
+			shared++
+		}
+	}
+	return float64(shared) / float64(len(small))
+}
+
+// RelativeDate is the human "3w ago" form used in listings and digests.
+func RelativeDate(t time.Time) string { return relativeDate(t) }
 
 func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, emptyQuery bool) []Hit {
 	now := time.Now()
@@ -344,6 +410,13 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), h.Session.Project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, short(h.Session.ID), cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))
 		} else {
 			fmt.Fprintf(w, "[%s] %-10s · %s · %s — %d matches%s\n", h.Session.Harness, h.Session.Project, d, short(h.Session.ID), h.Count, tierLabel(h))
+		}
+		if h.Superseded != "" {
+			note := "  earlier attempt — this project has a newer session on the same ground (" + h.Superseded + ")"
+			if color {
+				note = cDim + note + cReset
+			}
+			fmt.Fprintln(w, note)
 		}
 		for _, sn := range h.Snippets {
 			fmt.Fprintf(w, "  %s\n", highlight(sn, o.Query, o.Regex, color))
