@@ -1,20 +1,28 @@
 <!doctype html>
 <html lang="en" class="no-js">
 <head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Page not found — deja-vu</title>
+<title>session not found — deja-vu</title>
 <meta name="robots" content="noindex,follow">
-<meta name="theme-color" content="#0d0b16">
-<meta name="color-scheme" content="dark light">
-<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="assets/site.css">
+<meta name="theme-color" content="#050807">
+<link rel="icon" type="image/svg+xml" href="/deja-vu/assets/favicon.svg">
+<link rel="stylesheet" href="/deja-vu/assets/site.css">
 </head>
 <body>
-<main class="wrap" style="text-align:center;padding-top:14vh;padding-bottom:14vh">
-  <p style="font-size:3.4rem;font-weight:800;letter-spacing:-.03em;margin:0 0 .4rem">404</p>
-  <p style="font-size:1.15rem;opacity:.75;margin:0 0 1.6rem">That page doesn't exist — or maybe you already solved it and forgot.</p>
-  <p><a class="btn primary" href="/deja-vu/">Back home</a> <a class="btn" href="/deja-vu/guide/getting-started.html">Read the docs</a></p>
+<div class="glow"></div>
+<main class="wrap" style="padding-top:16vh;padding-bottom:16vh;font-family:var(--mono)">
+  <p style="color:var(--faint)">$ deja show <span id="path404" style="color:var(--amber)">404</span></p>
+  <p style="margin:10px 0 4px;color:#d7f5e2">deja: no session matches this path</p>
+  <p style="color:var(--faint);margin-bottom:26px">it was never indexed — or you already solved it and forgot.</p>
+  <p style="color:var(--faint)">try instead:</p>
+  <pre style="background:var(--panel);border:1px solid var(--line);padding:14px 16px;color:var(--ph);max-width:560px;margin-top:8px">$ <a href="/deja-vu/">deja home</a>
+$ <a href="/deja-vu/guide/getting-started.html">deja docs</a>
+$ <a href="/deja-vu/#demo">deja "what you were looking for"</a></pre>
 </main>
+<script>
+try{var p=location.pathname.replace(/^\/deja-vu/,'')||'/';document.getElementById('path404').textContent=JSON.stringify(p)}catch(e){}
+</script>
 </body>
 </html>

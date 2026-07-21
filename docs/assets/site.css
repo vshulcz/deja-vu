@@ -77,3 +77,14 @@ footer a:hover{color:var(--ph)}
 .term-shot img{display:block;width:100%;border:none}
 .term-shot .cap{color:#3d5c4a;font-size:.76rem;padding:8px 6px 2px}
 @media(max-width:760px){.doc{grid-template-columns:1fr;gap:20px}.doc aside{position:static}}
+
+/* guide ergonomics */
+.pre-wrap{position:relative;margin:0 0 16px}
+.pre-wrap pre{margin:0}
+.pre-copy{position:absolute;top:8px;right:8px;background:var(--bg);border:1px solid var(--line);color:var(--faint);font:inherit;font-size:.72rem;padding:3px 10px;cursor:pointer;opacity:0;transition:opacity .15s}
+.pre-wrap:hover .pre-copy,.pre-copy:focus{opacity:1}
+.pre-copy:hover{color:var(--ph);border-color:var(--ph-dim)}
+.hlink{opacity:0;color:var(--faint);font-weight:400}
+h2:hover .hlink{opacity:1}
+.hlink:hover{color:var(--ph);text-decoration:none}
+.pn{display:flex;justify-content:space-between;gap:16px;margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:.88rem}

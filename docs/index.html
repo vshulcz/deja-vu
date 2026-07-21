@@ -14,6 +14,7 @@
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="theme-color" content="#050807">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"A local memory layer for coding agents: retroactive search over agent session history, MCP recall, redaction, stats, share and SSH sync.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
 <style>
@@ -221,6 +222,9 @@ section{margin-top:96px}
 .stat b{display:block;font-size:1.5rem;font-weight:400;color:var(--ph);text-shadow:0 0 12px rgba(74,240,139,.35)}
 .stat span{color:var(--faint);font-size:.78rem}
 
+.cardbox{border:1px solid var(--line);background:var(--panel);padding:10px}
+.cardbox img{display:block;width:100%;max-width:880px}
+
 /* ── install ────────────────────────────────────────────── */
 .installs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:720px){.installs{grid-template-columns:1fr}}
@@ -337,7 +341,7 @@ footer .spacer{flex:1}
       <button class="chip" data-q="cors">cors</button>
       <button class="chip" data-q="migration rollback">migration rollback</button>
     </div>
-    <p class="demo-note">demo corpus: 16 synthetic sessions. The real thing searches your actual history — retroactively.</p>
+    <p class="demo-note">demo corpus: 16 synthetic sessions — press / anywhere to search. The real thing searches your actual history, retroactively.</p>
   </div>
 </section>
 
@@ -403,6 +407,12 @@ footer .spacer{flex:1}
 </section>
 
 <section class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja stats --card</span> <span class="out"># your agent year, one image</span></p>
+  <p class="slead">One command renders your indexed history into a shareable SVG — heatmap, counts, top agents. Paste it into a README or a post. This one is from the demo corpus:</p>
+  <div class="cardbox"><img src="assets/stats-card-demo.svg" alt="deja stats card: a year heatmap of agent sessions with totals per agent" loading="lazy"></div>
+</section>
+
+<section class="reveal">
   <div class="stats">
     <div class="stat"><b>~12 ms</b><span>warm search over ~3.3 GB</span></div>
     <div class="stat"><b>~10 s</b><span>cold index, once</span></div>
@@ -432,6 +442,21 @@ footer .spacer{flex:1}
     <a href="guide/privacy.html">privacy<span>redaction, forget, exclude</span></a>
     <a href="guide/benchmarks.html">benchmarks<span>the ~200× number, reproducible</span></a>
     <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">architecture<span>index format, internals</span></a>
+  </div>
+</section>
+
+<section class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja vs</span> <span class="out"># honest positioning</span></p>
+  <div class="sources">
+    <table class="mx">
+      <tr><th></th><th>memory plugins<br>(record-forward)</th><th>cass<br>(session search)</th><th>deja</th></tr>
+      <tr><td class="nm">starts with your history</td><td class="n">starts empty</td><td class="y">✓</td><td class="y">✓ retroactive</td></tr>
+      <tr><td class="nm">serves memory to agents</td><td class="y">✓</td><td class="n">—</td><td class="y">✓ MCP + auto-recall</td></tr>
+      <tr><td class="nm">redaction at ingest</td><td class="n">varies</td><td class="n">—</td><td class="y">✓</td></tr>
+      <tr><td class="nm">cross-machine sync</td><td class="n">cloud, if any</td><td class="n">—</td><td class="y">✓ ssh, local</td></tr>
+      <tr><td class="nm">setup</td><td class="am">per-agent</td><td class="am">Rust toolchain / TUI</td><td class="y">one binary</td></tr>
+    </table>
+    <p class="mx-foot"><a href="https://github.com/Dicklesworthstone/coding_agent_session_search">cass</a> is the kitchen-sink take — 22 providers, optional embeddings, a TUI. deja is the opposite bet: one small Go binary, eleven harnesses, zero setup, plus the memory-layer pieces around it.</p>
   </div>
 </section>
 
@@ -565,8 +590,19 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   document.querySelectorAll('.chip').forEach(function(ch){ch.addEventListener('click',function(){
     touched=true;input.value=ch.dataset.q;input.focus();dispatch(ch.dataset.q,true);
   })});
+  /* deep link: ?q= runs a search on load and scrolls to the demo */
+  var qp=new URLSearchParams(location.search).get('q');
+  if(qp){
+    touched=true;input.value=qp;dispatch(qp,false);
+    setTimeout(function(){document.getElementById('demo').scrollIntoView({behavior:reduced?'auto':'smooth'});input.focus()},300);
+  }
+  /* hotkeys: / focuses the prompt, esc clears it */
+  document.addEventListener('keydown',function(e){
+    if(e.key==='/'&&document.activeElement!==input){e.preventDefault();touched=true;input.focus();input.scrollIntoView({block:'center',behavior:reduced?'auto':'smooth'})}
+    if(e.key==='Escape'&&document.activeElement===input){input.value='';res.innerHTML=''}
+  });
   /* attract mode: if untouched, the demo demos itself */
-  if(!reduced){
+  if(!reduced&&!qp){
     var attract='jwt refresh';
     setTimeout(function(){
       if(touched||input.value)return;

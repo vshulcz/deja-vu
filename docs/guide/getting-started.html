@@ -80,5 +80,6 @@ deja install --auto     # same, plus session-start auto-recall where supported</
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
 document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 </script>
+<script src="../assets/guide.js" defer></script>
 </body>
 </html>
