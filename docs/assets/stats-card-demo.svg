@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
-<rect width="800" height="420" rx="20" fill="#050807"/>
-<rect x="0.5" y="0.5" width="799" height="419" rx="19.5" fill="none" stroke="#12291c"/>
+<defs>
+<linearGradient id="dg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c6cf0"/><stop offset="1" stop-color="#4ecdc4"/></linearGradient>
+<pattern id="scan" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" y="2" fill="#000000" fill-opacity="0.16"/></pattern>
+</defs>
+<rect width="800" height="420" fill="#050807"/>
+<rect x="0.5" y="0.5" width="799" height="419" fill="none" stroke="#12291c"/>
 <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#d7f5e2">
-<circle cx="46" cy="43" r="6" fill="#7c6cf0"/>
-<text x="62" y="48" font-size="15" font-weight="700" fill="#4af08b" letter-spacing="0.5">deja · agent history</text>
+<g transform="translate(36,26) scale(0.185)"><path d="M64 16 A48 48 0 1 0 112 64" fill="none" stroke="url(#dg)" stroke-width="14" stroke-linecap="round"/><path d="M112 64 l-20 -14 M112 64 l-24 6" fill="none" stroke="url(#dg)" stroke-width="14" stroke-linecap="round"/><circle cx="64" cy="64" r="8" fill="url(#dg)"/></g>
+<text x="70" y="48" font-size="15" font-weight="700" fill="#4af08b" letter-spacing="0.5">deja-vu</text>
+<text x="145" y="48" font-size="13" font-weight="400" fill="#5d8a6e">· agent history</text>
 <text x="760" y="48" font-size="13" font-weight="400" fill="#5d8a6e" text-anchor="end">2025-08-25 – 2026-08-14</text>
-<text x="40" y="90" font-size="21" font-weight="800" fill="#eafff2">You asked the same thing 18 times — deja remembered.</text>
+<text x="40" y="90" font-size="21" font-weight="800" fill="#eafff2">You asked the same thing 18 times<tspan fill="#ffb454"> — deja remembered.</tspan></text>
 <text x="44" y="122" font-size="10" font-weight="400" fill="#5d8a6e">Jul</text>
 <text x="83" y="122" font-size="10" font-weight="400" fill="#5d8a6e">Aug</text>
 <text x="148" y="122" font-size="10" font-weight="400" fill="#5d8a6e">Sep</text>
@@ -407,7 +412,8 @@
 <text x="470" y="312" font-size="10" font-weight="400" fill="#a9cbb6">codex</text>
 <rect x="570" y="304" width="48" height="8" rx="4" fill="#4af08b"/>
 <text x="672" y="312" font-size="10" font-weight="700" fill="#a9cbb6">38</text>
-<text x="40" y="402" font-size="11" font-weight="400" fill="#5d8a6e">deja vdev</text>
+<text x="40" y="402" font-size="11" font-weight="400" fill="#5d8a6e">$ deja stats --card · vdev</text>
 <text x="760" y="402" font-size="12" font-weight="700" fill="#4af08b" text-anchor="end">vshulcz.github.io/deja-vu</text>
 </g>
+<rect width="800" height="420" fill="url(#scan)"/>
 </svg>

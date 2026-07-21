@@ -28,12 +28,18 @@ func renderStatsCard(r stats.Report) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
 	b.WriteString(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">` + "\n")
-	b.WriteString(`<rect width="800" height="420" rx="20" fill="#050807"/>` + "\n")
-	b.WriteString(`<rect x="0.5" y="0.5" width="799" height="419" rx="19.5" fill="none" stroke="#12291c"/>` + "\n")
+	b.WriteString(`<defs>` + "\n")
+	b.WriteString(`<linearGradient id="dg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c6cf0"/><stop offset="1" stop-color="#4ecdc4"/></linearGradient>` + "\n")
+	b.WriteString(`<pattern id="scan" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" y="2" fill="#000000" fill-opacity="0.16"/></pattern>` + "\n")
+	b.WriteString(`</defs>` + "\n")
+	b.WriteString(`<rect width="800" height="420" fill="#050807"/>` + "\n")
+	b.WriteString(`<rect x="0.5" y="0.5" width="799" height="419" fill="none" stroke="#12291c"/>` + "\n")
 	b.WriteString(`<g font-family="` + statsCardFont + `" fill="#d7f5e2">` + "\n")
-	// brand line (kept verbatim so the card is unmistakably deja) + active range
-	b.WriteString(`<circle cx="46" cy="43" r="6" fill="#7c6cf0"/>` + "\n")
-	cardText(&b, 62, 48, 15, "700", "deja · agent history", "#4af08b", "letter-spacing=\"0.5\"")
+	// the rewind-loop mark from logo.svg, then the wordmark — the same header
+	// every deja surface carries
+	b.WriteString(`<g transform="translate(36,26) scale(0.185)"><path d="M64 16 A48 48 0 1 0 112 64" fill="none" stroke="url(#dg)" stroke-width="14" stroke-linecap="round"/><path d="M112 64 l-20 -14 M112 64 l-24 6" fill="none" stroke="url(#dg)" stroke-width="14" stroke-linecap="round"/><circle cx="64" cy="64" r="8" fill="url(#dg)"/></g>` + "\n")
+	cardText(&b, 70, 48, 15, "700", "deja-vu", "#4af08b", "letter-spacing=\"0.5\"")
+	cardText(&b, 145, 48, 13, "400", "· agent history", "#5d8a6e")
 	cardText(&b, 760, 48, 13, "400", valueOrDash(r.DateRange.Start)+" – "+valueOrDash(r.DateRange.End), "#5d8a6e", "text-anchor=\"end\"")
 	// the punch line — one personal sentence, sized to fit the card width
 	head := cardPunchline(r)
@@ -43,7 +49,7 @@ func renderStatsCard(r stats.Report) string {
 			headSize = 14
 		}
 	}
-	cardText(&b, 40, 90, headSize, "800", head, "#eafff2")
+	renderPunchline(&b, 40, 90, headSize, head)
 
 	// hero: a GitHub-style trailing-year activity grid
 	renderHeatmap(&b, r.Heatmap, 44, 128)
@@ -86,9 +92,11 @@ func renderStatsCard(r stats.Report) string {
 		cardText(&b, 672, y+9, 10, "700", fmt.Sprintf("%d", h.Sessions), "#a9cbb6")
 	}
 
-	cardText(&b, 40, 402, 11, "400", "deja v"+version, "#5d8a6e")
+	cardText(&b, 40, 402, 11, "400", "$ deja stats --card · v"+version, "#5d8a6e")
 	cardText(&b, 760, 402, 12, "700", "vshulcz.github.io/deja-vu", "#4af08b", "text-anchor=\"end\"")
-	b.WriteString("</g>\n</svg>\n")
+	b.WriteString("</g>\n")
+	b.WriteString(`<rect width="800" height="420" fill="url(#scan)"/>` + "\n")
+	b.WriteString("</svg>\n")
 	return b.String()
 }
 
@@ -106,6 +114,20 @@ func cardPunchline(r stats.Report) string {
 	default:
 		return "Your coding-agent memory, indexed and searchable."
 	}
+}
+
+// renderPunchline splits the headline on the em-dash so the "deja" clause
+// prints in the accent color, matching the site's two-tone tagline.
+func renderPunchline(b *strings.Builder, x, y, size int, head string) {
+	if i := strings.Index(head, " — "); i > 0 {
+		var main, tail strings.Builder
+		_ = xml.EscapeText(&main, []byte(head[:i]))
+		_ = xml.EscapeText(&tail, []byte(head[i:]))
+		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="%d" font-weight="800" fill="#eafff2">%s<tspan fill="#ffb454">%s</tspan></text>`+"\n",
+			x, y, size, main.String(), tail.String())
+		return
+	}
+	cardText(b, x, y, size, "800", head, "#eafff2")
 }
 
 // renderHeatmap draws a GitHub-style week-by-day grid with month ticks.
