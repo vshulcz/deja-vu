@@ -449,14 +449,14 @@ footer .spacer{flex:1}
   <p class="shead"><span class="p">$</span> <span class="cmd">deja vs</span> <span class="out"># honest positioning</span></p>
   <div class="sources">
     <table class="mx">
-      <tr><th></th><th>memory plugins<br>(record-forward)</th><th>cass<br>(session search)</th><th>deja</th></tr>
-      <tr><td class="nm">starts with your history</td><td class="n">starts empty</td><td class="y">✓</td><td class="y">✓ retroactive</td></tr>
-      <tr><td class="nm">serves memory to agents</td><td class="y">✓</td><td class="n">—</td><td class="y">✓ MCP + auto-recall</td></tr>
-      <tr><td class="nm">redaction at ingest</td><td class="n">varies</td><td class="n">—</td><td class="y">✓</td></tr>
-      <tr><td class="nm">cross-machine sync</td><td class="n">cloud, if any</td><td class="n">—</td><td class="y">✓ ssh, local</td></tr>
-      <tr><td class="nm">setup</td><td class="am">per-agent</td><td class="am">Rust toolchain / TUI</td><td class="y">one binary</td></tr>
+      <tr><th></th><th>engram &amp; record-forward</th><th>cass<br>(session search)</th><th>deja</th></tr>
+      <tr><td class="nm">starts with your history</td><td class="n">starts empty — agent must call mem_save</td><td class="y">✓</td><td class="y">✓ retroactive</td></tr>
+      <tr><td class="nm">serves memory to agents</td><td class="y">✓ MCP</td><td class="n">—</td><td class="y">✓ MCP + auto-recall</td></tr>
+      <tr><td class="nm">redaction at ingest</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td></tr>
+      <tr><td class="nm">cross-machine sync</td><td class="am">git / cloud</td><td class="n">—</td><td class="y">✓ ssh, local</td></tr>
+      <tr><td class="nm">setup</td><td class="am">wire MCP + teach agents to save</td><td class="am">Rust toolchain / TUI</td><td class="y">one binary, works on the past</td></tr>
     </table>
-    <p class="mx-foot"><a href="https://github.com/Dicklesworthstone/coding_agent_session_search">cass</a> is the kitchen-sink take — 22 providers, optional embeddings, a TUI. deja is the opposite bet: one small Go binary, eleven harnesses, zero setup, plus the memory-layer pieces around it.</p>
+    <p class="mx-foot"><a href="https://github.com/Gentleman-Programming/engram">engram</a> curates what an agent chooses to save — good conflict detection, empty past. <a href="https://github.com/Dicklesworthstone/coding_agent_session_search">cass</a> is the kitchen-sink search take. deja's bet: the transcripts are the memory — retroactive, redacted, synced over your own ssh.</p>
   </div>
 </section>
 

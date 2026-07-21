@@ -56,6 +56,12 @@ of these commands is run:
 - `deja sync ssh <host>` runs the system `ssh` and `scp` clients against the
   host supplied by the user. The remote peer receives redacted JSONL sync
   batches and imports them into its own index. `--pull` reverses that flow.
+- `deja doctor` makes one HTTPS GET to the GitHub releases API to compare the
+  installed version with the latest; `--offline` (or `DEJA_OFFLINE=1`) skips
+  it. No session data is sent.
+- `deja embed` and hybrid search talk to the embedding endpoint you configured
+  (an Ollama or LM Studio address, normally on localhost). Without that
+  configuration the semantic path is off and nothing is sent anywhere.
 
 `deja sync export <dir>` and `deja share <id>` write data to a path or output
 chosen by the user. They do not transmit it themselves. Exported batches and
@@ -82,6 +88,11 @@ unlabelled credential, encoded or transformed data, and a secret split across
 lines can pass through unchanged. Redaction also cannot remove sensitive prose
 that does not look like a credential. Review every share or export before
 sending it to another person or system.
+
+A credential that appears in a transcript was already sent to the model
+provider by the agent that wrote it. Redaction protects the artifacts derived
+from that transcript — the local index, shares, sync batches — from spreading
+it further; it does not undo the original exposure. Rotate the credential.
 
 Setting `DEJA_NO_REDACT=1` disables this boundary. Plaintext credentials may
 then be written to the local index and may appear in search, share, and sync
