@@ -3,7 +3,9 @@
 package digest
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -211,15 +213,53 @@ func UTF8SafeCut(s string, n int) string {
 
 func ProjectNameCandidates(cwd string) []string {
 	names := []string{sources.ClaudeProjectName(cwd)}
-	if base := filepath.Base(cwd); base != "" {
-		if two := filepath.Join(filepath.Base(filepath.Dir(cwd)), base); two != names[0] {
-			names = append(names, two)
+	add := func(name string) {
+		for _, n := range names {
+			if n == name {
+				return
+			}
 		}
-		if base != names[0] {
-			names = append(names, base)
+		names = append(names, name)
+	}
+	if base := filepath.Base(cwd); base != "" {
+		add(filepath.Join(filepath.Base(filepath.Dir(cwd)), base))
+		add(base)
+	}
+	// The same repo appears under every worktree's path; sessions recorded in
+	// one worktree belong to the project, not to that checkout. Each worktree
+	// root contributes its name forms so recall sees one project. Two
+	// different repos that merely share a basename stay separate everywhere
+	// the full encoded path matches first.
+	for _, root := range gitWorktreeRoots(cwd) {
+		add(sources.ClaudeProjectName(root))
+		if base := filepath.Base(root); base != "" {
+			add(filepath.Join(filepath.Base(filepath.Dir(root)), base))
+			add(base)
 		}
 	}
 	return names
+}
+
+// gitWorktreeRoots lists the repo's worktree roots (including the main one)
+// when cwd is inside a git repository. Best effort with a hard timeout: no
+// git, no repo, or a slow disk simply yields nothing.
+func gitWorktreeRoots(cwd string) []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "-C", cwd, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return nil
+	}
+	var roots []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if p, ok := strings.CutPrefix(line, "worktree "); ok && strings.TrimSpace(p) != "" {
+			roots = append(roots, strings.TrimSpace(p))
+		}
+	}
+	if len(roots) < 2 {
+		return nil // a single worktree adds nothing beyond cwd's own names
+	}
+	return roots
 }
 
 // agentArtifactMarkers flag transcript entries that are tool output or
