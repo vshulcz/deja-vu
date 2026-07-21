@@ -222,18 +222,31 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 		_ = json.NewEncoder(w).Encode(hits)
 		return
 	}
+	color := colorOK(w)
 	for _, hit := range hits {
 		date := "-"
 		if !hit.Session.Updated.IsZero() {
 			date = hit.Session.Updated.Format("2006-01-02")
 		}
-		fmt.Fprintf(w, "%s · %s · %s · %s", date, hit.Session.Harness, short(hit.Session.ID), hit.Session.Project)
-		if hit.Title != "" {
-			fmt.Fprintf(w, " · %s", hit.Title)
+		if color {
+			sep := cDim + " · " + cReset
+			fmt.Fprintf(w, "%s%s%s %s%s%s%s", harnessTag(hit.Session.Harness, true), sep, date, cBold+short(hit.Session.ID)+cReset, sep, hit.Session.Project, "")
+			if hit.Title != "" {
+				fmt.Fprintf(w, "%s%s", sep, cBold+hit.Title+cReset)
+			}
+		} else {
+			fmt.Fprintf(w, "%s · %s · %s · %s", date, hit.Session.Harness, short(hit.Session.ID), hit.Session.Project)
+			if hit.Title != "" {
+				fmt.Fprintf(w, " · %s", hit.Title)
+			}
 		}
 		fmt.Fprintln(w)
 		for _, text := range hit.Snippets {
-			fmt.Fprintf(w, "  %s\n", text)
+			if color {
+				fmt.Fprintf(w, "  %s%s%s\n", cDim, text, cReset)
+			} else {
+				fmt.Fprintf(w, "  %s\n", text)
+			}
 		}
 	}
 }
