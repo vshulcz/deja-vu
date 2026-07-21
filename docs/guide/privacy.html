@@ -63,6 +63,7 @@
 <li><b>Forget</b> — <code>deja forget</code> removes sessions and records a tombstone so they don't come back on the next index; <code>--dry-run</code> to preview, <code>--unforget</code> to reverse.</li>
 <li><b>Redaction report</b> — <code>deja stats --redaction</code> shows what was masked, per rule and harness.</li>
 <li><b>Audit what agents received</b> — <code>deja log</code> lists recent recalls and injections; <code>deja log --last</code> prints the exact digest most recently served.</li>
+<li><b>Trust scopes</b> — <code>~/.config/deja/policy.json</code> controls what memory activates where. Per activation path (<code>search</code>, <code>mcp</code>, <code>auto</code>) you allow or deny origins: <code>local</code>, <code>imported</code> (anything synced from another machine), or a single peer like <code>imported:mini</code>. Example — synced sessions stay searchable but never auto-inject: <code>{"activations":{"auto":{"imported":false}}}</code>. <code>DEJA_AUTORECALL_LOCAL_ONLY=1</code> remains an alias for exactly that rule. Receipts and <code>deja log --last</code> name the policy that allowed each injection.</li>
 </ul>
 <p>Full details in the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">security model</a>.</p>
 

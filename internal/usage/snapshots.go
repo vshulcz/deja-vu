@@ -17,7 +17,10 @@ type Snapshot struct {
 	Kind     string    `json:"kind"`
 	Sessions int       `json:"sessions,omitempty"`
 	Bytes    int       `json:"bytes"`
-	Digest   string    `json:"digest"`
+	// Policy names the rule set that allowed this injection, so the audit
+	// trail explains itself ("local+imported", "local-only").
+	Policy string `json:"policy,omitempty"`
+	Digest string `json:"digest"`
 }
 
 const (
@@ -35,13 +38,28 @@ func SnapshotPath(indexDir string) string {
 // the text. raw is the size of the source transcripts the digest distilled.
 // Best-effort like all usage recording.
 func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
+	RecordDigestPolicy(indexDir, kind, digest, sessions, raw, "")
+}
+
+// RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
+// the injection, kept with the snapshot for `deja log`.
+func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, policyName string) {
 	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
-	SnapshotOnly(indexDir, kind, digest, sessions)
+	snapshotWrite(indexDir, kind, digest, sessions, policyName)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
 // callers that already recorded one with extra fields.
 func SnapshotOnly(indexDir, kind, digest string, sessions int) {
+	snapshotWrite(indexDir, kind, digest, sessions, "")
+}
+
+// SnapshotPolicy is SnapshotOnly plus the policy name for the audit trail.
+func SnapshotPolicy(indexDir, kind, digest string, sessions int, policyName string) {
+	snapshotWrite(indexDir, kind, digest, sessions, policyName)
+}
+
+func snapshotWrite(indexDir, kind, digest string, sessions int, policyName string) {
 	if digest == "" {
 		return
 	}
@@ -55,7 +73,7 @@ func SnapshotOnly(indexDir, kind, digest string, sessions int) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions, Bytes: len(digest), Digest: digest})
+	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions, Bytes: len(digest), Policy: policyName, Digest: digest})
 	if err != nil {
 		return
 	}

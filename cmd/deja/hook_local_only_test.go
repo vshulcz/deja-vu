@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,7 +10,10 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // DEJA_AUTORECALL_LOCAL_ONLY=1 keeps synced sessions out of the startup
@@ -64,5 +68,41 @@ func TestAutoRecallLocalOnly(t *testing.T) {
 	}
 	if !strings.Contains(digest, "isoproj") {
 		t.Fatalf("local-only digest lost local session: %q", digest)
+	}
+}
+
+func TestPolicyFileBlocksImportedInSearchHits(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	t.Setenv("DEJA_POLICY_FILE", path)
+	if err := os.WriteFile(path, []byte(`{"activations":{"mcp":{"imported":false}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hits := []search.Hit{
+		{Session: model.Session{ID: "a", Project: "deja-vu"}},
+		{Session: model.Session{ID: "b", Project: "imported:mini/deja-vu"}},
+	}
+	got := policyFilterHits(policy.ActivationMCP, hits)
+	if len(got) != 1 || got[0].Session.ID != "a" {
+		t.Fatalf("mcp filter wrong: %#v", got)
+	}
+	// The search path has no rule in this file, so nothing is dropped.
+	hits2 := []search.Hit{
+		{Session: model.Session{ID: "a", Project: "deja-vu"}},
+		{Session: model.Session{ID: "b", Project: "imported:mini/deja-vu"}},
+	}
+	if got := policyFilterHits(policy.ActivationSearch, hits2); len(got) != 2 {
+		t.Fatalf("search filter must pass all: %#v", got)
+	}
+}
+
+func TestLogLastNamesPolicy(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	usage.RecordDigestPolicy(dir, usage.KindHook, "digest body", 2, 100, "local-only")
+	var out bytes.Buffer
+	if err := runLogTo(&out, dir, []string{"--last"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "policy: local-only") {
+		t.Fatalf("log --last must name the policy:\n%s", out.String())
 	}
 }

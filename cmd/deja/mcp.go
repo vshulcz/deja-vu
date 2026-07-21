@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -168,7 +169,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err == nil {
 			text = frameRecall(text)
 			usage.RecordServedSessions(dir, usage.KindRecall, len(text), sessions, sessions == 0, raw, ids)
-			usage.SnapshotOnly(dir, usage.KindRecall, text, sessions)
+			usage.SnapshotPolicy(dir, usage.KindRecall, text, sessions, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "recall_context":
@@ -186,7 +187,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err == nil {
 			text = frameRecall(text)
 			usage.RecordServedSessions(dir, usage.KindContext, len(text), sessions, sessions == 0, raw, ids)
-			usage.SnapshotOnly(dir, usage.KindContext, text, sessions)
+			usage.SnapshotPolicy(dir, usage.KindContext, text, sessions, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "blame":
@@ -290,6 +291,7 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, i
 	if err != nil {
 		return "", 0, 0, nil, err
 	}
+	hits = policyFilterHits(policy.ActivationMCP, hits)
 	if os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
@@ -390,6 +392,7 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	if err != nil {
 		return "", 0, 0, nil, err
 	}
+	hits = policyFilterHits(policy.ActivationMCP, hits)
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	if semantic {
