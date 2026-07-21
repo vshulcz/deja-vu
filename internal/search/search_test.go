@@ -585,7 +585,7 @@ func BenchmarkBM25Scoring1000Candidates(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		hits := scoreBM25(documents, []int{1000, 1000}, 1000, 6, 2)
+		hits := scoreBM25(documents, []int{1000, 1000}, 1000, 6, 2, nil)
 		if len(hits) != len(documents) {
 			b.Fatalf("hits=%d", len(hits))
 		}

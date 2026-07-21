@@ -56,8 +56,9 @@ envelope with `schema_version`:
 ```
 
 Stemmed search may also include `variants`; semantic search sets `semantic`.
-`superseded` (added in 0.15, optional) carries the date of a newer same-project
-session whose matches overlap this hit — an earlier-attempt signal.
+`superseded` (optional) carries the date of a newer same-project session whose
+matches overlap this hit — an earlier-attempt signal. `reused` (optional)
+counts recent agent recalls that served this session.
 
 ## `deja stats --json`
 

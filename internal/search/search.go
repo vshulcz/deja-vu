@@ -67,6 +67,8 @@ type Hit struct {
 	// Superseded holds the date of a newer session in the same project whose
 	// matches overlap this one — a signal that this hit is an earlier attempt.
 	Superseded string `json:"superseded,omitempty"`
+	// Reused counts recent agent recalls that served this session.
+	Reused int `json:"reused,omitempty"`
 }
 
 const (
@@ -196,7 +198,7 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 	if corpusDocuments > 0 {
 		avgLength = float64(corpusLength) / float64(corpusDocuments)
 	}
-	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks))
+	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks), o.RecallWorn)
 	markEarlierAttempts(hits)
 	if !o.All && len(hits) > 15 {
 		hits = hits[:15]
@@ -266,7 +268,7 @@ func snippetOverlap(a, b map[string]bool) float64 {
 // RelativeDate is the human "3w ago" form used in listings and digests.
 func RelativeDate(t time.Time) string { return relativeDate(t) }
 
-func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int) []Hit {
+func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int) []Hit {
 	emptyQuery := queryTokenCount == 0
 	now := time.Now()
 	hits := make([]Hit, 0, len(documents))
@@ -292,6 +294,10 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		}
 		score *= proximityBoost(doc.minWindow, queryTokenCount)
 		score *= titleBoost(doc.titleHits, queryTokenCount)
+		if n := worn[doc.hit.Session.ID]; n > 0 {
+			doc.hit.Reused = n
+			score *= wornBoost(n)
+		}
 		score *= freshnessDecay(doc.hit.Session.Updated, now)
 		doc.hit.Score = score
 		hits = append(hits, doc.hit)
@@ -351,6 +357,16 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	}
 	span := float64(window)
 	boost := 1 + 0.35*(200/(200+span))
+	return boost
+}
+
+// wornBoost rewards sessions agents keep recalling — capped hard at +20% so
+// popularity can never outrank relevance, only break near-ties.
+func wornBoost(n int) float64 {
+	boost := 1 + 0.05*math.Log2(float64(1+n))
+	if boost > 1.2 {
+		return 1.2
+	}
 	return boost
 }
 
@@ -472,6 +488,13 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), h.Session.Project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, short(h.Session.ID), cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))
 		} else {
 			fmt.Fprintf(w, "[%s] %-10s · %s · %s — %d matches%s\n", h.Session.Harness, h.Session.Project, d, short(h.Session.ID), h.Count, tierLabel(h))
+		}
+		if h.Reused > 1 {
+			note := fmt.Sprintf("  reused %d× by agents recently", h.Reused)
+			if color {
+				note = cDim + note + cReset
+			}
+			fmt.Fprintln(w, note)
 		}
 		if h.Superseded != "" {
 			note := "  earlier attempt — this project has a newer session on the same ground (" + h.Superseded + ")"

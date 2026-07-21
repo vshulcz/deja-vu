@@ -65,3 +65,17 @@ func TestEventsLimitAndOrder(t *testing.T) {
 		t.Fatalf("events = %+v", events)
 	}
 }
+
+func TestWornSessionsCountsAgentRecalls(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	RecordServedSessions(dir, KindRecall, 100, 2, false, 5000, []string{"s1", "s2"})
+	RecordServedSessions(dir, KindContext, 80, 1, false, 3000, []string{"s1"})
+	RecordDigest(dir, KindHook, "hook digest", 3, 900) // hook pushes must not count
+	worn := WornSessions(dir)
+	if worn["s1"] != 2 || worn["s2"] != 1 {
+		t.Fatalf("worn = %v", worn)
+	}
+	if len(worn) != 2 {
+		t.Fatalf("hook injection leaked into worn: %v", worn)
+	}
+}

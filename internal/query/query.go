@@ -31,6 +31,9 @@ type Options struct {
 	Semantic                  bool                `json:"-"`
 	FuzzyVariants             map[string][]string `json:"-"`
 	Tier                      string              `json:"-"`
+	// RecallWorn maps session id -> agent recall count; filled by callers
+	// from the usage log, consumed as a bounded ranking boost.
+	RecallWorn map[string]int `json:"-"`
 }
 
 const (
