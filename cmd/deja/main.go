@@ -89,6 +89,7 @@ var commands = map[string]command{
 	"statusline":      func(dir string, _ []string) error { return runStatusline(dir, os.Stdin, os.Stdout) },
 	"stats":           runStats,
 	"remember":        runRemember,
+	"promote":         func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
 	"forget":          runForget,
 	"mcp":             func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
 	"hook-prompt":     func(dir string, _ []string) error { return runHookPrompt(dir, os.Stdin, os.Stdout) },
@@ -818,6 +819,7 @@ Usage:
   deja statusline
   deja stats [--json] [--card [path]] [--html [path]]
 	deja remember "text" [--project name]
+  deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--to path]
   deja mcp
   deja version
   deja update

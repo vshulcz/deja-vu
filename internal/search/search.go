@@ -298,6 +298,11 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 			doc.hit.Reused = n
 			score *= wornBoost(n)
 		}
+		// Curated notes are distilled truth with provenance; they outrank the
+		// raw transcripts they were promoted from.
+		if doc.hit.Session.Harness == "deja" {
+			score *= promotedNoteBoost
+		}
 		score *= freshnessDecay(doc.hit.Session.Updated, now)
 		doc.hit.Score = score
 		hits = append(hits, doc.hit)
@@ -359,6 +364,10 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	boost := 1 + 0.35*(200/(200+span))
 	return boost
 }
+
+// promotedNoteBoost lifts curated deja notes over raw transcripts on equal
+// relevance. Kept modest: a note about X must not bury a transcript about Y.
+const promotedNoteBoost = 1.25
 
 // wornBoost rewards sessions agents keep recalling — capped hard at +20% so
 // popularity can never outrank relevance, only break near-ties.
