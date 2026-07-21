@@ -37,6 +37,8 @@ func guidancePath(harness string) string {
 		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
 	case "codex":
 		return filepath.Join(sources.CodexHome(), "AGENTS.md")
+	case "kimi":
+		return filepath.Join(sources.KimiConfigDir(), "AGENTS.md")
 	case "gemini":
 		return filepath.Join(sources.GeminiHome(), "GEMINI.md")
 	case "opencode":

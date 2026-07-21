@@ -54,12 +54,15 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "qwen" {
 		ss = append(ss, sources.LoadQwen()...)
 	}
+	if h == "" || h == "kimi" {
+		ss = append(ss, sources.LoadKimi()...)
+	}
 	return ss
 }
 
 func loadFileSources() []model.Session {
 	var ss []model.Session
-	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen"} {
+	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen", "kimi"} {
 		ss = append(ss, loadAll(harness)...)
 	}
 	return ss
@@ -604,6 +607,7 @@ func printSources(dir string) {
 		{"antigravity", antigravityLocation, antigravityRoots, sources.LoadAntigravity},
 		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.LoadGrok},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.LoadQwen},
+		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.LoadKimi},
 		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.LoadCopilot},
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, sources.LoadNotes},
 	}
@@ -807,8 +811,8 @@ Usage:
   deja mcp
   deja version
   deja update
-  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|statusline|--all|--auto>
-  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|statusline|--all|--auto>
+  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
+  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
 
 Examples:
   deja "jwt refresh token bug"

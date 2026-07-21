@@ -112,6 +112,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
 		return "", "", fmt.Errorf("grok has no session resume — start grok in %s to continue", sources.GrokCWDForSession(s.Path))
+	case "kimi":
+		return "", "kimi --session " + s.ID, nil
 	case "pi":
 		return piProjectDirFor(s), "pi --session " + s.ID, nil
 	case "copilot":

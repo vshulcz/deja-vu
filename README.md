@@ -14,7 +14,7 @@
 
 <p align="center"><img src="assets/demo.gif" alt="deja demo"></p>
 
-Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
+Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
 | Feature | What it does |
 | --- | --- |
@@ -237,6 +237,7 @@ limits, trust assumptions, and release verification.
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | — | ✅ | paste | — |
 | Grok Build | `${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl`<br>`${DEJA_GROK_ROOT}/sessions/**/updates.jsonl` | ✅ | — | — | ✅ | — |
 | Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | — | — | ✅ | — |
+| Kimi Code | `${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl`<br>`${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl` | ✅ | — | ✅ | paste | — |
 | pi | `${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl` | ✅ | — | ✅ | ✅ | — |
 | Copilot CLI | `${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl` | ✅ | — | ✅ | ✅ | — |
 <!-- matrix:end -->
@@ -296,7 +297,7 @@ Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact cr
 **Does anything leave my machine?** Indexing and search are local. `deja update` downloads releases from GitHub, and user-invoked `deja sync ssh` transfers redacted batches through the system SSH client. Directory exports and shares go only to the destination you choose. See the [security model](docs/SECURITY-MODEL.md#data-flows) for the full data flow.
 
 **How is this different from cass?**
-[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, eleven harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
+[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, twelve harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
 
 [engram](https://github.com/Gentleman-Programming/engram) is the strongest of the record-forward memory tools: the agent calls `mem_save` and curated notes accumulate in SQLite. Curation buys it conflict detection deja doesn't attempt — but it starts empty, only knows what an agent decided to save, and can't answer for the months of sessions that happened before it was installed. deja starts full: the transcripts are the memory, no cooperation required.
 

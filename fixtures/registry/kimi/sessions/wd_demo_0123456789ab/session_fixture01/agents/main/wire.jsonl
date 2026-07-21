@@ -1,0 +1,14 @@
+{"type":"metadata","protocol_version":"1.4","created_at":1782295200000}
+{"type":"config.update","profileName":"agent","systemPrompt":"You are Kimi Code CLI."}
+{"type":"turn.prompt","time":1782295200500}
+{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"why does the jwks cache go stale after rotation?"}],"toolCalls":[]},"time":1782295201000}
+{"type":"context.append_loop_event","event":{"type":"step.begin","uuid":"step_fx_01","turnId":"turn_fx_01","step":0},"time":1782295201100}
+{"type":"context.append_loop_event","event":{"type":"llm.request","uuid":"req_fx_01"},"time":1782295201150}
+{"type":"context.append_loop_event","event":{"type":"content.part","uuid":"part_fx_00","turnId":"turn_fx_01","step":0,"stepUuid":"step_fx_01","part":{"type":"think","text":"reasoning to be skipped"}},"time":1782295201180}
+{"type":"context.append_loop_event","event":{"type":"content.part","uuid":"part_fx_01","turnId":"turn_fx_01","step":0,"stepUuid":"step_fx_01","part":{"type":"text","text":"The cache keeps serving the old kid after rotateKey; "}},"time":1782295201200}
+{"type":"context.append_loop_event","event":{"type":"content.part","uuid":"part_fx_02","turnId":"turn_fx_01","step":0,"stepUuid":"step_fx_01","part":{"type":"text","text":"reload the jwks cache on rotation and add a clock-skew test."}},"time":1782295201300}
+{"type":"context.append_loop_event","event":{"type":"step.end","uuid":"step_fx_01","turnId":"turn_fx_01","step":0,"finishReason":"end_turn"},"time":1782295201400}
+{"type":"usage.record","time":1782295201500}
+{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"and the mid-stream needle?"}],"toolCalls":[]},"time":1782295202000}
+{"type":"context.append_loop_event","event":{"type":"step.begin","uuid":"step_fx_02","turnId":"turn_fx_02","step":0},"time":1782295202100}
+{"type":"context.append_loop_event","event":{"type":"content.part","uuid":"part_fx_03","turnId":"turn_fx_02","step":0,"stepUuid":"step_fx_02","part":{"type":"text","text":"torn-tail mid-stream answer survives"}},"time":1782295202200}

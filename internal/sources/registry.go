@@ -188,6 +188,17 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "kimi", Load: LoadKimi, Files: KimiSessionFiles,
+			Kinds: []FileKind{{
+				Name: "kimi",
+				Match: func(p string) bool {
+					return hasBase(p, "wire.jsonl") && strings.HasPrefix(p, filepath.Join(KimiRoot(), "sessions"))
+				},
+				Parse:     fullParse(ParseKimiFile),
+				ParseFrom: offsetParse(ParseKimiFileFromOffset),
+			}},
+		},
+		{
 			Name: "pi", Load: LoadPi, Files: PiSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "pi",

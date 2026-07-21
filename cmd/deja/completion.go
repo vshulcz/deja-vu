@@ -37,7 +37,7 @@ _deja_completion() {
 
     local commands="blame bench completion ctx doctor embed forget handoff index install last log mcp remember resume share show sources stats statusline sync uninstall update version warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja"
-    local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto"
+    local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen kimi copilot pi statusline --all --auto"
 
     if (( COMP_CWORD == 1 )); then
         COMPREPLY=( $(compgen -W "$commands --version -version --json --re --all --no-embed --harness --project --since --role --rebuild" -- "$cur") )
@@ -169,7 +169,7 @@ _deja() {
     'warmup:build or refresh the index'
   )
   harnesses=(claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja)
-  install_targets=(claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto)
+  install_targets=(claude-code codex opencode cursor gemini antigravity grok qwen kimi copilot pi statusline --all --auto)
 
   if (( CURRENT == 2 )); then
     _describe -t commands 'deja command' commands
