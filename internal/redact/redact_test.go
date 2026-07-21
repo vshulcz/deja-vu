@@ -171,3 +171,56 @@ func TestRedactionGapFixes(t *testing.T) {
 		}
 	}
 }
+
+func TestEntropyAssignmentRedacted(t *testing.T) {
+	in := `DB_PASS=V9rT2xK8mQ4nW7jL5hP3sD1f`
+	out, counts := Text(in)
+	if !strings.Contains(out, "DB_PASS=[redacted:entropy]") || counts["entropy"] != 1 {
+		t.Fatalf("assignment entropy missed: %q %v", out, counts)
+	}
+	in2 := `"private_key": "MIIEvQ2xK8mQ4nW7jL5hP3sD1fV9rT+ab/CDef=="`
+	out2, counts2 := Text(in2)
+	if !strings.Contains(out2, "[redacted:entropy]") || counts2["entropy"] != 1 {
+		t.Fatalf("json entropy missed: %q %v", out2, counts2)
+	}
+}
+
+func TestEntropyTelegramShape(t *testing.T) {
+	in := `token is 8247579861:AAHrT2xK8mQ4nW7jL5hP3sD1fV9x`
+	out, counts := Text(in)
+	if counts["entropy"] != 1 || strings.Contains(out, "AAHrT2xK8mQ4nW7jL5hP3sD1fV9x") {
+		t.Fatalf("telegram-shaped token missed: %q %v", out, counts)
+	}
+}
+
+func TestEntropyStandaloneLineRedacted(t *testing.T) {
+	in := "paste the key below:\n  VqrT2xK8mQ4nW7jL5hP3sD1fV9rT2xK8\nthanks"
+	out, counts := Text(in)
+	if counts["entropy"] != 1 || !strings.Contains(out, "[redacted:entropy]") {
+		t.Fatalf("standalone entropy missed: %q %v", out, counts)
+	}
+}
+
+func TestEntropyLeavesOrdinaryContentAlone(t *testing.T) {
+	for _, in := range []string{
+		"the function getUserAccountByIdentifier handles retries",
+		"commit 3f1a9c27e4b8d6015a2f3c4d5e6f7a8b9c0d1e2f fixed it",
+		"file=/private/tmp/claude-501/-users-shulcz/scratchpad/notes.txt",
+		"moved to: L3Zhci9mb2xkZXJzL2puL2NsYXVkZS41MDEvLXVzZXJz",
+		"id: 550e8400-e29b-41d4-a716-446655440000",
+		"see https://github.com/vshulcz/deja-vu/releases/download/v0.14.1",
+	} {
+		out, counts := Text(in)
+		if counts["entropy"] != 0 {
+			t.Fatalf("false positive on %q -> %q %v", in, out, counts)
+		}
+	}
+}
+
+func TestEntropySkipsAlreadyRedacted(t *testing.T) {
+	in := `api_key=sk-ant-abcdefghijklmnopqrstuvwxyz0123456789`
+	out, counts := Text(in)
+	if counts["entropy"] != 0 || strings.Count(out, "[redacted:") != 1 {
+		t.Fatalf("double redaction: %q %v", out, counts)
+	}
+}

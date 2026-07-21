@@ -1,6 +1,9 @@
 package redact
 
 import (
+	"math"
+
+	"github.com/vshulcz/deja-vu/internal/query"
 	"os"
 	"regexp"
 	"strings"
@@ -102,6 +105,7 @@ func Text(s string) (string, Counts) {
 	if containsAnyFold(s, providerHints) {
 		s = replaceProvider(s, counts)
 	}
+	s = redactEntropy(s, counts)
 	return s, counts
 }
 
@@ -164,4 +168,177 @@ func closingQuote(open, close string) string {
 		return ""
 	}
 	return close
+}
+
+// ── entropy pass ────────────────────────────────────────────────────────────
+// Pattern matching only catches shapes we know. A bare high-entropy string is
+// caught here instead — but entropy alone fires on identifiers, hashes and
+// paths everywhere (measured: thousands of hits on a real corpus), so a token
+// must also sit in a secret-shaped context: the value side of an assignment,
+// or alone on its own line.
+
+var entropyTokenRE = regexp.MustCompile(`[A-Za-z0-9+/_-]{20,}={0,2}`)
+
+const (
+	entropyMinBits       = 4.5
+	entropyMinAssign     = 20
+	entropyMinStandalone = 28
+)
+
+func shannonBits(s string) float64 {
+	counts := map[byte]int{}
+	for i := 0; i < len(s); i++ {
+		counts[s[i]]++
+	}
+	var h float64
+	n := float64(len(s))
+	for _, c := range counts {
+		p := float64(c) / n
+		h -= p * math.Log2(p)
+	}
+	return h
+}
+
+func charClasses(s string) int {
+	var lower, upper, digit, other bool
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c >= 'a' && c <= 'z':
+			lower = true
+		case c >= 'A' && c <= 'Z':
+			upper = true
+		case c >= '0' && c <= '9':
+			digit = true
+		default:
+			other = true
+		}
+	}
+	n := 0
+	for _, b := range []bool{lower, upper, digit, other} {
+		if b {
+			n++
+		}
+	}
+	return n
+}
+
+func isHexish(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' || c == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+func entropyCandidate(tok string) bool {
+	if len(tok) > 256 || isHexish(tok) || charClasses(tok) < 3 {
+		return false
+	}
+	// Lowercase-only path segments sneak into the charset via '/' and '-';
+	// real secrets with slashes (base64) mix cases.
+	if strings.Contains(tok, "/") && strings.ToLower(tok) == tok {
+		return false
+	}
+	return shannonBits(tok) >= entropyMinBits
+}
+
+// assignmentValue reports whether s[start] begins the value side of an
+// assignment: a word, then = or :, optional quote/space, then the token.
+// Prose and log lines assign nothing — a key that is an English stop word
+// ("moved to: <blob>", "at: <hash>") does not count.
+func assignmentValue(s string, start int) bool {
+	i := start - 1
+	for i >= 0 && (s[i] == '"' || s[i] == '\'' || s[i] == ' ' || s[i] == '\t') {
+		i--
+	}
+	if i < 0 || (s[i] != '=' && s[i] != ':') {
+		return false
+	}
+	i--
+	for i >= 0 && (s[i] == '"' || s[i] == '\'' || s[i] == ' ' || s[i] == '\t') {
+		i--
+	}
+	end := i + 1
+	for i >= 0 && isWordByte(s[i]) {
+		i--
+	}
+	key := s[i+1 : end]
+	digitsOnly := true
+	for k := 0; k < len(key); k++ {
+		if key[k] < '0' || key[k] > '9' {
+			digitsOnly = false
+			break
+		}
+	}
+	// A pure-digit key is the Telegram bot-token shape (12345678:AA…) — keep
+	// it. Otherwise require a real word: two-letter keys are log noise.
+	if digitsOnly {
+		return len(key) >= 6
+	}
+	if len(key) < 3 {
+		return false
+	}
+	return !query.IsStopWord(strings.ToLower(key))
+}
+
+func isWordByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '.'
+}
+
+// standaloneLine reports whether the token is the only content on its line —
+// the shape of a pasted credential.
+func standaloneLine(s string, start, end int) bool {
+	i := start - 1
+	for i >= 0 && s[i] != '\n' {
+		if s[i] != ' ' && s[i] != '\t' && s[i] != '\r' {
+			return false
+		}
+		i--
+	}
+	j := end
+	for j < len(s) && s[j] != '\n' {
+		if s[j] != ' ' && s[j] != '\t' && s[j] != '\r' {
+			return false
+		}
+		j++
+	}
+	return true
+}
+
+func redactEntropy(s string, counts Counts) string {
+	if len(s) < entropyMinAssign {
+		return s
+	}
+	spans := entropyTokenRE.FindAllStringIndex(s, -1)
+	if spans == nil {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for _, span := range spans {
+		tok := s[span[0]:span[1]]
+		if strings.Contains(tok, "[redacted:") {
+			continue
+		}
+		hit := false
+		if len(tok) >= entropyMinAssign && assignmentValue(s, span[0]) && entropyCandidate(tok) {
+			hit = true
+		} else if len(tok) >= entropyMinStandalone && standaloneLine(s, span[0], span[1]) && entropyCandidate(tok) {
+			hit = true
+		}
+		if !hit {
+			continue
+		}
+		b.WriteString(s[last:span[0]])
+		b.WriteString("[redacted:entropy]")
+		last = span[1]
+		counts.Add("entropy", 1)
+	}
+	if last == 0 {
+		return s
+	}
+	b.WriteString(s[last:])
+	return b.String()
 }
