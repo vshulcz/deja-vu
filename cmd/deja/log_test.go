@@ -30,7 +30,7 @@ func TestLogEmptyState(t *testing.T) {
 func TestLogListsEventsAndLastDigest(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
-	usage.RecordDigest(dir, usage.KindHook, "the injected context body", 3)
+	usage.RecordDigest(dir, usage.KindHook, "the injected context body", 3, 1024)
 	usage.RecordResult(dir, usage.KindRecall, 42, 0, true)
 
 	var out bytes.Buffer
@@ -59,5 +59,18 @@ func TestLogListsEventsAndLastDigest(t *testing.T) {
 	}
 	if err := runLogTo(&out, dir, []string{"--nope"}); err == nil {
 		t.Fatal("unknown flag accepted")
+	}
+}
+
+func TestStatuslineShowsDistillRatio(t *testing.T) {
+	hermeticEnv(t)
+	dir := index.DefaultDir()
+	usage.RecordDigest(dir, usage.KindRecall, strings.Repeat("d", 1000), 2, 250000)
+	var out bytes.Buffer
+	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "less than replaying") {
+		t.Fatalf("statusline missing ratio: %q", out.String())
 	}
 }

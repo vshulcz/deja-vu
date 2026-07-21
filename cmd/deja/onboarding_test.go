@@ -129,7 +129,7 @@ func TestHookMissingManifestRequestsWarmup(t *testing.T) {
 	oldSpawn := spawnWarmup
 	spawnWarmup = func(_, _ string) error { called = true; return nil }
 	defer func() { spawnWarmup = oldSpawn }()
-	if digest, sessions := hookDigestResult(index.DefaultDir()); digest != "" || sessions != 0 {
+	if digest, sessions, _ := hookDigestResult(index.DefaultDir()); digest != "" || sessions != 0 {
 		t.Fatalf("missing-manifest digest = %q, sessions=%d", digest, sessions)
 	}
 	if !called {
@@ -162,7 +162,7 @@ func TestFirstIndexGreetingIncludesParsedZeroWarning(t *testing.T) {
 	}
 	defer func() { index.LastBuild = oldBuild }()
 
-	out := captureStdoutCall(t, maybeFirstIndexGreeting)
+	out := captureStdoutCall(t, func() { maybeFirstIndexGreeting(index.DefaultDir()) })
 	if !strings.Contains(out, "warning: claude files found but newest parsed to zero") {
 		t.Fatalf("greeting missing parsed-zero warning: %q", out)
 	}

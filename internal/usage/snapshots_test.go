@@ -8,8 +8,8 @@ import (
 
 func TestRecordDigestAndSnapshots(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	RecordDigest(dir, KindHook, "first digest", 2)
-	RecordDigest(dir, KindRecall, "second digest", 1)
+	RecordDigest(dir, KindHook, "first digest", 2, 1024)
+	RecordDigest(dir, KindRecall, "second digest", 1, 1024)
 
 	snaps := Snapshots(dir, 10)
 	if len(snaps) != 2 {
@@ -30,7 +30,7 @@ func TestRecordDigestAndSnapshots(t *testing.T) {
 
 func TestRecordDigestEmptySkipsSnapshot(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	RecordDigest(dir, KindRecall, "", 0)
+	RecordDigest(dir, KindRecall, "", 0, 1024)
 	if snaps := Snapshots(dir, 10); len(snaps) != 0 {
 		t.Fatalf("empty digest recorded a snapshot: %+v", snaps)
 	}
@@ -44,7 +44,7 @@ func TestSnapshotRotationKeepsNewest(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	big := strings.Repeat("x", 60<<10)
 	for i := 0; i < 12; i++ {
-		RecordDigest(dir, KindHook, big+string(rune('a'+i)), 1)
+		RecordDigest(dir, KindHook, big+string(rune('a'+i)), 1, 2048)
 	}
 	snaps := Snapshots(dir, 0)
 	if len(snaps) == 0 || len(snaps) > snapshotsToKeep+2 {

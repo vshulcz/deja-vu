@@ -60,7 +60,7 @@ func runHookContext(dir string, plain bool) error {
 		Source string `json:"source"`
 	}
 	_ = json.NewDecoder(os.Stdin).Decode(&input)
-	digest, sessions := hookDigestResult(dir)
+	digest, sessions, raw := hookDigestResult(dir)
 	if digest == "" {
 		return nil
 	}
@@ -75,7 +75,7 @@ func runHookContext(dir string, plain bool) error {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
-	usage.RecordDigest(dir, usage.KindHook, digest, sessions)
+	usage.RecordDigest(dir, usage.KindHook, digest, sessions, raw)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -121,26 +121,26 @@ func receiptIsNews(dir, digest string) bool {
 }
 
 func hookDigest(dir string) string {
-	digest, _ := hookDigestResult(dir)
+	digest, _, _ := hookDigestResult(dir)
 	return digest
 }
 
-func hookDigestResult(dir string) (string, int) {
+func hookDigestResult(dir string) (string, int, int64) {
 	defer func() { _ = recover() }()
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
-		return "", 0
+		return "", 0, 0
 	}
 	if !index.HasManifest(dir) {
 		requestWarmup(dir)
-		return "", 0
+		return "", 0, 0
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return "", 0
+			return "", 0, 0
 		}
 	}
 	names := []string{sources.ClaudeProjectName(cwd)}
@@ -183,14 +183,14 @@ func hookDigestResult(dir string) (string, int) {
 		}
 	}
 	if len(ss) == 0 {
-		return "", 0
+		return "", 0, 0
 	}
 	sort.Slice(ss, func(i, j int) bool { return ss[i].Updated.After(ss[j].Updated) })
 	if len(ss) > 12 {
 		ss = ss[:12]
 	}
 	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names})
-	return result.Text, result.Sessions
+	return result.Text, result.Sessions, rawSize(ss)
 }
 
 func requestWarmup(dir string) {

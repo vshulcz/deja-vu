@@ -51,3 +51,15 @@ func sshSyncTip(dir string, ss []model.Session) string {
 	_ = os.WriteFile(sentinel, []byte("shown"), 0o600)
 	return fmt.Sprintf("tip: %d sessions mention ssh — if you work across machines, `deja sync ssh <host>` carries this memory along (shown once)", sshSessions)
 }
+
+// rawSize is the transcript volume a set of served sessions represents — the
+// denominator of the served-vs-replayed ratio.
+func rawSize(ss []model.Session) int64 {
+	var n int64
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			n += int64(len(m.Text))
+		}
+	}
+	return n
+}

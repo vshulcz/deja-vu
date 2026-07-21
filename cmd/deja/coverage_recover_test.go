@@ -154,15 +154,15 @@ func TestMaybeFirstIndexGreetingPrints(t *testing.T) {
 
 	// Just needs to run without panicking; output goes to /dev/null and
 	// there is nothing to assert on, but the branch executes.
-	maybeFirstIndexGreeting()
+	maybeFirstIndexGreeting(index.DefaultDir())
 
 	// A zero-message initial build digest.Short circuits before printing.
 	index.LastBuild = index.BuildSummary{Initial: true, Sessions: 1, Messages: 0, Harnesses: 1}
-	maybeFirstIndexGreeting()
+	maybeFirstIndexGreeting(index.DefaultDir())
 
 	// Non-initial build must digest.Short circuit before printing.
 	index.LastBuild = index.BuildSummary{Initial: false, Sessions: 1, Messages: 1, Harnesses: 1}
-	maybeFirstIndexGreeting()
+	maybeFirstIndexGreeting(index.DefaultDir())
 }
 
 // --- resume.go ---

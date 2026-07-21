@@ -29,6 +29,9 @@ type Event struct {
 	Bytes    int       `json:"bytes"`
 	Sessions int       `json:"sessions,omitempty"`
 	Empty    bool      `json:"empty,omitempty"`
+	// RawBytes is the size of the source transcripts the served digest was
+	// distilled from — what the agent would have had to replay without deja.
+	RawBytes int64 `json:"raw,omitempty"`
 }
 
 type Summary struct {
@@ -38,6 +41,7 @@ type Summary struct {
 	InjectedSessions int     `json:"injected_sessions"`
 	Bytes            int     `json:"bytes"`
 	InjectedBytes    int     `json:"injected_bytes"`
+	RawBytes         int64   `json:"raw_bytes,omitempty"`
 	EmptyResultRate  float64 `json:"empty_result_rate"`
 }
 
@@ -59,6 +63,12 @@ func Record(indexDir, kind string, bytes int) {
 
 // RecordResult appends an event with result accounting. Errors are swallowed.
 func RecordResult(indexDir, kind string, bytes, sessions int, empty bool) {
+	RecordResultRaw(indexDir, kind, bytes, sessions, empty, 0)
+}
+
+// RecordResultRaw additionally stores the source-transcript size the digest
+// was distilled from, for the served-vs-replayed ratio.
+func RecordResultRaw(indexDir, kind string, bytes, sessions int, empty bool, raw int64) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
@@ -69,7 +79,7 @@ func RecordResult(indexDir, kind string, bytes, sessions int, empty bool) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty})
+	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw})
 	if err != nil {
 		return
 	}
@@ -104,6 +114,23 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	return recalls, bytes, injected
 }
 
+// TodayRaw sums the source-transcript volume behind today's served digests.
+func TodayRaw(indexDir string) int64 {
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var raw int64
+	for _, e := range read(Path(indexDir)) {
+		if e.Time.Before(midnight) {
+			continue
+		}
+		switch e.Kind {
+		case KindRecall, KindContext, KindHook:
+			raw += e.RawBytes
+		}
+	}
+	return raw
+}
+
 // Totals summarizes the retained usage log.
 func Totals(indexDir string) Summary {
 	var out Summary
@@ -114,6 +141,7 @@ func Totals(indexDir string) Summary {
 			out.Recalls++
 			out.RecallSessions += e.Sessions
 			out.Bytes += e.Bytes
+			out.RawBytes += e.RawBytes
 			if e.Empty {
 				empty++
 			}
@@ -123,6 +151,7 @@ func Totals(indexDir string) Summary {
 			out.InjectedSessions += e.Sessions
 			out.InjectedBytes += e.Bytes
 			out.Bytes += e.Bytes
+			out.RawBytes += e.RawBytes
 		}
 	}
 	if served := out.Recalls - out.Injections; served > 0 {
