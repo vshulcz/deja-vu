@@ -26,6 +26,7 @@ func TestSuggestFirstQueryPicksDistinctiveRecentPhrase(t *testing.T) {
 		"s2": mk("s2", "jwks rotation cache still stale after deploy"),
 		"s3": mk("s3", "please update readme wording and typos"),
 		"s4": mk("s4", "update readme header image"),
+		"s5": mk("s5", "update readme badges"),
 	}
 	for id, body := range files {
 		if err := os.WriteFile(filepath.Join(root, id+".jsonl"), []byte(body), 0o644); err != nil {
