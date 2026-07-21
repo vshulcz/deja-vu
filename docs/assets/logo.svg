@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="680" height="200" viewBox="0 0 680 200" role="img" aria-label="deja-vu">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="200" viewBox="0 0 760 200" role="img" aria-label="deja-vu">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#7c6cf0"/>
@@ -14,7 +14,7 @@
   <!-- wordmark -->
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
     <text x="200" y="118" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>
-    <text x="203" y="160" font-size="22" fill="#8a87a0">persistent memory for coding agents</text>
+    <text x="203" y="160" font-size="20" fill="#8a87a0">your agents already solved this. deja finds it.</text>
   </g>
   <style>
     @media (prefers-color-scheme: light) {

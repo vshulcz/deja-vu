@@ -16,269 +16,363 @@
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <style>
-:root{--bg:#0b0a12;--panel:#141322;--line:#262439;--ink:#eceaf6;--dim:#918ea6;--a1:#7c6cf0;--a2:#4ecdc4;--mono:"SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace}
+:root{
+  --bg:#050807;
+  --ph:#4af08b;
+  --ph-hi:#8affc0;
+  --ph-dim:#2f9459;
+  --amber:#ffb454;
+  --body:#a9cbb6;
+  --faint:#527860;
+  --line:#12291c;
+  --panel:#070d0a;
+  --mono:"Berkeley Mono","SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
+}
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--ink);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-.glow{position:fixed;inset:0;pointer-events:none;background:
- radial-gradient(600px 340px at 50% -80px,#7c6cf022,transparent 70%),
- radial-gradient(500px 300px at 85% 15%,#4ecdc411,transparent 70%)}
-.wrap{max-width:920px;margin:0 auto;padding:0 22px;position:relative}
-nav{display:flex;align-items:center;gap:18px;padding:20px 0}
-nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem}
-nav .brand img{width:26px;height:26px}
-nav .spacer{flex:1}
-nav a{color:var(--dim);font-size:.92rem}
-nav a:hover{color:var(--ink);text-decoration:none}
-header{padding:64px 0 24px;text-align:center}
-h1{font-size:clamp(2rem,5.4vw,3.2rem);line-height:1.12;letter-spacing:-.02em;font-weight:800}
-h1 .grad{background:linear-gradient(92deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{color:var(--dim);font-size:1.12rem;max-width:640px;margin:18px auto 0}
-.sub code{font-family:var(--mono);font-size:.92em;color:var(--a2)}
-.cta{display:flex;gap:12px;justify-content:center;margin-top:30px;flex-wrap:wrap}
-.btn{border-radius:10px;padding:11px 22px;font-size:.95rem;font-weight:600;border:1px solid var(--line);color:var(--ink)}
-.btn:hover{text-decoration:none;border-color:var(--a1)}
-.btn.primary{background:linear-gradient(92deg,var(--a1),#5f54c9);border:none;color:#fff;box-shadow:0 4px 24px #7c6cf03d}
-.btn.primary:hover{filter:brightness(1.08)}
-.hero-install{margin:34px auto 0;max-width:660px;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px;font-family:var(--mono);font-size:.9rem;box-shadow:0 8px 40px #00000055}
-.hero-install .p{color:#5e5b73;user-select:none}
-.hero-install code{color:var(--a2);white-space:nowrap;overflow-x:auto;scrollbar-width:none}
-.copy{margin-left:auto;flex:none;background:#1d1b30;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:.78rem;font-family:inherit}
-.copy:hover{color:var(--ink);border-color:var(--a1)}
-.term{margin:52px auto 0;max-width:860px;border-radius:14px;border:1px solid var(--line);background:#100f1c;box-shadow:0 24px 80px #00000077;overflow:hidden}
-.term .bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line)}
-.term .bar i{width:11px;height:11px;border-radius:50%;display:block}
-.term .bar i:nth-child(1){background:#ff5f57}.term .bar i:nth-child(2){background:#febc2e}.term .bar i:nth-child(3){background:#28c840}
-.term .bar span{margin-left:8px;color:#5e5b73;font-size:.78rem;font-family:var(--mono)}
-.term img{display:block;width:100%}
-section{margin-top:88px}
-h2{font-size:1.5rem;letter-spacing:-.01em;margin-bottom:6px}
-.lead{color:var(--dim);margin-bottom:26px}
-.features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media(max-width:900px){.features{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.features{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;transition:border-color .2s}
-.card:hover{border-color:#3a3756}
-.card .ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#7c6cf022,#4ecdc422);margin-bottom:14px}
-.card .ic svg{width:20px;height:20px;stroke:var(--a2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.card h3{font-size:1.02rem;margin-bottom:8px}
-.card p{color:var(--dim);font-size:.92rem}
-.card p code{font-family:var(--mono);font-size:.88em;color:var(--ink)}
-.chat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;max-width:720px;margin:0 auto}
-.msg{display:flex;gap:12px;margin-bottom:18px}
-.msg:last-child{margin-bottom:0}
-.msg .who{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700}
-.msg.you .who{background:#26243a;color:var(--dim)}
-.msg.ai .who{background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff}
-.msg .bubble{font-size:.95rem;padding-top:5px}
-.msg.ai .bubble code{font-family:var(--mono);font-size:.86em;background:#1d1b30;padding:1px 6px;border-radius:5px;color:var(--a2)}
-.msg .tool{font-family:var(--mono);font-size:.78rem;color:#5e5b73;margin-bottom:6px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;text-align:center}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 10px}
-.stat b{display:block;font-size:1.7rem;letter-spacing:-.02em;background:linear-gradient(92deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.stat span{color:var(--dim);font-size:.84rem}
-.installs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
-.inst{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
-.inst .k{color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:.1em}
-.inst .row{display:flex;align-items:center;gap:8px}
-.inst pre{font-family:var(--mono);font-size:.82rem;color:var(--a2);overflow-x:auto;scrollbar-width:none;flex:1}
-.how{color:var(--dim);max-width:760px}
-.how code{font-family:var(--mono);color:var(--ink);font-size:.9em}
-footer{margin:96px 0 44px;padding-top:28px;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;color:var(--dim);font-size:.9rem;flex-wrap:wrap}
-footer .spacer{flex:1}
-a{color:var(--a2);text-decoration:none}
-a:hover{text-decoration:underline}
-@media(max-width:600px){.hero-install{font-size:.78rem}}
+body{
+  background:var(--bg);
+  overflow-x:hidden;
+  color:var(--body);
+  font:15px/1.7 var(--mono);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{background:#1c5c38;color:#eafff2}
 
-.agents{margin:34px auto 0;text-align:center}
-.agents .cap{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#8a87a0;margin-bottom:14px}
-.agents .row{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-items:flex-start}
-.agent{display:flex;flex-direction:column;align-items:center;gap:7px;width:76px;text-decoration:none}
-.agent .disc{width:46px;height:46px;border-radius:14px;background:#232134;border:1px solid #322f47;display:flex;align-items:center;justify-content:center;transition:transform .15s ease,border-color .15s ease}
-.agent:hover .disc{transform:translateY(-2px);border-color:#7c6cf0}
-.agent .disc{color:#9aa0b5}
-.agent svg{width:22px;height:22px}
-.agent:hover .disc{color:#c9c5e8}
-.agent .mono{font-family:var(--mono);font-size:.82rem;font-weight:700;color:#9aa0b5}
-.agent .nm{font-size:.72rem;color:#8a87a0}
+/* ── CRT screen ─────────────────────────────────────────── */
+.crt::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.16) 2px 3px);
+}
+.crt::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:61;
+  background:radial-gradient(ellipse 130% 100% at 50% 45%,transparent 55%,rgba(0,0,0,.42) 100%);
+}
+@keyframes flicker{0%,100%{opacity:1}96%{opacity:1}97%{opacity:.96}98%{opacity:1}99%{opacity:.98}}
+.js .screen{animation:flicker 7s infinite}
+@keyframes poweron{0%{transform:scaleY(.004);filter:brightness(6)}55%{transform:scaleY(.004);filter:brightness(6)}70%{transform:scaleY(1);filter:brightness(2.2)}100%{transform:scaleY(1);filter:brightness(1)}}
+.js .screen{transform-origin:50% 42vh;animation:poweron .6s ease-out,flicker 7s .6s infinite}
+@media (prefers-reduced-motion: reduce){
+  .js .screen{animation:none}
+  .crt::before{background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.09) 2px 3px)}
+}
 
-.proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px}
-@media(max-width:700px){.proof-grid{grid-template-columns:1fr}}
-.proof-cell{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 22px;text-align:center}
-.proof-cell .big{font-size:2.6rem;font-weight:800;letter-spacing:-.02em;line-height:1}
-.proof-cell .cap2{color:var(--dim);font-size:.9rem;margin-top:10px}
-.js .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px;position:relative}
+
+a{color:var(--ph);text-decoration:none}
+a:hover{color:var(--ph-hi);text-shadow:0 0 8px rgba(74,240,139,.45)}
+
+/* ── status bar ─────────────────────────────────────────── */
+.tty{
+  position:sticky;top:0;z-index:50;background:rgba(5,8,7,.92);backdrop-filter:blur(3px);
+  border-bottom:1px solid var(--line);
+}
+.tty .wrap{display:flex;align-items:center;gap:14px;padding:10px 20px;font-size:.82rem}
+.tty .host{color:var(--ph);font-weight:700;letter-spacing:.02em;text-shadow:0 0 10px rgba(74,240,139,.35)}
+.tty .host .blink{margin-left:2px}
+.tty .spacer{flex:1}
+.tty a{color:var(--faint)}
+.tty a:hover{color:var(--ph)}
+.tty .k{color:#2c4a39;margin-right:4px}
+
+/* ── shared terminal text bits ──────────────────────────── */
+.p{color:var(--faint);user-select:none}
+.cmd{color:var(--ph);text-shadow:0 0 7px rgba(74,240,139,.3)}
+.q{color:var(--amber)}
+.dim{color:var(--faint)}
+.hi{color:var(--ph-hi)}
+.ok{color:var(--ph)}
+mark{background:transparent;color:var(--amber);text-decoration:underline;text-underline-offset:3px}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+.blink{display:inline-block;width:.62em;height:1.05em;vertical-align:-.18em;background:var(--ph);box-shadow:0 0 9px rgba(74,240,139,.7)}
+.js .blink{animation:blink 1.06s step-end infinite}
+@media (prefers-reduced-motion: reduce){.js .blink{animation:none}}
+
+/* ── hero boot ──────────────────────────────────────────── */
+header{padding:56px 0 8px}
+.boot{font-size:.88rem;min-height:0}
+.boot .ln{white-space:pre-wrap}
+.boot .bar-h{color:var(--ph-dim)}
+.js .type-seq .ln{visibility:hidden}
+.js .type-seq .ln.on{visibility:visible}
+
+.logo-block{margin:34px 0 6px;overflow-x:auto;scrollbar-width:none}
+.logo-block::-webkit-scrollbar{display:none}
+pre.ascii{
+  font-size:clamp(6.4px,1.5vw,13px);line-height:1.18;color:var(--ph);
+  text-shadow:0 0 12px rgba(74,240,139,.4),0 0 2px rgba(74,240,139,.8);
+  user-select:none;
+}
+pre.ascii b{color:var(--amber);font-weight:400;text-shadow:0 0 12px rgba(255,180,84,.4)}
+.tagline{margin-top:18px;font-size:clamp(.95rem,2.4vw,1.25rem);color:#d7f5e2}
+.tagline .f2{color:var(--amber)}
+.sub{margin-top:14px;max-width:640px;color:var(--body);font-size:.92rem}
+.sub code{color:var(--ph)}
+
+.heroline{
+  margin-top:30px;display:flex;align-items:center;gap:10px;max-width:720px;
+  border:1px solid var(--line);background:var(--panel);padding:13px 16px;
+  box-shadow:inset 0 0 30px rgba(74,240,139,.03);
+}
+.heroline code{color:var(--ph);font-size:.85rem;white-space:nowrap;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.copy{
+  flex:none;background:transparent;border:1px solid var(--line);color:var(--faint);
+  padding:4px 12px;cursor:pointer;font:inherit;font-size:.76rem;
+}
+.copy:hover{color:var(--ph);border-color:var(--ph-dim)}
+.hero-links{margin-top:14px;font-size:.85rem;color:var(--faint)}
+
+/* ── section chrome: every section is a command ─────────── */
+section{margin-top:96px}
+.shead{font-size:.95rem;margin-bottom:6px;white-space:pre-wrap}
+.shead .out{color:var(--faint)}
+.slead{color:var(--faint);font-size:.9rem;max-width:680px;margin-bottom:24px}
+.slead code,.slead .cmd{font-size:.95em}
+.js .reveal{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
 .js .reveal.in{opacity:1;transform:none}
-@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
-.docs-teaser{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:6px}
-@media(max-width:760px){.docs-teaser{grid-template-columns:repeat(2,1fr)}}
-.docs-teaser a{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px;color:var(--ink);font-weight:600;font-size:.95rem;transition:border-color .2s}
-.docs-teaser a:hover{border-color:var(--a1);text-decoration:none}
-.docs-teaser a span{display:block;color:var(--dim);font-weight:400;font-size:.83rem;margin-top:4px}
+@media (prefers-reduced-motion: reduce){.js .reveal{opacity:1;transform:none;transition:none}}
 
-.chips{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin:24px auto 0;max-width:640px}
-.chip{background:#17162a;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:.82rem;color:var(--dim)}
-.chip b{color:var(--ink);font-weight:700}
-.demo-cap{text-align:center;color:var(--faint);font-size:.85rem;margin-top:14px}
-.glow{animation:drift 18s ease-in-out infinite alternate}
-@keyframes drift{from{transform:translateY(0)}to{transform:translateY(-24px)}}
-@media(prefers-reduced-motion:reduce){.glow{animation:none}}
-.card{transition:border-color .2s,transform .2s}
-.card:hover{border-color:#3a3756;transform:translateY(-3px)}
-.term{transition:box-shadow .3s}
-.term:hover{box-shadow:0 30px 90px #7c6cf033,0 24px 80px #00000077}
+/* ── live demo ──────────────────────────────────────────── */
+.demo{
+  border:1px solid var(--line);background:var(--panel);padding:20px;
+  box-shadow:inset 0 0 40px rgba(74,240,139,.03);
+}
+.demo .in-ln{display:flex;align-items:center;gap:0;font-size:.95rem}
+.demo .in-ln .p{margin-right:8px}
+.demo input{
+  flex:1;background:transparent;border:none;outline:none;color:var(--amber);
+  font:inherit;caret-color:var(--ph);min-width:0;
+}
+.demo input::placeholder{color:#3d5c4a}
+.demo .res{margin-top:16px;font-size:.86rem}
+.demo .res .r{margin-bottom:14px}
+.demo .res .meta{color:var(--faint)}
+.demo .res .meta .h{color:var(--ph)}
+.demo .res .t{color:#d7f5e2}
+.demo .res .s{color:var(--body);display:block;padding-left:2ch}
+.demo .res .none{color:var(--faint)}
+.demo .res .stat{color:#3d5c4a;font-size:.78rem;margin-top:4px}
+.chips{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  background:transparent;border:1px solid var(--line);color:var(--faint);
+  font:inherit;font-size:.78rem;padding:3px 10px;cursor:pointer;
+}
+.chip:hover{color:var(--amber);border-color:#3d3320}
+.demo-note{margin-top:12px;color:#3d5c4a;font-size:.78rem}
+
+/* ── the recall chat ────────────────────────────────────── */
+.replay{border:1px solid var(--line);background:var(--panel);padding:22px;max-width:760px}
+.replay .u{color:#d7f5e2}
+.replay .u .who{color:var(--amber)}
+.replay .tool{color:var(--faint);font-size:.82rem;margin:12px 0 4px}
+.replay .a{color:var(--body)}
+.replay .a .who{color:var(--ph)}
+.replay .a code{color:var(--ph)}
+.replay p{margin-top:10px}
+
+/* ── measured numbers ───────────────────────────────────── */
+.bench{border:1px solid var(--line);background:var(--panel);padding:22px;font-size:.9rem;overflow-x:auto}
+.bench table{border-collapse:collapse;width:100%;min-width:520px}
+.bench td{padding:7px 14px 7px 0;vertical-align:top}
+.bench .n{color:var(--ph);font-size:1.5rem;text-shadow:0 0 12px rgba(74,240,139,.35);white-space:nowrap}
+.bench .c{color:var(--faint)}
+.bench .foot{margin-top:14px;color:#3d5c4a;font-size:.8rem}
+
+/* ── features as help output ────────────────────────────── */
+.help{border:1px solid var(--line);background:var(--panel);padding:22px;font-size:.88rem;overflow-x:auto}
+.help dl{display:grid;grid-template-columns:auto 1fr;gap:10px 26px;min-width:560px}
+.help dt{color:var(--ph);white-space:nowrap}
+.help dd{color:var(--body)}
+.help dd .dim{font-size:.92em}
+
+/* ── sources ────────────────────────────────────────────── */
+.sources{border:1px solid var(--line);background:var(--panel);padding:22px;font-size:.86rem;overflow-x:auto}
+.sources table{border-collapse:collapse;min-width:540px;width:100%}
+.sources td{padding:4px 18px 4px 0;white-space:nowrap}
+.sources .nm{color:#d7f5e2}
+.sources .st{color:var(--ph)}
+.sources .pa{color:var(--faint)}
+
+/* ── stats strip ────────────────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.stat{background:var(--bg);padding:20px 16px;text-align:center}
+.stat b{display:block;font-size:1.5rem;font-weight:400;color:var(--ph);text-shadow:0 0 12px rgba(74,240,139,.35)}
+.stat span{color:var(--faint);font-size:.78rem}
+
+/* ── install ────────────────────────────────────────────── */
+.installs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:720px){.installs{grid-template-columns:1fr}}
+.inst{border:1px solid var(--line);background:var(--panel);padding:14px 16px;min-width:0}
+.inst .k{color:#3d5c4a;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
+.inst .row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.inst pre{font-family:inherit;font-size:.8rem;color:var(--ph);overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+
+/* ── docs ls ────────────────────────────────────────────── */
+.docs-ls{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+@media(max-width:640px){.docs-ls{grid-template-columns:1fr}}
+.docs-ls a{display:block;background:var(--bg);padding:14px 18px;color:var(--ph)}
+.docs-ls a span{display:block;color:var(--faint);font-size:.8rem}
+.docs-ls a:hover{background:var(--panel);text-shadow:0 0 8px rgba(74,240,139,.4)}
+
+.how{color:var(--faint);max-width:760px;font-size:.9rem}
+.how code,.how a{font-size:.95em}
+.how code{color:var(--body)}
+
+footer{margin:110px 0 40px;padding-top:22px;border-top:1px solid var(--line);font-size:.82rem;color:var(--faint);display:flex;gap:16px;flex-wrap:wrap}
+footer .spacer{flex:1}
+
+@media(max-width:600px){
+  body{font-size:13.5px}
+  .help dl,.bench table,.sources table{min-width:0}
+  .help dl{grid-template-columns:1fr}
+  .help dt{margin-top:8px}
+  .tty .wrap{gap:10px;font-size:.76rem}
+  .tty .k{display:none}
+  .tty .host{white-space:nowrap}
+  .sources td{white-space:normal}
+}
 </style>
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Linux, Windows","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","description":"Local searchable memory over your coding-agent session histories, served back via MCP recall.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","codeRepository":"https://github.com/vshulcz/deja-vu","author":{"@type":"Person","name":"vshulcz"}}
-</script>
-
-<meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
-<meta name="theme-color" content="#0d0b16">
-<meta name="color-scheme" content="dark light">
-<meta property="og:site_name" content="deja-vu">
-<meta property="og:image:width" content="1280">
-<meta property="og:image:height" content="640">
-<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="deja-vu — your agents already solved this. deja finds it.">
-<meta name="twitter:description" content="A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex, opencode, Cursor, Gemini CLI, aider, Antigravity, Grok Build, Qwen Code, pi and Copilot CLI already write. One zero-dependency binary, fully local.">
-<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
-<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
-<link rel="apple-touch-icon" href="assets/favicon.svg">
-<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/","description":"A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex, opencode, Cursor, Gemini CLI, aider, Antigravity, Grok Build, Qwen Code, pi and Copilot CLI already write. One zero-dependency binary, fully local.","publisher":{"@type":"Person","name":"vshulcz"},"inLanguage":"en"}</script>
 </head>
 <body>
-<div class="glow"></div>
-<div class="wrap">
+<div class="crt"></div>
+<div class="screen">
 
-<nav>
-  <span class="brand"><img src="assets/favicon.svg" alt="">deja-vu</span>
-  <span class="spacer"></span>
-  <a href="#install">Install</a>
-  <a href="guide/getting-started.html">Docs</a>
-  <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
+<nav class="tty" aria-label="site">
+  <div class="wrap">
+    <span class="host">deja-vu<span class="dim">@local</span>:~ <span class="blink" aria-hidden="true"></span></span>
+    <span class="spacer"></span>
+    <a href="#demo"><span class="k">[F2]</span>try</a>
+    <a href="#install"><span class="k">[F3]</span>install</a>
+    <a href="guide/getting-started.html"><span class="k">[F4]</span>docs</a>
+    <a href="https://github.com/vshulcz/deja-vu"><span class="k">[F5]</span>github</a>
+  </div>
 </nav>
 
-<header>
-  <h1>Your agents already solved this.<br><span class="grad">deja finds it.</span></h1>
-  <p class="sub">Memory tools start empty and record forward. <code>deja</code> starts full: it indexes the sessions your agents already wrote to disk — months of history from before you installed it — hands it back over MCP so any agent recalls what any other solved, and follows you between machines over SSH.</p>
-  <div class="cta">
-    <a class="btn primary" href="#install">Get started</a>
-    <a class="btn" href="https://github.com/vshulcz/deja-vu">Star on GitHub</a>
-  </div>
-  <div class="chips">
-    <span class="chip"><b>11</b> coding agents</span>
-    <span class="chip"><b>0</b> capture step — indexes retroactively</span>
-    <span class="chip"><b>0</b> config, 0 cloud</span>
-    <span class="chip">MIT &middot; fully local</span>
-  </div>
-  <div class="hero-install">
-    <span class="p">$</span>
-    <code id="cmd">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
-    <button class="copy" data-copy="cmd">copy</button>
-  </div>
-<div class="agents">
-  <div class="cap">one index &middot; eleven agents</div>
-  <div class="row">
-    <span class="agent"><span class="disc"><svg aria-label="Claude Code" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Claude</title><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg></span><span class="nm">Claude Code</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Codex CLI" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>OpenAI</title><path d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z"></path></svg></span><span class="nm">Codex CLI</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="opencode" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>opencode</title><path d="M16 6H8v12h8V6zm4 16H4V2h16v20z"></path></svg></span><span class="nm">opencode</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Cursor" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Cursor</title><path d="M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z"></path></svg></span><span class="nm">Cursor</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Gemini CLI" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Gemini</title><path d="M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z"></path></svg></span><span class="nm">Gemini CLI</span></span>
-    <span class="agent"><span class="disc"><img src="data:image/png;base64,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" alt="aider" width="22" height="22" style="border-radius:5px"></span><span class="nm">aider</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Antigravity" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Antigravity</title><path d="M21.751 22.607c1.34 1.005 3.35.335 1.508-1.508C17.73 15.74 18.904 1 12.037 1 5.17 1 6.342 15.74.815 21.1c-2.01 2.009.167 2.511 1.507 1.506 5.192-3.517 4.857-9.714 9.715-9.714 4.857 0 4.522 6.197 9.714 9.715z"></path></svg></span><span class="nm">Antigravity</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Grok Build" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Grok</title><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg></span><span class="nm">Grok Build</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Qwen Code" fill="currentColor" fill-rule="evenodd" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Qwen Code</title><path d="M23.919 14.545 20.817 9.17l1.47-2.544a.56.56 0 0 0 0-.566l-1.633-2.83a.57.57 0 0 0-.49-.283h-6.207L12.487.402a.57.57 0 0 0-.49-.284H8.732a.56.56 0 0 0-.49.284L5.139 5.775h-2.94a.56.56 0 0 0-.49.284L.077 8.887a.56.56 0 0 0 0 .567L3.18 14.83l-1.47 2.545a.56.56 0 0 0 0 .566l1.634 2.83a.57.57 0 0 0 .49.283h6.205l1.47 2.545a.57.57 0 0 0 .49.284h3.266a.57.57 0 0 0 .49-.284l3.104-5.375h2.94a.57.57 0 0 0 .49-.283l1.634-2.828a.55.55 0 0 0-.004-.568M8.733.686l1.634 2.828-1.634 2.828H21.8L20.164 9.17H7.425L5.63 6.06Zm1.306 19.801-6.205-.002 1.634-2.83h3.265L2.201 6.344h3.267q3.182 5.517 6.367 11.032zm10.124-5.66L18.53 12l-6.532 11.315-1.634-2.83c2.129-3.673 4.25-7.351 6.373-11.028h3.592l3.102 5.374z"></path></svg></span><span class="nm">Qwen Code</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="pi" fill="currentColor" height="1em" style="flex:none;line-height:1" viewBox="0 0 800 800" width="1em" xmlns="http://www.w3.org/2000/svg"><title>pi</title><path fill-rule="evenodd" d="M165.29 165.29H517.36V400H400V517.36H282.65V634.72H165.29ZM282.65 282.65V400H400V282.65Z"/><path d="M517.36 400H634.72V634.72H517.36Z"/></svg></span><span class="nm">pi</span></span>
-    <span class="agent"><span class="disc"><svg aria-label="Copilot" fill="currentColor" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Copilot CLI</title><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg></span><span class="nm">Copilot CLI</span></span>
-  </div>
-</div>
+<div class="wrap">
 
+<header>
+  <div class="boot type-seq" id="boot" aria-label="deja indexing existing agent history">
+    <div class="ln"><span class="p">$</span> <span class="cmd">deja index</span></div>
+    <div class="ln dim">scanning harness stores…</div>
+    <div class="ln bar-h">  claude       ▓▓▓▓▓▓▓▓▓▓▓▓▓▓  812 sessions</div>
+    <div class="ln bar-h">  codex        ▓▓▓▓▓░░░░░░░░░   96 sessions</div>
+    <div class="ln bar-h">  opencode     ▓▓▓░░░░░░░░░░░   57 sessions</div>
+    <div class="ln bar-h">  8 more…      ▓▓░░░░░░░░░░░░   54 sessions</div>
+    <div class="ln"><span class="ok">✓</span> 1,019 sessions · 3.3 GB · indexed in 9.6 s</div>
+    <div class="ln dim">months of history from before you installed it — already searchable</div>
+  </div>
+
+  <div class="logo-block reveal" id="logoblk">
+<pre class="ascii" aria-hidden="true">
+██████╗ ███████╗     ██╗ █████╗       ██╗   ██╗██╗   ██╗
+██╔══██╗██╔════╝     ██║██╔══██╗      ██║   ██║██║   ██║
+██║  ██║█████╗       ██║███████║<b>█████╗</b>██║   ██║██║   ██║
+██║  ██║██╔══╝  ██   ██║██╔══██║<b>╚════╝</b>╚██╗ ██╔╝██║   ██║
+██████╔╝███████╗╚█████╔╝██║  ██║       ╚████╔╝ ╚██████╔╝
+╚═════╝ ╚══════╝ ╚════╝ ╚═╝  ╚═╝        ╚═══╝   ╚═════╝</pre>
+    <h1 class="tagline">your agents already solved this. <span class="f2">deja finds it.</span></h1>
+    <p class="sub">Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk, searches gigabytes in ~12&nbsp;ms, serves memory back over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
+    <div class="heroline">
+      <span class="p">$</span>
+      <code id="cmd">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
+      <button class="copy" data-copy="cmd">copy</button>
+    </div>
+    <p class="hero-links">or <a href="#install">brew · go · npm</a> — then <span class="cmd">deja install --all</span> wires up your agents</p>
+  </div>
 </header>
 
-<div class="term reveal">
-  <div class="bar"><i></i><i></i><i></i><span>~/api-gateway — deja</span></div>
-  <img src="assets/demo.gif" alt="deja demo: searching indexed coding-agent history — exact match, natural-language fallback, and blame on a file">
-</div>
-<p class="demo-cap">Real output. Retroactive: it searches sessions from before you installed it.</p>
-
-<section>
-  <h2>Memory your agent actually uses</h2>
-  <p class="lead">After <code style="font-family:var(--mono);font-size:.9em">deja install --all</code>, every agent with an MCP client gets a <span style="font-family:var(--mono);font-size:.9em">recall</span> tool (aider's CLI has none — its history is still indexed) — add <span style="font-family:var(--mono);font-size:.9em">--auto</span> for session-start auto-recall where the agent supports it.</p>
-  <div class="chat">
-    <div class="msg you"><span class="who">you</span><div class="bubble">have we dealt with jwt refresh rotation before? check your memory</div></div>
-    <div class="msg ai"><span class="who">AI</span><div class="bubble"><div class="tool">→ recall("jwt refresh rotation")</div>Yes — three weeks ago in the <code>api-gateway</code> project (a Codex session). Login broke after key rotation: the jwks cache wasn't reloaded after <code>rotateKey</code>. You fixed it by reloading the cache and adding a clock-skew test. Want me to apply the same pattern here?</div></div>
+<section id="demo" class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja</span> <span class="out"># try it — a live search over a fake history, right here</span></p>
+  <p class="slead">This is the whole product in one motion: type what you half-remember, get the session where it was solved.</p>
+  <div class="demo">
+    <div class="in-ln">
+      <span class="p">$ deja</span>
+      <input id="dq" type="search" autocomplete="off" spellcheck="false" placeholder='"connection pool exhausted"' aria-label="search the demo history">
+      <span class="blink" aria-hidden="true"></span>
+    </div>
+    <div class="res" id="dres" aria-live="polite"></div>
+    <div class="chips" aria-label="example queries">
+      <button class="chip" data-q="jwt refresh">jwt refresh</button>
+      <button class="chip" data-q="docker oom">docker oom</button>
+      <button class="chip" data-q="flaky test">flaky test</button>
+      <button class="chip" data-q="cors">cors</button>
+      <button class="chip" data-q="migration rollback">migration rollback</button>
+    </div>
+    <p class="demo-note">demo corpus: 16 synthetic sessions. The real thing searches your actual history — retroactively.</p>
   </div>
 </section>
 
-<section class="reveal" id="proof">
-  <h2>Measured, not claimed</h2>
-  <p class="lead">Reaching the context a task needs, with deja recall vs replaying the whole history — a seeded benchmark anyone can run with <code style="font-family:var(--mono)">deja bench context</code>.</p>
-  <div class="proof-grid">
-    <div class="proof-cell"><div class="big grad">~200&times;</div><div class="cap2">fewer tokens to working context than grepping the raw logs, at equal fact coverage</div></div>
-    <div class="proof-cell"><div class="big grad">~12 ms</div><div class="cap2">typical warm search over gigabytes of history</div></div>
-    <div class="proof-cell"><div class="big grad">11</div><div class="cap2">coding agents indexed into one retroactive memory</div></div>
-  </div>
-  <p style="text-align:center;margin-top:20px"><a class="btn" href="guide/benchmarks.html">How it's measured →</a></p>
-</section>
 <section class="reveal">
-  <div class="features">
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 12l-4-3M21 12l-4 2"/></svg></div>
-      <h3>Agent memory via MCP</h3>
-      <p><code>recall</code> and <code>recall_context</code> tools, answers under ~4KB. Add <code>--auto</code> and project memory lands in your agent before you ask.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
-      <h3>One index, every harness</h3>
-      <p>Eleven harnesses — Claude Code, Codex, opencode, Cursor, Gemini CLI, aider, Antigravity, Grok Build, Qwen Code, pi, Copilot CLI — one index, retroactively. A fix found in Codex is recalled inside Claude Code.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M6 3v18M6 8h12l-3-3M18 8l-3 3"/></svg></div>
-      <h3>Blame for conversations</h3>
-      <p><code>deja blame &lt;path&gt;</code> — which sessions touched this file, what was decided and why. git blame, but for the discussions behind the code.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4z"/></svg></div>
-      <h3>Notes that persist</h3>
-      <p><code>deja remember</code> and the MCP <code>remember</code> tool keep explicit decisions next to the recalled history — same index, same redaction, same provenance.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-      <h3>Secrets redacted</h3>
-      <p>API keys, JWTs and private-key blocks are stripped at index time — the cache is safe to keep, shares and exports are safe to send.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
-      <h3>Stats, wrapped</h3>
-      <p><code>deja stats</code> — sessions, top projects, a monthly activity sparkline. Your agent year, one screenshot.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v9M8 8l4-4 4 4"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg></div>
-      <h3>Share a session</h3>
-      <p><code>deja share &lt;id&gt;</code> hands a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</p>
-    </div>
-    <div class="card">
-      <div class="ic"><svg viewBox="0 0 24 24"><path d="M7 8h10M7 8l3-3M7 8l3 3M17 16H7M17 16l-3-3M17 16l-3 3"/></svg></div>
-      <h3>Sync between machines</h3>
-      <p><code>deja sync ssh mini</code> moves memory laptop&nbsp;↔&nbsp;server in one command (or export/import via any shared folder). Watermarked, idempotent.</p>
-    </div>
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja mcp</span> <span class="out"># what your agent does with it</span></p>
+  <p class="slead">After <span class="cmd">deja install --all</span>, every agent with an MCP client gets a <span class="cmd">recall</span> tool (aider's CLI has none — its history is still indexed). Add <span class="cmd">--auto</span> for session-start auto-recall where the agent supports it.</p>
+  <div class="replay">
+    <p class="u"><span class="who">you ›</span> have we dealt with jwt refresh rotation before? check your memory</p>
+    <p class="tool">→ recall("jwt refresh rotation") · 1 match · 3.2 KB</p>
+    <p class="a"><span class="who">agent ›</span> Yes — three weeks ago in the <code>api-gateway</code> project (a Codex session). Login broke after key rotation: the jwks cache wasn't reloaded after <code>rotateKey</code>. You fixed it by reloading the cache and adding a clock-skew test. Want me to apply the same pattern here?</p>
   </div>
 </section>
 
-<section>
+<section id="proof" class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja bench context</span> <span class="out"># measured, not claimed</span></p>
+  <p class="slead">Reaching the context a task needs, with deja recall vs replaying the whole history — a seeded benchmark anyone can run.</p>
+  <div class="bench">
+    <table>
+      <tr><td class="n">~200×</td><td class="c">fewer tokens to working context than grepping the raw logs, at equal fact coverage</td></tr>
+      <tr><td class="n">~12 ms</td><td class="c">typical warm search over gigabytes of history</td></tr>
+      <tr><td class="n">11</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
+    </table>
+    <p class="foot"><a href="guide/benchmarks.html">how it's measured →</a></p>
+  </div>
+</section>
+
+<section class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja --help</span></p>
+  <div class="help">
+    <dl>
+      <dt>deja "query"</dt><dd>search everything your agents ever wrote — phrases, fuzzy, semantic tiers. <span class="dim">Retroactive: months of logs from before you installed it.</span></dd>
+      <dt>recall / recall_context</dt><dd>MCP tools, answers under ~4 KB. A fix found in Codex is recalled inside Claude Code.</dd>
+      <dt>deja blame &lt;path&gt;</dt><dd>which sessions touched this file, what was decided and why. <span class="dim">git blame, but for the discussions behind the code.</span></dd>
+      <dt>deja handoff --to codex</dt><dd>stuck in one agent? package the live context and continue in another.</dd>
+      <dt>deja remember "text"</dt><dd>keep durable decisions next to the recalled history — same index, same redaction.</dd>
+      <dt>deja sync ssh laptop</dt><dd>memory follows you between machines. Watermarked, idempotent, no cloud in the middle.</dd>
+      <dt>deja share &lt;id&gt;</dt><dd>hand a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</dd>
+      <dt>deja stats</dt><dd>sessions, top projects, activity sparkline. <span class="dim">Your agent year, one screenshot.</span></dd>
+    </dl>
+  </div>
+  <p class="slead" style="margin-top:16px">Secrets never reach the index: API keys, JWTs and private-key blocks are stripped at ingest — the cache is safe to keep, shares and exports are safe to send.</p>
+</section>
+
+<section class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja sources</span></p>
+  <div class="sources">
+    <table>
+      <tr><td class="nm">claude</td><td class="st">found</td><td class="pa">~/.claude/projects</td></tr>
+      <tr><td class="nm">codex</td><td class="st">found</td><td class="pa">~/.codex/sessions</td></tr>
+      <tr><td class="nm">opencode</td><td class="st">found</td><td class="pa">opencode.db</td></tr>
+      <tr><td class="nm">cursor</td><td class="st">found</td><td class="pa">~/.cursor + IDE store</td></tr>
+      <tr><td class="nm">gemini</td><td class="st">found</td><td class="pa">~/.gemini/tmp</td></tr>
+      <tr><td class="nm">aider</td><td class="st">found</td><td class="pa">.aider.chat.history.md</td></tr>
+      <tr><td class="nm">antigravity</td><td class="st">found</td><td class="pa">~/.gemini/antigravity*</td></tr>
+      <tr><td class="nm">grok</td><td class="st">found</td><td class="pa">~/.grok/sessions</td></tr>
+      <tr><td class="nm">qwen</td><td class="st">found</td><td class="pa">~/.qwen/projects</td></tr>
+      <tr><td class="nm">pi</td><td class="st">found</td><td class="pa">~/.pi</td></tr>
+      <tr><td class="nm">copilot</td><td class="st">found</td><td class="pa">~/.copilot</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="reveal">
   <div class="stats">
-    <div class="stat"><b>~12 ms</b><span>warm search over ~3.3GB</span></div>
+    <div class="stat"><b>~12 ms</b><span>warm search over ~3.3 GB</span></div>
     <div class="stat"><b>~10 s</b><span>cold index, once</span></div>
     <div class="stat"><b>~2.4%</b><span>index size vs corpus</span></div>
     <div class="stat"><b>0</b><span>runtime dependencies</span></div>
   </div>
 </section>
 
-<section id="install">
-  <h2>Install</h2>
-  <p class="lead">Pick one, then run <span style="font-family:var(--mono);font-size:.9em">deja install --all</span> to wire up your agents.</p>
+<section id="install" class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja install --all</span> <span class="out"># pick a package first</span></p>
   <div class="installs">
     <div class="inst"><span class="k">curl</span><div class="row"><pre id="i1">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre><button class="copy" data-copy="i1">copy</button></div></div>
     <div class="inst"><span class="k">Homebrew</span><div class="row"><pre id="i2">brew install vshulcz/tap/deja-vu</pre><button class="copy" data-copy="i2">copy</button></div></div>
@@ -287,44 +381,129 @@ a:hover{text-decoration:underline}
   </div>
 </section>
 
-<section class="reveal" id="docs">
-  <h2>Documentation</h2>
-  <p class="lead">Not just a landing page — a real guide from install to internals.</p>
-  <div class="docs-teaser">
-    <a href="guide/getting-started.html">Getting started<span>Install, index, first search</span></a>
-    <a href="guide/agents.html">Agents &amp; MCP<span>recall, blame, remember, auto-recall</span></a>
-    <a href="guide/search.html">Search<span>phrases, fuzzy, semantic, tiers</span></a>
-    <a href="guide/commands.html">CLI reference<span>every subcommand and flag</span></a>
-    <a href="guide/harnesses.html">Harnesses<span>eleven agents, and adding one</span></a>
-    <a href="guide/privacy.html">Privacy<span>redaction, forget, exclude</span></a>
-    <a href="guide/benchmarks.html">Benchmarks<span>the ~200&times; number, reproducible</span></a>
-    <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture<span>index format, internals</span></a>
+<section id="docs" class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">ls docs/</span> <span class="out"># a real guide, install to internals</span></p>
+  <div class="docs-ls">
+    <a href="guide/getting-started.html">getting-started<span>install, index, first search</span></a>
+    <a href="guide/agents.html">agents-and-mcp<span>recall, blame, remember, auto-recall</span></a>
+    <a href="guide/search.html">search<span>phrases, fuzzy, semantic, tiers</span></a>
+    <a href="guide/commands.html">cli-reference<span>every subcommand and flag</span></a>
+    <a href="guide/harnesses.html">harnesses<span>eleven agents, and adding one</span></a>
+    <a href="guide/privacy.html">privacy<span>redaction, forget, exclude</span></a>
+    <a href="guide/benchmarks.html">benchmarks<span>the ~200× number, reproducible</span></a>
+    <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">architecture<span>index format, internals</span></a>
   </div>
 </section>
 
-<section>
-  <h2>How it works</h2>
+<section class="reveal">
+  <p class="shead"><span class="p">$</span> <span class="cmd">man deja</span> <span class="out"># how it works</span></p>
   <p class="how">
-  deja parses the local history stores each harness already writes (<code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, opencode's SQLite db) into an incremental inverted index in <code>~/.cache/deja</code>. Only changed files are re-read on each run. The MCP server exposes the same index to agents. Also: secrets are redacted at ingest, <code>deja stats</code> summarizes your agent work, <code>deja share</code> hands a sanitized session to a colleague, and <code>deja sync</code> moves memory between machines. Details in <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> — adding a harness is one parser file.
+  deja parses the local history stores each harness already writes (<code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, opencode's SQLite db) into an incremental inverted index in <code>~/.cache/deja</code>. Only changed files are re-read on each run. The MCP server exposes the same index to agents. Secrets are redacted at ingest. Details in <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> — adding a harness is one parser file.
   </p>
 </section>
 
 <footer>
   <span>MIT © <a href="https://github.com/vshulcz">Vladislav Shulcz</a></span>
   <span class="spacer"></span>
-  <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
-  <a href="https://github.com/vshulcz/deja-vu/releases">Releases</a>
+  <a href="https://github.com/vshulcz/deja-vu">github</a>
+  <a href="https://github.com/vshulcz/deja-vu/releases">releases</a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu">npm</a>
+  <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md">json api</a>
 </footer>
 
-</div>
+</div><!-- /wrap -->
+</div><!-- /screen -->
+
 <script>
-document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{
+/* copy buttons */
+document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click',function(){
   navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent.trim());
-  const t=b.textContent;b.textContent='copied';setTimeout(()=>b.textContent=t,1200);
-}));
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
-document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+  var t=b.textContent;b.textContent='copied';setTimeout(function(){b.textContent=t},1200);
+})});
+
+var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* boot typewriter: reveal lines one by one, then the logo block */
+(function(){
+  var boot=document.getElementById('boot'),lines=[].slice.call(boot.querySelectorAll('.ln')),logo=document.getElementById('logoblk');
+  if(reduced){lines.forEach(function(l){l.classList.add('on')});logo.classList.add('in');return}
+  logo.classList.remove('in');
+  var i=0;
+  function next(){
+    if(i<lines.length){
+      lines[i].classList.add('on');
+      var d=lines[i].classList.contains('bar-h')?130:(i===0?380:300);
+      i++;setTimeout(next,d);
+    }else{
+      setTimeout(function(){logo.classList.add('in')},220);
+    }
+  }
+  setTimeout(next,650);
+})();
+
+/* scroll reveal */
+var io=new IntersectionObserver(function(es){es.forEach(function(e){
+  if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}
+})},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+
+/* live demo search */
+(function(){
+  var CORPUS=[
+    {h:'codex',p:'api-gateway',a:'3w ago',t:'jwt refresh breaks after key rotation',s:'jwks cache not reloaded after rotateKey — reload cache, add clock-skew test',k:'jwt refresh token rotation jwks auth login key'},
+    {h:'claude',p:'api-gateway',a:'2mo ago',t:'connection pool exhausted under load',s:'pgx pool leaked conns on ctx cancel; wrap acquire with timeout, cap MaxConns',k:'connection pool exhausted postgres pgx leak timeout database'},
+    {h:'claude',p:'billing',a:'5w ago',t:'stripe webhook drops events during deploy',s:'ack before restart window; move handler behind queue with retries',k:'stripe webhook events queue retry deploy billing payments'},
+    {h:'opencode',p:'infra',a:'6w ago',t:'docker OOM-killed at 2am builds',s:'BuildKit cache blew past memory limit — cap parallelism, add swap on runner',k:'docker oom killed memory buildkit ci runner build'},
+    {h:'cursor',p:'web-ui',a:'1mo ago',t:'CORS fails only from staging domain',s:'preflight cached with old origin; vary: origin + explicit allowlist',k:'cors preflight origin staging fetch browser headers'},
+    {h:'codex',p:'search-svc',a:'2mo ago',t:'race condition in cache warmup',s:'double-checked locking was broken; singleflight around the fill',k:'race condition cache warmup singleflight mutex concurrency data'},
+    {h:'claude',p:'search-svc',a:'3mo ago',t:'flaky test: TestReindexParallel',s:'goroutine leak across tests — t.Cleanup to drain workers, -race now green',k:'flaky test parallel goroutine leak race ci intermittent'},
+    {h:'gemini',p:'ml-pipeline',a:'2mo ago',t:'migration rollback loses tenant rows',s:'down-migration dropped FK cascade; write reversible pair + backup gate',k:'migration rollback database schema tenant foreign key sql'},
+    {h:'claude',p:'infra',a:'4mo ago',t:'k8s pod stuck Terminating',s:'finalizer from dead operator; patch to remove, then upgrade operator',k:'kubernetes k8s pod terminating finalizer operator stuck'},
+    {h:'aider',p:'cli-tools',a:'3mo ago',t:'zsh completion breaks on paths with spaces',s:'quote _files results; add compdef guard for old zsh',k:'zsh completion shell spaces quoting cli'},
+    {h:'qwen',p:'api-gateway',a:'6w ago',t:'rate limiter lets bursts through',s:'token bucket refilled on wall clock — switch to monotonic; add jitter test',k:'rate limit burst token bucket monotonic clock throttle'},
+    {h:'grok',p:'web-ui',a:'2mo ago',t:'memory leak in websocket reconnect',s:'listeners re-attached on every retry; abort controller + once',k:'memory leak websocket reconnect listeners frontend browser'},
+    {h:'claude',p:'billing',a:'4mo ago',t:'float rounding breaks invoice totals',s:'money as float64 — move to integer cents, property tests over samples',k:'float rounding money invoice cents decimal precision'},
+    {h:'copilot',p:'ml-pipeline',a:'5w ago',t:'CUDA OOM on batch 512 only in prod',s:'gradient accumulation misconfigured; effective batch was 4x — fix config',k:'cuda oom gpu batch training memory pytorch'},
+    {h:'codex',p:'infra',a:'1mo ago',t:'TLS cert renewal silently failing',s:'certbot renewed but nginx never reloaded — deploy hook + expiry alert',k:'tls certificate renewal certbot nginx expiry https'},
+    {h:'opencode',p:'cli-tools',a:'2mo ago',t:'windows path join bug in installer',s:'filepath.Dir("C:\\\\")=="C:\\\\" loops forever — parent==dir break guard',k:'windows path filepath installer loop walk'}
+  ];
+  var input=document.getElementById('dq'),res=document.getElementById('dres');
+  function esc(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function hl(text,toks){
+    var out=esc(text);
+    toks.forEach(function(tk){
+      if(tk.length<2)return;
+      out=out.replace(new RegExp('('+tk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig'),'<mark>$1</mark>');
+    });
+    return out;
+  }
+  function search(q){
+    var toks=q.toLowerCase().split(/\s+/).filter(Boolean);
+    if(!toks.length){res.innerHTML='';return}
+    var t0=performance.now();
+    var hits=CORPUS.map(function(c){
+      var hay=(c.t+' '+c.s+' '+c.k+' '+c.p).toLowerCase(),score=0;
+      toks.forEach(function(tk){
+        if(hay.indexOf(tk)>=0)score+=2;
+        else if(tk.length>3&&hay.indexOf(tk.slice(0,-1))>=0)score+=1;
+      });
+      return{c:c,score:score};
+    }).filter(function(x){return x.score>=Math.min(2,toks.length*2)})
+      .sort(function(a,b){return b.score-a.score}).slice(0,4);
+    var ms=Math.max(1,Math.round(performance.now()-t0));
+    if(!hits.length){
+      res.innerHTML='<p class="none">no matches in 16 demo sessions — the real corpus is a few thousand times bigger. try: jwt refresh · docker oom · cors</p>';
+      return;
+    }
+    res.innerHTML=hits.map(function(x){var c=x.c;
+      return '<div class="r"><span class="meta">[<span class="h">'+c.h+'</span> · '+c.p+' · '+c.a+'] </span><span class="t">'+hl(c.t,toks)+'</span><span class="s">'+hl(c.s,toks)+'</span></div>';
+    }).join('')+'<p class="stat">'+hits.length+' of 16 sessions · '+ms+' ms (your machine, not ours)</p>';
+  }
+  input.addEventListener('input',function(){search(input.value)});
+  document.querySelectorAll('.chip').forEach(function(ch){ch.addEventListener('click',function(){
+    input.value=ch.dataset.q;input.focus();search(ch.dataset.q);
+  })});
+})();
 </script>
 </body>
 </html>
