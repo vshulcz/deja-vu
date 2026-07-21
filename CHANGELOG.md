@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-07-21
+
+### Added
+- `deja log` — audit trail of served memory: recent recalls and injections as a table, `--last` prints the exact digest most recently injected (hook, per-prompt, MCP, handoff), from a size-capped snapshot file next to the usage sidecar.
+- Entropy redaction: bare high-entropy values in secret-shaped positions (any assignment's value side, including the Telegram `digits:token` shape, or a token alone on its own line) are now stripped at index time. Hex digests, UUIDs, paths and identifiers are excluded; measured no rebuild-time cost.
+- Earlier-attempt flags: when an old session and a newer one from the same project match the same ground, the older hit is labeled with the newer session's date in CLI output and MCP digests, plus an additive `superseded` field in `--json`.
+
+### Fixed
+- Natural-language queries no longer die on the AND: suffix stemming works in both directions (`failing` finds `fails`), short tokens get plural forms, and up to two tokens that no session can satisfy are dropped with explicit narration instead of returning zero results.
+
+### Changed
+- MCP recall digests show a relative age next to each session date.
+- `stats --card` renders in the site's terminal look: rewind-loop mark and wordmark in the header, scanline texture, accent punchline.
+
 ## [0.14.1] - 2026-07-21
 
 ### Changed

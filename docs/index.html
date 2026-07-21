@@ -380,9 +380,10 @@ footer .spacer{flex:1}
       <dt>deja sync ssh laptop</dt><dd>memory follows you between machines. Watermarked, idempotent, no cloud in the middle.</dd>
       <dt>deja share &lt;id&gt;</dt><dd>hand a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</dd>
       <dt>deja stats</dt><dd>sessions, top projects, activity sparkline. <span class="dim">Your agent year, one screenshot.</span></dd>
+      <dt>deja log</dt><dd>audit trail: what was recalled or injected, when, into which agent — <span class="dim">--last prints the exact digest an agent received.</span></dd>
     </dl>
   </div>
-  <p class="slead" style="margin-top:16px">Secrets never reach the index: API keys, JWTs and private-key blocks are stripped at ingest — the cache is safe to keep, shares and exports are safe to send.</p>
+  <p class="slead" style="margin-top:16px">Secrets never reach the index: API keys, JWTs, private-key blocks and bare high-entropy values in secret-shaped spots are stripped at ingest — the cache is safe to keep, shares and exports are safe to send.</p>
 </section>
 
 <section class="reveal">
