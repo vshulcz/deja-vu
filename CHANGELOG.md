@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-07-21
+
+### Added
+- Kimi Code is the twelfth harness: `wire.jsonl` transcripts are indexed retroactively (streamed assistant turns reconstructed from loop events, mid-stream responses survive incremental indexing), `deja install kimi` wires MCP through `$KIMI_CODE_HOME/mcp.json` plus an `AGENTS.md` guidance file, and `deja resume` reopens sessions via `kimi --session`. Spec contributed by @yearth (#248).
+
 ## [0.14.2] - 2026-07-21
 
 ### Added

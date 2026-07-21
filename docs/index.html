@@ -532,7 +532,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
     {h:'claude',p:'billing',a:'4mo ago',t:'float rounding breaks invoice totals',s:'money as float64 — move to integer cents, property tests over samples',k:'float rounding money invoice cents decimal precision'},
     {h:'copilot',p:'ml-pipeline',a:'5w ago',t:'CUDA OOM on batch 512 only in prod',s:'gradient accumulation misconfigured; effective batch was 4x — fix config',k:'cuda oom gpu batch training memory pytorch'},
     {h:'codex',p:'infra',a:'1mo ago',t:'TLS cert renewal silently failing',s:'certbot renewed but nginx never reloaded — deploy hook + expiry alert',k:'tls certificate renewal certbot nginx expiry https'},
-    {h:'opencode',p:'cli-tools',a:'2mo ago',t:'windows path join bug in installer',s:'filepath.Dir("C:\\\\")=="C:\\\\" loops forever — parent==dir break guard',k:'windows path filepath installer loop walk'}
+    {h:'kimi',p:'cli-tools',a:'2mo ago',t:'windows path join bug in installer',s:'filepath.Dir("C:\\\\")=="C:\\\\" loops forever — parent==dir break guard',k:'windows path filepath installer loop walk'}
   ];
   var input=document.getElementById('dq'),res=document.getElementById('dres');
   function esc(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
