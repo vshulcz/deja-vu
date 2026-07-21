@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
-	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -157,15 +157,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 			return "", 0, 0, nil
 		}
 	}
-	names := []string{sources.ClaudeProjectName(cwd)}
-	if base := filepath.Base(cwd); base != "" {
-		if two := filepath.Join(filepath.Base(filepath.Dir(cwd)), base); two != names[0] {
-			names = append(names, two)
-		}
-		if base != names[0] {
-			names = append(names, base)
-		}
-	}
+	names := digest.ProjectNameCandidates(cwd)
 	pol := policy.Load()
 	var ss []model.Session
 	seen := map[string]bool{}
