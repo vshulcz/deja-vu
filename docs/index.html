@@ -347,7 +347,7 @@ footer .spacer{flex:1}
 
 <section class="reveal">
   <p class="shead"><span class="p">$</span> <span class="cmd">deja mcp</span> <span class="out"># what your agent does with it</span></p>
-  <p class="slead">After <span class="cmd">deja install --all</span>, every agent with an MCP client gets a <span class="cmd">recall</span> tool (aider's CLI has none — its history is still indexed). Add <span class="cmd">--auto</span> for session-start auto-recall where the agent supports it.</p>
+  <p class="slead">After <span class="cmd">deja install --all</span>, every agent with an MCP client gets a <span class="cmd">recall</span> tool (aider's CLI has none — its history is still indexed). Add <span class="cmd">--auto</span> for session-start auto-recall where the agent supports it — and when a prompt matches work your history already answered, deja says so out loud: <span class="q">deja-vu: you have been here</span>.</p>
   <div class="replay">
     <p class="u"><span class="who">you ›</span> have we dealt with jwt refresh rotation before? check your memory</p>
     <p class="tool">→ recall("jwt refresh rotation") · 1 match · 3.2 KB</p>
@@ -381,6 +381,7 @@ footer .spacer{flex:1}
       <dt>deja share &lt;id&gt;</dt><dd>hand a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</dd>
       <dt>deja stats</dt><dd>sessions, top projects, activity sparkline. <span class="dim">Your agent year, one screenshot.</span></dd>
       <dt>deja log</dt><dd>audit trail: what was recalled or injected, when, into which agent — <span class="dim">--last prints the exact digest an agent received.</span></dd>
+      <dt>deja</dt><dd>bare, on a terminal: the living brief — today's sessions, recalls served, déjà vu moments, a suggested search from your own history.</dd>
     </dl>
   </div>
   <p class="slead" style="margin-top:16px">Secrets never reach the index: API keys, JWTs, private-key blocks and bare high-entropy values in secret-shaped spots are stripped at ingest — the cache is safe to keep, shares and exports are safe to send.</p>
