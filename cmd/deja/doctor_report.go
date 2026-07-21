@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -34,13 +35,14 @@ type doctorVersionReport struct {
 }
 
 type doctorReport struct {
-	Stores  []doctorStore                  `json:"stores"`
-	Index   doctorComponent                `json:"index"`
-	MCP     []doctorMCPStatus              `json:"mcp"`
-	SQLite3 doctorComponent                `json:"sqlite3"`
-	Version doctorVersionReport            `json:"version"`
-	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
-	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
+	SchemaVersion int                            `json:"schema_version"`
+	Stores        []doctorStore                  `json:"stores"`
+	Index         doctorComponent                `json:"index"`
+	MCP           []doctorMCPStatus              `json:"mcp"`
+	SQLite3       doctorComponent                `json:"sqlite3"`
+	Version       doctorVersionReport            `json:"version"`
+	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
+	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 }
 
 type doctorEmbedReport struct {
@@ -65,7 +67,7 @@ type doctorStoreCheck struct {
 
 func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	stores := doctorStoreChecks()
-	report := doctorReport{Stores: make([]doctorStore, 0, len(stores))}
+	report := doctorReport{SchemaVersion: jsonout.Version, Stores: make([]doctorStore, 0, len(stores))}
 	storeMods := make([]time.Time, 0, len(stores))
 	for _, check := range stores {
 		store, mod := inspectDoctorStore(check)

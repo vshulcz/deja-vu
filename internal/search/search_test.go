@@ -344,7 +344,7 @@ func TestQueryPartsDropsStopWordsButKeepsAllStopQueries(t *testing.T) {
 func TestFuzzyJSONEnvelope(t *testing.T) {
 	var b bytes.Buffer
 	Print(&b, []Hit{{Count: 1}}, Options{JSON: true, Fuzzy: true})
-	if !strings.Contains(b.String(), `"fuzzy":true`) || !strings.Contains(b.String(), `"hits"`) {
+	if !strings.Contains(b.String(), `"schema_version":1`) || !strings.Contains(b.String(), `"fuzzy":true`) || !strings.Contains(b.String(), `"hits"`) {
 		t.Fatalf("fuzzy json = %q", b.String())
 	}
 }
@@ -352,7 +352,7 @@ func TestFuzzyJSONEnvelope(t *testing.T) {
 func TestStemmedJSONEnvelope(t *testing.T) {
 	var b bytes.Buffer
 	Print(&b, []Hit{{Count: 1}}, Options{JSON: true, Stemmed: true, FuzzyVariants: map[string][]string{"rotation": {"rotated"}}})
-	if !strings.Contains(b.String(), `"stemmed":true`) || !strings.Contains(b.String(), `"rotation":["rotated"]`) {
+	if !strings.Contains(b.String(), `"schema_version":1`) || !strings.Contains(b.String(), `"stemmed":true`) || !strings.Contains(b.String(), `"rotation":["rotated"]`) {
 		t.Fatalf("stemmed json = %q", b.String())
 	}
 }

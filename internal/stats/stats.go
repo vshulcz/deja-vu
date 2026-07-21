@@ -8,12 +8,14 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 type Report struct {
+	SchemaVersion   int            `json:"schema_version"`
 	TotalSessions   int            `json:"total_sessions"`
 	TotalMessages   int            `json:"total_messages"`
 	RepeatQuestions int            `json:"repeat_questions,omitempty"`
@@ -134,7 +136,7 @@ func Build(ss []model.Session, now time.Time) Report {
 		monthIndex[label] = i
 	}
 
-	var out Report
+	out := Report{SchemaVersion: jsonout.Version}
 	var minT, maxT time.Time
 	for _, s := range ss {
 		out.TotalSessions++

@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
@@ -45,6 +46,15 @@ func MatchesQuery(text, q string) bool { return query.MatchesQuery(text, q) }
 
 func MatchesParts(text string, terms, phrases []string, variants map[string][]string) bool {
 	return query.MatchesParts(text, terms, phrases, variants)
+}
+
+type searchJSONEnvelope struct {
+	SchemaVersion int                 `json:"schema_version"`
+	Hits          []Hit               `json:"hits"`
+	Fuzzy         bool                `json:"fuzzy,omitempty"`
+	Stemmed       bool                `json:"stemmed,omitempty"`
+	Semantic      bool                `json:"semantic,omitempty"`
+	Variants      map[string][]string `json:"variants,omitempty"`
 }
 
 type Hit struct {
@@ -301,21 +311,24 @@ func Print(w io.Writer, hits []Hit, o Options) {
 	}
 	if o.JSON {
 		if o.Semantic {
-			_ = json.NewEncoder(w).Encode(struct {
-				Hits     []Hit `json:"hits"`
-				Semantic bool  `json:"semantic"`
-			}{hits, true})
+			_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
+				SchemaVersion: jsonout.Version,
+				Hits:          hits,
+				Semantic:      true,
+			})
 		} else if o.Stemmed {
-			_ = json.NewEncoder(w).Encode(struct {
-				Hits     []Hit               `json:"hits"`
-				Stemmed  bool                `json:"stemmed"`
-				Variants map[string][]string `json:"variants,omitempty"`
-			}{hits, true, o.FuzzyVariants})
+			_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
+				SchemaVersion: jsonout.Version,
+				Hits:          hits,
+				Stemmed:       true,
+				Variants:      o.FuzzyVariants,
+			})
 		} else if o.Fuzzy {
-			_ = json.NewEncoder(w).Encode(struct {
-				Hits  []Hit `json:"hits"`
-				Fuzzy bool  `json:"fuzzy"`
-			}{hits, true})
+			_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
+				SchemaVersion: jsonout.Version,
+				Hits:          hits,
+				Fuzzy:         true,
+			})
 		} else {
 			_ = json.NewEncoder(w).Encode(hits)
 		}
