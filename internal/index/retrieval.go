@@ -98,6 +98,11 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 		} else if result.Fuzzy {
 			return result, nil
 		}
+		if result, ferr := cooccurSearch(dir, m, o); ferr != nil {
+			return SearchResult{}, fmt.Errorf("cooccur postings: %w", ferr)
+		} else if len(result.Sessions) > 0 {
+			return result, nil
+		}
 	}
 	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
 }

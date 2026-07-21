@@ -216,6 +216,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err := rw.Close(); err != nil {
 		return err
 	}
+	buildCooccur(tmp, ss)
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
@@ -385,6 +386,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if err := rw.Close(); err != nil {
 		return err
 	}
+	buildCooccur(tmp, ss)
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
