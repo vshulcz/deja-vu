@@ -401,6 +401,10 @@ func fuzzySummary(variants map[string][]string) []string {
 	var out []string
 	for token, values := range variants {
 		for _, value := range values {
+			if value == "" {
+				out = append(out, token+" (ignored: no session matches it with the rest)")
+				continue
+			}
 			if value != token {
 				out = append(out, token+" -> "+value)
 			}

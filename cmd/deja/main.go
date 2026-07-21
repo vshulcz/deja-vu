@@ -284,6 +284,10 @@ func printStemmed(w io.Writer, variants map[string][]string) {
 	sort.Strings(keys)
 	for _, token := range keys {
 		for _, variant := range variants[token] {
+			if variant == "" {
+				fmt.Fprintf(w, "deja: ignoring %q — no session matches it together with the rest\n", token)
+				continue
+			}
 			if variant != token {
 				fmt.Fprintf(w, "deja: no exact match, trying word forms: %s -> %s\n", token, variant)
 			}

@@ -440,7 +440,7 @@ func variantDetail(text string, terms []string, variants map[string][]string) st
 		for _, variant := range variants[term] {
 			// A term that matched itself is an exact hit, not a variant —
 			// don't render "connection->connection" as the tier detail.
-			if variant == term {
+			if variant == term || variant == "" {
 				continue
 			}
 			if strings.Contains(low, variant) {
@@ -596,11 +596,19 @@ func countAllTokens(low string, toks []string) int {
 func countAllVariants(low string, toks []string, variants map[string][]string) int {
 	total := 0
 	for _, tok := range toks {
+		optional := false
 		count := strings.Count(low, tok)
 		for _, variant := range variants[tok] {
+			if variant == "" {
+				optional = true
+				continue
+			}
 			count += strings.Count(low, variant)
 		}
 		if count == 0 {
+			if optional {
+				continue
+			}
 			return 0
 		}
 		total += count
