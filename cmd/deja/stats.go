@@ -35,6 +35,7 @@ type redactionReport struct {
 
 func runStats(dir string, args []string) error {
 	jsonOut := false
+	impact := false
 	cardPath := ""
 	card := false
 	htmlPath := ""
@@ -57,6 +58,8 @@ func runStats(dir string, args []string) error {
 			}
 		case "--redaction":
 			redaction = true
+		case "--impact":
+			impact = true
 		case "--card":
 			if card {
 				return fmt.Errorf("stats: --card specified twice")
@@ -93,6 +96,9 @@ func runStats(dir string, args []string) error {
 	}
 	if (jsonOut && card) || (jsonOut && html) || (card && html) {
 		return fmt.Errorf("stats: choose one output")
+	}
+	if impact {
+		return runStatsImpact(os.Stdout, dir, jsonOut)
 	}
 	if redaction && card {
 		return fmt.Errorf("stats: --redaction cannot combine with --card")

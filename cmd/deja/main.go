@@ -817,7 +817,7 @@ Usage:
   deja bench recall [--json]
   deja log [n] [--last] [--json]
   deja statusline
-  deja stats [--json] [--card [path]] [--html [path]]
+  deja stats [--json] [--impact] [--card [path]] [--html [path]]
 	deja remember "text" [--project name]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--to path]
   deja mcp
