@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4] - 2026-07-21
+
+### Added
+- The first index greeting now suggests a search phrase taken from your own recent history instead of a generic hint.
+- `deja stats` and the statusline show what recall replaced: served bytes against the source transcripts they were distilled from, as a personal ratio measured from real events.
+- Search learns from use: sessions that agents keep recalling rank slightly higher (hard-capped at +20%), marked `reused N×` in output and as an additive `reused` JSON field.
+- Co-occurrence rescue: on zero results, one query token may swap for a neighbor the corpus itself ties it to — a 245 KB map built at full rebuild, narrated like any variant.
+- Compound identifiers answer for their parts: `deja "user profile"` finds `getUserProfile` and `refresh_token_rotation`.
+- A reviewed developer-synonym table (k8s↔kubernetes and friends) and Russian suffix folding join the stem tier.
+
+### Changed
+- Ranking now weighs term proximity and title matches (both bounded) on top of BM25 and freshness.
+- The postings AND considers up to 8 query tokens instead of the 3 longest, so a rare token narrows candidates before the scan.
+- `deja blame` human output is colored like search results.
+
 ## [0.14.3] - 2026-07-21
 
 ### Added
