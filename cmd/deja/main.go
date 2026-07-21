@@ -93,6 +93,7 @@ var commands = map[string]command{
 	"share":           func(dir string, rest []string) error { return runShare(dir, rest, os.Stdout) },
 	"resume":          func(dir string, rest []string) error { return runResume(dir, rest, os.Stdout) },
 	"handoff":         func(dir string, rest []string) error { return runHandoff(dir, rest, os.Stdout) },
+	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,
 	"blame":           runBlame,
@@ -795,6 +796,7 @@ Usage:
   deja index [--rebuild]
   deja embed
   deja bench recall [--json]
+  deja log [n] [--last] [--json]
   deja statusline
   deja stats [--json] [--card [path]] [--html [path]]
 	deja remember "text" [--project name]

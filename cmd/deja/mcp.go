@@ -166,7 +166,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		text, sessions, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
 		if err == nil {
 			text = frameRecall(text)
-			usage.RecordResult(dir, usage.KindRecall, len(text), sessions, sessions == 0)
+			usage.RecordDigest(dir, usage.KindRecall, text, sessions)
 		}
 		return text, err
 	case "recall_context":
@@ -183,7 +183,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		text, sessions, err := recallContextResult(dir, a.Query, a.Harness)
 		if err == nil {
 			text = frameRecall(text)
-			usage.RecordResult(dir, usage.KindContext, len(text), sessions, sessions == 0)
+			usage.RecordDigest(dir, usage.KindContext, text, sessions)
 		}
 		return text, err
 	case "blame":
