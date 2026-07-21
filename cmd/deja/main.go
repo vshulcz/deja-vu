@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 var version = "dev"
@@ -239,6 +240,7 @@ func runSearch(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
+	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
 	if err := index.EnsureForSearch(dir, o, force, os.Stderr); err != nil {
 		return fmt.Errorf("ensure: %w", err)

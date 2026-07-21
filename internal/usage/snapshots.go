@@ -36,6 +36,12 @@ func SnapshotPath(indexDir string) string {
 // Best-effort like all usage recording.
 func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
 	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
+	SnapshotOnly(indexDir, kind, digest, sessions)
+}
+
+// SnapshotOnly stores the digest text without writing a counting event, for
+// callers that already recorded one with extra fields.
+func SnapshotOnly(indexDir, kind, digest string, sessions int) {
 	if digest == "" {
 		return
 	}

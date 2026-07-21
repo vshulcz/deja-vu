@@ -32,6 +32,9 @@ type Event struct {
 	// RawBytes is the size of the source transcripts the served digest was
 	// distilled from — what the agent would have had to replay without deja.
 	RawBytes int64 `json:"raw,omitempty"`
+	// SessionIDs lists the sessions served by an agent-initiated recall, so
+	// search can weigh what agents actually re-used.
+	SessionIDs []string `json:"ids,omitempty"`
 }
 
 type Summary struct {
@@ -69,6 +72,16 @@ func RecordResult(indexDir, kind string, bytes, sessions int, empty bool) {
 // RecordResultRaw additionally stores the source-transcript size the digest
 // was distilled from, for the served-vs-replayed ratio.
 func RecordResultRaw(indexDir, kind string, bytes, sessions int, empty bool, raw int64) {
+	recordFull(indexDir, kind, bytes, sessions, empty, raw, nil)
+}
+
+// RecordServedSessions is RecordResultRaw plus the ids of the sessions the
+// digest contained.
+func RecordServedSessions(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {
+	recordFull(indexDir, kind, bytes, sessions, empty, raw, ids)
+}
+
+func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
@@ -79,7 +92,7 @@ func RecordResultRaw(indexDir, kind string, bytes, sessions int, empty bool, raw
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw})
+	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids})
 	if err != nil {
 		return
 	}
@@ -237,4 +250,23 @@ func rotate(p string) {
 		return
 	}
 	_ = os.Rename(tmp, p)
+}
+
+// WornSessions counts, per session id, how often agent-initiated recalls
+// served it inside the retention window. Search uses it as a small bounded
+// boost: what agents keep pulling is what the user keeps needing.
+func WornSessions(indexDir string) map[string]int {
+	out := map[string]int{}
+	for _, e := range read(Path(indexDir)) {
+		if e.Kind != KindRecall && e.Kind != KindContext {
+			continue
+		}
+		for _, id := range e.SessionIDs {
+			out[id]++
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

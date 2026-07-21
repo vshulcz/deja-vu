@@ -66,3 +66,28 @@ func TestBoostsAreBounded(t *testing.T) {
 		t.Fatal("neutral cases must not boost")
 	}
 }
+
+func TestWornBoostBreaksTiesButIsCapped(t *testing.T) {
+	a := rankSession("cold", "", "jwt refresh rotation fix applied")
+	b := rankSession("worn", "", "jwt refresh rotation fix applied")
+	hits, err := Run([]model.Session{a, b}, Options{Query: "jwt refresh rotation", All: true, RecallWorn: map[string]int{"worn": 4}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hits[0].Session.ID != "worn" || hits[0].Reused != 4 {
+		t.Fatalf("worn tie-break missing: %+v", hits[0])
+	}
+	if wornBoost(1000) != 1.2 {
+		t.Fatalf("worn boost uncapped: %f", wornBoost(1000))
+	}
+	// A clearly better match must beat a worn weak one: relevance > popularity.
+	strong := rankSession("strong", "jwt refresh rotation", "jwt refresh rotation everywhere jwt refresh rotation again")
+	weak := rankSession("weakworn", "", "jwt mentioned once, refresh later, rotation at the end of a long unrelated story about deployments")
+	hits2, err := Run([]model.Session{strong, weak}, Options{Query: "jwt refresh rotation", All: true, RecallWorn: map[string]int{"weakworn": 50}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hits2[0].Session.ID != "strong" {
+		t.Fatalf("popularity outranked relevance: %+v", hits2)
+	}
+}
