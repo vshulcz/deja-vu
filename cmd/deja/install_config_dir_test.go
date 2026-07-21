@@ -48,3 +48,31 @@ func TestInstallClaudeHonorsConfigDir(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudeHookUninstallNeverLeavesNullHooks(t *testing.T) {
+	root := map[string]any{}
+	root = updateClaudeHook(root, "PreCompact", "/bin/deja hook-precompact", "manual|auto", false)
+	root = updateClaudeHook(root, "PreCompact", "/bin/deja hook-precompact", "manual|auto", true)
+	root = updateClaudeHook(root, "PreCompact", "/bin/deja hook-precompact", "manual|auto", false)
+	entries, _ := root["hooks"].(map[string]any)["PreCompact"].([]any)
+	if len(entries) != 1 {
+		t.Fatalf("install/uninstall/install left %d entries, want 1: %#v", len(entries), entries)
+	}
+	for _, e := range entries {
+		entry := e.(map[string]any)
+		hs, ok := entry["hooks"].([]any)
+		if !ok || len(hs) == 0 {
+			t.Fatalf("entry with null/empty hooks survived: %#v", entry)
+		}
+	}
+	// Pre-existing damage from older versions heals on the next install.
+	damaged := map[string]any{"hooks": map[string]any{"PreCompact": []any{
+		map[string]any{"matcher": "manual|auto", "hooks": nil},
+		map[string]any{"matcher": "manual|auto", "hooks": []any{map[string]any{"type": "command", "command": "/bin/deja hook-precompact"}}},
+	}}}
+	healed := updateClaudeHook(damaged, "PreCompact", "/bin/deja hook-precompact", "manual|auto", false)
+	entries2, _ := healed["hooks"].(map[string]any)["PreCompact"].([]any)
+	if len(entries2) != 1 {
+		t.Fatalf("null-hooks entry not healed: %#v", entries2)
+	}
+}

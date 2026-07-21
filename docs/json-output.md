@@ -89,6 +89,7 @@ counts recent agent recalls that served this session.
   "busiest_day": {"date": "2026-07-04", "messages": 22},
   "recall": {
     "recalls_served": 10,
+    "dejavu_moments": 3,
     "injections": 4,
     "recall_sessions": 8,
     "injected_sessions": 3,

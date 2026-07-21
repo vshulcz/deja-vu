@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-21
+
+### Added
+- Déjà vu moments: when a prompt matches work your own history already answered, the per-prompt recall now announces it with a visible one-liner — `deja-vu: you have been here — "<that session>" (3w ago)` — and the moment is counted in stats and the weekly numbers.
+- Bare `deja` on a terminal shows a living brief instead of help text: today's sessions, recalls served and what they distilled, this week's déjà vu moments, recent sessions, and a suggested search from your own history. `deja help` keeps the usage text.
+- The session-start recall receipt now carries the day's tally: how many recalls deja served today and how much history they distilled.
+
+### Fixed
+- `deja uninstall` could leave a hook entry with `"hooks": null` in Claude Code's settings.json when the entry carried a matcher — Claude Code then rejected the whole settings file. Uninstall now drops the entry, and any damaged entry from an earlier version heals on the next install.
+
 ## [0.14.4] - 2026-07-21
 
 ### Added

@@ -455,7 +455,13 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 			out = append(out, entryAny)
 			continue
 		}
-		hs, _ := entry["hooks"].([]any)
+		hs, hasHooks := entry["hooks"].([]any)
+		// Self-heal: an entry whose hooks are null/absent is invalid — Claude
+		// Code rejects the whole file over it. Earlier deja versions could
+		// leave one behind on uninstall when the entry carried a matcher.
+		if !hasHooks || len(hs) == 0 {
+			continue
+		}
 		var kept []any
 		removed := false
 		for _, hAny := range hs {
@@ -470,7 +476,7 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 			kept = append(kept, hAny)
 		}
 		if removed {
-			if len(kept) == 0 && len(entry) == 1 {
+			if len(kept) == 0 {
 				continue
 			}
 			entry["hooks"] = kept
