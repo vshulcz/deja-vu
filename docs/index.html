@@ -15,6 +15,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"A local memory layer for coding agents: retroactive search over agent session history, MCP recall, redaction, stats, share and SSH sync.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
 <style>
 :root{
   --bg:#050807;
@@ -23,7 +24,7 @@
   --ph-dim:#2f9459;
   --amber:#ffb454;
   --body:#a9cbb6;
-  --faint:#527860;
+  --faint:#5d8a6e;
   --line:#12291c;
   --panel:#070d0a;
   --mono:"Berkeley Mono","SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
@@ -159,22 +160,22 @@ section{margin-top:96px}
   flex:1;background:transparent;border:none;outline:none;color:var(--amber);
   font:inherit;caret-color:var(--ph);min-width:0;
 }
-.demo input::placeholder{color:#3d5c4a}
+.demo input::placeholder{color:#47705a}
 .demo .res{margin-top:16px;font-size:.86rem}
 .demo .res .r{margin-bottom:14px}
 .demo .res .meta{color:var(--faint)}
 .demo .res .meta .h{color:var(--ph)}
 .demo .res .t{color:#d7f5e2}
 .demo .res .s{color:var(--body);display:block;padding-left:2ch}
-.demo .res .none{color:var(--faint)}
-.demo .res .stat{color:#3d5c4a;font-size:.78rem;margin-top:4px}
+.demo .res .none{color:var(--faint);white-space:pre-line}
+.demo .res .stat{color:#47705a;font-size:.78rem;margin-top:4px}
 .chips{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
 .chip{
   background:transparent;border:1px solid var(--line);color:var(--faint);
   font:inherit;font-size:.78rem;padding:3px 10px;cursor:pointer;
 }
 .chip:hover{color:var(--amber);border-color:#3d3320}
-.demo-note{margin-top:12px;color:#3d5c4a;font-size:.78rem}
+.demo-note{margin-top:12px;color:#47705a;font-size:.78rem}
 
 /* ── the recall chat ────────────────────────────────────── */
 .replay{border:1px solid var(--line);background:var(--panel);padding:20px}
@@ -208,6 +209,11 @@ section{margin-top:96px}
 .sources .nm{color:#d7f5e2}
 .sources .st{color:var(--ph)}
 .sources .pa{color:var(--faint)}
+.sources .mx th{color:#47705a;text-align:left;font-weight:400;text-transform:uppercase;font-size:.7rem;letter-spacing:.1em;padding:4px 18px 10px 0}
+.sources .mx .y{color:var(--ph)}
+.sources .mx .n{color:#31503f}
+.sources .mx .am{color:var(--amber)}
+.sources .mx-foot{margin-top:14px;color:#47705a;font-size:.78rem}
 
 /* ── stats strip ────────────────────────────────────────── */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
@@ -376,21 +382,23 @@ footer .spacer{flex:1}
 </section>
 
 <section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja sources</span></p>
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja doctor</span> <span class="out"># eleven harnesses, one memory</span></p>
   <div class="sources">
-    <table>
-      <tr><td class="nm">claude</td><td class="st">found</td><td class="pa">~/.claude/projects</td></tr>
-      <tr><td class="nm">codex</td><td class="st">found</td><td class="pa">~/.codex/sessions</td></tr>
-      <tr><td class="nm">opencode</td><td class="st">found</td><td class="pa">opencode.db</td></tr>
-      <tr><td class="nm">cursor</td><td class="st">found</td><td class="pa">~/.cursor + IDE store</td></tr>
-      <tr><td class="nm">gemini</td><td class="st">found</td><td class="pa">~/.gemini/tmp</td></tr>
-      <tr><td class="nm">aider</td><td class="st">found</td><td class="pa">.aider.chat.history.md</td></tr>
-      <tr><td class="nm">antigravity</td><td class="st">found</td><td class="pa">~/.gemini/antigravity*</td></tr>
-      <tr><td class="nm">grok</td><td class="st">found</td><td class="pa">~/.grok/sessions</td></tr>
-      <tr><td class="nm">qwen</td><td class="st">found</td><td class="pa">~/.qwen/projects</td></tr>
-      <tr><td class="nm">pi</td><td class="st">found</td><td class="pa">~/.pi</td></tr>
-      <tr><td class="nm">copilot</td><td class="st">found</td><td class="pa">~/.copilot</td></tr>
+    <table class="mx">
+      <tr><th></th><th>mcp recall</th><th>auto-recall</th><th>resume</th><th>handoff</th><th>needs</th></tr>
+      <tr><td class="nm">claude code</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">codex cli</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">opencode</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="pa">sqlite3</td></tr>
+      <tr><td class="nm">cursor</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">sqlite3 (IDE)</td></tr>
+      <tr><td class="nm">gemini cli</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">antigravity</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
+      <tr><td class="nm">grok build</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">qwen code</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">pi</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">copilot cli</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
+      <tr><td class="nm">aider</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">no MCP client — history still indexed</td></tr>
     </table>
+    <p class="mx-foot">full matrix with store paths and formats: <a href="guide/harnesses.html">guide/harnesses</a> · generated from the <a href="registry/README.md">format registry</a>, pinned by a conformance test</p>
   </div>
 </section>
 
@@ -531,10 +539,45 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
       return '<div class="r"><span class="meta">[<span class="h">'+c.h+'</span> · '+c.p+' · '+c.a+'] </span><span class="t">'+hl(c.t,toks)+'</span><span class="s">'+hl(c.s,toks)+'</span></div>';
     }).join('')+'<p class="stat">'+hits.length+' of 16 sessions · '+ms+' ms (your machine, not ours)</p>';
   }
-  input.addEventListener('input',function(){search(input.value)});
+  var COMMANDS={
+    'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;pi&nbsp;&nbsp;copilot\n11 harnesses, one index — real paths in the <a href="#proof">matrix below</a></p>',
+    'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
+    'version':'<p class="none">deja 0.14.1</p>',
+    'clear':''
+  };
+  COMMANDS['--help']=COMMANDS['help'];COMMANDS['--version']=COMMANDS['version'];
+  var userSearches=0;
+  function dispatch(q,typed){
+    var key=q.trim().toLowerCase();
+    if(key in COMMANDS){res.innerHTML=COMMANDS[key];return}
+    search(q);
+    if(typed&&q.trim().length>2&&res.querySelector('.r')){
+      userSearches++;
+      if(userSearches>=2){
+        res.innerHTML+='<p class="stat"># your real history is a few thousand sessions bigger — <a href="#install">install deja</a></p>';
+      }
+    }
+  }
+  var touched=false;
+  input.addEventListener('input',function(){touched=true;dispatch(input.value,true)});
+  input.addEventListener('focus',function(){touched=true});
   document.querySelectorAll('.chip').forEach(function(ch){ch.addEventListener('click',function(){
-    input.value=ch.dataset.q;input.focus();search(ch.dataset.q);
+    touched=true;input.value=ch.dataset.q;input.focus();dispatch(ch.dataset.q,true);
   })});
+  /* attract mode: if untouched, the demo demos itself */
+  if(!reduced){
+    var attract='jwt refresh';
+    setTimeout(function(){
+      if(touched||input.value)return;
+      var i=0;
+      var t=setInterval(function(){
+        if(touched){clearInterval(t);return}
+        i++;input.value=attract.slice(0,i);search(input.value);
+        if(i>=attract.length)clearInterval(t);
+      },110);
+    },6000);
+  }
 })();
 </script>
 </body>
