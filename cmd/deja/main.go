@@ -807,7 +807,7 @@ Usage:
   deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
   deja forget --list | --unforget <id>
-  deja doctor [--json]
+  deja doctor [--json] [--deep]
   deja warmup
   deja index [--rebuild]
   deja embed

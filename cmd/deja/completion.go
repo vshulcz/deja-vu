@@ -67,7 +67,7 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
             ;;
         doctor)
-            COMPREPLY=( $(compgen -W "--json --offline" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--json --offline --deep" -- "$cur") )
             ;;
         forget)
             COMPREPLY=( $(compgen -W "--list --dry-run --session --project --before --unforget" -- "$cur") )
@@ -193,7 +193,7 @@ _deja() {
       _values 'shell' bash zsh fish
       ;;
     doctor)
-      _arguments '--json[print JSON]' '--offline[skip version check]'
+      _arguments '--json[print JSON]' '--offline[skip version check]' '--deep[verify index against sources]'
       ;;
     forget)
       _arguments '--list[list tombstones]' '--dry-run[show changes without applying]' '--session=[session ID prefix]:session:' '--project=[project substring]:project:' '--before=[duration or date]:time:' '--unforget=[tombstone ID]:ID:'
@@ -272,6 +272,7 @@ complete -c deja -n '__fish_seen_subcommand_from context' -l json
 complete -c deja -n '__fish_seen_subcommand_from context' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
+complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
 complete -c deja -n '__fish_seen_subcommand_from forget' -l list
 complete -c deja -n '__fish_seen_subcommand_from forget' -l dry-run
 complete -c deja -n '__fish_seen_subcommand_from forget' -l session -r

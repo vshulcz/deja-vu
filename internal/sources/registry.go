@@ -239,3 +239,16 @@ func KindForPath(p string) string {
 	}
 	return ""
 }
+
+// KindForPathKind returns the full FileKind whose Match accepts p, for
+// callers that need to parse, not just classify.
+func KindForPathKind(p string) (FileKind, bool) {
+	for _, h := range Registry() {
+		for _, k := range h.Kinds {
+			if k.Match(p) {
+				return k, true
+			}
+		}
+	}
+	return FileKind{}, false
+}

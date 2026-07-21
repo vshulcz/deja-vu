@@ -66,7 +66,7 @@
 <tr><td><code>deja install &lt;target|--all|--auto&gt;</code></td><td>Wire MCP recall (and hooks) into your agents.</td></tr>
 <tr><td><code>deja embed</code></td><td>Build the semantic vector sidecar from a local endpoint.</td></tr>
 <tr><td><code>deja sync export/import/ssh</code></td><td>Move redacted memory between machines.</td></tr>
-<tr><td><code>deja doctor</code></td><td>Diagnose stores, wiring, index and version. <code>--json</code>, <code>--offline</code>.</td></tr>
+<tr><td><code>deja doctor</code></td><td>Diagnose stores, wiring, index and version. <code>--json</code>, <code>--offline</code>. <code>--deep</code> re-parses a sample of source files and resolves postings to prove the index against the sources; exits non-zero on drift.</td></tr>
 <tr><td><code>deja bench recall|context</code></td><td>Reproducible search-quality and context-readiness benchmarks.</td></tr>
 <tr><td><code>deja update</code></td><td>Update a standalone install (Homebrew/npm update via the package manager).</td></tr>
 </tbody></table>

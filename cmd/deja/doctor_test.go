@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -436,5 +437,62 @@ func writeFileMkdir(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDoctorDeepCleanAndDrift(t *testing.T) {
+	hermeticEnv(t)
+	src := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-tmp-proj", "sess.jsonl")
+	writeClaudeFixture(t, src, "sess", []string{
+		`{"type":"user","sessionId":"sess","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"deep verify me"}}`,
+	})
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runDoctor(&out, []string{"--deep", "--offline"}, nil, dir); err != nil {
+		t.Fatalf("clean deep doctor must exit 0: %v\n%s", err, out.String())
+	}
+	got := out.String()
+	if !strings.Contains(got, "Deep verification:") || !strings.Contains(got, "index matches sources") {
+		t.Fatalf("missing clean deep section:\n%s", got)
+	}
+
+	if err := os.Remove(src); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	err := runDoctor(&out, []string{"--deep", "--offline"}, nil, dir)
+	if err == nil || !strings.Contains(err.Error(), "index drift") {
+		t.Fatalf("deleted source must fail deep doctor, err=%v", err)
+	}
+	if !strings.Contains(out.String(), "orphan-file") || !strings.Contains(out.String(), "deja index --rebuild") {
+		t.Fatalf("drift output missing finding or fix hint:\n%s", out.String())
+	}
+}
+
+func TestDoctorDeepJSON(t *testing.T) {
+	hermeticEnv(t)
+	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-tmp-proj", "s.jsonl"), "s", []string{
+		`{"type":"user","sessionId":"s","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"json deep"}}`,
+	})
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runDoctor(&out, []string{"--deep", "--json", "--offline"}, nil, dir); err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Deep *index.DeepReport `json:"deep"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Deep == nil || got.Deep.FilesChecked != 1 || !got.Deep.Clean() {
+		t.Fatalf("json deep report wrong: %#v", got.Deep)
 	}
 }
