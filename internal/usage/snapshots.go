@@ -32,9 +32,10 @@ func SnapshotPath(indexDir string) string {
 }
 
 // RecordDigest records a served digest: the counting event plus a snapshot of
-// the text. Best-effort like all usage recording.
-func RecordDigest(indexDir, kind, digest string, sessions int) {
-	RecordResult(indexDir, kind, len(digest), sessions, sessions == 0)
+// the text. raw is the size of the source transcripts the digest distilled.
+// Best-effort like all usage recording.
+func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
+	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
 	if digest == "" {
 		return
 	}

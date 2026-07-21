@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -163,10 +164,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
+		text, sessions, raw, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), 4096-recallFrameOverhead)
 		if err == nil {
 			text = frameRecall(text)
-			usage.RecordDigest(dir, usage.KindRecall, text, sessions)
+			usage.RecordDigest(dir, usage.KindRecall, text, sessions, raw)
 		}
 		return text, err
 	case "recall_context":
@@ -180,10 +181,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
-		text, sessions, err := recallContextResult(dir, a.Query, a.Harness)
+		text, sessions, raw, err := recallContextResult(dir, a.Query, a.Harness)
 		if err == nil {
 			text = frameRecall(text)
-			usage.RecordDigest(dir, usage.KindContext, text, sessions)
+			usage.RecordDigest(dir, usage.KindContext, text, sessions, raw)
 		}
 		return text, err
 	case "blame":
@@ -256,21 +257,21 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 }
 
 func recallText(dir, q, harness string, limit, budget int) (string, error) {
-	text, _, err := recallTextResult(dir, q, harness, limit, budget)
+	text, _, _, err := recallTextResult(dir, q, harness, limit, budget)
 	return text, err
 }
 
-func recallTextResult(dir, q, harness string, limit, budget int) (string, int, error) {
+func recallTextResult(dir, q, harness string, limit, budget int) (string, int, int64, error) {
 	if limit <= 0 {
 		limit = 5
 	}
 	o := search.Options{Query: q, Harness: harness, All: true}
 	if err := index.EnsureForSearch(dir, o, false, mcpProgress()); err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	ss := result.Sessions
 	o.Tier = result.Tier
@@ -285,7 +286,7 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, e
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	if os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
@@ -294,7 +295,7 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, e
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	o.Semantic = semantic
 	if len(hits) == 0 {
-		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
+		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, 0, nil
 	}
 	if len(hits) > limit {
 		hits = hits[:limit]
@@ -331,7 +332,16 @@ func recallTextResult(dir, q, harness string, limit, budget int) (string, int, e
 	if len(out) > budget {
 		out = trimUTF8(out, budget)
 	}
-	return out, served, nil
+	var raw int64
+	for i, h := range hits {
+		if i >= served {
+			break
+		}
+		for _, m := range h.Session.Messages {
+			raw += int64(len(m.Text))
+		}
+	}
+	return out, served, raw, nil
 }
 
 func trimUTF8(s string, budget int) string {
@@ -345,18 +355,18 @@ func trimUTF8(s string, budget int) string {
 }
 
 func recallContext(dir, q string) (string, error) {
-	text, _, err := recallContextResult(dir, q, "")
+	text, _, _, err := recallContextResult(dir, q, "")
 	return text, err
 }
 
-func recallContextResult(dir, q, harness string) (string, int, error) {
+func recallContextResult(dir, q, harness string) (string, int, int64, error) {
 	o := search.Options{Query: q, Harness: harness, All: true}
 	if err := index.EnsureForSearch(dir, o, false, mcpProgress()); err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	ss := result.Sessions
 	o.Tier = result.Tier
@@ -371,7 +381,7 @@ func recallContextResult(dir, q, harness string) (string, int, error) {
 	}
 	hits, err := search.Run(ss, o)
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
@@ -379,7 +389,7 @@ func recallContextResult(dir, q, harness string) (string, int, error) {
 		o.Tier = search.TierSemantic
 	}
 	if len(hits) == 0 {
-		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, nil
+		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, 0, nil
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, hits[0].Session, q)
@@ -387,7 +397,7 @@ func recallContextResult(dir, q, harness string) (string, int, error) {
 	if hits[0].Tier != search.TierExact {
 		text = "[" + hits[0].Tier + "]\n" + text
 	}
-	return text, 1, nil
+	return text, 1, rawSize([]model.Session{hits[0].Session}), nil
 }
 
 func mcpProgress() io.Writer {

@@ -125,7 +125,7 @@ func cmdWarmup(dir string, _ []string) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return err
 	}
-	maybeFirstIndexGreeting()
+	maybeFirstIndexGreeting(dir)
 	return nil
 }
 
@@ -143,7 +143,7 @@ func cmdIndex(dir string, rest []string) error {
 		return err
 	}
 	clearWarmupSentinel()
-	maybeFirstIndexGreeting()
+	maybeFirstIndexGreeting(dir)
 	return nil
 }
 
@@ -243,7 +243,7 @@ func runSearch(dir string, args []string) error {
 	if err := index.EnsureForSearch(dir, o, force, os.Stderr); err != nil {
 		return fmt.Errorf("ensure: %w", err)
 	}
-	maybeFirstIndexGreeting()
+	maybeFirstIndexGreeting(dir)
 	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)

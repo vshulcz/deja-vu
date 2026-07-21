@@ -26,7 +26,11 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	if recalls == 1 {
 		noun = "recall"
 	}
-	fmt.Fprintf(stdout, "deja · %d %s · %s ctx today · %s injected", recalls, noun, humanBytes(int64(bytes)), humanBytes(int64(injected)))
+	line := fmt.Sprintf("deja · %d %s · %s ctx today · %s injected", recalls, noun, humanBytes(int64(bytes)), humanBytes(int64(injected)))
+	if raw := usage.TodayRaw(dir); bytes > 0 && raw/int64(bytes) >= 2 {
+		line += fmt.Sprintf(" · ~%d× less than replaying", raw/int64(bytes))
+	}
+	fmt.Fprint(stdout, line)
 	return nil
 }
 

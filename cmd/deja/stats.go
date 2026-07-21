@@ -242,6 +242,12 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
 	fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
+	if r.Recall.RawBytes > 0 && r.Recall.Bytes > 0 {
+		ratio := r.Recall.RawBytes / int64(r.Recall.Bytes)
+		if ratio >= 2 {
+			fmt.Fprintf(w, "  Distilled        %s served from %s of transcripts — ~%d× less context\n", humanBytes(int64(r.Recall.Bytes)), humanBytes(r.Recall.RawBytes), ratio)
+		}
+	}
 	fmt.Fprintf(w, "  This week        %d recalls by your agents · %s re-used (plus %d auto-injections)\n", r.WeekRecalls, humanBytes(int64(r.WeekBytes)), r.WeekInjected)
 	if r.AgentCredits > 0 {
 		fmt.Fprintf(w, "  Credited aloud   agents said \"deja-vu recalled\" %d times (%d this week)\n", r.AgentCredits, r.WeekCredits)

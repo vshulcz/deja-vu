@@ -106,7 +106,7 @@ func prepareFirstIndexGreeting(dir string) {
 	}
 }
 
-func maybeFirstIndexGreeting() {
+func maybeFirstIndexGreeting(dir string) {
 	index.SuppressHarnessNarration = false
 	b := index.LastBuild
 	if !b.Initial || b.Messages == 0 || !logoWanted(os.Stdout) {
@@ -127,10 +127,14 @@ func maybeFirstIndexGreeting() {
 		info = append(info, fmt.Sprintf("%-*s  %s%6d%s messages · %d sessions",
 			nameW, h.Name, logoBold, h.Messages, logoReset, h.Sessions))
 	}
+	tryLine := logoDim + `try: deja "something you fixed weeks ago"` + logoReset
+	if q := suggestFirstQuery(dir); q != "" {
+		tryLine = "try it on your own history:  " + logoBold + `deja "` + q + `"` + logoReset
+	}
 	info = append(info,
 		"",
 		fmt.Sprintf("indexed %s%d%s messages across %s%d%s agents", logoBold, b.Messages, logoReset, logoBold, b.Harnesses, logoReset),
-		logoDim+`try: deja "something you fixed weeks ago"`+logoReset,
+		tryLine,
 	)
 	if warning := doctorParsedZeroWarning(); warning != "" {
 		info = append(info, warning)
