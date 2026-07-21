@@ -43,6 +43,11 @@ func runSync(dir string, args []string) error {
 			return err
 		}
 		fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
+		masked := 0
+		if rs, rerr := index.Redactions(dir); rerr == nil {
+			masked = rs.Total
+		}
+		fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
 		return nil
 	case "import":
 		n, err := index.Import(dir, args[1])

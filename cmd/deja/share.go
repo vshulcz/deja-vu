@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -27,9 +28,16 @@ func runShare(dir string, args []string, w io.Writer) error {
 func printSanitized(w io.Writer, text string) {
 	// Redact the whole document at once: multiline secrets (PEM private key
 	// blocks) never match when scanned line-by-line.
-	redacted, _ := redact.Text(text)
+	redacted, counts := redact.Text(text)
 	fmt.Fprint(w, redacted)
 	if !strings.HasSuffix(redacted, "\n") {
 		fmt.Fprintln(w)
 	}
+	// The boundary line goes to stderr so piped output stays clean. Precise
+	// non-claims: pattern redaction is a floor, not a guarantee.
+	masked := 0
+	for _, n := range counts {
+		masked += n
+	}
+	fmt.Fprintf(os.Stderr, "deja: %d secrets masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked)
 }
