@@ -81,7 +81,14 @@ leaving surrounding text searchable. The current patterns cover:
 - PEM private-key blocks;
 - known GitHub, GitLab, OpenAI/Anthropic-style, Groq, xAI, Hugging Face, npm,
   Slack, and Google token prefixes;
-- URLs containing `scheme://user:password@host` credentials.
+- URLs containing `scheme://user:password@host` credentials;
+- bare high-entropy values in secret-shaped positions: the value side of an
+  assignment (`ANYTHING=<random-looking string>`, including the Telegram
+  `digits:token` shape) and a token standing alone on its own line. Entropy
+  alone is not enough — hex digests, UUIDs, paths and identifiers are
+  excluded, and the assignment key must be a real word, so ordinary code and
+  logs pass through unchanged (measured ~0.4% of messages affected on a real
+  23 MB corpus).
 
 Pattern matching is not secret detection. A new provider's token shape, an
 unlabelled credential, encoded or transformed data, and a secret split across
