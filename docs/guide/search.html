@@ -74,6 +74,10 @@
 deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
 <p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. No endpoint, no semantic layer — search is unchanged.</p>
 
+<h2>Natural-language queries</h2>
+<p>Stop words are dropped, word forms bridge morphology in both directions (<code>failing</code> finds <code>fails</code>), and when no session holds every remaining token deja drops up to two — telling you exactly which (<code>ignoring "why" — no session matches it together with the rest</code>). Zero results now mean the content genuinely is not there.</p>
+<h2>Earlier attempts</h2>
+<p>When an old session and a newer one from the same project match the same ground, the older hit is labeled an earlier attempt with the newer session's date — in CLI output, MCP digests, and as an additive <code>superseded</code> field in <code>--json</code>. History stays; the direction the project moved is visible.</p>
 </article>
 </div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
