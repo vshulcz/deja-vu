@@ -133,3 +133,39 @@ func recordsIntact(dir string, m Manifest) bool {
 	// manifest never committed; re-appending them would duplicate messages.
 	return fi.Size() == m.RecordsSize
 }
+
+// Overview summarizes the index from manifest metadata alone — no record
+// reads — so the zero-argument brief stays instant.
+type OverviewStats struct {
+	Sessions      int
+	Harnesses     int
+	SessionsToday int
+	SessionsWeek  int
+}
+
+func Overview(dir string) (OverviewStats, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return OverviewStats{}, err
+	}
+	var o OverviewStats
+	now := time.Now()
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	week := now.AddDate(0, 0, -7)
+	hs := map[string]bool{}
+	for _, meta := range m.Sessions {
+		o.Sessions++
+		hs[meta.Harness] = true
+		if meta.Updated.After(day) {
+			o.SessionsToday++
+		}
+		if meta.Updated.After(week) {
+			o.SessionsWeek++
+		}
+	}
+	o.Harnesses = len(hs)
+	return o, nil
+}

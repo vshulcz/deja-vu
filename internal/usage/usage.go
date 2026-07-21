@@ -21,6 +21,9 @@ const (
 	KindHook    = "hook"
 	KindSearch  = "search"
 	KindHandoff = "handoff"
+	// KindDejaVu marks a per-prompt recall: the user asked something their
+	// own history already answers — the product's namesake moment.
+	KindDejaVu = "dejavu"
 )
 
 type Event struct {
@@ -45,6 +48,7 @@ type Summary struct {
 	Bytes            int     `json:"bytes"`
 	InjectedBytes    int     `json:"injected_bytes"`
 	RawBytes         int64   `json:"raw_bytes,omitempty"`
+	DejaVuMoments    int     `json:"dejavu_moments,omitempty"`
 	EmptyResultRate  float64 `json:"empty_result_rate"`
 }
 
@@ -118,13 +122,26 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 		case KindRecall, KindContext:
 			recalls++
 			bytes += e.Bytes
-		case KindHook:
+		case KindHook, KindDejaVu:
 			recalls++
 			bytes += e.Bytes
 			injected += e.Bytes
 		}
 	}
 	return recalls, bytes, injected
+}
+
+// DejaVuWeek counts this week's déjà vu moments — prompts the user's own
+// history already answered.
+func DejaVuWeek(indexDir string) int {
+	cut := time.Now().AddDate(0, 0, -7)
+	n := 0
+	for _, e := range read(Path(indexDir)) {
+		if e.Kind == KindDejaVu && e.Time.After(cut) && e.Sessions > 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // TodayRaw sums the source-transcript volume behind today's served digests.
@@ -137,7 +154,7 @@ func TodayRaw(indexDir string) int64 {
 			continue
 		}
 		switch e.Kind {
-		case KindRecall, KindContext, KindHook:
+		case KindRecall, KindContext, KindHook, KindDejaVu:
 			raw += e.RawBytes
 		}
 	}
@@ -158,13 +175,16 @@ func Totals(indexDir string) Summary {
 			if e.Empty {
 				empty++
 			}
-		case KindHook:
+		case KindHook, KindDejaVu:
 			out.Recalls++
 			out.Injections++
 			out.InjectedSessions += e.Sessions
 			out.InjectedBytes += e.Bytes
 			out.Bytes += e.Bytes
 			out.RawBytes += e.RawBytes
+			if e.Kind == KindDejaVu {
+				out.DejaVuMoments++
+			}
 		}
 	}
 	if served := out.Recalls - out.Injections; served > 0 {
@@ -189,7 +209,7 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 		case KindRecall, KindContext:
 			recalls++
 			bytes += e.Bytes
-		case KindHook:
+		case KindHook, KindDejaVu:
 			injected++
 			injectedBytes += e.Bytes
 		}

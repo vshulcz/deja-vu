@@ -73,6 +73,9 @@ type command func(dir string, rest []string) error
 
 var commands = map[string]command{
 	"version":         cmdVersion,
+	"help":            func(_ string, _ []string) error { printUsage(); return nil },
+	"--help":          func(_ string, _ []string) error { printUsage(); return nil },
+	"-h":              func(_ string, _ []string) error { printUsage(); return nil },
 	"--version":       cmdVersion,
 	"-version":        cmdVersion,
 	"sources":         func(dir string, _ []string) error { printSources(dir); return nil },
@@ -105,11 +108,14 @@ var commands = map[string]command{
 }
 
 func run(args []string) error {
+	dir := index.DefaultDir()
 	if len(args) == 0 {
+		if logoWanted(os.Stdout) {
+			return runBrief(dir, os.Stdout)
+		}
 		printUsage()
 		return nil
 	}
-	dir := index.DefaultDir()
 	if cmd, ok := commands[args[0]]; ok {
 		return cmd(dir, args[1:])
 	}

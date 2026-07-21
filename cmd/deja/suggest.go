@@ -80,6 +80,7 @@ func suggestTokens(text string) []string {
 	raw := query.Tokens(text)
 	out := make([]string, 0, len(raw))
 	for _, tok := range raw {
+		tok = strings.Trim(tok, "*#`~_-")
 		if len(tok) < 4 || len(tok) > 24 || query.IsStopWord(tok) {
 			continue
 		}

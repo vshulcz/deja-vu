@@ -114,6 +114,7 @@ $ deja "jwt refresh token"
 | `deja update` | Download the latest GitHub release, verify its checksum, and replace the current binary. |
 | `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
 | `deja log [n] [--last] [--json]` | Audit what deja actually served: recent recalls and injections, or the exact text of the last injected digest with `--last`. |
+| `deja` | On a terminal with an index: a living brief — today's sessions, recalls served, déjà vu moments, and a search suggestion from your own history. |
 
 Stemmed JSON searches set `"stemmed": true` and include the catalog variants used.
 

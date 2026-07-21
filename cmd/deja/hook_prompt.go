@@ -78,10 +78,11 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
 	out := frameRecall(lead + digest + citationLine(ss[0]))
-	usage.RecordDigest(dir, usage.KindHook, out, len(ss), rawSize(ss))
+	usage.RecordDigest(dir, usage.KindDejaVu, out, len(ss), rawSize(ss))
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out
+	resp.SystemMessage = dejaVuLine(ss[0])
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil
@@ -182,4 +183,18 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 	for _, s := range ss {
 		fmt.Fprintf(f, "%s %s\n", sid, s.ID)
 	}
+}
+
+// dejaVuLine is the one visible line a déjà vu moment earns: which past
+// session answered, and how old it is.
+func dejaVuLine(s model.Session) string {
+	topic := strings.TrimSpace(s.Title)
+	if topic == "" {
+		topic = s.Project
+	}
+	r := []rune(topic)
+	if len(r) > 48 {
+		topic = strings.TrimSpace(string(r[:48])) + "…"
+	}
+	return fmt.Sprintf("deja-vu: you have been here — %q (%s)", topic, search.RelativeDate(s.Updated))
 }

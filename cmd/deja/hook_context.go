@@ -91,7 +91,7 @@ func runHookContext(dir string, plain bool) error {
 		if sessions > 1 {
 			plural = "s"
 		}
-		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s from this project (~%dKB) — the agent starts already knowing them", sessions, plural, (len(digest)+1023)/1024)
+		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s from this project (~%dKB) — the agent starts already knowing them%s", sessions, plural, (len(digest)+1023)/1024, serviceReceipt(dir))
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -292,4 +292,18 @@ func limitHandoffTip(dir string) string {
 		}
 	}
 	return ""
+}
+
+// serviceReceipt appends today's tally when there is one — the moment memory
+// lands is the moment to say what it has been doing all day.
+func serviceReceipt(dir string) string {
+	recalls, bytes, _ := usage.TodayWithInjections(dir)
+	if recalls < 2 || bytes == 0 {
+		return ""
+	}
+	raw := usage.TodayRaw(dir)
+	if raw/int64(bytes) < 2 {
+		return fmt.Sprintf(" · today: %d recalls", recalls)
+	}
+	return fmt.Sprintf(" · today: %d recalls, %s distilled from %s", recalls, humanBytes(int64(bytes)), humanBytes(raw))
 }
