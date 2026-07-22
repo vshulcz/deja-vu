@@ -15,6 +15,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 func Search(dir string, o query.Options) ([]model.Session, error) {
@@ -77,7 +78,7 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 			} else if result.Fuzzy {
 				return result, nil
 			}
-			return SearchResult{}, nil
+			return relevanceSearch(dir, m, o)
 		}
 		ss, err := scanRecords(dir, m, o, nil)
 		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
@@ -103,8 +104,66 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 		} else if len(result.Sessions) > 0 {
 			return result, nil
 		}
+		return relevanceSearch(dir, m, o)
 	}
 	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
+}
+
+// RelevanceTerms extracts the rankable tokens of a natural-language query:
+// lowercased, stopwords dropped. Exported so callers and the benchmark can
+// mirror exactly what the relevance tier scores against.
+func RelevanceTerms(q string) []string {
+	fields := strings.FieldsFunc(strings.ToLower(q), func(r rune) bool {
+		wordy := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') ||
+			r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400
+		return !wordy
+	})
+	seen := map[string]bool{}
+	var out []string
+	for _, f := range fields {
+		if len(f) < 3 || search.IsStopWord(f) || seen[f] {
+			continue
+		}
+		seen[f] = true
+		out = append(out, f)
+	}
+	return out
+}
+
+// relevanceSearch is the ladder's last resort: no AND survived, so rank every
+// session by IDF-weighted overlap with the query's informative words. Order
+// carries the ranking; callers must not re-sort by exact-match BM25 (the whole
+// point is that exact matching already failed). A session must match at least
+// two informative terms — one lucky word is noise, the same bar the déjà vu
+// hook applies.
+func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	// A quoted phrase is an explicit exactness request; loosening it into
+	// bag-of-words relevance would betray what the user asked for.
+	if strings.Contains(o.Query, "\"") || o.Regex {
+		return SearchResult{}, nil
+	}
+	terms := RelevanceTerms(o.Query)
+	if len(terms) < 2 {
+		return SearchResult{}, nil
+	}
+	metas, _, anyMatched := relevantMetasCounts(dir, m, nil, terms, 50)
+	if len(metas) == 0 {
+		return SearchResult{}, nil
+	}
+	keep := make([]SessionMeta, 0, len(metas))
+	for i, meta := range metas {
+		if anyMatched[i] >= 2 && sessionMetaMatches(meta, o) {
+			keep = append(keep, meta)
+		}
+	}
+	if len(keep) == 0 {
+		return SearchResult{}, nil
+	}
+	ss, err := sessionsForMetas(dir, keep)
+	if err != nil {
+		return SearchResult{}, err
+	}
+	return SearchResult{Sessions: ss, Tier: query.TierRelevance}, nil
 }
 
 // ProjectRelevant ranks the current project's sessions by how well they match
@@ -136,8 +195,33 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	if err != nil {
 		return nil, nil, err
 	}
+	metas, matched := relevantMetasMatched(dir, m, projects, terms, n)
+	if len(metas) == 0 {
+		return nil, nil, nil
+	}
+	out, err := sessionsForMetas(dir, metas)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, matched, nil
+}
+
+func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int) {
+	metas, informative, _ := relevantMetasCounts(dir, m, projects, terms, n)
+	return metas, informative
+}
+
+// relevantMetasCounts additionally reports how many terms of ANY frequency
+// each session matched — the noise gate for full-index relevance search,
+// where demanding two rare terms also rejects real answers that pair one
+// rare word with one ordinary one.
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int) {
 	inProject := map[uint32]SessionMeta{}
 	for _, meta := range m.Sessions {
+		if len(projects) == 0 { // empty scope = whole index
+			inProject[meta.Ord] = meta
+			continue
+		}
 		lp := strings.ToLower(meta.Project)
 		for _, want := range projects {
 			w := strings.ToLower(want)
@@ -153,6 +237,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	totalDocs := float64(len(m.Sessions)) + 1
 	score := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
+	anyTerms := map[uint32]int{}
 	for _, term := range terms {
 		keys := queryKeys(term)
 		if len(keys) == 0 {
@@ -185,6 +270,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		informative := idf >= dejaVuIDFFloor || len(df) <= 2
 		for ord := range hit {
 			score[ord] += idf
+			anyTerms[ord]++
 			if informative {
 				matchedTerms[ord]++
 			}
@@ -194,11 +280,12 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		meta    SessionMeta
 		score   float64
 		matched int
+		any     int
 	}
 	ranked := make([]scored, 0, len(score))
 	for ord, sc := range score {
 		if sc > 0 {
-			ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord]})
+			ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 		}
 	}
 	if len(ranked) == 0 {
@@ -215,15 +302,13 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	}
 	metas := make([]SessionMeta, 0, len(ranked))
 	matched := make([]int, 0, len(ranked))
+	anyMatched := make([]int, 0, len(ranked))
 	for _, r := range ranked {
 		metas = append(metas, r.meta)
 		matched = append(matched, r.matched)
+		anyMatched = append(anyMatched, r.any)
 	}
-	out, err := sessionsForMetas(dir, metas)
-	if err != nil {
-		return nil, nil, err
-	}
-	return out, matched, nil
+	return metas, matched, anyMatched
 }
 
 // loadSessionRecords materializes one session's transcript from the index.

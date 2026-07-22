@@ -881,12 +881,31 @@ func TestRedactsSecretsAtIngest(t *testing.T) {
 		if bytes.Contains(recordBytes, []byte(secret)) {
 			t.Fatalf("records.bin contains secret %q", secret)
 		}
+		// Searching for a secret must never hand the secret back. The
+		// relevance tier may legitimately surface the session via the
+		// non-secret words around a masked value (postgres, localhost), so
+		// the invariant is value absence in results, not result emptiness.
 		ss, err := Search(dir, search.Options{Query: secret, Harness: "claude"})
 		if err != nil {
 			t.Fatal(err)
 		}
+		for _, sess := range ss {
+			for _, m := range sess.Messages {
+				if strings.Contains(m.Text, secret) {
+					t.Fatalf("search for %q returned the raw secret", secret)
+				}
+			}
+		}
+	}
+	// The secret VALUES themselves must stay unfindable: no session should
+	// match a query made of the masked value alone.
+	for _, value := range []string{"pass1234567890", "1234567890abcdefghijklmnop", "MIIEpAIBAAKCAQEAfakefakefakefakefake"} {
+		ss, err := Search(dir, search.Options{Query: value, Harness: "claude"})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if len(ss) != 0 {
-			t.Fatalf("search for secret %q returned %#v", secret, ss)
+			t.Fatalf("masked value %q still findable: %#v", value, ss)
 		}
 	}
 	ss, err := Search(dir, search.Options{Query: "redactionmarker", Harness: "claude"})
