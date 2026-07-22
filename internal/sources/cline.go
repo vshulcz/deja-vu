@@ -185,7 +185,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 				cwd = man.WorkspaceRoot
 			}
 			if cwd != "" {
-				s.Project = claudeProjectName(strings.ReplaceAll(cwd, "/", "-"))
+				s.Project = claudeProjectName(pathToProjectKey(cwd))
 			}
 			s.Title = strings.TrimSpace(man.Metadata.Title)
 			if s.Title == "" {
@@ -259,7 +259,7 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 				if m.ID == taskID {
 					s.Title = firstLineTrim(m.Task)
 					if m.CWD != "" {
-						s.Project = claudeProjectName(strings.ReplaceAll(m.CWD, "/", "-"))
+						s.Project = claudeProjectName(pathToProjectKey(m.CWD))
 					}
 					if m.TS > 0 {
 						base = time.UnixMilli(m.TS)
@@ -347,6 +347,13 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// pathToProjectKey converts an absolute workspace path to the dash-encoded
+// key claudeProjectName expects, so cline/roo sessions land in the same
+// project namespace as every other harness.
+func pathToProjectKey(p string) string {
+	return strings.ReplaceAll(p, "/", "-")
 }
 
 func firstLineTrim(s string) string {

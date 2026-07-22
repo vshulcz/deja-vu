@@ -98,7 +98,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			t.Fatalf("%s: unknown handoff kind %q", h.ID, c.Handoff)
 		}
 	}
-	if seen != len(handoffTargets())+3 { // +3: antigravity, kimi and cline are paste-only
+	if seen != len(handoffTargets())+4 { // +4: antigravity, kimi, cline and roo are paste-only
 		t.Fatalf("registry covers %d harnesses, handoff targets %d", seen, len(handoffTargets()))
 	}
 

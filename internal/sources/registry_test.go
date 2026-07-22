@@ -39,7 +39,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_CURSOR_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GROK_ROOT",
 		"DEJA_PI_ROOT", "DEJA_QWEN_ROOT", "DEJA_KIMI_ROOT", "KIMI_CODE_HOME",
 		"DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "CLINE_DIR", "CLINE_DATA_DIR",
-		"CLINE_SESSION_DATA_DIR", "CLINE_MCP_SETTINGS_PATH",
+		"CLINE_SESSION_DATA_DIR", "CLINE_MCP_SETTINGS_PATH", "DEJA_ROO_ROOTS",
 		"DEJA_INCLUDE_SUBAGENTS", "DEJA_OPENCODE_DB", "GEMINI_CLI_HOME",
 		"GROK_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
 		"DEJA_NOTES_FILE",
@@ -139,6 +139,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseKimiFile(path)
 	case "cline":
 		sessions, err = ParseClineFile(path)
+	case "roo":
+		sessions, err = ParseRooTask(path)
 	case "opencode":
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")

@@ -117,6 +117,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 			return "", "", fmt.Errorf("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
 		}
 		return "", "cline --id " + s.ID, nil
+	case "roo":
+		return "", "", fmt.Errorf("Roo Code tasks reopen from the extension's history UI, not the terminal")
 	case "kimi":
 		return "", "kimi --session " + s.ID, nil
 	case "pi":

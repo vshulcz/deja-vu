@@ -279,6 +279,27 @@
     "handoff": "exec",
     "prereq": ""
    }
+  },
+  {
+   "id": "roo",
+   "store_paths": [
+    "<vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json",
+    "${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json"
+   ],
+   "format_kind": "json",
+   "fixture_paths": [
+    "fixtures/registry/roo/tasks/1767225700000/api_conversation_history.json"
+   ],
+   "parser_source": "internal/sources/roo.go",
+   "last_verified": "2026-07-23",
+   "display_name": "Roo Code",
+   "capabilities": {
+    "mcp": false,
+    "auto": false,
+    "resume": false,
+    "handoff": "paste",
+    "prereq": ""
+   }
   }
  ]
 }
