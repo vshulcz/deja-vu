@@ -48,13 +48,19 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND. n=8 to leave room after
 	// excluding the current/too-fresh sessions.
-	ranked, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
+	ranked, matched, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return nil
 	}
 	ss := make([]model.Session, 0, 2)
 	seen := alreadyInjected(dir, input.SessionID)
-	for _, s := range ranked {
+	for i, s := range ranked {
+		// One lucky rare word is not a déjà vu. Demand real overlap before
+		// claiming "you have been here" — a false moment teaches the user to
+		// ignore the true ones.
+		if matched[i] < 2 {
+			continue
+		}
 		// Never recall the session being written right now, or work fresh
 		// enough the user still remembers it — that is anti-magic.
 		if s.ID == input.SessionID || (!s.Updated.IsZero() && time.Since(s.Updated) < 15*time.Minute) {
@@ -83,6 +89,16 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out
 	resp.SystemMessage = dejaVuLine(ss[0])
+	if resp.SystemMessage == "" {
+		// No presentable topic — inject the context silently rather than
+		// flashing harness plumbing at the user.
+		b, err := json.Marshal(resp)
+		if err != nil {
+			return nil
+		}
+		fmt.Fprintln(stdout, string(b))
+		return nil
+	}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil
@@ -188,13 +204,44 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 // dejaVuLine is the one visible line a déjà vu moment earns: which past
 // session answered, and how old it is.
 func dejaVuLine(s model.Session) string {
-	topic := strings.TrimSpace(s.Title)
+	topic := dejaVuTopic(s)
 	if topic == "" {
-		topic = s.Project
+		return ""
 	}
 	r := []rune(topic)
 	if len(r) > 48 {
 		topic = strings.TrimSpace(string(r[:48])) + "…"
 	}
 	return fmt.Sprintf("deja-vu: you have been here — %q (%s)", topic, search.RelativeDate(s.Updated))
+}
+
+// dejaVuTopic picks something a human actually typed. Session titles are the
+// first user message, which for some harnesses is injected plumbing
+// ("# AGENTS.md instructions <INSTRUCTIONS>...") — showing that as "you have
+// been here" reads as a glitch, not a memory.
+func dejaVuTopic(s model.Session) string {
+	if t := strings.TrimSpace(s.Title); t != "" && presentableTopic(t) {
+		return t
+	}
+	for _, m := range s.Messages {
+		if m.Role != "user" || digest.IsAgentArtifact(m.Text) {
+			continue
+		}
+		t := strings.TrimSpace(digest.MessageText(m.Text))
+		if t != "" && presentableTopic(t) {
+			return t
+		}
+	}
+	return ""
+}
+
+func presentableTopic(t string) bool {
+	if digest.IsAgentArtifact(t) {
+		return false
+	}
+	r := []rune(t)[0]
+	if r == '#' || r == '<' || r == '{' || r == '[' {
+		return false
+	}
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r >= 0x400
 }

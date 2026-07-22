@@ -112,18 +112,22 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 // filler words. Each session scores the IDF-weighted sum of prompt terms it
 // contains (rare topical terms dominate; common filler barely moves it), from
 // bucket postings only. The best sessions are materialized with transcripts.
-func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, error) {
+// ProjectRelevant ranks the project's sessions by IDF-weighted overlap with
+// the prompt terms. matched reports, per returned session, how many distinct
+// terms hit — callers gate on it so one lucky rare word cannot manufacture a
+// confident "you have been here".
+func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	unlock, err := lockDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer unlock()
 	m, err := readManifest(dir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	inProject := map[uint32]SessionMeta{}
 	for _, meta := range m.Sessions {
@@ -137,10 +141,11 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		}
 	}
 	if len(inProject) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	totalDocs := float64(len(m.Sessions)) + 1
 	score := map[uint32]float64{}
+	matchedTerms := map[uint32]int{}
 	for _, term := range terms {
 		keys := queryKeys(term)
 		if len(keys) == 0 {
@@ -163,20 +168,22 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		}
 		for ord := range hit {
 			score[ord] += idf
+			matchedTerms[ord]++
 		}
 	}
 	type scored struct {
-		meta  SessionMeta
-		score float64
+		meta    SessionMeta
+		score   float64
+		matched int
 	}
 	ranked := make([]scored, 0, len(score))
 	for ord, sc := range score {
 		if sc > 0 {
-			ranked = append(ranked, scored{inProject[ord], sc})
+			ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord]})
 		}
 	}
 	if len(ranked) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score == ranked[j].score {
@@ -188,14 +195,16 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		ranked = ranked[:n]
 	}
 	out := make([]model.Session, 0, len(ranked))
+	matched := make([]int, 0, len(ranked))
 	for _, r := range ranked {
 		full, err := loadSessionRecords(dir, m, r.meta)
 		if err != nil || len(full.Messages) == 0 {
 			full = sessionFromMeta(r.meta)
 		}
 		out = append(out, full)
+		matched = append(matched, r.matched)
 	}
-	return out, nil
+	return out, matched, nil
 }
 
 // loadSessionRecords materializes one session's transcript from the index.

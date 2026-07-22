@@ -174,3 +174,53 @@ func TestAgentCreditsCountedFromIndex(t *testing.T) {
 		t.Fatalf("credits = %d/%d, want 2/1", r.AgentCredits, r.WeekCredits)
 	}
 }
+
+func TestHookPromptRequiresRealOverlap(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	// A session sharing exactly ONE informative term with the prompt.
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-gamma", "one.jsonl"), "one", []string{
+		`{"type":"user","sessionId":"one","timestamp":"` + old + `","message":{"role":"user","content":"tune the quetzalcoatl dashboard colors"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "gamma")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	var out bytes.Buffer
+	in := strings.NewReader(`{"prompt":"quetzalcoatl deploy pipeline retries failing"}`)
+	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "you have been here") {
+		t.Fatalf("single-term overlap must not claim deja vu:\n%s", out.String())
+	}
+}
+
+func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
+	s := model.Session{
+		Harness: "codex", ID: "x", Project: "app",
+		Title: `# AGENTS.md instructions <INSTRUCTIONS> <!-- deja guidance:start -->`,
+		Messages: []model.Message{
+			{Role: "user", Text: `# AGENTS.md instructions <INSTRUCTIONS> <!-- deja guidance:start -->`},
+			{Role: "user", Text: "why does the exporter drop rows at midnight"},
+		},
+	}
+	if got := dejaVuTopic(s); got != "why does the exporter drop rows at midnight" {
+		t.Fatalf("topic = %q", got)
+	}
+	line := dejaVuLine(s)
+	if strings.Contains(line, "AGENTS.md") {
+		t.Fatalf("plumbing leaked into deja vu line: %q", line)
+	}
+	junk := model.Session{Harness: "codex", ID: "y", Project: "app",
+		Title:    `<environment_context> <cwd>/x</cwd>`,
+		Messages: []model.Message{{Role: "user", Text: `{"type":"init"}`}}}
+	if got := dejaVuLine(junk); got != "" {
+		t.Fatalf("all-plumbing session must yield no visible line, got %q", got)
+	}
+}
