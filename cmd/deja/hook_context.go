@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,11 +43,29 @@ type precompactHookInput struct {
 	Trigger        string `json:"trigger"`
 }
 
+// readHookStdin reads the hook payload without trusting the host to close
+// stdin. Codex keeps the pipe open and silent, and a hook that blocks on
+// stdin hangs the whole session start — the harness then disables the hook
+// and the user just sees memory quietly stop working.
+func readHookStdin() []byte {
+	ch := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
+		ch <- b
+	}()
+	select {
+	case b := <-ch:
+		return b
+	case <-time.After(300 * time.Millisecond):
+		return nil
+	}
+}
+
 // runHookPrecompact is deliberately best effort: Claude must be able to
 // compact even when the input is incomplete or the index cannot start.
 func runHookPrecompact(dir string) {
 	var input precompactHookInput
-	_ = json.NewDecoder(os.Stdin).Decode(&input)
+	_ = json.Unmarshal(readHookStdin(), &input)
 	requestWarmup(dir)
 }
 
@@ -60,7 +79,7 @@ func runHookContext(dir string, plain bool) error {
 	var input struct {
 		Source string `json:"source"`
 	}
-	_ = json.NewDecoder(os.Stdin).Decode(&input)
+	_ = json.Unmarshal(readHookStdin(), &input)
 	digest, sessions, raw, taskMatched := hookDigestResult(dir)
 	if digest == "" {
 		return nil
