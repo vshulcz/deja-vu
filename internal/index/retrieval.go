@@ -386,7 +386,11 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 		want[meta.Harness+":"+meta.ID] = i
 		out[i] = sessionFromMeta(meta)
 	}
-	err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+	keys := make(map[string]bool, len(want))
+	for k := range want {
+		keys[k] = true
+	}
+	err := eachRecordForKeys(filepath.Join(dir, "records.bin"), keys, func(r Record) {
 		if i, ok := want[r.Key]; ok {
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}

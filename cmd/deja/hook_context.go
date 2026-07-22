@@ -186,6 +186,10 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 			return "", 0, 0, nil
 		}
 	}
+	// The two git probes (worktree list for identity, status/log for the
+	// task signal) are independent forks — overlap them.
+	taskCh := make(chan []string, 1)
+	go func() { taskCh <- changedTaskFiles(cwd) }()
 	names := digest.ProjectNameCandidates(cwd)
 	mark("names+worktrees")
 	pol := policy.Load()
@@ -205,7 +209,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	// The task signal decides how wide the candidate pool is: with changed
 	// files to match against, older sessions are worth considering; without
 	// it, recency alone decides and a small pool is enough.
-	taskFiles := changedTaskFiles(cwd)
+	taskFiles := <-taskCh
 	mark("git-taskfiles")
 	perName := 3
 	if len(taskFiles) > 0 {
