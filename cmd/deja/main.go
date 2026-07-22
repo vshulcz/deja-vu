@@ -272,8 +272,11 @@ func runSearch(dir string, args []string) error {
 	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
-	hits, err := search.Run(ss, o)
-	if err != nil {
+	var hits []search.Hit
+	if result.Tier == search.TierRelevance {
+		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
+		hits = search.RelevanceHits(ss, index.RelevanceTerms(o.Query))
+	} else if hits, err = search.Run(ss, o); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
 	hits = policyFilterHits(policy.ActivationSearch, hits)

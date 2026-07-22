@@ -837,3 +837,32 @@ func contextText(s string, matched bool) string {
 	}
 	return proseForSnippet(strings.Join(lines, "\n"))
 }
+
+// TierRelevance mirrors query.TierRelevance for callers of this package.
+const TierRelevance = query.TierRelevance
+
+// RelevanceHits wraps relevance-ranked sessions as hits WITHOUT re-scoring:
+// the index already ordered them by IDF overlap, and exact-match BM25 (which
+// just failed) must not reshuffle the ranking. Count and snippets come from
+// term occurrences so output still shows why each session surfaced.
+func RelevanceHits(ss []model.Session, terms []string) []Hit {
+	hits := make([]Hit, 0, len(ss))
+	for rank, s := range ss {
+		hit := Hit{Session: s, Tier: TierRelevance}
+		for _, m := range s.Messages {
+			low := strings.ToLower(m.Text)
+			for _, t := range terms {
+				if strings.Contains(low, t) {
+					hit.Count++
+					if len(hit.Snippets) < 2 {
+						hit.Snippets = append(hit.Snippets, snippet(m.Text, t, nil))
+					}
+					break
+				}
+			}
+		}
+		hit.Score = float64(len(ss) - rank)
+		hits = append(hits, hit)
+	}
+	return hits
+}

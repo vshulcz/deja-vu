@@ -40,6 +40,10 @@ const (
 	TierExact    = "exact"
 	TierClose    = "close"
 	TierSemantic = "semantic"
+	// TierRelevance ranks sessions by IDF-weighted term overlap when the
+	// exact ladder finds nothing — natural-language questions rarely survive
+	// an AND over every word.
+	TierRelevance = "relevance"
 )
 
 func QueryParts(q string) (terms []string, phrases []string) {

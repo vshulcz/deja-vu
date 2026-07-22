@@ -298,8 +298,10 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	if o.Tier == search.TierClose && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
-	hits, err := search.Run(ss, o)
-	if err != nil {
+	var hits []search.Hit
+	if result.Tier == search.TierRelevance {
+		hits = search.RelevanceHits(ss, index.RelevanceTerms(q))
+	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
 	}
 	hits = policyFilterHits(policy.ActivationMCP, hits)
@@ -330,6 +332,8 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Fuzzy {
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	} else if result.Tier == search.TierRelevance {
+		fmt.Fprintln(&b, "No exact match; sessions ranked by relevance to the whole query.")
 	}
 	if offset > 0 {
 		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+len(hits), total)
@@ -415,8 +419,10 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	if o.Tier == search.TierClose && o.FuzzyVariants == nil {
 		o.FuzzyVariants = result.Variants
 	}
-	hits, err := search.Run(ss, o)
-	if err != nil {
+	var hits []search.Hit
+	if result.Tier == search.TierRelevance {
+		hits = search.RelevanceHits(ss, index.RelevanceTerms(q))
+	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
 	}
 	hits = policyFilterHits(policy.ActivationMCP, hits)
