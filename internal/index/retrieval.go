@@ -112,10 +112,17 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 // filler words. Each session scores the IDF-weighted sum of prompt terms it
 // contains (rare topical terms dominate; common filler barely moves it), from
 // bucket postings only. The best sessions are materialized with transcripts.
+// dejaVuIDFFloor is the informativeness bar for a term to count toward a
+// déjà vu match: ln(N/df) >= 2 keeps terms present in at most ~13% of
+// sessions. Conversational filler ("post", "text", "claude") is frequent in
+// any large corpus and clears nothing. Terms living in one or two sessions
+// are informative regardless — small corpora never reach the ratio bar.
+const dejaVuIDFFloor = 2.0
+
 // ProjectRelevant ranks the project's sessions by IDF-weighted overlap with
 // the prompt terms. matched reports, per returned session, how many distinct
-// terms hit — callers gate on it so one lucky rare word cannot manufacture a
-// confident "you have been here".
+// INFORMATIVE terms hit (idf >= dejaVuIDFFloor) — callers gate on it so
+// generic words cannot manufacture a confident "you have been here".
 func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -156,19 +163,31 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		if err != nil || len(posts) == 0 {
 			continue
 		}
-		idf := math.Log(totalDocs / float64(len(posts)+1))
-		if idf <= 0 {
-			continue
-		}
+		// Document frequency in sessions, not postings: one marathon session
+		// repeating a term 300 times must not make the term look common.
+		df := map[uint32]bool{}
 		hit := map[uint32]bool{}
 		for _, pp := range posts {
+			df[pp.Sid] = true
 			if _, ok := inProject[pp.Sid]; ok {
 				hit[pp.Sid] = true
 			}
 		}
+		idf := math.Log(totalDocs / float64(len(df)+1))
+		if idf <= 0 {
+			// In a tiny corpus every ratio collapses to zero; a term living
+			// in only a couple of sessions still identifies them.
+			if len(df) > 2 {
+				continue
+			}
+			idf = 0.1
+		}
+		informative := idf >= dejaVuIDFFloor || len(df) <= 2
 		for ord := range hit {
 			score[ord] += idf
-			matchedTerms[ord]++
+			if informative {
+				matchedTerms[ord]++
+			}
 		}
 	}
 	type scored struct {

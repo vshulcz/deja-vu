@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -222,5 +223,49 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 		Messages: []model.Message{{Role: "user", Text: `{"type":"init"}`}}}
 	if got := dejaVuLine(junk); got != "" {
 		t.Fatalf("all-plumbing session must yield no visible line, got %q", got)
+	}
+}
+
+func TestHookPromptSkipsMarathonSessions(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	var lines []string
+	for i := 0; i < dejaVuMaxMessages+10; i++ {
+		lines = append(lines, `{"type":"user","sessionId":"hay","timestamp":"`+old+`","message":{"role":"user","content":"quetzalcoatl stampede msg `+fmt.Sprint(i)+`"}}`)
+	}
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "hay.jsonl"), "hay", lines)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "focus.jsonl"), "focus", []string{
+		`{"type":"user","sessionId":"focus","timestamp":"` + old + `","message":{"role":"user","content":"the quetzalcoatl stampede fix: jittered ttl"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "hay")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	var out bytes.Buffer
+	in := strings.NewReader(`{"prompt":"quetzalcoatl stampede regression again","session_id":"s-new"}`)
+	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "you have been here") {
+		t.Fatalf("focused session must fire:\n%s", got)
+	}
+	if strings.Contains(got, "msg 5") {
+		t.Fatalf("marathon session leaked into injection:\n%s", got)
+	}
+}
+
+func TestDejaVuLineCooldown(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	if !dejaVuLineDue(dir) {
+		t.Fatal("first call must be due")
+	}
+	if dejaVuLineDue(dir) {
+		t.Fatal("second call within cooldown must be suppressed")
 	}
 }
