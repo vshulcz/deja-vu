@@ -13,12 +13,21 @@ import (
 
 func runRemember(dir string, args []string) error {
 	var text, project string
+	var tags []string
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--project" {
 			if i+1 >= len(args) {
 				return fmt.Errorf("remember: --project needs value")
 			}
 			project = args[i+1]
+			i++
+			continue
+		}
+		if args[i] == "--tag" {
+			if i+1 >= len(args) {
+				return fmt.Errorf("remember: --tag needs value")
+			}
+			tags = append(tags, args[i+1])
 			i++
 			continue
 		}
@@ -40,12 +49,16 @@ func runRemember(dir string, args []string) error {
 		}
 		project = sources.ClaudeProjectName(cwd)
 	}
-	if err := sources.AppendNote(project, text, time.Now()); err != nil {
+	if err := sources.AppendNoteTagged(project, text, tags, time.Now()); err != nil {
 		return err
 	}
 	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "deja: remembered under %s\n", strings.TrimSpace(project))
+	suffix := ""
+	if norm := sources.NormalizeTags(tags); len(norm) > 0 {
+		suffix = " #" + strings.Join(norm, " #")
+	}
+	fmt.Fprintf(os.Stdout, "deja: remembered under %s%s\n", strings.TrimSpace(project), suffix)
 	return nil
 }

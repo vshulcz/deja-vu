@@ -141,3 +141,38 @@ func searchHits(t *testing.T, dir, q string) []search.Hit {
 	}
 	return hits
 }
+
+func TestPromoteSurfacesConflicts(t *testing.T) {
+	dir := promoteFixture(t)
+	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-tmp-proj", "sess2.jsonl"), "sess9999", []string{
+		`{"type":"user","sessionId":"sess9999","timestamp":"2026-01-05T03:04:05Z","message":{"role":"user","content":"the signing key rotation keeps breaking downstream verification"}}`,
+		`{"type":"assistant","sessionId":"sess9999","timestamp":"2026-01-05T03:05:05Z","message":{"role":"assistant","content":[{"type":"text","text":"rotate the signing key monthly and pin the previous kid for one overlap window"}]}}`,
+	})
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := runPromote(dir, []string{"sess1234", "--tag", "signing"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runPromote(dir, []string{"sess9999", "--tag", "signing"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "conflict: another accepted note") {
+		t.Fatalf("conflict must surface at promote time:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "--state superseded") {
+		t.Fatalf("resolution hint missing:\n%s", out.String())
+	}
+	// Superseding the older note dissolves the conflict for the next promote.
+	if err := runPromote(dir, []string{"sess1234", "--state", "superseded"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := runPromote(dir, []string{"sess9999", "--tag", "signing"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "conflict:") {
+		t.Fatalf("superseded note must not conflict:\n%s", out.String())
+	}
+}

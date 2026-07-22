@@ -94,3 +94,27 @@ func appendMustRead(t *testing.T, path, suffix string) []byte {
 	}
 	return append(b, suffix...)
 }
+
+func TestConflictingNotes(t *testing.T) {
+	a := PromotedNote{Project: "app", Session: "claude:a", State: "accepted", Title: "retry policy", Text: "use exponential backoff with jitter for outbound retries", Tags: []string{"retries"}}
+	b := PromotedNote{Project: "app", Session: "claude:b", State: "accepted", Title: "retry policy v2", Text: "fixed-interval retries are simpler and sufficient here", Tags: []string{"retries"}}
+	c := PromotedNote{Project: "app", Session: "claude:c", State: "superseded", Title: "old retries", Text: "exponential backoff jitter outbound retries", Tags: []string{"retries"}}
+	d := PromotedNote{Project: "other", Session: "claude:d", State: "accepted", Title: "retry policy", Text: "exponential backoff with jitter for outbound retries", Tags: []string{"retries"}}
+	all := []PromotedNote{a, b, c, d}
+	got := ConflictingNotes(a, all)
+	if len(got) != 1 || got[0].Session != "claude:b" {
+		t.Fatalf("conflicts = %+v", got)
+	}
+	// No tags: 3+ shared informative words still connect them ("retry",
+	// "policy", "retries" — a genuine topical clash).
+	a2, b2 := a, b
+	a2.Tags, b2.Tags = nil, nil
+	if got := ConflictingNotes(a2, []PromotedNote{a2, b2}); len(got) != 1 {
+		t.Fatalf("topical word overlap must conflict, got %+v", got)
+	}
+	// A note sharing fewer than 3 informative words stays unrelated.
+	far := PromotedNote{Project: "app", Session: "claude:e", State: "accepted", Title: "logging", Text: "ship structured logs with retries counter"}
+	if got := ConflictingNotes(a2, []PromotedNote{a2, far}); len(got) != 0 {
+		t.Fatalf("weak overlap conflicted: %+v", got)
+	}
+}
