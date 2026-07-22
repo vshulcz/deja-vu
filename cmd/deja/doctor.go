@@ -166,8 +166,21 @@ func hookEventWired(hooks map[string]any, event, command string) bool {
 	entries, _ := hooks[event].([]any)
 	for _, entryAny := range entries {
 		entry, _ := entryAny.(map[string]any)
-		if entry != nil && entryHasCommand(entry, command) {
-			return true
+		if entry == nil {
+			continue
+		}
+		// Substring match: installs write the absolute binary path ahead of
+		// the subcommand, so an exact compare would report every real
+		// installation as missing.
+		hs, _ := entry["hooks"].([]any)
+		for _, hAny := range hs {
+			h, _ := hAny.(map[string]any)
+			if h == nil || h["type"] != "command" {
+				continue
+			}
+			if cmd, _ := h["command"].(string); strings.Contains(cmd, command) {
+				return true
+			}
 		}
 	}
 	return false

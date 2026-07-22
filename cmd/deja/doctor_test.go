@@ -496,3 +496,20 @@ func TestDoctorDeepJSON(t *testing.T) {
 		t.Fatalf("json deep report wrong: %#v", got.Deep)
 	}
 }
+
+func TestDoctorHooksMatchAbsolutePathCommands(t *testing.T) {
+	tmp := hermeticEnv(t)
+	settings := filepath.Join(tmp, "home", ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Real installs write the absolute binary path, not the bare subcommand.
+	if err := os.WriteFile(settings, []byte(`{"hooks":{"PreCompact":[{"matcher":"manual|auto","hooks":[{"type":"command","command":"/Users/x/.local/bin/deja hook-precompact"}]}]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	doctorHooks(&out)
+	if !strings.Contains(out.String(), "precompact   wired") {
+		t.Fatalf("absolute-path hook must count as wired:\n%s", out.String())
+	}
+}
