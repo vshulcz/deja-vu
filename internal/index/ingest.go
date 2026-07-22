@@ -170,6 +170,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		_ = rf.Close()
 		return err
 	}
+	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
 	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
@@ -198,7 +199,8 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
 				}
-				text := redactForIngest(&m, s.Path, msg.Text)
+				// Already redacted (and length-capped) by preRedactSessions.
+				text := msg.Text
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -284,24 +286,45 @@ func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss 
 }
 
 func loadProgress(h string, progress io.Writer) []model.Session {
-	var ss []model.Session
-	for _, hr := range sources.Registry() {
+	// Harness stores are independent files owned by different tools; parsing
+	// them is CPU-bound JSON/regex work with no shared state, so the cold
+	// build parses all stores concurrently. Results keep registry order so a
+	// rebuild stays deterministic.
+	type loaded struct {
+		name string
+		ss   []model.Session
+	}
+	reg := sources.Registry()
+	results := make([]loaded, len(reg))
+	var wg sync.WaitGroup
+	for i, hr := range reg {
 		if h != "" && h != hr.Name {
 			continue
 		}
-		got := safeLoad(hr.Name, hr.Load, progress)
-		ss = append(ss, got...)
-		if progress != nil && len(got) > 0 && !SuppressHarnessNarration {
+		wg.Add(1)
+		go func(i int, name string, load func() []model.Session) {
+			defer wg.Done()
+			results[i] = loaded{name: name, ss: safeLoad(name, load, progress)}
+		}(i, hr.Name, hr.Load)
+	}
+	wg.Wait()
+	var ss []model.Session
+	for _, r := range results {
+		if len(r.ss) == 0 {
+			continue
+		}
+		ss = append(ss, r.ss...)
+		if progress != nil && !SuppressHarnessNarration {
 			msgs := 0
-			for _, s := range got {
+			for _, s := range r.ss {
 				msgs += len(s.Messages)
 			}
 			// "deja" is the notes pseudo-source; it narrates as "notes".
-			label := hr.Name
+			label := r.name
 			if label == "deja" {
 				label = "notes"
 			}
-			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", label, len(got), msgs)
+			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", label, len(r.ss), msgs)
 		}
 	}
 	return ss
@@ -1143,4 +1166,70 @@ func lastCompleteLineOffset(p string, size int64) int64 {
 		end = start
 	}
 	return 0
+}
+
+// preRedactSessions redacts every message concurrently before the write
+// loop. Redaction is regex-heavy and was the serial bottleneck of a cold
+// build; the write loop stays sequential (append-only log), but by the time
+// it runs every text is already clean. Counters land in the manifest exactly
+// as the serial path recorded them.
+func preRedactSessions(m *Manifest, ss []model.Session) {
+	var mu sync.Mutex
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	workers := runtime.GOMAXPROCS(0)
+	if workers > len(ss) {
+		workers = len(ss)
+	}
+	if workers < 1 {
+		return
+	}
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for si := range jobs {
+				s := &ss[si]
+				for mi := range s.Messages {
+					redacted, counts := redact.Text(s.Messages[mi].Text)
+					if len(redacted) > maxIndexedText {
+						cut := maxIndexedText
+						for cut > 0 && !utf8.RuneStart(redacted[cut]) {
+							cut--
+						}
+						redacted = redacted[:cut]
+					}
+					s.Messages[mi].Text = redacted
+					if n := counts.Total(); n > 0 && m != nil {
+						mu.Lock()
+						m.Redacted += n
+						if m.RedactionRules == nil {
+							m.RedactionRules = map[string]int{}
+						}
+						h := harnessForPath(s.Path)
+						if h == "" {
+							if _, ok := m.Files[sources.OpencodeDB()]; ok {
+								h = "opencode"
+							}
+						}
+						for rule, c := range counts {
+							m.RedactionRules[h+":"+rule] += c
+						}
+						if s.Path != "" && m.Files != nil {
+							if fs, ok := m.Files[s.Path]; ok {
+								fs.Redactions += n
+								m.Files[s.Path] = fs
+							}
+						}
+						mu.Unlock()
+					}
+				}
+			}
+		}()
+	}
+	for si := range ss {
+		jobs <- si
+	}
+	close(jobs)
+	wg.Wait()
 }
