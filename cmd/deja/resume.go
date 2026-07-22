@@ -118,7 +118,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		return "", "cline --id " + s.ID, nil
 	case "roo":
-		return "", "", fmt.Errorf("Roo Code tasks reopen from the extension's history UI, not the terminal")
+		return "", "", fmt.Errorf("roo tasks reopen from the extension's history UI, not the terminal")
 	case "kimi":
 		return "", "kimi --session " + s.ID, nil
 	case "pi":
