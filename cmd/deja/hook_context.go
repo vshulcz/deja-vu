@@ -81,7 +81,7 @@ func runHookContext(dir string, plain bool) error {
 		Source string `json:"source"`
 	}
 	_ = json.Unmarshal(readHookStdin(), &input)
-	digest, sessions, raw, taskMatched := hookDigestResult(dir)
+	digest, sessions, raw, taskMatched := cachedHookDigest(dir)
 	if digest == "" {
 		return nil
 	}
@@ -152,6 +152,41 @@ func receiptIsNews(dir, digest string) bool {
 	}
 	_ = os.WriteFile(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 	return true
+}
+
+// hookDigestTTL bounds how stale a cached session-start digest may be. A
+// minute-old digest is indistinguishable at session start, and the cache
+// turns the common hook path from ~120ms of index work into one file read.
+const hookDigestTTL = 60 * time.Second
+
+type hookCacheEntry struct {
+	At          time.Time `json:"at"`
+	CWD         string    `json:"cwd"`
+	Digest      string    `json:"digest"`
+	Sessions    int       `json:"sessions"`
+	Raw         int64     `json:"raw"`
+	TaskMatched []string  `json:"task_matched,omitempty"`
+}
+
+func cachedHookDigest(dir string) (string, int, int64, []string) {
+	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+	p := dir + ".hookcache"
+	if b, err := os.ReadFile(p); err == nil {
+		var e hookCacheEntry
+		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && time.Since(e.At) < hookDigestTTL {
+			return e.Digest, e.Sessions, e.Raw, e.TaskMatched
+		}
+	}
+	digest, sessions, raw, taskMatched := hookDigestResult(dir)
+	if digest != "" {
+		if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched}); err == nil {
+			_ = os.WriteFile(p, b, 0o600)
+		}
+	}
+	return digest, sessions, raw, taskMatched
 }
 
 func hookDigest(dir string) string {
