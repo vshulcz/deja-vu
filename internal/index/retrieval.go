@@ -27,11 +27,16 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	// Non-blocking: while a detached rebuild holds the lock, read the
+	// current snapshot lock-free — the directory swap is atomic and a torn
+	// read fails recordsIntact, which SearchWithRecoveryDetailed retries.
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return SearchResult{}, err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return SearchResult{}, fmt.Errorf("manifest: %w", err)

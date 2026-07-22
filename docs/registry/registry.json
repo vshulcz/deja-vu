@@ -1,260 +1,284 @@
 {
-  "schema_version": 1,
-  "harnesses": [
-    {
-      "id": "claude",
-      "store_paths": [
-        "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
-        "${DEJA_CLAUDE_ROOT}/**/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/claude-code/session.jsonl"
-      ],
-      "parser_source": "internal/sources/claude.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Claude Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "codex",
-      "store_paths": [
-        "${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl",
-        "${CODEX_HOME:-~/.codex}/history.jsonl",
-        "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
-      ],
-      "format_kind": "jsonl-rollout-and-history",
-      "fixture_paths": [
-        "fixtures/registry/codex/rollout-2026-07-17T09-00-00-registry-codex.jsonl"
-      ],
-      "parser_source": "internal/sources/codex.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Codex CLI",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "opencode",
-      "store_paths": [
-        "~/.local/share/opencode/opencode.db",
-        "${XDG_DATA_HOME}/opencode/opencode.db",
-        "${DEJA_OPENCODE_DB}"
-      ],
-      "format_kind": "sqlite",
-      "fixture_paths": [
-        "fixtures/registry/opencode/opencode.sql"
-      ],
-      "parser_source": "internal/sources/opencode.go",
-      "last_verified": "2026-07-17",
-      "display_name": "opencode",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3"
-      }
-    },
-    {
-      "id": "aider",
-      "store_paths": [
-        "~/.aider.chat.history.md",
-        "${AIDER_CHAT_HISTORY_FILE}",
-        "${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md"
-      ],
-      "format_kind": "markdown-log",
-      "fixture_paths": [
-        "fixtures/registry/aider/.aider.chat.history.md"
-      ],
-      "parser_source": "internal/sources/aider.go",
-      "last_verified": "2026-07-17",
-      "display_name": "aider",
-      "capabilities": {
-        "mcp": false,
-        "auto": false,
-        "resume": false,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "gemini",
-      "store_paths": [
-        "${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}",
-        "${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}"
-      ],
-      "format_kind": "json-or-jsonl",
-      "fixture_paths": [
-        "fixtures/registry/gemini/session.jsonl"
-      ],
-      "parser_source": "internal/sources/gemini.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Gemini CLI",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": false,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "cursor",
-      "store_paths": [
-        "~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
-        "~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
-        "${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl",
-        "${DEJA_CURSOR_ROOT}",
-        "${DEJA_CURSOR_CLI_ROOT}"
-      ],
-      "format_kind": "sqlite-kv-or-jsonl",
-      "fixture_paths": [
-        "fixtures/registry/cursor/projects/registry-demo/agent-transcripts/registry-cursor.jsonl"
-      ],
-      "parser_source": "internal/sources/cursor.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Cursor",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": false,
-        "handoff": "exec",
-        "prereq": "sqlite3 (IDE chats)"
-      }
-    },
-    {
-      "id": "antigravity",
-      "store_paths": [
-        "~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl",
-        "${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/antigravity/brain/registry-antigravity/.system_generated/logs/transcript.jsonl"
-      ],
-      "parser_source": "internal/sources/antigravity.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Antigravity",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": true,
-        "handoff": "paste",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "grok",
-      "store_paths": [
-        "${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl",
-        "${DEJA_GROK_ROOT}/sessions/**/updates.jsonl"
-      ],
-      "format_kind": "acp-jsonl-with-json-metadata",
-      "fixture_paths": [
-        "fixtures/registry/grok/sessions/workspace%2Fregistry-demo/registry-grok/updates.jsonl"
-      ],
-      "parser_source": "internal/sources/grok.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Grok Build",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": false,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "qwen",
-      "store_paths": [
-        "${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl"
-      ],
-      "parser_source": "internal/sources/qwen.go",
-      "last_verified": "2026-07-17",
-      "display_name": "Qwen Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": false,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "kimi",
-      "store_paths": [
-        "${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl",
-        "${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/kimi/sessions/wd_demo_0123456789ab/session_fixture01/agents/main/wire.jsonl"
-      ],
-      "parser_source": "internal/sources/kimi.go",
-      "last_verified": "2026-07-21",
-      "display_name": "Kimi Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": true,
-        "handoff": "paste",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "pi",
-      "store_paths": [
-        "${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/pi/session.jsonl"
-      ],
-      "parser_source": "internal/sources/pi.go",
-      "last_verified": "2026-07-19",
-      "display_name": "pi",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    },
-    {
-      "id": "copilot",
-      "store_paths": [
-        "${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/copilot/7cf44517-55ca-435c-893a-3fde1973a44e/events.jsonl"
-      ],
-      "parser_source": "internal/sources/copilot.go",
-      "last_verified": "2026-07-20",
-      "display_name": "Copilot CLI",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": ""
-      }
-    }
-  ]
+ "schema_version": 1,
+ "harnesses": [
+  {
+   "id": "claude",
+   "store_paths": [
+    "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+    "${DEJA_CLAUDE_ROOT}/**/*.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/claude-code/session.jsonl"
+   ],
+   "parser_source": "internal/sources/claude.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Claude Code",
+   "capabilities": {
+    "mcp": true,
+    "auto": true,
+    "resume": true,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "cline",
+   "store_paths": [
+    "${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json",
+    "<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json",
+    "${DEJA_CLINE_ROOT}/*/*.messages.json",
+    "${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json"
+   ],
+   "format_kind": "json",
+   "fixture_paths": [
+    "fixtures/registry/cline/modern/sessions/session_synthetic_01/session_synthetic_01.messages.json",
+    "fixtures/registry/cline/legacy/tasks/1767225600000/api_conversation_history.json"
+   ],
+   "parser_source": "internal/sources/cline.go",
+   "last_verified": "2026-07-23",
+   "display_name": "Cline",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": true,
+    "handoff": "paste",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "codex",
+   "store_paths": [
+    "${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl",
+    "${CODEX_HOME:-~/.codex}/history.jsonl",
+    "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
+   ],
+   "format_kind": "jsonl-rollout-and-history",
+   "fixture_paths": [
+    "fixtures/registry/codex/rollout-2026-07-17T09-00-00-registry-codex.jsonl"
+   ],
+   "parser_source": "internal/sources/codex.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Codex CLI",
+   "capabilities": {
+    "mcp": true,
+    "auto": true,
+    "resume": true,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "opencode",
+   "store_paths": [
+    "~/.local/share/opencode/opencode.db",
+    "${XDG_DATA_HOME}/opencode/opencode.db",
+    "${DEJA_OPENCODE_DB}"
+   ],
+   "format_kind": "sqlite",
+   "fixture_paths": [
+    "fixtures/registry/opencode/opencode.sql"
+   ],
+   "parser_source": "internal/sources/opencode.go",
+   "last_verified": "2026-07-17",
+   "display_name": "opencode",
+   "capabilities": {
+    "mcp": true,
+    "auto": true,
+    "resume": true,
+    "handoff": "exec",
+    "prereq": "sqlite3"
+   }
+  },
+  {
+   "id": "aider",
+   "store_paths": [
+    "~/.aider.chat.history.md",
+    "${AIDER_CHAT_HISTORY_FILE}",
+    "${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md"
+   ],
+   "format_kind": "markdown-log",
+   "fixture_paths": [
+    "fixtures/registry/aider/.aider.chat.history.md"
+   ],
+   "parser_source": "internal/sources/aider.go",
+   "last_verified": "2026-07-17",
+   "display_name": "aider",
+   "capabilities": {
+    "mcp": false,
+    "auto": false,
+    "resume": false,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "gemini",
+   "store_paths": [
+    "${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}",
+    "${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}"
+   ],
+   "format_kind": "json-or-jsonl",
+   "fixture_paths": [
+    "fixtures/registry/gemini/session.jsonl"
+   ],
+   "parser_source": "internal/sources/gemini.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Gemini CLI",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": false,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "cursor",
+   "store_paths": [
+    "~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
+    "~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
+    "${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl",
+    "${DEJA_CURSOR_ROOT}",
+    "${DEJA_CURSOR_CLI_ROOT}"
+   ],
+   "format_kind": "sqlite-kv-or-jsonl",
+   "fixture_paths": [
+    "fixtures/registry/cursor/projects/registry-demo/agent-transcripts/registry-cursor.jsonl"
+   ],
+   "parser_source": "internal/sources/cursor.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Cursor",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": false,
+    "handoff": "exec",
+    "prereq": "sqlite3 (IDE chats)"
+   }
+  },
+  {
+   "id": "antigravity",
+   "store_paths": [
+    "~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl",
+    "${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/antigravity/brain/registry-antigravity/.system_generated/logs/transcript.jsonl"
+   ],
+   "parser_source": "internal/sources/antigravity.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Antigravity",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": true,
+    "handoff": "paste",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "grok",
+   "store_paths": [
+    "${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl",
+    "${DEJA_GROK_ROOT}/sessions/**/updates.jsonl"
+   ],
+   "format_kind": "acp-jsonl-with-json-metadata",
+   "fixture_paths": [
+    "fixtures/registry/grok/sessions/workspace%2Fregistry-demo/registry-grok/updates.jsonl"
+   ],
+   "parser_source": "internal/sources/grok.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Grok Build",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": false,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "qwen",
+   "store_paths": [
+    "${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl"
+   ],
+   "parser_source": "internal/sources/qwen.go",
+   "last_verified": "2026-07-17",
+   "display_name": "Qwen Code",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": false,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "kimi",
+   "store_paths": [
+    "${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl",
+    "${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/kimi/sessions/wd_demo_0123456789ab/session_fixture01/agents/main/wire.jsonl"
+   ],
+   "parser_source": "internal/sources/kimi.go",
+   "last_verified": "2026-07-21",
+   "display_name": "Kimi Code",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": true,
+    "handoff": "paste",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "pi",
+   "store_paths": [
+    "${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/pi/session.jsonl"
+   ],
+   "parser_source": "internal/sources/pi.go",
+   "last_verified": "2026-07-19",
+   "display_name": "pi",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": true,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  },
+  {
+   "id": "copilot",
+   "store_paths": [
+    "${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/copilot/7cf44517-55ca-435c-893a-3fde1973a44e/events.jsonl"
+   ],
+   "parser_source": "internal/sources/copilot.go",
+   "last_verified": "2026-07-20",
+   "display_name": "Copilot CLI",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "resume": true,
+    "handoff": "exec",
+    "prereq": ""
+   }
+  }
+ ]
 }

@@ -1,0 +1,3 @@
+[
+  {"id": "1767225600000", "ts": 1767225600000, "task": "Say hello", "tokensIn": 10, "tokensOut": 2, "totalCost": 0, "cwdOnTaskInitialization": "/home/example/work/demo", "modelId": "synthetic-model"}
+]

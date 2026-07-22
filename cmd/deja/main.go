@@ -826,7 +826,7 @@ Usage:
   deja mcp
   deja version
   deja update
-  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
+  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|cline|statusline|--all|--auto>
   deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
 
 Examples:
