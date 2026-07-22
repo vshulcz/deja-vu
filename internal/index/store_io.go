@@ -148,6 +148,47 @@ func readRecord(r io.Reader) (Record, error) {
 	return decodeRecord(b)
 }
 
+// eachRecordForKeys walks the log decoding only records whose Key is in
+// want; other bodies are skipped after peeking the key field. On a large log
+// this trades a full decode of every record for a few length reads.
+func eachRecordForKeys(path string, want map[string]bool, fn func(Record)) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, 1024*1024)
+	var hdr [4]byte
+	for {
+		if _, err := io.ReadFull(r, hdr[:]); err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				return nil
+			}
+			return err
+		}
+		n := binary.LittleEndian.Uint32(hdr[:])
+		if n > maxRecordSize {
+			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
+		}
+		b := make([]byte, n)
+		if _, err := io.ReadFull(r, b); err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				return nil
+			}
+			return err
+		}
+		key, _, ok := consumeField(b)
+		if !ok || !want[key] {
+			continue
+		}
+		rec, derr := decodeRecord(b)
+		if derr != nil {
+			continue
+		}
+		fn(rec)
+	}
+}
+
 func encodeRecord(r Record) []byte {
 	b := make([]byte, 0, len(r.Key)+len(r.SourcePath)+len(r.Role)+len(r.Text)+32)
 	b = appendField(b, r.Key)
