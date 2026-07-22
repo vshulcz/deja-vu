@@ -32,7 +32,7 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 		return SearchResult{}, err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return SearchResult{}, fmt.Errorf("manifest: %w", err)
 	}
@@ -205,7 +205,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 		return nil, nil, err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -382,7 +382,7 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 		return nil, "", err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, "", fmt.Errorf("manifest: %w", err)
 	}
@@ -450,7 +450,7 @@ func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error)
 		return nil, err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +485,7 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 		return nil, err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +540,7 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 		return nil, err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +579,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 		return model.Session{}, false, err
 	}
 	defer unlock()
-	m, err := readManifest(dir)
+	m, err := readManifestCached(dir)
 	if err != nil {
 		return model.Session{}, false, err
 	}
