@@ -151,14 +151,28 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		return SearchResult{}, nil
 	}
 	keep := make([]SessionMeta, 0, len(metas))
+	var weak []SessionMeta
 	for i, meta := range metas {
-		if anyMatched[i] >= 2 && sessionMetaMatches(meta, o) {
+		if !sessionMetaMatches(meta, o) {
+			continue
+		}
+		if anyMatched[i] >= 2 {
 			keep = append(keep, meta)
+		} else {
+			weak = append(weak, meta)
 		}
 	}
 	if len(keep) == 0 {
+		// No multi-term session at all: stay silent rather than serve
+		// single-word noise as if it were an answer.
 		return SearchResult{}, nil
 	}
+	// Single-term sessions ride BEHIND every strong candidate: they widen
+	// deep recall without letting a lucky word outrank a real match.
+	if len(keep)+len(weak) > 50 {
+		weak = weak[:50-len(keep)]
+	}
+	keep = append(keep, weak...)
 	ss, err := sessionsForMetas(dir, keep)
 	if err != nil {
 		return SearchResult{}, err
@@ -238,6 +252,10 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	score := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
 	anyTerms := map[uint32]int{}
+	// perMessage tracks how many distinct terms hit each message (record
+	// offset) of a session: co-occurrence inside one message is a far
+	// stronger topical signal than terms scattered across a long session.
+	perMessage := map[uint32]map[int64]int{}
 	for _, term := range terms {
 		keys := queryKeys(term)
 		if len(keys) == 0 {
@@ -252,10 +270,18 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// repeating a term 300 times must not make the term look common.
 		df := map[uint32]bool{}
 		hit := map[uint32]bool{}
+		tf := map[uint32]int{}
 		for _, pp := range posts {
 			df[pp.Sid] = true
 			if _, ok := inProject[pp.Sid]; ok {
 				hit[pp.Sid] = true
+				tf[pp.Sid]++
+				mm := perMessage[pp.Sid]
+				if mm == nil {
+					mm = map[int64]int{}
+					perMessage[pp.Sid] = mm
+				}
+				mm[pp.Off]++
 			}
 		}
 		idf := math.Log(totalDocs / float64(len(df)+1))
@@ -269,7 +295,10 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 		informative := idf >= dejaVuIDFFloor || len(df) <= 2
 		for ord := range hit {
-			score[ord] += idf
+			// Saturated term frequency: repeated mentions add confidence
+			// with quickly diminishing returns, so a marathon session cannot
+			// bury a focused one through sheer repetition.
+			score[ord] += idf * (1 + 0.25*math.Log2(float64(tf[ord])))
 			anyTerms[ord]++
 			if informative {
 				matchedTerms[ord]++
@@ -284,9 +313,23 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	}
 	ranked := make([]scored, 0, len(score))
 	for ord, sc := range score {
-		if sc > 0 {
-			ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
+		if sc <= 0 {
+			continue
 		}
+		// Same-message co-occurrence bonus: the best single message covering
+		// k distinct query terms scales the session's score. A session where
+		// one message answers the whole question outranks one that merely
+		// mentions every word somewhere.
+		best := 1
+		for _, k := range perMessage[ord] {
+			if k > best {
+				best = k
+			}
+		}
+		if best > 1 {
+			sc *= 1 + 0.2*float64(best-1)
+		}
+		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 	}
 	if len(ranked) == 0 {
 		return nil, nil, nil
