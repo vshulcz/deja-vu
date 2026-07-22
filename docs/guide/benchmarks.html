@@ -61,6 +61,14 @@
 <p>The interesting number. Across seeded multi-session task chains, it compares four ways to assemble the context a task needs — deja recall, replaying full history, naive grep, and cold — reporting median tokens with spread and verbatim fact coverage. On the default corpus, deja reaches the same fact coverage as grepping the raw logs for roughly <b>200× fewer tokens</b> — and about 60× fewer than replaying the matched sessions in full — while injecting nothing on the negative-control chains where no prior fact is relevant.</p>
 <div class="note">The comparison is ablation-matched (same pipeline, memory on/off) with naive baselines, so the number isolates deja's contribution rather than "more context helps". Run it and read the distribution.</div>
 
+<h2>Public benchmarks</h2>
+<pre>go run ./scripts/longmemeval -skip-abs -data longmemeval_s.json
+go run ./scripts/locomo -data locomo10.json</pre>
+<p>Two published long-term-memory benchmarks run through the exact production path: haystack sessions are written as real transcript files, indexed by the normal pipeline (parsing, redaction, tokenization), and queried with the verbatim question text. No LLM, no embeddings, no question rewriting. Both harnesses ship in the repo and finish in minutes on the public datasets.</p>
+<p><b>LongMemEval-S</b> (session-level retrieval, 470 questions on the cleaned set): <b>R@1 84.9%</b>, R@5 94.0%, R@10 95.1%, R@20 96.8%, MRR 0.888, median search ~41&nbsp;ms. Weakest slice: preference questions (36.7% R@1 — pure paraphrase is where lexical retrieval loses to semantic indexes, by design; R@20 still reaches 100%). Full-set numbers (500 questions, abstention included): R@1 83.0%.</p>
+<p><b>LoCoMo</b> (session-level retrieval, 1,982 questions): R@1 63.7%, R@5 79.5%, MRR 0.708, median search ~7&nbsp;ms. Note: most published LoCoMo numbers are end-to-end QA accuracy with an answering LLM — a different metric; deja reports retrieval only.</p>
+<div class="note">Read these honestly: LongMemEval is lexically tractable — strong lexical retrievers cluster in the mid-90s at R@5, so R@5 does not differentiate systems there. deja's ranking is R@1-oriented and gates single-word noise, which caps deep R@k by design.</div>
+
 </article>
 </div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>

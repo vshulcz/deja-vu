@@ -362,7 +362,8 @@ footer .spacer{flex:1}
     <table>
       <tr><td class="n">~200×</td><td class="c">fewer tokens to working context than grepping the raw logs, at equal fact coverage</td></tr>
       <tr><td class="n">~12 ms</td><td class="c">typical warm search over gigabytes of history</td></tr>
-      <tr><td class="n">~120 ms</td><td class="c">session-start hook on a 1000-session index — memory lands before you type</td></tr>
+      <tr><td class="n">~50 ms</td><td class="c">session-start hook on a 1000-session index — memory lands before you type</td></tr>
+      <tr><td class="n">84.9%</td><td class="c">R@1 on LongMemEval-S session retrieval — no LLM, no embeddings, harness in-repo</td></tr>
       <tr><td class="n">12</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
     </table>
     <p class="foot"><a href="guide/benchmarks.html">how it's measured →</a></p>
