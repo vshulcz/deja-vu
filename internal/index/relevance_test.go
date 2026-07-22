@@ -34,7 +34,7 @@ func TestLadderFallsBackToRelevance(t *testing.T) {
 	}
 	// A natural question: no session contains every word, so exact/stem/fuzzy
 	// all miss — the relevance tier must surface the graduation session.
-	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "quetzal figment bartleby marzipan wombat cufflink", All: true}, nil)
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "quetzal figment bartleby snorkel marzipan wombat cufflink", All: true}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

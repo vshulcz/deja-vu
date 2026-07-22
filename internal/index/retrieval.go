@@ -335,10 +335,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		return nil, nil, nil
 	}
 	sort.Slice(ranked, func(i, j int) bool {
-		if ranked[i].score == ranked[j].score {
+		if ranked[i].score != ranked[j].score {
+			return ranked[i].score > ranked[j].score
+		}
+		if !ranked[i].meta.Updated.Equal(ranked[j].meta.Updated) {
 			return ranked[i].meta.Updated.After(ranked[j].meta.Updated)
 		}
-		return ranked[i].score > ranked[j].score
+		// Total order even on full ties: map iteration must never decide
+		// what the user sees first.
+		return ranked[i].meta.ID < ranked[j].meta.ID
 	})
 	if n > 0 && len(ranked) > n {
 		ranked = ranked[:n]
