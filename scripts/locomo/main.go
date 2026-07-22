@@ -92,10 +92,9 @@ func main() {
 				if rank >= 1 {
 					bb.mrr += 1 / float64(rank)
 				}
-				switch {
-				case rank == 0:
+				if rank == 0 {
 					bb.miss++
-				default:
+				} else {
 					if rank == 1 {
 						bb.r1++
 					}
