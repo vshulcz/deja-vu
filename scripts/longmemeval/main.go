@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -46,6 +47,7 @@ type lmeTurn struct {
 func main() {
 	dataPath := flag.String("data", "longmemeval_s.json", "path to longmemeval_s.json")
 	limit := flag.Int("limit", 0, "run only the first N questions (0 = all)")
+	skipAbs := flag.Bool("skip-abs", false, "skip abstention (_abs) questions, matching cleaned-dataset runs")
 	verbose := flag.Bool("v", false, "log per-question results")
 	flag.Parse()
 
@@ -57,11 +59,23 @@ func main() {
 	if err := json.Unmarshal(raw, &questions); err != nil {
 		fatal(err)
 	}
+	if *skipAbs {
+		kept := questions[:0]
+		for _, q := range questions {
+			if !strings.Contains(q.QuestionID, "_abs") {
+				kept = append(kept, q)
+			}
+		}
+		questions = kept
+	}
 	if *limit > 0 && len(questions) > *limit {
 		questions = questions[:*limit]
 	}
 
-	type bucket struct{ n, r1, r5, miss int }
+	type bucket struct {
+		n, r1, r5, r10, r20, miss int
+		mrr                       float64
+	}
 	byType := map[string]*bucket{}
 	total := &bucket{}
 	var searchTimes []time.Duration
@@ -81,14 +95,25 @@ func main() {
 		}
 		for _, bb := range []*bucket{b, total} {
 			bb.n++
+			if rank >= 1 {
+				bb.mrr += 1 / float64(rank)
+			}
 			switch {
-			case rank == 1:
-				bb.r1++
-				bb.r5++
-			case rank >= 2 && rank <= 5:
-				bb.r5++
-			default:
+			case rank == 0:
 				bb.miss++
+			default:
+				if rank <= 1 {
+					bb.r1++
+				}
+				if rank <= 5 {
+					bb.r5++
+				}
+				if rank <= 10 {
+					bb.r10++
+				}
+				if rank <= 20 {
+					bb.r20++
+				}
 			}
 		}
 		if *verbose {
@@ -107,7 +132,7 @@ func main() {
 	}
 	fmt.Printf("\nLongMemEval-S · deja production retrieval path (lexical ladder, no LLM, no embeddings)\n")
 	fmt.Printf("questions: %d · wall: %s · median search: %s · avg candidates: %.1f\n\n", total.n, time.Since(start).Round(time.Second), searchTimes[len(searchTimes)/2].Round(time.Microsecond), avgHits)
-	fmt.Printf("%-28s %6s %8s %8s\n", "type", "n", "R@1", "R@5")
+	fmt.Printf("%-28s %6s %8s %8s %8s %8s %8s\n", "type", "n", "R@1", "R@5", "R@10", "R@20", "MRR")
 	types := make([]string, 0, len(byType))
 	for t := range byType {
 		types = append(types, t)
@@ -115,9 +140,9 @@ func main() {
 	sort.Strings(types)
 	for _, t := range types {
 		b := byType[t]
-		fmt.Printf("%-28s %6d %7.1f%% %7.1f%%\n", t, b.n, pct(b.r1, b.n), pct(b.r5, b.n))
+		fmt.Printf("%-28s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", t, b.n, pct(b.r1, b.n), pct(b.r5, b.n), pct(b.r10, b.n), pct(b.r20, b.n), b.mrr/float64(b.n))
 	}
-	fmt.Printf("%-28s %6d %7.1f%% %7.1f%%\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n))
+	fmt.Printf("%-28s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n), pct(total.r10, total.n), pct(total.r20, total.n), total.mrr/float64(total.n))
 }
 
 // runQuestion builds a fresh index over the question's haystack via the real
