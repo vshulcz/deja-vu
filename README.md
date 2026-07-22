@@ -22,10 +22,13 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
 | **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"` |
-| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask; Claude Code also captures the current transcript before compaction |
+| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
 | **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
-| **Stats** | `deja stats` — your agent work, wrapped: harnesses, top projects, activity sparkline |
+| **Stats** | `deja stats` — your agent work, wrapped; `--impact` reports only counted numbers: recalls served, session starts that began with memory, served-vs-raw ratio |
+| **Promote** | `deja promote <id>` — distill a session into a curated note with provenance and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts |
+| **Trust scopes** | `policy.json` decides what memory activates where: search / MCP / auto × local / imported / per-peer; receipts and `deja log` name the rule |
+| **Deep verify** | `deja doctor --deep` proves the index against the sources — re-parses a sample, resolves postings, separates staleness from drift |
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
 | **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
