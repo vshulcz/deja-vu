@@ -19,6 +19,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	state := "accepted"
 	noteText := ""
 	exportPath := ""
+	var tags []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--state":
@@ -39,6 +40,12 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			}
 			i++
 			exportPath = args[i]
+		case "--tag":
+			if i+1 >= len(args) {
+				return fmt.Errorf("promote: --tag needs a value")
+			}
+			i++
+			tags = append(tags, args[i])
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return fmt.Errorf("promote: unknown flag %q", args[i])
@@ -71,7 +78,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if title == "" {
 		title = firstLine(text)
 	}
-	if err := sources.AppendPromoted(s.Project, title, text, src, state, time.Now()); err != nil {
+	if err := sources.AppendPromotedTagged(s.Project, title, text, src, state, tags, time.Now()); err != nil {
 		return err
 	}
 	if exportPath != "" {
@@ -80,6 +87,14 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	fmt.Fprintf(stdout, "promoted %s as %s: %s\n", src, state, title)
+	if state == "accepted" {
+		all := sources.LoadPromotedNotes()
+		me := sources.PromotedNote{Project: s.Project, Session: src, State: state, Title: title, Text: text, Tags: sources.NormalizeTags(tags)}
+		for _, c := range sources.ConflictingNotes(me, all) {
+			fmt.Fprintf(stdout, "conflict: another accepted note covers this ground — %q (from %s, %s). If one replaced the other: deja promote <id> --state superseded\n",
+				firstLine(c.Title+" "+c.Text), c.Session, c.At.Format("2006-01-02"))
+		}
+	}
 	if exportPath != "" {
 		fmt.Fprintf(stdout, "exported to %s\n", exportPath)
 	}
