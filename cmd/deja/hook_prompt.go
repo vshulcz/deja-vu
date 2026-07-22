@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,10 @@ import (
 // promptHookBudget keeps per-prompt injections small: this fires on every
 // user message, so it must be a hint, not a payload.
 const promptHookBudget = 1024
+
+// dejaVuMaxMessages caps how large a session can be and still read as one
+// rememberable episode. Marathon catch-all sessions rank into everything.
+const dejaVuMaxMessages = 300
 
 type promptHookInput struct {
 	Prompt    string `json:"prompt"`
@@ -61,6 +66,11 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 		if matched[i] < 2 {
 			continue
 		}
+		// Marathon sessions that touched everything match everything; "you
+		// have been here" is about a focused episode, not a haystack.
+		if len(s.Messages) > dejaVuMaxMessages {
+			continue
+		}
 		// Never recall the session being written right now, or work fresh
 		// enough the user still remembers it — that is anti-magic.
 		if s.ID == input.SessionID || (!s.Updated.IsZero() && time.Since(s.Updated) < 15*time.Minute) {
@@ -78,6 +88,7 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 		return nil
 	}
 	rememberInjected(dir, input.SessionID, ss)
+	showLine := dejaVuLineDue(dir)
 	digest := search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
 	if strings.TrimSpace(digest) == "" {
 		return nil
@@ -88,7 +99,9 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out
-	resp.SystemMessage = dejaVuLine(ss[0])
+	if showLine {
+		resp.SystemMessage = dejaVuLine(ss[0])
+	}
 	if resp.SystemMessage == "" {
 		// No presentable topic — inject the context silently rather than
 		// flashing harness plumbing at the user.
@@ -119,7 +132,7 @@ func promptSearchTerms(prompt string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, f := range fields {
-		if len(f) < 3 || search.IsStopWord(f) || seen[f] {
+		if len(f) < 3 || search.IsStopWord(f) || seen[f] || !techTerm(f) {
 			continue
 		}
 		seen[f] = true
@@ -129,6 +142,24 @@ func promptSearchTerms(prompt string) []string {
 		}
 	}
 	return out
+}
+
+// techTerm keeps tokens that can actually identify past work: identifiers,
+// error codes, paths, or long plain-ASCII words. Ordinary prose — any
+// language — matches by theme, not by task, and theme matches are what made
+// déjà vu fire on every prompt.
+func techTerm(f string) bool {
+	long := 0
+	for _, r := range f {
+		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
+			return true
+		}
+		if r > 127 {
+			return false
+		}
+		long++
+	}
+	return long >= 7
 }
 
 // citationLine pre-writes the narration so the agent copies structure instead
@@ -203,6 +234,20 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 
 // dejaVuLine is the one visible line a déjà vu moment earns: which past
 // session answered, and how old it is.
+// dejaVuLineDue rate-limits the visible line: a déjà vu that fires every
+// prompt is wallpaper, and wallpaper trains the user to ignore the real
+// moments. Context still flows to the agent regardless.
+func dejaVuLineDue(dir string) bool {
+	p := dir + ".dejavu"
+	if b, err := os.ReadFile(p); err == nil {
+		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && time.Since(time.Unix(ts, 0)) < 20*time.Minute {
+			return false
+		}
+	}
+	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	return true
+}
+
 func dejaVuLine(s model.Session) string {
 	topic := dejaVuTopic(s)
 	if topic == "" {

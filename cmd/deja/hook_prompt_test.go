@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,6 +19,11 @@ import (
 
 func TestHookPromptInjectsOnRelevantHit(t *testing.T) {
 	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "hookfix.jsonl"), "hookfix", []string{
+		`{"type":"user","sessionId":"hookfix","timestamp":"` + old + `","message":{"role":"user","content":"gateway_timeout on the reconnect_loop keeps dropping heartbeats"}}`,
+	})
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +33,7 @@ func TestHookPromptInjectsOnRelevantHit(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	in := strings.NewReader(`{"prompt":"long beta answer session"}`)
+	in := strings.NewReader(`{"prompt":"seeing gateway_timeout in the reconnect_loop again"}`)
 	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +82,23 @@ func TestHookPromptSilentPaths(t *testing.T) {
 func TestPromptSearchTerms(t *testing.T) {
 	got := promptSearchTerms("Why is the connection pool exhausted again in the gateway???")
 	joined := strings.Join(got, " ")
-	if !strings.Contains(joined, "connection") || !strings.Contains(joined, "pool") || !strings.Contains(joined, "gateway") {
+	if !strings.Contains(joined, "connection") || !strings.Contains(joined, "gateway") {
 		t.Fatalf("terms = %v", got)
+	}
+	// Short prose words identify themes, not tasks — they must not survive.
+	if strings.Contains(joined, "pool") {
+		t.Fatalf("short prose term kept: %v", got)
 	}
 	if len(promptSearchTerms("a of to")) != 0 {
 		t.Fatal("stop words must not produce terms")
+	}
+	for term, want := range map[string]bool{
+		"auth.go": true, "e404": true, "npm_token": true, "singleflight": true,
+		"brew": false, "пост": false, "готовь": false,
+	} {
+		if techTerm(term) != want {
+			t.Fatalf("techTerm(%q) = %v, want %v", term, !want, want)
+		}
 	}
 }
 
@@ -128,6 +146,11 @@ func TestSSHSyncTipThresholdAndOnce(t *testing.T) {
 
 func TestHookPromptCitationAndDedupe(t *testing.T) {
 	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "citefix.jsonl"), "citefix", []string{
+		`{"type":"user","sessionId":"citefix","timestamp":"` + old + `","message":{"role":"user","content":"the exporter_batch job drops rows at utc_midnight"}}`,
+	})
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +159,7 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	in := `{"prompt":"long beta answer session","session_id":"agent-1"}`
+	in := `{"prompt":"exporter_batch dropping rows at utc_midnight again","session_id":"agent-1"}`
 	var out bytes.Buffer
 	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
@@ -154,7 +177,7 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	}
 	// A different agent session still gets it.
 	var out3 bytes.Buffer
-	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(`{"prompt":"the long beta session broke again","session_id":"agent-2"}`), &out3); err != nil {
+	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(`{"prompt":"exporter_batch utc_midnight rows again","session_id":"agent-2"}`), &out3); err != nil {
 		t.Fatal(err)
 	}
 	if out3.Len() == 0 {
@@ -222,5 +245,49 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 		Messages: []model.Message{{Role: "user", Text: `{"type":"init"}`}}}
 	if got := dejaVuLine(junk); got != "" {
 		t.Fatalf("all-plumbing session must yield no visible line, got %q", got)
+	}
+}
+
+func TestHookPromptSkipsMarathonSessions(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	var lines []string
+	for i := 0; i < dejaVuMaxMessages+10; i++ {
+		lines = append(lines, `{"type":"user","sessionId":"hay","timestamp":"`+old+`","message":{"role":"user","content":"quetzalcoatl stampede msg `+fmt.Sprint(i)+`"}}`)
+	}
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "hay.jsonl"), "hay", lines)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "focus.jsonl"), "focus", []string{
+		`{"type":"user","sessionId":"focus","timestamp":"` + old + `","message":{"role":"user","content":"the quetzalcoatl stampede fix: jittered ttl"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "hay")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	var out bytes.Buffer
+	in := strings.NewReader(`{"prompt":"quetzalcoatl stampede regression again","session_id":"s-new"}`)
+	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "you have been here") {
+		t.Fatalf("focused session must fire:\n%s", got)
+	}
+	if strings.Contains(got, "msg 5") {
+		t.Fatalf("marathon session leaked into injection:\n%s", got)
+	}
+}
+
+func TestDejaVuLineCooldown(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	if !dejaVuLineDue(dir) {
+		t.Fatal("first call must be due")
+	}
+	if dejaVuLineDue(dir) {
+		t.Fatal("second call within cooldown must be suppressed")
 	}
 }
