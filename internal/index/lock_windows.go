@@ -10,7 +10,10 @@ import (
 	"unsafe"
 )
 
-const lockfileExclusiveLock = 0x2
+const (
+	lockfileExclusiveLock   = 0x2
+	lockfileFailImmediately = 0x1
+)
 
 var (
 	kernel32         = syscall.NewLazyDLL("kernel32.dll")
@@ -64,4 +67,30 @@ func unlockFileEx(h syscall.Handle, reserved, low, high uint32, ol *syscall.Over
 		return syscall.EINVAL
 	}
 	return nil
+}
+
+// tryLockDir mirrors the unix non-blocking variant using
+// LOCKFILE_FAIL_IMMEDIATELY.
+func tryLockDir(dir string) (func(), bool, error) {
+	lockPath := dir + ".lock"
+	_ = os.Chmod(dir, 0o700)
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+		return nil, false, err
+	}
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, false, err
+	}
+	h := syscall.Handle(f.Fd())
+	var ol syscall.Overlapped
+	if err := lockFileEx(h, lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &ol); err != nil {
+		f.Close()
+		return nil, false, nil
+	}
+	recoverIndexDir(dir)
+	return func() {
+		var ol2 syscall.Overlapped
+		_ = unlockFileEx(h, 0, 1, 0, &ol2)
+		_ = f.Close()
+	}, true, nil
 }

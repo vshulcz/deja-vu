@@ -141,6 +141,56 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 	return nil
 }
 
+// EnsureForSearchStale is EnsureForSearch for latency-bound callers (the MCP
+// server): cheap append-only increments run synchronously, but anything that
+// would rewrite the index (full rebuild or a whole-file store change) is
+// kicked to a detached warmup instead. The return value says whether the
+// caller is serving a stale view so it can say so honestly.
+func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		// A rebuild is already running; serve the current snapshot.
+		return true, nil
+	}
+	defer unlock()
+	want := currentFiles("")
+	m, err := readManifest(dir)
+	if err != nil || m.Version != version || m.Scope != "" || !recordsIntact(dir, m) {
+		// No usable index yet (or a rebuild-grade problem): the caller cannot
+		// serve anything sensible stale, so build synchronously.
+		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+	}
+	if manifestFresh(m, want, "") {
+		return false, nil
+	}
+	changed := map[string]FileState{}
+	removedAny := false
+	for p, f := range want {
+		if of, ok := m.Files[p]; !ok || !sameFile(of, f) {
+			changed[p] = f
+		}
+	}
+	for p := range m.Files {
+		if p == syncImportPath {
+			continue
+		}
+		if _, ok := want[p]; !ok {
+			removedAny = true
+		}
+	}
+	if !removedAny && canAppendIncremental(changed, m.Files) {
+		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+	}
+	// Caller detaches the rebuild (it owns the executable path).
+	return true, nil
+}
+
 func rebuild(dir string, harness string, scope string, files map[string]FileState, progress io.Writer) error {
 	return rebuildWithTombstones(dir, harness, scope, files, progress, readTombstones())
 }
@@ -810,7 +860,10 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if !ok {
 			return nil
 		}
-		r.Text = redactForIngest(&m, r.SourcePath, r.Text)
+		// Carried records were redacted when first written; re-running the
+		// regex battery over the whole corpus made every incremental update
+		// cost O(index), which is what a live cline/cursor store hits on
+		// each change.
 		off, err := rw.write(r)
 		if err != nil {
 			return err

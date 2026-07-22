@@ -199,6 +199,22 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "cline", Load: LoadCline, Files: ClineSessionFiles,
+			Kinds: []FileKind{{
+				Name: "cline-sdk",
+				Match: func(p string) bool {
+					return strings.HasSuffix(p, ".messages.json") && strings.HasPrefix(p, ClineSessionsDir())
+				},
+				Parse: fullParse(ParseClineFile),
+			}, {
+				Name: "cline-vscode",
+				Match: func(p string) bool {
+					return hasBase(p, "api_conversation_history.json")
+				},
+				Parse: fullParse(ParseClineFile),
+			}},
+		},
+		{
 			Name: "pi", Load: LoadPi, Files: PiSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "pi",

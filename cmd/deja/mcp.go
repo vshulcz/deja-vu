@@ -280,8 +280,15 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		limit = 5
 	}
 	o := search.Options{Query: q, Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
-	if err := index.EnsureForSearch(dir, o, false, mcpProgress()); err != nil {
+	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
+	if err != nil {
 		return "", 0, 0, nil, err
+	}
+	if stale {
+		// A store rewrote itself (cline, cursor); rebuilding inline would
+		// blow the client's tool timeout, so refresh detached and serve the
+		// current index with an honest note.
+		requestWarmup(dir)
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
@@ -328,6 +335,9 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	}
 	var b strings.Builder
 	served := 0
+	if stale {
+		fmt.Fprintln(&b, "(index refresh running in the background — the very newest sessions may not appear yet)")
+	}
 	if result.Stemmed {
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Fuzzy {
@@ -401,8 +411,10 @@ func recallContext(dir, q string) (string, error) {
 
 func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) {
 	o := search.Options{Query: q, Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
-	if err := index.EnsureForSearch(dir, o, false, mcpProgress()); err != nil {
+	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, err
+	} else if stale {
+		requestWarmup(dir)
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {

@@ -1,0 +1,13 @@
+{
+  "session_id": "session_synthetic_01",
+  "created_at": "2026-01-01T00:00:00.000Z",
+  "updated_at": "2026-01-01T00:00:03.000Z",
+  "interactive": true,
+  "provider": "anthropic",
+  "model": "synthetic-model",
+  "cwd": "/home/example/work/demo",
+  "workspace_root": "/home/example/work/demo",
+  "prompt": "Say hello",
+  "metadata": {"title": "Synthetic parser example"},
+  "messages_path": "/home/example/.cline/data/sessions/session_synthetic_01/session_synthetic_01.messages.json"
+}

@@ -253,6 +253,7 @@ func existingTargets() []string {
 		"grok":        sources.GrokRoot(),
 		"qwen":        sources.QwenConfigDir(),
 		"kimi":        sources.KimiConfigDir(),
+		"cline":       sources.ClineConfigDir(),
 		"pi":          sources.PiConfigDir(),
 	}
 	var out []string
@@ -291,6 +292,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
+	case "cline":
+		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
 	case "pi":

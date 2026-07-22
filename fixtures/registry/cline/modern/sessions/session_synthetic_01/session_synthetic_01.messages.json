@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "updated_at": "2026-01-01T00:00:03.000Z",
+  "agent": "lead",
+  "sessionId": "session_synthetic_01",
+  "messages": [
+    {"id": "msg_user_01", "role": "user", "content": [{"type": "text", "text": "Say hello"}], "ts": 1767225600000},
+    {"id": "msg_assistant_01", "role": "assistant", "content": [{"type": "text", "text": "Hello!"}, {"type": "thinking", "text": "hidden"}], "ts": 1767225603000}
+  ]
+}

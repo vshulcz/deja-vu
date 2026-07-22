@@ -112,6 +112,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
 		return "", "", fmt.Errorf("grok has no session resume — start grok in %s to continue", sources.GrokCWDForSession(s.Path))
+	case "cline":
+		if strings.HasPrefix(s.ID, "cline-task-") {
+			return "", "", fmt.Errorf("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
+		}
+		return "", "cline --id " + s.ID, nil
 	case "kimi":
 		return "", "kimi --session " + s.ID, nil
 	case "pi":

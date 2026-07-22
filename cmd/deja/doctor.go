@@ -269,6 +269,14 @@ func doctorHarnesses(w io.Writer) {
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
 	printRow("kimi", kimiRoot, doctorExists(kimiRoot), doctorCount(len(sources.KimiSessionFiles()), "file"))
 
+	clineModern := sources.ClineSessionsDir()
+	clineFiles := len(sources.ClineSessionFiles())
+	clineLoc := clineModern
+	if legacy := sources.ClineLegacyRoots(); len(legacy) > 0 {
+		clineLoc += ", " + strings.Join(legacy, string(os.PathListSeparator))
+	}
+	printRow("cline", clineLoc, clineFiles > 0 || doctorExists(clineModern), doctorCount(clineFiles, "file"))
+
 	piRoot := sources.PiRoot()
 	printRow("pi", piRoot, doctorExists(piRoot), doctorCount(len(sources.PiSessionFiles()), "file"))
 	copilotRoot := sources.CopilotRoot()
