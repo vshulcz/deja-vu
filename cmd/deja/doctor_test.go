@@ -513,3 +513,50 @@ func TestDoctorHooksMatchAbsolutePathCommands(t *testing.T) {
 		t.Fatalf("absolute-path hook must count as wired:\n%s", out.String())
 	}
 }
+
+func TestDoctorCodexHookStates(t *testing.T) {
+	tmp := hermeticEnv(t)
+	codexHome := filepath.Join(tmp, "home", ".codex")
+	t.Setenv("CODEX_HOME", codexHome)
+	if err := os.MkdirAll(codexHome, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	doctorHooks(&out)
+	if !strings.Contains(out.String(), "codex-hook   missing") {
+		t.Fatalf("missing state wrong:\n%s", out.String())
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "hooks.json"), []byte(`{"hooks":{"SessionStart":[]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("[hooks.state.\"/x/hooks.json:session_start:0:0\"]\ntrusted_hash = \"sha256:aa\"\nenabled = false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	doctorHooks(&out)
+	if !strings.Contains(out.String(), "codex-hook   disabled") || !strings.Contains(out.String(), "re-enable") {
+		t.Fatalf("disabled state wrong:\n%s", out.String())
+	}
+}
+
+func TestHookContextDoesNotBlockOnSilentStdin(t *testing.T) {
+	hermeticEnv(t)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close(); _ = r.Close() }()
+	old := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = old }()
+	done := make(chan error, 1)
+	go func() { done <- runHookContext(index.DefaultDir(), false) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("hook-context must not hang when the host never closes stdin (codex does this)")
+	}
+}

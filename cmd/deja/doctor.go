@@ -146,11 +146,13 @@ func doctorHooks(w io.Writer) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", path)
+		doctorCodexHook(w)
 		return
 	}
 	var root map[string]any
 	if json.Unmarshal(b, &root) != nil {
 		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", path)
+		doctorCodexHook(w)
 		return
 	}
 	hooks, _ := root["hooks"].(map[string]any)
@@ -160,6 +162,34 @@ func doctorHooks(w io.Writer) {
 		status = "wired"
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, path)
+	doctorCodexHook(w)
+}
+
+// doctorCodexHook reports the codex session-start hook state. Codex gates
+// hooks behind its own trust store: hooks.json can be perfectly wired while
+// codex keeps the hook disabled — memory then silently never arrives.
+func doctorCodexHook(w io.Writer) {
+	hooksPath := filepath.Join(sources.CodexHome(), "hooks.json")
+	if _, err := os.Stat(hooksPath); err != nil {
+		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", hooksPath)
+		return
+	}
+	cfg, err := os.ReadFile(filepath.Join(sources.CodexHome(), "config.toml"))
+	status := "wired"
+	if err == nil {
+		if i := strings.Index(string(cfg), "hooks.json:session_start"); i >= 0 {
+			rest := string(cfg[i:])
+			off, on := strings.Index(rest, "enabled = false"), strings.Index(rest, "enabled = true")
+			if off >= 0 && (on == -1 || on > off) {
+				status = "disabled"
+			}
+		}
+	}
+	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
+	if status == "disabled" {
+		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"
+	}
+	fmt.Fprintln(w, line)
 }
 
 func hookEventWired(hooks map[string]any, event, command string) bool {

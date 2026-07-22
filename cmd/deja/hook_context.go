@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,11 +43,30 @@ type precompactHookInput struct {
 	Trigger        string `json:"trigger"`
 }
 
+// readHookStdin reads the hook payload without trusting the host to close
+// stdin. Codex keeps the pipe open and silent, and a hook that blocks on
+// stdin hangs the whole session start — the harness then disables the hook
+// and the user just sees memory quietly stop working.
+func readHookStdin() []byte {
+	in := os.Stdin // capture before the goroutine: tests swap the global
+	ch := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(io.LimitReader(in, 1<<20))
+		ch <- b
+	}()
+	select {
+	case b := <-ch:
+		return b
+	case <-time.After(300 * time.Millisecond):
+		return nil
+	}
+}
+
 // runHookPrecompact is deliberately best effort: Claude must be able to
 // compact even when the input is incomplete or the index cannot start.
 func runHookPrecompact(dir string) {
 	var input precompactHookInput
-	_ = json.NewDecoder(os.Stdin).Decode(&input)
+	_ = json.Unmarshal(readHookStdin(), &input)
 	requestWarmup(dir)
 }
 
@@ -60,7 +80,7 @@ func runHookContext(dir string, plain bool) error {
 	var input struct {
 		Source string `json:"source"`
 	}
-	_ = json.NewDecoder(os.Stdin).Decode(&input)
+	_ = json.Unmarshal(readHookStdin(), &input)
 	digest, sessions, raw, taskMatched := hookDigestResult(dir)
 	if digest == "" {
 		return nil
@@ -141,6 +161,15 @@ func hookDigest(dir string) string {
 
 func hookDigestResult(dir string) (string, int, int64, []string) {
 	defer func() { _ = recover() }()
+	trace := os.Getenv("DEJA_TRACE") == "1"
+	t0 := time.Now()
+	mark := func(stage string) {
+		if trace {
+			fmt.Fprintf(os.Stderr, "trace %-16s %6.1fms\n", stage, float64(time.Since(t0).Microseconds())/1000)
+			t0 = time.Now()
+		}
+	}
+	_ = mark
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
 		return "", 0, 0, nil
@@ -158,7 +187,9 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 		}
 	}
 	names := digest.ProjectNameCandidates(cwd)
+	mark("names+worktrees")
 	pol := policy.Load()
+	mark("policy")
 	var ss []model.Session
 	seen := map[string]bool{}
 	lookupNames := names
@@ -175,15 +206,12 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	// files to match against, older sessions are worth considering; without
 	// it, recency alone decides and a small pool is enough.
 	taskFiles := changedTaskFiles(cwd)
+	mark("git-taskfiles")
 	perName := 3
 	if len(taskFiles) > 0 {
 		perName = 12
 	}
-	for _, name := range lookupNames {
-		got, err := index.RecentProject(dir, name, perName)
-		if err != nil {
-			continue
-		}
+	if got, err := index.RecentProjects(dir, lookupNames, perName); err == nil {
 		for _, s := range got {
 			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				continue
@@ -196,6 +224,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 			ss = append(ss, s)
 		}
 	}
+	mark("load-sessions")
 	if len(ss) == 0 {
 		return "", 0, 0, nil
 	}
@@ -209,7 +238,16 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	if len(ss) > 12 {
 		ss = ss[:12]
 	}
+	// Digest and scoring only ever use the recent tail; hauling a marathon
+	// session's megabytes through word sets is pure waste.
+	for i := range ss {
+		if len(ss[i].Messages) > 150 {
+			ss[i].Messages = ss[i].Messages[len(ss[i].Messages)-150:]
+		}
+	}
+	mark("task-scores")
 	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names, TaskScores: scores})
+	mark("build-digest")
 	if result.Sessions == 0 {
 		matched = nil
 	}
