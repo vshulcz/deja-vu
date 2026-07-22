@@ -213,15 +213,15 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	if n > 0 && len(ranked) > n {
 		ranked = ranked[:n]
 	}
-	out := make([]model.Session, 0, len(ranked))
+	metas := make([]SessionMeta, 0, len(ranked))
 	matched := make([]int, 0, len(ranked))
 	for _, r := range ranked {
-		full, err := loadSessionRecords(dir, m, r.meta)
-		if err != nil || len(full.Messages) == 0 {
-			full = sessionFromMeta(r.meta)
-		}
-		out = append(out, full)
+		metas = append(metas, r.meta)
 		matched = append(matched, r.matched)
+	}
+	out, err := sessionsForMetas(dir, metas)
+	if err != nil {
+		return nil, nil, err
 	}
 	return out, matched, nil
 }
@@ -373,19 +373,69 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 	if n > 0 && len(metas) > n {
 		metas = metas[:n]
 	}
-	out := make([]model.Session, 0, len(metas))
-	for _, meta := range metas {
-		s := sessionFromMeta(meta)
-		recs, err := recordsForKey(filepath.Join(dir, "records.bin"), meta.Harness+":"+meta.ID)
-		if err != nil {
-			return nil, err
+	return sessionsForMetas(dir, metas)
+}
+
+// sessionsForMetas loads full sessions for the given metas in ONE pass over
+// records.bin. The per-session variant re-scanned the whole log for every
+// session, which turned a session-start hook into hundreds of milliseconds.
+func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) {
+	want := make(map[string]int, len(metas))
+	out := make([]model.Session, len(metas))
+	for i, meta := range metas {
+		want[meta.Harness+":"+meta.ID] = i
+		out[i] = sessionFromMeta(meta)
+	}
+	err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+		if i, ok := want[r.Key]; ok {
+			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
-		for _, r := range recs {
-			s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
-		}
-		out = append(out, s)
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
+}
+
+// RecentProjects is RecentProject for several project names at once: one
+// manifest read and one records pass instead of names × sessions scans.
+func RecentProjects(dir string, projects []string, perName int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var metas []SessionMeta
+	for _, project := range projects {
+		project = strings.ToLower(project)
+		var mine []SessionMeta
+		for _, meta := range m.Sessions {
+			p := strings.ToLower(meta.Project)
+			if p == project || (project != "" && strings.Contains(p, project)) {
+				mine = append(mine, meta)
+			}
+		}
+		sort.Slice(mine, func(i, j int) bool { return mine[i].Updated.After(mine[j].Updated) })
+		if perName > 0 && len(mine) > perName {
+			mine = mine[:perName]
+		}
+		for _, meta := range mine {
+			k := meta.Harness + ":" + meta.ID
+			if !seen[k] {
+				seen[k] = true
+				metas = append(metas, meta)
+			}
+		}
+	}
+	return sessionsForMetas(dir, metas)
 }
 
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
