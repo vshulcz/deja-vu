@@ -215,6 +215,24 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "roo", Load: LoadRoo, Files: RooTaskFiles,
+			Kinds: []FileKind{{
+				Name: "roo",
+				Match: func(p string) bool {
+					if !hasBase(p, "api_conversation_history.json") {
+						return false
+					}
+					for _, root := range RooRoots() {
+						if strings.HasPrefix(p, root) {
+							return true
+						}
+					}
+					return false
+				},
+				Parse: fullParse(ParseRooTask),
+			}},
+		},
+		{
 			Name: "pi", Load: LoadPi, Files: PiSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "pi",

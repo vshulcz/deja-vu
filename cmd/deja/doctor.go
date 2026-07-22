@@ -277,6 +277,13 @@ func doctorHarnesses(w io.Writer) {
 	}
 	printRow("cline", clineLoc, clineFiles > 0 || doctorExists(clineModern), doctorCount(clineFiles, "file"))
 
+	rooFiles := len(sources.RooTaskFiles())
+	rooLoc := "VS Code globalStorage rooveterinaryinc.roo-cline"
+	if roots := sources.RooRoots(); len(roots) > 0 {
+		rooLoc = strings.Join(roots, string(os.PathListSeparator))
+	}
+	printRow("roo", rooLoc, rooFiles > 0, doctorCount(rooFiles, "file"))
+
 	piRoot := sources.PiRoot()
 	printRow("pi", piRoot, doctorExists(piRoot), doctorCount(len(sources.PiSessionFiles()), "file"))
 	copilotRoot := sources.CopilotRoot()

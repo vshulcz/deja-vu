@@ -1,0 +1,4 @@
+[
+  {"role": "user", "content": [{"type": "text", "text": "<task>\nFix the flaky test\n</task>"}]},
+  {"role": "assistant", "content": [{"type": "text", "text": "The retry loop reused a stale timeout; pinned it per attempt."}]}
+]
