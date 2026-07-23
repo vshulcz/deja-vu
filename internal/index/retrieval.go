@@ -280,7 +280,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			hit    map[uint32]bool
 			tf     map[uint32]int
 			minDF  = -1
-			offs   = map[uint32]map[int64]bool{}
+			offs   map[uint32]map[int64]bool
 			missed bool
 		)
 		for _, key := range keys {
@@ -294,15 +294,16 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			df := map[uint32]bool{}
 			keyHit := map[uint32]bool{}
 			keyTF := map[uint32]int{}
+			keyOffs := map[uint32]map[int64]bool{}
 			for _, pp := range posts {
 				df[pp.Sid] = true
 				if _, ok := inProject[pp.Sid]; ok {
 					keyHit[pp.Sid] = true
 					keyTF[pp.Sid]++
-					oo := offs[pp.Sid]
+					oo := keyOffs[pp.Sid]
 					if oo == nil {
 						oo = map[int64]bool{}
-						offs[pp.Sid] = oo
+						keyOffs[pp.Sid] = oo
 					}
 					oo[pp.Off] = true
 				}
@@ -319,8 +320,13 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 					}
 				}
 			}
+			// Message credit follows the rarest sub-token — the one whose df
+			// sets the term's idf. A union would let a message containing
+			// only a common sub-token ("index" of "pkg/index") collect the
+			// full term mass, and best-message ranking amplifies that.
 			if minDF == -1 || len(df) < minDF {
 				minDF = len(df)
+				offs = keyOffs
 			}
 			if len(hit) == 0 {
 				missed = true
