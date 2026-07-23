@@ -261,6 +261,10 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// offset) of a session: co-occurrence inside one message is a far
 	// stronger topical signal than terms scattered across a long session.
 	perMessage := map[uint32]map[int64]int{}
+	// msgIDF accumulates the idf mass of distinct terms per message, so a
+	// session can be ranked by its best single message rather than by the
+	// total it collects across thousands of them.
+	msgIDF := map[uint32]map[int64]float64{}
 	for _, term := range terms {
 		keys := queryKeys(term)
 		if len(keys) == 0 {
@@ -326,16 +330,6 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if missed || len(hit) == 0 {
 			continue
 		}
-		for ord := range hit {
-			mm := perMessage[ord]
-			if mm == nil {
-				mm = map[int64]int{}
-				perMessage[ord] = mm
-			}
-			for off := range offs[ord] {
-				mm[off]++
-			}
-		}
 		idf := math.Log(totalDocs / float64(minDF+1))
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
@@ -346,6 +340,22 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			idf = 0.1
 		}
 		informative := idf >= dejaVuIDFFloor || minDF <= 2
+		for ord := range hit {
+			mm := perMessage[ord]
+			if mm == nil {
+				mm = map[int64]int{}
+				perMessage[ord] = mm
+			}
+			mi := msgIDF[ord]
+			if mi == nil {
+				mi = map[int64]float64{}
+				msgIDF[ord] = mi
+			}
+			for off := range offs[ord] {
+				mm[off]++
+				mi[off] += idf
+			}
+		}
 		for ord := range hit {
 			// Saturated term frequency: repeated mentions add confidence
 			// with quickly diminishing returns, so a marathon session cannot
@@ -378,9 +388,19 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				best = k
 			}
 		}
-		if best > 1 {
-			sc *= 1 + 0.2*float64(best-1)
+		// A focused message beats diffuse mentions: the session's score is
+		// its best message's idf mass (scaled by same-message co-occurrence),
+		// with the session-wide total only as a dampened tail. Without this,
+		// one marathon session that brushes every query word somewhere
+		// outranks the short session that actually answers.
+		var bestMsg float64
+		for _, v := range msgIDF[ord] {
+			if v > bestMsg {
+				bestMsg = v
+			}
 		}
+		coocc := 1 + 0.2*float64(best-1)
+		sc = bestMsg*coocc + 0.25*(sc-bestMsg)
 		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 	}
 	if len(ranked) == 0 {
