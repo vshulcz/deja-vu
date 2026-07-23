@@ -261,6 +261,27 @@
    }
   },
   {
+   "id": "openclaw",
+   "store_paths": [
+    "${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl",
+    "${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/openclaw/agents/main/sessions/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.jsonl"
+   ],
+   "parser_source": "internal/sources/openclaw.go",
+   "last_verified": "2026-07-23",
+   "display_name": "OpenClaw",
+   "capabilities": {
+    "mcp": false,
+    "auto": false,
+    "resume": false,
+    "handoff": "paste",
+    "prereq": ""
+   }
+  },
+  {
    "id": "copilot",
    "store_paths": [
     "${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl"

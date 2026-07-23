@@ -1,0 +1,4 @@
+{"type":"session","version":3,"id":"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d","timestamp":"2026-07-20T09:00:00Z","cwd":"/workspace/registry-demo"}
+{"type":"model_change","id":"mc1","parentId":null,"timestamp":"2026-07-20T09:00:01Z","provider":"anthropic","modelId":"claude-sonnet-4"}
+{"type":"message","id":"u1","parentId":"mc1","timestamp":"2026-07-20T09:00:05Z","message":{"role":"user","content":[{"type":"text","text":"openclaw registry conformance question"}],"timestamp":1784883605000}}
+{"type":"message","id":"a1","parentId":"u1","timestamp":"2026-07-20T09:00:10Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"reasoning"},{"type":"text","text":"openclaw registry conformance answer"}],"api":"anthropic","model":"claude-sonnet-4","usage":{"input":5,"output":10},"stopReason":"endTurn","timestamp":1784883610000}}

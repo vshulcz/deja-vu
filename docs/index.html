@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deja-vu — your agents already solved this. deja finds it.</title>
-<meta name="description" content="A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex, opencode, Cursor, Gemini CLI, aider, Antigravity, Grok Build, Qwen Code, Kimi Code, pi and Copilot CLI already write. One zero-dependency binary, fully local.">
+<meta name="description" content="A memory layer for coding agents: search, MCP recall, auto-context, secret redaction, stats, share and sync over the session histories Claude Code, Codex, opencode, Cursor, Gemini CLI, aider, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, pi and Copilot CLI already write. One zero-dependency binary, fully local.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="deja-vu — search every session your coding agents ever wrote">
-<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across fourteen coding agents, served back to them via MCP.">
+<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across fifteen coding agents, served back to them via MCP.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -365,7 +365,7 @@ footer .spacer{flex:1}
       <tr><td class="n">~12 ms</td><td class="c">typical warm search over gigabytes of history</td></tr>
       <tr><td class="n">~50 ms</td><td class="c">session-start hook on a 1000-session index — memory lands before you type</td></tr>
       <tr><td class="n">84.9%</td><td class="c">R@1 on LongMemEval-S session retrieval — no LLM, no embeddings, harness in-repo</td></tr>
-      <tr><td class="n">14</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
+      <tr><td class="n">15</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
     </table>
     <p class="foot"><a href="guide/benchmarks.html">how it's measured →</a></p>
   </div>
@@ -391,7 +391,7 @@ footer .spacer{flex:1}
 </section>
 
 <section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja doctor</span> <span class="out"># fourteen harnesses, one memory</span></p>
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja doctor</span> <span class="out"># fifteen harnesses, one memory</span></p>
   <div class="sources">
     <table class="mx">
       <tr><th></th><th>mcp recall</th><th>auto-recall</th><th>resume</th><th>handoff</th><th>needs</th></tr>
@@ -406,6 +406,7 @@ footer .spacer{flex:1}
       <tr><td class="nm">kimi code</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
       <tr><td class="nm">cline</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
       <tr><td class="nm">roo code</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="am">paste</td><td class="pa">history still indexed</td></tr>
+      <tr><td class="nm">openclaw</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="am">paste</td><td class="pa">history still indexed</td></tr>
       <tr><td class="nm">pi</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
       <tr><td class="nm">copilot cli</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
       <tr><td class="nm">aider</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">no MCP client — history still indexed</td></tr>
@@ -446,7 +447,7 @@ footer .spacer{flex:1}
     <a href="guide/agents.html">agents-and-mcp<span>recall, blame, remember, auto-recall</span></a>
     <a href="guide/search.html">search<span>phrases, fuzzy, semantic, tiers</span></a>
     <a href="guide/commands.html">cli-reference<span>every subcommand and flag</span></a>
-    <a href="guide/harnesses.html">harnesses<span>fourteen agents, and adding one</span></a>
+    <a href="guide/harnesses.html">harnesses<span>fifteen agents, and adding one</span></a>
     <a href="guide/privacy.html">privacy<span>redaction, forget, exclude</span></a>
     <a href="guide/benchmarks.html">benchmarks<span>the ~200× number, reproducible</span></a>
     <a href="guide/compare.html">compare<span>deja next to Mem0, Letta, memU…</span></a>
@@ -575,7 +576,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
   var COMMANDS={
     'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
-    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;pi&nbsp;&nbsp;copilot\n14 harnesses, one index — real paths in the <a href="#proof">matrix below</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;pi&nbsp;&nbsp;openclaw&nbsp;&nbsp;copilot\n15 harnesses, one index — real paths in the <a href="#proof">matrix below</a></p>',
     'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
     'version':'<p class="none">deja 0.14.1</p>',
     'clear':''

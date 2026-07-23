@@ -70,7 +70,7 @@
 <tr><td>What is stored</td><td class="us">verbatim transcript, secrets redacted at ingest</td><td>LLM-extracted facts</td><td>self-edited memory blocks</td><td>distilled markdown</td><td>LLM-extracted rows (SQLite/Postgres)</td><td>LLM summaries (lossy)</td><td>captured events + embeddings</td></tr>
 <tr><td>Needs an LLM/embedding key to remember</td><td class="us">no</td><td>yes</td><td>yes</td><td>yes (embedding API)</td><td>yes (extraction)</td><td>yes (compression)</td><td>local model or API</td></tr>
 <tr><td>Background process</td><td class="us">none — search runs in-process, index updates inside the call</td><td>hosted platform or self-hosted server</td><td>server + Postgres</td><td>server (self-host) or cloud</td><td>in-process</td><td>worker process</td><td>daemon, several local ports</td></tr>
-<tr><td>Coding agents covered</td><td class="us">14 native transcript parsers (Claude Code, Codex, opencode, Cursor, Cline, Roo…)</td><td>via SDK/MCP integration</td><td>its own runtime</td><td>several via adapters</td><td>frameworks (LangChain, Agno…)</td><td>Claude Code</td><td>many via hooks</td></tr>
+<tr><td>Coding agents covered</td><td class="us">15 native transcript parsers (Claude Code, Codex, opencode, Cursor, Cline, OpenClaw…)</td><td>via SDK/MCP integration</td><td>its own runtime</td><td>several via adapters</td><td>frameworks (LangChain, Agno…)</td><td>Claude Code</td><td>many via hooks</td></tr>
 <tr><td>Cross-machine sync</td><td class="us">✅ SSH, watermarked, no cloud</td><td>cloud platform</td><td>server-side</td><td>cloud or self-host</td><td>your database</td><td>—</td><td>—</td></tr>
 <tr><td>Recall provenance</td><td class="us">✅ every injection logged (<code>deja log</code>), receipts show what/why</td><td>—</td><td>partial (agent-visible)</td><td>—</td><td>rows are queryable</td><td>viewer shows summaries</td><td>dashboard</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical (exact→fuzzy→co-occurrence→relevance), optional embedding endpoint</td><td>vector + graph</td><td>agent-driven + vector</td><td>embedding rank</td><td>SQL + vector optional</td><td>vector</td><td>hybrid RRF</td></tr>
@@ -87,7 +87,7 @@
 <p><b>Mem0 / Memori</b> — you are building an application and want to give <em>your users</em> memory through an API. deja has no SDK; it is not for app-embedded memory.</p>
 <p><b>Letta</b> — you want a full agent runtime with self-editing memory and you're happy living inside it. deja is the opposite bet: memory only, bring whatever agent you already use.</p>
 <p><b>memU</b> — you want curated, distilled knowledge files and don't mind the agent doing the distilling. deja keeps the verbatim record and searches it instead.</p>
-<p><b>claude-mem</b> — you only use Claude Code and prefer compressed summaries over raw history. deja covers 14 agents and keeps recall lossless.</p>
+<p><b>claude-mem</b> — you only use Claude Code and prefer compressed summaries over raw history. deja covers 15 agents and keeps recall lossless.</p>
 <p><b>A vector database + your own pipeline</b> — you need semantic paraphrase matching above all. deja's lexical ladder loses to embeddings on pure paraphrase (we say so in the <a href="benchmarks.html">benchmarks</a>); it wins on identifiers, error strings, and everything code-shaped, with no key and no daemon.</p>
 
 <h2>What only deja does</h2>
