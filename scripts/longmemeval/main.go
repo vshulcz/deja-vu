@@ -49,7 +49,16 @@ func main() {
 	limit := flag.Int("limit", 0, "run only the first N questions (0 = all)")
 	skipAbs := flag.Bool("skip-abs", false, "skip abstention (_abs) questions, matching cleaned-dataset runs")
 	verbose := flag.Bool("v", false, "log per-question results")
+	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
 	flag.Parse()
+	var missFile *os.File
+	if *dumpMisses != "" {
+		var err error
+		if missFile, err = os.Create(*dumpMisses); err != nil {
+			fatal(err)
+		}
+		defer func() { _ = missFile.Close() }()
+	}
 
 	raw, err := os.ReadFile(*dataPath)
 	if err != nil {
@@ -83,7 +92,7 @@ func main() {
 	start := time.Now()
 
 	for qi, q := range questions {
-		rank, elapsed, err := runQuestion(q)
+		rank, detail, elapsed, err := runQuestion(q)
 		if err != nil {
 			fatal(fmt.Errorf("question %s: %w", q.QuestionID, err))
 		}
@@ -115,6 +124,19 @@ func main() {
 				}
 			}
 		}
+		if missFile != nil && rank != 1 {
+			rec := map[string]any{
+				"question_id": q.QuestionID,
+				"type":        q.QuestionType,
+				"question":    q.Question,
+				"rank":        rank,
+				"tier":        detail.tier,
+				"answer_ids":  q.AnswerSessionIDs,
+				"top10":       detail.top10,
+			}
+			b, _ := json.Marshal(rec)
+			_, _ = missFile.Write(append(b, '\n'))
+		}
 		if *verbose {
 			fmt.Printf("%4d/%d %-24s rank=%-3d %s\n", qi+1, len(questions), q.QuestionType, rank, q.QuestionID)
 		}
@@ -144,19 +166,24 @@ func main() {
 	fmt.Printf("%-28s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n), pct(total.r10, total.n), pct(total.r20, total.n), total.mrr/float64(total.n))
 }
 
+type questionDetail struct {
+	tier  string
+	top10 []string
+}
+
 // runQuestion builds a fresh index over the question's haystack via the real
 // ingestion pipeline and returns the rank (1-based) of the first answer
 // session in the search results, or 0 if absent from the top 50.
-func runQuestion(q lmeQuestion) (int, time.Duration, error) {
+func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	tmp, err := os.MkdirTemp("", "lme")
 	if err != nil {
-		return 0, 0, err
+		return 0, questionDetail{}, 0, err
 	}
 	defer os.RemoveAll(tmp)
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-work-lme")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
-		return 0, 0, err
+		return 0, questionDetail{}, 0, err
 	}
 	// One transcript file per haystack session, in Claude Code's on-disk
 	// format, timestamped with the haystack dates so freshness decay applies
@@ -166,7 +193,7 @@ func runQuestion(q lmeQuestion) (int, time.Duration, error) {
 		ts := parseLMEDate(q.HaystackDates[si])
 		f, err := os.Create(filepath.Join(proj, id+".jsonl"))
 		if err != nil {
-			return 0, 0, err
+			return 0, questionDetail{}, 0, err
 		}
 		enc := json.NewEncoder(f)
 		for ti, turn := range turns {
@@ -185,25 +212,25 @@ func runQuestion(q lmeQuestion) (int, time.Duration, error) {
 			}
 			if err := enc.Encode(line); err != nil {
 				_ = f.Close()
-				return 0, 0, err
+				return 0, questionDetail{}, 0, err
 			}
 		}
 		if err := f.Close(); err != nil {
-			return 0, 0, err
+			return 0, questionDetail{}, 0, err
 		}
 	}
 	dir := filepath.Join(tmp, "index.db")
 	_ = os.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	_ = os.Setenv("DEJA_INDEX_DIR", dir)
 	if err := index.Ensure(dir, "claude", true, nil); err != nil {
-		return 0, 0, err
+		return 0, questionDetail{}, 0, err
 	}
 
 	o := search.Options{Query: q.Question, All: true}
 	t0 := time.Now()
 	result, err := index.SearchWithRecoveryDetailed(dir, o, nil)
 	if err != nil {
-		return 0, 0, err
+		return 0, questionDetail{}, 0, err
 	}
 	o.Tier = result.Tier
 	if result.Stemmed {
@@ -218,7 +245,7 @@ func runQuestion(q lmeQuestion) (int, time.Duration, error) {
 	if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHits(result.Sessions, index.RelevanceTerms(q.Question))
 	} else if hits, err = search.Run(result.Sessions, o); err != nil {
-		return 0, 0, err
+		return 0, questionDetail{}, 0, err
 	}
 	ranked := make([]string, 0, 50)
 	for _, h := range hits {
@@ -226,6 +253,12 @@ func runQuestion(q lmeQuestion) (int, time.Duration, error) {
 	}
 	elapsed := time.Since(t0)
 	hitCounts = append(hitCounts, len(ranked))
+	detail := questionDetail{tier: string(result.Tier)}
+	if len(ranked) > 10 {
+		detail.top10 = ranked[:10]
+	} else {
+		detail.top10 = ranked
+	}
 	want := map[string]bool{}
 	for _, id := range q.AnswerSessionIDs {
 		want[id] = true
@@ -235,10 +268,10 @@ func runQuestion(q lmeQuestion) (int, time.Duration, error) {
 			break
 		}
 		if want[id] {
-			return i + 1, elapsed, nil
+			return i + 1, detail, elapsed, nil
 		}
 	}
-	return 0, elapsed, nil
+	return 0, detail, elapsed, nil
 }
 
 // parseLMEDate parses "2023/05/20 (Sat) 02:21".

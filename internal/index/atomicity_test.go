@@ -237,3 +237,45 @@ func TestProjectRelevantRanksByIDFNotFiller(t *testing.T) {
 		t.Fatalf("ranking = %v, want s1 first (rare term dominates filler)", got)
 	}
 }
+
+func TestProjectRelevantDottedTermNeedsAllSubTokens(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mk := func(id, text string) {
+		line := `{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// s1 contains stray octets from unrelated numbers; s2 the full address.
+	mk("s1", "screenshot batch 138 of run 79 finished")
+	mk("s2", "deploy target 203.0.113.51 rotated keys")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, matched, err := ProjectRelevant(dir, []string{"app"}, []string{"203.0.113.51"}, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, s := range got {
+		if s.ID == "s1" && matched[i] > 0 {
+			t.Fatalf("octet-only session counted as a match: %v", matched)
+		}
+	}
+	found := false
+	for i, s := range got {
+		if s.ID == "s2" && matched[i] >= 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("full-address session missing: got=%v matched=%v", len(got), matched)
+	}
+}

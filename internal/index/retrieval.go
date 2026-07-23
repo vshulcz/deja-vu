@@ -266,39 +266,86 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if len(keys) == 0 {
 			continue
 		}
-		key := keys[0]
-		posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
-		if err != nil || len(posts) == 0 {
-			continue
-		}
-		// Document frequency in sessions, not postings: one marathon session
-		// repeating a term 300 times must not make the term look common.
-		df := map[uint32]bool{}
-		hit := map[uint32]bool{}
-		tf := map[uint32]int{}
-		for _, pp := range posts {
-			df[pp.Sid] = true
-			if _, ok := inProject[pp.Sid]; ok {
-				hit[pp.Sid] = true
-				tf[pp.Sid]++
-				mm := perMessage[pp.Sid]
-				if mm == nil {
-					mm = map[int64]int{}
-					perMessage[pp.Sid] = mm
+		// A dotted or slashed term ("203.0.113.51", "pkg/index") tokenizes
+		// into several index keys. Matching only the first key made an IP
+		// degrade to its first octet — a bare small number that lives in
+		// half the corpus — so déjà vu fired on unrelated sessions. The
+		// term counts only where every sub-token is present; idf comes from
+		// the rarest sub-token, which is the one that actually identifies.
+		var (
+			hit    map[uint32]bool
+			tf     map[uint32]int
+			minDF  = -1
+			offs   = map[uint32]map[int64]bool{}
+			missed bool
+		)
+		for _, key := range keys {
+			posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+			if err != nil || len(posts) == 0 {
+				missed = true
+				break
+			}
+			// Document frequency in sessions, not postings: one marathon
+			// session repeating a term 300 times must not make it common.
+			df := map[uint32]bool{}
+			keyHit := map[uint32]bool{}
+			keyTF := map[uint32]int{}
+			for _, pp := range posts {
+				df[pp.Sid] = true
+				if _, ok := inProject[pp.Sid]; ok {
+					keyHit[pp.Sid] = true
+					keyTF[pp.Sid]++
+					oo := offs[pp.Sid]
+					if oo == nil {
+						oo = map[int64]bool{}
+						offs[pp.Sid] = oo
+					}
+					oo[pp.Off] = true
 				}
-				mm[pp.Off]++
+			}
+			if hit == nil {
+				hit, tf = keyHit, keyTF
+			} else {
+				for ord := range hit {
+					if !keyHit[ord] {
+						delete(hit, ord)
+						delete(tf, ord)
+					} else if keyTF[ord] < tf[ord] {
+						tf[ord] = keyTF[ord]
+					}
+				}
+			}
+			if minDF == -1 || len(df) < minDF {
+				minDF = len(df)
+			}
+			if len(hit) == 0 {
+				missed = true
+				break
 			}
 		}
-		idf := math.Log(totalDocs / float64(len(df)+1))
+		if missed || len(hit) == 0 {
+			continue
+		}
+		for ord := range hit {
+			mm := perMessage[ord]
+			if mm == nil {
+				mm = map[int64]int{}
+				perMessage[ord] = mm
+			}
+			for off := range offs[ord] {
+				mm[off]++
+			}
+		}
+		idf := math.Log(totalDocs / float64(minDF+1))
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
 			// in only a couple of sessions still identifies them.
-			if len(df) > 2 {
+			if minDF > 2 {
 				continue
 			}
 			idf = 0.1
 		}
-		informative := idf >= dejaVuIDFFloor || len(df) <= 2
+		informative := idf >= dejaVuIDFFloor || minDF <= 2
 		for ord := range hit {
 			// Saturated term frequency: repeated mentions add confidence
 			// with quickly diminishing returns, so a marathon session cannot
