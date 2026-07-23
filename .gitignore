@@ -4,3 +4,5 @@ fixtures/private/
 .build.log
 fixtures/synthetic/opencode.db
 .deja-bench/
+/longmemeval
+/locomo
