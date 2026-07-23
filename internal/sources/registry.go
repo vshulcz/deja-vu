@@ -242,6 +242,15 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "openclaw", Load: LoadOpenClaw, Files: OpenClawSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "openclaw",
+				Match:     func(p string) bool { return openclawTranscript(OpenClawRoot(), p) },
+				Parse:     fullParse(ParseOpenClawFile),
+				ParseFrom: offsetParse(ParseOpenClawFileFromOffset),
+			}},
+		},
+		{
 			Name: "copilot", Load: LoadCopilot, Files: CopilotSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "copilot",

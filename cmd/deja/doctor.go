@@ -286,6 +286,8 @@ func doctorHarnesses(w io.Writer) {
 
 	piRoot := sources.PiRoot()
 	printRow("pi", piRoot, doctorExists(piRoot), doctorCount(len(sources.PiSessionFiles()), "file"))
+	openclawRoot := sources.OpenClawRoot()
+	printRow("openclaw", openclawRoot, doctorExists(openclawRoot), doctorCount(len(sources.OpenClawSessionFiles()), "file"))
 	copilotRoot := sources.CopilotRoot()
 	printRow("copilot", copilotRoot, doctorExists(copilotRoot), doctorCount(len(sources.CopilotSessionFiles()), "file"))
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
@@ -386,7 +388,9 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
 		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers")},
 		{"kimi", filepath.Join(sources.KimiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
+		{"cline", sources.ClineMCPSettingsPath(), doctorJSONWired("mcpServers")},
 		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
+		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired},
 		{"copilot", guidancePath("copilot"), doctorFileWired},
 	}
 }
@@ -405,6 +409,22 @@ func doctorOpencodeConfigPath() string {
 		}
 	}
 	return path
+}
+
+// doctorOpenClawWired checks openclaw.json's nested mcp.servers map.
+func doctorOpenClawWired(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var root map[string]any
+	if json.Unmarshal(b, &root) != nil {
+		return strings.Contains(string(b), `"deja"`)
+	}
+	mcp, _ := root["mcp"].(map[string]any)
+	servers, _ := mcp["servers"].(map[string]any)
+	_, ok := servers["deja"]
+	return ok
 }
 
 func doctorJSONWired(key string) func(string) bool {

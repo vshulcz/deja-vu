@@ -92,6 +92,14 @@
       "files": 0
     },
     {
+      "name": "openclaw",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.openclaw/agents"
+      ],
+      "files": 0
+    },
+    {
       "name": "copilot",
       "state": "missing",
       "paths": [
@@ -159,9 +167,19 @@
       "path": "<tmp>/home/.kimi-code/mcp.json"
     },
     {
+      "name": "cline",
+      "state": "config-missing",
+      "path": "<tmp>/home/.cline/data/settings/cline_mcp_settings.json"
+    },
+    {
       "name": "pi",
       "state": "config-missing",
       "path": "<tmp>/home/.pi/agent/mcp.json"
+    },
+    {
+      "name": "openclaw",
+      "state": "config-missing",
+      "path": "<tmp>/home/.openclaw/openclaw.json"
     },
     {
       "name": "copilot",

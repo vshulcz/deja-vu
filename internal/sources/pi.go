@@ -34,10 +34,17 @@ func ParsePiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 }
 
 func parsePiFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parsePiShaped(path, offset, "pi", piProjectName(path), false)
+}
+
+// parsePiShaped parses a pi-format transcript (shared by pi and OpenClaw,
+// whose agent runtime is the same lineage). useHeaderCwd promotes the session
+// header's cwd to the project key when present.
+func parsePiShaped(path string, offset int64, harness, project string, useHeaderCwd bool) ([]model.Session, error) {
 	s := model.Session{
-		Harness: "pi",
+		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
-		Project: piProjectName(path),
+		Project: project,
 		Path:    path,
 	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
@@ -47,6 +54,11 @@ func parsePiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 			// First line: session header with id and timestamp.
 			if id, _ := m["id"].(string); id != "" {
 				s.ID = id
+			}
+			if useHeaderCwd {
+				if cwd, _ := m["cwd"].(string); cwd != "" {
+					s.Project = claudeProjectName(pathToProjectKey(cwd))
+				}
 			}
 			t := parseTimeAny(m["timestamp"])
 			s.Touch(t)
