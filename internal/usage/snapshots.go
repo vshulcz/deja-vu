@@ -20,7 +20,10 @@ type Snapshot struct {
 	// Policy names the rule set that allowed this injection, so the audit
 	// trail explains itself ("local+imported", "local-only").
 	Policy string `json:"policy,omitempty"`
-	Digest string `json:"digest"`
+	// Terms are the query terms behind a déjà vu firing, kept so a wrong
+	// "you have been here" can be explained after the fact.
+	Terms  []string `json:"terms,omitempty"`
+	Digest string   `json:"digest"`
 }
 
 const (
@@ -39,6 +42,12 @@ func SnapshotPath(indexDir string) string {
 // Best-effort like all usage recording.
 func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
 	RecordDigestPolicy(indexDir, kind, digest, sessions, raw, "")
+}
+
+// RecordDigestTerms is RecordDigest plus the query terms, for déjà vu audits.
+func RecordDigestTerms(indexDir, kind, digest string, sessions int, raw int64, terms []string) {
+	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
+	snapshotWriteTerms(indexDir, kind, digest, sessions, "", terms)
 }
 
 // RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
@@ -60,6 +69,10 @@ func SnapshotPolicy(indexDir, kind, digest string, sessions int, policyName stri
 }
 
 func snapshotWrite(indexDir, kind, digest string, sessions int, policyName string) {
+	snapshotWriteTerms(indexDir, kind, digest, sessions, policyName, nil)
+}
+
+func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName string, terms []string) {
 	if digest == "" {
 		return
 	}
@@ -73,7 +86,7 @@ func snapshotWrite(indexDir, kind, digest string, sessions int, policyName strin
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions, Bytes: len(digest), Policy: policyName, Digest: digest})
+	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions, Bytes: len(digest), Policy: policyName, Terms: terms, Digest: digest})
 	if err != nil {
 		return
 	}

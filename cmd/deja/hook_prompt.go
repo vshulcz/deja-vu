@@ -95,12 +95,12 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
 	out := frameRecall(lead + digest + citationLine(ss[0]))
-	usage.RecordDigest(dir, usage.KindDejaVu, out, len(ss), rawSize(ss))
+	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms)
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out
 	if showLine {
-		resp.SystemMessage = dejaVuLine(ss[0])
+		resp.SystemMessage = dejaVuLine(ss[0], terms...)
 	}
 	if resp.SystemMessage == "" {
 		// No presentable topic — inject the context silently rather than
@@ -248,7 +248,7 @@ func dejaVuLineDue(dir string) bool {
 	return true
 }
 
-func dejaVuLine(s model.Session) string {
+func dejaVuLine(s model.Session, terms ...string) string {
 	topic := dejaVuTopic(s)
 	if topic == "" {
 		return ""
@@ -257,7 +257,16 @@ func dejaVuLine(s model.Session) string {
 	if len(r) > 48 {
 		topic = strings.TrimSpace(string(r[:48])) + "…"
 	}
-	return fmt.Sprintf("deja-vu: you have been here — %q (%s)", topic, search.RelativeDate(s.Updated))
+	// Name the terms that triggered the moment: "you have been here" with no
+	// visible reason reads as noise the first time it misfires.
+	why := ""
+	if len(terms) > 0 {
+		if len(terms) > 3 {
+			terms = terms[:3]
+		}
+		why = " · via: " + strings.Join(terms, ", ")
+	}
+	return fmt.Sprintf("deja-vu: you have been here — %q (%s%s)", topic, search.RelativeDate(s.Updated), why)
 }
 
 // dejaVuTopic picks something a human actually typed. Session titles are the

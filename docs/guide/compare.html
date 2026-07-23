@@ -33,10 +33,18 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"How deja compares","description":"An honest feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory.","url":"https://vshulcz.github.io/deja-vu/guide/compare.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/compare.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Compare","item":"https://vshulcz.github.io/deja-vu/guide/compare.html"}]}</script>
 <style>
-.cmpwrap{overflow-x:auto;margin:0 0 16px}
-.cmpwrap table{min-width:900px;font-size:.8rem}
-.cmpwrap td:first-child,.cmpwrap th:first-child{position:sticky;left:0;background:var(--bg,#0d0b16);white-space:nowrap}
-.cmpwrap .us{color:#7ee2a0}
+/* Full-width page: the matrix needs every pixel, so the sidebar folds into a top strip. */
+.doc{display:block}
+.doc aside{position:static;display:flex;flex-wrap:wrap;gap:4px 14px;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.doc aside .grp{display:none}
+.cmpwrap{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line)}
+.cmpwrap table{table-layout:fixed;border-collapse:collapse;margin:0;font-size:.8rem;min-width:820px;width:100%}
+.cmpwrap th,.cmpwrap td{padding:7px 9px;vertical-align:top;overflow-wrap:break-word;border:1px solid var(--line)}
+.cmpwrap td:first-child,.cmpwrap th:first-child{position:sticky;left:0;z-index:1;background:var(--bg);width:118px;color:var(--faint);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+.cmpwrap th{background:var(--panel)}
+.cmpwrap th.us,.cmpwrap td.us{background:rgba(74,240,139,.08);color:#a5eec0}
+.cmpwrap .y{color:#7ee2a0}
+.cmpwrap .n{color:#5d8a6e}
 </style>
 </head>
 <body>
@@ -64,19 +72,19 @@
 <div class="cmpwrap">
 <table>
 <tr><th></th><th class="us">deja-vu</th><th>Mem0</th><th>Letta</th><th>memU</th><th>Memori</th><th>claude-mem</th><th>agentmemory</th></tr>
-<tr><td>What it is</td><td class="us">retroactive index over coding-agent transcripts</td><td>memory API/SDK for apps</td><td>stateful agent runtime (MemGPT)</td><td>memory filesystem for agents</td><td>SQL-native memory SDK</td><td>Claude Code plugin, compressed session memory</td><td>capture daemon for coding agents</td></tr>
-<tr><td>Starts with your history</td><td class="us">✅ months of existing sessions indexed on install</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>— (records forward from install)</td></tr>
-<tr><td>Capture step</td><td class="us">none — agents already write the files</td><td>API calls in your code</td><td>runs inside its runtime</td><td>agent distills sessions to files</td><td>SDK wraps your LLM calls</td><td>hooks + LLM compression</td><td>hooks into each agent</td></tr>
-<tr><td>What is stored</td><td class="us">verbatim transcript, secrets redacted at ingest</td><td>LLM-extracted facts</td><td>self-edited memory blocks</td><td>distilled markdown</td><td>LLM-extracted rows (SQLite/Postgres)</td><td>LLM summaries (lossy)</td><td>captured events + embeddings</td></tr>
-<tr><td>Needs an LLM/embedding key to remember</td><td class="us">no</td><td>yes</td><td>yes</td><td>yes (embedding API)</td><td>yes (extraction)</td><td>yes (compression)</td><td>local model or API</td></tr>
-<tr><td>Background process</td><td class="us">none — search runs in-process, index updates inside the call</td><td>hosted platform or self-hosted server</td><td>server + Postgres</td><td>server (self-host) or cloud</td><td>in-process</td><td>worker process</td><td>daemon, several local ports</td></tr>
-<tr><td>Coding agents covered</td><td class="us">15 native transcript parsers (Claude Code, Codex, opencode, Cursor, Cline, OpenClaw…)</td><td>via SDK/MCP integration</td><td>its own runtime</td><td>several via adapters</td><td>frameworks (LangChain, Agno…)</td><td>Claude Code</td><td>many via hooks</td></tr>
-<tr><td>Cross-machine sync</td><td class="us">✅ SSH, watermarked, no cloud</td><td>cloud platform</td><td>server-side</td><td>cloud or self-host</td><td>your database</td><td>—</td><td>—</td></tr>
-<tr><td>Recall provenance</td><td class="us">✅ every injection logged (<code>deja log</code>), receipts show what/why</td><td>—</td><td>partial (agent-visible)</td><td>—</td><td>rows are queryable</td><td>viewer shows summaries</td><td>dashboard</td></tr>
-<tr><td>Retrieval</td><td class="us">tiered lexical (exact→fuzzy→co-occurrence→relevance), optional embedding endpoint</td><td>vector + graph</td><td>agent-driven + vector</td><td>embedding rank</td><td>SQL + vector optional</td><td>vector</td><td>hybrid RRF</td></tr>
-<tr><td>Published retrieval numbers, harness in repo</td><td class="us">LongMemEval-S R@1 84.9% · LoCoMo R@1 63.7% — reproducible, <a href="benchmarks.html">how measured</a></td><td>self-reported LoCoMo (QA metric)</td><td>research lineage (MemGPT)</td><td>self-reported LoCoMo 92.09 (QA)</td><td>self-reported LoCoMo 81.95 (QA)</td><td>—</td><td>—</td></tr>
-<tr><td>Install</td><td class="us">one static binary, zero runtime deps</td><td>pip + keys</td><td>docker/server</td><td>pip/server</td><td>pip</td><td>npm + Claude</td><td>installer + binary deps</td></tr>
-<tr><td>License</td><td class="us">MIT</td><td>Apache-2.0 (+ hosted)</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td><td>MIT</td></tr>
+<tr><td>What it is</td><td class="us">index over agent transcripts</td><td>memory API for apps</td><td>agent runtime</td><td>memory filesystem</td><td>SQL memory SDK</td><td>Claude Code plugin</td><td>capture daemon</td></tr>
+<tr><td>Starts with your history</td><td class="us y">✓ retroactive</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Capture step</td><td class="us">none needed</td><td>API calls</td><td>its runtime</td><td>agent distills</td><td>SDK wrap</td><td>hooks + LLM</td><td>hooks</td></tr>
+<tr><td>Stored as</td><td class="us">verbatim, redacted</td><td>LLM facts</td><td>memory blocks</td><td>markdown</td><td>SQL rows</td><td>LLM summaries</td><td>events + vectors</td></tr>
+<tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>model or API</td></tr>
+<tr><td>Background process</td><td class="us y">none</td><td>server / cloud</td><td>server + Postgres</td><td>server / cloud</td><td class="y">none</td><td>worker</td><td>daemon, ports</td></tr>
+<tr><td>Coding agents</td><td class="us">15 native parsers</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>frameworks</td><td>Claude Code</td><td>via hooks</td></tr>
+<tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td>cloud</td><td>server-side</td><td>cloud / self-host</td><td>your DB</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Recall provenance</td><td class="us y">✓ log + receipts</td><td class="n">—</td><td>partial</td><td class="n">—</td><td>queryable rows</td><td>viewer</td><td>dashboard</td></tr>
+<tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>vector + graph</td><td>agent + vector</td><td>embeddings</td><td>SQL + vector</td><td>vector</td><td>hybrid RRF</td></tr>
+<tr><td>Benchmark, harness in repo</td><td class="us">84.9% R@1 LME-S · <a href="benchmarks.html">measured</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Install</td><td class="us">one binary</td><td>pip + keys</td><td>docker</td><td>pip / server</td><td>pip</td><td>npm + Claude</td><td>installer + deps</td></tr>
+<tr><td>License</td><td class="us">MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td><td>MIT</td></tr>
 </table>
 </div>
 

@@ -240,6 +240,10 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 	if strings.Contains(line, "AGENTS.md") {
 		t.Fatalf("plumbing leaked into deja vu line: %q", line)
 	}
+	withWhy := dejaVuLine(s, "exporter", "midnight", "rows", "fourth")
+	if !strings.Contains(withWhy, "via: exporter, midnight, rows") || strings.Contains(withWhy, "fourth") {
+		t.Fatalf("via-terms missing or uncapped: %q", withWhy)
+	}
 	junk := model.Session{Harness: "codex", ID: "y", Project: "app",
 		Title:    `<environment_context> <cwd>/x</cwd>`,
 		Messages: []model.Message{{Role: "user", Text: `{"type":"init"}`}}}
