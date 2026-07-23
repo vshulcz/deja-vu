@@ -1,6 +1,6 @@
 # Contributing
 
-## Build and test
+## Build and Test
 
 deja requires Go 1.25 and has no runtime Go dependencies. Before opening a pull
 request, run:
@@ -26,7 +26,7 @@ actually looks at — run them before opening the PR and there will be no
 surprises. Do not add low-value tests only to move the number; explain a
 genuinely unreachable branch in the pull request instead.
 
-## Hermetic tests
+## Hermetic Tests
 
 Tests must not read or modify a contributor's real agent configuration or
 history.
@@ -45,7 +45,7 @@ history.
 Use table-driven tests from the standard library. The project does not use
 testify or other test frameworks.
 
-## Adding or updating a harness parser
+## Adding or Updating a Harness Parser
 
 The [source parser registry](docs/ARCHITECTURE.md#source-parsers) maps harnesses
 to their implementation under `internal/sources`. Follow the integration steps
@@ -71,7 +71,7 @@ For a new harness, use the
 [parser request](https://github.com/vshulcz/deja-vu/issues/new?template=parser-request.yml)
 before contributing real session data.
 
-## Pull requests and review
+## Pull Requests and Review
 
 - Keep changes small and explain the user-visible behavior.
 - Add or update tests and documentation with the implementation.
