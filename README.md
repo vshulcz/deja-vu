@@ -2,7 +2,9 @@
 
 <p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; searches 3.3&nbsp;GB in ~12&nbsp;ms, serves it back to any agent over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">vshulcz.github.io/deja-vu</a></p>
+<p align="center"><strong>84.9% R@1</strong> on LongMemEval-S retrieval &mdash; no LLM, no embeddings, no API key. <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Harness in-repo, run it yourself.</a></p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">vshulcz.github.io/deja-vu</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">how deja compares</a></p>
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>

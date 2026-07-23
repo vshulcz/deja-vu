@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How deja compares — Mem0, Letta, memU, Memori, claude-mem &amp; others</title>
+<meta name="description" content="An honest feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory: capture model, storage fidelity, infrastructure, retrieval, benchmarks.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/compare.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How deja compares — coding-agent memory systems">
+<meta property="og:description" content="Capture model, storage fidelity, infrastructure, retrieval and benchmarks — deja-vu next to Mem0, Letta, memU, Memori, claude-mem and agentmemory.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/compare.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="How deja compares — coding-agent memory systems">
+<meta name="twitter:description" content="Capture model, storage fidelity, infrastructure, retrieval and benchmarks — deja-vu next to Mem0, Letta, memU, Memori, claude-mem and agentmemory.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/favicon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"How deja compares","description":"An honest feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory.","url":"https://vshulcz.github.io/deja-vu/guide/compare.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/compare.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Compare","item":"https://vshulcz.github.io/deja-vu/guide/compare.html"}]}</script>
+<style>
+.cmpwrap{overflow-x:auto;margin:0 0 16px}
+.cmpwrap table{min-width:900px;font-size:.8rem}
+.cmpwrap td:first-child,.cmpwrap th:first-child{position:sticky;left:0;background:var(--bg,#0d0b16);white-space:nowrap}
+.cmpwrap .us{color:#7ee2a0}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/favicon.svg" alt="">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents & MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html" aria-current="page">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.md">Format registry</a></aside>
+<article>
+
+<h1>How deja compares</h1>
+<p>There are a lot of AI memory systems. Most solve a different problem than deja: they give <em>applications</em> a memory API you call from code, or wrap an agent runtime around their own store. deja is narrower — it makes the transcripts your coding agents <em>already write to disk</em> searchable, and serves them back to those agents. That one difference (retroactive indexing vs forward capture) drives most of the table below.</p>
+
+<div class="cmpwrap">
+<table>
+<tr><th></th><th class="us">deja-vu</th><th>Mem0</th><th>Letta</th><th>memU</th><th>Memori</th><th>claude-mem</th><th>agentmemory</th></tr>
+<tr><td>What it is</td><td class="us">retroactive index over coding-agent transcripts</td><td>memory API/SDK for apps</td><td>stateful agent runtime (MemGPT)</td><td>memory filesystem for agents</td><td>SQL-native memory SDK</td><td>Claude Code plugin, compressed session memory</td><td>capture daemon for coding agents</td></tr>
+<tr><td>Starts with your history</td><td class="us">✅ months of existing sessions indexed on install</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>— (records forward from install)</td></tr>
+<tr><td>Capture step</td><td class="us">none — agents already write the files</td><td>API calls in your code</td><td>runs inside its runtime</td><td>agent distills sessions to files</td><td>SDK wraps your LLM calls</td><td>hooks + LLM compression</td><td>hooks into each agent</td></tr>
+<tr><td>What is stored</td><td class="us">verbatim transcript, secrets redacted at ingest</td><td>LLM-extracted facts</td><td>self-edited memory blocks</td><td>distilled markdown</td><td>LLM-extracted rows (SQLite/Postgres)</td><td>LLM summaries (lossy)</td><td>captured events + embeddings</td></tr>
+<tr><td>Needs an LLM/embedding key to remember</td><td class="us">no</td><td>yes</td><td>yes</td><td>yes (embedding API)</td><td>yes (extraction)</td><td>yes (compression)</td><td>local model or API</td></tr>
+<tr><td>Background process</td><td class="us">none — search runs in-process, index updates inside the call</td><td>hosted platform or self-hosted server</td><td>server + Postgres</td><td>server (self-host) or cloud</td><td>in-process</td><td>worker process</td><td>daemon, several local ports</td></tr>
+<tr><td>Coding agents covered</td><td class="us">14 native transcript parsers (Claude Code, Codex, opencode, Cursor, Cline, Roo…)</td><td>via SDK/MCP integration</td><td>its own runtime</td><td>several via adapters</td><td>frameworks (LangChain, Agno…)</td><td>Claude Code</td><td>many via hooks</td></tr>
+<tr><td>Cross-machine sync</td><td class="us">✅ SSH, watermarked, no cloud</td><td>cloud platform</td><td>server-side</td><td>cloud or self-host</td><td>your database</td><td>—</td><td>—</td></tr>
+<tr><td>Recall provenance</td><td class="us">✅ every injection logged (<code>deja log</code>), receipts show what/why</td><td>—</td><td>partial (agent-visible)</td><td>—</td><td>rows are queryable</td><td>viewer shows summaries</td><td>dashboard</td></tr>
+<tr><td>Retrieval</td><td class="us">tiered lexical (exact→fuzzy→co-occurrence→relevance), optional embedding endpoint</td><td>vector + graph</td><td>agent-driven + vector</td><td>embedding rank</td><td>SQL + vector optional</td><td>vector</td><td>hybrid RRF</td></tr>
+<tr><td>Published retrieval numbers, harness in repo</td><td class="us">LongMemEval-S R@1 84.9% · LoCoMo R@1 63.7% — reproducible, <a href="benchmarks.html">how measured</a></td><td>self-reported LoCoMo (QA metric)</td><td>research lineage (MemGPT)</td><td>self-reported LoCoMo 92.09 (QA)</td><td>self-reported LoCoMo 81.95 (QA)</td><td>—</td><td>—</td></tr>
+<tr><td>Install</td><td class="us">one static binary, zero runtime deps</td><td>pip + keys</td><td>docker/server</td><td>pip/server</td><td>pip</td><td>npm + Claude</td><td>installer + binary deps</td></tr>
+<tr><td>License</td><td class="us">MIT</td><td>Apache-2.0 (+ hosted)</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td><td>MIT</td></tr>
+</table>
+</div>
+
+<div class="note">Benchmark rows are not directly comparable across systems: most projects publish end-to-end QA accuracy (an answering LLM on top of retrieval), deja publishes retrieval-only numbers with the harness in-repo so you can rerun them. Competitor cells reflect their public READMEs as of July 2026 — corrections welcome, <a href="https://github.com/vshulcz/deja-vu/issues">open an issue</a>.</div>
+
+<h2>When to pick something else</h2>
+<p>Honest routing, because the categories genuinely differ:</p>
+<p><b>Mem0 / Memori</b> — you are building an application and want to give <em>your users</em> memory through an API. deja has no SDK; it is not for app-embedded memory.</p>
+<p><b>Letta</b> — you want a full agent runtime with self-editing memory and you're happy living inside it. deja is the opposite bet: memory only, bring whatever agent you already use.</p>
+<p><b>memU</b> — you want curated, distilled knowledge files and don't mind the agent doing the distilling. deja keeps the verbatim record and searches it instead.</p>
+<p><b>claude-mem</b> — you only use Claude Code and prefer compressed summaries over raw history. deja covers 14 agents and keeps recall lossless.</p>
+<p><b>A vector database + your own pipeline</b> — you need semantic paraphrase matching above all. deja's lexical ladder loses to embeddings on pure paraphrase (we say so in the <a href="benchmarks.html">benchmarks</a>); it wins on identifiers, error strings, and everything code-shaped, with no key and no daemon.</p>
+
+<h2>What only deja does</h2>
+<p>Across the systems we've studied, these have no equivalent elsewhere: indexing history from <em>before</em> the tool was installed; déjà&nbsp;vu recurrence detection ("you have been here" when a prompt matches solved work); origin-trust scopes on imported memory; <code>deja blame</code> — which sessions touched a file and what was decided; sanitized <code>deja share</code> digests; and the whole thing in one binary you can <code>scp</code>.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
