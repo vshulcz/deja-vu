@@ -51,6 +51,8 @@ func main() {
 	verbose := flag.Bool("v", false, "log per-question results")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
 	flag.Parse()
+	evSum := map[int]float64{}
+	evN := 0
 	var missFile *os.File
 	if *dumpMisses != "" {
 		var err error
@@ -93,6 +95,10 @@ func main() {
 
 	for qi, q := range questions {
 		rank, detail, elapsed, err := runQuestion(q)
+		for k, v := range detail.evRecall {
+			evSum[k] += v
+		}
+		evN++
 		if err != nil {
 			fatal(fmt.Errorf("question %s: %w", q.QuestionID, err))
 		}
@@ -153,7 +159,7 @@ func main() {
 	}
 	fmt.Printf("\nLongMemEval-S · deja production retrieval path (lexical ladder, no LLM, no embeddings)\n")
 	fmt.Printf("questions: %d · wall: %s · median search: %s · avg candidates: %.1f\n\n", total.n, time.Since(start).Round(time.Second), searchTimes[len(searchTimes)/2].Round(time.Microsecond), avgHits)
-	fmt.Printf("%-28s %6s %8s %8s %8s %8s %8s\n", "type", "n", "R@1", "R@5", "R@10", "R@20", "MRR")
+	fmt.Printf("%-28s %6s %8s %8s %8s %8s %8s\n", "type", "n", "hit@1", "hit@5", "hit@10", "hit@20", "MRR")
 	types := make([]string, 0, len(byType))
 	for t := range byType {
 		types = append(types, t)
@@ -164,11 +170,18 @@ func main() {
 		fmt.Printf("%-28s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", t, b.n, pct(b.r1, b.n), pct(b.r5, b.n), pct(b.r10, b.n), pct(b.r20, b.n), b.mrr/float64(b.n))
 	}
 	fmt.Printf("%-28s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n), pct(total.r10, total.n), pct(total.r20, total.n), total.mrr/float64(total.n))
+	if evN > 0 {
+		fmt.Printf("%-28s %6s %7.1f%% %7.1f%% %7.1f%% %7.1f%%\n", "evidence-recall (official)", "", 100*evSum[1]/float64(evN), 100*evSum[5]/float64(evN), 100*evSum[10]/float64(evN), 100*evSum[20]/float64(evN))
+	}
 }
 
 type questionDetail struct {
 	tier  string
 	top10 []string
+	// evidence recall: how many of the question's answer sessions appear in
+	// the top-k, divided by how many exist — LongMemEval's official metric,
+	// stricter than any-hit on multi-evidence questions.
+	evRecall map[int]float64
 }
 
 // runQuestion builds a fresh index over the question's haystack via the real
@@ -262,6 +275,19 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	want := map[string]bool{}
 	for _, id := range q.AnswerSessionIDs {
 		want[id] = true
+	}
+	detail.evRecall = map[int]float64{}
+	for _, k := range []int{1, 5, 10, 20} {
+		got := 0
+		for i, id := range ranked {
+			if i >= k {
+				break
+			}
+			if want[id] {
+				got++
+			}
+		}
+		detail.evRecall[k] = float64(got) / float64(len(want))
 	}
 	for i, id := range ranked {
 		if i >= 50 {
