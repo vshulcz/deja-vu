@@ -376,7 +376,10 @@ func limitHandoffTip(dir string) string {
 		return ""
 	}
 	// Recent returns metadata only; the tail scan needs the transcript.
-	if full, ok, err := findByPrefix(dir, s.ID); err == nil && ok {
+	// Snapshot read ONLY: findByPrefix would run a full synchronous index
+	// (10s on a dirty multi-GB store) inside every agent's session start —
+	// a garnish line must never cost startup time.
+	if full, ok, err := index.FindByPrefix(dir, s.ID); err == nil && ok {
 		s = full
 	}
 	tail := s.Messages

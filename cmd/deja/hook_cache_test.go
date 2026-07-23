@@ -69,3 +69,36 @@ func TestCachedHookDigestServesWithinTTLAndInvalidates(t *testing.T) {
 		t.Fatal("cache must be scoped to cwd")
 	}
 }
+
+func TestHookContextNeverRebuildsIndex(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	// A fresh session so the handoff-tip path (the one that used to index
+	// synchronously) actually engages.
+	fresh := time.Now().Add(-30 * time.Minute).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-app", "one.jsonl"), "one", []string{
+		`{"type":"user","sessionId":"one","timestamp":"` + fresh + `","message":{"role":"user","content":"recent work marker"}}`,
+	})
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
+	// Dirty the store: a new session file appears after the index was built.
+	late := `{"type":"user","sessionId":"late1","timestamp":"` + fresh + `","message":{"role":"user","content":"late arrival"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(claudeRoot, "-tmp-app", "late1.jsonl"), []byte(late), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := runHookContext(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	// If the hook indexed, the late session is now findable; startup must
+	// never pay for indexing, so it must not be.
+	if _, ok, _ := index.FindByPrefix(dir, "late1"); ok {
+		t.Fatal("session-start hook indexed a dirty store — startup must never pay for indexing")
+	}
+}
