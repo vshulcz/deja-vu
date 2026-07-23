@@ -140,6 +140,25 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 					s.Touch(t)
 				}
 			}
+			// Newer Gemini CLI builds write the message state inside $set
+			// snapshots (sometimes the only message-bearing lines in the
+			// file). A $set replaces the state collected so far.
+			if list, ok := patch["messages"].([]any); ok {
+				var snap []geminiMessage
+				for _, item := range list {
+					raw, err := json.Marshal(item)
+					if err != nil {
+						continue
+					}
+					var gm geminiMessage
+					if json.Unmarshal(raw, &gm) == nil && gm.Type != "" {
+						snap = append(snap, gm)
+					}
+				}
+				if len(snap) > 0 || len(list) == 0 {
+					msgs = snap
+				}
+			}
 			return
 		}
 		if rid, ok := m["$rewindTo"].(string); ok {

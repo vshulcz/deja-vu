@@ -120,10 +120,11 @@
    ],
    "format_kind": "json-or-jsonl",
    "fixture_paths": [
-    "fixtures/registry/gemini/session.jsonl"
+    "fixtures/registry/gemini/session.jsonl",
+    "fixtures/registry/gemini/session-set-snapshot.jsonl"
    ],
    "parser_source": "internal/sources/gemini.go",
-   "last_verified": "2026-07-17",
+   "last_verified": "2026-07-24",
    "display_name": "Gemini CLI",
    "capabilities": {
     "mcp": true,
