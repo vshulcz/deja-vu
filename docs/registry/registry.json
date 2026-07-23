@@ -274,7 +274,7 @@
    "last_verified": "2026-07-23",
    "display_name": "OpenClaw",
    "capabilities": {
-    "mcp": false,
+    "mcp": true,
     "auto": false,
     "resume": false,
     "handoff": "paste",

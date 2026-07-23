@@ -200,7 +200,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Copilot CLI, pi — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin — Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Copilot CLI and pi have no hook that can inject context, so MCP is their full install). To make
+`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin — Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI and pi have no hook that can inject context, so MCP is their full install). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
@@ -247,7 +247,7 @@ limits, trust assumptions, and release verification.
 | Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | — | — | ✅ | — |
 | Kimi Code | `${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl`<br>`${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl` | ✅ | — | ✅ | paste | — |
 | pi | `${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl` | ✅ | — | ✅ | ✅ | — |
-| OpenClaw | `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl`<br>`${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl` | — | — | — | paste | — |
+| OpenClaw | `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl`<br>`${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl` | ✅ | — | — | paste | — |
 | Copilot CLI | `${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl` | ✅ | — | ✅ | ✅ | — |
 | Roo Code | `<vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json`<br>`${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json` | — | — | — | paste | — |
 <!-- matrix:end -->

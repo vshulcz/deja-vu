@@ -859,3 +859,26 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 		t.Fatalf("push scp err=%v", err)
 	}
 }
+
+func TestInstallOpenClawMCP(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("OPENCLAW_STATE_DIR", "")
+	r, err := installTarget("openclaw", "/bin/deja", false)
+	if err != nil || r.Action != "created" {
+		t.Fatalf("install openclaw: %#v %v", r, err)
+	}
+	b, _ := os.ReadFile(r.Path)
+	// OpenClaw nests servers under mcp.servers, not mcpServers.
+	if !strings.Contains(string(b), `"mcp"`) || !strings.Contains(string(b), `"servers"`) || !strings.Contains(string(b), "/bin/deja") {
+		t.Fatalf("bad openclaw.json: %s", b)
+	}
+	if r, err = installTarget("openclaw", "/bin/deja", true); err != nil || r.Action != "updated" {
+		t.Fatalf("uninstall openclaw: %#v %v", r, err)
+	}
+	if err := os.WriteFile(filepath.Join(homeDir(), ".openclaw", "openclaw.json"), []byte(`{"mcp":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installOpenClawMCP("/bin/deja", false); err == nil {
+		t.Fatal("expected malformed openclaw.json error")
+	}
+}

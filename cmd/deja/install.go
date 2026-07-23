@@ -255,6 +255,7 @@ func existingTargets() []string {
 		"kimi":        sources.KimiConfigDir(),
 		"cline":       sources.ClineConfigDir(),
 		"pi":          sources.PiConfigDir(),
+		"openclaw":    filepath.Join(sources.OpenClawStateDir(), "openclaw.json"),
 	}
 	var out []string
 	for name, p := range checks {
@@ -298,6 +299,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCopilotMCP(exe, uninstall)
 	case "pi":
 		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
+	case "openclaw":
+		return installOpenClawMCP(exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -651,6 +654,42 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	} else {
 		command, args := mcpCommandArgs(exe)
 		m["deja"] = map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}
+	}
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
+}
+
+// installOpenClawMCP wires deja into openclaw.json — OpenClaw keeps MCP
+// servers under mcp.servers, not the common mcpServers root.
+func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
+	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+	old, _ := os.ReadFile(path)
+	var root map[string]any
+	if len(bytes.TrimSpace(old)) == 0 {
+		root = map[string]any{}
+	} else if err := json.Unmarshal(old, &root); err != nil {
+		return installResult{}, err
+	}
+	mcp, _ := root["mcp"].(map[string]any)
+	if mcp == nil {
+		mcp = map[string]any{}
+		root["mcp"] = mcp
+	}
+	servers, _ := mcp["servers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+		mcp["servers"] = servers
+	}
+	if uninstall {
+		delete(servers, "deja")
+	} else {
+		command, args := mcpCommandArgs(exe)
+		servers["deja"] = map[string]any{"command": command, "args": args}
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {

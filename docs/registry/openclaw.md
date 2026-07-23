@@ -18,7 +18,9 @@ keep session *metadata* in SQLite; transcripts stay JSONL files, which is all
 deja reads. Format verified against openclaw source
 (`src/config/sessions/paths.ts`, `artifacts.ts`, `src/transcripts/store.ts`).
 
-- **MCP**: OpenClaw manages its own tool wiring; deja indexes its history and
-  serves it to other agents.
+- **MCP**: `deja install openclaw` wires deja into `openclaw.json` under
+  `mcp.servers` (OpenClaw's own layout, not the common `mcpServers` root).
+  Live-verified: `openclaw mcp probe deja` reports the tools and the agent
+  calls `recall` mid-turn.
 - **Resume**: OpenClaw's own session continuity.
 - **Handoff**: paste.
