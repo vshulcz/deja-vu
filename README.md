@@ -2,7 +2,9 @@
 
 <p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; searches 3.3&nbsp;GB in ~12&nbsp;ms, serves it back to any agent over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">vshulcz.github.io/deja-vu</a></p>
+<p align="center"><strong>84.9% R@1</strong> on LongMemEval-S retrieval &mdash; no LLM, no embeddings, no API key. <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Harness in-repo, run it yourself.</a></p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">vshulcz.github.io/deja-vu</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">how deja compares</a></p>
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -26,7 +28,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
 | **Stats** | `deja stats` — your agent work, wrapped; `--impact` reports only counted numbers: recalls served, session starts that began with memory, served-vs-raw ratio |
-| **Promote** | `deja promote <id>` — distill a session into a curated note with provenance and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts |
+| **Promote** | `deja promote <id>` — distill a session into a curated note with provenance, `--tag` keywords and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts, and promoting over an existing accepted note surfaces the conflict |
 | **Trust scopes** | `policy.json` decides what memory activates where: search / MCP / auto × local / imported / per-peer; receipts and `deja log` name the rule |
 | **Deep verify** | `deja doctor --deep` proves the index against the sources — re-parses a sample, resolves postings, separates staleness from drift |
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
@@ -304,9 +306,9 @@ Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact cr
 **Does anything leave my machine?** Indexing and search are local. `deja update` downloads releases from GitHub, and user-invoked `deja sync ssh` transfers redacted batches through the system SSH client. Directory exports and shares go only to the destination you choose. See the [security model](docs/SECURITY-MODEL.md#data-flows) for the full data flow.
 
 **How is this different from cass?**
-[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, twelve harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
+[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, fourteen harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
 
-[engram](https://github.com/Gentleman-Programming/engram) is the strongest of the record-forward memory tools: the agent calls `mem_save` and curated notes accumulate in SQLite. Curation buys it conflict detection deja doesn't attempt — but it starts empty, only knows what an agent decided to save, and can't answer for the months of sessions that happened before it was installed. deja starts full: the transcripts are the memory, no cooperation required.
+[engram](https://github.com/Gentleman-Programming/engram) is the strongest of the record-forward memory tools: the agent calls `mem_save` and curated notes accumulate in SQLite. Curation buys it conflict detection — deja now surfaces conflicts too, between accepted notes at promote time — but it starts empty, only knows what an agent decided to save, and can't answer for the months of sessions that happened before it was installed. deja starts full: the transcripts are the memory, no cooperation required.
 
 **And from MemPalace / Mem0 / Letta?**
 Those are memory *platforms*: a Python runtime, embedding models, a vector store, and capture hooks that only remember what happens after you adopt them. deja has no capture step and no stack — one binary over the logs your agents already wrote, so it knows your history from day one, including everything from before you installed it.

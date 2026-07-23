@@ -45,6 +45,7 @@
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
@@ -56,7 +57,7 @@
 <tr><td><code>deja "query"</code></td><td>Search indexed history. Filters: <code>--harness --project --since --role --re --json</code>.</td></tr>
 <tr><td><code>deja ctx "query"</code></td><td>Print a context digest to stdout (for piping into an agent).</td></tr>
 <tr><td><code>deja blame &lt;path&gt;</code></td><td>Sessions that discussed a file, most specific first.</td></tr>
-<tr><td><code>deja remember "text"</code></td><td>Store a durable note. <code>--project</code> optional.</td></tr>
+<tr><td><code>deja remember "text"</code></td><td>Store a durable note. <code>--project</code> optional; <code>--tag</code> (repeatable) attaches keywords that boost matching queries.</td></tr>
 <tr><td><code>deja forget</code></td><td>Remove sessions by <code>--session</code>/<code>--project</code>/<code>--before</code>; <code>--dry-run</code>, <code>--list</code>, <code>--unforget</code>.</td></tr>
 <tr><td><code>deja stats</code></td><td>Totals, top projects, activity. <code>--card</code> (SVG), <code>--html</code> (timeline), <code>--redaction</code>, <code>--json</code>. <code>--impact</code> prints the measured impact report (recalls, reuse, distillation ratio) with the arithmetic labeled.</td></tr>
 <tr><td><code>deja</code></td><td>Bare, on a terminal: the living brief — today's activity, recalls served, déjà vu moments, a suggested search from your own history.</td></tr>
@@ -66,7 +67,7 @@
 <tr><td><code>deja install &lt;target|--all|--auto&gt;</code></td><td>Wire MCP recall (and hooks) into your agents.</td></tr>
 <tr><td><code>deja embed</code></td><td>Build the semantic vector sidecar from a local endpoint.</td></tr>
 <tr><td><code>deja sync export/import/ssh</code></td><td>Move redacted memory between machines.</td></tr>
-<tr><td><code>deja promote &lt;id&gt;</code></td><td>Distill a session into a curated note: quoted evidence with provenance and a lifecycle state (<code>--state accepted|rejected|superseded|stale</code>). Corrections append; the note outranks the raw transcript in recall. <code>--to path</code> also appends a Markdown block for repo-visible notes.</td></tr>
+<tr><td><code>deja promote &lt;id&gt;</code></td><td>Distill a session into a curated note: quoted evidence with provenance and a lifecycle state (<code>--state accepted|rejected|superseded|stale</code>). Corrections append; the note outranks the raw transcript in recall. <code>--to path</code> also appends a Markdown block for repo-visible notes. <code>--tag</code> adds keywords; promoting into ground another accepted note already covers prints a conflict warning naming the older note.</td></tr>
 <tr><td><code>deja doctor</code></td><td>Diagnose stores, wiring, index and version. <code>--json</code>, <code>--offline</code>. <code>--deep</code> re-parses a sample of source files and resolves postings to prove the index against the sources; exits non-zero on drift.</td></tr>
 <tr><td><code>deja bench recall|context</code></td><td>Reproducible search-quality and context-readiness benchmarks.</td></tr>
 <tr><td><code>deja update</code></td><td>Update a standalone install (Homebrew/npm update via the package manager).</td></tr>

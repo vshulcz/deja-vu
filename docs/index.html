@@ -9,7 +9,7 @@
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="deja-vu — search every session your coding agents ever wrote">
-<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across twelve coding agents, served back to them via MCP.">
+<meta property="og:description" content="Your agents already solved this. deja finds it. One local index across fourteen coding agents, served back to them via MCP.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -314,6 +314,7 @@ footer .spacer{flex:1}
 ██████╔╝███████╗╚█████╔╝██║  ██║       ╚████╔╝ ╚██████╔╝
 ╚═════╝ ╚══════╝ ╚════╝ ╚═╝  ╚═╝        ╚═══╝   ╚═════╝</pre>
     <h1 class="tagline">your agents already solved this. <span class="f2">deja finds it.</span></h1>
+    <p class="tagline" style="margin-top:8px;font-size:clamp(.85rem,2vw,1.05rem)"><span class="f2">84.9% R@1</span> on LongMemEval-S retrieval — no LLM, no embeddings, no API key. <a href="guide/benchmarks.html" style="color:inherit">measured, in-repo →</a></p>
     <p class="sub">Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk, searches gigabytes in ~12&nbsp;ms, serves memory back over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
     <div class="heroline">
       <span class="p">$</span>
@@ -364,7 +365,7 @@ footer .spacer{flex:1}
       <tr><td class="n">~12 ms</td><td class="c">typical warm search over gigabytes of history</td></tr>
       <tr><td class="n">~50 ms</td><td class="c">session-start hook on a 1000-session index — memory lands before you type</td></tr>
       <tr><td class="n">84.9%</td><td class="c">R@1 on LongMemEval-S session retrieval — no LLM, no embeddings, harness in-repo</td></tr>
-      <tr><td class="n">12</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
+      <tr><td class="n">14</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
     </table>
     <p class="foot"><a href="guide/benchmarks.html">how it's measured →</a></p>
   </div>
@@ -390,7 +391,7 @@ footer .spacer{flex:1}
 </section>
 
 <section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja doctor</span> <span class="out"># twelve harnesses, one memory</span></p>
+  <p class="shead"><span class="p">$</span> <span class="cmd">deja doctor</span> <span class="out"># fourteen harnesses, one memory</span></p>
   <div class="sources">
     <table class="mx">
       <tr><th></th><th>mcp recall</th><th>auto-recall</th><th>resume</th><th>handoff</th><th>needs</th></tr>
@@ -403,6 +404,8 @@ footer .spacer{flex:1}
       <tr><td class="nm">grok build</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
       <tr><td class="nm">qwen code</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
       <tr><td class="nm">kimi code</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
+      <tr><td class="nm">cline</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
+      <tr><td class="nm">roo code</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="am">paste</td><td class="pa">history still indexed</td></tr>
       <tr><td class="nm">pi</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
       <tr><td class="nm">copilot cli</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
       <tr><td class="nm">aider</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">no MCP client — history still indexed</td></tr>
@@ -443,9 +446,10 @@ footer .spacer{flex:1}
     <a href="guide/agents.html">agents-and-mcp<span>recall, blame, remember, auto-recall</span></a>
     <a href="guide/search.html">search<span>phrases, fuzzy, semantic, tiers</span></a>
     <a href="guide/commands.html">cli-reference<span>every subcommand and flag</span></a>
-    <a href="guide/harnesses.html">harnesses<span>twelve agents, and adding one</span></a>
+    <a href="guide/harnesses.html">harnesses<span>fourteen agents, and adding one</span></a>
     <a href="guide/privacy.html">privacy<span>redaction, forget, exclude</span></a>
     <a href="guide/benchmarks.html">benchmarks<span>the ~200× number, reproducible</span></a>
+    <a href="guide/compare.html">compare<span>deja next to Mem0, Letta, memU…</span></a>
     <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">architecture<span>index format, internals</span></a>
   </div>
 </section>
@@ -461,7 +465,7 @@ footer .spacer{flex:1}
       <tr><td class="nm">cross-machine sync</td><td class="am">git / cloud</td><td class="n">—</td><td class="y">✓ ssh, local</td></tr>
       <tr><td class="nm">setup</td><td class="am">wire MCP + teach agents to save</td><td class="am">Rust toolchain / TUI</td><td class="y">one binary, works on the past</td></tr>
     </table>
-    <p class="mx-foot"><a href="https://github.com/Gentleman-Programming/engram">engram</a> curates what an agent chooses to save — good conflict detection, empty past. <a href="https://github.com/Dicklesworthstone/coding_agent_session_search">cass</a> is the kitchen-sink search take. deja's bet: the transcripts are the memory — retroactive, redacted, synced over your own ssh.</p>
+    <p class="mx-foot"><a href="https://github.com/Gentleman-Programming/engram">engram</a> curates what an agent chooses to save — good conflict detection, empty past. <a href="https://github.com/Dicklesworthstone/coding_agent_session_search">cass</a> is the kitchen-sink search take. deja's bet: the transcripts are the memory — retroactive, redacted, synced over your own ssh. Full table against Mem0, Letta, memU, Memori, claude-mem: <a href="guide/compare.html">guide/compare</a>.</p>
   </div>
 </section>
 
@@ -571,7 +575,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
   var COMMANDS={
     'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
-    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;pi&nbsp;&nbsp;copilot\n12 harnesses, one index — real paths in the <a href="#proof">matrix below</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;pi&nbsp;&nbsp;copilot\n14 harnesses, one index — real paths in the <a href="#proof">matrix below</a></p>',
     'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
     'version':'<p class="none">deja 0.14.1</p>',
     'clear':''
