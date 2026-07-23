@@ -1,0 +1,2 @@
+{"sessionId":"reg-gem-set-001","projectHash":"abc","startTime":"2026-07-22T07:53:15.572Z","lastUpdated":"2026-07-22T07:53:15.572Z","kind":"main"}
+{"$set":{"messages":[{"id":"m1","timestamp":"2026-07-22T07:53:15.573Z","type":"user","content":[{"text":"gemini set-snapshot conformance question"}]},{"id":"m2","timestamp":"2026-07-22T07:53:20.000Z","type":"gemini","content":[{"text":"gemini set-snapshot conformance answer"}],"model":"gemini-2.5-pro"}],"lastUpdated":"2026-07-22T07:53:20.000Z"}}
