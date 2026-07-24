@@ -63,7 +63,7 @@ func syncSSHPush(dir, host string, full bool) error {
 		n, err = index.ExportFull(dir, tmp)
 		commit = func() error { return nil }
 	} else {
-		n, commit, err = index.ExportDeferred(dir, tmp)
+		n, commit, err = index.ExportDeferred(dir, tmp, host)
 	}
 	if err != nil {
 		return err

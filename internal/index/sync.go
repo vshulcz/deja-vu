@@ -27,34 +27,45 @@ type SyncRecord struct {
 	Time      time.Time `json:"time"`
 }
 
-// Export writes records newer than the per-source watermarks. ExportFull
-// ignores watermarks so a fresh machine can receive the whole history even
-// after earlier batch dirs are gone; import-side dedupe makes it safe.
+// Export writes records newer than the watermarks for an unnamed peer (a
+// manual `deja sync export`). ExportFull ignores watermarks so a fresh
+// machine can receive the whole history even after earlier batch dirs are
+// gone; import-side dedupe makes it safe.
 func Export(dir, outDir string) (int, error) {
-	return exportRecords(dir, outDir, false)
+	return exportRecords(dir, outDir, "", false)
 }
 
 func ExportFull(dir, outDir string) (int, error) {
-	return exportRecords(dir, outDir, true)
+	return exportRecords(dir, outDir, "", true)
 }
 
 // ExportDeferred writes batches like Export but does not advance the
 // watermarks; the returned commit persists them once the receiver has
 // acknowledged the batch. Watermarked sync must be acknowledged delivery:
 // advancing on a failed transport silently drops records from the next push.
-func ExportDeferred(dir, outDir string) (int, func() error, error) {
-	return exportRecordsDeferred(dir, outDir, false)
+func ExportDeferred(dir, outDir, peer string) (int, func() error, error) {
+	return exportRecordsDeferred(dir, outDir, peer, false)
 }
 
-func exportRecords(dir, outDir string, full bool) (int, error) {
-	n, commit, err := exportRecordsDeferred(dir, outDir, full)
+// watermarkKey namespaces a source's watermark by peer: what a laptop has
+// already received says nothing about what a server has. An empty peer keeps
+// the bare source key, so manifests written before this existed still read.
+func watermarkKey(peer, source string) string {
+	if peer == "" {
+		return source
+	}
+	return peer + "\x00" + source
+}
+
+func exportRecords(dir, outDir, peer string, full bool) (int, error) {
+	n, commit, err := exportRecordsDeferred(dir, outDir, peer, full)
 	if err != nil {
 		return n, err
 	}
 	return n, commit()
 }
 
-func exportRecordsDeferred(dir, outDir string, full bool) (int, func() error, error) {
+func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() error, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -86,7 +97,12 @@ func exportRecordsDeferred(dir, outDir string, full bool) (int, func() error, er
 		if source == "" {
 			source = r.Key
 		}
-		if !full && !r.Time.IsZero() && r.Time.UnixNano() <= m.ExportWatermarks[source] {
+		// Strictly older, not "not newer": harnesses that stamp every message
+		// of a session with one time (aider, Cursor) would otherwise lose
+		// every message appended after the first push. Re-sending the records
+		// that sit exactly on the watermark is free — import dedupes them by
+		// role and text hash.
+		if !full && !r.Time.IsZero() && r.Time.UnixNano() < m.ExportWatermarks[watermarkKey(peer, source)] {
 			return
 		}
 		meta, ok := m.Sessions[r.Key]
@@ -96,8 +112,8 @@ func exportRecordsDeferred(dir, outDir string, full bool) (int, func() error, er
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time}
 		bySource[source] = append(bySource[source], rec)
-		if r.Time.UnixNano() > nextWatermarks[source] {
-			nextWatermarks[source] = r.Time.UnixNano()
+		if wk := watermarkKey(peer, source); r.Time.UnixNano() > nextWatermarks[wk] {
+			nextWatermarks[wk] = r.Time.UnixNano()
 		}
 	})
 	if err != nil {

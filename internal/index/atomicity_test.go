@@ -161,12 +161,12 @@ func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(tmp, "out")
-	n, commit, err := ExportDeferred(dir, out)
+	n, commit, err := ExportDeferred(dir, out, "")
 	if err != nil || n != 1 {
 		t.Fatalf("deferred export = %d, %v", n, err)
 	}
 	// Not committed: a re-export must still see the record.
-	n2, commit2, err := ExportDeferred(dir, filepath.Join(tmp, "out2"))
+	n2, commit2, err := ExportDeferred(dir, filepath.Join(tmp, "out2"), "")
 	if err != nil || n2 != 1 {
 		t.Fatalf("pre-ack re-export = %d, %v — watermark advanced before ack", n2, err)
 	}
@@ -174,10 +174,24 @@ func TestExportDeferredCommitsWatermarkOnlyOnAck(t *testing.T) {
 	if err := commit(); err != nil {
 		t.Fatal(err)
 	}
-	// Committed: nothing new.
-	n3, _, err := ExportDeferred(dir, filepath.Join(tmp, "out3"))
-	if err != nil || n3 != 0 {
-		t.Fatalf("post-ack export = %d, %v — watermark not persisted", n3, err)
+	// Committed: the watermark holds, so strictly older work is not resent.
+	// Records sitting exactly on the watermark are resent by design (import
+	// dedupes them) — see the tie handling in exportRecordsDeferred.
+	// Same source file: watermarks are per source, so an older record must
+	// land in the file that already has one.
+	older := line + `{"type":"user","sessionId":"s1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":"older than the watermark"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(older), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	n3, _, err := ExportDeferred(dir, filepath.Join(tmp, "out3"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n3 > 1 {
+		t.Fatalf("post-ack export = %d — watermark not persisted (older work resent)", n3)
 	}
 	// Sessions must survive the core-only manifest write.
 	ss, err := Recent(dir, 5)
