@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- CJK bigram indexing (#337, design by @AliceLJY): Chinese/Japanese/Korean text gets first-class exact search and full ranking; index version bumps for one automatic rebuild. Note: a single-character query against a longer run (`茶` in `喝茶`) resolves via the close tier, not exact.
+
 ## [0.15.5] - 2026-07-24
 
 ### Added

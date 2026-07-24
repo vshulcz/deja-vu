@@ -1429,6 +1429,8 @@ func oneSuffixStep(word string) []string {
 
 func hasFuzzyToken(terms []string) bool {
 	for _, term := range terms {
+		// The 4-rune floor also keeps CJK bigrams (always 2 runes) out of
+		// fuzzy variant generation entirely — no variant-space blowup (#338).
 		if len([]rune(term)) >= 4 {
 			return true
 		}
