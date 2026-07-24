@@ -188,10 +188,11 @@ func RelevanceTerms(q string) []string {
 			r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400
 		return !wordy
 	})
+	fields = expandCJKTokens(fields)
 	seen := map[string]bool{}
 	var out []string
 	for _, f := range fields {
-		if len(f) < 3 || search.IsStopWord(f) || seen[f] {
+		if len([]rune(f)) < 2 || (len(f) < 3 && !isCJK([]rune(f)[0])) || search.IsStopWord(f) || seen[f] {
 			continue
 		}
 		seen[f] = true
@@ -1609,6 +1610,9 @@ func indexKeys(s string) []string {
 	for _, part := range identifierParts(s) {
 		out = append(out, "t"+part)
 	}
+	for _, bg := range cjkBigrams(s) {
+		out = append(out, "t"+bg)
+	}
 	return out
 }
 
@@ -1684,7 +1688,7 @@ func retrievalKeys(keys []string) []string {
 }
 
 func queryKeys(s string) []string {
-	toks := tokens(s)
+	toks := expandCJKTokens(tokens(s))
 	if len(toks) == 0 {
 		return nil
 	}

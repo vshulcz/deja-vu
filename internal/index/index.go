@@ -10,7 +10,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-const version = 10
+const version = 11
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
