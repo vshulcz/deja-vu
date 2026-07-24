@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +25,34 @@ func Search(dir string, o query.Options) ([]model.Session, error) {
 }
 
 func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
+	r, err := searchDetailedOnce(dir, o)
+	if err != nil || len(r.Sessions) > 0 || o.Regex {
+		return r, err
+	}
+	// A question that embeds a quoted phrase ("when did I read \"x y\"?")
+	// and matched nothing anywhere: the phrase kept its exactness contract,
+	// now retry once with the quotes dropped, served under the relevance
+	// tier so the loosening is visible. A bare quoted phrase with no words
+	// of its own stays silent — reversed or misremembered phrases must not
+	// dissolve into bag-of-words matches.
+	if strings.Contains(o.Query, "\"") {
+		outside := quotedSpanRE.ReplaceAllString(o.Query, " ")
+		if len(RelevanceTerms(outside)) >= 2 {
+			o2 := o
+			o2.Query = strings.ReplaceAll(o.Query, "\"", " ")
+			r2, err2 := searchDetailedOnce(dir, o2)
+			if err2 == nil && len(r2.Sessions) > 0 {
+				r2.Tier = query.TierRelevance
+				return r2, nil
+			}
+		}
+	}
+	return r, err
+}
+
+var quotedSpanRE = regexp.MustCompile(`"[^"]*"`)
+
+func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -187,7 +216,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched := relevantMetasCounts(dir, m, nil, terms, 50)
+	metas, _, anyMatched, termsKnown := relevantMetasCounts(dir, m, nil, terms, 50)
 	if len(metas) == 0 {
 		return SearchResult{}, nil
 	}
@@ -204,9 +233,24 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		}
 	}
 	if len(keep) == 0 {
-		// No multi-term session at all: stay silent rather than serve
-		// single-word noise as if it were an answer.
-		return SearchResult{}, nil
+		// No multi-term session at all. For a real question (three or more
+		// informative words) serving nothing teaches the user the tool is
+		// deaf — serve the single-term candidates ranked by idf as an
+		// explicitly weak tail. Short queries keep the silence contract:
+		// one lucky word on a two-word query is noise, not an answer.
+		// Guard: at least two of the query's words must exist in the corpus
+		// at all — one known anchor among typos is noise, not a question.
+		if len(weak) == 0 || len(terms) < 3 || termsKnown < 2 {
+			return SearchResult{}, nil
+		}
+		if len(weak) > 50 {
+			weak = weak[:50]
+		}
+		ss, err := sessionsForMetas(dir, weak)
+		if err != nil {
+			return SearchResult{}, err
+		}
+		return SearchResult{Sessions: ss, Tier: query.TierRelevance}, nil
 	}
 	// Single-term sessions ride BEHIND every strong candidate: they widen
 	// deep recall without letting a lucky word outrank a real match.
@@ -262,7 +306,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int) {
-	metas, informative, _ := relevantMetasCounts(dir, m, projects, terms, n)
+	metas, informative, _, _ := relevantMetasCounts(dir, m, projects, terms, n)
 	return metas, informative
 }
 
@@ -270,7 +314,7 @@ func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n in
 // each session matched — the noise gate for full-index relevance search,
 // where demanding two rare terms also rejects real answers that pair one
 // rare word with one ordinary one.
-func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int) {
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, int) {
 	inProject := map[uint32]SessionMeta{}
 	for _, meta := range m.Sessions {
 		if len(projects) == 0 { // empty scope = whole index
@@ -287,7 +331,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	if len(inProject) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, 0
 	}
 	totalDocs := float64(len(m.Sessions)) + 1
 	score := map[uint32]float64{}
@@ -301,6 +345,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// session can be ranked by its best single message rather than by the
 	// total it collects across thousands of them.
 	msgIDF := map[uint32]map[int64]float64{}
+	termsKnown := 0
 	for _, term := range terms {
 		keys := queryKeys(term)
 		if len(keys) == 0 {
@@ -372,6 +417,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if missed || len(hit) == 0 {
 			continue
 		}
+		termsKnown++
 		idf := math.Log(totalDocs / float64(minDF+1))
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
@@ -446,7 +492,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 	}
 	if len(ranked) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, termsKnown
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score != ranked[j].score {
@@ -470,7 +516,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		matched = append(matched, r.matched)
 		anyMatched = append(anyMatched, r.any)
 	}
-	return metas, matched, anyMatched
+	return metas, matched, anyMatched, termsKnown
 }
 
 // loadSessionRecords materializes one session's transcript from the index.
