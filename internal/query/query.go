@@ -34,6 +34,9 @@ type Options struct {
 	// RecallWorn maps session id -> agent recall count; filled by callers
 	// from the usage log, consumed as a bounded ranking boost.
 	RecallWorn map[string]int `json:"-"`
+	// Now anchors relative-time phrases in the query ("a week ago"); zero
+	// means the moment of the search.
+	Now time.Time `json:"-"`
 }
 
 const (

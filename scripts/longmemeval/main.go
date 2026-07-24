@@ -240,6 +240,9 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	}
 
 	o := search.Options{Query: q.Question, All: true}
+	if t, err := time.Parse("2006/01/02 (Mon) 15:04", q.QuestionDate); err == nil {
+		o.Now = t
+	}
 	t0 := time.Now()
 	result, err := index.SearchWithRecoveryDetailed(dir, o, nil)
 	if err != nil {

@@ -212,7 +212,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if strings.Contains(o.Query, "\"") || o.Regex {
 		return SearchResult{}, nil
 	}
-	terms := RelevanceTerms(o.Query)
+	terms := RelevanceTermsWithTime(o.Query, o.Now)
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
