@@ -77,6 +77,8 @@ deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
 
 <h2>Natural-language queries</h2>
 <p>Stop words are dropped, word forms bridge morphology in both directions (<code>failing</code> finds <code>fails</code>), and when no session holds every remaining token deja drops up to two — telling you exactly which (<code>ignoring "why" — no session matches it together with the rest</code>). Zero results now mean the content genuinely is not there.</p>
+<h2>Search by time</h2>
+<p>Every message also carries its month and year as searchable tokens, so <code>deja "what did we do in may"</code> meets May's sessions structurally, and relative phrases resolve against the moment you ask: <code>a week ago</code>, <code>last month</code>, <code>10 days ago</code>. These are ranking hints, not filters — for a hard cutoff use <code>--since</code>.</p>
 <h2>Earlier attempts</h2>
 <p>When an old session and a newer one from the same project match the same ground, the older hit is labeled an earlier attempt with the newer session's date — in CLI output, MCP digests, and as an additive <code>superseded</code> field in <code>--json</code>. History stays; the direction the project moved is visible.</p>
 </article>

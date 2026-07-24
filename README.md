@@ -20,7 +20,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 
 | Feature | What it does |
 | --- | --- |
-| **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo |
+| **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time works too: `deja "what did we do in may"`, "a week ago" |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
 | **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"` |
