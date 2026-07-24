@@ -45,3 +45,34 @@ func TestRussianFillerDoesNotAnchor(t *testing.T) {
 		}
 	}
 }
+
+func TestRussianInflectionFolds(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := `{"type":"user","sessionId":"net1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"что то у меня с сетью локально всё отваливается"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "net1.jsonl"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A decoy that has the exact nominative "сеть" but nothing else relevant.
+	line2 := `{"type":"user","sessionId":"dec1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"локальная сеть офиса работает стабильно"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "dec1.jsonl"), []byte(line2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Search(dir, search.Options{Query: "сеть отваливается почему", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) == 0 || got[0].ID != "net1" {
+		t.Fatalf("inflected сетью must be reachable from сеть and outrank the decoy, got %d", len(got))
+	}
+}
