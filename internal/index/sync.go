@@ -57,6 +57,20 @@ func watermarkKey(peer, source string) string {
 	return peer + "\x00" + source
 }
 
+// exportBoundaryCap bounds how many record identities a watermark carries.
+const exportBoundaryCap = 4096
+
+// recordIdentity is a stable fingerprint of one exported record.
+func recordIdentity(r Record) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(r.Key))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(r.Role))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(r.Text))
+	return h.Sum64()
+}
+
 func exportRecords(dir, outDir, peer string, full bool) (int, error) {
 	n, commit, err := exportRecordsDeferred(dir, outDir, peer, full)
 	if err != nil {
@@ -89,6 +103,18 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	for k, v := range m.ExportWatermarks {
 		nextWatermarks[k] = v
 	}
+	// Records that already went out at exactly the watermark instant. Time
+	// alone cannot resume precisely when a harness stamps a whole session
+	// with one timestamp, so the boundary is remembered by record identity.
+	sentAtBoundary := map[string]map[uint64]bool{}
+	for k, hashes := range m.ExportBoundary {
+		set := make(map[uint64]bool, len(hashes))
+		for _, h := range hashes {
+			set[h] = true
+		}
+		sentAtBoundary[k] = set
+	}
+	nextBoundary := map[string]map[uint64]bool{}
 	err = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
 		if r.SourcePath == syncImportPath {
 			return
@@ -97,13 +123,18 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		if source == "" {
 			source = r.Key
 		}
-		// Strictly older, not "not newer": harnesses that stamp every message
-		// of a session with one time (aider, Cursor) would otherwise lose
-		// every message appended after the first push. Re-sending the records
-		// that sit exactly on the watermark is free — import dedupes them by
-		// role and text hash.
-		if !full && !r.Time.IsZero() && r.Time.UnixNano() < m.ExportWatermarks[watermarkKey(peer, source)] {
-			return
+		wk := watermarkKey(peer, source)
+		rh := recordIdentity(r)
+		if !full && !r.Time.IsZero() {
+			wm := m.ExportWatermarks[wk]
+			// Strictly older is settled; a record sharing the watermark
+			// instant is only settled if it was in that push.
+			if r.Time.UnixNano() < wm {
+				return
+			}
+			if r.Time.UnixNano() == wm && sentAtBoundary[wk][rh] {
+				return
+			}
 		}
 		meta, ok := m.Sessions[r.Key]
 		if !ok {
@@ -112,8 +143,19 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time}
 		bySource[source] = append(bySource[source], rec)
-		if wk := watermarkKey(peer, source); r.Time.UnixNano() > nextWatermarks[wk] {
-			nextWatermarks[wk] = r.Time.UnixNano()
+		tn := r.Time.UnixNano()
+		switch {
+		case tn > nextWatermarks[wk]:
+			nextWatermarks[wk] = tn
+			nextBoundary[wk] = map[uint64]bool{rh: true}
+		case tn == nextWatermarks[wk]:
+			if nextBoundary[wk] == nil {
+				nextBoundary[wk] = map[uint64]bool{}
+				for h := range sentAtBoundary[wk] {
+					nextBoundary[wk][h] = true
+				}
+			}
+			nextBoundary[wk][rh] = true
 		}
 	})
 	if err != nil {
@@ -154,9 +196,25 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		if cur.ExportWatermarks == nil {
 			cur.ExportWatermarks = map[string]int64{}
 		}
+		if cur.ExportBoundary == nil {
+			cur.ExportBoundary = map[string][]uint64{}
+		}
 		for source, wm := range nextWatermarks {
-			if wm > cur.ExportWatermarks[source] {
-				cur.ExportWatermarks[source] = wm
+			if wm < cur.ExportWatermarks[source] {
+				continue
+			}
+			cur.ExportWatermarks[source] = wm
+			// Above the cap the boundary set stops being cheap; drop it and
+			// let the next push resend that instant — import dedupes.
+			if set := nextBoundary[source]; len(set) > 0 && len(set) <= exportBoundaryCap {
+				hashes := make([]uint64, 0, len(set))
+				for h := range set {
+					hashes = append(hashes, h)
+				}
+				sort.Slice(hashes, func(i, j int) bool { return hashes[i] < hashes[j] })
+				cur.ExportBoundary[source] = hashes
+			} else {
+				delete(cur.ExportBoundary, source)
 			}
 		}
 		return writeManifestOnly(dir, cur)

@@ -85,7 +85,11 @@ type Manifest struct {
 	Redacted         int                    `json:"redacted"`
 	RedactionRules   map[string]int         `json:"redaction_rules,omitempty"`
 	ExportWatermarks map[string]int64       `json:"export_watermarks,omitempty"`
-	ImportedRecords  map[string]bool        `json:"imported_records,omitempty"`
+	// ExportBoundary remembers which records were already sent at exactly
+	// the watermark instant, so resuming is precise even when a harness
+	// stamps a whole session with one timestamp.
+	ExportBoundary  map[string][]uint64 `json:"export_boundary,omitempty"`
+	ImportedRecords map[string]bool     `json:"imported_records,omitempty"`
 	// RecordsSize is records.bin's byte length when the manifest was committed.
 	// A live index whose records.bin is shorter than this lost its tail to a
 	// torn write and must be treated as corrupt.
@@ -112,6 +116,7 @@ type manifestCore struct {
 	Redacted         int
 	RedactionRules   map[string]int
 	ExportWatermarks map[string]int64
+	ExportBoundary   map[string][]uint64
 	ImportedRecords  map[string]bool
 	RecordsSize      int64
 	IngestHealth     map[string]HarnessIngest
