@@ -27,6 +27,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
 | **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
+| **View** | `deja view` — your whole memory in one local HTML: sessions, the recall audit trail, curated notes; no server, nothing leaves the machine |
 | **Stats** | `deja stats` — your agent work, wrapped; `--impact` reports only counted numbers: recalls served, session starts that began with memory, served-vs-raw ratio |
 | **Promote** | `deja promote <id>` — distill a session into a curated note with provenance, `--tag` keywords and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts, and promoting over an existing accepted note surfaces the conflict |
 | **Trust scopes** | `policy.json` decides what memory activates where: search / MCP / auto × local / imported / per-peer; receipts and `deja log` name the rule |
