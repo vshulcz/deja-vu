@@ -96,6 +96,7 @@ var commands = map[string]command{
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
+	"view":            runView,
 	"install":         func(dir string, rest []string) error { return runInstall(dir, rest, false) },
 	"uninstall":       func(dir string, rest []string) error { return runInstall(dir, rest, true) },
 	"update":          func(_ string, rest []string) error { return runUpdate(rest, os.Stdout) },
@@ -804,6 +805,7 @@ Usage:
   deja resume <id-prefix> [--exec]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt   (UserPromptSubmit hook: relevance recall per prompt)
+  deja view          (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja sync export <dir> [--full]
