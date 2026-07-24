@@ -358,6 +358,12 @@ func readBucket(p string) (map[string][]posting, error) {
 func readBucketToken(p, tok string) ([]posting, error) {
 	entries, f, err := openBucketDir(p)
 	if err != nil {
+		// A bucket that was never written means the token simply does not
+		// occur — that is "no postings", not a failure. Erroring here made
+		// the stem tier abort whole searches over an absent shard.
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()

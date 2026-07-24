@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	search "github.com/vshulcz/deja-vu/internal/query"
 )
 
 func TestEnsureHonorsHarnessScope(t *testing.T) {
@@ -44,5 +46,35 @@ func TestEnsureHonorsHarnessScope(t *testing.T) {
 	}
 	if len(m.Sessions) != 1 {
 		t.Fatalf("sessions = %d, want the single claude fixture", len(m.Sessions))
+	}
+}
+
+func TestDateTokensMakeSessionsFindableByMonth(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mk := func(id, ts, text string) {
+		line := `{"type":"user","sessionId":"` + id + `","timestamp":"` + ts + `","message":{"role":"user","content":"` + text + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("jun", "2023-06-10T10:00:00Z", "fixed the camping stove regression")
+	mk("sep", "2023-09-03T10:00:00Z", "tuned the winter tent lineup")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Search(dir, search.Options{Query: "camping june", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) == 0 || got[0].ID != "jun" {
+		t.Fatalf("month token did not surface the June session: %+v", got)
 	}
 }

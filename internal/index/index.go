@@ -170,6 +170,7 @@ type tokenJob struct {
 	text   string
 	offset int64
 	sid    uint32
+	when   time.Time
 }
 
 type bucketPostings map[string]map[string][]posting

@@ -264,7 +264,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 					return err
 				}
 				writtenMessages++
-				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord})
+				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time})
 			}
 		}
 		return nil
@@ -455,7 +455,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 					return err
 				}
 				writtenMessages++
-				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord})
+				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time})
 			}
 		}
 		return nil
@@ -502,7 +502,7 @@ func indexTextParallel(feed func(push func(tokenJob)) error) (bucketPostings, er
 			defer wg.Done()
 			for batch := range jobs {
 				for _, job := range batch {
-					addIndexKeys(partials[i], job.text, job.offset, job.sid)
+					addIndexKeys(partials[i], job.text, job.offset, job.sid, job.when)
 				}
 			}
 		}()
@@ -538,9 +538,23 @@ func indexTextParallel(feed func(push func(tokenJob)) error) (bucketPostings, er
 	return merged, nil
 }
 
-func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32) {
+// dateTokens makes a message findable by when it happened: the month name,
+// the year, and year-month land in the postings like ordinary words, so
+// "deja \"what did we do in may\"" matches May sessions structurally.
+func dateTokens(when time.Time) []string {
+	if when.IsZero() {
+		return nil
+	}
+	return []string{
+		"t" + strings.ToLower(when.Month().String()),
+		"t" + when.Format("2006"),
+		"t" + when.Format("2006-01"),
+	}
+}
+
+func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time) {
 	seen := map[string]bool{}
-	for _, tok := range indexKeys(text) {
+	for _, tok := range append(indexKeys(text), dateTokens(when)...) {
 		if seen[tok] {
 			continue
 		}
@@ -877,7 +891,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			return err
 		}
 		seen := map[string]bool{}
-		for _, tok := range indexKeys(r.Text) {
+		for _, tok := range append(indexKeys(r.Text), dateTokens(r.Time)...) {
 			if seen[tok] {
 				continue
 			}
