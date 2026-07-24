@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 type SyncRecord struct {
@@ -231,6 +232,7 @@ func Import(dir, inDir string) (int, error) {
 		return 0, err
 	}
 	defer unlock()
+	dead := readTombstones()
 	if !HasManifest(dir) {
 		if err := initEmptyIndex(dir); err != nil {
 			return 0, err
@@ -269,6 +271,17 @@ func Import(dir, inDir string) (int, error) {
 				return nil
 			}
 			importID := ImportedSessionID(sr.Harness, origID)
+			// Forgetting is primary data, not cache: a tombstoned session
+			// must stay dead even when the peer still holds the batch and
+			// this index was wiped and rebuilt.
+			if dead[sr.Harness+":"+importID] {
+				return nil
+			}
+			// The exclude list keeps a project out of this machine's memory;
+			// a sync from another machine must not put it back.
+			if sources.ExcludedProject(sr.Project) {
+				return nil
+			}
 			key := sr.Harness + ":" + importID
 			text, _ := redact.Text(sr.Text)
 			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})

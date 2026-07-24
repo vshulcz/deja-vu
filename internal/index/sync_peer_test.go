@@ -101,3 +101,57 @@ func TestExportKeepsMessagesSharingTheWatermarkTimestamp(t *testing.T) {
 		t.Fatal("the appended message never reached the peer index")
 	}
 }
+
+// Forgetting is primary data: a tombstoned session must not come back when
+// the peer still holds the batch and this index was wiped and rebuilt.
+func TestImportHonorsTombstonesAfterCacheWipe(t *testing.T) {
+	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "secret client work"))
+	batch := filepath.Join(tmp, "batch")
+	if _, err := Export(dir, batch); err != nil {
+		t.Fatal(err)
+	}
+	peer := filepath.Join(tmp, "peer.db")
+	if _, err := Import(peer, batch); err != nil {
+		t.Fatal(err)
+	}
+	imported := ImportedSessionID("claude", "s1")
+	if _, err := Forget(peer, ForgetOptions{Session: imported}); err != nil {
+		t.Fatal(err)
+	}
+	// The documented wipe procedure: delete the cache, keep the tombstones.
+	if err := os.RemoveAll(peer); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Import(peer, batch); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Search(peer, search.Options{Query: "secret client work", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("forgotten session came back through sync: %d sessions", len(got))
+	}
+}
+
+// The exclude list keeps a project out of this machine's memory; a sync from
+// another machine must not put it back.
+func TestImportHonorsExcludeList(t *testing.T) {
+	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "nda project notes"))
+	batch := filepath.Join(tmp, "batch")
+	if _, err := Export(dir, batch); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_EXCLUDE_PROJECTS", "tmp-app")
+	peer := filepath.Join(tmp, "peer.db")
+	if _, err := Import(peer, batch); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Search(peer, search.Options{Query: "nda project notes", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("excluded project arrived through sync: %d sessions", len(got))
+	}
+}
