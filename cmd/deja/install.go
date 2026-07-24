@@ -255,7 +255,7 @@ func existingTargets() []string {
 		"kimi":        sources.KimiConfigDir(),
 		"cline":       sources.ClineConfigDir(),
 		"pi":          sources.PiConfigDir(),
-		"openclaw":    filepath.Join(sources.OpenClawStateDir(), "openclaw.json"),
+		"openclaw":    sources.OpenClawStateDir(),
 	}
 	var out []string
 	for name, p := range checks {
