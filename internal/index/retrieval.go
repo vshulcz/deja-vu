@@ -183,10 +183,17 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 // lowercased, stopwords dropped. Exported so callers and the benchmark can
 // mirror exactly what the relevance tier scores against.
 func RelevanceTerms(q string) []string {
+	// Letters and digits are wordy in every script; everything else splits.
+	// The old "anything above U+0400 is wordy" rule swallowed CJK and
+	// fullwidth punctuation ("？", "，"), so a real Chinese question became
+	// one giant term that matched nothing and never reached bigram
+	// expansion.
 	fields := strings.FieldsFunc(strings.ToLower(q), func(r rune) bool {
-		wordy := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') ||
-			r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400
-		return !wordy
+		if r < 128 {
+			return (r < 'a' || r > 'z') && (r < '0' || r > '9') &&
+				r != '-' && r != '_' && r != '.' && r != '/'
+		}
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
 	fields = expandCJKTokens(fields)
 	seen := map[string]bool{}

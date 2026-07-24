@@ -52,25 +52,47 @@ func cjkBigrams(s string) []string {
 	return out
 }
 
-// expandCJKTokens maps each token to itself or, when the token is a pure CJK
-// run of 2+ runes, to its bigram set — the query-side mirror of the index
-// emitter, so multi-character queries AND their bigrams.
+// expandCJKTokens maps each token to itself plus, for every CJK run of 2+
+// runes inside it, that run's bigram set — the query-side mirror of the index
+// emitter. A phrase query ANDs its bigrams (they are contiguous in the text
+// that answers it); a sentence question's grammar bigrams cannot co-occur, so
+// its AND simply finds nothing and the ladder falls through to the relevance
+// tier, which is where a question belongs.
 func expandCJKTokens(toks []string) []string {
 	out := make([]string, 0, len(toks))
 	for _, t := range toks {
 		runes := []rune(t)
-		pure := len(runes) >= 2
+		hasCJK := false
+		allCJK := true
 		for _, r := range runes {
-			if !isCJK(r) {
-				pure = false
-				break
+			if isCJK(r) {
+				hasCJK = true
+			} else {
+				allCJK = false
 			}
 		}
-		if !pure {
+		if !hasCJK {
 			out = append(out, t)
 			continue
 		}
-		out = append(out, cjkBigrams(t)...)
+		if !allCJK {
+			// A glued CJK+latin token keeps its whole form as a key: that is
+			// exactly what the index emits for such text.
+			out = append(out, t)
+		}
+		i := 0
+		for i < len(runes) {
+			if !isCJK(runes[i]) {
+				i++
+				continue
+			}
+			j := i
+			for j < len(runes) && isCJK(runes[j]) {
+				j++
+			}
+			out = append(out, cjkBigrams(string(runes[i:j]))...)
+			i = j
+		}
 	}
 	return out
 }

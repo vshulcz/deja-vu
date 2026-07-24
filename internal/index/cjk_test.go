@@ -94,3 +94,112 @@ func TestCJKBigramsUnit(t *testing.T) {
 		t.Fatalf("ascii leaked = %v", got)
 	}
 }
+
+// cjkIndex builds a small index from the given id/text pairs.
+func cjkIndex(t *testing.T, docs map[string]string) string {
+	t.Helper()
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for id, text := range docs {
+		line := `{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func cjkFirstID(t *testing.T, dir, q string) string {
+	t.Helper()
+	got, err := Search(dir, search.Options{Query: q, All: true})
+	if err != nil {
+		t.Fatalf("%q: %v", q, err)
+	}
+	if len(got) == 0 {
+		return ""
+	}
+	return got[0].ID
+}
+
+// A contiguous CJK phrase longer than a couple of characters must keep
+// matching through the AND — its bigrams really do co-occur in the text that
+// contains it.
+func TestCJKLongPhraseStillMatches(t *testing.T) {
+	dir := cjkIndex(t, map[string]string{
+		"s1": "我们讨论了刷新令牌怎么实现的问题",
+		"s2": "缓存重载和证书轮换的会议记录",
+	})
+	for _, q := range []string{"刷新令牌怎么实现", "令牌怎么实现", "我们讨论了刷新令牌", "刷新令牌"} {
+		if got := cjkFirstID(t, dir, q); got != "s1" {
+			t.Fatalf("phrase %q: got %q, want s1", q, got)
+		}
+	}
+}
+
+// A quoted CJK phrase keeps its exactness contract and must not be routed
+// into a path that cannot serve it.
+func TestCJKQuotedPhraseMatches(t *testing.T) {
+	dir := cjkIndex(t, map[string]string{
+		"s1": "我们讨论了刷新令牌怎么实现的问题",
+		"s2": "另一个会话讲的是缓存重载",
+	})
+	if got := cjkFirstID(t, dir, `"刷新令牌怎么实现"`); got != "s1" {
+		t.Fatalf(`quoted phrase: got %q, want s1`, got)
+	}
+}
+
+// A real question carries fullwidth punctuation and grammar; its bigrams
+// cannot all co-occur, so the ladder must fall through to relevance instead
+// of returning nothing.
+func TestCJKQuestionReachesRelevance(t *testing.T) {
+	dir := cjkIndex(t, map[string]string{
+		"s1": "刷新令牌在缓存没有重载之后开始失效，我们改了轮换逻辑",
+		"s2": "今天讨论了前端样式和构建速度的问题",
+	})
+	got, err := SearchDetailed(dir, search.Options{Query: "刷新令牌是什么时候开始失效的？", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Sessions) == 0 || got.Sessions[0].ID != "s1" {
+		t.Fatalf("question must reach the answer: %d sessions, tier %q", len(got.Sessions), got.Tier)
+	}
+}
+
+// Text that glues CJK and latin ("刷新token") is one token on both sides;
+// the query must still reach it.
+func TestCJKMixedTokenMatches(t *testing.T) {
+	dir := cjkIndex(t, map[string]string{
+		"s1": "我们用刷新token做了鉴权",
+		"s2": "别的会话说的是构建缓存",
+	})
+	for _, q := range []string{"刷新token", "刷新"} {
+		if got := cjkFirstID(t, dir, q); got != "s1" {
+			t.Fatalf("mixed %q: got %q, want s1", q, got)
+		}
+	}
+}
+
+// Latin-1, Greek and other scripts below U+0400 used to be shattered by the
+// relevance term splitter while the index kept them whole.
+func TestRelevanceTermsKeepNonASCIILetters(t *testing.T) {
+	got := RelevanceTerms("café naïve straße Ελλάδα")
+	want := []string{"café", "naïve", "straße", "ελλάδα"}
+	if len(got) != len(want) {
+		t.Fatalf("terms = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("terms = %v, want %v", got, want)
+		}
+	}
+}
