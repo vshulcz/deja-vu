@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.6] - 2026-07-24
+
 ### Added
 - CJK bigram indexing (#337, design by @AliceLJY): Chinese/Japanese/Korean text gets first-class exact search and full ranking; index version bumps for one automatic rebuild. Note: a single-character query against a longer run (`茶` in `喝茶`) resolves via the close tier, not exact.
-- Goose harness: legacy JSONL sessions and SQLite `sessions.db` (>= 1.10.0), resume via `goose session --resume --session-id`. ([#255](https://github.com/vshulcz/deja-vu/issues/255))
+- Goose harness by @syf2211: legacy JSONL sessions and SQLite `sessions.db` (>= 1.10.0), resume via `goose session --resume --session-id` — sixteen agents indexed. ([#255](https://github.com/vshulcz/deja-vu/issues/255))
+- Russian: conversational stop words and inflection folding in relevance ranking — сеть meets сетью and сети; instruction glue no longer anchors search or déjà vu.
 
 ## [0.15.5] - 2026-07-24
 

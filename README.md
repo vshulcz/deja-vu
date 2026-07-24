@@ -309,7 +309,7 @@ Local inverted index in `~/.cache/deja`: parse JSONL/SQLite stores → redact cr
 **Does anything leave my machine?** Indexing and search are local. `deja update` downloads releases from GitHub, and user-invoked `deja sync ssh` transfers redacted batches through the system SSH client. Directory exports and shares go only to the destination you choose. See the [security model](docs/SECURITY-MODEL.md#data-flows) for the full data flow.
 
 **How is this different from cass?**
-[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, fifteen harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
+[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the kitchen-sink take on session search: 22 providers, Rust, optional semantic embeddings, a TUI. deja is the opposite bet — one small Go binary, pure lexical, sixteen harnesses, zero setup — plus the memory-layer pieces around it: auto-recall, redaction, share, sync.
 
 [engram](https://github.com/Gentleman-Programming/engram) is the strongest of the record-forward memory tools: the agent calls `mem_save` and curated notes accumulate in SQLite. Curation buys it conflict detection — deja now surfaces conflicts too, between accepted notes at promote time — but it starts empty, only knows what an agent decided to save, and can't answer for the months of sessions that happened before it was installed. deja starts full: the transcripts are the memory, no cooperation required.
 
