@@ -154,7 +154,11 @@ func receiptIsNews(dir, digest string) bool {
 	return true
 }
 
-// hookDigestTTL bounds how stale a cached session-start digest may be. A
+// hookDigestTTL bounds how long a cached session-start digest is considered
+// fresh. Older entries are still served instantly — startup must never wait
+// on digest work — but a detached refresh is kicked so the next session gets
+// a current one (stale-while-revalidate).
+// A
 // minute-old digest is indistinguishable at session start, and the cache
 // turns the common hook path from ~120ms of index work into one file read.
 const hookDigestTTL = 60 * time.Second
@@ -168,25 +172,87 @@ type hookCacheEntry struct {
 	TaskMatched []string  `json:"task_matched,omitempty"`
 }
 
+func hookCachePath(dir, cwd string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(cwd))
+	return fmt.Sprintf("%s.hookcache-%08x", dir, h.Sum32())
+}
+
 func cachedHookDigest(dir string) (string, int, int64, []string) {
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
-	p := dir + ".hookcache"
+	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {
 		var e hookCacheEntry
-		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && time.Since(e.At) < hookDigestTTL {
+		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd {
+			if time.Since(e.At) >= hookDigestTTL {
+				// Serve stale instantly; a detached self-refresh rebuilds
+				// the cache off the startup path.
+				requestHookRefresh(dir, cwd)
+			}
 			return e.Digest, e.Sessions, e.Raw, e.TaskMatched
 		}
 	}
 	digest, sessions, raw, taskMatched := hookDigestResult(dir)
-	if digest != "" {
-		if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched}); err == nil {
-			_ = os.WriteFile(p, b, 0o600)
-		}
-	}
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched)
 	return digest, sessions, raw, taskMatched
+}
+
+func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string) {
+	if digest == "" {
+		return
+	}
+	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched}); err == nil {
+		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
+	}
+}
+
+// requestHookRefresh spawns a detached `deja hook-refresh` for cwd; a
+// same-named sentinel prevents stampedes. Best effort by design.
+func requestHookRefresh(dir, cwd string) {
+	if os.Getenv("DEJA_HOOK_REFRESH") != "" {
+		return
+	}
+	sentinel := hookCachePath(dir, cwd) + ".refreshing"
+	if fi, err := os.Stat(sentinel); err == nil && time.Since(fi.ModTime()) < 2*time.Minute {
+		return
+	}
+	if err := os.WriteFile(sentinel, []byte("1"), 0o600); err != nil {
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	// Under `go test` the executable is the test binary; spawning it as a
+	// refresher would rerun the suite (and hung the Windows runner).
+	if strings.HasSuffix(strings.TrimSuffix(exe, ".exe"), ".test") {
+		return
+	}
+	cmd := exec.Command(exe, "hook-refresh")
+	cmd.Env = append(os.Environ(), "DEJA_HOOK_REFRESH=1", "CLAUDE_PROJECT_DIR="+cwd)
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return
+	}
+	defer func() { _ = devNull.Close() }()
+	cmd.Stdout = devNull
+	cmd.Stderr = cmd.Stdout
+	_ = startDetached(cmd)
+}
+
+// runHookRefresh recomputes the session-start digest for the cwd in the
+// environment and rewrites its cache entry.
+func runHookRefresh(dir string) {
+	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+	digest, sessions, raw, taskMatched := hookDigestResult(dir)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched)
+	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }
 
 func hookDigest(dir string) string {

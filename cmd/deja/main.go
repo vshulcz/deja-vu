@@ -95,6 +95,7 @@ var commands = map[string]command{
 	"hook-prompt":     func(dir string, _ []string) error { return runHookPrompt(dir, os.Stdin, os.Stdout) },
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
+	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
 	"install":         func(dir string, rest []string) error { return runInstall(dir, rest, false) },
 	"uninstall":       func(dir string, rest []string) error { return runInstall(dir, rest, true) },
 	"update":          func(_ string, rest []string) error { return runUpdate(rest, os.Stdout) },
