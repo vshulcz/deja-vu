@@ -303,7 +303,15 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if _, err := readRecordAt(os.NewFile(0, os.DevNull), 1); err == nil && runtime.GOOS != "windows" {
+	// os.NewFile(0, …) installs a finalizer that closes fd 0; once the GC
+	// runs it, an unrelated os.Create later in the suite gets the recycled
+	// descriptor and fails mid-write. Open the device instead.
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = devNull.Close() }()
+	if _, err := readRecordAt(devNull, 1); err == nil && runtime.GOOS != "windows" {
 		t.Fatal("readRecordAt bad seek returned nil")
 	}
 	if _, err := readRecord(&buf); !errors.Is(err, io.EOF) {
