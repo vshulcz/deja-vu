@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -351,7 +352,7 @@ func TestUpdateIndexAppendNonCorruptErrorWrapped(t *testing.T) {
 
 func TestAddIndexKeysDedupBranch(t *testing.T) {
 	buckets := bucketPostings{}
-	addIndexKeys(buckets, "alpha alpha alpha", 5, 1)
+	addIndexKeys(buckets, "alpha alpha alpha", 5, 1, time.Time{})
 	total := 0
 	for _, toks := range buckets {
 		for _, posts := range toks {
