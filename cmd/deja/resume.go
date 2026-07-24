@@ -119,6 +119,10 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "cline --id " + s.ID, nil
 	case "roo":
 		return "", "", fmt.Errorf("roo tasks reopen from the extension's history UI, not the terminal")
+	case "qwen":
+		return "", "", fmt.Errorf("qwen sessions reopen from inside the CLI: run qwen, then /chat resume")
+	case "openclaw":
+		return "", "", fmt.Errorf("openclaw keeps its own session continuity — message the same agent and it continues; see openclaw sessions")
 	case "kimi":
 		return "", "kimi --session " + s.ID, nil
 	case "pi":
