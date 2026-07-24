@@ -67,6 +67,42 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 				if len(posts) > 0 {
 					fallbackVariants = variants
 					fallbackTier = query.TierClose
+					// A natural-language query that degraded to substring
+					// intersection often lands on one incidental session and
+					// the ladder used to stop there. When the query carries
+					// enough informative words to rank by relevance, prefer
+					// that ranking and keep the substring hits as the tail.
+					if rel, rerr := relevanceSearch(dir, m, o); rerr == nil && len(rel.Sessions) > 0 {
+						closeSS, serr := scanRecords(dir, m, o, postingOffsets(cutPostingsBySession(posts, m, o)))
+						agree := false
+						if serr == nil {
+							top := rel.Sessions[0].Harness + ":" + rel.Sessions[0].ID
+							for _, c := range closeSS {
+								if c.Harness+":"+c.ID == top {
+									agree = true
+									break
+								}
+							}
+						}
+						// Substring hits that contain relevance's own best
+						// candidate are trustworthy — keep the close tier
+						// (and its variant annotations). When they disagree,
+						// the intersection landed on an incidental session;
+						// serve the relevance ranking with close as a tail.
+						if serr == nil && len(closeSS) > 0 && !agree {
+							seen := map[string]bool{}
+							for _, r := range rel.Sessions {
+								seen[r.Harness+":"+r.ID] = true
+							}
+							merged := rel.Sessions
+							for _, c := range closeSS {
+								if !seen[c.Harness+":"+c.ID] {
+									merged = append(merged, c)
+								}
+							}
+							return SearchResult{Sessions: merged, Tier: query.TierRelevance}, nil
+						}
+					}
 				}
 			}
 		}
