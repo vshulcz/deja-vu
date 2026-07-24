@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.3] - 2026-07-24
+
+### Added
+- Cline harness: both store generations (modern `~/.cline/data/sessions` and the VS Code globalStorage tasks), MCP wiring, resume for modern sessions. (#306)
+- Roo Code harness: VS Code globalStorage tasks with per-task metadata. (#307)
+- OpenClaw harness: pi-lineage transcripts under `~/.openclaw/agents/*/sessions`, compaction checkpoints and archives skipped; `deja install openclaw` wires `openclaw.json`, doctor gains store and wiring rows. (#312, #320)
+- Tags on curated notes (`deja remember --tag`, `deja promote --tag`) and conflict surfacing when an accepted note covers ground another accepted note already holds. (#309)
+- Sessions are findable by when they happened: month, year and year-month land in the index as tokens (`deja "what did we do in may"`), and relative-time phrases ("a week ago", "last month") resolve against the moment of the search. (#323, #325)
+- Benchmarks report the official per-evidence recall alongside hit@k, and both harnesses ship a JSONL miss report. (#322)
+
+### Changed
+- Search ranking: a session is scored by its best message instead of its whole-transcript sum, sessions covering more distinct query words outrank repetition, natural-language queries fall through junk substring intersections to relevance ranking, and stem forms fold in when the exact word is absent from the corpus. LongMemEval-S hit@1 84.9% / hit@5 94.3%; LoCoMo hit@1 69.8% / hit@5 85.6%. (#317, #318, #322, #324)
+- Real questions of three or more words answer with a ranked weak tail instead of silence; bare short queries and bare quoted phrases keep the silence contract. (#322)
+
+### Fixed
+- Agent startup no longer pays for indexing: the session-start hook ran a full synchronous index through a garnish lookup — up to ~10s per start with a dirty multi-gigabyte store, now ~0.2s worst case. (#315)
+- `Ensure` silently ignored its harness scope: every scoped build ingested all stores. (#319)
+- Déjà vu matched dotted terms by their first sub-token (an IP degraded to one octet and fired on unrelated sessions); the visible line now names its trigger terms and `deja log` records them. (#313)
+- Newer Gemini CLI chats parsed to zero: message state inside `$set` snapshot lines is read now. (#316)
+- A missing bucket shard aborted stem-tier searches instead of meaning "no postings". (#323)
+
+## [0.15.2] - 2026-07-23
+
+### Added
+- Public benchmark numbers on the site and README; scoop/winget manifests pinned per release. (#304, #305)
+- Parallel harness parsing and redaction on cold builds. (#303)
+
+## [0.15.1] - 2026-07-22
+
+### Fixed
+- Déjà vu calibration: identifier-shaped terms only, session-level document frequency, cooldown — no more "you have been here" on every prompt. (#292, #293)
+- Codex hook could hang agents that keep stdin open; reads now bound at 300ms, and doctor reports codex-side hook state. (#294)
+
+### Changed
+- MCP recall serves a stale snapshot instantly while rebuilds run detached; hook and search latency cut across the board. (#291-#302)
+
 ## [0.15.0] - 2026-07-21
 
 ### Added
