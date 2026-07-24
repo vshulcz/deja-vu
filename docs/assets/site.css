@@ -68,7 +68,7 @@ footer a:hover{color:var(--ph)}
 .doc article li::marker{color:var(--faint)}
 .doc article pre{background:var(--panel);border:1px solid var(--line);padding:14px 16px;overflow-x:auto;margin:0 0 16px;font-family:var(--mono);font-size:.85rem;line-height:1.6;color:var(--ph);box-shadow:inset 0 0 30px rgba(74,240,139,.03)}
 .doc article :not(pre)>code{color:var(--ph);background:var(--panel);border:1px solid var(--line);padding:1px 6px}
-.doc article table{width:100%;border-collapse:collapse;margin:0 0 16px;font-size:.85rem}
+.doc article table{width:100%;border-collapse:collapse;margin:0 0 16px;font-size:.85rem;display:block;overflow-x:auto}
 .doc article th,.doc article td{border:1px solid var(--line);padding:7px 11px;text-align:left}
 .doc article th{background:var(--panel);color:var(--faint);font-weight:400;text-transform:uppercase;font-size:.72rem;letter-spacing:.1em}
 .doc article img{max-width:100%;border:1px solid var(--line)}
