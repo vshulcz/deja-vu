@@ -106,12 +106,20 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 		return err
 	}
 	defer unlock()
-	want := currentFiles("")
+	want := currentFiles(harness)
+	scope := ""
+	if harness != "" {
+		// A harness-scoped index is partial by construction; the manifest
+		// records that so freshness checks and search callers know. The
+		// parameter was silently ignored before — every "scoped" build
+		// ingested the whole machine.
+		scope = harness
+	}
 	m, err := readManifest(dir)
-	if !force && err == nil && manifestFresh(m, want, "") && recordsIntact(dir, m) {
+	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
-	return updateIndex(dir, "", "", want, force, progress)
+	return updateIndex(dir, harness, scope, want, force, progress)
 }
 
 func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer) error {
