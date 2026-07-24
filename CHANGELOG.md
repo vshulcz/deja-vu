@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.4] - 2026-07-24
+
+### Fixed
+- Agent startup never waits on digest work: the session-start cache is served at any age and refreshed by a detached process; the cache is also scoped per project directory, so switching projects no longer starts cold. Worst-case session-start on a dirty multi-gigabyte store: ~1s -> under 100ms; opencode startup overhead ~1.8s -> ~0.8s (the remainder is MCP process spawn). (#330)
+
 ## [0.15.3] - 2026-07-24
 
 ### Added
