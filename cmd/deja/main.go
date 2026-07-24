@@ -569,7 +569,7 @@ func runBlame(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	hits, err := findBlameHits(dir, target, o, os.Stderr)
+	hits, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
 	}
@@ -585,7 +585,7 @@ func runBlame(dir string, args []string) error {
 	return nil
 }
 
-func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, progress io.Writer) ([]search.BlameHit, error) {
+func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, error) {
 	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
 	if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
 		return nil, err
@@ -594,7 +594,7 @@ func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions,
 	if err != nil {
 		return nil, err
 	}
-	return search.Blame(result.Sessions, target, o), nil
+	return policyFilterBlame(activation, search.Blame(result.Sessions, target, o)), nil
 }
 func parseDur(s string) (time.Duration, error) {
 	if strings.HasSuffix(s, "d") {

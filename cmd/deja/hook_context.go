@@ -164,12 +164,17 @@ func receiptIsNews(dir, digest string) bool {
 const hookDigestTTL = 60 * time.Second
 
 type hookCacheEntry struct {
-	At          time.Time `json:"at"`
-	CWD         string    `json:"cwd"`
-	Digest      string    `json:"digest"`
-	Sessions    int       `json:"sessions"`
-	Raw         int64     `json:"raw"`
-	TaskMatched []string  `json:"task_matched,omitempty"`
+	At  time.Time `json:"at"`
+	CWD string    `json:"cwd"`
+	// Gate records the recall mode and the policy the digest was built
+	// under. A cache hit returns before either is consulted, so serving an
+	// entry built under different rules would let a cached digest outlive
+	// DEJA_RECALL=off or a policy that now forbids it.
+	Gate        string   `json:"gate,omitempty"`
+	Digest      string   `json:"digest"`
+	Sessions    int      `json:"sessions"`
+	Raw         int64    `json:"raw"`
+	TaskMatched []string `json:"task_matched,omitempty"`
 }
 
 func hookCachePath(dir, cwd string) string {
@@ -178,15 +183,27 @@ func hookCachePath(dir, cwd string) string {
 	return fmt.Sprintf("%s.hookcache-%08x", dir, h.Sum32())
 }
 
+// hookGate identifies the rules a digest was built under: the recall mode and
+// the auto-activation policy. Both are consulted only deep inside
+// hookDigestResult, which a cache hit never reaches.
+func hookGate() string {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
+	return mode + "|" + policy.Load().Describe(policy.ActivationAuto)
+}
+
 func cachedHookDigest(dir string) (string, int, int64, []string) {
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
+	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
+		return "", 0, 0, nil
+	}
+	gate := hookGate()
 	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {
 		var e hookCacheEntry
-		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd {
+		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && e.Gate == gate {
 			if time.Since(e.At) >= hookDigestTTL {
 				// Serve stale instantly; a detached self-refresh rebuilds
 				// the cache off the startup path.
@@ -204,7 +221,7 @@ func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatche
 	if digest == "" {
 		return
 	}
-	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched}); err == nil {
+	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched}); err == nil {
 		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
 	}
 }

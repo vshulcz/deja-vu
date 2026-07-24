@@ -11,6 +11,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -59,7 +60,14 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	ss := make([]model.Session, 0, 2)
 	seen := alreadyInjected(dir, input.SessionID)
+	pol := policy.Load()
 	for i, s := range ranked {
+		// Every other injection path asks the policy first; this one is a
+		// per-prompt injection like any other, and imported projects reach
+		// it (a local project name is a substring of "imported:<name>").
+		if !pol.Allows(policy.ActivationAuto, s.Project) {
+			continue
+		}
 		// One lucky rare word is not a déjà vu. Demand real overlap before
 		// claiming "you have been here" — a false moment teaches the user to
 		// ignore the true ones.
