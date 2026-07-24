@@ -68,6 +68,7 @@
 <tr><td><code>deja embed</code></td><td>Build the semantic vector sidecar from a local endpoint.</td></tr>
 <tr><td><code>deja sync export/import/ssh</code></td><td>Move redacted memory between machines.</td></tr>
 <tr><td><code>deja promote &lt;id&gt;</code></td><td>Distill a session into a curated note: quoted evidence with provenance and a lifecycle state (<code>--state accepted|rejected|superseded|stale</code>). Corrections append; the note outranks the raw transcript in recall. <code>--to path</code> also appends a Markdown block for repo-visible notes. <code>--tag</code> adds keywords; promoting into ground another accepted note already covers prints a conflict warning naming the older note.</td></tr>
+<tr><td><code>deja view</code></td><td>Browse memory in one self-contained local HTML: sessions with previews, recall audit trail, curated notes. <code>--out path</code>, <code>--no-open</code>.</td></tr>
 <tr><td><code>deja doctor</code></td><td>Diagnose stores, wiring, index and version. <code>--json</code>, <code>--offline</code>. <code>--deep</code> re-parses a sample of source files and resolves postings to prove the index against the sources; exits non-zero on drift.</td></tr>
 <tr><td><code>deja bench recall|context</code></td><td>Reproducible search-quality and context-readiness benchmarks.</td></tr>
 <tr><td><code>deja update</code></td><td>Update a standalone install (Homebrew/npm update via the package manager).</td></tr>

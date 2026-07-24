@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.5] - 2026-07-24
+
+### Added
+- `deja view` — browse your memory in one local HTML file: sessions with capped previews and client-side filtering, the verbatim recall audit trail, and curated notes with lifecycle badges. No server, no external assets; the page opens in your browser and nothing leaves the machine. (#334)
+
+### Fixed
+- Site: wide tables scroll inside their own container (mobile pages no longer overflow sideways), and the comparison page lost its broken navigation strip. (#333)
+
 ## [0.15.4] - 2026-07-24
 
 ### Fixed
