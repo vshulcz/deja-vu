@@ -102,3 +102,31 @@ func TestStemFallbackNeedsTwoAnchors(t *testing.T) {
 		t.Fatalf("single anchor produced results: %+v", result.Sessions)
 	}
 }
+
+func TestCloseTierDisagreeFallsThroughToRelevance(t *testing.T) {
+	// Session a answers the question but lacks "birthday" in any form, so the
+	// substring intersection lands only on b — an incidental session whose
+	// long words contain every query token. The ladder used to stop at b.
+	dir := nlIndex(t,
+		"picked a scarf as the gift for my sister celebration",
+		"gifted birthdays sisterhood newsletter volume nine",
+	)
+	result, err := SearchDetailed(dir, search.Options{Query: "sister birthday gift", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Sessions) < 2 || result.Sessions[0].ID != "a" {
+		t.Fatalf("relevance must lead when substring hits disagree: %+v", idsOf(result.Sessions))
+	}
+	if result.Sessions[1].ID != "b" {
+		t.Fatalf("substring hit must survive as the tail: %+v", idsOf(result.Sessions))
+	}
+}
+
+func idsOf(ss []model.Session) []string {
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		out = append(out, s.ID)
+	}
+	return out
+}
