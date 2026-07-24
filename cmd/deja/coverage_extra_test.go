@@ -29,6 +29,9 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	// Goose resolves through %APPDATA% on Windows; pin it so the doctor
+	// golden stays OS-neutral.
+	t.Setenv("DEJA_GOOSE_ROOT", filepath.Join(home, ".local", "share", "goose"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
