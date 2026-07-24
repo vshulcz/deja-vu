@@ -84,6 +84,14 @@
       "files": 0
     },
     {
+      "name": "goose",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.local/share/goose/sessions"
+      ],
+      "files": 0
+    },
+    {
       "name": "pi",
       "state": "missing",
       "paths": [

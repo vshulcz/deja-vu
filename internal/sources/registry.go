@@ -177,6 +177,22 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "goose", Load: LoadGoose, Files: GooseSessionFiles,
+			Kinds: []FileKind{{
+				Name: "goose-jsonl",
+				Match: func(p string) bool {
+					return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, gooseSessionsDir())
+				},
+				Parse:     fullParse(ParseGooseFile),
+				ParseFrom: offsetParse(ParseGooseFileFromOffset),
+			}, {
+				Name:      "goose-db",
+				Match:     func(p string) bool { return p == GooseDB() },
+				Parse:     dbParse(ParseGooseDB, ParseGooseDBSince),
+				ParseFrom: dbParseFrom(ParseGooseDB, ParseGooseDBSince),
+			}},
+		},
+		{
 			Name: "qwen", Load: LoadQwen, Files: QwenSessionFiles,
 			Kinds: []FileKind{{
 				Name: "qwen",

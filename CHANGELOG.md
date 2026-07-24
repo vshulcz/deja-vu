@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Goose harness: legacy JSONL sessions and SQLite `sessions.db` (>= 1.10.0), resume via `goose session --resume --session-id`. ([#255](https://github.com/vshulcz/deja-vu/issues/255))
+
 ## [0.15.5] - 2026-07-24
 
 ### Added

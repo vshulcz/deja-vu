@@ -269,6 +269,9 @@ func doctorHarnesses(w io.Writer) {
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
 	printRow("kimi", kimiRoot, doctorExists(kimiRoot), doctorCount(len(sources.KimiSessionFiles()), "file"))
 
+	gooseRoot := filepath.Join(sources.GooseRoot(), "sessions")
+	printRow("goose", gooseRoot, doctorExists(gooseRoot) || doctorFilePresent(sources.GooseDB()), doctorGooseDetail(sqlite))
+
 	clineModern := sources.ClineSessionsDir()
 	clineFiles := len(sources.ClineSessionFiles())
 	clineLoc := clineModern
@@ -303,6 +306,18 @@ func doctorSQLiteDetail(db string, sqlite bool) string {
 		d += ", sqlite3 CLI missing — sessions unavailable"
 	}
 	return d
+}
+
+func doctorGooseDetail(sqlite bool) string {
+	parts := []string{doctorCount(len(sources.GooseJSONLFiles()), "legacy file")}
+	if fi, err := os.Stat(sources.GooseDB()); err == nil && fi.Size() > 0 {
+		seg := humanBytes(fi.Size()) + " SQLite"
+		if !sqlite {
+			seg += ", sqlite3 CLI missing — modern sessions unavailable"
+		}
+		parts = append(parts, seg)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func doctorCursorDetail(sqlite bool) string {

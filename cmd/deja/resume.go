@@ -125,6 +125,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("openclaw keeps its own session continuity — message the same agent and it continues; see openclaw sessions")
 	case "kimi":
 		return "", "kimi --session " + s.ID, nil
+	case "goose":
+		return "", "goose session --resume --session-id " + s.ID, nil
 	case "pi":
 		return piProjectDirFor(s), "pi --session " + s.ID, nil
 	case "copilot":

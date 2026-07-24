@@ -918,7 +918,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// change — they must be retained, not dropped, or they vanish.
 		// Superseded sessions are handled by replaceKeys.
 		h := harnessForPath(r.SourcePath)
-		sharedStore := h == "opencode" || h == "cursor-db"
+		sharedStore := h == "opencode" || h == "cursor-db" || h == "goose-db"
 		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !sharedStore) || replaceKeys[r.Key] {
 			return
 		}
@@ -986,7 +986,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			return false
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode", "cursor-db", "deja", "pi", "copilot":
+		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot":
 		default:
 			return false
 		}
@@ -1152,6 +1152,7 @@ func harnessForPath(p string) string { return sources.KindForPath(p) }
 
 func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
+	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
 	}

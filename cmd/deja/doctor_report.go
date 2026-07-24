@@ -122,6 +122,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"grok", []string{sources.GrokRoot()}, sources.GrokSessionFiles(), sources.ParseGrokFile},
 		{"qwen", []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles(), sources.ParseQwenFile},
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles(), sources.ParseKimiFile},
+		{"goose", []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles(), parseDoctorGoose},
 		{"pi", []string{sources.PiRoot()}, sources.PiSessionFiles(), sources.ParsePiFile},
 		{"openclaw", []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles(), sources.ParseOpenClawFile},
 		{"copilot", []string{sources.CopilotRoot()}, sources.CopilotSessionFiles(), sources.ParseCopilotFile},
@@ -148,6 +149,13 @@ func parseDoctorCursor(path string) ([]model.Session, error) {
 		return sources.ParseCursorDB(path)
 	}
 	return sources.ParseCursorTranscript(path)
+}
+
+func parseDoctorGoose(path string) ([]model.Session, error) {
+	if filepath.Base(path) == "sessions.db" {
+		return sources.ParseGooseDB(path)
+	}
+	return sources.ParseGooseFile(path)
 }
 
 func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {

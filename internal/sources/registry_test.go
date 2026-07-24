@@ -36,7 +36,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"AIDER_CHAT_HISTORY_FILE", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
 		"CURSOR_CONFIG_DIR", "DEJA_AIDER_ROOTS", "DEJA_ANTIGRAVITY_ROOT",
 		"DEJA_CLAUDE_ROOT", "DEJA_CODEX_ROOT", "DEJA_CURSOR_CLI_ROOT",
-		"DEJA_CURSOR_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GROK_ROOT",
+		"DEJA_CURSOR_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GROK_ROOT", "DEJA_GOOSE_ROOT", "DEJA_GOOSE_DB",
 		"DEJA_PI_ROOT", "DEJA_QWEN_ROOT", "DEJA_KIMI_ROOT", "KIMI_CODE_HOME",
 		"DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "CLINE_DIR", "CLINE_DATA_DIR",
 		"CLINE_SESSION_DATA_DIR", "CLINE_MCP_SETTINGS_PATH", "DEJA_ROO_ROOTS",
@@ -165,6 +165,23 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseAntigravityFile(path)
 	case "grok":
 		sessions, err = ParseGrokFile(path)
+	case "goose":
+		if strings.HasSuffix(path, ".sql") {
+			if !SQLite3Available() {
+				t.Skip("sqlite3 not installed")
+			}
+			sql, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			db := filepath.Join(t.TempDir(), "goose.db")
+			if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+			}
+			sessions, err = ParseGooseDB(db)
+		} else {
+			sessions, err = ParseGooseFile(path)
+		}
 	case "qwen":
 		sessions, err = ParseQwenFile(path)
 	case "pi":

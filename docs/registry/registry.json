@@ -201,6 +201,33 @@
    }
   },
   {
+   "id": "goose",
+   "store_paths": [
+    "~/.local/share/goose/sessions/*.jsonl",
+    "~/.local/share/goose/sessions/sessions.db",
+    "${XDG_DATA_HOME}/goose/sessions/*.jsonl",
+    "${XDG_DATA_HOME}/goose/sessions/sessions.db",
+    "${DEJA_GOOSE_ROOT}/sessions/*.jsonl",
+    "${DEJA_GOOSE_ROOT}/sessions/sessions.db",
+    "${DEJA_GOOSE_DB}"
+   ],
+   "format_kind": "jsonl+sqlite",
+   "fixture_paths": [
+    "fixtures/registry/goose/sessions/20250724_1.jsonl",
+    "fixtures/registry/goose/sessions/goose.sql"
+   ],
+   "parser_source": "internal/sources/goose.go",
+   "last_verified": "2026-07-24",
+   "display_name": "Goose",
+   "capabilities": {
+    "mcp": false,
+    "auto": false,
+    "resume": true,
+    "handoff": "paste",
+    "prereq": "sqlite3"
+   }
+  },
+  {
    "id": "qwen",
    "store_paths": [
     "${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl"
