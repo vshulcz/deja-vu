@@ -489,6 +489,10 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 		coocc := 1 + 0.2*float64(best-1)
 		sc = bestMsg*coocc + 0.25*(sc-bestMsg)
+		// Coverage: distinct informative terms beat repetition.
+		if matchedTerms[ord] > 1 {
+			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
+		}
 		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 	}
 	if len(ranked) == 0 {
