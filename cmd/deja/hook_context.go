@@ -226,6 +226,11 @@ func requestHookRefresh(dir, cwd string) {
 	if err != nil {
 		return
 	}
+	// Under `go test` the executable is the test binary; spawning it as a
+	// refresher would rerun the suite (and hung the Windows runner).
+	if strings.HasSuffix(strings.TrimSuffix(exe, ".exe"), ".test") {
+		return
+	}
 	cmd := exec.Command(exe, "hook-refresh")
 	cmd.Env = append(os.Environ(), "DEJA_HOOK_REFRESH=1", "CLAUDE_PROJECT_DIR="+cwd)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
