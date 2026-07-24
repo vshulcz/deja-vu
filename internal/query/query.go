@@ -17,6 +17,25 @@ var stopWords = map[string]bool{
 	"of": true, "on": true, "or": true, "that": true, "the": true,
 	"this": true, "to": true, "was": true, "we": true, "what": true,
 	"when": true, "where": true, "which": true, "who": true, "with": true,
+	// Russian conversational filler — the words that made déjà vu fire on
+	// "делай все по шагам" (#313 history). Same bar as the English list:
+	// words that identify no task, only грамматика and instruction glue.
+	"и": true, "в": true, "во": true, "не": true, "на": true, "но": true,
+	"я": true, "ты": true, "он": true, "она": true, "оно": true, "мы": true,
+	"вы": true, "они": true, "что": true, "чтобы": true, "как": true,
+	"так": true, "это": true, "этот": true, "эта": true, "эти": true,
+	"тот": true, "все": true, "всё": true, "всех": true, "был": true,
+	"была": true, "было": true, "были": true, "есть": true, "быть": true,
+	"будет": true, "для": true, "от": true, "до": true, "по": true,
+	"из": true, "у": true, "за": true, "с": true, "со": true, "к": true,
+	"ко": true, "о": true, "об": true, "обо": true, "же": true, "ну": true,
+	"вот": true, "или": true, "если": true, "когда": true, "где": true,
+	"куда": true, "там": true, "тут": true, "здесь": true, "его": true,
+	"её": true, "их": true, "мне": true, "меня": true, "тебе": true,
+	"тебя": true, "нам": true, "вам": true, "надо": true, "нужно": true,
+	"можно": true, "может": true, "давай": true, "сделай": true,
+	"делай": true, "делать": true, "сделать": true, "скажи": true,
+	"говори": true, "покажи": true, "посмотри": true, "пожалуйста": true,
 }
 
 // QueryParts separates ordinary terms from quoted phrases without changing
