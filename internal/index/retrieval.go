@@ -351,6 +351,21 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if len(keys) == 0 {
 			continue
 		}
+		// A single-token term folds its stem forms in as OR-variants:
+		// "camped" must score sessions that say "camping". Multi-token
+		// terms keep strict AND semantics below.
+		var orKeys []string
+		if len(keys) == 1 {
+			seenForm := map[string]bool{keys[0]: true}
+			orKeys = []string{keys[0]}
+			for _, form := range stemMatchForms(term) {
+				k := "t" + form
+				if !seenForm[k] {
+					seenForm[k] = true
+					orKeys = append(orKeys, k)
+				}
+			}
+		}
 		// A dotted or slashed term ("203.0.113.51", "pkg/index") tokenizes
 		// into several index keys. Matching only the first key made an IP
 		// degrade to its first octet — a bare small number that lives in
@@ -364,60 +379,101 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			offs   map[uint32]map[int64]bool
 			missed bool
 		)
-		for _, key := range keys {
-			posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
-			if err != nil || len(posts) == 0 {
-				missed = true
-				break
+		if len(orKeys) > 1 {
+			// Fold stem forms in ONLY when the exact token is absent from
+			// the corpus: "camped" with no postings tries "camping", but an
+			// exact hit is never diluted by its variants.
+			if exact, err := readBucketToken(filepath.Join(dir, "buckets", bucket(orKeys[0])+".bin"), orKeys[0]); err == nil && len(exact) > 0 {
+				orKeys = orKeys[:1]
 			}
-			// Document frequency in sessions, not postings: one marathon
-			// session repeating a term 300 times must not make it common.
+		}
+		if len(orKeys) > 1 {
+			// OR path: union postings across the term's stem forms.
 			df := map[uint32]bool{}
-			keyHit := map[uint32]bool{}
-			keyTF := map[uint32]int{}
-			keyOffs := map[uint32]map[int64]bool{}
-			for _, pp := range posts {
-				df[pp.Sid] = true
-				if _, ok := inProject[pp.Sid]; ok {
-					keyHit[pp.Sid] = true
-					keyTF[pp.Sid]++
-					oo := keyOffs[pp.Sid]
-					if oo == nil {
-						oo = map[int64]bool{}
-						keyOffs[pp.Sid] = oo
-					}
-					oo[pp.Off] = true
+			hit = map[uint32]bool{}
+			tf = map[uint32]int{}
+			offs = map[uint32]map[int64]bool{}
+			for _, key := range orKeys {
+				posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+				if err != nil || len(posts) == 0 {
+					continue
 				}
-			}
-			if hit == nil {
-				hit, tf = keyHit, keyTF
-			} else {
-				for ord := range hit {
-					if !keyHit[ord] {
-						delete(hit, ord)
-						delete(tf, ord)
-					} else if keyTF[ord] < tf[ord] {
-						tf[ord] = keyTF[ord]
+				for _, pp := range posts {
+					df[pp.Sid] = true
+					if _, ok := inProject[pp.Sid]; ok {
+						hit[pp.Sid] = true
+						tf[pp.Sid]++
+						oo := offs[pp.Sid]
+						if oo == nil {
+							oo = map[int64]bool{}
+							offs[pp.Sid] = oo
+						}
+						oo[pp.Off] = true
 					}
 				}
-			}
-			// Message credit follows the rarest sub-token — the one whose df
-			// sets the term's idf. A union would let a message containing
-			// only a common sub-token ("index" of "pkg/index") collect the
-			// full term mass, and best-message ranking amplifies that.
-			if minDF == -1 || len(df) < minDF {
-				minDF = len(df)
-				offs = keyOffs
 			}
 			if len(hit) == 0 {
-				missed = true
-				break
+				continue
 			}
+			minDF = len(df)
+			termsKnown++
+			// fallthrough to idf/scoring below
+		} else {
+			for _, key := range keys {
+				posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+				if err != nil || len(posts) == 0 {
+					missed = true
+					break
+				}
+				// Document frequency in sessions, not postings: one marathon
+				// session repeating a term 300 times must not make it common.
+				df := map[uint32]bool{}
+				keyHit := map[uint32]bool{}
+				keyTF := map[uint32]int{}
+				keyOffs := map[uint32]map[int64]bool{}
+				for _, pp := range posts {
+					df[pp.Sid] = true
+					if _, ok := inProject[pp.Sid]; ok {
+						keyHit[pp.Sid] = true
+						keyTF[pp.Sid]++
+						oo := keyOffs[pp.Sid]
+						if oo == nil {
+							oo = map[int64]bool{}
+							keyOffs[pp.Sid] = oo
+						}
+						oo[pp.Off] = true
+					}
+				}
+				if hit == nil {
+					hit, tf = keyHit, keyTF
+				} else {
+					for ord := range hit {
+						if !keyHit[ord] {
+							delete(hit, ord)
+							delete(tf, ord)
+						} else if keyTF[ord] < tf[ord] {
+							tf[ord] = keyTF[ord]
+						}
+					}
+				}
+				// Message credit follows the rarest sub-token — the one whose df
+				// sets the term's idf. A union would let a message containing
+				// only a common sub-token ("index" of "pkg/index") collect the
+				// full term mass, and best-message ranking amplifies that.
+				if minDF == -1 || len(df) < minDF {
+					minDF = len(df)
+					offs = keyOffs
+				}
+				if len(hit) == 0 {
+					missed = true
+					break
+				}
+			}
+			if missed || len(hit) == 0 {
+				continue
+			}
+			termsKnown++
 		}
-		if missed || len(hit) == 0 {
-			continue
-		}
-		termsKnown++
 		idf := math.Log(totalDocs / float64(minDF+1))
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
@@ -1682,4 +1738,26 @@ func safe(s string) string {
 		}
 		return '_'
 	}, s)
+}
+
+// stemMatchForms generates the same candidate surface forms stemMatches
+// derives, without requiring the token catalog: absent forms simply read
+// empty buckets.
+func stemMatchForms(term string) []string {
+	if len([]rune(term)) < 5 {
+		var out []string
+		for _, form := range []string{term + "s", term + "es", strings.TrimSuffix(term, "s")} {
+			if len(form) >= 3 && form != term {
+				out = append(out, form)
+			}
+		}
+		return out
+	}
+	var out []string
+	for _, form := range suffixForms(term) {
+		if form != term {
+			out = append(out, form)
+		}
+	}
+	return out
 }
