@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,10 +12,19 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-// sshRunner is swapped in tests.
+// sshRunner is swapped in tests. It returns stdout only: ssh writes host-key
+// notices and server banners to stderr, and folding those into the result
+// made `mktemp -d` unparseable on any host with a banner configured.
 var sshRunner = func(name string, args ...string) (string, error) {
-	out, err := exec.Command(name, args...).CombinedOutput()
-	return string(out), err
+	cmd := exec.Command(name, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil && strings.TrimSpace(stderr.String()) != "" {
+		return stdout.String(), fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.String(), err
 }
 
 func runSyncSSH(dir string, args []string) error {
@@ -160,8 +170,20 @@ func sshCapture(host, cmd string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("ssh %s: %v: %s", host, err, s)
 	}
+	// A remote that still prints something conversational on stdout (motd,
+	// profile chatter) leaves the useful value on the last line.
+	if i := strings.LastIndexByte(s, '\n'); i >= 0 {
+		s = strings.TrimSpace(s[i+1:])
+	}
+	// scp interprets the remote path through the remote shell on older
+	// OpenSSH and through SFTP on newer ones, so neither quoting nor leaving
+	// it bare is safe for a path with shell metacharacters. Reject it with a
+	// message that points at the cause instead of failing obscurely later.
 	if s == "" || strings.ContainsAny(s, "'\"\n") {
 		return "", fmt.Errorf("ssh %s: unexpected output %q", host, s)
+	}
+	if strings.ContainsAny(s, " \t*?$;`&|<>()") {
+		return "", fmt.Errorf("ssh %s: remote temp path %q contains characters scp cannot carry — set TMPDIR on %s to a plain path", host, s, host)
 	}
 	return s, nil
 }

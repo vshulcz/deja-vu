@@ -204,3 +204,64 @@ func TestRunSyncExportImport(t *testing.T) {
 		t.Fatalf("imported sessions = %#v", ss)
 	}
 }
+
+// ssh writes host-key notices and server banners to stderr; folding them into
+// the result made `mktemp -d` unparseable and sync unusable against such a
+// host.
+func TestSyncSSHIgnoresStderrBanner(t *testing.T) {
+	setupLocalIndex(t)
+	old := sshRunner
+	defer func() { sshRunner = old }()
+	sshRunner = func(name string, args ...string) (string, error) {
+		if name == "ssh" && len(args) > 1 && strings.Contains(args[1], "mktemp") {
+			// stdout only — the banner went to stderr, which we now drop.
+			return "/tmp/remote-batch\n", nil
+		}
+		return "deja: imported 1 records", nil
+	}
+	if err := runSyncSSH(index.DefaultDir(), []string{"bannerhost"}); err != nil {
+		t.Fatalf("banner on stderr broke sync: %v", err)
+	}
+}
+
+// A remote whose profile still prints chatter on stdout leaves the value on
+// the last line.
+func TestSyncSSHTakesLastLineOfRemoteOutput(t *testing.T) {
+	setupLocalIndex(t)
+	old := sshRunner
+	defer func() { sshRunner = old }()
+	var target string
+	sshRunner = func(name string, args ...string) (string, error) {
+		if name == "ssh" && len(args) > 1 && strings.Contains(args[1], "mktemp") {
+			return "Welcome to prod\n/tmp/remote-batch\n", nil
+		}
+		if name == "scp" {
+			target = args[len(args)-1]
+		}
+		return "deja: imported 1 records", nil
+	}
+	if err := runSyncSSH(index.DefaultDir(), []string{"chattyhost"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(target, "/tmp/remote-batch/") {
+		t.Fatalf("scp target took the wrong line: %q", target)
+	}
+}
+
+// A remote temp path scp cannot carry must fail with a message naming the
+// cause rather than word-splitting on the far side.
+func TestSyncSSHRejectsUnusableRemotePath(t *testing.T) {
+	setupLocalIndex(t)
+	old := sshRunner
+	defer func() { sshRunner = old }()
+	sshRunner = func(name string, args ...string) (string, error) {
+		if name == "ssh" && len(args) > 1 && strings.Contains(args[1], "mktemp") {
+			return "/tmp/deja sync/tmp.AbCd\n", nil
+		}
+		return "deja: imported 1 records", nil
+	}
+	err := runSyncSSH(index.DefaultDir(), []string{"oddhost"})
+	if err == nil || !strings.Contains(err.Error(), "TMPDIR") {
+		t.Fatalf("want an actionable TMPDIR error, got %v", err)
+	}
+}
