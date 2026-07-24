@@ -16,7 +16,7 @@
 
 <p align="center"><img src="assets/demo.gif" alt="deja demo"></p>
 
-Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
+Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, Goose, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
 | Feature | What it does |
 | --- | --- |
@@ -207,7 +207,7 @@ the agent reach for memory on its own, add this to your `CLAUDE.md` /
 
 ```
 Before debugging or re-implementing something, run `deja "<query>"` (or the
- MCP recall tool) — past agent sessions across Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI and pi
+ MCP recall tool) — past agent sessions across Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Goose, Copilot CLI and pi
 are indexed locally. Cite what you reuse.
 ```
 
