@@ -43,7 +43,16 @@ var evidenceRE = regexp.MustCompile(`D(\d+):\d+`)
 
 func main() {
 	dataPath := flag.String("data", "locomo10.json", "path to locomo10.json")
+	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
 	flag.Parse()
+	var missFile *os.File
+	if *dumpMisses != "" {
+		var err error
+		if missFile, err = os.Create(*dumpMisses); err != nil {
+			fatal(err)
+		}
+		defer func() { _ = missFile.Close() }()
+	}
 
 	raw, err := os.ReadFile(*dataPath)
 	if err != nil {
@@ -76,9 +85,23 @@ func main() {
 			if len(gold) == 0 {
 				continue
 			}
-			rank, elapsed, err := askDialog(dir, qa.Question, gold)
+			rank, detail, elapsed, err := askDialog(dir, qa.Question, gold)
 			if err != nil {
 				fatal(err)
+			}
+			if missFile != nil && rank != 1 {
+				goldIDs := make([]string, 0, len(gold))
+				for g := range gold {
+					goldIDs = append(goldIDs, g)
+				}
+				sort.Strings(goldIDs)
+				rec := map[string]any{
+					"sample": sample.SampleID, "category": fmt.Sprint(qa.Category),
+					"question": qa.Question, "rank": rank, "tier": detail.tier,
+					"gold": goldIDs, "top5": detail.top5,
+				}
+				bb, _ := json.Marshal(rec)
+				_, _ = missFile.Write(append(bb, 10))
 			}
 			searchTimes = append(searchTimes, elapsed)
 			cat := fmt.Sprint(qa.Category)
@@ -137,11 +160,20 @@ func buildDialogIndex(sample locomoSample) (string, func(), error) {
 		cleanup()
 		return "", nil, err
 	}
-	base := time.Date(2023, 5, 1, 10, 0, 0, 0, time.UTC)
+	defaultBase := time.Date(2023, 5, 1, 10, 0, 0, 0, time.UTC)
 	for k, v := range sample.Conversation {
 		var sessNum string
 		if _, err := fmt.Sscanf(k, "session_%s", &sessNum); err != nil || strings.Contains(sessNum, "_") {
 			continue
+		}
+		// LoCoMo carries real per-session dates ("1:56 pm on 8 May, 2023");
+		// writing them into the fixtures gives temporal questions the same
+		// freshness signal real history has.
+		base := defaultBase
+		if raw, ok := sample.Conversation["session_"+sessNum+"_date_time"].(string); ok {
+			if t, err := time.Parse("3:04 pm on 2 January, 2006", raw); err == nil {
+				base = t
+			}
 		}
 		turns, ok := v.([]any)
 		if !ok {
@@ -188,12 +220,17 @@ func buildDialogIndex(sample locomoSample) (string, func(), error) {
 	return dir, cleanup, nil
 }
 
-func askDialog(dir, question string, gold map[string]bool) (int, time.Duration, error) {
+type dialogDetail struct {
+	tier string
+	top5 []string
+}
+
+func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, time.Duration, error) {
 	o := query.Options{Query: question, All: true}
 	t0 := time.Now()
 	result, err := index.SearchWithRecoveryDetailed(dir, o, nil)
 	if err != nil {
-		return 0, 0, err
+		return 0, dialogDetail{}, 0, err
 	}
 	o.Tier = result.Tier
 	if result.Stemmed {
@@ -206,18 +243,25 @@ func askDialog(dir, question string, gold map[string]bool) (int, time.Duration, 
 	if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHits(result.Sessions, index.RelevanceTerms(question))
 	} else if hits, err = search.Run(result.Sessions, o); err != nil {
-		return 0, 0, err
+		return 0, dialogDetail{}, 0, err
 	}
 	elapsed := time.Since(t0)
+	detail := dialogDetail{tier: string(result.Tier)}
+	for i, h := range hits {
+		if i >= 5 {
+			break
+		}
+		detail.top5 = append(detail.top5, h.Session.ID)
+	}
 	for i, h := range hits {
 		if i >= 20 {
 			break
 		}
 		if gold[h.Session.ID] {
-			return i + 1, elapsed, nil
+			return i + 1, detail, elapsed, nil
 		}
 	}
-	return 0, elapsed, nil
+	return 0, detail, elapsed, nil
 }
 
 func pct(a, n int) float64 {
