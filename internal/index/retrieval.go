@@ -379,10 +379,12 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			offs   map[uint32]map[int64]bool
 			missed bool
 		)
-		if len(orKeys) > 1 {
+		if len(orKeys) > 1 && !isCyrToken(term) {
 			// Fold stem forms in ONLY when the exact token is absent from
 			// the corpus: "camped" with no postings tries "camping", but an
-			// exact hit is never diluted by its variants.
+			// exact hit is never diluted by its variants. Russian inflects
+			// too heavily for that gate — a Cyrillic term keeps its whole
+			// form union, matching сеть against сетью and сети alike.
 			if exact, err := readBucketToken(filepath.Join(dir, "buckets", bucket(orKeys[0])+".bin"), orKeys[0]); err == nil && len(exact) > 0 {
 				orKeys = orKeys[:1]
 			}
@@ -1744,7 +1746,16 @@ func safe(s string) string {
 // derives, without requiring the token catalog: absent forms simply read
 // empty buckets.
 func stemMatchForms(term string) []string {
-	if len([]rune(term)) < 5 {
+	runes := []rune(term)
+	if len(runes) < 5 {
+		if isCyrToken(term) && len(runes) >= 3 {
+			// Short Russian stems inflect too: сеть -> сетью, сети.
+			out := make([]string, 0, 12)
+			for _, end := range []string{"ю", "и", "е", "а", "у", "ы", "ой", "ей", "ью", "ям", "ях", "ами"} {
+				out = append(out, term+end)
+			}
+			return out
+		}
 		var out []string
 		for _, form := range []string{term + "s", term + "es", strings.TrimSuffix(term, "s")} {
 			if len(form) >= 3 && form != term {
@@ -1760,4 +1771,17 @@ func stemMatchForms(term string) []string {
 		}
 	}
 	return out
+}
+
+// isCyrToken reports whether the token is written in Cyrillic.
+func isCyrToken(term string) bool {
+	for _, r := range term {
+		if r >= 0x400 && r <= 0x4FF {
+			return true
+		}
+		if r < 128 {
+			return false
+		}
+	}
+	return false
 }
