@@ -1342,12 +1342,14 @@ var cyrEndings = []string{
 // hard adjective endings there is what folded цель onto целая and верь onto
 // вера: сеть->сети needs "и", цель->целая needs "ая", so keeping the two
 // tables apart separates shapes that look identical by length alone.
-var cyrSoftEndings = []string{"и", "ью", "ям", "ях", "ями", "ей", "е"}
+var cyrSoftEndings = []string{"и", "ью", "ям", "ях", "ями", "ей", "е", "я", "ю", "ем"}
 
 // cyrVerbEndings are the infinitive and past-tense endings.
 var cyrVerbEndings = map[string]bool{"ть": true, "л": true, "ла": true, "ло": true, "ли": true}
 
-var cyrVerbEndingList = []string{"ть", "л", "ла", "ло", "ли"}
+// cyrVerbEndingList is what a ь-final infinitive's stem takes back: the past
+// tense plus the present-tense vowels, so знать reaches both знал and знаю.
+var cyrVerbEndingList = []string{"ть", "л", "ла", "ло", "ли", "ю", "у", "а", "я", "е", "и", "ем"}
 
 // cyrNominalEndings are unambiguously noun-case: a stem exposed by stripping
 // one of these came from a noun, so verb endings must not attach to it —
@@ -1357,7 +1359,7 @@ var cyrNominalEndings = map[string]bool{
 	"иями": true, "ями": true, "ами": true, "ией": true, "иях": true,
 	"ях": true, "ах": true, "ов": true, "ев": true, "ей": true, "ой": true,
 	"ий": true, "ия": true, "ию": true, "ии": true, "ие": true,
-	"ый": true, "ая": true, "ое": true, "ые": true, "ем": true, "ом": true,
+	"ый": true, "ая": true, "ое": true, "ые": true, "ом": true,
 }
 
 // cyrMatchForms folds a Russian term onto its inflection family for the

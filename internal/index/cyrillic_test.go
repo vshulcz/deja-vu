@@ -63,6 +63,14 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 		{"знаю", "знать"},
 		{"могу", "могли"},
 		{"говорит", "говорить"},
+		{"знать", "знаю"},
+		{"считаем", "считать"},
+		// Soft-masculine nouns take the hard endings, unlike the feminines.
+		{"автомобиль", "автомобиля"},
+		{"писатель", "писателем"},
+		// -ость nouns never folded before: "ть" matched ahead of "ь".
+		{"новость", "новостей"},
+		{"активность", "активности"},
 	} {
 		forms := stemMatchForms(c.query)
 		found := false
@@ -103,6 +111,9 @@ func TestRussianFoldDoesNotReachUnrelatedWords(t *testing.T) {
 		{"бить", "битой"},
 		{"верь", "вера"},
 		{"весь", "веса"},
+		{"цель", "целое"},
+		{"голубь", "голубой"},
+		{"столь", "стол"},
 	} {
 		for _, f := range stemMatchForms(c.query) {
 			if f == c.unrelated {
