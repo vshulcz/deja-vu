@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.7] - 2026-07-25
+
+Existing indexes are rebuilt once on first use: the on-disk format changed
+several times in this release.
+
+### Fixed
+- Non-ASCII search was scanning the whole vocabulary on every lookup: tokens were sharded by their first two *bytes*, so a prefix plus half a UTF-8 sequence collapsed every Russian, Chinese and Greek token in the corpus into one bucket. Median search on a 100k-passage corpus: Chinese 4.02s -> 1.45s, Russian 1.50s -> 186ms. (#351)
+- Russian inflection folding never fired — Cyrillic terms were handed to the ASCII stemmer, which appended English suffixes to them. Folding now covers the third-declension nouns (сеть/сети/сетью, новость/новостей) and short verb stems (знать/знал/знаю), while no longer reaching unrelated words: цель no longer recalls целая, часть no longer recalls час. (#351)
+- Cross-machine sync: watermarks are per peer, a message sharing the newest timestamp is no longer skipped, tombstones and the exclude list survive a cache wipe, and a message the harness never stamped can now reach another machine at all. (#346)
+- `--harness` and `--project` searches returned nothing when the unfiltered top of the ranking was full of other sessions — the scope was applied after truncation. Session ids could also collide during an incremental update, merging two sessions' postings. (#348)
+- Recall kill switch and trust policy now bind every path, including the session-start hook cache. (#347)
+- Chinese questions reach the relevance tier: fullwidth punctuation was glued into terms. Question grammar (在哪, 什么) no longer weighs as much as the entity asked about — MIRACL Chinese hit@1 40.4% -> 42.5%. (#345, #360)
+- Relevance results no longer render "0 matches" with no snippet when a session surfaced through a folded form. (#352)
+
+### Changed
+- Index is smaller: records intern their session key and source path instead of repeating them (a real store wrote 90 distinct paths 57 000 times), large tool output and file dumps are deflated, and bucket directories no longer store an offset the reader can derive. A 1000-session store goes 66 MB -> 53 MB; the saving is larger the more tool output the corpus holds. Index build and search latency are unchanged. (#354, #357, #358)
+- Search latency on queries that fall through the ladder: the token catalog is cached between queries instead of being rebuilt by both the stem and fuzzy tiers, and fuzzy matching only compares tokens whose length is within its edit limit rather than every token in the corpus — 168ms -> 36ms per term on a 267k-token vocabulary. (#350, #356, #360)
+
 ## [0.15.6] - 2026-07-24
 
 ### Added
