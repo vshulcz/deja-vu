@@ -145,7 +145,7 @@ func cooccurSearch(dir string, m Manifest, o query.Options) (SearchResult, error
 	if neighbors == nil {
 		return SearchResult{}, nil
 	}
-	catalog, err := tokenCatalog(dir)
+	catalog, err := tokenCatalogCached(dir)
 	if err != nil {
 		return SearchResult{}, err
 	}
