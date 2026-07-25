@@ -77,7 +77,7 @@ func BenchmarkFuzzyTokenEnumeration(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = closeTokens("synthetic-token-12345", catalog)
+		_ = closeTokens("synthetic-token-12345", newTokenIndex(catalog))
 	}
 }
 
@@ -162,7 +162,7 @@ func containsString(values []string, want string) bool {
 
 func TestFuzzyHelperCapsAndDistanceRules(t *testing.T) {
 	catalog := map[string]bool{"abcdefgh": true, "abcdefgi": true, "abcdxfgh": true, "abcdefghij": true}
-	got := closeTokens("abcdefgh", catalog)
+	got := closeTokens("abcdefgh", newTokenIndex(catalog))
 	if len(got) > 8 || len(got) == 0 || got[0] != "abcdefgh" {
 		t.Fatalf("close tokens=%v", got)
 	}
