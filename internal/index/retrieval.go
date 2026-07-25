@@ -224,16 +224,15 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched, termsKnown := relevantMetasCounts(dir, m, nil, terms, 50)
+	metas, _, anyMatched, termsKnown := relevantMetasCounts(dir, m, nil, terms, 50, func(meta SessionMeta) bool {
+		return sessionMetaMatches(meta, o)
+	})
 	if len(metas) == 0 {
 		return SearchResult{}, nil
 	}
 	keep := make([]SessionMeta, 0, len(metas))
 	var weak []SessionMeta
 	for i, meta := range metas {
-		if !sessionMetaMatches(meta, o) {
-			continue
-		}
 		if anyMatched[i] >= 2 {
 			keep = append(keep, meta)
 		} else {
@@ -314,7 +313,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int) {
-	metas, informative, _, _ := relevantMetasCounts(dir, m, projects, terms, n)
+	metas, informative, _, _ := relevantMetasCounts(dir, m, projects, terms, n, nil)
 	return metas, informative
 }
 
@@ -322,9 +321,16 @@ func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n in
 // each session matched — the noise gate for full-index relevance search,
 // where demanding two rare terms also rejects real answers that pair one
 // rare word with one ordinary one.
-func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, int) {
+// keep, when non-nil, restricts the candidate pool before ranking. The
+// search tier used to rank the whole index, take the top n and only then
+// apply the scope, so a --harness or --project search came back empty
+// whenever the unfiltered head was full of other sessions.
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int) {
 	inProject := map[uint32]SessionMeta{}
 	for _, meta := range m.Sessions {
+		if keep != nil && !keep(meta) {
+			continue
+		}
 		if len(projects) == 0 { // empty scope = whole index
 			inProject[meta.Ord] = meta
 			continue

@@ -935,6 +935,22 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return recErr
 	}
 	seenMsgs := msgSeen{}
+	// Ord is the posting's session id, so two sessions sharing one merges
+	// their postings. A replacement reclaims its Ord from the OLD manifest,
+	// which the new map has not seen yet — so a new session picked from
+	// max(new)+1 could collide with an Ord an existing session was about to
+	// take back. Reserve both sides before handing any out.
+	nextOrd := uint32(0)
+	for _, meta := range m.Sessions {
+		if meta.Ord > nextOrd {
+			nextOrd = meta.Ord
+		}
+	}
+	for _, meta := range old.Sessions {
+		if meta.Ord > nextOrd {
+			nextOrd = meta.Ord
+		}
+	}
 	for _, s := range replacements {
 		key := s.Harness + ":" + s.ID
 		ord := uint32(0)
@@ -944,7 +960,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			ord = cur.Ord
 		}
 		if ord == 0 {
-			ord = nextSessionOrd(m.Sessions)
+			nextOrd++
+			ord = nextOrd
 		}
 		m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 		for _, msg := range s.Messages {
