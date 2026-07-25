@@ -347,6 +347,8 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	if len(inProject) == 0 {
 		return nil, nil, nil, 0
 	}
+	br := newBucketReader(dir)
+	defer br.close()
 	totalDocs := float64(len(m.Sessions)) + 1
 	score := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
@@ -399,7 +401,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			// exact hit is never diluted by its variants. Russian inflects
 			// too heavily for that gate — a Cyrillic term keeps its whole
 			// form union, matching сеть against сетью and сети alike.
-			if exact, err := readBucketToken(filepath.Join(dir, "buckets", bucket(orKeys[0])+".bin"), orKeys[0]); err == nil && len(exact) > 0 {
+			if exact, err := br.postings(orKeys[0]); err == nil && len(exact) > 0 {
 				orKeys = orKeys[:1]
 			}
 		}
@@ -410,7 +412,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			tf = map[uint32]int{}
 			offs = map[uint32]map[int64]bool{}
 			for _, key := range orKeys {
-				posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+				posts, err := br.postings(key)
 				if err != nil || len(posts) == 0 {
 					continue
 				}
@@ -436,7 +438,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			// fallthrough to idf/scoring below
 		} else {
 			for _, key := range keys {
-				posts, err := readBucketToken(filepath.Join(dir, "buckets", bucket(key)+".bin"), key)
+				posts, err := br.postings(key)
 				if err != nil || len(posts) == 0 {
 					missed = true
 					break

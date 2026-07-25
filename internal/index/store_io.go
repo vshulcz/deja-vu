@@ -514,3 +514,59 @@ func readGob(p string, v any) error {
 	}
 	return nil
 }
+
+// bucketReader memoizes parsed bucket directories for the span of one query.
+// A bucket's directory lists every token in that shard, and readBucketToken
+// re-read and re-parsed the whole thing per token. The relevance tier asks
+// for every inflected form of a term, and those forms share their opening
+// runes — so they all hash to the same bucket and re-parsed the same
+// directory dozens of times per query. Only the directory is cached; the
+// file is reopened per read so a concurrent index swap is never blocked by a
+// held handle.
+type bucketReader struct {
+	dir     string
+	entries map[string][]bucketEntry
+}
+
+func newBucketReader(dir string) *bucketReader {
+	return &bucketReader{dir: dir, entries: map[string][]bucketEntry{}}
+}
+
+func (b *bucketReader) postings(tok string) ([]posting, error) {
+	p := filepath.Join(b.dir, "buckets", bucket(tok)+".bin")
+	entries, cached := b.entries[p]
+	if !cached {
+		e, f, err := openBucketDir(p)
+		if err != nil {
+			// A bucket that was never written means the token does not occur
+			// — "no postings", not a failure.
+			if os.IsNotExist(err) {
+				b.entries[p] = nil
+				return nil, nil
+			}
+			return nil, err
+		}
+		_ = f.Close()
+		b.entries[p] = e
+		entries = e
+	}
+	for _, e := range entries {
+		if e.tok != tok {
+			continue
+		}
+		f, err := os.Open(p)
+		if err != nil {
+			return nil, err
+		}
+		buf := make([]byte, e.n)
+		_, err = f.ReadAt(buf, int64(e.off))
+		_ = f.Close()
+		if err != nil {
+			return nil, err
+		}
+		return decodePostings(buf), nil
+	}
+	return nil, nil
+}
+
+func (b *bucketReader) close() { b.entries = nil }
