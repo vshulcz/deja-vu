@@ -203,3 +203,41 @@ func TestRelevanceTermsKeepNonASCIILetters(t *testing.T) {
 		}
 	}
 }
+
+// A Chinese question expands into one bigram per adjacent character pair, so
+// the grammar of the question ("在哪", "什么") arrives as terms carrying the
+// same weight as the entity being asked about. Nothing else filters them:
+// IsStopWord only knows Latin and Cyrillic.
+func TestCJKFunctionBigramsAreNotQueryTerms(t *testing.T) {
+	has := func(terms []string, want string) bool {
+		for _, term := range terms {
+			if term == want {
+				return true
+			}
+		}
+		return false
+	}
+	terms := RelevanceTerms("复旦大学在哪个城市？")
+	for _, junk := range []string{"在哪", "哪个"} {
+		if has(terms, junk) {
+			t.Errorf("function bigram %q survived as a query term: %v", junk, terms)
+		}
+	}
+	for _, want := range []string{"复旦", "大学", "城市"} {
+		if !has(terms, want) {
+			t.Errorf("content bigram %q was dropped: %v", want, terms)
+		}
+	}
+	// The rule is "every rune is a function rune", not "any": these are real
+	// words built from characters that are function runes on their own.
+	if got := RelevanceTerms("中国有多少个人"); !has(got, "中国") || !has(got, "个人") {
+		t.Errorf("real words dropped from %q: %v", "中国有多少个人", got)
+	}
+	if got := RelevanceTerms("目的是什么"); !has(got, "目的") {
+		t.Errorf("real word 目的 dropped: %v", got)
+	}
+	// Latin is untouched — the filter requires CJK runes.
+	if got := RelevanceTerms("what is the database migration"); !has(got, "database") {
+		t.Errorf("ASCII query lost content terms: %v", got)
+	}
+}
