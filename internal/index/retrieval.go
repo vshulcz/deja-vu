@@ -1142,7 +1142,7 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 	if !hasFuzzyToken(terms) {
 		return nil, nil, nil
 	}
-	catalog, err := tokenCatalog(dir)
+	catalog, err := tokenCatalogCached(dir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1209,7 +1209,7 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 	if !hasStemToken(terms) {
 		return nil, nil, nil
 	}
-	catalog, err := tokenCatalog(dir)
+	catalog, err := tokenCatalogCached(dir)
 	if err != nil {
 		return nil, nil, err
 	}

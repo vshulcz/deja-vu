@@ -124,3 +124,42 @@ func TestInternedIDsAreStable(t *testing.T) {
 		t.Fatalf("out-of-range id resolved to %q", got)
 	}
 }
+
+// The catalog must be rebuilt when a bucket changes, or a corrupt bucket goes
+// unreported and the ladder never triggers a rebuild.
+func TestCatalogCacheNoticesBucketChanges(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"),
+		[]byte(`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"quetzalcoatl marker"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	first, err := tokenCatalogCached(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first["quetzalcoatl"] {
+		t.Fatalf("catalog missing the indexed token")
+	}
+	if again, err := tokenCatalogCached(dir); err != nil || len(again) != len(first) {
+		t.Fatalf("second call = %d tokens err=%v", len(again), err)
+	}
+	// Corrupting a bucket must invalidate the cache and surface as an error,
+	// which is what makes the search ladder rebuild a damaged index.
+	if err := os.WriteFile(filepath.Join(dir, "buckets", "zz.bin"), []byte("not a bucket"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tokenCatalogCached(dir); err == nil {
+		t.Fatal("a corrupt bucket was hidden by the cached catalog")
+	}
+}
