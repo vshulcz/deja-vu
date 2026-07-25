@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -469,18 +470,34 @@ func TestDefaultDirQueriesFiltersAndCorruptBucketBranches(t *testing.T) {
 	if _, _, err := openBucketDir(shortTok); err == nil || !IsCorrupt(err) {
 		t.Fatalf("short token err=%v", err)
 	}
+	// A directory entry that ends before its posting-block length.
 	b.Reset()
 	b.Write(bucketMagic)
 	b.WriteByte(1)
 	b.WriteByte(1)
 	b.WriteByte('a')
-	b.Write([]byte{1, 2})
 	shortFixed := filepath.Join(tmp, "short-fixed.bin")
 	if err := os.WriteFile(shortFixed, b.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := openBucketDir(shortFixed); err == nil || !IsCorrupt(err) {
 		t.Fatalf("short fixed err=%v", err)
+	}
+	// A block length no file could hold must be rejected rather than
+	// truncated into a uint32.
+	b.Reset()
+	b.Write(bucketMagic)
+	b.WriteByte(1)
+	b.WriteByte(1)
+	b.WriteByte('a')
+	var huge [binary.MaxVarintLen64]byte
+	b.Write(huge[:binary.PutUvarint(huge[:], uint64(math.MaxUint32)+9)])
+	hugeBlock := filepath.Join(tmp, "huge-block.bin")
+	if err := os.WriteFile(hugeBlock, b.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := openBucketDir(hugeBlock); err == nil || !IsCorrupt(err) {
+		t.Fatalf("huge block err=%v", err)
 	}
 }
 

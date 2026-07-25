@@ -8,6 +8,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -447,11 +448,16 @@ func writeBucket(p string, data map[string][]posting) error {
 		toks = append(toks, tok)
 	}
 	sort.Strings(toks)
+	// Posting blocks are written back to back in directory order, so an
+	// entry's offset is the running sum of the lengths before it. Storing it
+	// cost 8 bytes per token — 180k tokens on a real corpus — to record a
+	// number the reader can add up itself.
 	encoded := make(map[string][]byte, len(toks))
 	dirLen := len(bucketMagic) + uvarintLen(uint64(len(toks)))
 	for _, tok := range toks {
-		dirLen += uvarintLen(uint64(len(tok))) + len(tok) + 8 + 4
-		encoded[tok] = encodePostings(data[tok])
+		b := encodePostings(data[tok])
+		encoded[tok] = b
+		dirLen += uvarintLen(uint64(len(tok))) + len(tok) + uvarintLen(uint64(len(b)))
 	}
 	entries := make([]bucketEntry, 0, len(toks))
 	pos := uint64(dirLen)
@@ -483,10 +489,8 @@ func writeBucket(p string, data map[string][]posting) error {
 		if _, err := w.Write([]byte(e.tok)); err != nil {
 			return err
 		}
-		var fixed [12]byte
-		binary.LittleEndian.PutUint64(fixed[:8], e.off)
-		binary.LittleEndian.PutUint32(fixed[8:], e.n)
-		if _, err := w.Write(fixed[:]); err != nil {
+		n = binary.PutUvarint(scratch[:], uint64(e.n))
+		if _, err := w.Write(scratch[:n]); err != nil {
 			return err
 		}
 	}
@@ -572,6 +576,9 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 	}
 	entries := make([]bucketEntry, 0, count)
+	// Offsets are not stored; they are the running sum of the lengths, taken
+	// from where the directory ends.
+	dirLen := uint64(len(bucketMagic)) + uint64(uvarintLen(count))
 	for i := uint64(0); i < count; i++ {
 		ln, err := binary.ReadUvarint(r)
 		if err != nil {
@@ -583,12 +590,22 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 			f.Close()
 			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 		}
-		var fixed [12]byte
-		if _, err := io.ReadFull(r, fixed[:]); err != nil {
+		size, err := binary.ReadUvarint(r)
+		if err != nil {
 			f.Close()
 			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 		}
-		entries = append(entries, bucketEntry{tok: string(tb), off: binary.LittleEndian.Uint64(fixed[:8]), n: binary.LittleEndian.Uint32(fixed[8:])})
+		if size > math.MaxUint32 {
+			f.Close()
+			return nil, nil, fmt.Errorf("%w: posting block length %d", errCorruptIndex, size)
+		}
+		dirLen += uint64(uvarintLen(ln)) + ln + uint64(uvarintLen(size))
+		entries = append(entries, bucketEntry{tok: string(tb), n: uint32(size)})
+	}
+	pos := dirLen
+	for i := range entries {
+		entries[i].off = pos
+		pos += uint64(entries[i].n)
 	}
 	return entries, f, nil
 }
