@@ -189,6 +189,10 @@ func eachRecordForKeys(path string, want map[string]bool, fn func(Record)) error
 	}
 }
 
+// zeroTimeUnixNano is what the zero time serializes to; records.bin has
+// always stored it, so it stays the on-disk marker for "never stamped".
+var zeroTimeUnixNano = time.Time{}.UnixNano()
+
 func encodeRecord(r Record) []byte {
 	b := make([]byte, 0, len(r.Key)+len(r.SourcePath)+len(r.Role)+len(r.Text)+32)
 	b = appendField(b, r.Key)
@@ -219,7 +223,15 @@ func decodeRecord(b []byte) (Record, error) {
 	if len(b) < 8 {
 		return rec, io.ErrUnexpectedEOF
 	}
-	rec.Time = time.Unix(0, int64(binary.LittleEndian.Uint64(b[:8])))
+	// time.Time{}.UnixNano() is a large negative number that time.Unix turns
+	// into the year 1754, so an unstamped message never satisfied IsZero()
+	// again. Sync then read it as older than any watermark and skipped it on
+	// every push — the message could never reach another machine, silently.
+	if n := int64(binary.LittleEndian.Uint64(b[:8])); n == zeroTimeUnixNano {
+		rec.Time = time.Time{}
+	} else {
+		rec.Time = time.Unix(0, n)
+	}
 	b = b[8:]
 	if rec.Text, _, ok = consumeField(b); !ok {
 		return rec, io.ErrUnexpectedEOF
