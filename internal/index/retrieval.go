@@ -1336,8 +1336,15 @@ var cyrEndings = []string{
 	// Soft-sign stems: сеть -> сети, сетью, сетям. Without "ью" and "ям"
 	// stripping the "ь" would strand the very forms the fold exists to reach.
 	"ью", "ям", "ем", "ом",
-	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о", "ь",
+	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о",
 }
+
+// Deliberately absent: a bare "ь". Stripping the soft sign off a four-rune
+// noun leaves a three-rune base that collides with unrelated words — цель
+// folds onto целая, верь onto вера, бить onto битой. It bought only
+// сеть->сети (новость->новости is taken by "ть" first), which is the same
+// shape as the false ones, so there is no rule that keeps one without the
+// others. A wrong recall costs more than a missed inflection.
 
 // cyrMatchForms folds a Russian term onto its inflection family for the
 // relevance tier: strip the longest known ending, then re-attach each, so
@@ -1360,13 +1367,24 @@ func cyrMatchForms(term string) []string {
 	if base != term {
 		forms = append(forms, base)
 	}
+	baseLen := len([]rune(base))
 	for _, end := range cyrEndings {
+		// Verb endings on a short base reach unrelated words: весом strips
+		// to вес, and вес+ть is весть. Nouns that short still fold through
+		// their vowel endings (баз -> базы, базе).
+		if baseLen < 4 && cyrVerbEndings[end] {
+			continue
+		}
 		if form := base + end; form != term {
 			forms = append(forms, form)
 		}
 	}
 	return forms
 }
+
+// cyrVerbEndings are the infinitive and past-tense endings; attaching one to
+// a noun stem is how a fold lands on a word from another paradigm.
+var cyrVerbEndings = map[string]bool{"ть": true, "л": true, "ла": true, "ло": true, "ли": true}
 
 // cyrSuffixForms bridges Russian inflection: strip the longest known ending,
 // then re-attach each — миграция matches миграции and миграцию. ASCII terms

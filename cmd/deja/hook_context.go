@@ -292,7 +292,10 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	if mode == search.RecallOff {
 		return "", 0, 0, nil
 	}
-	if !index.HasManifest(dir) {
+	// A store from an older index version must be rebuilt before it is read:
+	// this path never calls Ensure, so otherwise the first prompts after an
+	// upgrade recall nothing and say nothing about why.
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) {
 		requestWarmup(dir)
 		return "", 0, 0, nil
 	}

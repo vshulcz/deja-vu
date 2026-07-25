@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+// IsCurrentVersion reports whether the index on disk was written by this
+// build's format. Hook paths never call Ensure, so after an upgrade that
+// changes the layout they would read the old store directly — for version 12
+// that meant non-ASCII tokens hashing to buckets the old index never wrote,
+// i.e. silent zero recall for Russian and CJK while English kept working.
+func IsCurrentVersion(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	return err == nil && m.Version == version
+}
+
 func HasManifest(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()

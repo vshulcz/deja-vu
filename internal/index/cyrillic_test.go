@@ -47,7 +47,8 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 		{"миграция", "миграциями"},
 		{"миграциями", "миграция"},
 		{"репликация", "репликации"},
-		{"сеть", "сети"},
+		{"агентом", "агент"},
+		{"база", "базы"},
 	} {
 		forms := stemMatchForms(c.query)
 		found := false
@@ -71,6 +72,27 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 	for _, w := range []string{"что", "как", "его"} {
 		if got := stemMatchForms(w); len(got) != 0 {
 			t.Errorf("stemMatchForms(%q) = %v, want none", w, got)
+		}
+	}
+}
+
+// The relevance tier has no catalog gate — whatever the fold invents is looked
+// up for real — so an over-eager ending reaches a word from another paradigm
+// and recalls a session that has nothing to do with the query. A wrong recall
+// costs more than a missed inflection.
+func TestRussianFoldDoesNotReachUnrelatedWords(t *testing.T) {
+	for _, c := range []struct{ query, unrelated string }{
+		{"цель", "целая"},
+		{"борись", "борис"},
+		{"весом", "весть"},
+		{"бить", "битой"},
+		{"верь", "вера"},
+	} {
+		for _, f := range stemMatchForms(c.query) {
+			if f == c.unrelated {
+				t.Errorf("stemMatchForms(%q) reaches the unrelated %q", c.query, c.unrelated)
+				break
+			}
 		}
 	}
 }
