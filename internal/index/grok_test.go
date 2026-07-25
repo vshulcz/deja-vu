@@ -16,8 +16,13 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	stores := map[string]string{
-		"HOME":                  root,
-		"USERPROFILE":           root,
+		"HOME":        root,
+		"USERPROFILE": root,
+		// Tombstones and the exclude list live under XDG_CONFIG_HOME. A
+		// developer who has it set would otherwise have the suite write into
+		// their real ~/.config/deja.
+		"XDG_CONFIG_HOME":       filepath.Join(root, "config"),
+		"DEJA_EXCLUDE_PROJECTS": "",
 		"DEJA_CLAUDE_ROOT":      filepath.Join(root, "claude"),
 		"DEJA_CODEX_ROOT":       filepath.Join(root, "codex"),
 		"DEJA_OPENCODE_DB":      filepath.Join(root, "opencode.db"),

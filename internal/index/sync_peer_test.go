@@ -1,6 +1,7 @@
 package index
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,6 +26,9 @@ func syncPeerIndex(t *testing.T, msgs ...string) (string, string) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	// Tombstones live outside the cache, so without this every test in the
+	// package shares one list and a Forget here leaks into the next test.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	if err := Ensure(dir, "", true, nil); err != nil {
@@ -142,7 +146,21 @@ func TestImportHonorsExcludeList(t *testing.T) {
 	if _, err := Export(dir, batch); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("DEJA_EXCLUDE_PROJECTS", "tmp-app")
+	// Control: without an exclude list this batch does arrive. Without it a
+	// typo in the pattern would make the assertion below pass for free.
+	control := filepath.Join(tmp, "control.db")
+	if _, err := Import(control, batch); err != nil {
+		t.Fatal(err)
+	}
+	base, err := Search(control, search.Options{Query: "nda project notes", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(base) == 0 {
+		t.Fatal("fixture never imports at all — the exclude assertion would be vacuous")
+	}
+
+	t.Setenv("DEJA_EXCLUDE_PROJECTS", exportedProject(t, batch))
 	peer := filepath.Join(tmp, "peer.db")
 	if _, err := Import(peer, batch); err != nil {
 		t.Fatal(err)
@@ -154,4 +172,27 @@ func TestImportHonorsExcludeList(t *testing.T) {
 	if len(got) != 0 {
 		t.Fatalf("excluded project arrived through sync: %d sessions", len(got))
 	}
+}
+
+// exportedProject reads the project name straight off the wire, so the test
+// excludes what actually travels rather than what the fixture path suggests.
+func exportedProject(t *testing.T, batch string) string {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(batch, "*.jsonl"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no batch files in %s: %v", batch, err)
+	}
+	f, err := os.Open(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	var rec SyncRecord
+	if err := json.NewDecoder(f).Decode(&rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Project == "" {
+		t.Fatal("exported record carries no project")
+	}
+	return rec.Project
 }

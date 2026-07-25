@@ -168,6 +168,7 @@ const syncImportPath = "deja-sync-import"
 type importedState struct {
 	sessions   []model.Session
 	watermarks map[string]int64
+	boundary   map[string][]uint64
 	dedupe     map[string]bool
 }
 

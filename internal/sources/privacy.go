@@ -43,26 +43,44 @@ func ExclusionPatterns() []string {
 	return out
 }
 
-func ExcludedProject(project string) bool {
+// Excluder answers exclusion questions from patterns read once. Sync imports
+// ask per record, and re-opening the exclude file for each one costs seconds
+// on a large batch.
+type Excluder struct{ patterns []string }
+
+func NewExcluder() Excluder { return Excluder{patterns: ExclusionPatterns()} }
+
+func (e Excluder) Empty() bool { return len(e.patterns) == 0 }
+
+func (e Excluder) Match(project string) bool {
+	// Sync-imported sessions are stored as "imported:<project>"; a glob
+	// written for the local name must still match after the trip.
 	project = strings.ToLower(project)
-	for _, pattern := range ExclusionPatterns() {
+	bare := strings.TrimPrefix(project, "imported:")
+	for _, pattern := range e.patterns {
 		if strings.Contains(project, pattern) {
 			return true
 		}
 		if ok, _ := filepath.Match(pattern, project); ok {
 			return true
 		}
+		if ok, _ := filepath.Match(pattern, bare); ok {
+			return true
+		}
 	}
 	return false
 }
 
+func ExcludedProject(project string) bool { return NewExcluder().Match(project) }
+
 func FilterSessions(ss []model.Session) []model.Session {
-	if len(ExclusionPatterns()) == 0 {
+	ex := NewExcluder()
+	if ex.Empty() {
 		return ss
 	}
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
-		if !ExcludedProject(s.Project) {
+		if !ex.Match(s.Project) {
 			out = append(out, s)
 		}
 	}

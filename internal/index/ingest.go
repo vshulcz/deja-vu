@@ -214,10 +214,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	ss := sources.FilterSessions(filterTombstonedSet(loadProgress(harness, progress), dead))
-	ss = append(ss, imported.sessions...)
+	// Imported sessions are filtered too: excluding a project must also drop
+	// what a peer already pushed, not only what arrives next.
+	ss = append(ss, sources.FilterSessions(imported.sessions)...)
 	ss = filterTombstonedSet(ss, dead)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
-		ExportWatermarks: imported.watermarks, ImportedRecords: imported.dedupe}
+		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -300,6 +302,7 @@ func importedSessions(dir string) importedState {
 		return out
 	}
 	out.watermarks = m.ExportWatermarks
+	out.boundary = m.ExportBoundary
 	out.dedupe = m.ImportedRecords
 	by := map[string]*model.Session{}
 	_ = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
@@ -410,7 +413,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	writtenMessages := 0
 	lastIngestFiles = len(files)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
-		ExportWatermarks: imp.watermarks, ImportedRecords: imp.dedupe}
+		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -861,7 +864,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: old.Generation, Scope: scope,
-		ExportWatermarks: old.ExportWatermarks, ImportedRecords: old.ImportedRecords}
+		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true

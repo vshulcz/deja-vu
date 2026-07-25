@@ -59,7 +59,10 @@ func watermarkKey(peer, source string) string {
 }
 
 // exportBoundaryCap bounds how many record identities a watermark carries.
-const exportBoundaryCap = 4096
+// The manifest is read on every search, so this stays small: harnesses that
+// stamp distinct times need one entry, and one that stamps a whole session
+// with its start time falls back to resending that session.
+const exportBoundaryCap = 32
 
 // recordIdentity is a stable fingerprint of one exported record.
 func recordIdentity(r Record) uint64 {
@@ -116,6 +119,9 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		sentAtBoundary[k] = set
 	}
 	nextBoundary := map[string]map[uint64]bool{}
+	// Only sources this export actually touched may have their watermark or
+	// boundary rewritten; pushing project B must leave project A's alone.
+	touched := map[string]bool{}
 	err = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
 		if r.SourcePath == syncImportPath {
 			return
@@ -144,6 +150,7 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time}
 		bySource[source] = append(bySource[source], rec)
+		touched[wk] = true
 		tn := r.Time.UnixNano()
 		switch {
 		case tn > nextWatermarks[wk]:
@@ -200,7 +207,8 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		if cur.ExportBoundary == nil {
 			cur.ExportBoundary = map[string][]uint64{}
 		}
-		for source, wm := range nextWatermarks {
+		for source := range touched {
+			wm := nextWatermarks[source]
 			if wm < cur.ExportWatermarks[source] {
 				continue
 			}
@@ -233,6 +241,7 @@ func Import(dir, inDir string) (int, error) {
 	}
 	defer unlock()
 	dead := readTombstones()
+	ex := sources.NewExcluder()
 	if !HasManifest(dir) {
 		if err := initEmptyIndex(dir); err != nil {
 			return 0, err
@@ -279,7 +288,7 @@ func Import(dir, inDir string) (int, error) {
 			}
 			// The exclude list keeps a project out of this machine's memory;
 			// a sync from another machine must not put it back.
-			if sources.ExcludedProject(sr.Project) {
+			if ex.Match(sr.Project) {
 				return nil
 			}
 			key := sr.Harness + ":" + importID
