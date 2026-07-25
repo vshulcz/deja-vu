@@ -1114,14 +1114,14 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 	if !hasFuzzyToken(terms) {
 		return nil, nil, nil
 	}
-	catalog, err := tokenCatalogCached(dir)
+	idx, err := tokenIndexCached(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 	perToken := make([]map[int64]posting, len(terms))
 	variants := map[string][]string{}
 	for i, term := range terms {
-		matches := closeTokens(term, catalog)
+		matches := closeTokens(term, idx)
 		if len(matches) == 0 {
 			return nil, nil, nil
 		}
@@ -1580,22 +1580,26 @@ func tokenCatalog(dir string) (map[string]bool, error) {
 	return catalog, nil
 }
 
-func closeTokens(query string, catalog map[string]bool) []string {
+func closeTokens(query string, idx *tokenIndex) []string {
 	type match struct {
 		token    string
 		distance int
 	}
 	var matches []match
+	qr := len([]rune(query))
 	limit := 1
-	if len([]rune(query)) >= 8 {
+	if qr >= 8 {
 		limit = 2
 	}
-	for token := range catalog {
-		d := damerauDistance(query, token, limit)
-		if d <= limit {
+	// An edit changes the length by at most one and a transposition not at
+	// all, so only tokens within the limit of the query's length can match.
+	// Walking those buckets replaces a Damerau-Levenshtein run against every
+	// token in the corpus — ~200k of them — with a few short slices.
+	idx.candidates(qr, limit, func(token string) {
+		if d := damerauDistance(query, token, limit); d <= limit {
 			matches = append(matches, match{token: token, distance: d})
 		}
-	}
+	})
 	sort.Slice(matches, func(i, j int) bool {
 		if matches[i].distance == matches[j].distance {
 			return matches[i].token < matches[j].token
@@ -1610,6 +1614,17 @@ func closeTokens(query string, catalog map[string]bool) []string {
 		out[i] = m.token
 	}
 	return out
+}
+
+// isASCIIString reports whether every byte is one rune, so the byte length is
+// the rune count.
+func isASCIIString(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 func damerauDistance(a, b string, max int) int {
