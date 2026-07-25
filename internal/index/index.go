@@ -10,9 +10,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// version 12 resharded non-ASCII tokens across buckets; 13 interns the key
-// and source path of every record, which an older log spells out in full.
-const version = 13
+// version 12 resharded non-ASCII tokens across buckets; 13 interned the key
+// and source path of every record; 14 deflates the record payload.
+const version = 14
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

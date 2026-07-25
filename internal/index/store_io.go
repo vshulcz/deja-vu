@@ -2,6 +2,8 @@ package index
 
 import (
 	"bufio"
+	"bytes"
+	"compress/flate"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -285,14 +288,52 @@ func (t *recordTables) lookup(id uint64) string {
 	return ""
 }
 
+// compressFloor is deliberately high. Compressing every message halved the
+// record log but doubled index build time and tripled the latency of a query
+// that materializes many records — the payload is touched once per message on
+// write and once per message shown. The mass is in the tail instead: on a real
+// corpus 1.1% of messages (tool output, file dumps) hold 22.6% of the text, so
+// only those are worth the CPU.
+const compressFloor = 8192
+
+const (
+	recordRaw      = 0
+	recordDeflated = 1
+)
+
+var deflateWriters = sync.Pool{New: func() any { w, _ := flate.NewWriter(nil, flate.DefaultCompression); return w }}
+var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
+
+// A record is [keyID][pathID][flag][payload]. The ids stay outside the
+// payload so a walk can peek the key and skip the record without inflating
+// anything — that path never touches a compressed byte.
 func encodeRecord(r Record, t *recordTables) []byte {
-	b := make([]byte, 0, len(r.Role)+len(r.Text)+32)
+	body := make([]byte, 0, len(r.Role)+len(r.Text)+24)
+	body = appendField(body, r.Role)
+	body = binary.LittleEndian.AppendUint64(body, uint64(r.Time.UnixNano()))
+	body = appendField(body, r.Text)
+
+	b := make([]byte, 0, len(body)+16)
 	b = binary.AppendUvarint(b, t.intern(r.Key))
 	b = binary.AppendUvarint(b, t.intern(r.SourcePath))
-	b = appendField(b, r.Role)
-	b = binary.LittleEndian.AppendUint64(b, uint64(r.Time.UnixNano()))
-	b = appendField(b, r.Text)
-	return b
+	if len(body) < compressFloor {
+		return append(append(b, recordRaw), body...)
+	}
+	var buf bytes.Buffer
+	w := deflateWriters.Get().(*flate.Writer)
+	w.Reset(&buf)
+	if _, err := w.Write(body); err != nil {
+		deflateWriters.Put(w)
+		return append(append(b, recordRaw), body...)
+	}
+	err := w.Close()
+	deflateWriters.Put(w)
+	// Incompressible payloads (already-compressed blobs, random ids) are
+	// stored as they are rather than grown.
+	if err != nil || buf.Len() >= len(body) {
+		return append(append(b, recordRaw), body...)
+	}
+	return append(append(b, recordDeflated), buf.Bytes()...)
 }
 
 func appendField(b []byte, s string) []byte {
@@ -315,6 +356,26 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 	b = b[n:]
 	rec.Key = t.lookup(kid)
 	rec.SourcePath = t.lookup(pid)
+	if len(b) < 1 {
+		return rec, io.ErrUnexpectedEOF
+	}
+	flag := b[0]
+	b = b[1:]
+	if flag == recordDeflated {
+		zr := inflateReaders.Get().(io.ReadCloser)
+		if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil {
+			inflateReaders.Put(zr)
+			return rec, err
+		}
+		body, err := io.ReadAll(zr)
+		inflateReaders.Put(zr)
+		if err != nil {
+			return rec, err
+		}
+		b = body
+	} else if flag != recordRaw {
+		return rec, fmt.Errorf("%w: unknown record encoding %d", errCorruptIndex, flag)
+	}
 	if rec.Role, b, ok = consumeField(b); !ok {
 		return rec, io.ErrUnexpectedEOF
 	}
