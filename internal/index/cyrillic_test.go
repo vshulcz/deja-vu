@@ -71,6 +71,14 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 		// -ость nouns never folded before: "ть" matched ahead of "ь".
 		{"новость", "новостей"},
 		{"активность", "активности"},
+		// Real infinitives are vowel + ть and keep the verb branch.
+		{"делать", "делаю"},
+		{"работать", "работаю"},
+		{"видеть", "видел"},
+		// ...and ть-final nouns still fold within their own paradigm.
+		{"часть", "части"},
+		{"весть", "вести"},
+		{"власть", "власти"},
 	} {
 		forms := stemMatchForms(c.query)
 		found := false
@@ -114,6 +122,14 @@ func TestRussianFoldDoesNotReachUnrelatedWords(t *testing.T) {
 		{"цель", "целое"},
 		{"голубь", "голубой"},
 		{"столь", "стол"},
+		// A noun can end in "ть" too. Taking the verb branch sent часть to
+		// час and весть to вес — the latter being the surviving inverse of
+		// весом -> весть.
+		{"часть", "час"},
+		{"часть", "часа"},
+		{"весть", "вес"},
+		{"весть", "веса"},
+		{"лесть", "лес"},
 	} {
 		for _, f := range stemMatchForms(c.query) {
 			if f == c.unrelated {

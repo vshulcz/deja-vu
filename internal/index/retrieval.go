@@ -1337,6 +1337,23 @@ var cyrEndings = []string{
 	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о", "ь",
 }
 
+// endsInfinitive reports whether a ть-final term is shaped like a verb: the
+// rune before "ть" is a vowel. Consonant-stem infinitives (лезть, сесть,
+// класть) are misread as nouns and lose the verb branch — 11 reachable pairs
+// across a 20k frequency list, against closing часть -> час and весть -> вес,
+// which are common words landing on a different lemma entirely.
+func endsInfinitive(term string) bool {
+	runes := []rune(term)
+	if len(runes) < 3 {
+		return false
+	}
+	switch runes[len(runes)-3] {
+	case 'а', 'е', 'ё', 'и', 'о', 'у', 'ы', 'э', 'ю', 'я':
+		return true
+	}
+	return false
+}
+
 // cyrSoftEndings is the third-declension feminine paradigm, and the only set
 // that may attach to a stem exposed by stripping a soft sign. Attaching the
 // hard adjective endings there is what folded цель onto целая and верь onto
@@ -1393,8 +1410,13 @@ func cyrMatchForms(term string) []string {
 				add(base + end)
 			}
 		}
-		// A ь-final infinitive is a verb, not a noun: знать -> знал.
-		if strings.HasSuffix(term, "ть") {
+		// A ь-final infinitive is a verb, not a noun: знать -> знал. But a
+		// noun can end in "ть" too, and часть taking the verb branch reaches
+		// час — a different lemma entirely. Infinitives are vowel + ть
+		// (де-лать, зна-ть, ви-деть); ть-final nouns are consonant + ть
+		// (час-ть, вес-ть, лес-ть, кос-ть). That also closes весть -> вес,
+		// which was the surviving inverse of весом -> весть.
+		if strings.HasSuffix(term, "ть") && endsInfinitive(term) {
 			if base := strings.TrimSuffix(term, "ть"); len([]rune(base)) >= 3 {
 				add(base)
 				for _, end := range cyrVerbEndingList {
