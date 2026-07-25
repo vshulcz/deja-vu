@@ -59,10 +59,13 @@ func watermarkKey(peer, source string) string {
 }
 
 // exportBoundaryCap bounds how many record identities a watermark carries.
-// The manifest is read on every search, so this stays small: harnesses that
-// stamp distinct times need one entry, and one that stamps a whole session
-// with its start time falls back to resending that session.
-const exportBoundaryCap = 32
+// The manifest is read on every search, so this is a size trade: only sources
+// whose records actually tie on a timestamp carry a full set, and those are
+// the ones the boundary exists for — aider stamps a whole session with its
+// start time, which blows any small cap and would resend that session on
+// every push. A full set costs ~4 KB; a source that still overflows falls
+// back to resending its newest instant, which import dedupes.
+const exportBoundaryCap = 512
 
 // recordIdentity is a stable fingerprint of one exported record.
 func recordIdentity(r Record) uint64 {
