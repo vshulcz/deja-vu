@@ -1428,33 +1428,15 @@ func cyrMatchForms(term string) []string {
 // then re-attach each — миграция matches миграции and миграцию. ASCII terms
 // return nothing.
 func cyrSuffixForms(term string) []string {
-	runes := []rune(term)
-	if len(runes) < 5 {
+	if !isCyrToken(term) {
 		return nil
 	}
-	cyr := false
-	for _, r := range runes {
-		if r >= 'а' && r <= 'я' || r == 'ё' {
-			cyr = true
-			break
-		}
-	}
-	if !cyr {
-		return nil
-	}
-	base := term
-	for _, end := range cyrEndings {
-		if strings.HasSuffix(term, end) && len([]rune(term))-len([]rune(end)) >= 4 {
-			base = strings.TrimSuffix(term, end)
-			break
-		}
-	}
-	forms := make([]string, 0, len(cyrEndings)+1)
-	forms = append(forms, base)
-	for _, end := range cyrEndings {
-		forms = append(forms, base+end)
-	}
-	return forms
+	// Both tiers fold Russian the same way. This one used to strip and
+	// re-attach from one shared table, which is the цель->целая shape the
+	// relevance tier was fixed for — it survived here one tier over, letting
+	// пусть recall a session that only says пустой. The catalog gate and the
+	// 8-match cap made it milder, not correct.
+	return cyrMatchForms(term)
 }
 
 func suffixForms(word string) []string {

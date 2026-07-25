@@ -124,6 +124,43 @@ func TestRussianFoldDoesNotReachUnrelatedWords(t *testing.T) {
 	}
 }
 
+// Both tiers must fold Russian the same way. The stem tier used to strip and
+// re-attach from one shared table, so пусть recalled a session that only said
+// пустой — the same defect the relevance tier was fixed for, one tier over.
+func TestStemTierFoldsLikeTheRelevanceTier(t *testing.T) {
+	for _, c := range []struct{ query, unrelated string }{
+		{"пусть", "пустой"},
+		{"пусть", "пустая"},
+		{"часть", "часто"},
+		{"цель", "целая"},
+	} {
+		for _, f := range cyrSuffixForms(c.query) {
+			if f == c.unrelated {
+				t.Errorf("stem tier folds %q onto the unrelated %q", c.query, c.unrelated)
+				break
+			}
+		}
+	}
+	for _, c := range []struct{ query, want string }{
+		{"жизнь", "жизни"},
+		{"дверь", "двери"},
+		{"приятель", "приятеля"},
+		{"часть", "части"},
+		{"миграция", "миграциями"},
+	} {
+		found := false
+		for _, f := range cyrSuffixForms(c.query) {
+			if f == c.want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("stem tier lost %q -> %q", c.query, c.want)
+		}
+	}
+}
+
 // End to end through the relevance tier, which is what auto-recall uses: it
 // has no close/fuzzy ladder to fall back on, so a dead fold there means a
 // Russian prompt silently recalls nothing.
