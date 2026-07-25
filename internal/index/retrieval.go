@@ -202,6 +202,9 @@ func RelevanceTerms(q string) []string {
 		if len([]rune(f)) < 2 || (len(f) < 3 && !isCJK([]rune(f)[0])) || search.IsStopWord(f) || seen[f] {
 			continue
 		}
+		if cjkFunctionBigram(f) {
+			continue
+		}
 		seen[f] = true
 		out = append(out, f)
 	}

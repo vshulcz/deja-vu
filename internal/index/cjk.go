@@ -96,3 +96,42 @@ func expandCJKTokens(toks []string) []string {
 	}
 	return out
 }
+
+// cjkFunctionRunes are Chinese particles, pronouns and question words: the
+// closed class that carries no topic. A bigram made of two of them ("在哪",
+// "什么", "怎么") is grammar, not content — it is the CJK counterpart of a
+// stop word, and nothing else filters it because IsStopWord only knows
+// Latin and Cyrillic.
+//
+// The test is deliberately "both runes", not "either": 中 and 个 are function
+// runes on their own but carry meaning in 中国 and 个人, and dropping every
+// bigram that merely contains one would delete real words. This filter runs
+// at query time only — the index keeps every bigram, so nothing about
+// ingestion changes.
+var cjkFunctionRunes = map[rune]bool{
+	'的': true, '了': true, '是': true, '在': true, '和': true, '与': true,
+	'或': true, '而': true, '但': true, '就': true, '都': true, '也': true,
+	'还': true, '又': true, '再': true, '只': true, '才': true, '很': true,
+	'我': true, '你': true, '他': true, '她': true, '它': true, '们': true,
+	'这': true, '那': true, '些': true, '什': true, '么': true, '哪': true,
+	'怎': true, '呢': true, '吗': true, '吧': true, '啊': true, '之': true,
+	'其': true, '此': true, '所': true, '被': true, '把': true, '让': true,
+	'给': true, '向': true, '于': true, '以': true, '从': true, '到': true,
+	'由': true, '对': true, '因': true, '如': true, '若': true, '则': true,
+	'并': true, '且': true, '为': true, '个': true, '有': true, '会': true,
+}
+
+// cjkFunctionBigram reports whether every rune of a CJK token is a function
+// rune, i.e. the token is pure grammar.
+func cjkFunctionBigram(tok string) bool {
+	runes := []rune(tok)
+	if len(runes) < 2 {
+		return false
+	}
+	for _, r := range runes {
+		if !isCJK(r) || !cjkFunctionRunes[r] {
+			return false
+		}
+	}
+	return true
+}
