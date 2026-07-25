@@ -174,16 +174,36 @@ func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn fu
 		if n > maxRecordSize {
 			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, n)
 		}
+		// The key id is the first varint of the payload, so peek it and skip
+		// the rest of the record without touching it. Materializing every
+		// record just to read two bytes copied the whole log per query.
+		peek := int(n)
+		if peek > binary.MaxVarintLen64 {
+			peek = binary.MaxVarintLen64
+		}
+		head, perr := r.Peek(peek)
+		if perr != nil && len(head) == 0 {
+			if perr == io.EOF || perr == io.ErrUnexpectedEOF {
+				return nil
+			}
+			return perr
+		}
+		kid, un := binary.Uvarint(head)
+		if un <= 0 || !want[t.lookup(kid)] {
+			if _, derr := r.Discard(int(n)); derr != nil {
+				if derr == io.EOF || derr == io.ErrUnexpectedEOF {
+					return nil
+				}
+				return derr
+			}
+			continue
+		}
 		b := make([]byte, n)
 		if _, err := io.ReadFull(r, b); err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return nil
 			}
 			return err
-		}
-		kid, un := binary.Uvarint(b)
-		if un <= 0 || !want[t.lookup(kid)] {
-			continue
 		}
 		rec, derr := decodeRecord(b, t)
 		if derr != nil {
