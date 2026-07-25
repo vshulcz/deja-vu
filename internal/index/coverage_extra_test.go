@@ -531,6 +531,10 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 		t.Fatalf("decode missing source err=%v", err)
 	}
 	buf = binary.AppendUvarint(buf, rtbl.intern("src"))
+	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("decode missing encoding flag err=%v", err)
+	}
+	buf = append(buf, recordRaw)
 	buf = appendField(buf, "role")
 	if rec, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) || rec.Key != "k" || rec.SourcePath != "src" {
 		t.Fatalf("decode missing time rec=%#v err=%v", rec, err)
@@ -813,12 +817,16 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 
 	for _, data := range [][]byte{
 		{0x80},
-		appendField(nil, "key"),
-		[]byte("garbage"),
+		{1, 1},
+		{1, 1, recordRaw},
 	} {
 		if _, err := decodeRecord(data, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
 			t.Fatalf("decodeRecord(%v) err=%v", data, err)
 		}
+	}
+	// An encoding byte the reader does not know is corruption, not EOF.
+	if _, err := decodeRecord([]byte{1, 1, 9}, newRecordTables()); !IsCorrupt(err) {
+		t.Fatalf("unknown encoding flag err=%v, want a corruption error", err)
 	}
 	recPath := filepath.Join(tmp, "records.bin")
 	if err := os.WriteFile(recPath, []byte{0, 0, 0}, 0o644); err != nil {
