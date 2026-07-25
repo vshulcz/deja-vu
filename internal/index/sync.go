@@ -125,7 +125,7 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	// Only sources this export actually touched may have their watermark or
 	// boundary rewritten; pushing project B must leave project A's alone.
 	touched := map[string]bool{}
-	err = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		if r.SourcePath == syncImportPath {
 			return
 		}
@@ -367,7 +367,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	if err != nil {
 		return err
 	}
-	rw, err := newRecordWriter(rf)
+	tbl := tablesFromManifest(*m)
+	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
 		return err
@@ -428,6 +429,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	if err := rw.Close(); err != nil {
 		return err
 	}
+	m.RecordStrings = tbl.strs
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
 		return err
 	}

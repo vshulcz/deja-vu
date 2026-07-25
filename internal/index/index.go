@@ -10,9 +10,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// version 12 reshards non-ASCII tokens across buckets; an index built by 11
-// keeps them all under "t_", where the new lookup would never find them.
-const version = 12
+// version 12 resharded non-ASCII tokens across buckets; 13 interns the key
+// and source path of every record, which an older log spells out in full.
+const version = 13
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -92,6 +92,10 @@ type Manifest struct {
 	// stamps a whole session with one timestamp.
 	ExportBoundary  map[string][]uint64 `json:"export_boundary,omitempty"`
 	ImportedRecords map[string]bool     `json:"imported_records,omitempty"`
+	// RecordStrings interns the keys and source paths of records.bin; a
+	// record stores an index into this table instead of repeating the
+	// strings. Append-only, so an appended log keeps resolving.
+	RecordStrings []string `json:"record_strings,omitempty"`
 	// RecordsSize is records.bin's byte length when the manifest was committed.
 	// A live index whose records.bin is shorter than this lost its tail to a
 	// torn write and must be treated as corrupt.
@@ -120,6 +124,7 @@ type manifestCore struct {
 	ExportWatermarks map[string]int64
 	ExportBoundary   map[string][]uint64
 	ImportedRecords  map[string]bool
+	RecordStrings    []string
 	RecordsSize      int64
 	IngestHealth     map[string]HarnessIngest
 }
@@ -193,9 +198,10 @@ type msgSeen map[string]bool
 // the file offset in memory: the hot rebuild path used to pay a Seek syscall
 // per record, which dominated cold-rebuild profiles.
 type recordWriter struct {
-	f   *os.File
-	w   *bufio.Writer
-	off int64
+	f      *os.File
+	w      *bufio.Writer
+	off    int64
+	tables *recordTables
 }
 
 type bucketEntry struct {

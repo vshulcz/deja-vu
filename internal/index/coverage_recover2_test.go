@@ -27,7 +27,7 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := newRecordWriter(f); err == nil {
+	if _, err := newRecordWriter(f, newRecordTables()); err == nil {
 		t.Fatal("newRecordWriter on closed file returned nil error")
 	}
 
@@ -42,7 +42,7 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 	if err := f2.Close(); err != nil {
 		t.Fatal(err)
 	}
-	rw := &recordWriter{f: f2, w: bufio.NewWriterSize(f2, 1)}
+	rw := &recordWriter{f: f2, w: bufio.NewWriterSize(f2, 1), tables: newRecordTables()}
 	if _, err := rw.write(rec); err == nil {
 		t.Fatal("write on closed file returned nil error")
 	}
@@ -59,7 +59,7 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 	if err := f2b.Close(); err != nil {
 		t.Fatal(err)
 	}
-	rwBig := &recordWriter{f: f2b, w: bufio.NewWriterSize(f2b, 8)}
+	rwBig := &recordWriter{f: f2b, w: bufio.NewWriterSize(f2b, 8), tables: newRecordTables()}
 	if _, err := rwBig.write(rec); err == nil {
 		t.Fatal("write (body) on closed file returned nil error")
 	}
@@ -74,7 +74,7 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f3.Close()
-	if _, err := writeRecord(f3, rec); err == nil {
+	if _, err := writeRecord(f3, rec, newRecordTables()); err == nil {
 		t.Fatal("writeRecord on a read-only file returned nil error")
 	}
 
@@ -85,7 +85,7 @@ func TestRecordIOErrorsViaClosedFile(t *testing.T) {
 	if err := f4.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readRecordAt(f4, 0); err == nil {
+	if _, err := readRecordAt(f4, 0, newRecordTables()); err == nil {
 		t.Fatal("readRecordAt on closed file returned nil error")
 	}
 }
@@ -226,7 +226,10 @@ func TestExportDefaultDirSourceFallbackAndOrphanSkip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw, err := newRecordWriter(rf)
+	// Appending continues the index's own string table; a fresh one would
+	// hand id 0 to a new string and repoint records that already use it.
+	atbl := mustTables(t, dir)
+	rw, err := newRecordWriter(rf, atbl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,6 +240,14 @@ func TestExportDefaultDirSourceFallbackAndOrphanSkip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := rw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	am, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	am.RecordStrings = atbl.strs
+	if err := writeManifest(dir, am); err != nil {
 		t.Fatal(err)
 	}
 

@@ -780,6 +780,10 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
 func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) {
+	tbl, terr := loadRecordTables(dir)
+	if terr != nil {
+		return nil, terr
+	}
 	want := make(map[string]int, len(metas))
 	out := make([]model.Session, len(metas))
 	for i, meta := range metas {
@@ -790,7 +794,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	for k := range want {
 		keys[k] = true
 	}
-	err := eachRecordForKeys(filepath.Join(dir, "records.bin"), keys, func(r Record) {
+	err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, keys, func(r Record) {
 		if i, ok := want[r.Key]; ok {
 			out[i].Messages = append(out[i].Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
@@ -867,7 +871,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	sort.Slice(matches, func(i, j int) bool { return matches[i].Updated.After(matches[j].Updated) })
 	meta := matches[0]
 	s := sessionFromMeta(meta)
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), meta.Harness+":"+meta.ID)
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Harness+":"+meta.ID)
 	if err != nil {
 		return model.Session{}, false, err
 	}
@@ -916,12 +920,12 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		defer func() { _ = f.Close() }()
 		offsets = sortedUniqueOffsets(offsets)
 		for _, off := range offsets {
-			if r, err := readRecordAt(f, off); err == nil && recordMatchesQueryVariants(r, o, variants) {
+			if r, err := readRecordAt(f, off, tablesFromManifest(m)); err == nil && recordMatchesQueryVariants(r, o, variants) {
 				add(r)
 			}
 		}
 	} else {
-		if err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+		if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 			if recordMatchesQueryVariants(r, o, variants) {
 				add(r)
 			}

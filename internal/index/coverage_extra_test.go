@@ -311,13 +311,13 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = devNull.Close() }()
-	if _, err := readRecordAt(devNull, 1); err == nil && runtime.GOOS != "windows" {
+	if _, err := readRecordAt(devNull, 1, newRecordTables()); err == nil && runtime.GOOS != "windows" {
 		t.Fatal("readRecordAt bad seek returned nil")
 	}
-	if _, err := readRecord(&buf); !errors.Is(err, io.EOF) {
+	if _, err := readRecord(&buf, newRecordTables()); !errors.Is(err, io.EOF) {
 		t.Fatalf("empty readRecord err=%v", err)
 	}
-	if _, err := decodeRecord([]byte{1, 'k'}); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord([]byte{1, 'k'}, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("short decode err=%v", err)
 	}
 	gobPath := filepath.Join(tmp, "bad.gob")
@@ -523,17 +523,20 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 	if lastCompleteLineOffset(noNL, 3) != 0 {
 		t.Fatal("unterminated short file did not return 0")
 	}
-	buf := appendField(nil, "k")
-	if _, err := decodeRecord(buf); !errors.Is(err, io.ErrUnexpectedEOF) {
+	// A record is [keyID][pathID][role][time][text]; truncating at each
+	// boundary must fail cleanly rather than return a half-built record.
+	rtbl := testTables(Record{Key: "k", SourcePath: "src"})
+	buf := binary.AppendUvarint(nil, rtbl.intern("k"))
+	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("decode missing source err=%v", err)
 	}
-	buf = appendField(buf, "src")
+	buf = binary.AppendUvarint(buf, rtbl.intern("src"))
 	buf = appendField(buf, "role")
-	if rec, err := decodeRecord(buf); !errors.Is(err, io.ErrUnexpectedEOF) || rec.Key != "k" {
+	if rec, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) || rec.Key != "k" || rec.SourcePath != "src" {
 		t.Fatalf("decode missing time rec=%#v err=%v", rec, err)
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(time.Now().UnixNano()))
-	if _, err := decodeRecord(buf); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("decode missing text err=%v", err)
 	}
 	if _, err := scanRecords(filepath.Join(tmp, "missing-index"), Manifest{}, search.Options{}, nil); err == nil {
@@ -813,7 +816,7 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 		appendField(nil, "key"),
 		[]byte("garbage"),
 	} {
-		if _, err := decodeRecord(data); !errors.Is(err, io.ErrUnexpectedEOF) {
+		if _, err := decodeRecord(data, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
 			t.Fatalf("decodeRecord(%v) err=%v", data, err)
 		}
 	}
@@ -826,7 +829,7 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	if _, err := readRecordAt(f, 99); !errors.Is(err, io.EOF) {
+	if _, err := readRecordAt(f, 99, newRecordTables()); !errors.Is(err, io.EOF) {
 		t.Fatalf("readRecordAt bad offset err=%v", err)
 	}
 

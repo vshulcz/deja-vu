@@ -19,7 +19,7 @@ func TestZeroTimeRoundTripsAsZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw, err := newRecordWriter(f)
+	rw, err := newRecordWriter(f, newRecordTables())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestZeroTimeRoundTripsAsZero(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got Record
-	if err := eachRecord(p, func(r Record) { got = r }); err != nil {
+	if err := eachRecord(p, newRecordTables(), func(r Record) { got = r }); err != nil {
 		t.Fatal(err)
 	}
 	if !got.Time.IsZero() {
@@ -42,7 +42,7 @@ func TestZeroTimeRoundTripsAsZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw2, err := newRecordWriter(f2)
+	rw2, err := newRecordWriter(f2, newRecordTables())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestZeroTimeRoundTripsAsZero(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got2 Record
-	if err := eachRecord(filepath.Join(dir, "r2.bin"), func(r Record) { got2 = r }); err != nil {
+	if err := eachRecord(filepath.Join(dir, "r2.bin"), newRecordTables(), func(r Record) { got2 = r }); err != nil {
 		t.Fatal(err)
 	}
 	if !got2.Time.Equal(when) {

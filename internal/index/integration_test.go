@@ -158,7 +158,7 @@ func TestRebuildDeterminism(t *testing.T) {
 			t.Fatal(err)
 		}
 		msgs := 0
-		_ = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) { msgs++ })
+		_ = eachRecord(filepath.Join(dir, "records.bin"), mustTables(t, dir), func(r Record) { msgs++ })
 		return len(m.Sessions), msgs
 	}
 	s1, m1 := count()
