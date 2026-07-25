@@ -40,7 +40,7 @@ func TestLastCompleteLineOffsetReadAtError(t *testing.T) {
 func TestDecodeRecordMissingRole(t *testing.T) {
 	buf := appendField(nil, "key")
 	buf = appendField(buf, "src")
-	if _, err := decodeRecord(buf); err == nil {
+	if _, err := decodeRecord(buf, newRecordTables()); err == nil {
 		t.Fatal("decodeRecord missing role field returned nil error")
 	}
 }
@@ -54,7 +54,7 @@ func TestEachRecordNonEOFReadError(t *testing.T) {
 	if err := os.MkdirAll(dirAsFile, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := eachRecord(dirAsFile, func(Record) {}); err == nil {
+	if err := eachRecord(dirAsFile, newRecordTables(), func(Record) {}); err == nil {
 		t.Fatal("eachRecord over a directory returned nil error")
 	}
 }
@@ -101,7 +101,7 @@ func TestImportedSessionsOrphanRecordSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw, err := newRecordWriter(rf)
+	rw, err := newRecordWriter(rf, newRecordTables())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestScanRecordsMetaMissingAndOpenError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw, err := newRecordWriter(rf)
+	rw, err := newRecordWriter(rf, newRecordTables())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestUpdateIndexReplacePathOrphanRecordsDropped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rw, err := newRecordWriter(rf)
+	rw, err := newRecordWriter(rf, newRecordTables())
 	if err != nil {
 		t.Fatal(err)
 	}

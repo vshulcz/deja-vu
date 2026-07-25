@@ -13,6 +13,10 @@ import (
 )
 
 func ReadRecords(dir string) ([]OffsetRecord, error) {
+	t, err := loadRecordTables(dir)
+	if err != nil {
+		return nil, err
+	}
 	var out []OffsetRecord
 	f, err := os.Open(filepath.Join(dir, "records.bin"))
 	if err != nil {
@@ -24,7 +28,7 @@ func ReadRecords(dir string) ([]OffsetRecord, error) {
 		if err != nil {
 			return nil, err
 		}
-		r, err := readRecord(f)
+		r, err := readRecord(f, t)
 		if err == io.EOF {
 			break
 		}
@@ -47,16 +51,16 @@ func Generation(dir string) (string, error) {
 	return m.BuiltAt.UTC().Format(time.RFC3339Nano), nil
 }
 
-func newRecordWriter(f *os.File) (*recordWriter, error) {
+func newRecordWriter(f *os.File, t *recordTables) (*recordWriter, error) {
 	off, err := f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, err
 	}
-	return &recordWriter{f: f, w: bufio.NewWriterSize(f, 1<<20), off: off}, nil
+	return &recordWriter{f: f, w: bufio.NewWriterSize(f, 1<<20), off: off, tables: t}, nil
 }
 
 func (rw *recordWriter) write(r Record) (int64, error) {
-	b := encodeRecord(r)
+	b := encodeRecord(r, rw.tables)
 	if len(b) > 1<<31 {
 		return 0, fmt.Errorf("record too large")
 	}
@@ -88,12 +92,12 @@ func (rw *recordWriter) Close() error {
 	return cerr
 }
 
-func writeRecord(f *os.File, r Record) (int64, error) {
+func writeRecord(f *os.File, r Record, t *recordTables) (int64, error) {
 	off, err := f.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return 0, err
 	}
-	b := encodeRecord(r)
+	b := encodeRecord(r, t)
 	if len(b) > 1<<31 {
 		return 0, fmt.Errorf("record too large")
 	}
@@ -106,14 +110,14 @@ func writeRecord(f *os.File, r Record) (int64, error) {
 	return off, err
 }
 
-func readRecordAt(f *os.File, off int64) (Record, error) {
+func readRecordAt(f *os.File, off int64, t *recordTables) (Record, error) {
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
 		return Record{}, err
 	}
-	return readRecord(f)
+	return readRecord(f, t)
 }
 
-func eachRecord(path string, fn func(Record)) error {
+func eachRecord(path string, t *recordTables, fn func(Record)) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -121,7 +125,7 @@ func eachRecord(path string, fn func(Record)) error {
 	defer func() { _ = f.Close() }()
 	r := bufio.NewReaderSize(f, 1024*1024)
 	for {
-		rec, err := readRecord(r)
+		rec, err := readRecord(r, t)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil
 		}
@@ -132,7 +136,7 @@ func eachRecord(path string, fn func(Record)) error {
 	}
 }
 
-func readRecord(r io.Reader) (Record, error) {
+func readRecord(r io.Reader, t *recordTables) (Record, error) {
 	var hdr [4]byte
 	if _, err := io.ReadFull(r, hdr[:]); err != nil {
 		return Record{}, err
@@ -145,13 +149,13 @@ func readRecord(r io.Reader) (Record, error) {
 	if _, err := io.ReadFull(r, b); err != nil {
 		return Record{}, err
 	}
-	return decodeRecord(b)
+	return decodeRecord(b, t)
 }
 
 // eachRecordForKeys walks the log decoding only records whose Key is in
 // want; other bodies are skipped after peeking the key field. On a large log
 // this trades a full decode of every record for a few length reads.
-func eachRecordForKeys(path string, want map[string]bool, fn func(Record)) error {
+func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn func(Record)) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -177,11 +181,11 @@ func eachRecordForKeys(path string, want map[string]bool, fn func(Record)) error
 			}
 			return err
 		}
-		key, _, ok := consumeField(b)
-		if !ok || !want[key] {
+		kid, un := binary.Uvarint(b)
+		if un <= 0 || !want[t.lookup(kid)] {
 			continue
 		}
-		rec, derr := decodeRecord(b)
+		rec, derr := decodeRecord(b, t)
 		if derr != nil {
 			continue
 		}
@@ -193,10 +197,78 @@ func eachRecordForKeys(path string, want map[string]bool, fn func(Record)) error
 // always stored it, so it stays the on-disk marker for "never stamped".
 var zeroTimeUnixNano = time.Time{}.UnixNano()
 
-func encodeRecord(r Record) []byte {
-	b := make([]byte, 0, len(r.Key)+len(r.SourcePath)+len(r.Role)+len(r.Text)+32)
-	b = appendField(b, r.Key)
-	b = appendField(b, r.SourcePath)
+// recordTables interns the two fields every record used to repeat verbatim.
+// A corpus of 57k messages held only 90 distinct source paths and 1073
+// distinct keys, so writing them per record cost 7.3 MB — 15% of the record
+// log — to store 1163 strings.
+//
+// The table is its own thing, deliberately not the session Ord: reusing Ord
+// would make a record's identity depend on the manifest's Ord bookkeeping
+// being right, turning an Ord bug from "postings merged" into "this message
+// belongs to a different session". The table is written by the same pass that
+// writes the records and swapped with them.
+type recordTables struct {
+	strs []string
+	id   map[string]uint64
+}
+
+func newRecordTables() *recordTables {
+	return &recordTables{id: map[string]uint64{}}
+}
+
+// tablesFromStrings is the read path: resolving an id is a slice index, so
+// the string->id map is left nil and built lazily only if something interns.
+// Building it eagerly here cost a map of every string in the corpus on every
+// search.
+func tablesFromStrings(strs []string) *recordTables {
+	return &recordTables{strs: strs}
+}
+
+func tablesFromManifest(m Manifest) *recordTables { return tablesFromStrings(m.RecordStrings) }
+
+func loadRecordTables(dir string) (*recordTables, error) {
+	// Cached: this sits on the search path, and re-decoding the whole
+	// manifest per query is what the interning was meant to avoid paying for.
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	return tablesFromManifest(m), nil
+}
+
+// intern returns the id for s, appending it on first sight. Ids are stable:
+// the table only ever grows, so an appended record log keeps resolving.
+func (t *recordTables) intern(s string) uint64 {
+	if t.id == nil {
+		// A zero-value table is usable; callers that build a writer by hand
+		// should not have to know about the map.
+		t.id = make(map[string]uint64, len(t.strs)+8)
+		for i, v := range t.strs {
+			if _, ok := t.id[v]; !ok {
+				t.id[v] = uint64(i)
+			}
+		}
+	}
+	if id, ok := t.id[s]; ok {
+		return id
+	}
+	id := uint64(len(t.strs))
+	t.strs = append(t.strs, s)
+	t.id[s] = id
+	return id
+}
+
+func (t *recordTables) lookup(id uint64) string {
+	if id < uint64(len(t.strs)) {
+		return t.strs[id]
+	}
+	return ""
+}
+
+func encodeRecord(r Record, t *recordTables) []byte {
+	b := make([]byte, 0, len(r.Role)+len(r.Text)+32)
+	b = binary.AppendUvarint(b, t.intern(r.Key))
+	b = binary.AppendUvarint(b, t.intern(r.SourcePath))
 	b = appendField(b, r.Role)
 	b = binary.LittleEndian.AppendUint64(b, uint64(r.Time.UnixNano()))
 	b = appendField(b, r.Text)
@@ -208,15 +280,21 @@ func appendField(b []byte, s string) []byte {
 	return append(b, s...)
 }
 
-func decodeRecord(b []byte) (Record, error) {
+func decodeRecord(b []byte, t *recordTables) (Record, error) {
 	var rec Record
 	var ok bool
-	if rec.Key, b, ok = consumeField(b); !ok {
+	kid, n := binary.Uvarint(b)
+	if n <= 0 {
 		return rec, io.ErrUnexpectedEOF
 	}
-	if rec.SourcePath, b, ok = consumeField(b); !ok {
+	b = b[n:]
+	pid, n := binary.Uvarint(b)
+	if n <= 0 {
 		return rec, io.ErrUnexpectedEOF
 	}
+	b = b[n:]
+	rec.Key = t.lookup(kid)
+	rec.SourcePath = t.lookup(pid)
 	if rec.Role, b, ok = consumeField(b); !ok {
 		return rec, io.ErrUnexpectedEOF
 	}

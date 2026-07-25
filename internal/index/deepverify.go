@@ -129,7 +129,8 @@ func DeepVerify(dir string) (DeepReport, error) {
 
 	// 3. Dead postings: a sample of tokens must resolve to readable records.
 	catalog, err := tokenCatalog(dir)
-	if err == nil {
+	dvTables, dvErr := loadRecordTables(dir)
+	if err == nil && dvErr == nil {
 		f, ferr := os.Open(recordsPath(dir))
 		if ferr == nil {
 			defer func() { _ = f.Close() }()
@@ -139,7 +140,7 @@ func DeepVerify(dir string) (DeepReport, error) {
 					continue
 				}
 				report.SampledPostings++
-				if _, rerr := readRecordAt(f, posts[0].Off); rerr != nil {
+				if _, rerr := readRecordAt(f, posts[0].Off, dvTables); rerr != nil {
 					report.Findings = append(report.Findings, DeepFinding{Kind: "dead-posting", Detail: fmt.Sprintf("token %q points at unreadable record offset %d", tok, posts[0].Off)})
 				}
 			}
@@ -153,7 +154,11 @@ func recordsPath(dir string) string { return filepath.Join(dir, "records.bin") }
 // indexedMessageCounts counts records per session key straight from the log.
 func indexedMessageCounts(dir string) (map[string]int, error) {
 	counts := map[string]int{}
-	err := eachRecord(recordsPath(dir), func(r Record) {
+	tbl, terr := loadRecordTables(dir)
+	if terr != nil {
+		return nil, terr
+	}
+	err := eachRecord(recordsPath(dir), tbl, func(r Record) {
 		counts[r.Key]++
 	})
 	return counts, err

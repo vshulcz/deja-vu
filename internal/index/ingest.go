@@ -225,7 +225,8 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err != nil {
 		return err
 	}
-	rw, err := newRecordWriter(rf)
+	tbl := newRecordTables()
+	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
 		return err
@@ -283,6 +284,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
+	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
@@ -305,7 +307,7 @@ func importedSessions(dir string) importedState {
 	out.boundary = m.ExportBoundary
 	out.dedupe = m.ImportedRecords
 	by := map[string]*model.Session{}
-	_ = eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+	_ = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		if r.SourcePath != syncImportPath {
 			return
 		}
@@ -419,7 +421,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if err != nil {
 		return err
 	}
-	rw, err := newRecordWriter(rf)
+	tbl := newRecordTables()
+	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
 		return err
@@ -475,6 +478,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
+	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
@@ -682,9 +686,9 @@ func truncateTitle(s string, n int) string {
 	return strings.TrimSpace(string(r[:n])) + "…"
 }
 
-func recordsForKey(path, key string) ([]Record, error) {
+func recordsForKey(path string, t *recordTables, key string) ([]Record, error) {
 	var out []Record
-	err := eachRecord(path, func(r Record) {
+	err := eachRecord(path, t, func(r Record) {
 		if r.Key == key {
 			out = append(out, r)
 		}
@@ -858,7 +862,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err != nil {
 		return err
 	}
-	rw, err := newRecordWriter(rf)
+	tbl := newRecordTables()
+	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
 		return err
@@ -912,7 +917,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return nil
 	}
 	var recErr error
-	if err := eachRecord(filepath.Join(dir, "records.bin"), func(r Record) {
+	if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(old), func(r Record) {
 		if recErr != nil {
 			return
 		}
@@ -982,6 +987,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
+	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
@@ -1020,7 +1026,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err != nil {
 		return 0, 0, err
 	}
-	rw, err := newRecordWriter(rf)
+	// The log is being APPENDED to, so ids must continue where the existing
+	// records left off. Starting a fresh table would hand id 0 to a new
+	// string and silently repoint every record that already uses it.
+	tbl := tablesFromManifest(old)
+	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
 		return 0, 0, err
@@ -1117,6 +1127,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		return filesTouched, messages, err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
+	m.RecordStrings = tbl.strs
 	if err := writeManifest(dir, m); err != nil {
 		return filesTouched, messages, err
 	}

@@ -93,7 +93,8 @@ func TestReadRecordsAndGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Record{Key: "claude:s", SourcePath: "session.jsonl", Role: "user", Text: "semantic text", Time: time.Unix(10, 20)}
-	off, err := writeRecord(f, want)
+	wtbl := newRecordTables()
+	off, err := writeRecord(f, want, wtbl)
 	if err != nil {
 		_ = f.Close()
 		t.Fatal(err)
@@ -101,9 +102,15 @@ func TestReadRecordsAndGeneration(t *testing.T) {
 	if off != 0 || f.Close() != nil {
 		t.Fatal("record write did not start at zero")
 	}
+	if err := writeManifest(dir, Manifest{Version: version, Sessions: map[string]SessionMeta{}, RecordStrings: wtbl.strs}); err != nil {
+		t.Fatal(err)
+	}
 	got, err := ReadRecords(dir)
 	if err != nil || len(got) != 1 || got[0].Offset != 0 || got[0].Record.Text != want.Text || got[0].Record.Time != want.Time {
 		t.Fatalf("records=%#v err=%v", got, err)
+	}
+	if got[0].Record.Key != want.Key || got[0].Record.SourcePath != want.SourcePath {
+		t.Fatalf("interned fields lost: key=%q path=%q", got[0].Record.Key, got[0].Record.SourcePath)
 	}
 	if err := writeManifest(dir, Manifest{Version: version, BuiltAt: time.Unix(20, 0), Generation: "gen-1", Sessions: map[string]SessionMeta{}}); err != nil {
 		t.Fatal(err)
@@ -318,7 +325,9 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = writeRecord(rec, Record{Key: "claude:unposted", Role: "user", Text: "jwt only refresh would appear during a full scan", Time: time.Now()})
+	utbl := mustTables(t, dir)
+	_, err = writeRecord(rec, Record{Key: "claude:unposted", Role: "user", Text: "jwt only refresh would appear during a full scan", Time: time.Now()}, utbl)
+	m.RecordStrings = utbl.strs
 	if closeErr := rec.Close(); err != nil {
 		t.Fatal(err)
 	} else if closeErr != nil {
@@ -518,7 +527,7 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 	if got, ok, err := FindByPrefix(idx, "s"); err != nil || !ok || len(got.Messages) != 2 {
 		t.Fatalf("FindByPrefix=%#v ok=%v err=%v", got, ok, err)
 	}
-	recs, err := recordsForKey(filepath.Join(idx, "records.bin"), "claude:s1")
+	recs, err := recordsForKey(filepath.Join(idx, "records.bin"), mustTables(t, idx), "claude:s1")
 	if err != nil || len(recs) != 2 {
 		t.Fatalf("records=%#v err=%v", recs, err)
 	}
@@ -742,7 +751,8 @@ func TestEachRecordIgnoresTruncatedTail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := writeRecord(f, Record{Key: "claude:s1", SourcePath: "s1.jsonl", Role: "user", Text: "complete"}); err != nil {
+	ttbl := newRecordTables()
+	if _, err := writeRecord(f, Record{Key: "claude:s1", SourcePath: "s1.jsonl", Role: "user", Text: "complete"}, ttbl); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.Write([]byte{99, 0, 0, 0, '{'}); err != nil {
@@ -752,7 +762,7 @@ func TestEachRecordIgnoresTruncatedTail(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got []Record
-	if err := eachRecord(p, func(r Record) { got = append(got, r) }); err != nil {
+	if err := eachRecord(p, ttbl, func(r Record) { got = append(got, r) }); err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0].Text != "complete" {

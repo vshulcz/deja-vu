@@ -14,7 +14,7 @@ func TestReadRecordRejectsHugeLengthPrefix(t *testing.T) {
 	if err := os.WriteFile(p, append(hdr[:], 'x'), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	err := eachRecord(p, func(Record) { t.Fatal("should not decode a corrupt record") })
+	err := eachRecord(p, newRecordTables(), func(Record) { t.Fatal("should not decode a corrupt record") })
 	if err == nil || !IsCorrupt(err) {
 		t.Fatalf("expected corrupt-index error, got %v", err)
 	}
