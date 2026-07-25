@@ -208,6 +208,32 @@ func RelevanceTerms(q string) []string {
 	return out
 }
 
+// RelevanceMatchTerms returns the query's relevance terms plus the surface
+// forms the relevance tier actually matches on. Callers count and snippet
+// with these: a session surfaced through the fold ("camped" ranking a session
+// that says "camping") otherwise rendered as "0 matches" with no snippet,
+// because the raw term appears nowhere in its text.
+func RelevanceMatchTerms(q string) []string {
+	terms := RelevanceTerms(q)
+	out := make([]string, 0, len(terms))
+	seen := map[string]bool{}
+	for _, t := range terms {
+		if !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	for _, t := range terms {
+		for _, f := range stemMatchForms(t) {
+			if !seen[f] {
+				seen[f] = true
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
 // relevanceSearch is the ladder's last resort: no AND survived, so rank every
 // session by IDF-weighted overlap with the query's informative words. Order
 // carries the ranking; callers must not re-sort by exact-match BM25 (the whole

@@ -280,7 +280,7 @@ func runSearch(dir string, args []string) error {
 	var hits []search.Hit
 	if result.Tier == search.TierRelevance {
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
-		hits = search.RelevanceHits(ss, index.RelevanceTerms(o.Query))
+		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
