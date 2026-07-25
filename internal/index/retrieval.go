@@ -1343,6 +1343,9 @@ var cyrEndings = []string{
 // across a 20k frequency list, against closing часть -> час and весть -> вес,
 // which are common words landing on a different lemma entirely.
 func endsInfinitive(term string) bool {
+	if !strings.HasSuffix(term, "ть") {
+		return false
+	}
 	runes := []rune(term)
 	if len(runes) < 3 {
 		return false
