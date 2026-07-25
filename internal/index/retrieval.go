@@ -1333,58 +1333,94 @@ var devSynonyms = func() map[string][]string {
 var cyrEndings = []string{
 	"иями", "ями", "ами", "ией", "иях", "ях", "ах", "ов", "ев", "ей",
 	"ой", "ий", "ия", "ию", "ии", "ие", "ый", "ая", "ое", "ые",
-	// Soft-sign stems: сеть -> сети, сетью, сетям. Without "ью" and "ям"
-	// stripping the "ь" would strand the very forms the fold exists to reach.
 	"ью", "ям", "ем", "ом",
-	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о",
+	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о", "ь",
 }
 
-// Deliberately absent: a bare "ь". Stripping the soft sign off a four-rune
-// noun leaves a three-rune base that collides with unrelated words — цель
-// folds onto целая, верь onto вера, бить onto битой. It bought only
-// сеть->сети (новость->новости is taken by "ть" first), which is the same
-// shape as the false ones, so there is no rule that keeps one without the
-// others. A wrong recall costs more than a missed inflection.
+// cyrSoftEndings is the third-declension feminine paradigm, and the only set
+// that may attach to a stem exposed by stripping a soft sign. Attaching the
+// hard adjective endings there is what folded цель onto целая and верь onto
+// вера: сеть->сети needs "и", цель->целая needs "ая", so keeping the two
+// tables apart separates shapes that look identical by length alone.
+var cyrSoftEndings = []string{"и", "ью", "ям", "ях", "ями", "ей", "е"}
+
+// cyrVerbEndings are the infinitive and past-tense endings.
+var cyrVerbEndings = map[string]bool{"ть": true, "л": true, "ла": true, "ло": true, "ли": true}
+
+var cyrVerbEndingList = []string{"ть", "л", "ла", "ло", "ли"}
+
+// cyrNominalEndings are unambiguously noun-case: a stem exposed by stripping
+// one of these came from a noun, so verb endings must not attach to it —
+// весом strips to вес, and вес+ть is весть. Endings a verb can also carry
+// (ю, у, а, и ...) stay out of this set, so знаю -> зна -> знать survives.
+var cyrNominalEndings = map[string]bool{
+	"иями": true, "ями": true, "ами": true, "ией": true, "иях": true,
+	"ях": true, "ах": true, "ов": true, "ев": true, "ей": true, "ой": true,
+	"ий": true, "ия": true, "ию": true, "ии": true, "ие": true,
+	"ый": true, "ая": true, "ое": true, "ые": true, "ем": true, "ом": true,
+}
 
 // cyrMatchForms folds a Russian term onto its inflection family for the
-// relevance tier: strip the longest known ending, then re-attach each, so
-// "миграциями" reaches "миграция". Four runes is the floor — below it the
-// three-letter function words (что, как, его) would each fan out into the
-// whole ending table for nothing.
+// relevance tier: strip a known ending, then re-attach the endings that
+// belong to the same paradigm. Four runes is the floor — below it the
+// three-letter function words (что, как, его) would fan out for nothing.
+//
+// The tier has no catalog gate, so whatever this invents is looked up for
+// real and can surface a session. That is why stripping and re-attaching use
+// different tables: one shared table folded цель onto целая.
 func cyrMatchForms(term string) []string {
 	runes := []rune(term)
 	if len(runes) < 4 {
 		return nil
 	}
-	base := term
+	seen := map[string]bool{term: true}
+	forms := make([]string, 0, len(cyrEndings)+1)
+	add := func(f string) {
+		if !seen[f] {
+			seen[f] = true
+			forms = append(forms, f)
+		}
+	}
+	if strings.HasSuffix(term, "ь") {
+		// Soft stem — the third-declension nouns: сеть, жизнь, ночь, очередь.
+		if base := strings.TrimSuffix(term, "ь"); len([]rune(base)) >= 3 {
+			// The bare stem is deliberately not emitted: a third-declension
+			// noun's stem is not a word on its own (сеть -> сет), while for a
+			// ь-final imperative it is — борись would recall Борис.
+			for _, end := range cyrSoftEndings {
+				add(base + end)
+			}
+		}
+		// A ь-final infinitive is a verb, not a noun: знать -> знал.
+		if strings.HasSuffix(term, "ть") {
+			if base := strings.TrimSuffix(term, "ть"); len([]rune(base)) >= 3 {
+				add(base)
+				for _, end := range cyrVerbEndingList {
+					add(base + end)
+				}
+			}
+		}
+		return forms
+	}
+	base, stripped := term, ""
 	for _, end := range cyrEndings {
 		if strings.HasSuffix(term, end) && len(runes)-len([]rune(end)) >= 3 {
-			base = strings.TrimSuffix(term, end)
+			base, stripped = strings.TrimSuffix(term, end), end
 			break
 		}
 	}
-	forms := make([]string, 0, len(cyrEndings)+1)
 	if base != term {
-		forms = append(forms, base)
+		add(base)
 	}
-	baseLen := len([]rune(base))
+	nominal := cyrNominalEndings[stripped]
 	for _, end := range cyrEndings {
-		// Verb endings on a short base reach unrelated words: весом strips
-		// to вес, and вес+ть is весть. Nouns that short still fold through
-		// their vowel endings (баз -> базы, базе).
-		if baseLen < 4 && cyrVerbEndings[end] {
+		if nominal && cyrVerbEndings[end] {
 			continue
 		}
-		if form := base + end; form != term {
-			forms = append(forms, form)
-		}
+		add(base + end)
 	}
 	return forms
 }
-
-// cyrVerbEndings are the infinitive and past-tense endings; attaching one to
-// a noun stem is how a fold lands on a word from another paradigm.
-var cyrVerbEndings = map[string]bool{"ть": true, "л": true, "ла": true, "ло": true, "ли": true}
 
 // cyrSuffixForms bridges Russian inflection: strip the longest known ending,
 // then re-attach each — миграция matches миграции and миграцию. ASCII terms

@@ -49,6 +49,20 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 		{"репликация", "репликации"},
 		{"агентом", "агент"},
 		{"база", "базы"},
+		{"кластера", "кластеров"},
+		// Third-declension feminine nouns — 11% of the vocabulary, and the
+		// paradigm this fold was written for.
+		{"сеть", "сети"},
+		{"сеть", "сетью"},
+		{"жизнь", "жизни"},
+		{"ночь", "ночи"},
+		{"очередь", "очереди"},
+		// Short verb stems must still reach their own paradigm: a guard keyed
+		// on stem length alone cannot tell вес (noun) from зна (verb).
+		{"знать", "знал"},
+		{"знаю", "знать"},
+		{"могу", "могли"},
+		{"говорит", "говорить"},
 	} {
 		forms := stemMatchForms(c.query)
 		found := false
@@ -83,10 +97,12 @@ func TestRussianInflectionsFoldInRelevanceTier(t *testing.T) {
 func TestRussianFoldDoesNotReachUnrelatedWords(t *testing.T) {
 	for _, c := range []struct{ query, unrelated string }{
 		{"цель", "целая"},
+		{"цель", "целый"},
 		{"борись", "борис"},
 		{"весом", "весть"},
 		{"бить", "битой"},
 		{"верь", "вера"},
+		{"весь", "веса"},
 	} {
 		for _, f := range stemMatchForms(c.query) {
 			if f == c.unrelated {
