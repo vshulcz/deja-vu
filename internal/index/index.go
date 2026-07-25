@@ -10,7 +10,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-const version = 11
+// version 12 reshards non-ASCII tokens across buckets; an index built by 11
+// keeps them all under "t_", where the new lookup would never find them.
+const version = 12
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

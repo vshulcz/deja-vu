@@ -1333,7 +1333,39 @@ var devSynonyms = func() map[string][]string {
 var cyrEndings = []string{
 	"иями", "ями", "ами", "ией", "иях", "ях", "ах", "ов", "ев", "ей",
 	"ой", "ий", "ия", "ию", "ии", "ие", "ый", "ая", "ое", "ые",
-	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о",
+	// Soft-sign stems: сеть -> сети, сетью, сетям. Without "ью" and "ям"
+	// stripping the "ь" would strand the very forms the fold exists to reach.
+	"ью", "ям", "ем", "ом",
+	"ть", "л", "ла", "ло", "ли", "а", "я", "у", "ю", "ы", "и", "е", "о", "ь",
+}
+
+// cyrMatchForms folds a Russian term onto its inflection family for the
+// relevance tier: strip the longest known ending, then re-attach each, so
+// "миграциями" reaches "миграция". Four runes is the floor — below it the
+// three-letter function words (что, как, его) would each fan out into the
+// whole ending table for nothing.
+func cyrMatchForms(term string) []string {
+	runes := []rune(term)
+	if len(runes) < 4 {
+		return nil
+	}
+	base := term
+	for _, end := range cyrEndings {
+		if strings.HasSuffix(term, end) && len(runes)-len([]rune(end)) >= 3 {
+			base = strings.TrimSuffix(term, end)
+			break
+		}
+	}
+	forms := make([]string, 0, len(cyrEndings)+1)
+	if base != term {
+		forms = append(forms, base)
+	}
+	for _, end := range cyrEndings {
+		if form := base + end; form != term {
+			forms = append(forms, form)
+		}
+	}
+	return forms
 }
 
 // cyrSuffixForms bridges Russian inflection: strip the longest known ending,
@@ -1743,14 +1775,28 @@ func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][
 	return query.MatchesParts(r.Text, terms, phrases, variants)
 }
 
+// bucket shards a token by its opening characters. It used to slice two
+// *bytes*, which for any non-ASCII token is a prefix plus half a UTF-8
+// sequence: safe() mapped the broken half to "_", so every Russian, Chinese
+// and Greek token in the corpus landed in the single bucket "t_". Each lookup
+// then had to scan the whole non-ASCII vocabulary. Sharding by runes keeps
+// ASCII bucket names exactly as they were and spreads the rest over 256.
 func bucket(tok string) string {
-	if len(tok) >= 2 {
-		return safe(tok[:2])
+	runes := []rune(tok)
+	if len(runes) >= 2 && isShardASCII(runes[0]) && isShardASCII(runes[1]) {
+		return safe(string(runes[:2]))
+	}
+	if len(runes) > 3 {
+		runes = runes[:3]
 	}
 	h := fnv.New32a()
-	_, _ = h.Write([]byte(tok))
+	_, _ = h.Write([]byte(string(runes)))
 	return fmt.Sprintf("x%02x", h.Sum32()%256)
 }
+
+// isShardASCII reports whether a rune is one byte wide, so slicing it cannot
+// split a multi-byte sequence.
+func isShardASCII(r rune) bool { return r < 128 }
 
 func safe(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -1766,15 +1812,14 @@ func safe(s string) string {
 // empty buckets.
 func stemMatchForms(term string) []string {
 	runes := []rune(term)
+	// Cyrillic terms took the ASCII path, which appends English suffixes to
+	// Russian words — "миграции" became "миграцииed" and read nothing but
+	// empty buckets, so the relevance-tier fold was a no-op in both
+	// directions. Route them through the Russian ending table instead.
+	if isCyrToken(term) {
+		return cyrMatchForms(term)
+	}
 	if len(runes) < 5 {
-		if isCyrToken(term) && len(runes) >= 3 {
-			// Short Russian stems inflect too: сеть -> сетью, сети.
-			out := make([]string, 0, 12)
-			for _, end := range []string{"ю", "и", "е", "а", "у", "ы", "ой", "ей", "ью", "ям", "ях", "ами"} {
-				out = append(out, term+end)
-			}
-			return out
-		}
 		var out []string
 		for _, form := range []string{term + "s", term + "es", strings.TrimSuffix(term, "s")} {
 			if len(form) >= 3 && form != term {
