@@ -96,3 +96,45 @@ func TestCompressedDumpsStaySearchable(t *testing.T) {
 		t.Fatalf("compressed dump came back truncated: %d bytes, want >= %d", len(full), len(dump))
 	}
 }
+
+// A bucket directory no longer stores each token's offset; it is the running
+// sum of the block lengths. Every token must still land on its own postings.
+func TestBucketOffsetsAreDerivedCorrectly(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "ab.bin")
+	want := map[string][]posting{
+		"talpha": {{Off: 1, Sid: 1}, {Off: 900, Sid: 2}},
+		"tbeta":  {{Off: 5, Sid: 3}},
+		"tgamma": {},
+		"tdelta": {{Off: 7, Sid: 4}, {Off: 8, Sid: 5}, {Off: 9000000, Sid: 6}},
+	}
+	if err := writeBucket(p, want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readBucket(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for tok, w := range want {
+		g := got[tok]
+		if len(g) != len(w) {
+			t.Errorf("token %q: %d postings, want %d", tok, len(g), len(w))
+			continue
+		}
+		for i := range w {
+			if g[i] != w[i] {
+				t.Errorf("token %q posting %d = %+v, want %+v", tok, i, g[i], w[i])
+			}
+		}
+	}
+	// And reading one token directly must land on the same block.
+	for tok, w := range want {
+		g, err := readBucketToken(p, tok)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(g) != len(w) {
+			t.Errorf("readBucketToken(%q) = %d postings, want %d", tok, len(g), len(w))
+		}
+	}
+}
