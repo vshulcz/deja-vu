@@ -31,10 +31,13 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("copilot"); got != filepath.Join(home, ".copilot", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("copilot path = %q", got)
 	}
-	for _, harness := range []string{"cursor", "grok"} {
-		if got := guidancePath(harness); got != "" {
-			t.Fatalf("%s path = %q, want unsupported", harness, got)
-		}
+	// grok reads <cwd>/.grok/GROK.md first, so the home copy never shadows a
+	// project's own instructions.
+	if got := guidancePath("grok"); got != filepath.Join(home, ".grok", "GROK.md") {
+		t.Fatalf("grok path = %q", got)
+	}
+	if got := guidancePath("cursor"); got != "" {
+		t.Fatalf("cursor path = %q, want unsupported", got)
 	}
 }
 
@@ -246,8 +249,8 @@ func TestCopilotInstallWritesMCPConfig(t *testing.T) {
 func TestInstallGuidanceSkillErrorBranches(t *testing.T) {
 	tmp := hermeticEnv(t)
 	// path == "" branch for a harness without a guidance location.
-	if r, err := installGuidance("grok", false); err != nil || r.Path != "" {
-		t.Fatalf("grok guidance = %#v err=%v", r, err)
+	if r, err := installGuidance("cursor", false); err != nil || r.Path != "" {
+		t.Fatalf("cursor guidance = %#v err=%v", r, err)
 	}
 	// Read failure that is not IsNotExist must surface (copilot skill dir
 	// squatted by a file).
