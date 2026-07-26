@@ -520,6 +520,22 @@ func hookStatusMessage(event string) string {
 	return ""
 }
 
+// isDejaHookCommand reports whether an existing hook entry is one of ours for
+// the same subcommand. Matching on the trailing subcommand rather than the
+// whole string means moving the binary replaces the old entry instead of
+// leaving a duplicate that fires alongside the new one.
+func isDejaHookCommand(existing any, cmd string) bool {
+	s, ok := existing.(string)
+	if !ok {
+		return false
+	}
+	if s == cmd {
+		return true
+	}
+	sub := cmd[strings.LastIndex(cmd, " ")+1:]
+	return strings.HasSuffix(s, " "+sub) && strings.Contains(s, "deja")
+}
+
 func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall bool) map[string]any {
 	hooks, _ := root["hooks"].(map[string]any)
 	if hooks == nil {
@@ -546,14 +562,24 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		removed := false
 		for _, hAny := range hs {
 			h, _ := hAny.(map[string]any)
-			if h != nil && h["type"] == "command" && h["command"] == cmd {
-				found = true
+			if h != nil && h["type"] == "command" && isDejaHookCommand(h["command"], cmd) {
 				if uninstall {
 					removed = true
 					continue
 				}
+				// An entry of ours for this event already exists. Take it over
+				// rather than adding a second one: installing from a new path
+				// used to leave the old entry behind, and both would fire.
+				found = true
+				h["command"] = cmd
+				if msg := hookStatusMessage(event); msg != "" {
+					h["statusMessage"] = msg
+				}
 			}
 			kept = append(kept, hAny)
+		}
+		if len(kept) != len(hs) || found {
+			entry["hooks"] = kept
 		}
 		if removed {
 			if len(kept) == 0 {
