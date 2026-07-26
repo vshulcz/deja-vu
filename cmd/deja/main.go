@@ -76,26 +76,30 @@ func loadFileSources() []model.Session {
 type command func(dir string, rest []string) error
 
 var commands = map[string]command{
-	"version":         cmdVersion,
-	"help":            func(_ string, _ []string) error { printUsage(); return nil },
-	"--help":          func(_ string, _ []string) error { printUsage(); return nil },
-	"-h":              func(_ string, _ []string) error { printUsage(); return nil },
-	"--version":       cmdVersion,
-	"-version":        cmdVersion,
-	"sources":         func(dir string, _ []string) error { printSources(dir); return nil },
-	"completion":      func(_ string, rest []string) error { return runCompletion(rest) },
-	"doctor":          func(dir string, rest []string) error { return runDoctor(os.Stdout, rest, doctorLookup, dir) },
-	"warmup":          cmdWarmup,
-	"index":           cmdIndex,
-	"embed":           runEmbed,
-	"bench":           func(_ string, rest []string) error { return runBench(rest) },
-	"statusline":      func(dir string, _ []string) error { return runStatusline(dir, os.Stdin, os.Stdout) },
-	"stats":           runStats,
-	"remember":        runRemember,
-	"promote":         func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
-	"forget":          runForget,
-	"mcp":             func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
-	"hook-prompt":     func(dir string, _ []string) error { return runHookPrompt(dir, os.Stdin, os.Stdout) },
+	"version":       cmdVersion,
+	"help":          func(_ string, _ []string) error { printUsage(); return nil },
+	"--help":        func(_ string, _ []string) error { printUsage(); return nil },
+	"-h":            func(_ string, _ []string) error { printUsage(); return nil },
+	"--version":     cmdVersion,
+	"-version":      cmdVersion,
+	"sources":       func(dir string, _ []string) error { printSources(dir); return nil },
+	"completion":    func(_ string, rest []string) error { return runCompletion(rest) },
+	"doctor":        func(dir string, rest []string) error { return runDoctor(os.Stdout, rest, doctorLookup, dir) },
+	"warmup":        cmdWarmup,
+	"warmup-status": cmdWarmupStatus,
+	"index":         cmdIndex,
+	"embed":         runEmbed,
+	"bench":         func(_ string, rest []string) error { return runBench(rest) },
+	"statusline":    func(dir string, _ []string) error { return runStatusline(dir, os.Stdin, os.Stdout) },
+	"stats":         runStats,
+	"remember":      runRemember,
+	"promote":       func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
+	"forget":        runForget,
+	"mcp":           func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
+	"hook-prompt":   func(dir string, _ []string) error { return runHookPrompt(dir, os.Stdin, os.Stdout) },
+	"hook-antigravity": func(dir string, _ []string) error {
+		return runHookAntigravity(dir, os.Stdin, os.Stdout)
+	},
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
@@ -136,7 +140,7 @@ func cmdVersion(_ string, _ []string) error {
 
 func cmdWarmup(dir string, _ []string) error {
 	prepareFirstIndexGreeting(dir)
-	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+	if err := withBuildProgress(func() error { return index.Ensure(dir, "", false, os.Stderr) }); err != nil {
 		return err
 	}
 	maybeFirstIndexGreeting(dir)
@@ -153,7 +157,10 @@ func cmdIndex(dir string, rest []string) error {
 		return fmt.Errorf("index: unknown flag %q", a)
 	}
 	prepareFirstIndexGreeting(dir)
-	if err := index.Ensure(dir, "", force, os.Stderr); err != nil {
+	// The detached warmup publishes its progress so hooks can tell the user
+	// memory is on its way; an interactive run draws the live display.
+	build := func() error { return index.Ensure(dir, "", force, os.Stderr) }
+	if err := withWarmupStatus(dir, func() error { return withBuildProgress(build) }); err != nil {
 		return err
 	}
 	clearWarmupSentinel()
@@ -255,7 +262,7 @@ func runSearch(dir string, args []string) error {
 	}
 	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
-	if err := index.EnsureForSearch(dir, o, force, os.Stderr); err != nil {
+	if err := withBuildProgress(func() error { return index.EnsureForSearch(dir, o, force, os.Stderr) }); err != nil {
 		return fmt.Errorf("ensure: %w", err)
 	}
 	maybeFirstIndexGreeting(dir)
@@ -809,6 +816,7 @@ Usage:
   deja resume <id-prefix> [--exec]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt   (UserPromptSubmit hook: relevance recall per prompt)
+  deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja view          (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]

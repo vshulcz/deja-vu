@@ -41,6 +41,10 @@ func guidancePath(harness string) string {
 		return filepath.Join(sources.KimiConfigDir(), "AGENTS.md")
 	case "gemini":
 		return filepath.Join(sources.GeminiHome(), "GEMINI.md")
+	case "grok":
+		// grok reads <cwd>/.grok/GROK.md first and only falls back to the
+		// home copy, so this never shadows a project's own instructions.
+		return filepath.Join(sources.GrokHome(), "GROK.md")
 	case "opencode":
 		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
 	default:
@@ -172,7 +176,7 @@ func guidanceStatus(harness string) string {
 
 func guidanceResult(harness string, uninstall bool) (installResult, error) {
 	canonical := guidanceHarness(harness)
-	if canonical == "cursor" || canonical == "grok" {
+	if canonical == "cursor" {
 		return installResult{}, nil
 	}
 	return installGuidance(canonical, uninstall)

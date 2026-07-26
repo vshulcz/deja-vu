@@ -44,9 +44,23 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "codex-auto")
 			case "opencode":
 				targets = append(targets, "opencode-auto")
+			case "gemini":
+				targets = append(targets, "gemini-auto")
+			case "qwen":
+				targets = append(targets, "qwen-auto")
+			case "kimi":
+				targets = append(targets, "kimi-auto")
+			case "cursor":
+				targets = append(targets, "cursor-auto")
+			case "pi":
+				targets = append(targets, "pi-auto")
+			case "openclaw":
+				targets = append(targets, "openclaw-auto")
+			case "antigravity":
+				targets = append(targets, "antigravity-auto")
 			default:
-				// cursor, gemini, antigravity, grok: the MCP server is the
-				// deepest integration those harnesses support.
+				// grok and the IDE extensions: the MCP server is the deepest
+				// integration those harnesses support.
 				targets = append(targets, t)
 			}
 		}
@@ -283,24 +297,38 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCodexAuto(exe, uninstall)
 	case "cursor":
 		return installCursor(exe, uninstall)
+	case "cursor-auto":
+		return installCursorAuto(exe, uninstall)
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
+	case "gemini-auto":
+		return installGeminiAuto(exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
+	case "antigravity-auto":
+		return installAntigravityAuto(exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
+	case "qwen-auto":
+		return installQwenAuto(exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
+	case "kimi-auto":
+		return installKimiAuto(exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
 	case "pi":
 		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
+	case "pi-auto":
+		return installPiAuto(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
+	case "openclaw-auto":
+		return installOpenClawAuto(exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -317,6 +345,34 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installClaudeHook(exe, uninstall)
+}
+
+func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installAntigravityPlugin(exe, uninstall)
+}
+
+func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installOpenClawMCP(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installOpenClawHooks(exe, uninstall)
+}
+
+func installPiAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installPiExtension(exe, uninstall)
+}
+
+func installCursorAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installCursor(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installCursorHooks(exe, uninstall)
 }
 
 func installCodexAuto(exe string, uninstall bool) (installResult, error) {
