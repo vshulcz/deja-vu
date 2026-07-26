@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -14,7 +15,9 @@ func repoFile(t *testing.T, rel string) []byte {
 	if err != nil {
 		t.Fatalf("read %s: %v", rel, err)
 	}
-	return b
+	// Git may check these out with CRLF on Windows; the comparison is about
+	// content, not about how the working tree stores it.
+	return bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
 }
 
 // The Claude Code plugin is what `claude plugin install` pulls, so a typo in
