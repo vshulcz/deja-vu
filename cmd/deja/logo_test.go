@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -31,5 +32,40 @@ func TestLogoWanted(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	if logoWanted(os.Stdout) {
 		t.Fatal("NO_COLOR must suppress the logo")
+	}
+}
+
+// Sixteen harnesses plus a header outgrow the mark, and the column used to be
+// cut to the mark's height — the last stores simply vanished from the first
+// build greeting.
+func TestLogoLinesKeepsAColumnTallerThanTheMark(t *testing.T) {
+	info := []string{"deja-vu", "", "header"}
+	for i := 0; i < 22; i++ {
+		info = append(info, "store"+strconv.Itoa(i))
+	}
+	out := logoLines(info)
+	plain := strings.Join(out, "\n")
+	for i := 0; i < 22; i++ {
+		if !strings.Contains(plain, "store"+strconv.Itoa(i)) {
+			t.Fatalf("store%d was dropped from a %d-line column rendered as %d lines", i, len(info), len(out))
+		}
+	}
+	// The overflow keeps the same left margin as the lines beside the mark.
+	var beside, below string
+	for _, l := range out {
+		if strings.Contains(l, "store0") {
+			beside = l
+		}
+		if strings.Contains(l, "store21") {
+			below = l
+		}
+	}
+	// Columns are counted in runes: the mark is drawn with three-byte block
+	// glyphs, so a byte offset would compare two different things.
+	runeCol := func(line, want string) int {
+		return len([]rune(ansiRE.ReplaceAllString(line, "")[:strings.Index(ansiRE.ReplaceAllString(line, ""), want)]))
+	}
+	if got, want := runeCol(below, "store21"), runeCol(beside, "store0"); got != want {
+		t.Errorf("overflow line starts at column %d, the ones beside the mark at %d", got, want)
 	}
 }

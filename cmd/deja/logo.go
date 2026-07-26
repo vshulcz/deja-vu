@@ -62,21 +62,40 @@ func defaultLogoWanted(f *os.File) bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// printLogo lays the info column beside the mark, vertically centred.
-func printLogo(w io.Writer, info []string) {
+// logoLines lays the info column beside the mark, vertically centred, and
+// returns the composed lines. The live build display repaints these, so the
+// layout has to be shared with printLogo rather than reimplemented.
+func logoLines(info []string) []string {
 	top := (len(loopArt) - len(info)) / 2
 	if top < 0 {
 		top = 0
 	}
-	fmt.Fprintln(w)
+	out := make([]string, 0, len(loopArt)+len(info)+2)
+	out = append(out, "")
 	for i, a := range loopArt {
 		line := "  " + a
 		if j := i - top; j >= 0 && j < len(info) && info[j] != "" {
 			line += spaces(40-visibleLen(a)) + info[j]
 		}
-		fmt.Fprintln(w, line)
+		out = append(out, line)
 	}
-	fmt.Fprintln(w)
+	// An info column taller than the mark keeps going underneath it rather
+	// than being cut off: sixteen harnesses plus a header already overflow,
+	// so the last stores were silently dropped from the greeting.
+	for j := len(loopArt) - top; j < len(info); j++ {
+		if j < 0 {
+			continue
+		}
+		out = append(out, spaces(42)+info[j])
+	}
+	return append(out, "")
+}
+
+// printLogo lays the info column beside the mark, vertically centred.
+func printLogo(w io.Writer, info []string) {
+	for _, l := range logoLines(info) {
+		fmt.Fprintln(w, l)
+	}
 }
 
 func spaces(n int) string {

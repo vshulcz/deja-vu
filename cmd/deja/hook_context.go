@@ -83,6 +83,22 @@ func runHookContext(dir string, plain bool) error {
 	_ = json.Unmarshal(readHookStdin(), &input)
 	digest, sessions, raw, taskMatched := cachedHookDigest(dir)
 	if digest == "" {
+		// A first build (or one forced by a new index format) is running in
+		// the background. It never blocks the agent, but starting in silence
+		// looks like deja is simply not working — so say what is happening.
+		// Only on the JSON path: systemMessage is the host's UI channel,
+		// whereas the plain path is injected into the model's context, where
+		// a progress line is noise.
+		if !plain {
+			if st := readWarmupStatus(dir); st != nil {
+				var resp sessionStartHookResponse
+				resp.HookSpecificOutput.HookEventName = "SessionStart"
+				resp.SystemMessage = st.line()
+				if b, err := json.Marshal(resp); err == nil {
+					fmt.Fprintln(os.Stdout, string(b))
+				}
+			}
+		}
 		return nil
 	}
 	// One actionable line so injected memory leads somewhere: models that see
@@ -126,6 +142,14 @@ func runHookContext(dir string, plain bool) error {
 			polNote = " · policy: " + polName
 		}
 		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote)
+	}
+	// Nothing to recall yet because the index is still being built: say so
+	// rather than starting in silence. The build runs detached, so the agent
+	// is already usable — this only explains why memory is not here yet.
+	if resp.SystemMessage == "" {
+		if st := readWarmupStatus(dir); st != nil {
+			resp.SystemMessage = st.line()
+		}
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {

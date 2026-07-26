@@ -139,7 +139,9 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 	}
 	if force || err != nil || m.Version != version || m.Scope != scope || !recordsIntact(dir, m) {
 		if progress != nil {
-			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
+			if !hasProgressSink() {
+				fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
+			}
 		}
 		return rebuildForSearch(dir, o, scope, want, progress)
 	}
@@ -213,6 +215,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
+	total := 0
+	progressWeights = filesPerHarness(files)
+	for _, n := range progressWeights {
+		total += n
+	}
+	reportPhase("reading sessions", total)
 	ss := sources.FilterSessions(filterTombstonedSet(loadProgress(harness, progress), dead))
 	// Imported sessions are filtered too: excluding a project must also drop
 	// what a peer already pushed, not only what arrives next.
@@ -233,8 +241,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
+	reportPhase("indexing messages", len(ss))
 	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
+			reportAdvance(1)
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
 			if old, ok := m.Sessions[key]; ok {
@@ -280,6 +290,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	buildCooccur(tmp, ss)
+	reportPhase("writing index", len(buckets))
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
@@ -348,6 +359,10 @@ func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss 
 	return load()
 }
 
+// progressWeights is how many files each store contributes, set by the caller
+// that already walked the filesystem so the bar advances proportionally.
+var progressWeights = map[string]int{}
+
 func loadProgress(h string, progress io.Writer) []model.Session {
 	// Harness stores are independent files owned by different tools; parsing
 	// them is CPU-bound JSON/regex work with no shared state, so the cold
@@ -367,7 +382,16 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		wg.Add(1)
 		go func(i int, name string, load func() []model.Session) {
 			defer wg.Done()
-			results[i] = loaded{name: name, ss: safeLoad(name, load, progress)}
+			ss := safeLoad(name, load, progress)
+			results[i] = loaded{name: name, ss: ss}
+			// Report as this store lands rather than after every store has,
+			// so the bar moves during the parse instead of jumping at the end.
+			msgs := 0
+			for _, x := range ss {
+				msgs += len(x.Messages)
+			}
+			reportHarness(name, len(ss), msgs)
+			reportAdvance(progressWeights[name])
 		}(i, hr.Name, hr.Load)
 	}
 	wg.Wait()
@@ -785,7 +809,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	if force || err != nil || old.Version != version || old.Scope != scope {
 		if progress != nil {
-			fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
+			if !hasProgressSink() {
+				fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
+			}
 		}
 		return rebuild(dir, harness, scope, files, progress)
 	}
