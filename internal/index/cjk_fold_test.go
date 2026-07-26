@@ -108,3 +108,12 @@ func TestCJKFoldUnit(t *testing.T) {
 		}
 	}
 }
+
+// Folding changes posting keys, so an index written before it holds keys this
+// build never queries. The version gate is what turns that into an automatic
+// rebuild instead of silent zero recall for CJK.
+func TestFoldRequiresAnIndexVersionOfItsOwn(t *testing.T) {
+	if version < 16 {
+		t.Fatalf("index version is %d: Traditional folding changes keys and needs its own version", version)
+	}
+}
