@@ -173,7 +173,48 @@ func promptSearchTerms(prompt string) []string {
 			}
 		}
 	}
+	// Cyrillic hits the same wall for the same reason: techTerm rejects every
+	// rune above 127, so a Russian prompt without an ASCII identifier yields
+	// nothing and auto-recall stays silent. Unlike CJK it is space-separated,
+	// so the words are already there — they just need a length floor and the
+	// closed class removed, and the index matches their inflected forms.
+	for _, f := range fields {
+		if seen[f] || !cyrPromptTerm(f) {
+			continue
+		}
+		if add(f) {
+			break
+		}
+	}
 	return out
+}
+
+// cyrPromptTerm reports whether a field is a Cyrillic word specific enough to
+// search on. Short words carry no signal and the closed class is noise, so
+// both are dropped; what is left is roughly what techTerm keeps for ASCII.
+func cyrPromptTerm(f string) bool {
+	n := 0
+	for _, r := range f {
+		if r < 0x400 || r > 0x4ff {
+			return false
+		}
+		n++
+	}
+	return n >= 5 && !cyrPromptStop[f]
+}
+
+// The closed class plus the handful of verbs that open half of all questions.
+var cyrPromptStop = map[string]bool{
+	"который": true, "которая": true, "которые": true, "потому": true,
+	"чтобы": true, "нужно": true, "надо": true, "можно": true, "нельзя": true,
+	"когда": true, "почему": true, "зачем": true, "какой": true, "какая": true,
+	"какие": true, "этот": true, "эта": true, "это": true, "тот": true,
+	"такой": true, "также": true, "тоже": true, "очень": true, "просто": true,
+	"сейчас": true, "сделать": true, "делать": true, "сделай": true,
+	"работает": true, "работать": true, "показать": true, "посмотреть": true,
+	"давай": true, "было": true, "были": true, "будет": true, "быть": true,
+	"есть": true, "нет": true, "если": true, "или": true, "как": true,
+	"что": true, "где": true, "там": true, "тут": true, "уже": true, "ещё": true,
 }
 
 func hasCJKRune(s string) bool {
