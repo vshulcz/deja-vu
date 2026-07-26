@@ -56,9 +56,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "pi-auto")
 			case "openclaw":
 				targets = append(targets, "openclaw-auto")
+			case "antigravity":
+				targets = append(targets, "antigravity-auto")
 			default:
-				// antigravity, grok: the MCP server is the deepest integration
-				// those harnesses support.
+				// grok and the IDE extensions: the MCP server is the deepest
+				// integration those harnesses support.
 				targets = append(targets, t)
 			}
 		}
@@ -303,6 +305,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installGeminiAuto(exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
+	case "antigravity-auto":
+		return installAntigravityAuto(exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
 	case "qwen":
@@ -341,6 +345,13 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installClaudeHook(exe, uninstall)
+}
+
+func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installAntigravityPlugin(exe, uninstall)
 }
 
 func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {

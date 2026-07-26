@@ -935,7 +935,7 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 	// gemini and cursor now get their own injection point rather than MCP alone.
 	if out, err := captureRun(t, "install", "--auto"); err != nil ||
 		!strings.Contains(out, "claude-auto:") || !strings.Contains(out, "cursor-auto:") ||
-		!strings.Contains(out, "gemini-auto:") || !strings.Contains(out, "antigravity:") ||
+		!strings.Contains(out, "gemini-auto:") || !strings.Contains(out, "antigravity-auto:") ||
 		!strings.Contains(out, "grok:") {
 		t.Fatalf("install --auto out=%q err=%v", out, err)
 	}
