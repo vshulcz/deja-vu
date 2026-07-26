@@ -54,6 +54,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "cursor-auto")
 			case "pi":
 				targets = append(targets, "pi-auto")
+			case "openclaw":
+				targets = append(targets, "openclaw-auto")
 			default:
 				// antigravity, grok: the MCP server is the deepest integration
 				// those harnesses support.
@@ -321,6 +323,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installPiAuto(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
+	case "openclaw-auto":
+		return installOpenClawAuto(exe, uninstall)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -337,6 +341,13 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installClaudeHook(exe, uninstall)
+}
+
+func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installOpenClawMCP(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installOpenClawHooks(exe, uninstall)
 }
 
 func installPiAuto(exe string, uninstall bool) (installResult, error) {
