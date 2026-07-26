@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -139,17 +140,91 @@ func promptSearchTerms(prompt string) []string {
 	})
 	var out []string
 	seen := map[string]bool{}
+	add := func(f string) bool {
+		if seen[f] {
+			return false
+		}
+		seen[f] = true
+		out = append(out, f)
+		return len(out) == 6
+	}
 	for _, f := range fields {
 		if len(f) < 3 || search.IsStopWord(f) || seen[f] || !techTerm(f) {
 			continue
 		}
-		seen[f] = true
-		out = append(out, f)
-		if len(out) == 6 {
+		if add(f) {
+			return out
+		}
+	}
+	// CJK carries no spaces, so FieldsFunc hands back a whole phrase as one
+	// field, and techTerm rejects every rune above 127 — a Chinese, Japanese
+	// or Korean prompt therefore yields no terms at all and auto-recall can
+	// never fire for it. Fall back to the terms the relevance tier already
+	// ranks on: per-run bigrams with pure-grammar pairs dropped. A bigram is
+	// as specific as the identifiers techTerm looks for, and the caller still
+	// demands two of them overlap before claiming a déjà vu.
+	if hasCJKRune(prompt) {
+		for _, t := range index.RelevanceTerms(prompt) {
+			if !hasCJKRune(t) {
+				continue
+			}
+			if add(t) {
+				break
+			}
+		}
+	}
+	// Cyrillic hits the same wall for the same reason: techTerm rejects every
+	// rune above 127, so a Russian prompt without an ASCII identifier yields
+	// nothing and auto-recall stays silent. Unlike CJK it is space-separated,
+	// so the words are already there — they just need a length floor and the
+	// closed class removed, and the index matches their inflected forms.
+	for _, f := range fields {
+		if seen[f] || !cyrPromptTerm(f) {
+			continue
+		}
+		if add(f) {
 			break
 		}
 	}
 	return out
+}
+
+// cyrPromptTerm reports whether a field is a Cyrillic word specific enough to
+// search on. Short words carry no signal and the closed class is noise, so
+// both are dropped; what is left is roughly what techTerm keeps for ASCII.
+func cyrPromptTerm(f string) bool {
+	n := 0
+	for _, r := range f {
+		if r < 0x400 || r > 0x4ff {
+			return false
+		}
+		n++
+	}
+	return n >= 5 && !cyrPromptStop[f]
+}
+
+// The closed class plus the handful of verbs that open half of all questions.
+var cyrPromptStop = map[string]bool{
+	"который": true, "которая": true, "которые": true, "потому": true,
+	"чтобы": true, "нужно": true, "надо": true, "можно": true, "нельзя": true,
+	"когда": true, "почему": true, "зачем": true, "какой": true, "какая": true,
+	"какие": true, "этот": true, "эта": true, "это": true, "тот": true,
+	"такой": true, "также": true, "тоже": true, "очень": true, "просто": true,
+	"сейчас": true, "сделать": true, "делать": true, "сделай": true,
+	"работает": true, "работать": true, "показать": true, "посмотреть": true,
+	"давай": true, "было": true, "были": true, "будет": true, "быть": true,
+	"есть": true, "нет": true, "если": true, "или": true, "как": true,
+	"что": true, "где": true, "там": true, "тут": true, "уже": true, "ещё": true,
+}
+
+func hasCJKRune(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
+			unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) {
+			return true
+		}
+	}
+	return false
 }
 
 // techTerm keeps tokens that can actually identify past work: identifiers,

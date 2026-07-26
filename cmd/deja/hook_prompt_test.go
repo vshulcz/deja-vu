@@ -295,3 +295,38 @@ func TestDejaVuLineCooldown(t *testing.T) {
 		t.Fatal("second call within cooldown must be suppressed")
 	}
 }
+
+// techTerm rejects every rune above 127, so a Russian prompt without an ASCII
+// identifier used to yield no terms and auto-recall could never fire for it —
+// the same hole CJK had, in the language this project is written from.
+func TestPromptSearchTermsCyrillic(t *testing.T) {
+	got := promptSearchTerms("почему падает индексация кириллицы")
+	if len(got) < 2 {
+		t.Fatalf("Russian prompt yielded %v, recall cannot fire", got)
+	}
+	for _, junk := range []string{"почему", "нужно", "сделать"} {
+		for _, g := range got {
+			if g == junk {
+				t.Errorf("closed-class word %q became a search term: %v", junk, got)
+			}
+		}
+	}
+	// Short words carry no signal.
+	if terms := promptSearchTerms("а он там был"); len(terms) != 0 {
+		t.Errorf("short Russian words became terms: %v", terms)
+	}
+	// A prompt mixing Russian prose with an identifier keeps both.
+	mixed := promptSearchTerms("почему падает openBucketDir на кириллице")
+	var hasIdent, hasWord bool
+	for _, g := range mixed {
+		if g == "openbucketdir" {
+			hasIdent = true
+		}
+		if g == "кириллице" || g == "падает" {
+			hasWord = true
+		}
+	}
+	if !hasIdent || !hasWord {
+		t.Errorf("mixed prompt lost one side: %v", mixed)
+	}
+}
