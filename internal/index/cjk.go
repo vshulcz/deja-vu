@@ -108,7 +108,13 @@ func expandCJKTokens(toks []string) []string {
 // bigram that merely contains one would delete real words. This filter runs
 // at query time only — the index keeps every bigram, so nothing about
 // ingestion changes.
+//
+// The list covers three scripts of the same closed class. Simplified Mandarin
+// alone is not enough: a Traditional writer's 哪個 and a Cantonese writer's
+// 我點 / 唔用 / 嘅索 are the same grammar, and without them a question ranks on
+// its own wording instead of on the entity it asks about.
 var cjkFunctionRunes = map[rune]bool{
+	// Simplified Mandarin
 	'的': true, '了': true, '是': true, '在': true, '和': true, '与': true,
 	'或': true, '而': true, '但': true, '就': true, '都': true, '也': true,
 	'还': true, '又': true, '再': true, '只': true, '才': true, '很': true,
@@ -119,6 +125,18 @@ var cjkFunctionRunes = map[rune]bool{
 	'给': true, '向': true, '于': true, '以': true, '从': true, '到': true,
 	'由': true, '对': true, '因': true, '如': true, '若': true, '则': true,
 	'并': true, '且': true, '为': true, '个': true, '有': true, '会': true,
+
+	// Traditional forms of the entries above, for zh-TW / zh-HK writing
+	'與': true, '還': true, '們': true, '這': true, '麼': true, '嗎': true,
+	'讓': true, '給': true, '於': true, '從': true, '對': true, '則': true,
+	'並': true, '為': true, '個': true, '會': true,
+
+	// Cantonese closed class: 嘅=的 係=是 喺=在 唔=不 咩/乜=什麼 點=怎
+	// 哋=們 嗰=那 啲=些 樣=樣(如「咁樣」) 冇=沒 嚟=來, plus the
+	// sentence-final particles 咪 囉 喎 啦.
+	'嘅': true, '係': true, '喺': true, '唔': true, '咩': true, '乜': true,
+	'點': true, '哋': true, '嗰': true, '啲': true, '樣': true, '冇': true,
+	'嚟': true, '咪': true, '囉': true, '喎': true, '啦': true, '咁': true,
 }
 
 // cjkFunctionBigram reports whether every rune of a CJK token is a function
