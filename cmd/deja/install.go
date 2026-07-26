@@ -50,9 +50,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "qwen-auto")
 			case "kimi":
 				targets = append(targets, "kimi-auto")
+			case "cursor":
+				targets = append(targets, "cursor-auto")
 			default:
-				// cursor, antigravity, grok: the MCP server is the deepest
-				// integration those harnesses support.
+				// antigravity, grok: the MCP server is the deepest integration
+				// those harnesses support.
 				targets = append(targets, t)
 			}
 		}
@@ -289,6 +291,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCodexAuto(exe, uninstall)
 	case "cursor":
 		return installCursor(exe, uninstall)
+	case "cursor-auto":
+		return installCursorAuto(exe, uninstall)
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 	case "gemini-auto":
@@ -329,6 +333,13 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installClaudeHook(exe, uninstall)
+}
+
+func installCursorAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installCursor(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installCursorHooks(exe, uninstall)
 }
 
 func installCodexAuto(exe string, uninstall bool) (installResult, error) {
