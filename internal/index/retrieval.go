@@ -14,6 +14,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -1773,7 +1774,10 @@ func indexKeys(s string) []string {
 		out = append(out, "t"+part)
 	}
 	for _, bg := range cjkBigrams(s) {
-		out = append(out, "t"+bg)
+		// Fold Traditional to Simplified so the same word written either way
+		// lands on one key and a query in one script reaches content in the
+		// other. Folding only the key keeps the stored text untouched.
+		out = append(out, "t"+cjkfold.String(bg))
 	}
 	return out
 }
@@ -1868,7 +1872,9 @@ func queryKeys(s string) []string {
 	}
 	out := make([]string, 0, len(content))
 	for _, tok := range content {
-		out = append(out, "t"+tok)
+		// Mirror of indexKeys: the posting side is folded, so the query side
+		// must be too.
+		out = append(out, "t"+cjkfold.String(tok))
 	}
 	return out
 }
@@ -1885,7 +1891,21 @@ func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][
 	if len(terms) == 0 && len(phrases) == 0 {
 		return true
 	}
-	return query.MatchesParts(r.Text, terms, phrases, variants)
+	if query.MatchesParts(r.Text, terms, phrases, variants) {
+		return true
+	}
+	// Postings are keyed on Traditional-folded bigrams, so a Simplified query
+	// can legitimately reach a Traditional record (and the reverse). This
+	// verification step compares surface text, which would then reject the
+	// very record the postings pointed at — retry it on both sides folded.
+	folded := cjkfold.String(r.Text)
+	if folded == r.Text {
+		if q := cjkfold.String(o.Query); q == o.Query {
+			return false
+		}
+	}
+	fterms, fphrases := query.QueryParts(cjkfold.String(o.Query))
+	return query.MatchesParts(folded, fterms, fphrases, variants)
 }
 
 // bucket shards a token by its opening characters. It used to slice two

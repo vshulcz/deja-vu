@@ -12,8 +12,10 @@ import (
 
 // version 12 resharded non-ASCII tokens across buckets; 13 interned the key
 // and source path of every record; 14 deflates the record payload; 15 drops
-// the derivable offset from every bucket directory entry.
-const version = 15
+// the derivable offset from every bucket directory entry; 16 folds Traditional
+// CJK to Simplified before keying, so an index written before it holds keys
+// this build never queries.
+const version = 16
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

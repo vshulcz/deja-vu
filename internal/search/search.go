@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -89,10 +90,39 @@ type bm25Document struct {
 	titleHits int
 }
 
+// countIn scores one message against the query the way the exact tier does:
+// a parts match first, then either a whole-query substring count for a single
+// bare token or a per-token count, plus any quoted phrases.
+func countIn(text, low string, qtoks, phrases []string, qlow string, variants map[string][]string) int {
+	if !MatchesParts(text, qtoks, phrases, variants) {
+		return 0
+	}
+	if len(qtoks) <= 1 && len(phrases) == 0 && variants == nil {
+		if strings.Contains(low, qlow) {
+			return strings.Count(low, qlow)
+		}
+		return 0
+	}
+	var c int
+	if variants != nil {
+		c = countAllVariants(low, qtoks, variants)
+	} else {
+		c = countAllTokens(low, qtoks)
+	}
+	for _, phrase := range phrases {
+		c += strings.Count(low, phrase)
+	}
+	return c
+}
+
 func Run(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
 	qlow := strings.ToLower(o.Query)
 	qtoks, phrases := QueryParts(o.Query)
+	// Cross-script CJK: prepared once, used only when a raw match scores zero.
+	queryCJK := cjkfold.HasCJK(o.Query)
+	qlowFolded := cjkfold.String(qlow)
+	qtoksFolded, phrasesFolded := QueryParts(cjkfold.String(o.Query))
 	if o.Regex {
 		var err error
 		re, err = regexp.Compile("(?i)" + o.Query)
@@ -145,21 +175,16 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 			if re != nil {
 				c = len(re.FindAllStringIndex(m.Text, -1))
 			} else {
-				if !MatchesParts(m.Text, qtoks, phrases, o.FuzzyVariants) {
-					c = 0
-				} else if len(qtoks) <= 1 && len(phrases) == 0 && o.FuzzyVariants == nil {
-					if strings.Contains(low, qlow) {
-						c = strings.Count(low, qlow)
-					}
-				} else {
-					if o.FuzzyVariants != nil {
-						c = countAllVariants(low, qtoks, o.FuzzyVariants)
-					} else {
-						c = countAllTokens(low, qtoks)
-					}
-					for _, phrase := range phrases {
-						c += strings.Count(low, phrase)
-					}
+				c = countIn(m.Text, low, qtoks, phrases, qlow, o.FuzzyVariants)
+				// Postings are keyed on Traditional-folded CJK, so a query in
+				// one script legitimately reaches a record in the other. This
+				// counting pass works on surface text and would score that
+				// record zero, dropping it from the results the postings
+				// already found — retry with both sides folded.
+				if c == 0 && queryCJK {
+					foldedLow := cjkfold.String(low)
+					c = countIn(cjkfold.String(m.Text), foldedLow, qtoksFolded,
+						phrasesFolded, qlowFolded, o.FuzzyVariants)
 				}
 			}
 			if c > 0 {
@@ -851,6 +876,7 @@ func RelevanceHits(ss []model.Session, terms []string) []Hit {
 		hit := Hit{Session: s, Tier: TierRelevance}
 		for _, m := range s.Messages {
 			low := strings.ToLower(m.Text)
+			var foldedLow string
 			for _, t := range terms {
 				if strings.Contains(low, t) {
 					hit.Count++
@@ -858,6 +884,20 @@ func RelevanceHits(ss []model.Session, terms []string) []Hit {
 						hit.Snippets = append(hit.Snippets, snippet(m.Text, t, nil))
 					}
 					break
+				}
+				// Cross-script: a Simplified term can describe Traditional
+				// text and vice versa.
+				if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
+					if foldedLow == "" {
+						foldedLow = cjkfold.String(low)
+					}
+					if strings.Contains(foldedLow, ft) {
+						hit.Count++
+						if len(hit.Snippets) < 2 {
+							hit.Snippets = append(hit.Snippets, snippet(m.Text, t, nil))
+						}
+						break
+					}
 				}
 			}
 		}
