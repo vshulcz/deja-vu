@@ -36,6 +36,7 @@ func openclawHookEntry(root map[string]any) (enabled bool, masterSwitch any, pre
 func TestInstallOpenClawHooksWritesPackAndEnablesIt(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	if _, err := installOpenClawHooks("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}
@@ -71,6 +72,7 @@ func TestInstallOpenClawHooksWritesPackAndEnablesIt(t *testing.T) {
 func TestInstallOpenClawHooksUninstallLeavesOtherHooks(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	cfgDir := filepath.Join(home, ".openclaw")
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -109,6 +111,7 @@ func TestInstallOpenClawHooksUninstallLeavesOtherHooks(t *testing.T) {
 func TestInstallOpenClawHooksUninstallClearsConfigItCreated(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	if _, err := installOpenClawHooks("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}

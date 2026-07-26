@@ -181,7 +181,7 @@ func (p *buildProgress) bar() string {
 	}
 	b.WriteString(logoReset)
 	if p.total > 0 {
-		b.WriteString(fmt.Sprintf("  %s%3.0f%%%s", logoDim, frac*100, logoReset))
+		fmt.Fprintf(&b, "  %s%3.0f%%%s", logoDim, frac*100, logoReset)
 	}
 	return b.String()
 }

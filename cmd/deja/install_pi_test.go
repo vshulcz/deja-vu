@@ -10,6 +10,7 @@ import (
 func TestInstallPiExtensionWritesDiscoverableFile(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	if _, err := installPiExtension("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}
@@ -36,6 +37,7 @@ func TestInstallPiExtensionWritesDiscoverableFile(t *testing.T) {
 func TestInstallPiExtensionRemovesOnUninstall(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	path := filepath.Join(home, ".pi", "agent", "extensions", "deja.ts")
 	if _, err := installPiExtension("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
