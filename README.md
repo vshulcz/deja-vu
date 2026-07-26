@@ -88,6 +88,13 @@ claude plugin install deja-vu@deja-vu
 
 The plugin wires the same three hooks and the `/deja` command. It stands down on its own if `deja install` already wired them, so having both does not recall twice.
 
+Codex has its own marketplace:
+
+```sh
+codex plugin marketplace add vshulcz/deja-vu
+codex plugin add deja-vu@deja-vu
+```
+
 On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
 
 Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, Gemini CLI, Qwen, Copilot, and OpenCode use their corresponding guidance files (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no documented user-level guidance location and is skipped.
