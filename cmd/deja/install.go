@@ -505,9 +505,10 @@ func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall boo
 	return root
 }
 
-// hookStatusMessage is what Claude Code shows while the hook runs. Without it
-// the pause before the first prompt is unexplained; with it, the one moment
-// deja costs the user is the moment it announces itself.
+// hookStatusMessage labels the hook while it runs. Codex carries it through
+// to its hook run summary; Claude Code 2.1.220 parses the field but shows
+// nothing for it — there the receipt in systemMessage is what the user sees,
+// which was checked by rendering the actual TUI rather than by reading docs.
 func hookStatusMessage(event string) string {
 	switch event {
 	case "SessionStart":
