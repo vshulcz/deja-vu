@@ -575,6 +575,21 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 		f.Close()
 		return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 	}
+	// count and the token lengths below come straight off disk. A truncated
+	// file, or one written by a different index layout, can name a size no
+	// allocation could satisfy — and make() panics on that rather than
+	// failing. Every other corruption here is recoverable, so bound both
+	// against the file: no entry occupies fewer than two bytes.
+	fi, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	fileSize := uint64(fi.Size())
+	if count > fileSize/2 {
+		f.Close()
+		return nil, nil, fmt.Errorf("%w: bucket directory claims %d entries in %d bytes", errCorruptIndex, count, fileSize)
+	}
 	entries := make([]bucketEntry, 0, count)
 	// Offsets are not stored; they are the running sum of the lengths, taken
 	// from where the directory ends.
@@ -584,6 +599,10 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 		if err != nil {
 			f.Close()
 			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
+		}
+		if ln > fileSize {
+			f.Close()
+			return nil, nil, fmt.Errorf("%w: token length %d exceeds bucket size %d", errCorruptIndex, ln, fileSize)
 		}
 		tb := make([]byte, ln)
 		if _, err := io.ReadFull(r, tb); err != nil {
