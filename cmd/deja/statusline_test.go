@@ -110,7 +110,7 @@ func TestStatuslineReportsColdBuild(t *testing.T) {
 		t.Fatalf("statusline = %q, want the build and its progress", got)
 	}
 	// Once the build is done the line goes back to reporting recalls.
-	os.Remove(warmupStatusPath(dir))
+	_ = os.Remove(warmupStatusPath(dir))
 	out.Reset()
 	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
