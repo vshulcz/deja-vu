@@ -18,6 +18,12 @@ func isCJK(r rune) bool {
 }
 
 // cjkBigrams emits the bigram set for every CJK run in s.
+//
+// Bigrams keep the script they were written in. Folding happens where postings
+// keys are built (indexKeys and queryKeys), not here, so the query-time
+// function-word filter still sees the runes the user actually typed: 係 folds
+// to 系, which is a content character in 系統 and 關係, so a filter applied
+// after folding could not tell the two apart.
 func cjkBigrams(s string) []string {
 	var out []string
 	seen := map[string]bool{}
