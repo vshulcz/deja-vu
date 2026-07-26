@@ -79,9 +79,18 @@ deja install --all     # MCP recall for every agent it finds on this machine
 deja install --auto    # same, plus session-start auto-recall where supported
 ```
 
+Claude Code users can skip that step and install everything as a plugin instead:
+
+```sh
+claude plugin marketplace add vshulcz/deja-vu
+claude plugin install deja-vu@deja-vu
+```
+
+The plugin wires the same three hooks and the `/deja` command. It stands down on its own if `deja install` already wired them, so having both does not recall twice.
+
 On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, Gemini CLI, Qwen, Copilot, and OpenCode use their corresponding guidance files (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Cursor and Grok have no documented user-level guidance location and are skipped.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, Gemini CLI, Qwen, Copilot, and OpenCode use their corresponding guidance files (or the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no documented user-level guidance location and is skipped.
 
 Install reports whether it found local history and builds the first index immediately when history is present.
 

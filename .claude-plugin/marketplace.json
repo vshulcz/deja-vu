@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "deja-vu",
+  "description": "Memory for AI coding agents: search and auto-recall your own past sessions across every tool you use.",
+  "owner": {
+    "name": "vshulcz",
+    "url": "https://github.com/vshulcz"
+  },
+  "plugins": [
+    {
+      "name": "deja-vu",
+      "description": "Your agent starts already knowing what you did before — recall across Claude Code, Codex, Cursor, opencode and a dozen others.",
+      "source": "./claude-plugin",
+      "category": "productivity"
+    }
+  ]
+}
