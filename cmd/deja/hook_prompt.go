@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -139,17 +140,50 @@ func promptSearchTerms(prompt string) []string {
 	})
 	var out []string
 	seen := map[string]bool{}
+	add := func(f string) bool {
+		if seen[f] {
+			return false
+		}
+		seen[f] = true
+		out = append(out, f)
+		return len(out) == 6
+	}
 	for _, f := range fields {
 		if len(f) < 3 || search.IsStopWord(f) || seen[f] || !techTerm(f) {
 			continue
 		}
-		seen[f] = true
-		out = append(out, f)
-		if len(out) == 6 {
-			break
+		if add(f) {
+			return out
+		}
+	}
+	// CJK carries no spaces, so FieldsFunc hands back a whole phrase as one
+	// field, and techTerm rejects every rune above 127 — a Chinese, Japanese
+	// or Korean prompt therefore yields no terms at all and auto-recall can
+	// never fire for it. Fall back to the terms the relevance tier already
+	// ranks on: per-run bigrams with pure-grammar pairs dropped. A bigram is
+	// as specific as the identifiers techTerm looks for, and the caller still
+	// demands two of them overlap before claiming a déjà vu.
+	if hasCJKRune(prompt) {
+		for _, t := range index.RelevanceTerms(prompt) {
+			if !hasCJKRune(t) {
+				continue
+			}
+			if add(t) {
+				break
+			}
 		}
 	}
 	return out
+}
+
+func hasCJKRune(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
+			unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) {
+			return true
+		}
+	}
+	return false
 }
 
 // techTerm keeps tokens that can actually identify past work: identifiers,
