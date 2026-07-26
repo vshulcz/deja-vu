@@ -152,3 +152,44 @@ func TestWarmupStatusCommandIsSilentWithoutABuild(t *testing.T) {
 		t.Errorf("printed %q during a build", out)
 	}
 }
+
+// Thirteen of the sixteen harnesses have no hook and reach deja only over
+// MCP. A recall during the first build must not answer with a confident
+// negative, or the agent tells the user they have no history at all.
+func TestMCPRecallDistinguishesEmptyFromStillBuilding(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+
+	quiet := emptyRecallAnswer(dir, "jwt skew")
+	if !strings.Contains(quiet, "No prior deja sessions matched") {
+		t.Errorf("with no build running the answer should be a plain negative, got %q", quiet)
+	}
+
+	p := newFileProgress(dir)
+	p.Phase("reading sessions", 10)
+	p.Advance(3)
+	t.Cleanup(p.done)
+
+	building := emptyRecallAnswer(dir, "jwt skew")
+	if strings.Contains(building, "No prior deja sessions matched") {
+		t.Fatalf("a recall during the build still reads as a negative: %q", building)
+	}
+	// Not asserting the percentage here: publishing is throttled to 250ms, so
+	// a freshly reported Advance may not have reached the file yet. The
+	// percentage itself is covered by TestWarmupProgressFragment.
+	for _, want := range []string{"building", "reading sessions", "ask again"} {
+		if !strings.Contains(building, want) {
+			t.Errorf("answer %q is missing %q", building, want)
+		}
+	}
+}
+
+func TestWarmupProgressFragment(t *testing.T) {
+	if got := (&warmupStatus{Phase: "indexing messages", Done: 1, Total: 4}).progress(); got != "indexing messages 25%" {
+		t.Errorf("progress = %q", got)
+	}
+	// No total means no invented percentage.
+	if got := (&warmupStatus{Phase: "starting"}).progress(); got != "starting" {
+		t.Errorf("progress with unknown total = %q", got)
+	}
+}

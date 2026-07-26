@@ -319,7 +319,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	o.Semantic = semantic
 	if len(hits) == 0 {
-		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, 0, nil, nil
+		return emptyRecallAnswer(dir, q), 0, 0, nil, nil
 	}
 	total := len(hits)
 	if offset > 0 {
@@ -444,7 +444,7 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 		o.Tier = search.TierSemantic
 	}
 	if len(hits) == 0 {
-		return fmt.Sprintf("No prior deja sessions matched %q.", q), 0, 0, nil, nil
+		return emptyRecallAnswer(dir, q), 0, 0, nil, nil
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, hits[0].Session, q)

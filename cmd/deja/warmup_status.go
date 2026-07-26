@@ -117,6 +117,19 @@ func readWarmupStatus(dir string) *warmupStatus {
 	return &st
 }
 
+// progress is the bare "phase 42%" fragment, for callers that supply their
+// own sentence.
+func (s *warmupStatus) progress() string {
+	if s.Total <= 0 {
+		return s.Phase
+	}
+	p := 100 * s.Done / s.Total
+	if p > 100 {
+		p = 100
+	}
+	return fmt.Sprintf("%s %d%%", s.Phase, p)
+}
+
 // line is the one-sentence status a host can show its user. It names what is
 // happening rather than just a number, because "deja" alone means nothing to
 // someone who installed it once and forgot.
@@ -159,4 +172,16 @@ func cmdWarmupStatus(dir string, _ []string) error {
 		fmt.Fprintln(os.Stdout, st.line())
 	}
 	return nil
+}
+
+// emptyRecallAnswer distinguishes "there is nothing" from "there is nothing
+// YET". Thirteen of the sixteen harnesses have no hook to speak through and
+// reach deja only over MCP, so a tool result is the one place they can learn
+// that the first index is still being built. Without this the agent reads a
+// confident negative and tells the user they have no history.
+func emptyRecallAnswer(dir, q string) string {
+	if st := readWarmupStatus(dir); st != nil {
+		return fmt.Sprintf("deja is still building its index (%s). Nothing can be recalled yet — it finishes within a few seconds, so ask again later in this session rather than concluding there is no history.", st.progress())
+	}
+	return fmt.Sprintf("No prior deja sessions matched %q.", q)
 }
