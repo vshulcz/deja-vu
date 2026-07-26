@@ -43,7 +43,7 @@ func TestMCPInstructionsReportBuildInProgress(t *testing.T) {
 	if !strings.Contains(got, "indexing 25%") {
 		t.Fatalf("instructions omit build progress: %q", got)
 	}
-	os.Remove(warmupStatusPath(dir))
+	_ = os.Remove(warmupStatusPath(dir))
 	if got := mcpInstructions(dir); strings.Contains(got, "still building") {
 		t.Fatalf("instructions claim a build with no status file: %q", got)
 	}
