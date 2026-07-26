@@ -97,6 +97,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 			"protocolVersion": mcpProtocolVersion,
 			"capabilities":    map[string]any{"tools": map[string]any{}, "resources": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "deja", "version": version},
+			"instructions":    mcpInstructions(dir),
 		}, 0, ""
 	case "tools/list":
 		return map[string]any{"tools": []map[string]any{
