@@ -344,6 +344,9 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 	if _, err := installClaude(exe, uninstall); err != nil {
 		return installResult{}, err
 	}
+	if _, err := installClaudeCommands(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
 	return installClaudeHook(exe, uninstall)
 }
 
@@ -502,6 +505,21 @@ func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall boo
 	return root
 }
 
+// hookStatusMessage is what Claude Code shows while the hook runs. Without it
+// the pause before the first prompt is unexplained; with it, the one moment
+// deja costs the user is the moment it announces itself.
+func hookStatusMessage(event string) string {
+	switch event {
+	case "SessionStart":
+		return "Recalling past sessions…"
+	case "UserPromptSubmit":
+		return "Searching past sessions…"
+	case "PreCompact":
+		return "Saving this session to memory…"
+	}
+	return ""
+}
+
 func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall bool) map[string]any {
 	hooks, _ := root["hooks"].(map[string]any)
 	if hooks == nil {
@@ -546,7 +564,11 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		out = append(out, entry)
 	}
 	if !uninstall && !found {
-		entry := map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd}}}
+		h := map[string]any{"type": "command", "command": cmd}
+		if msg := hookStatusMessage(event); msg != "" {
+			h["statusMessage"] = msg
+		}
+		entry := map[string]any{"hooks": []any{h}}
 		if matcher != "" {
 			entry["matcher"] = matcher
 		}

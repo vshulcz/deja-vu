@@ -48,7 +48,12 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	if !uninstall && !found {
 		kept = append(kept, map[string]any{
 			"matcher": "startup|resume",
-			"hooks":   []any{map[string]any{"type": "command", "command": cmd, "timeout": 10}},
+			"hooks": []any{map[string]any{
+				"type": "command", "command": cmd, "timeout": 10,
+				// Codex renders statusMessage while the hook runs, same as
+				// Claude Code — the one pause deja costs says what it is for.
+				"statusMessage": hookStatusMessage("SessionStart"),
+			}},
 		})
 	}
 	if len(kept) == 0 {

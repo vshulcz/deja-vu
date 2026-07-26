@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -84,5 +87,35 @@ func TestStatuslineSingular(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "1 recall ·") {
 		t.Fatalf("statusline = %q", out.String())
+	}
+}
+
+// While the first index builds there is nothing to report but the build
+// itself, and the status bar is where the user is already looking.
+func TestStatuslineReportsColdBuild(t *testing.T) {
+	dir := t.TempDir()
+	st := warmupStatus{Phase: "indexing", Total: 4, Done: 3, Updated: time.Now().UnixNano()}
+	b, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(warmupStatusPath(dir), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); !strings.Contains(got, "building memory") || !strings.Contains(got, "75%") {
+		t.Fatalf("statusline = %q, want the build and its progress", got)
+	}
+	// Once the build is done the line goes back to reporting recalls.
+	_ = os.Remove(warmupStatusPath(dir))
+	out.Reset()
+	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "building memory") {
+		t.Fatalf("statusline still claims a build: %q", out.String())
 	}
 }

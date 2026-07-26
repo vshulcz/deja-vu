@@ -1,0 +1,103 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func repoFile(t *testing.T, rel string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "..", rel))
+	if err != nil {
+		t.Fatalf("read %s: %v", rel, err)
+	}
+	// Git may check these out with CRLF on Windows; the comparison is about
+	// content, not about how the working tree stores it.
+	return bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
+}
+
+// The Claude Code plugin is what `claude plugin install` pulls, so a typo in
+// either manifest breaks the one-command install for everyone.
+func TestClaudePluginManifestsAreWellFormed(t *testing.T) {
+	var market struct {
+		Name    string `json:"name"`
+		Plugins []struct {
+			Name   string `json:"name"`
+			Source string `json:"source"`
+		} `json:"plugins"`
+	}
+	if err := json.Unmarshal(repoFile(t, ".claude-plugin/marketplace.json"), &market); err != nil {
+		t.Fatalf("marketplace.json: %v", err)
+	}
+	if len(market.Plugins) != 1 || market.Plugins[0].Source != "./claude-plugin" {
+		t.Fatalf("marketplace does not point at the plugin directory: %+v", market.Plugins)
+	}
+	var plugin struct {
+		Name  string `json:"name"`
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command       string `json:"command"`
+				StatusMessage string `json:"statusMessage"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(repoFile(t, "claude-plugin/.claude-plugin/plugin.json"), &plugin); err != nil {
+		t.Fatalf("plugin.json: %v", err)
+	}
+	if plugin.Name != market.Plugins[0].Name {
+		t.Fatalf("plugin name %q does not match the marketplace entry %q", plugin.Name, market.Plugins[0].Name)
+	}
+	// The same three events the local installer wires, so a plugin user is
+	// not quietly getting less than someone who ran `deja install`.
+	for _, event := range []string{"SessionStart", "UserPromptSubmit", "PreCompact"} {
+		groups, ok := plugin.Hooks[event]
+		if !ok || len(groups) == 0 || len(groups[0].Hooks) == 0 {
+			t.Fatalf("plugin does not hook %s", event)
+		}
+		h := groups[0].Hooks[0]
+		if !strings.HasPrefix(h.Command, "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh ") {
+			t.Fatalf("%s command is not plugin-relative: %q", event, h.Command)
+		}
+		// Without this the pause before the first prompt is unexplained.
+		if h.StatusMessage == "" {
+			t.Fatalf("%s hook has no statusMessage", event)
+		}
+	}
+}
+
+// The plugin ships its own copy of the slash command; it must not drift from
+// the one `deja install` writes.
+func TestPluginCommandMatchesInstaller(t *testing.T) {
+	want := claudeCommandMD("deja")
+	got := string(repoFile(t, "claude-plugin/commands/deja.md"))
+	if got != want {
+		t.Fatalf("claude-plugin/commands/deja.md has drifted from claudeCommandMD:\n--- file ---\n%s\n--- installer ---\n%s", got, want)
+	}
+}
+
+// A plugin user may not have the binary yet. The bridge must say so through
+// the hook's own channel and still exit clean.
+func TestPluginBridgeHandlesMissingBinary(t *testing.T) {
+	script := string(repoFile(t, "claude-plugin/hooks/deja.sh"))
+	for _, want := range []string{"systemMessage", "$HOME/.local/bin/deja", "exit 0", `exec "$DEJA"`} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("bridge script missing %q", want)
+		}
+	}
+}
+
+// Users who already ran `deja install claude-auto` and then install the
+// plugin must not get the digest twice.
+func TestPluginBridgeStandsDownWhenLocallyInstalled(t *testing.T) {
+	script := string(repoFile(t, "claude-plugin/hooks/deja.sh"))
+	if !strings.Contains(script, `grep -q "deja hook-"`) {
+		t.Fatalf("bridge does not detect an existing local install:\n%s", script)
+	}
+	if !strings.Contains(script, "CLAUDE_CONFIG_DIR") {
+		t.Fatal("bridge ignores CLAUDE_CONFIG_DIR when looking for settings.json")
+	}
+}
