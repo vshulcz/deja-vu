@@ -13,6 +13,13 @@ import (
 // because status bars call it constantly.
 func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	drainStdin(stdin)
+	// A first build takes a while and runs detached. The status bar is the
+	// one surface the user is already looking at, so the build reports there
+	// instead of leaving them to wonder why recall is quiet.
+	if st := readWarmupStatus(dir); st != nil {
+		fmt.Fprintf(stdout, "deja · building memory · %s", st.progress())
+		return nil
+	}
 	recalls, bytes, injected := usage.TodayWithInjections(dir)
 	if recalls == 0 {
 		if wr, wb, _, _ := usage.Week(dir); wr > 0 {

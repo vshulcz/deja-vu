@@ -344,6 +344,9 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 	if _, err := installClaude(exe, uninstall); err != nil {
 		return installResult{}, err
 	}
+	if _, err := installClaudeCommands(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
 	return installClaudeHook(exe, uninstall)
 }
 

@@ -152,7 +152,7 @@
    "display_name": "Cursor",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (IDE chats)"
@@ -173,7 +173,7 @@
    "display_name": "Antigravity",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": true,
     "handoff": "paste",
     "prereq": ""
@@ -282,7 +282,7 @@
    "display_name": "pi",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -303,7 +303,7 @@
    "display_name": "OpenClaw",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": false,
     "handoff": "paste",
     "prereq": ""
