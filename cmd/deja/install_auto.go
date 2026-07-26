@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -214,4 +216,54 @@ func installSettingsHook(path, event, matcher string, timeout int, exe string, u
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a}, err
+}
+
+// kimiHookMarker identifies our block in a config the user also edits by
+// hand. Kimi keeps hooks in config.toml as an array of tables, so removal
+// cannot key on a table name the way the MCP block does — several [[hooks]]
+// entries are legal and only one of them is ours.
+const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`)"
+
+// Kimi Code runs SessionStart hooks, so auto-recall works there too. Its
+// config is TOML, not JSON, and the entry is a flat table rather than the
+// nested matcher/hooks shape Claude uses.
+func installKimiAuto(exe string, uninstall bool) (installResult, error) {
+	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
+	old, _ := os.ReadFile(path)
+	s := removeKimiHookBlock(string(old))
+	s = strings.TrimRight(s, "\n")
+	if !uninstall {
+		block := kimiHookMarker + "\n[[hooks]]\nevent = \"SessionStart\"\ncommand = " +
+			strconv.Quote(exe+" hook-context") + "\ntimeout = 10\n"
+		if s != "" {
+			s += "\n\n"
+		}
+		s += block
+	} else if s != "" {
+		s += "\n"
+	}
+	a, err := writeIfChanged(path, old, []byte(s))
+	return installResult{Path: path, Action: a}, err
+}
+
+// removeKimiHookBlock drops our marked entry and nothing else: the next table
+// header ends it, so a hand-written [[hooks]] below survives.
+func removeKimiHookBlock(s string) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	for i := 0; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) != kimiHookMarker {
+			out = append(out, lines[i])
+			continue
+		}
+		i++ // skip the marker
+		if i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "[[hooks]]") {
+			i++
+		}
+		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[i]), "[") {
+			i++
+		}
+		i-- // the loop's own i++ steps onto the next table header
+	}
+	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
 }

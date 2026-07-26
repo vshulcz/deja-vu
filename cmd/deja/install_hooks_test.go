@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -122,5 +123,81 @@ func TestSettingsHookLeavesTheRestOfTheFileAlone(t *testing.T) {
 	}
 	if _, ok := hooks["BeforeAgent"]; ok {
 		t.Error("uninstall left our hook")
+	}
+}
+
+// Kimi keeps hooks in config.toml as an array of tables, so our entry cannot
+// be removed by table name the way the MCP block is — several [[hooks]] are
+// legal and only one is ours.
+func TestKimiAutoHookAndItsRemoval(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("KIMI_CODE_HOME", "")
+	t.Setenv("DEJA_KIMI_ROOT", "")
+
+	res, err := installKimiAuto("/usr/local/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(res.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{"[[hooks]]", `event = "SessionStart"`, `command = "/usr/local/bin/deja hook-context"`, "timeout = 10"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("config is missing %q:\n%s", want, got)
+		}
+	}
+	if _, err := installKimiAuto("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(res.Path)
+	if n := strings.Count(string(b), "[[hooks]]"); n != 1 {
+		t.Fatalf("reinstall produced %d hook entries", n)
+	}
+	if _, err := installKimiAuto("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(res.Path)
+	if strings.Contains(string(b), "hook-context") {
+		t.Errorf("uninstall left our hook: %s", b)
+	}
+}
+
+// A config the user also edits by hand must come back intact: their own
+// hooks, their providers, their keys.
+func TestKimiUninstallKeepsSomeoneElsesHooks(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("KIMI_CODE_HOME", "")
+	t.Setenv("DEJA_KIMI_ROOT", "")
+
+	dir := filepath.Join(home, ".kimi-code")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.toml")
+	original := "[providers.openrouter]\napi_key = \"secret\"\n\n[[hooks]]\nevent = \"Stop\"\ncommand = \"mine\"\n"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installKimiAuto("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installKimiAuto("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(path)
+	got := string(b)
+	for _, want := range []string{"[providers.openrouter]", `api_key = "secret"`, `event = "Stop"`, `command = "mine"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("uninstall destroyed %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "hook-context") {
+		t.Error("uninstall left our entry behind")
 	}
 }

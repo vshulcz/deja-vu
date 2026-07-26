@@ -48,6 +48,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "gemini-auto")
 			case "qwen":
 				targets = append(targets, "qwen-auto")
+			case "kimi":
+				targets = append(targets, "kimi-auto")
 			default:
 				// cursor, antigravity, grok: the MCP server is the deepest
 				// integration those harnesses support.
@@ -301,6 +303,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installQwenAuto(exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
+	case "kimi-auto":
+		return installKimiAuto(exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "copilot":
