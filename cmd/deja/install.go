@@ -52,6 +52,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "kimi-auto")
 			case "cursor":
 				targets = append(targets, "cursor-auto")
+			case "pi":
+				targets = append(targets, "pi-auto")
 			default:
 				// antigravity, grok: the MCP server is the deepest integration
 				// those harnesses support.
@@ -315,6 +317,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCopilotMCP(exe, uninstall)
 	case "pi":
 		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
+	case "pi-auto":
+		return installPiAuto(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
 	case "opencode":
@@ -333,6 +337,13 @@ func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installClaudeHook(exe, uninstall)
+}
+
+func installPiAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installPiExtension(exe, uninstall)
 }
 
 func installCursorAuto(exe string, uninstall bool) (installResult, error) {
