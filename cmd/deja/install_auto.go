@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // Codex (v0.114+) ships lifecycle hooks with the same JSON contract as
@@ -133,4 +135,83 @@ export const DejaRecall = async ({ $, client }) => {
   }
 }
 `, "`", exe, "hook-context --plain", "`", "`", exe, "warmup-status", "`")
+}
+
+// Gemini CLI and Qwen Code both run a command before the agent loop, which is
+// the same injection point Claude Code's SessionStart gives us — so
+// auto-recall works there too, not just MCP on demand.
+//
+// They are not the same shape, and both differences were found by running
+// them rather than by reading their bundles:
+//
+//   - Gemini calls the event BeforeAgent (it has no SessionStart) and reads
+//     `timeout` in MILLISECONDS. A Claude-style `"timeout": 10` is ten
+//     milliseconds there, and the hook is killed before it can answer.
+//   - Qwen forked from an older Gemini and kept SessionStart with a matcher,
+//     with `timeout` in seconds.
+func installGeminiAuto(exe string, uninstall bool) (installResult, error) {
+	return installSettingsHook(
+		filepath.Join(sources.GeminiHome(), "settings.json"),
+		"BeforeAgent", "", 10000, exe, uninstall)
+}
+
+func installQwenAuto(exe string, uninstall bool) (installResult, error) {
+	return installSettingsHook(
+		filepath.Join(sources.QwenConfigDir(), "settings.json"),
+		"SessionStart", "startup|resume", 10, exe, uninstall)
+}
+
+// installSettingsHook merges one hook entry into a settings.json that the
+// host also uses for everything else, leaving the rest of the file alone.
+func installSettingsHook(path, event, matcher string, timeout int, exe string, uninstall bool) (installResult, error) {
+	old, _ := os.ReadFile(path)
+	var root map[string]any
+	if len(bytes.TrimSpace(old)) == 0 {
+		root = map[string]any{}
+	} else if err := json.Unmarshal(old, &root); err != nil {
+		return installResult{}, err
+	}
+	cmd := exe + " hook-context"
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+		root["hooks"] = hooks
+	}
+	entries, _ := hooks[event].([]any)
+	var kept []any
+	found := false
+	for _, entryAny := range entries {
+		entry, _ := entryAny.(map[string]any)
+		if entry != nil && entryHasCommand(entry, cmd) {
+			found = true
+			if uninstall {
+				continue
+			}
+		}
+		kept = append(kept, entryAny)
+	}
+	if !uninstall && !found {
+		entry := map[string]any{
+			"hooks": []any{map[string]any{"type": "command", "command": cmd, "timeout": timeout}},
+		}
+		if matcher != "" {
+			entry["matcher"] = matcher
+		}
+		kept = append(kept, entry)
+	}
+	if len(kept) == 0 {
+		delete(hooks, event)
+	} else {
+		hooks[event] = kept
+	}
+	if len(hooks) == 0 {
+		delete(root, "hooks")
+	}
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return installResult{Path: path, Action: a}, err
 }

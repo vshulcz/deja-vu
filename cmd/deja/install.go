@@ -44,9 +44,13 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "codex-auto")
 			case "opencode":
 				targets = append(targets, "opencode-auto")
+			case "gemini":
+				targets = append(targets, "gemini-auto")
+			case "qwen":
+				targets = append(targets, "qwen-auto")
 			default:
-				// cursor, gemini, antigravity, grok: the MCP server is the
-				// deepest integration those harnesses support.
+				// cursor, antigravity, grok: the MCP server is the deepest
+				// integration those harnesses support.
 				targets = append(targets, t)
 			}
 		}
@@ -285,12 +289,16 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCursor(exe, uninstall)
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
+	case "gemini-auto":
+		return installGeminiAuto(exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
+	case "qwen-auto":
+		return installQwenAuto(exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
 	case "cline":
