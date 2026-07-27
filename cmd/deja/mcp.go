@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -166,10 +167,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	switch name {
 	case "recall":
 		var a struct {
-			Query   string  `json:"query"`
-			Harness string  `json:"harness"`
-			Limit   float64 `json:"limit"`
-			Offset  float64 `json:"offset"`
+			Query   string    `json:"query"`
+			Harness string    `json:"harness"`
+			Limit   mcpNumber `json:"limit"`
+			Offset  mcpNumber `json:"offset"`
 		}
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return "", err
@@ -204,12 +205,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		return text, err
 	case "blame":
 		var a struct {
-			Path    string  `json:"path"`
-			Harness string  `json:"harness"`
-			Project string  `json:"project"`
-			Since   string  `json:"since"`
-			Limit   float64 `json:"limit"`
-			All     bool    `json:"all"`
+			Path    string    `json:"path"`
+			Harness string    `json:"harness"`
+			Project string    `json:"project"`
+			Since   string    `json:"since"`
+			Limit   mcpNumber `json:"limit"`
+			All     bool      `json:"all"`
 		}
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return "", err
@@ -478,4 +479,31 @@ func fuzzySummary(variants map[string][]string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// mcpNumber accepts a number or a numeric string. Models emit both — the
+// schema says number, but a client that stringifies its arguments would
+// otherwise get a Go type error back instead of a result, and the error text
+// leaks internal field names into a protocol surface.
+type mcpNumber float64
+
+func (n *mcpNumber) UnmarshalJSON(b []byte) error {
+	var f float64
+	if err := json.Unmarshal(b, &f); err == nil {
+		*n = mcpNumber(f)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return fmt.Errorf("want a number, got %s", strings.TrimSpace(string(b)))
+	}
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if err != nil {
+		return fmt.Errorf("want a number, got %q", s)
+	}
+	*n = mcpNumber(f)
+	return nil
 }
