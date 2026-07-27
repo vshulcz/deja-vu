@@ -98,20 +98,12 @@ func TestInstallGeminiUninstallLeavesTheSwitchAlone(t *testing.T) {
 	}
 }
 
-// Qwen has no hook system and Kimi's hooks cannot carry context, so both
-// installers exist only to clear what older versions wrote.
-func TestQwenAndKimiInstallNoHooks(t *testing.T) {
+// Kimi's hooks cannot carry context, so its installer exists only to clear
+// what older versions wrote.
+func TestKimiInstallsNoHooks(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	if _, err := installQwenAuto("/bin/deja", false); err != nil {
-		t.Fatalf("qwen: %v", err)
-	}
-	if b, err := os.ReadFile(filepath.Join(home, ".qwen", "settings.json")); err == nil {
-		if strings.Contains(string(b), "hook-context") {
-			t.Fatalf("qwen settings gained a hook that qwen never runs: %s", b)
-		}
-	}
 	if _, err := installKimiAuto("/bin/deja", false); err != nil {
 		t.Fatalf("kimi: %v", err)
 	}
@@ -119,5 +111,48 @@ func TestQwenAndKimiInstallNoHooks(t *testing.T) {
 		if strings.Contains(string(b), "hook-context") {
 			t.Fatalf("kimi config gained a hook whose output is discarded: %s", b)
 		}
+	}
+}
+
+// Qwen was written off as having no hooks twice over: its timeout is in
+// milliseconds, so the 10 deja used to write killed the hook instantly, and
+// only UserPromptSubmit consumes additionalContext — a SessionStart-shaped
+// reply is dropped because the event name does not match.
+func TestQwenHooksUserPromptSubmitInMilliseconds(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_QWEN_ROOT", "")
+	if _, err := installQwenAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".qwen", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string  `json:"command"`
+				Timeout float64 `json:"timeout"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := root.Hooks["SessionStart"]; ok {
+		t.Fatal("SessionStart fires but never takes the context: wrong event")
+	}
+	groups := root.Hooks["UserPromptSubmit"]
+	if len(groups) == 0 || len(groups[0].Hooks) == 0 {
+		t.Fatalf("no UserPromptSubmit hook: %s", b)
+	}
+	h := groups[0].Hooks[0]
+	if !strings.HasSuffix(h.Command, "hook-prompt") {
+		t.Fatalf("command = %q, want the prompt hook whose reply names UserPromptSubmit", h.Command)
+	}
+	if h.Timeout < 1000 {
+		t.Fatalf("timeout = %v, too small for milliseconds", h.Timeout)
 	}
 }

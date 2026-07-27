@@ -226,18 +226,26 @@ func installGeminiAuto(exe string, uninstall bool) (installResult, error) {
 	return installGeminiExtension(exe, uninstall)
 }
 
-// Qwen has no hook system at all — the only SessionStart in its bundle is an
-// unrelated counter — so deja removes the entry older versions wrote and
-// leaves MCP and QWEN.md as the whole integration.
+// Qwen took two wrong readings to get right. Its `timeout` is MILLISECONDS,
+// like Gemini's — the 10 deja used to write killed the hook ten milliseconds
+// in, which is indistinguishable from a harness that has no hooks. And while
+// SessionStart does fire, only UserPromptSubmit consumes additionalContext
+// (appendUserPromptExpansionAdditionalContext), and Qwen checks that the
+// hookEventName in the reply matches the event — so the SessionStart-shaped
+// output of `hook-context` was dropped without a word.
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
-	return installSettingsHook(
+	return installSettingsHookCmd(
 		filepath.Join(sources.QwenConfigDir(), "settings.json"),
-		"SessionStart", "startup|resume", 10, exe, true)
+		"UserPromptSubmit", "", 60000, exe+" hook-prompt", uninstall)
 }
 
 // installSettingsHook merges one hook entry into a settings.json that the
 // host also uses for everything else, leaving the rest of the file alone.
 func installSettingsHook(path, event, matcher string, timeout int, exe string, uninstall bool) (installResult, error) {
+	return installSettingsHookCmd(path, event, matcher, timeout, exe+" hook-context", uninstall)
+}
+
+func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string, uninstall bool) (installResult, error) {
 	old, _ := os.ReadFile(path)
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -245,7 +253,6 @@ func installSettingsHook(path, event, matcher string, timeout int, exe string, u
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, err
 	}
-	cmd := exe + " hook-context"
 	hooks, _ := root["hooks"].(map[string]any)
 	if hooks == nil {
 		hooks = map[string]any{}
