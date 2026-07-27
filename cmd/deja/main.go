@@ -124,12 +124,12 @@ var commands = map[string]command{
 	// likely someone searching for the word than someone asking to launch
 	// an editor, and launching one from a search is not a mistake worth
 	// making. See cmdAider/cmdGoose.
-	"aider":           cmdAider,
-	"goose":           cmdGoose,
-	"hook-goose":      cmdGooseHook,
-	"search":          cmdSearch,
-	"blame":           runBlame,
-	"last":            cmdLast,
+	"aider":      cmdAider,
+	"goose":      cmdGoose,
+	"hook-goose": cmdGooseHook,
+	"search":     cmdSearch,
+	"blame":      runBlame,
+	"last":       cmdLast,
 }
 
 func run(args []string) error {
