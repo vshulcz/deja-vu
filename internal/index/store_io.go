@@ -614,9 +614,13 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 			f.Close()
 			return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 		}
-		if size > math.MaxUint32 {
+		// MaxUint32 alone is not a bound: a bucket claiming four gigabytes for
+		// one token is an out-of-memory kill rather than a corrupt-index
+		// error, and the caller can recover from the latter. Postings live in
+		// this same file, so the file's own size is the real ceiling.
+		if size > math.MaxUint32 || size > fileSize {
 			f.Close()
-			return nil, nil, fmt.Errorf("%w: posting block length %d", errCorruptIndex, size)
+			return nil, nil, fmt.Errorf("%w: posting block of %d bytes in a %d byte bucket", errCorruptIndex, size, fileSize)
 		}
 		dirLen += uint64(uvarintLen(ln)) + ln + uint64(uvarintLen(size))
 		entries = append(entries, bucketEntry{tok: string(tb), n: uint32(size)})
