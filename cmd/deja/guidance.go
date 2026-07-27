@@ -112,7 +112,23 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		next = []byte(updateGuidanceBlock(string(old), uninstall))
 	}
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	if err != nil {
+		return installResult{}, err
+	}
+	// grok is three CLIs sharing one directory: the one that still reads
+	// GROK.md is not the one being maintained, and grok-dev reads AGENTS.md
+	// instead. Writing both is the only way to cover a user of either.
+	if harness == "grok" {
+		alt := filepath.Join(sources.GrokHome(), "AGENTS.md")
+		oldAlt, rerr := os.ReadFile(alt)
+		if rerr != nil && !os.IsNotExist(rerr) {
+			return installResult{}, rerr
+		}
+		if _, werr := writeIfChanged(alt, oldAlt, []byte(updateGuidanceBlock(string(oldAlt), uninstall))); werr != nil {
+			return installResult{}, werr
+		}
+	}
+	return installResult{Path: path, Action: a}, nil
 }
 
 func updateGuidanceBlock(old string, uninstall bool) string {
