@@ -236,3 +236,16 @@ func TestOpencodePluginRecallsPerPrompt(t *testing.T) {
 		t.Fatalf("recall does not append to the user's own text:\n%s", src)
 	}
 }
+
+// Compaction throws away the working transcript. Claude Code gets it indexed
+// first through PreCompact; opencode fires experimental.session.compacting at
+// the same moment and was going unused.
+func TestOpencodePluginIndexesBeforeCompaction(t *testing.T) {
+	src := opencodePluginJS("/bin/deja")
+	if !strings.Contains(src, "experimental.session.compacting") {
+		t.Fatalf("compaction passes without indexing:\n%s", src)
+	}
+	if !strings.Contains(src, "hook-precompact") {
+		t.Fatalf("compaction hook does not index:\n%s", src)
+	}
+}
