@@ -62,6 +62,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "antigravity-auto")
 			case "cline":
 				targets = append(targets, "cline", "cline-auto")
+			case "goose":
+				targets = append(targets, "goose-auto")
 			default:
 				// grok and the IDE extensions: the MCP server is the deepest
 				// integration those harnesses support.
@@ -279,6 +281,10 @@ func existingTargets() []string {
 		// has been used here. The binary alone would match every machine that
 		// merely has it on PATH.
 		"aider": filepath.Join(homeDir(), ".aider.chat.history.md"),
+		// The session store, not the config directory: deja creates the
+		// latter itself, which would make every machine look like a Goose
+		// machine after one install.
+		"goose": sources.GooseRoot(),
 	}
 	var out []string
 	for name, p := range checks {
@@ -350,6 +356,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installOpencodeAuto(exe, uninstall)
 	case "aider":
 		return installAider(exe, uninstall)
+	case "goose":
+		return installGoose(exe, uninstall)
+	case "goose-auto":
+		return installGooseAuto(exe, uninstall)
 	case "statusline":
 		return installStatusline(exe, uninstall)
 	default:

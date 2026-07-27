@@ -121,6 +121,8 @@ var commands = map[string]command{
 	"sync":            runSync,
 	"ctx":             cmdCtx,
 	"aider":           cmdAider,
+	"goose":           cmdGoose,
+	"hook-goose":      cmdGooseHook,
 	"blame":           runBlame,
 	"last":            cmdLast,
 }
