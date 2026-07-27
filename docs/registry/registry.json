@@ -36,11 +36,11 @@
     "fixtures/registry/cline/legacy/tasks/1767225600000/api_conversation_history.json"
    ],
    "parser_source": "internal/sources/cline.go",
-   "last_verified": "2026-07-23",
+   "last_verified": "2026-07-27",
    "display_name": "Cline",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": true,
     "handoff": "paste",
     "prereq": ""
