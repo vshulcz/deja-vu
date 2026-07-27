@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -469,9 +470,60 @@ func doctorJSONWired(key string) func(string) bool {
 			return strings.Contains(string(b), `"deja"`)
 		}
 		m, _ := root[key].(map[string]any)
-		_, ok := m["deja"]
-		return ok
+		if _, ok := m["deja"]; ok {
+			return true
+		}
+		// Someone who wired the server by hand may have called it anything —
+		// "deja-vu" is the obvious other choice. What identifies it is the
+		// command it runs, not the key it was filed under, and telling a
+		// working setup it is not wired sends the debugging the wrong way.
+		for _, v := range m {
+			if mcpEntryRunsDeja(v) {
+				return true
+			}
+		}
+		return false
 	}
+}
+
+// mcpEntryRunsDeja reports whether an MCP server entry launches deja, in any
+// of the shapes clients accept: a bare command, a command plus args, or a
+// nested transport object.
+func mcpEntryRunsDeja(v any) bool {
+	m, _ := v.(map[string]any)
+	if m == nil {
+		return false
+	}
+	if t, ok := m["transport"].(map[string]any); ok {
+		if mcpEntryRunsDeja(t) {
+			return true
+		}
+	}
+	cmd, _ := m["command"].(string)
+	if commandIsDeja(cmd) {
+		return true
+	}
+	// Windows and npx-style wiring puts the binary in args instead.
+	args, _ := m["args"].([]any)
+	for _, a := range args {
+		if s, ok := a.(string); ok && commandIsDeja(s) {
+			return true
+		}
+	}
+	return false
+}
+
+func commandIsDeja(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return false
+	}
+	// A windows path read on a unix build and vice versa: filepath.Base only
+	// knows the separator it was compiled for, and these configs travel.
+	cmd = strings.ReplaceAll(cmd, `\`, "/")
+	base := strings.ToLower(path.Base(cmd))
+	base = strings.TrimSuffix(base, ".exe")
+	return base == "deja"
 }
 
 func doctorTOMLWired(path string) bool {
@@ -479,7 +531,22 @@ func doctorTOMLWired(path string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(b), "[mcp_servers.deja]")
+	if strings.Contains(string(b), "[mcp_servers.deja]") {
+		return true
+	}
+	// Same reasoning as the JSON probe: a hand-wired server under another
+	// name still runs deja. The TOML here is small and flat enough that
+	// finding a command line naming the binary is enough.
+	for _, line := range strings.Split(string(b), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(key) != "command" {
+			continue
+		}
+		if commandIsDeja(strings.Trim(strings.TrimSpace(value), `"`)) {
+			return true
+		}
+	}
+	return false
 }
 
 func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
