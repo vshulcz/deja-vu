@@ -176,6 +176,16 @@ export const DejaRecall = async ({ $, client }) => {
         // memory is optional: never break the session over it
       }
     },
+    // Compaction is about to throw away the working transcript. Claude Code
+    // gets the same treatment through PreCompact: index what exists now, so
+    // the session survives in memory even after the window is collapsed.
+    "experimental.session.compacting": async () => {
+      try {
+        await $%s%q hook-precompact%s.quiet()
+      } catch {
+        // memory is optional: never break a compaction over it
+      }
+    },
     // Per-prompt recall, the same relevance pass Claude Code gets on
     // UserPromptSubmit: the session digest is ranked by the project, this is
     // ranked by what the user just asked. Silent when nothing matches.
@@ -201,7 +211,7 @@ export const DejaRecall = async ({ $, client }) => {
     },
   }
 }
-`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", "", exe, "`")
+`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`")
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is
