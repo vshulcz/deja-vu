@@ -52,6 +52,12 @@ signs:
     args: ["sign-blob", "--yes", "--output-signature", "${signature}", "--output-certificate", "${certificate}", "${artifact}"]
     artifacts: checksum
 
+# The nightly publishes a rolling `nightly` tag. Left visible, it becomes the
+# most recent tag and every version template downstream fails on it.
+git:
+  ignore_tags:
+    - nightly
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
