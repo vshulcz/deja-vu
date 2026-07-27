@@ -105,7 +105,9 @@ func TestDoctorStoreStates(t *testing.T) {
 	}
 
 	file := filepath.Join(tmp, "session.jsonl")
-	if err := os.WriteFile(file, []byte("fixture"), 0o600); err != nil {
+	// The file has to look like a transcript: a store whose newest file holds
+	// no conversation at all is an unused session, not a parse failure.
+	if err := os.WriteFile(file, []byte(`{"type":"user","message":{"role":"user","content":"hi"}}`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {

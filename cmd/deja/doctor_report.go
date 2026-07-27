@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -205,6 +207,13 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	_ = f.Close()
 	sessions, _ := check.parse(newest)
 	store.State = "ok"
+	// A session someone opened and closed without typing parses to nothing,
+	// correctly. Calling that a parse failure sends people looking for a bug
+	// in deja when the file simply holds no conversation — so only a file
+	// with something to parse counts.
+	if len(sessions) == 0 && !fileHasConversation(newest) {
+		return store, mod
+	}
 	if len(sessions) == 0 {
 		store.State = "parsed-zero"
 	}
@@ -300,4 +309,32 @@ func doctorParsedZeroWarning() string {
 		return ""
 	}
 	return "warning: " + strings.Join(names, ", ") + " files found but newest parsed to zero"
+}
+
+// fileHasConversation reports whether a store file holds anything that should
+// have produced a message. Harness files begin with setup records — protocol
+// metadata, model config, tool lists — and a session that was opened and never
+// used contains only those.
+func fileHasConversation(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return true // unreadable is a real problem; let the caller flag it
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(io.LimitReader(f, 1<<20))
+	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	for sc.Scan() {
+		line := sc.Bytes()
+		for _, marker := range [][]byte{
+			[]byte(`"role":"user"`), []byte(`"role": "user"`),
+			[]byte(`"role":"assistant"`), []byte(`"role": "assistant"`),
+			[]byte(`"type":"user"`), []byte(`"type":"assistant"`),
+			[]byte("#### "),
+		} {
+			if bytes.Contains(line, marker) {
+				return true
+			}
+		}
+	}
+	return false
 }

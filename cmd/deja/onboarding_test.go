@@ -150,8 +150,11 @@ func TestHookContextMissingManifestStaysSilent(t *testing.T) {
 
 func TestFirstIndexGreetingIncludesParsedZeroWarning(t *testing.T) {
 	hermeticEnv(t)
+	// A transcript with a turn in it that the parser cannot read — which is
+	// the case worth warning about. A file holding only setup records is an
+	// unused session and stays quiet.
 	bad := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "project", "bad.jsonl")
-	writeFileMkdir(t, bad, "not json\n")
+	writeFileMkdir(t, bad, `{"type":"user","message":{"role":"user","content":"hi"` + "\n")
 	oldLogoWanted := logoWanted
 	logoWanted = func(*os.File) bool { return true }
 	defer func() { logoWanted = oldLogoWanted }()
