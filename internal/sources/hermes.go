@@ -13,13 +13,21 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// HermesHome is the Hermes root: profiles, plugins and config.yaml live here.
+func HermesHome() string {
+	if p := os.Getenv("DEJA_HERMES_HOME"); p != "" {
+		return p
+	}
+	return filepath.Join(Home(), ".hermes")
+}
+
 // Hermes keeps one SQLite store per profile under ~/.hermes/profiles/<name>,
 // so a user running several profiles has several stores and all of them count.
 func HermesProfilesRoot() string {
 	if p := os.Getenv("DEJA_HERMES_PROFILES_ROOT"); p != "" {
 		return p
 	}
-	return filepath.Join(Home(), ".hermes", "profiles")
+	return filepath.Join(HermesHome(), "profiles")
 }
 
 // HermesDBs lists every profile store that exists and has content. A single
@@ -31,17 +39,22 @@ func HermesDBs() []string {
 		}
 		return nil
 	}
+	var out []string
+	// 0.17 keeps one store at the root; older builds shard it per profile.
+	// Both shapes exist in the wild, so both are looked for.
+	if db := filepath.Join(HermesHome(), "state.db"); nonEmptyFile(db) {
+		out = append(out, db)
+	}
 	entries, err := os.ReadDir(HermesProfilesRoot())
 	if err != nil {
-		return nil
+		return out
 	}
-	var out []string
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		db := filepath.Join(HermesProfilesRoot(), e.Name(), "state.db")
-		if fi, err := os.Stat(db); err == nil && fi.Size() > 0 {
+		if nonEmptyFile(db) {
 			out = append(out, db)
 		}
 	}
@@ -180,10 +193,19 @@ func hermesTime(v any) time.Time {
 	return time.Unix(sec, int64((secs-float64(sec))*1e9)).UTC()
 }
 
+func nonEmptyFile(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.Size() > 0
+}
+
 // hermesProfile names the session's project after the profile directory, the
 // only grouping Hermes stores — there is no working directory in the schema.
 func hermesProfile(db string) string {
 	name := filepath.Base(filepath.Dir(db))
+	// The root store has no profile directory to be named after.
+	if name == filepath.Base(HermesHome()) {
+		return "hermes"
+	}
 	if name == "" || name == "." || name == string(filepath.Separator) {
 		return "hermes"
 	}

@@ -93,6 +93,10 @@ func TestHermesDBsFindsEveryProfile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "empty", "state.db"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Without a fake home this reaches the developer's own ~/.hermes.
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	t.Setenv("DEJA_HERMES_HOME", filepath.Join(root, "empty-home"))
 	t.Setenv("DEJA_HERMES_PROFILES_ROOT", root)
 	t.Setenv("DEJA_HERMES_DB", "")
 	if got := HermesDBs(); len(got) != 2 {
@@ -129,4 +133,46 @@ func TestParseHermesDBHandlesMissingAndEmpty(t *testing.T) {
 	if ss, err := ParseHermesDB(empty); err != nil || ss != nil {
 		t.Fatalf("empty store = %v, %v", ss, err)
 	}
+}
+
+// Hermes 0.17 keeps one store at ~/.hermes/state.db; older builds shard it per
+// profile. Reading only the profile layout meant a current install indexed
+// nothing at all, silently.
+func TestHermesFindsTheRootStore(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_HERMES_HOME", "")
+	t.Setenv("DEJA_HERMES_DB", "")
+	t.Setenv("DEJA_HERMES_PROFILES_ROOT", "")
+	root := filepath.Join(home, ".hermes")
+	writeHermesDB(t, root, `
+		INSERT INTO messages (session_id,role,content,timestamp) VALUES ('flat','user','root store',1785000000);`)
+	writeHermesDB(t, filepath.Join(root, "profiles", "architect"), `
+		INSERT INTO messages (session_id,role,content,timestamp) VALUES ('per-profile','user','profile store',1785000000);`)
+	got := HermesDBs()
+	if len(got) != 2 {
+		t.Fatalf("stores = %v, want both layouts", got)
+	}
+	ss := LoadHermes()
+	if len(ss) != 2 {
+		t.Fatalf("sessions = %d, want one from each store", len(ss))
+	}
+	// The root store has no profile directory to be named after.
+	var names []string
+	for _, s := range ss {
+		names = append(names, s.Project)
+	}
+	if !contains(names, "hermes") || !contains(names, "architect") {
+		t.Fatalf("projects = %v", names)
+	}
+}
+
+func contains(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }

@@ -54,6 +54,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "cursor-auto")
 			case "pi":
 				targets = append(targets, "pi-auto")
+			case "hermes":
+				targets = append(targets, "hermes-auto")
 			case "openclaw":
 				targets = append(targets, "openclaw-auto")
 			case "antigravity":
@@ -268,6 +270,7 @@ func existingTargets() []string {
 		"qwen":        sources.QwenConfigDir(),
 		"kimi":        sources.KimiConfigDir(),
 		"cline":       sources.ClineConfigDir(),
+		"hermes":      sources.HermesHome(),
 		"pi":          sources.PiConfigDir(),
 		"openclaw":    sources.OpenClawStateDir(),
 	}
@@ -321,6 +324,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
+	case "hermes":
+		return installHermesMCP(exe, uninstall)
+	case "hermes-auto":
+		return installHermesAuto(exe, uninstall)
 	case "pi":
 		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
 	case "pi-auto":
@@ -362,6 +369,13 @@ func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installOpenClawHooks(exe, uninstall)
+}
+
+func installHermesAuto(exe string, uninstall bool) (installResult, error) {
+	if _, err := installHermesMCP(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	return installHermesPlugin(exe, uninstall)
 }
 
 func installPiAuto(exe string, uninstall bool) (installResult, error) {

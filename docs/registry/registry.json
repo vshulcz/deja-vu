@@ -215,8 +215,8 @@
    "last_verified": "2026-07-27",
    "display_name": "Hermes",
    "capabilities": {
-    "mcp": false,
-    "auto": false,
+    "mcp": true,
+    "auto": true,
     "resume": false,
     "handoff": "paste",
     "prereq": "sqlite3"
