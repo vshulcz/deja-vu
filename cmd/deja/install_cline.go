@@ -78,7 +78,7 @@ export default {
         if (!query) return "Usage: /deja <what you are looking for>";
         // A command the user just typed can wait: the first search may have
         // to build the index, which a hook never gets to do.
-        const found = run([query], "", 120000);
+        const found = run(["search", query], "", 120000);
         return found || `+"`No past session matches ${query}.`"+`;
       },
     });

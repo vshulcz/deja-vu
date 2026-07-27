@@ -135,6 +135,12 @@ const aiderLead = "The sessions below are from this project's recent history. " 
 // cmdAider refreshes the context file and then becomes aider. Everything after
 // the subcommand belongs to aider, including flags deja also has.
 func cmdAider(dir string, rest []string) error {
+	// `deja aider` with nothing after it is ambiguous, and the harmless
+	// reading is the right default: search for the word rather than start
+	// an editor the user did not ask for.
+	if len(rest) == 0 {
+		return cmdSearch(dir, []string{"aider"})
+	}
 	if err := refreshAiderContext(dir); err != nil {
 		// A failed recall is not a reason to keep the user out of their editor.
 		fmt.Fprintf(os.Stderr, "deja: could not refresh recall: %v\n", err)

@@ -120,11 +120,16 @@ var commands = map[string]command{
 	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,
-	"aider":           cmdAider,
-	"goose":           cmdGoose,
-	"hook-goose":      cmdGooseHook,
-	"blame":           runBlame,
-	"last":            cmdLast,
+	// Wrappers, but only with arguments: bare `deja aider` is far more
+	// likely someone searching for the word than someone asking to launch
+	// an editor, and launching one from a search is not a mistake worth
+	// making. See cmdAider/cmdGoose.
+	"aider":      cmdAider,
+	"goose":      cmdGoose,
+	"hook-goose": cmdGooseHook,
+	"search":     cmdSearch,
+	"blame":      runBlame,
+	"last":       cmdLast,
 }
 
 func run(args []string) error {
@@ -253,6 +258,17 @@ func cmdLast(dir string, rest []string) error {
 		fmt.Println()
 	}
 	return nil
+}
+
+// cmdSearch is the explicit form. Bare `deja <words>` also searches, but a
+// single word that happens to name a subcommand runs that instead, which is
+// how `/deja uninstall` inside a plugin came back with "nothing matches".
+// Anything shelling out to deja with user text should use this.
+func cmdSearch(dir string, rest []string) error {
+	if len(rest) == 0 {
+		return fmt.Errorf("search needs a query")
+	}
+	return runSearch(dir, rest)
 }
 
 func runSearch(dir string, args []string) error {
