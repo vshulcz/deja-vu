@@ -183,10 +183,19 @@ func doctorCodexHook(w io.Writer) {
 			off, on := strings.Index(rest, "enabled = false"), strings.Index(rest, "enabled = true")
 			if off >= 0 && (on == -1 || on > off) {
 				status = "disabled"
+			} else if !codexHookTrusted(hooksPath, rest) {
+				// Codex pins the hook file's hash when the user trusts it.
+				// Any reinstall that rewrites hooks.json invalidates that,
+				// and the hook stops running while enabled stays true — so
+				// this is the state that looks healthiest and works least.
+				status = "untrusted"
 			}
 		}
 	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
+	if status == "untrusted" {
+		line += "  (codex will not run it until you review it — press t in codex, or run /hooks)"
+	}
 	if status == "disabled" {
 		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"
 	}

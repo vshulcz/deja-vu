@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,5 +99,31 @@ func TestCompletionListsEveryInstallTarget(t *testing.T) {
 				t.Fatalf("%s completion never offers %q", shell, target)
 			}
 		}
+	}
+}
+
+// Codex pins the hook file's hash when the user trusts it, and any reinstall
+// that rewrites hooks.json invalidates the pin. The hook then stops running
+// while `enabled = true` stays in the config — the state that looks healthiest
+// and works least, and the one doctor used to call "wired".
+func TestCodexHookTrustDetectsARewrittenFile(t *testing.T) {
+	dir := t.TempDir()
+	hooks := filepath.Join(dir, "hooks.json")
+	if err := os.WriteFile(hooks, []byte(`{"hooks":{"session_start":[]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte(`{"hooks":{"session_start":[]}}`))
+	matching := "\ntrusted_hash = \"sha256:" + hex.EncodeToString(sum[:]) + "\"\nenabled = true\n"
+	if !codexHookTrusted(hooks, matching) {
+		t.Fatal("an untouched hook file is reported untrusted")
+	}
+	stale := "\ntrusted_hash = \"sha256:0000000000000000000000000000000000000000000000000000000000000000\"\nenabled = true\n"
+	if codexHookTrusted(hooks, stale) {
+		t.Fatal("a rewritten hook file is reported trusted")
+	}
+	// A config with no pin at all is a codex that never asked; saying
+	// "untrusted" there would be a false alarm on every fresh install.
+	if !codexHookTrusted(hooks, "\nenabled = true\n") {
+		t.Fatal("absence of a pin reported as untrusted")
 	}
 }
