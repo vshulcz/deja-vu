@@ -263,7 +263,7 @@
    "display_name": "Qwen Code",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": false,
     "handoff": "exec",
     "prereq": ""

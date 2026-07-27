@@ -217,7 +217,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension — Grok Build, Qwen Code, Kimi Code, Cline, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
+`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension, a Qwen Code prompt hook — Grok Build, Kimi Code, Cline, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
@@ -263,7 +263,7 @@ limits, trust assumptions, and release verification.
 | Grok Build | `${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl`<br>`${DEJA_GROK_ROOT}/sessions/**/updates.jsonl` | ✅ | — | — | ✅ | — |
 | Hermes | `~/.hermes/profiles/*/state.db`<br>`${DEJA_HERMES_PROFILES_ROOT}/*/state.db`<br>`${DEJA_HERMES_DB}` | — | — | — | paste | sqlite3 |
 | Goose | `~/.local/share/goose/sessions/*.jsonl`<br>`~/.local/share/goose/sessions/sessions.db`<br>`${XDG_DATA_HOME}/goose/sessions/*.jsonl`<br>`${XDG_DATA_HOME}/goose/sessions/sessions.db`<br>`${DEJA_GOOSE_ROOT}/sessions/*.jsonl`<br>`${DEJA_GOOSE_ROOT}/sessions/sessions.db`<br>`${DEJA_GOOSE_DB}` | — | — | ✅ | paste | sqlite3 |
-| Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | — | — | ✅ | — |
+| Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | ✅ | — | ✅ | — |
 | Kimi Code | `${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl`<br>`${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl` | ✅ | — | ✅ | paste | — |
 | pi | `${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl`<br>`${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl` | ✅ | ✅ | — | paste | — |
