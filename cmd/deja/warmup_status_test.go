@@ -193,3 +193,25 @@ func TestWarmupProgressFragment(t *testing.T) {
 		t.Errorf("progress with unknown total = %q", got)
 	}
 }
+
+// opencode has no place to put a receipt in the prompt, so the toast is the
+// only sign the user gets that memory arrived. It fires once per session and
+// only when there is something to announce.
+func TestOpencodePluginToastsTheRecallReceipt(t *testing.T) {
+	src := opencodePluginJS("/bin/deja")
+	for _, want := range []string{
+		`hook-context`,         // JSON form: the receipt rides with the context
+		"hookSpecificOutput",   // context is read from the envelope
+		"systemMessage",        // receipt is read from the envelope
+		"told.add(key)",        // once per session
+		"client.tui.showToast", // opencode's own channel to the user
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("generated plugin missing %q:\n%s", want, src)
+		}
+	}
+	// --plain would drop the receipt on the floor.
+	if strings.Contains(src, "hook-context --plain") {
+		t.Fatal("plugin still asks for the plain digest, which carries no receipt")
+	}
+}

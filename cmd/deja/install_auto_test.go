@@ -100,7 +100,7 @@ func TestInstallOpencodePlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(b)
-	for _, want := range []string{"experimental.chat.system.transform", "/opt/deja", "hook-context --plain", "cache"} {
+	for _, want := range []string{"experimental.chat.system.transform", "/opt/deja", "hook-context", "cache"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("plugin missing %q:\n%s", want, s)
 		}
