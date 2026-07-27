@@ -6,3 +6,17 @@ fixtures/synthetic/opencode.db
 .deja-bench/
 /longmemeval
 /locomo
+
+# Harness artefacts: running an agent inside this checkout to test an
+# integration leaves its own history and config here. None of it belongs in
+# the repository — three of these were committed by a careless `git add -A`.
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v*/
+.grok/
+.roo/
+.cline/
+.goose/
+.opencode/
+.qwen/
+.kimi-code/
