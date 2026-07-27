@@ -86,7 +86,7 @@ claude plugin marketplace add vshulcz/deja-vu
 claude plugin install deja-vu@deja-vu
 ```
 
-The plugin wires the same three hooks and the `/deja` command. It stands down on its own if `deja install` already wired them, so having both does not recall twice.
+The plugin wires the same three hooks, the `/deja` command and the MCP server. It stands down on its own if `deja install` already wired them, so having both does not recall twice.
 
 Codex, Cursor and Qwen read the same bundle from their own registries:
 
@@ -96,13 +96,14 @@ cursor-agent plugin marketplace add https://github.com/vshulcz/deja-vu
 qwen extensions install https://github.com/vshulcz/deja-vu
 ```
 
-OpenClaw takes it too:
+Copilot CLI takes it too, and OpenClaw installs plugins from a path rather than a URL:
 
 ```sh
-openclaw plugins install https://github.com/vshulcz/deja-vu
+copilot plugin marketplace add vshulcz/deja-vu && copilot plugin install deja-vu@deja-vu
+openclaw plugins install ./deja-vu/claude-plugin
 ```
 
-Cursor, Qwen and OpenClaw all read the Claude plugin format, so **one bundle installs into five harnesses**. Their hook support differs — OpenClaw runs its own hook packs, which `deja install openclaw-auto` writes — but the MCP server, skill and `/deja` command come from the same directory in this repository.
+Cursor, Qwen, OpenClaw and Copilot all read the Claude plugin format, so **one bundle installs into six harnesses**. Their hook support differs — OpenClaw runs its own hook packs, which `deja install openclaw-auto` writes, and Copilot runs the hooks but drops their context, so recall there is MCP plus the skill — while the MCP server, skill and `/deja` command come from the same directory in this repository.
 
 On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
 
