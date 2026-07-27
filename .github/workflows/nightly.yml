@@ -59,7 +59,9 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot --clean
+          # Signing and attestation belong to tagged releases: keyless cosign
+          # needs an OIDC identity this job deliberately does not carry.
+          args: release --snapshot --clean --skip=sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
