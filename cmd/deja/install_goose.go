@@ -211,7 +211,10 @@ const gooseLead = "The sessions below are from this project's recent history. " 
 // cmdGoose turns MOIM on for the session it starts: recall is then re-read
 // every turn rather than pinned to whatever the session began with, and it
 // survives compaction.
-func cmdGoose(_ string, rest []string) error {
+func cmdGoose(dir string, rest []string) error {
+	if len(rest) == 0 {
+		return cmdSearch(dir, []string{"goose"})
+	}
 	moim := filepath.Join(gooseConfigDir(), "deja-recall.md")
 	if os.Getenv("GOOSE_MOIM_MESSAGE_FILE") == "" {
 		if err := os.Setenv("GOOSE_MOIM_MESSAGE_FILE", moim); err != nil {

@@ -106,7 +106,7 @@ def search(raw_args):
         return "Usage: /deja <what you are looking for>"
     # A hook must not stall a turn, but a command the user just typed can
     # wait: a first search may rebuild the index, which took 18s here.
-    found = _deja([query], timeout=120)
+    found = _deja(["search", query], timeout=120)
     return found or f"Nothing in your history matches {query!r}."
 
 

@@ -105,7 +105,7 @@ openclaw plugins install ./deja-vu/claude-plugin
 
 Cursor, Qwen, OpenClaw and Copilot all read the Claude plugin format, so **one bundle installs into six harnesses**. Their hook support differs — OpenClaw runs its own hook packs, which `deja install openclaw-auto` writes, and Copilot runs the hooks but drops their context, so recall there is MCP plus the skill — while the MCP server, skill and `/deja` command come from the same directory in this repository.
 
-aider has no MCP client and no hooks, but read-only files are re-read from disk on every message. `deja install aider` adds a context file to `read:` in `~/.aider.conf.yml`, and `deja aider [args…]` refreshes it and starts aider — the digest is in context from the first message, and one line says how many sessions it recalled. Everything after `deja aider` goes to aider unchanged.
+aider has no MCP client and no hooks, but read-only files are re-read from disk on every message. `deja install aider` adds a context file to `read:` in `~/.aider.conf.yml`, and `deja aider <args…>` refreshes it and starts aider (bare `deja aider` searches for the word instead of launching anything) — the digest is in context from the first message, and one line says how many sessions it recalled. Everything after `deja aider` goes to aider unchanged.
 
 On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
 

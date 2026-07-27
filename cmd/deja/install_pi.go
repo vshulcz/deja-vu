@@ -94,7 +94,7 @@ export default function (pi: any) {
       }
       // The user is waiting on this one, so it may outlive the hook budget:
       // a first search can rebuild the index.
-      const found = run([query], "", 120000);
+      const found = run(["search", query], "", 120000);
       ctx.ui.notify(found || "Nothing in your history matches " + query, "info");
     },
   });
