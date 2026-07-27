@@ -106,8 +106,8 @@ func TestStatuslineReportsColdBuild(t *testing.T) {
 	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
-	if got := out.String(); !strings.Contains(got, "building memory") || !strings.Contains(got, "75%") {
-		t.Fatalf("statusline = %q, want the build and its progress", got)
+	if got := out.String(); !strings.Contains(got, "███") || !strings.Contains(got, "75%") {
+		t.Fatalf("statusline = %q, want a filled bar and the percentage", got)
 	}
 	// Once the build is done the line goes back to reporting recalls.
 	_ = os.Remove(warmupStatusPath(dir))
@@ -115,7 +115,7 @@ func TestStatuslineReportsColdBuild(t *testing.T) {
 	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "building memory") {
+	if strings.Contains(out.String(), "███") {
 		t.Fatalf("statusline still claims a build: %q", out.String())
 	}
 }
