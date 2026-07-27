@@ -60,6 +60,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "openclaw-auto")
 			case "antigravity":
 				targets = append(targets, "antigravity-auto")
+			case "cline":
+				targets = append(targets, "cline", "cline-auto")
 			default:
 				// grok and the IDE extensions: the MCP server is the deepest
 				// integration those harnesses support.
@@ -326,6 +328,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installKimiAuto(exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
+	case "cline-auto":
+		return installClineAuto(exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
 	case "hermes":

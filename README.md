@@ -229,7 +229,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Hermes, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client — `deja install aider` wires it through its read-only files instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension, a Qwen Code prompt hook, a Kimi Code prompt hook, a Hermes plugin — Grok Build, Cline, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
+`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Hermes, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client — `deja install aider` wires it through its read-only files instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension, a Qwen Code prompt hook, a Kimi Code prompt hook, a Hermes plugin, a Cline plugin — Grok Build, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
@@ -265,7 +265,7 @@ limits, trust assumptions, and release verification.
 | Harness | Store | MCP recall | Auto-recall | Resume | Handoff | Needs |
 | --- | --- | :-: | :-: | :-: | :-: | --- |
 | Claude Code | `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl`<br>`${DEJA_CLAUDE_ROOT}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
-| Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | — | ✅ | paste | — |
+| Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | ✅ | ✅ | paste | — |
 | Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
 | opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | — | ✅ | — | ✅ | deja aider |

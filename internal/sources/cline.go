@@ -366,3 +366,12 @@ func firstLineTrim(s string) string {
 	}
 	return s
 }
+
+// ClinePluginsDir is where the CLI looks for plugins. Note it is not under
+// the data directory: plugins sit next to it, and CLINE_DIR moves both.
+func ClinePluginsDir() string {
+	if p := os.Getenv("CLINE_DIR"); p != "" {
+		return filepath.Join(p, "plugins")
+	}
+	return filepath.Join(Home(), ".cline", "plugins")
+}
