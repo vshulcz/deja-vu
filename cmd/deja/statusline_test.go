@@ -106,8 +106,8 @@ func TestStatuslineReportsColdBuild(t *testing.T) {
 	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
-	if got := out.String(); !strings.Contains(got, "building memory") || !strings.Contains(got, "75%") {
-		t.Fatalf("statusline = %q, want the build and its progress", got)
+	if got := out.String(); !strings.Contains(got, "███") || !strings.Contains(got, "75%") {
+		t.Fatalf("statusline = %q, want a filled bar and the percentage", got)
 	}
 	// Once the build is done the line goes back to reporting recalls.
 	_ = os.Remove(warmupStatusPath(dir))
@@ -115,7 +115,37 @@ func TestStatuslineReportsColdBuild(t *testing.T) {
 	if err := runStatusline(dir, strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "building memory") {
+	if strings.Contains(out.String(), "███") {
 		t.Fatalf("statusline still claims a build: %q", out.String())
+	}
+}
+
+// Most people already run something in the status bar, so the conflict path is
+// the common one. It has to hand over a line that works, not advice.
+func TestStatuslineConflictOffersAWorkingCommand(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	dir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	seed := `{"statusLine":{"type":"command","command":"bash /opt/theirs.sh"}}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(seed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := installStatusline("/bin/deja", false)
+	if err == nil {
+		t.Fatal("replaced someone else's statusline")
+	}
+	msg := err.Error()
+	for _, want := range []string{
+		"bash /opt/theirs.sh", // theirs still runs
+		"/bin/deja statusline",
+		"json=$(cat)", // Claude pipes session JSON: capture once, feed both
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("conflict message is not a usable command, missing %q:\n%s", want, msg)
+		}
 	}
 }

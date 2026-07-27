@@ -612,6 +612,12 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 	return root
 }
 
+// combinedStatusline builds a command that runs the existing statusline and
+// deja's, separated by a middle dot.
+func combinedStatusline(existing, exe string) string {
+	return fmt.Sprintf(`sh -c 'json=$(cat); printf "%%s" "$json" | %s; printf " · "; printf "%%s" "$json" | %s statusline'`, existing, exe)
+}
+
 // installStatusline wires `deja statusline` as the Claude Code status bar.
 // It refuses to replace a statusline the user already configured (many run
 // ccstatusline or their own script) — printing how to combine instead.
@@ -633,9 +639,18 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 		delete(root, "statusLine")
 	} else {
 		if existing != nil && existing["command"] != cmd {
-			return installResult{}, fmt.Errorf("a statusline is already configured (%v) — append `deja statusline` output to it instead of replacing it", existing["command"])
+			// Most people already run something here. Replacing it silently
+			// would be rude, and "append our output" is not actionable — so
+			// hand over the line that runs both. Claude pipes session JSON to
+			// the command, so it is captured once and fed to each in turn.
+			prev, _ := existing["command"].(string)
+			return installResult{}, fmt.Errorf("a statusline is already configured — to keep both, set statusLine.command to:\n\n  %s", combinedStatusline(prev, exe))
 		}
-		root["statusLine"] = map[string]any{"type": "command", "command": cmd}
+		// refreshInterval makes Claude Code re-run the command on a timer
+		// instead of only after a turn, so the first index build shows a
+		// moving bar rather than a number frozen at whatever it was when the
+		// user last typed.
+		root["statusLine"] = map[string]any{"type": "command", "command": cmd, "refreshInterval": 1000}
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {

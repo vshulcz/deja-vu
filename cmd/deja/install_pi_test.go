@@ -26,6 +26,8 @@ func TestInstallPiExtensionWritesDiscoverableFile(t *testing.T) {
 		"hook-context",
 		"hook-prompt",
 		"ctx.ui.notify",
+		"ctx.ui.setStatus", // pi keeps a footer line; the build belongs there
+		"session_start",    // status has to appear before the first prompt
 		`"/bin/deja"`,
 	} {
 		if !strings.Contains(src, want) {

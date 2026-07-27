@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -17,7 +18,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	// one surface the user is already looking at, so the build reports there
 	// instead of leaving them to wonder why recall is quiet.
 	if st := readWarmupStatus(dir); st != nil {
-		fmt.Fprintf(stdout, "deja · building memory · %s", st.progress())
+		fmt.Fprintf(stdout, "deja %s %s", warmupBar(st), st.progress())
 		return nil
 	}
 	recalls, bytes, injected := usage.TodayWithInjections(dir)
@@ -39,6 +40,21 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	fmt.Fprint(stdout, line)
 	return nil
+}
+
+// warmupBar draws the build as a bar rather than a bare percentage: a status
+// line is read at a glance, and a moving bar reads as progress where a number
+// reads as noise. Width is fixed so the line does not jitter between frames.
+func warmupBar(st *warmupStatus) string {
+	const width = 10
+	filled := 0
+	if st.Total > 0 {
+		filled = width * st.Done / st.Total
+		if filled > width {
+			filled = width
+		}
+	}
+	return "▕" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "▏"
 }
 
 // Claude Code pipes session JSON to statusline commands. We don't need it,
