@@ -84,6 +84,10 @@ func removeGooseExtension(s string) string {
 }
 
 func gooseConfigDir() string {
+	// Checked before XDG: Goose gives GOOSE_PATH_ROOT precedence over both.
+	if root := os.Getenv("GOOSE_PATH_ROOT"); root != "" {
+		return filepath.Join(root, "config")
+	}
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return filepath.Join(xdg, "goose")
 	}

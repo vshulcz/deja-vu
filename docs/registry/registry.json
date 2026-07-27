@@ -226,6 +226,7 @@
   {
    "id": "goose",
    "store_paths": [
+    "${GOOSE_PATH_ROOT}/data/sessions/sessions.db",
     "~/.local/share/goose/sessions/*.jsonl",
     "~/.local/share/goose/sessions/sessions.db",
     "${XDG_DATA_HOME}/goose/sessions/*.jsonl",
