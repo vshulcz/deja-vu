@@ -245,9 +245,13 @@ func installGeminiAuto(exe string, uninstall bool) (installResult, error) {
 // hookEventName in the reply matches the event — so the SessionStart-shaped
 // output of `hook-context` was dropped without a word.
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
-	return installSettingsHookCmd(
+	// Older deja wrote SessionStart here, which qwen never consumed. Naming
+	// it as retired means an upgrade removes the dead entry instead of
+	// leaving qwen to run a hook that answers into the void.
+	return installSettingsHookRetiring(
 		filepath.Join(sources.QwenConfigDir(), "settings.json"),
-		"UserPromptSubmit", "", 60000, exe+" hook-prompt", uninstall)
+		"UserPromptSubmit", "", 60000, exe+" hook-prompt", uninstall,
+		map[string]bool{"SessionStart": true})
 }
 
 // installSettingsHook merges one hook entry into a settings.json that the
@@ -257,6 +261,13 @@ func installSettingsHook(path, event, matcher string, timeout int, exe string, u
 }
 
 func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string, uninstall bool) (installResult, error) {
+	return installSettingsHookRetiring(path, event, matcher, timeout, cmd, uninstall, nil)
+}
+
+// installSettingsHookRetiring also drops deja hooks under events this harness
+// no longer uses. Without it a generator fix ships and the old, dead entry
+// keeps firing next to the new one for everyone who installed before.
+func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd string, uninstall bool, retire map[string]bool) (installResult, error) {
 	old, _ := os.ReadFile(path)
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -268,6 +279,25 @@ func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string
 	if hooks == nil {
 		hooks = map[string]any{}
 		root["hooks"] = hooks
+	}
+	for name := range retire {
+		if name == event {
+			continue
+		}
+		old, _ := hooks[name].([]any)
+		var survivors []any
+		for _, entryAny := range old {
+			entry, _ := entryAny.(map[string]any)
+			if entry != nil && dejaHookEntry(entry) {
+				continue
+			}
+			survivors = append(survivors, entryAny)
+		}
+		if len(survivors) == 0 {
+			delete(hooks, name)
+		} else {
+			hooks[name] = survivors
+		}
 	}
 	entries, _ := hooks[event].([]any)
 	var kept []any
@@ -364,4 +394,22 @@ func removeKimiHookBlock(s string) string {
 		i-- // the loop's own i++ steps onto the next table header
 	}
 	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+}
+
+// dejaHookEntry reports whether a settings.json hook entry runs deja. Used to
+// retire wiring written by an older version under an event we abandoned.
+func dejaHookEntry(entry map[string]any) bool {
+	inner, _ := entry["hooks"].([]any)
+	for _, h := range inner {
+		m, _ := h.(map[string]any)
+		cmd, _ := m["command"].(string)
+		// Any deja subcommand counts: the point is to find wiring we wrote,
+		// whatever the old binary called.
+		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity"} {
+			if isDejaHookCommand(cmd, "deja "+sub) {
+				return true
+			}
+		}
+	}
+	return false
 }

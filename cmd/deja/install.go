@@ -93,6 +93,9 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		return err
 	}
 	exe, _ = filepath.Abs(exe)
+	// Remembered so a later upgrade can refresh exactly these and nothing
+	// else: the generators change, the files on disk do not.
+	defer recordWiring(targets, uninstall)
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
 	var done []lineItem

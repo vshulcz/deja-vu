@@ -113,6 +113,8 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 Install reports whether it found local history and builds the first index immediately when history is present.
 
+Install records what it wired. When a later version changes how a hook or plugin is generated, the next session start rewrites those same targets — only the ones deja installed — so a fix reaches people who installed months ago without them re-running anything.
+
 That's it. Next session, ask your agent:
 
 > have we dealt with jwt refresh rotation before? check your memory

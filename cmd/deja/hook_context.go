@@ -74,6 +74,12 @@ func runHookPrecompact(dir string) {
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).
 func runHookContext(dir string, plain bool) error {
+	// A session start is the one moment deja is guaranteed to run on every
+	// harness, which makes it the only reliable place to repair wiring left
+	// behind by an older binary. It costs one small file read when nothing
+	// changed, and it says nothing: the user asked for memory, not for
+	// maintenance notes.
+	refreshWiringAfterUpgrade()
 	// SessionStart fires for startup, resume, clear and compact; the payload
 	// says which. After a compaction the model just lost its working context,
 	// so the lead line changes to say the memory below survived it.
