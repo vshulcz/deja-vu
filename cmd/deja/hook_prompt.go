@@ -285,7 +285,14 @@ func techTerm(f string) bool {
 		}
 		long++
 	}
-	return long >= 7
+	// Seven was a proxy for "looks like an identifier" and the wrong one:
+	// etag, ttl, mutex, gzip, oauth and most of what people actually type is
+	// shorter. Measured on `deja bench prompt`, dropping to four takes real
+	// questions answered from 2/12 to 7/12 with precision unchanged at 1.00
+	// and no false fire on any negative control; three scores higher still
+	// but starts keeping words like "log" and "run", so four is where the
+	// evidence stops being comfortable.
+	return long >= 4
 }
 
 // citationLine pre-writes the narration so the agent copies structure instead

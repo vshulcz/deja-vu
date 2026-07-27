@@ -85,16 +85,23 @@ func TestPromptSearchTerms(t *testing.T) {
 	if !strings.Contains(joined, "connection") || !strings.Contains(joined, "gateway") {
 		t.Fatalf("terms = %v", got)
 	}
-	// Short prose words identify themes, not tasks — they must not survive.
-	if strings.Contains(joined, "pool") {
-		t.Fatalf("short prose term kept: %v", got)
+	// Short words used to be dropped on the theory that they identify themes
+	// rather than tasks. `deja bench prompt` says otherwise: keeping them
+	// takes answered questions from 2/12 to 7/12 with precision unchanged and
+	// no false fire, because "pool" is exactly what names the session someone
+	// is asking about. Noise is held back by the two-term overlap gate, not
+	// by a length floor.
+	if !strings.Contains(joined, "pool") {
+		t.Fatalf("short identifier dropped: %v", got)
 	}
 	if len(promptSearchTerms("a of to")) != 0 {
 		t.Fatal("stop words must not produce terms")
 	}
 	for term, want := range map[string]bool{
 		"auth.go": true, "e404": true, "npm_token": true, "singleflight": true,
-		"brew": false, "пост": false, "готовь": false,
+		// Four characters is the floor `deja bench prompt` settled on: "brew"
+		// is a real command name, and words this short are what people type.
+		"brew": true, "ttl": false, "пост": false, "готовь": false,
 	} {
 		if techTerm(term) != want {
 			t.Fatalf("techTerm(%q) = %v, want %v", term, !want, want)
