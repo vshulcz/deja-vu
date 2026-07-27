@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -84,4 +86,26 @@ func doctorHermesWired(path string) bool {
 	}
 	s := string(b)
 	return strings.Contains(s, "\nmcp_servers:\n") && strings.Contains(s, "\n  deja:\n")
+}
+
+// codexHookTrusted compares the hook file against the hash codex recorded
+// when the user last trusted it. A mismatch means codex is holding the hook
+// for review, however enabled it looks in the config.
+func codexHookTrusted(hooksPath, stateSection string) bool {
+	i := strings.Index(stateSection, "trusted_hash = \"sha256:")
+	if i < 0 {
+		return true // no pin recorded: nothing to contradict
+	}
+	rest := stateSection[i+len("trusted_hash = \"sha256:"):]
+	end := strings.IndexByte(rest, '"')
+	if end < 0 {
+		return true
+	}
+	want := rest[:end]
+	b, err := os.ReadFile(hooksPath)
+	if err != nil {
+		return true
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:]) == want
 }
