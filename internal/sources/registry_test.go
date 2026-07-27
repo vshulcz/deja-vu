@@ -182,6 +182,19 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		} else {
 			sessions, err = ParseGooseFile(path)
 		}
+	case "hermes":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		db := filepath.Join(t.TempDir(), "state.db")
+		if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseHermesDB(db)
 	case "qwen":
 		sessions, err = ParseQwenFile(path)
 	case "pi":

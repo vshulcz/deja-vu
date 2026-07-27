@@ -272,6 +272,9 @@ func doctorHarnesses(w io.Writer) {
 	gooseRoot := filepath.Join(sources.GooseRoot(), "sessions")
 	printRow("goose", gooseRoot, doctorExists(gooseRoot) || doctorFilePresent(sources.GooseDB()), doctorGooseDetail(sqlite))
 
+	hermesRoot := sources.HermesProfilesRoot()
+	printRow("hermes", hermesRoot, doctorExists(hermesRoot), doctorCount(len(sources.HermesSessionFiles()), "store"))
+
 	clineModern := sources.ClineSessionsDir()
 	clineFiles := len(sources.ClineSessionFiles())
 	clineLoc := clineModern

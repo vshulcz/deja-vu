@@ -62,12 +62,15 @@ func loadAll(h string) []model.Session {
 	if h == "" || h == "goose" {
 		ss = append(ss, sources.LoadGoose()...)
 	}
+	if h == "" || h == "hermes" {
+		ss = append(ss, sources.LoadHermes()...)
+	}
 	return ss
 }
 
 func loadFileSources() []model.Session {
 	var ss []model.Session
-	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen", "kimi", "goose"} {
+	for _, harness := range []string{"claude", "codex", "aider", "gemini", "cursor", "antigravity", "grok", "qwen", "kimi", "goose", "hermes"} {
 		ss = append(ss, loadAll(harness)...)
 	}
 	return ss
@@ -635,6 +638,7 @@ func printSources(dir string) {
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.LoadQwen},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.LoadKimi},
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.LoadGoose},
+		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.LoadHermes},
 		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.LoadCopilot},
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, sources.LoadNotes},
 	}

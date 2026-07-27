@@ -201,6 +201,28 @@
    }
   },
   {
+   "id": "hermes",
+   "store_paths": [
+    "~/.hermes/profiles/*/state.db",
+    "${DEJA_HERMES_PROFILES_ROOT}/*/state.db",
+    "${DEJA_HERMES_DB}"
+   ],
+   "format_kind": "sqlite",
+   "fixture_paths": [
+    "fixtures/registry/hermes/profiles/architect/hermes.sql"
+   ],
+   "parser_source": "internal/sources/hermes.go",
+   "last_verified": "2026-07-27",
+   "display_name": "Hermes",
+   "capabilities": {
+    "mcp": false,
+    "auto": false,
+    "resume": false,
+    "handoff": "paste",
+    "prereq": "sqlite3"
+   }
+  },
+  {
    "id": "goose",
    "store_paths": [
     "~/.local/share/goose/sessions/*.jsonl",
