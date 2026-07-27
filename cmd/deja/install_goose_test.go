@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,9 +94,9 @@ func TestInstallGooseAutoWritesHints(t *testing.T) {
 	}
 }
 
-// Goose has no hooks — the only lifecycle strings in the binary belong to its
-// Nushell integration — so an install that writes one would be dead wiring.
-func TestInstallGooseWritesNoHooks(t *testing.T) {
+// The hook is what makes plain `goose` recall: it runs before Goose reads the
+// hints file, so refreshing it there lands in the same session.
+func TestInstallGooseAutoWritesTheHook(t *testing.T) {
 	home := t.TempDir()
 	cfg := filepath.Join(home, "cfg")
 	t.Setenv("HOME", home)
@@ -104,7 +105,57 @@ func TestInstallGooseWritesNoHooks(t *testing.T) {
 	if _, err := installGooseAuto("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}
-	if strings.Contains(gooseConf(t, cfg), "hook") {
-		t.Fatal("config gained a hook Goose does not run")
+	hook := filepath.Join(home, ".agents", "plugins", "deja", "hooks", "hooks.json")
+	b, err := os.ReadFile(hook)
+	if err != nil {
+		t.Fatalf("hook not written: %v", err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Type    string `json:"type"`
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatalf("hooks.json: %v", err)
+	}
+	groups := root.Hooks["SessionStart"]
+	if len(groups) == 0 || len(groups[0].Hooks) == 0 {
+		t.Fatalf("no SessionStart hook: %s", b)
+	}
+	h := groups[0].Hooks[0]
+	if h.Type != "command" || !strings.Contains(h.Command, "hook-goose") {
+		t.Fatalf("hook = %+v", h)
+	}
+	// An invalid matcher makes Goose skip the rule without saying so, which is
+	// why SessionStart carries none at all.
+	if strings.Contains(string(b), "matcher") {
+		t.Fatalf("SessionStart rule carries a matcher:\n%s", b)
+	}
+	if _, err := installGooseAuto("/bin/deja", true); err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	if _, err := os.Stat(hook); !os.IsNotExist(err) {
+		t.Fatal("uninstall left Goose running a command that is gone")
+	}
+}
+
+// Under the wrapper the digest goes to the MOIM file, which Goose re-reads
+// every turn; writing the hints too would inject the same text twice.
+func TestGooseRecallPathFollowsMOIM(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
+	t.Setenv("GOOSE_MOIM_MESSAGE_FILE", "")
+	if got := gooseRecallPath(); !strings.HasSuffix(got, ".goosehints") {
+		t.Fatalf("without MOIM the target is %q", got)
+	}
+	moim := filepath.Join(home, "recall.md")
+	t.Setenv("GOOSE_MOIM_MESSAGE_FILE", moim)
+	if got := gooseRecallPath(); got != moim {
+		t.Fatalf("with MOIM set the target is %q, want %q", got, moim)
 	}
 }

@@ -122,6 +122,7 @@ var commands = map[string]command{
 	"ctx":             cmdCtx,
 	"aider":           cmdAider,
 	"goose":           cmdGoose,
+	"hook-goose":      cmdGooseHook,
 	"blame":           runBlame,
 	"last":            cmdLast,
 }

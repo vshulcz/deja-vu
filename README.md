@@ -229,7 +229,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Hermes, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi, Goose — aider has no MCP client — `deja install aider` wires it through its read-only files instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension, a Qwen Code prompt hook, a Kimi Code prompt hook, a Hermes plugin, a Cline plugin, Goose hints — Grok Build, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
+`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Hermes, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi, Goose — aider has no MCP client — `deja install aider` wires it through its read-only files instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension, a Qwen Code prompt hook, a Kimi Code prompt hook, a Hermes plugin, a Cline plugin, a Goose hook — Grok Build, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
