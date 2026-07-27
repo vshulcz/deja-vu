@@ -709,7 +709,19 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.GrokHome(), "config.toml")
 	cmd, args := mcpCommandArgs(exe)
 	block := fmt.Sprintf("[mcp_servers.deja]\ncommand = %q\nargs = %s\n", cmd, tomlStringArray(args))
-	return installTOML(path, block, uninstall)
+	res, err := installTOML(path, block, uninstall)
+	if err != nil {
+		return res, err
+	}
+	// The other CLI sharing this directory reads a different file entirely.
+	user, uerr := installGrokUserSettings(exe, uninstall)
+	if uerr != nil {
+		return res, uerr
+	}
+	if res.Action == "unchanged" {
+		return user, nil
+	}
+	return res, nil
 }
 
 func installTOML(path, block string, uninstall bool) (installResult, error) {

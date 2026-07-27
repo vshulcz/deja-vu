@@ -183,21 +183,22 @@
    "id": "grok",
    "store_paths": [
     "${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl",
-    "${DEJA_GROK_ROOT}/sessions/**/updates.jsonl"
+    "${DEJA_GROK_ROOT}/sessions/**/updates.jsonl",
+    "${GROK_HOME:-~/.grok}/grok.db"
    ],
    "format_kind": "acp-jsonl-with-json-metadata",
    "fixture_paths": [
     "fixtures/registry/grok/sessions/workspace%2Fregistry-demo/registry-grok/updates.jsonl"
    ],
    "parser_source": "internal/sources/grok.go",
-   "last_verified": "2026-07-17",
+   "last_verified": "2026-07-27",
    "display_name": "Grok Build",
    "capabilities": {
     "mcp": true,
     "auto": false,
     "resume": false,
     "handoff": "exec",
-    "prereq": ""
+    "prereq": "sqlite3 (grok-dev store)"
    }
   },
   {
