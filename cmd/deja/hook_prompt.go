@@ -28,8 +28,41 @@ const promptHookBudget = 1024
 const dejaVuMaxMessages = 300
 
 type promptHookInput struct {
-	Prompt    string `json:"prompt"`
-	SessionID string `json:"session_id"`
+	Prompt    hookPromptText `json:"prompt"`
+	SessionID string         `json:"session_id"`
+}
+
+// hookPromptText reads a prompt that arrives either as a string (Claude Code,
+// Cursor) or as content parts (Kimi sends [{"type":"text","text":"…"}]). A
+// harness whose shape we do not read looks exactly like one where recall never
+// matches, so both are accepted rather than assumed.
+type hookPromptText string
+
+func (h *hookPromptText) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		*h = hookPromptText(s)
+		return nil
+	}
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(b, &parts); err != nil {
+		return nil // an unknown shape means no prompt, not a broken hook
+	}
+	var sb strings.Builder
+	for _, p := range parts {
+		if p.Text == "" {
+			continue
+		}
+		if sb.Len() > 0 {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(p.Text)
+	}
+	*h = hookPromptText(sb.String())
+	return nil
 }
 
 // runHookPrompt is the UserPromptSubmit hook: search the user's own prompt
@@ -38,9 +71,15 @@ type promptHookInput struct {
 // that talks every turn is wallpaper. It never builds or refreshes the index:
 // this path runs on every prompt and must stay ~milliseconds.
 func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
+	return runHookPromptMode(dir, stdin, stdout, false)
+}
+
+// plain=true prints the bare digest for hosts that inject a hook's stdout
+// verbatim — Kimi does that and reads no JSON field for context.
+func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
 	var input promptHookInput
 	_ = json.NewDecoder(io.LimitReader(stdin, 1<<20)).Decode(&input)
-	terms := promptSearchTerms(input.Prompt)
+	terms := promptSearchTerms(string(input.Prompt))
 	if len(terms) < 2 {
 		return nil
 	}
@@ -105,6 +144,10 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
 	out := frameRecall(lead + digest + citationLine(ss[0]))
 	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms)
+	if plain {
+		fmt.Fprintln(stdout, out)
+		return nil
+	}
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out

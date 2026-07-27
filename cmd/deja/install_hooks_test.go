@@ -133,3 +133,37 @@ func TestCodexHookInstallAdoptsAnOlderEntry(t *testing.T) {
 		t.Fatalf("kept the stale path: %s", ours[0])
 	}
 }
+
+// Kimi took three wrong readings: it injects the hook's plain stdout rather
+// than a JSON field, only UserPromptSubmit does it, and its prompt arrives as
+// content parts. Each one on its own looks like "recall found nothing".
+func TestKimiHooksUserPromptSubmitWithPlainOutput(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if _, err := installKimiAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".kimi-code", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := string(b)
+	if strings.Contains(cfg, `event = "SessionStart"`) {
+		t.Fatal("SessionStart runs but its output goes nowhere: wrong event")
+	}
+	if !strings.Contains(cfg, `event = "UserPromptSubmit"`) {
+		t.Fatalf("no UserPromptSubmit hook:\n%s", cfg)
+	}
+	// Kimi reads stdout verbatim; the JSON envelope would land in the prompt.
+	if !strings.Contains(cfg, "hook-prompt --plain") {
+		t.Fatalf("hook does not ask for the bare digest:\n%s", cfg)
+	}
+	if _, err := installKimiAuto("/bin/deja", true); err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	b, _ = os.ReadFile(filepath.Join(home, ".kimi-code", "config.toml"))
+	if strings.Contains(string(b), "hook-prompt") {
+		t.Fatalf("uninstall left the hook behind:\n%s", b)
+	}
+}

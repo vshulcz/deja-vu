@@ -98,8 +98,6 @@ func TestInstallGeminiUninstallLeavesTheSwitchAlone(t *testing.T) {
 	}
 }
 
-// Kimi's hooks cannot carry context, so its installer exists only to clear
-// what older versions wrote.
 func TestKimiInstallsNoHooks(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
