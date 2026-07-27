@@ -160,7 +160,7 @@ func stripJSONCComments(b []byte) []byte {
 			out = append(out, '\n')
 		case c == '/' && i+1 < len(b) && b[i+1] == '*':
 			i += 2
-			for i+1 < len(b) && !(b[i] == '*' && b[i+1] == '/') {
+			for i+1 < len(b) && (b[i] != '*' || b[i+1] != '/') {
 				i++
 			}
 			i++
