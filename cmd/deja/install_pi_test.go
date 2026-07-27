@@ -63,3 +63,15 @@ func TestPiExtensionQuotesExecutablePath(t *testing.T) {
 		t.Fatalf("executable path not escaped:\n%s", src)
 	}
 }
+
+// A search the user typed may rebuild the index; a hook may not. One shared
+// timeout made /deja answer "nothing matches" for a query with real hits.
+func TestPiCommandOutlivesTheHookTimeout(t *testing.T) {
+	src := piExtensionTS("/bin/deja")
+	if !strings.Contains(src, "120000") {
+		t.Fatalf("the slash command runs on the hook budget:\n%s", src)
+	}
+	if !strings.Contains(src, "timeout = 10000") {
+		t.Fatalf("the hook budget is no longer the default:\n%s", src)
+	}
+}

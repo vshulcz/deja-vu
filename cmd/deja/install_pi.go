@@ -43,12 +43,12 @@ import { execFileSync } from "node:child_process";
 
 const DEJA = %q;
 
-function run(args: string[], input: string): string {
+function run(args: string[], input: string, timeout = 10000): string {
   try {
     return execFileSync(DEJA, args, {
       input,
       encoding: "utf8",
-      timeout: 10000,
+      timeout,
       maxBuffer: 4 * 1024 * 1024,
       stdio: ["pipe", "pipe", "ignore"],
     }).trim();
@@ -82,6 +82,23 @@ export default function (pi: any) {
     }
   });
 
+  // pi surfaces registered commands in the prompt box, which is how someone
+  // who never read the docs finds this at all.
+  pi.registerCommand("deja", {
+    description: "Search your own past coding sessions",
+    handler: async (args: string, ctx: any) => {
+      const query = (args || "").trim();
+      if (!query) {
+        ctx.ui.notify("Usage: /deja <what you are looking for>", "info");
+        return;
+      }
+      // The user is waiting on this one, so it may outlive the hook budget:
+      // a first search can rebuild the index.
+      const found = run([query], "", 120000);
+      ctx.ui.notify(found || "Nothing in your history matches " + query, "info");
+    },
+  });
+
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       if (!injected) {
@@ -101,6 +118,10 @@ export default function (pi: any) {
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.
           if (receipt) ctx.ui.notify(receipt, "info");
+          // pi keeps the footer until it is cleared, so the session carries a
+          // quiet reminder that memory is on rather than a one-off toast.
+          const stats = run(["statusline"], "");
+          if (stats) ctx.ui.setStatus("deja", stats);
           return { message: { customType: "deja-recall", content: digest, display: false } };
         }
         // Nothing to recall: either there is no history yet, or the first
