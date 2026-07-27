@@ -174,6 +174,10 @@ func TestDoctorJSONGolden(t *testing.T) {
 	got := strings.ReplaceAll(out.String(), `\\`, `/`)
 	got = filepath.ToSlash(got)
 	got = strings.ReplaceAll(got, filepath.ToSlash(tmp), "<tmp>")
+	// Goose is the one harness whose config lives under a vendor directory on
+	// Windows rather than ~/.config, so the golden keeps the posix path and
+	// the platform difference is normalised here.
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Block/goose/config", "<tmp>/home/.config/goose")
 	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)

@@ -1009,3 +1009,27 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) []byte {
 	out = append(out, lines[insert:]...)
 	return []byte(strings.Join(out, "\n") + "\n")
 }
+
+// installTargetNames is the one list of what `deja install` accepts. Shell
+// completion and doctor's coverage test both read it, so a harness added to
+// installTarget without appearing here is caught rather than quietly missing
+// from both.
+func installTargetNames() []string {
+	return []string{
+		"claude-code", "claude-auto",
+		"codex", "codex-auto",
+		"opencode", "opencode-auto",
+		"cursor", "cursor-auto",
+		"gemini", "gemini-auto",
+		"antigravity", "antigravity-auto",
+		"qwen", "qwen-auto",
+		"kimi", "kimi-auto",
+		"hermes", "hermes-auto",
+		"pi", "pi-auto",
+		"openclaw", "openclaw-auto",
+		"cline", "cline-auto",
+		"goose", "goose-auto",
+		"grok", "copilot", "roo", "aider",
+		"statusline",
+	}
+}

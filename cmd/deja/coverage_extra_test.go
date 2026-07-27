@@ -27,6 +27,11 @@ func hermeticEnv(t *testing.T) string {
 	home := filepath.Join(tmp, "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	// Windows resolvers read APPDATA rather than the home directory — goose's
+	// config is one — so leaving it alone lets one test's install show up in
+	// another's report.
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// Goose resolves through %APPDATA% on Windows; pin it so the doctor

@@ -193,6 +193,16 @@
       "name": "copilot",
       "state": "config-missing",
       "path": "<tmp>/home/.copilot/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "hermes",
+      "state": "config-missing",
+      "path": "<tmp>/home/.hermes/config.yaml"
+    },
+    {
+      "name": "goose",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/goose/config.yaml"
     }
   ],
   "sqlite3": {
