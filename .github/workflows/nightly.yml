@@ -60,8 +60,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          notes=$(printf 'Built from %s on %s.\n\nUnreleased code — use a tagged release unless you are testing something specific.\n\n```sh\ngh release download nightly --pattern "deja-vu_*_$(uname -s | tr A-Z a-z)_*"\n```' \
-            "$(git rev-parse --short HEAD)" "$(date -u +%Y-%m-%d)")
+          notes=$(cat <<NOTES
+          Built from $(git rev-parse --short HEAD) on $(date -u +%Y-%m-%d).
+
+          Unreleased code — use a tagged release unless you are testing something specific.
+
+          Download with: gh release download nightly
+          NOTES
+          )
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
           gh release create nightly dist/deja-vu_* dist/checksums.txt \
             --prerelease \
