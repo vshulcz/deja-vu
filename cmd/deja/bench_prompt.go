@@ -57,6 +57,12 @@ type promptReport struct {
 	Seed       int64           `json:"seed"`
 	Real       promptArmReport `json:"real_questions"`
 	Negative   promptArmReport `json:"negative_controls"`
+	// Shapes the gates turn away: a session too long to read as one episode,
+	// and one worked on minutes ago. Scored separately because the tradeoff
+	// is different — here a miss is a question the user asked and did not
+	// get answered.
+	Marathon promptArmReport `json:"marathon_sessions"`
+	Fresh    promptArmReport `json:"fresh_sessions"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -78,6 +84,10 @@ func runBenchPrompt(args []string) error {
 	fmt.Println("arm                fired  correct  precision")
 	fmt.Printf("real questions     %2d/%-2d  %2d       %.2f\n",
 		report.Real.Fired, report.Real.Cases, report.Real.Correct, report.Real.Precision)
+	fmt.Printf("long sessions      %2d/%-2d  %2d       %.2f\n",
+		report.Marathon.Fired, report.Marathon.Cases, report.Marathon.Correct, report.Marathon.Precision)
+	fmt.Printf("recent sessions    %2d/%-2d  %2d       %.2f\n",
+		report.Fresh.Fired, report.Fresh.Cases, report.Fresh.Correct, report.Fresh.Precision)
 	fmt.Printf("negative controls  %2d/%-2d  —        false fires: %d\n",
 		report.Negative.Fired, report.Negative.Cases, report.Negative.FalseFires)
 	return nil
@@ -111,14 +121,22 @@ func measurePrompt(seed int64) (promptReport, error) {
 			continue
 		}
 		terms := promptSearchTerms(chain.Question)
-		realTerms = append(realTerms, len(terms))
 		fired, correct := promptBenchProbe(indexDir, chain.Project, chain.ID, terms)
-		report.Real.Cases++
+		arm := &report.Real
+		switch chain.Kind {
+		case "marathon":
+			arm = &report.Marathon
+		case "fresh":
+			arm = &report.Fresh
+		default:
+			realTerms = append(realTerms, len(terms))
+		}
+		arm.Cases++
 		if fired {
-			report.Real.Fired++
+			arm.Fired++
 		}
 		if correct {
-			report.Real.Correct++
+			arm.Correct++
 		}
 	}
 	// Negative questions are asked against every project in turn: firing
@@ -137,6 +155,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 	}
 	finishPromptArm(&report.Real, realTerms)
 	finishPromptArm(&report.Negative, negTerms)
+	finishPromptArm(&report.Marathon, nil)
+	finishPromptArm(&report.Fresh, nil)
 	return report, nil
 }
 
@@ -153,8 +173,15 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 		return false, false
 	}
 	for i, s := range ranked {
-		if matched[i] < 2 || len(s.Messages) > dejaVuMaxMessages {
+		// Every gate the hook applies, applied here too — a benchmark that
+		// skips one reports a recall the user would never see.
+		if matched[i] < 1 || (matched[i] < 2 && !hasIdentifierTerm(terms)) {
 			continue
+		}
+		if len(s.Messages) > dejaVuMaxMessages {
+			if s = focusSession(s, terms); len(s.Messages) == 0 {
+				continue
+			}
 		}
 		fired = true
 		if strings.HasPrefix(s.ID, chainID) {

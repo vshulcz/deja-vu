@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,11 @@ const promptHookBudget = 1024
 // dejaVuMaxMessages caps how large a session can be and still read as one
 // rememberable episode. Marathon catch-all sessions rank into everything.
 const dejaVuMaxMessages = 300
+
+// dejaVuMinAge withholds work the user plausibly still remembers. Named so the
+// benchmark can apply the same rule; a benchmark that skips a gate reports a
+// recall nobody would see.
+const dejaVuMinAge = 15 * time.Minute
 
 type promptHookInput struct {
 	Prompt    hookPromptText `json:"prompt"`
@@ -99,6 +105,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		return nil
 	}
 	ss := make([]model.Session, 0, 2)
+	confident := false
 	seen := alreadyInjected(dir, input.SessionID)
 	pol := policy.Load()
 	for i, s := range ranked {
@@ -108,20 +115,34 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if !pol.Allows(policy.ActivationAuto, s.Project) {
 			continue
 		}
-		// One lucky rare word is not a déjà vu. Demand real overlap before
-		// claiming "you have been here" — a false moment teaches the user to
-		// ignore the true ones.
-		if matched[i] < 2 {
+		// matched counts only informative terms — ones rare enough in this
+		// corpus to identify something. One of those is a weak claim but a
+		// fair answer to a question that was actually asked, so it is served
+		// without the déjà vu line; two or more earn the announcement.
+		if matched[i] < 1 || (matched[i] < 2 && !hasIdentifierTerm(terms)) {
 			continue
 		}
-		// Marathon sessions that touched everything match everything; "you
-		// have been here" is about a focused episode, not a haystack.
+		if matched[i] >= 2 {
+			confident = true
+		}
+		// A marathon session that touched everything matches everything, so
+		// it used to be skipped whole. But the sessions people ask about are
+		// exactly the long ones — measured here, only 2% of sessions cross
+		// the line and they are the current work. The haystack argument is
+		// about the session as a whole and not about the part that matched,
+		// so narrow it to that part instead of dropping the answer.
 		if len(s.Messages) > dejaVuMaxMessages {
-			continue
+			s = focusSession(s, terms)
+			if len(s.Messages) == 0 {
+				continue
+			}
 		}
-		// Never recall the session being written right now, or work fresh
-		// enough the user still remembers it — that is anti-magic.
-		if s.ID == input.SessionID || (!s.Updated.IsZero() && time.Since(s.Updated) < 15*time.Minute) {
+		// The session being written right now is never worth recalling to
+		// itself. Work merely fresh is a different case: "what did we just
+		// change" is a question about the last ten minutes, so age alone no
+		// longer withholds an answer — it only withholds the unprompted
+		// déjà vu line below.
+		if s.ID == input.SessionID {
 			continue
 		}
 		if seen[s.ID] {
@@ -136,7 +157,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		return nil
 	}
 	rememberInjected(dir, input.SessionID, ss)
-	showLine := dejaVuLineDue(dir)
+	// "You have been here" on the strength of one word teaches the user to
+	// ignore the line. The recall itself still goes in.
+	showLine := confident && dejaVuLineDue(dir)
 	digest := search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
 	if strings.TrimSpace(digest) == "" {
 		return nil
@@ -274,7 +297,45 @@ func hasCJKRune(s string) bool {
 // error codes, paths, or long plain-ASCII words. Ordinary prose — any
 // language — matches by theme, not by task, and theme matches are what made
 // déjà vu fire on every prompt.
+// hasIdentifierTerm reports whether the question contains a word specific
+// enough to carry a match on its own. In a small corpus even "file" clears the
+// informativeness bar, so a single hit is only trusted when the question named
+// something that reads like a term of art — long, or shaped like a symbol.
+func hasIdentifierTerm(terms []string) bool {
+	for _, t := range terms {
+		if len(t) >= 6 {
+			return true
+		}
+		for _, r := range t {
+			if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// promptFiller is the short English filler a four-character floor lets
+// through. search.IsStopWord is deliberately not extended: it governs search
+// queries too, where "about" typed on purpose should still match.
+var promptFiller = map[string]bool{
+	"about": true, "again": true, "after": true, "before": true, "still": true,
+	"there": true, "their": true, "these": true, "those": true, "which": true,
+	"would": true, "could": true, "should": true, "thing": true, "things": true,
+	"really": true, "maybe": true, "into": true, "from": true, "with": true,
+	"that": true, "this": true, "what": true, "when": true, "were": true,
+	"have": true, "does": true, "just": true, "like": true, "make": true,
+	"made": true, "want": true, "need": true, "know": true, "tell": true,
+	"show": true, "look": true, "some": true, "more": true, "most": true,
+	"then": true, "than": true, "here": true, "your": true, "ours": true,
+	"going": true, "doing": true, "being": true, "used": true, "using": true,
+	"give": true, "take": true, "come": true, "seen": true, "said": true,
+}
+
 func techTerm(f string) bool {
+	if promptFiller[f] {
+		return false
+	}
 	long := 0
 	for _, r := range f {
 		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
@@ -431,4 +492,86 @@ func presentableTopic(t string) bool {
 		return false
 	}
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r >= 0x400
+}
+
+// focusSession narrows a long session to the neighbourhood of the messages
+// that matched, so a haystack contributes its relevant part rather than being
+// dropped or flooding the digest. Two messages either side keeps the exchange
+// readable: a question without its answer recalls nothing useful.
+func focusSession(s model.Session, terms []string) model.Session {
+	const window = 2
+	keep := map[int]bool{}
+	for i, m := range s.Messages {
+		text := strings.ToLower(m.Text)
+		hits := 0
+		for _, t := range terms {
+			if strings.Contains(text, strings.ToLower(t)) {
+				hits++
+			}
+		}
+		if hits == 0 {
+			continue
+		}
+		for j := i - window; j <= i+window; j++ {
+			if j >= 0 && j < len(s.Messages) {
+				keep[j] = true
+			}
+		}
+	}
+	if len(keep) == 0 {
+		s.Messages = nil
+		return s
+	}
+	focused := make([]model.Message, 0, len(keep))
+	for i, m := range s.Messages {
+		if keep[i] {
+			focused = append(focused, m)
+		}
+	}
+	// A term common enough to appear throughout keeps most of the session,
+	// which is the haystack again. Rather than give up, keep the densest
+	// windows — the places where the most distinct terms land together are
+	// where the answer is, and the rest is the session's background noise.
+	if len(focused) > dejaVuMaxMessages {
+		s.Messages = densestMessages(s.Messages, terms, dejaVuMaxMessages)
+		return s
+	}
+	s.Messages = focused
+	return s
+}
+
+// densestMessages keeps the cap best messages by how many distinct terms each
+// one carries, in original order so the exchange still reads as a conversation.
+func densestMessages(msgs []model.Message, terms []string, cap int) []model.Message {
+	type scored struct {
+		i, hits int
+	}
+	var ranked []scored
+	for i, m := range msgs {
+		text := strings.ToLower(m.Text)
+		hits := 0
+		for _, t := range terms {
+			if strings.Contains(text, strings.ToLower(t)) {
+				hits++
+			}
+		}
+		if hits > 0 {
+			ranked = append(ranked, scored{i, hits})
+		}
+	}
+	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].hits > ranked[b].hits })
+	if len(ranked) > cap {
+		ranked = ranked[:cap]
+	}
+	keep := make(map[int]bool, len(ranked))
+	for _, r := range ranked {
+		keep[r.i] = true
+	}
+	out := make([]model.Message, 0, len(keep))
+	for i, m := range msgs {
+		if keep[i] {
+			out = append(out, m)
+		}
+	}
+	return out
 }

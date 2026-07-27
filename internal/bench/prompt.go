@@ -26,6 +26,10 @@ type PromptChain struct {
 	Question string
 	Sessions []model.Session
 	Negative bool
+	// Kind names what this chain is here to measure: "" for the plain case,
+	// "marathon" for a chain whose sessions are long enough to be skipped
+	// wholesale, "fresh" for one worked on minutes ago.
+	Kind string
 }
 
 type PromptCorpus struct {
@@ -63,10 +67,41 @@ const PromptNegativeCount = 3
 // GeneratePrompt builds one chain per topic: three prior sessions carrying the
 // fact under working noise, and no task session — the question comes from the
 // caller, the way a prompt does.
+// promptShapeChain builds one chain with a given session length and start
+// time, so a gate can be measured instead of argued about.
+func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, start time.Time, turns int) PromptChain {
+	chain := PromptChain{
+		ID:       fmt.Sprintf("prompt-chain-%02d", i),
+		Project:  fmt.Sprintf("promptbench%02d", i),
+		Topic:    topic.word,
+		Question: topic.question,
+		Kind:     kind,
+	}
+	msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: start}}
+	for k := 0; k < turns; k++ {
+		msgs = append(msgs,
+			model.Message{Role: "user", Text: fillerText(rng, "ran it again and pasted the output"), Time: start.Add(time.Duration(2*k+2) * time.Minute)},
+			model.Message{Role: "assistant", Text: fillerText(rng, "walked the trace and adjusted the patch"), Time: start.Add(time.Duration(2*k+3) * time.Minute)},
+		)
+	}
+	last := start.Add(time.Duration(2*turns+3) * time.Minute)
+	if kind == "fresh" {
+		last = time.Now().Add(-1 * time.Minute).UTC()
+	}
+	chain.Sessions = append(chain.Sessions, model.Session{
+		ID: chain.ID + "-session-0", Harness: "claude", Project: chain.Project,
+		Started: start, Updated: last, Messages: msgs,
+	})
+	return chain
+}
+
 func GeneratePrompt(seed int64) PromptCorpus {
 	rng := rand.New(rand.NewSource(seed))
 	topics := promptTopics()
-	base := time.Date(2099, time.February, 1, 0, 0, 0, 0, time.UTC)
+	// A fixed date in the past: the freshness gate measures how long ago a
+	// session was touched, and a corpus dated in the future reads as newer
+	// than now and is withheld wholesale.
+	base := time.Date(2024, time.May, 1, 0, 0, 0, 0, time.UTC)
 	chains := make([]PromptChain, 0, len(topics)+PromptNegativeCount)
 	for i, topic := range topics {
 		chain := PromptChain{
@@ -91,6 +126,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		}
 		chains = append(chains, chain)
 	}
+	// Two shapes the plain chains cannot express, and the two the gates
+	// actually turn away: a session too long to be read as one episode, and
+	// one worked on minutes ago.
+	chains = append(chains, promptShapeChain(rng, len(topics), "marathon", promptTopic{
+		"backpressure", "the queue got backpressure so producers block instead of dropping", "what did we do about queue backpressure?",
+	}, base, 400))
+	chains = append(chains, promptShapeChain(rng, len(topics)+1, "fresh", promptTopic{
+		"idempotency", "the import path became idempotent by keying on the source hash", "how did we make the import idempotent?",
+	}, time.Now().Add(-2*time.Minute).UTC(), 3))
 	// Negative controls share the corpus but hold none of its topics, so a
 	// question about them must not recall anything.
 	for i := 0; i < PromptNegativeCount; i++ {
