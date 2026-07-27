@@ -281,7 +281,10 @@ func existingTargets() []string {
 		// has been used here. The binary alone would match every machine that
 		// merely has it on PATH.
 		"aider": filepath.Join(homeDir(), ".aider.chat.history.md"),
-		"goose": gooseConfigDir(),
+		// The session store, not the config directory: deja creates the
+		// latter itself, which would make every machine look like a Goose
+		// machine after one install.
+		"goose": sources.GooseRoot(),
 	}
 	var out []string
 	for name, p := range checks {
