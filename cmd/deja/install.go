@@ -635,7 +635,11 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 		if existing != nil && existing["command"] != cmd {
 			return installResult{}, fmt.Errorf("a statusline is already configured (%v) — append `deja statusline` output to it instead of replacing it", existing["command"])
 		}
-		root["statusLine"] = map[string]any{"type": "command", "command": cmd}
+		// refreshInterval makes Claude Code re-run the command on a timer
+		// instead of only after a turn, so the first index build shows a
+		// moving bar rather than a number frozen at whatever it was when the
+		// user last typed.
+		root["statusLine"] = map[string]any{"type": "command", "command": cmd, "refreshInterval": 1000}
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {

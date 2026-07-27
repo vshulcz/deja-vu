@@ -61,22 +61,53 @@ export default function (pi: any) {
   let injected = false;
   let toldBuilding = false;
 
+  // pi keeps a footer status line: while the first index builds, that is
+  // where the user can see it happening instead of wondering why recall is
+  // quiet. Cleared as soon as the build finishes.
+  const showBuild = (ctx: any) => {
+    const status = run(["warmup-status"], "");
+    if (status) {
+      ctx.ui.setStatus("deja", status);
+      return true;
+    }
+    ctx.ui.setStatus("deja", "");
+    return false;
+  };
+
+  pi.on("session_start", async (_event: any, ctx: any) => {
+    try {
+      showBuild(ctx);
+    } catch {
+      // memory is optional: never break the session over it
+    }
+  });
+
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       if (!injected) {
-        const digest = run(["hook-context", "--plain"], "");
+        const raw = run(["hook-context"], "");
+        let digest = "";
+        let receipt = "";
+        try {
+          const parsed = JSON.parse(raw);
+          digest = parsed?.hookSpecificOutput?.additionalContext || "";
+          receipt = parsed?.systemMessage || "";
+        } catch {
+          digest = raw;
+        }
         if (digest) {
           injected = true;
+          ctx.ui.setStatus("deja", "");
+          // The receipt is what tells the user memory arrived; without it the
+          // recall is invisible and reads as the model guessing.
+          if (receipt) ctx.ui.notify(receipt, "info");
           return { message: { customType: "deja-recall", content: digest, display: false } };
         }
         // Nothing to recall: either there is no history yet, or the first
         // index is still building. Only the second is worth saying, once.
-        if (!toldBuilding) {
-          const status = run(["warmup-status"], "");
-          if (status) {
-            toldBuilding = true;
-            ctx.ui.notify(status, "info");
-          }
+        if (!toldBuilding && showBuild(ctx)) {
+          toldBuilding = true;
+          ctx.ui.notify(run(["warmup-status"], ""), "info");
         }
         return;
       }
