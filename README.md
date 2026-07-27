@@ -96,7 +96,13 @@ cursor-agent plugin marketplace add https://github.com/vshulcz/deja-vu
 qwen extensions install https://github.com/vshulcz/deja-vu
 ```
 
-Cursor and Qwen accept the Claude plugin format directly, so one bundle covers four harnesses.
+OpenClaw takes it too:
+
+```sh
+openclaw plugins install https://github.com/vshulcz/deja-vu
+```
+
+Cursor, Qwen and OpenClaw all read the Claude plugin format, so **one bundle installs into five harnesses**. Their hook support differs — OpenClaw runs its own hook packs, which `deja install openclaw-auto` writes — but the MCP server, skill and `/deja` command come from the same directory in this repository.
 
 On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
 
