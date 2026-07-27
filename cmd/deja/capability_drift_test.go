@@ -37,7 +37,9 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	installID := map[string]string{"claude": "claude-code"}
-	autoCapable := map[string]bool{"claude": true, "codex": true, "opencode": true}
+	// aider is auto-capable without an -auto target: the wrapper refreshes the
+	// read-only file, which aider re-reads on every message.
+	autoCapable := map[string]bool{"claude": true, "codex": true, "opencode": true, "aider": true}
 	seen := 0
 	for _, h := range reg.Harnesses {
 		if h.ID == "deja" {
@@ -60,10 +62,9 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		r, err := installTarget(id, "/bin/deja", false)
 		gotMCP := err == nil && r.Action != "" && r.Action != "guidance-only"
 		if h.ID == "aider" {
-			gotMCP = false // aider has no MCP client and no install target
-			if _, err := installTarget("aider", "/bin/deja", false); err == nil {
-				t.Fatal("aider unexpectedly grew an install target — update the registry")
-			}
+			// aider has an install target but no MCP client: what it writes is
+			// the read: key, and recall arrives through `deja aider`.
+			gotMCP = false
 		}
 		if gotMCP != c.MCP {
 			t.Fatalf("%s: registry mcp=%v, code says %v", h.ID, c.MCP, gotMCP)

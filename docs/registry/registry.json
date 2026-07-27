@@ -102,14 +102,14 @@
     "fixtures/registry/aider/.aider.chat.history.md"
    ],
    "parser_source": "internal/sources/aider.go",
-   "last_verified": "2026-07-17",
+   "last_verified": "2026-07-27",
    "display_name": "aider",
    "capabilities": {
     "mcp": false,
-    "auto": false,
+    "auto": true,
     "resume": false,
     "handoff": "exec",
-    "prereq": ""
+    "prereq": "deja aider"
    }
   },
   {

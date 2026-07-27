@@ -273,6 +273,10 @@ func existingTargets() []string {
 		"hermes":      sources.HermesHome(),
 		"pi":          sources.PiConfigDir(),
 		"openclaw":    sources.OpenClawStateDir(),
+		// aider keeps no config directory: its history file is what says it
+		// has been used here. The binary alone would match every machine that
+		// merely has it on PATH.
+		"aider": filepath.Join(homeDir(), ".aider.chat.history.md"),
 	}
 	var out []string
 	for name, p := range checks {
@@ -340,6 +344,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
 		return installOpencodeAuto(exe, uninstall)
+	case "aider":
+		return installAider(exe, uninstall)
 	case "statusline":
 		return installStatusline(exe, uninstall)
 	default:
