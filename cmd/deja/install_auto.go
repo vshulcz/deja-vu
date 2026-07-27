@@ -154,9 +154,32 @@ export const DejaRecall = async ({ $, client }) => {
         // memory is optional: never break the session over it
       }
     },
+    // Per-prompt recall, the same relevance pass Claude Code gets on
+    // UserPromptSubmit: the session digest is ranked by the project, this is
+    // ranked by what the user just asked. Silent when nothing matches.
+    "experimental.chat.messages.transform": async (_input, output) => {
+      try {
+        const msgs = output.messages || []
+        let last
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i]?.info?.role === "user") { last = msgs[i]; break }
+        }
+        if (!last) return
+        const parts = (last.parts || []).filter((p) => p?.type === "text" && p.text)
+        const prompt = parts.map((p) => p.text).join("\n").trim()
+        if (!prompt) return
+        const raw = await $%secho ${JSON.stringify({ prompt })} | %s%q hook-prompt%s.text()
+        if (!raw.trim()) return
+        const extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext
+        if (!extra) return
+        parts[parts.length - 1].text += "\n\n" + extra
+      } catch {
+        // memory is optional: never break the session over it
+      }
+    },
   }
 }
-`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`")
+`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", "", exe, "`")
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is
