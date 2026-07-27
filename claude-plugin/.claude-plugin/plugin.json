@@ -13,7 +13,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-context",
             "timeout": 10,
-            "statusMessage": "Recalling past sessions…"
+            "statusMessage": "Recalling past sessions\u2026"
           }
         ]
       }
@@ -25,7 +25,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-prompt",
             "timeout": 10,
-            "statusMessage": "Searching past sessions…"
+            "statusMessage": "Searching past sessions\u2026"
           }
         ]
       }
@@ -38,10 +38,16 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-precompact",
             "timeout": 10,
-            "statusMessage": "Saving this session to memory…"
+            "statusMessage": "Saving this session to memory\u2026"
           }
         ]
       }
     ]
+  },
+  "mcpServers": {
+    "deja": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/mcp/deja-mcp.sh",
+      "args": []
+    }
   }
 }

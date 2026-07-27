@@ -74,8 +74,9 @@ deja install --auto     # same, plus session-start auto-recall where supported</
 codex  plugin marketplace add vshulcz/deja-vu &amp;&amp; codex plugin add deja-vu@deja-vu
 cursor-agent plugin marketplace add https://github.com/vshulcz/deja-vu
 qwen   extensions install https://github.com/vshulcz/deja-vu
-openclaw plugins install https://github.com/vshulcz/deja-vu</pre>
-<div class="note">Cursor, Qwen and OpenClaw read the Claude plugin format directly, so all five install from the one bundle in this repository. OpenClaw runs hooks only from its own packs — <code>deja install openclaw-auto</code> writes one. The plugin stands down if <code>deja install</code> already wired the same hooks, so having both does not recall twice.</div>
+openclaw plugins install ./deja-vu/claude-plugin
+copilot plugin marketplace add vshulcz/deja-vu &amp;&amp; copilot plugin install deja-vu@deja-vu</pre>
+<div class="note">Cursor, Qwen, OpenClaw and Copilot read the Claude plugin format directly, so all six install from the one bundle in this repository, which carries the hooks, the <code>/deja</code> command and the MCP server. OpenClaw runs hooks only from its own packs — <code>deja install openclaw-auto</code> writes one — and Copilot runs the plugin hooks but drops their context, so recall there is MCP plus the skill. The plugin stands down if <code>deja install</code> already wired the same hooks, so having both does not recall twice.</div>
 <p>After that, an agent can call <code>recall</code> the moment you reference past work — see <a href="agents.html">Agents &amp; MCP</a>. Confirm the wiring any time with <code>deja doctor</code>.</p>
 <h2>Optional: semantic recall</h2>
 <p>If you run a local embedding endpoint (Ollama, LM Studio), <code>deja embed</code> adds a vector sidecar so rephrased queries still match. Without one, deja works exactly as before. See <a href="search.html">Search</a>.</p>

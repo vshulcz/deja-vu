@@ -69,6 +69,41 @@ func TestClaudePluginManifestsAreWellFormed(t *testing.T) {
 	}
 }
 
+// Five registries install this one bundle, and in four of them it is the only
+// thing the user runs — so the recall tools have to come with it rather than
+// waiting for a separate `deja install`.
+func TestPluginBundleShipsTheMCPServer(t *testing.T) {
+	var plugin struct {
+		MCPServers map[string]struct {
+			Command string `json:"command"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(repoFile(t, "claude-plugin/.claude-plugin/plugin.json"), &plugin); err != nil {
+		t.Fatalf("plugin.json: %v", err)
+	}
+	server, ok := plugin.MCPServers["deja"]
+	if !ok {
+		t.Fatalf("bundle declares no MCP server: %+v", plugin.MCPServers)
+	}
+	// An absolute path from the author's machine, or a bare `deja` that is not
+	// on the client's PATH, both register a server that never starts.
+	if !strings.HasPrefix(server.Command, "${CLAUDE_PLUGIN_ROOT}/") {
+		t.Fatalf("MCP command is not plugin-relative: %q", server.Command)
+	}
+	launcher := string(repoFile(t, "claude-plugin/mcp/deja-mcp.sh"))
+	if !strings.Contains(launcher, "mcp") {
+		t.Fatalf("launcher does not start the MCP server:\n%s", launcher)
+	}
+	// The hook bridge stands down when deja is installed locally; the MCP
+	// launcher must not copy that, or the server exits at handshake.
+	if strings.Contains(launcher, "settings.json") {
+		t.Fatal("MCP launcher stands down like the hook bridge; clients dedupe by name instead")
+	}
+	if strings.Contains(launcher, "exit 0") {
+		t.Fatal("launcher exits clean without a binary; the client would report a server that answers nothing")
+	}
+}
+
 // The plugin ships its own copy of the slash command; it must not drift from
 // the one `deja install` writes.
 func TestPluginCommandMatchesInstaller(t *testing.T) {
