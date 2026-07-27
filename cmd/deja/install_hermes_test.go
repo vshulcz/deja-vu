@@ -87,3 +87,17 @@ func TestInstallHermesUninstallLeavesNeighbours(t *testing.T) {
 		t.Fatalf("plugin directory survived: %v", err)
 	}
 }
+
+// A hook must not stall a turn, but a command the user typed can wait: the
+// first search of a session may rebuild the index, which takes far longer than
+// the hook budget. With one shared timeout /deja answered "nothing matches"
+// for a query that had thirty-six hits.
+func TestHermesCommandGetsALongerTimeoutThanTheHook(t *testing.T) {
+	src := hermesPluginPy("/bin/deja")
+	if !strings.Contains(src, "timeout=120") {
+		t.Fatalf("the slash command still runs on the hook budget:\n%s", src)
+	}
+	if !strings.Contains(src, "def _deja(args, payload=\"\", timeout=10)") {
+		t.Fatalf("the hook budget is no longer the default:\n%s", src)
+	}
+}

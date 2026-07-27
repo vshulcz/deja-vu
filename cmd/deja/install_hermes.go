@@ -69,7 +69,7 @@ import subprocess
 DEJA = %s
 
 
-def _deja(args, payload=""):
+def _deja(args, payload="", timeout=10):
     """Never let memory break a turn: a failure here returns nothing."""
     try:
         done = subprocess.run(
@@ -77,7 +77,7 @@ def _deja(args, payload=""):
             input=payload,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=timeout,
         )
         return done.stdout.strip()
     except Exception:
@@ -104,7 +104,9 @@ def search(raw_args):
     query = (raw_args or "").strip()
     if not query:
         return "Usage: /deja <what you are looking for>"
-    found = _deja([query])
+    # A hook must not stall a turn, but a command the user just typed can
+    # wait: a first search may rebuild the index, which took 18s here.
+    found = _deja([query], timeout=120)
     return found or f"Nothing in your history matches {query!r}."
 
 
