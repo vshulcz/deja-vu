@@ -253,7 +253,18 @@ func Registry() []Harness {
 			}, {
 				Name: "cline-vscode",
 				Match: func(p string) bool {
-					return hasBase(p, "api_conversation_history.json")
+					if !hasBase(p, "api_conversation_history.json") {
+						return false
+					}
+					// Roo writes the same filename in the same layout. Without
+					// the root check this kind claims every Roo task, and Roo
+					// history is filed under cline.
+					for _, root := range ClineLegacyRoots() {
+						if strings.HasPrefix(p, root) {
+							return true
+						}
+					}
+					return false
 				},
 				Parse: fullParse(ParseClineFile),
 			}},

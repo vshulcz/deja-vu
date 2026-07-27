@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -38,5 +39,29 @@ func TestRooRootsOverride(t *testing.T) {
 	}
 	if ss := LoadRoo(); len(ss) != 1 {
 		t.Fatalf("sessions = %d", len(ss))
+	}
+}
+
+// Roo and Cline write the same filename in the same layout. Cline's kind is
+// registered first, so without a root check it claims every Roo task and the
+// history is filed under the wrong harness — which is what deja did until a
+// real roo CLI session showed up as cline.
+func TestRooTasksAreNotClaimedByCline(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_ROO_ROOTS", "")
+	t.Setenv("DEJA_CLINE_ROOTS", "")
+	cli := filepath.Join(home, ".vscode-mock", "global-storage")
+	t.Setenv("DEJA_ROO_CLI_ROOT", cli)
+	task := filepath.Join(cli, "tasks", "019fa464", "api_conversation_history.json")
+	if err := os.MkdirAll(filepath.Dir(task), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(task, []byte(`[{"role":"user","content":[{"type":"text","text":"hello"}]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := KindForPath(task); got != "roo" {
+		t.Fatalf("KindForPath(%s) = %q, want roo", task, got)
 	}
 }
