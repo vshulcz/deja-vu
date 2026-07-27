@@ -120,6 +120,7 @@ var commands = map[string]command{
 	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,
+	"aider":           cmdAider,
 	"blame":           runBlame,
 	"last":            cmdLast,
 }
