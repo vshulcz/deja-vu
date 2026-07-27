@@ -6,6 +6,15 @@ Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<
 
 The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers `summary.json` and `.cwd` over decoding the directory name.
 
+## Two products share this directory
+
+`@vibe-kit/grok-cli` (npm) also keeps its configuration under `~/.grok`, and the
+two are unrelated: it reads `~/.grok/user-settings.json` plus a project-level
+`.grok/settings.json`, and never looks at `config.toml`. Its MCP servers are
+**per project** — `grok mcp add` writes into the working directory — so a
+global `deja install` cannot wire it. Run `grok mcp add deja --command deja
+--args mcp` inside a project to use deja there.
+
 ## Records
 
 `summary.json` includes `info.id`, `info.cwd`, titles, and RFC 3339 creation/update times. Conversation lines use ACP session updates:
