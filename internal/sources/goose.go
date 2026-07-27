@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +18,11 @@ import (
 // GooseDataDir is Block's Goose CLI data root. On Linux it honors XDG_DATA_HOME;
 // on Windows it uses %APPDATA%\Block\goose\data.
 func GooseDataDir() string {
+	// GOOSE_PATH_ROOT relocates config, data and state together; a user who
+	// sets it has every session under it and none where we would look.
+	if root := os.Getenv("GOOSE_PATH_ROOT"); root != "" {
+		return filepath.Join(root, "data")
+	}
 	if runtime.GOOS == "windows" {
 		if appdata := os.Getenv("APPDATA"); appdata != "" {
 			return filepath.Join(appdata, "Block", "goose", "data")
@@ -134,6 +140,18 @@ func gooseText(v any) string {
 	}
 }
 
+// gooseTypeFilter keeps subagent turns and cron-recipe runs out of recall:
+// Goose stores them in the same table as the user's own sessions. The column
+// exists only on newer stores, and naming it on an older one fails the whole
+// query, so it is probed rather than assumed.
+func gooseTypeFilter(db string) string {
+	out, err := exec.Command("sqlite3", db, "pragma table_info(sessions)").Output()
+	if err != nil || !bytes.Contains(out, []byte("session_type")) {
+		return ""
+	}
+	return " and (s.session_type is null or s.session_type = '' or s.session_type = 'user')"
+}
+
 func ParseGooseDB(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, "", 0)
 }
@@ -159,7 +177,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	q := `select s.id,s.working_dir,s.description,s.created_at,s.updated_at,` +
 		`m.role,m.content_json,m.created_timestamp ` +
 		`from sessions s join messages m on m.session_id=s.id ` +
-		`where m.role in ('user','assistant')` + where +
+		`where m.role in ('user','assistant')` + gooseTypeFilter(db) + where +
 		` order by s.id,m.created_timestamp,m.id` + lim
 	cmd := exec.Command("sqlite3", "-json", db, q)
 	stdout, err := cmd.StdoutPipe()
