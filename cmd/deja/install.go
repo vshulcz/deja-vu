@@ -82,6 +82,12 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			return nil
 		}
 	}
+	// Uninstalling has to reach further than installing: --all wires MCP, but
+	// --auto may have written hooks and plugins too, and leaving those behind
+	// means every agent keeps shelling out to a binary the user just removed.
+	if uninstall {
+		targets = withAutoTargets(targets)
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -1014,6 +1020,41 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) []byte {
 // completion and doctor's coverage test both read it, so a harness added to
 // installTarget without appearing here is caught rather than quietly missing
 // from both.
+// withAutoTargets pairs each target with its -auto sibling where one exists,
+// keeping the original order so the report reads harness by harness.
+func withAutoTargets(targets []string) []string {
+	known := map[string]bool{}
+	for _, name := range installTargetNames() {
+		known[name] = true
+	}
+	// Detection reports Claude as "claude-code" while its hook target is
+	// "claude-auto"; without this the slash command and hooks survive a
+	// full uninstall.
+	autoName := map[string]string{"claude-code": "claude-auto"}
+	out := make([]string, 0, len(targets)*2)
+	seen := map[string]bool{}
+	for _, t := range targets {
+		base := strings.TrimSuffix(t, "-auto")
+		if alias, ok := autoName[base]; ok {
+			for _, candidate := range []string{base, alias} {
+				if !seen[candidate] {
+					seen[candidate] = true
+					out = append(out, candidate)
+				}
+			}
+			continue
+		}
+		for _, candidate := range []string{base, base + "-auto"} {
+			if !known[candidate] || seen[candidate] {
+				continue
+			}
+			seen[candidate] = true
+			out = append(out, candidate)
+		}
+	}
+	return out
+}
+
 func installTargetNames() []string {
 	return []string{
 		"claude-code", "claude-auto",
