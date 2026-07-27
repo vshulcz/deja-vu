@@ -285,6 +285,7 @@ func existingTargets() []string {
 		// latter itself, which would make every machine look like a Goose
 		// machine after one install.
 		"goose": sources.GooseRoot(),
+		"roo":   rooFirstRoot(),
 	}
 	var out []string
 	for name, p := range checks {
@@ -334,6 +335,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installKimiAuto(exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
+	case "roo":
+		return installRoo(exe, uninstall)
 	case "cline-auto":
 		return installClineAuto(exe, uninstall)
 	case "copilot":

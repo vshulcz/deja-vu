@@ -59,6 +59,10 @@ func RooRoots() []string {
 			bases = append(bases, filepath.Join(cfg, host, "User", "globalStorage", ext))
 		}
 	}
+	// The roo CLI runs the same extension against a VS Code shim, so its
+	// tasks land under a mock storage root rather than any editor's. Same
+	// layout, so the parser needs nothing new — only the path.
+	bases = append(bases, RooCLIRoot())
 	var out []string
 	for _, b := range bases {
 		if fi, err := os.Stat(b); err == nil && fi.IsDir() {
@@ -66,6 +70,15 @@ func RooRoots() []string {
 		}
 	}
 	return out
+}
+
+// RooCLIRoot is where @roo-code/cli keeps tasks and settings: it runs the
+// extension against a VS Code shim whose storage base is ~/.vscode-mock.
+func RooCLIRoot() string {
+	if p := os.Getenv("DEJA_ROO_CLI_ROOT"); p != "" {
+		return p
+	}
+	return filepath.Join(Home(), ".vscode-mock", "global-storage")
 }
 
 func RooTaskFiles() []string {

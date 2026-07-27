@@ -47,6 +47,10 @@ func guidancePath(harness string) string {
 		return filepath.Join(sources.GrokHome(), "GROK.md")
 	case "opencode":
 		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
+	case "roo":
+		// Global rules are read verbatim into the system prompt for every
+		// mode and every task, which is the only always-on channel Roo has.
+		return rooRulesPath()
 	default:
 		return ""
 	}
