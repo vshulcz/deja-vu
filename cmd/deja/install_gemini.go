@@ -52,9 +52,10 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	}
 	hooks, err := json.MarshalIndent(map[string]any{
 		"hooks": map[string]any{
-			// BeforeAgent runs once before the agent loop, which is where the
-			// session digest belongs.
-			"BeforeAgent": []any{map[string]any{
+			// SessionStart, not BeforeAgent: it injects additionalContext into
+			// the session history and prints systemMessage, while BeforeAgent
+			// surfaces the message only when the hook blocks execution.
+			"SessionStart": []any{map[string]any{
 				"hooks": []any{map[string]any{
 					"type": "command", "command": exe + " hook-context",
 					// Gemini reads timeout in milliseconds; a Claude-style 10

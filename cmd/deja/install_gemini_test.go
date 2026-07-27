@@ -35,9 +35,9 @@ func TestInstallGeminiWritesAnExtension(t *testing.T) {
 		t.Fatalf("install: %v", err)
 	}
 	hooks := geminiExtensionHooks(t, home)
-	group := hooks["BeforeAgent"]
+	group := hooks["SessionStart"]
 	if len(group) == 0 {
-		t.Fatalf("no BeforeAgent group: %v", hooks)
+		t.Fatalf("no SessionStart group: %v", hooks)
 	}
 	inner, _ := group[0]["hooks"].([]any)
 	if len(inner) != 1 {
