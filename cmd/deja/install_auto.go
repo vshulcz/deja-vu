@@ -37,10 +37,15 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	for _, entryAny := range entries {
 		entry, _ := entryAny.(map[string]any)
 		if entry != nil && entryHasCommand(entry, cmd) {
-			found = true
 			if uninstall {
 				continue
 			}
+			// Take the entry over rather than leaving it as it was: an install
+			// from a new binary path, or from a version that gained a field,
+			// has to update ours in place or the change never reaches anyone
+			// who already had it.
+			found = true
+			adoptCodexHookEntry(entry, cmd)
 		}
 		kept = append(kept, entryAny)
 	}
@@ -74,6 +79,22 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 // entryHasCommand matches on the trailing subcommand rather than the whole
 // string, so an install from a new binary path replaces our old entry instead
 // of leaving it to fire alongside the new one.
+// adoptCodexHookEntry rewrites the command and status message of an entry deja
+// already owns.
+func adoptCodexHookEntry(entry map[string]any, cmd string) {
+	hs, _ := entry["hooks"].([]any)
+	for _, hAny := range hs {
+		h, _ := hAny.(map[string]any)
+		if h == nil || h["type"] != "command" || !isDejaHookCommand(h["command"], cmd) {
+			continue
+		}
+		h["command"] = cmd
+		if msg := hookStatusMessage("SessionStart"); msg != "" {
+			h["statusMessage"] = msg
+		}
+	}
+}
+
 func entryHasCommand(entry map[string]any, cmd string) bool {
 	hs, _ := entry["hooks"].([]any)
 	for _, hAny := range hs {
@@ -236,10 +257,15 @@ func installSettingsHook(path, event, matcher string, timeout int, exe string, u
 	for _, entryAny := range entries {
 		entry, _ := entryAny.(map[string]any)
 		if entry != nil && entryHasCommand(entry, cmd) {
-			found = true
 			if uninstall {
 				continue
 			}
+			// Take the entry over rather than leaving it as it was: an install
+			// from a new binary path, or from a version that gained a field,
+			// has to update ours in place or the change never reaches anyone
+			// who already had it.
+			found = true
+			adoptCodexHookEntry(entry, cmd)
 		}
 		kept = append(kept, entryAny)
 	}

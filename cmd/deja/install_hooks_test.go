@@ -78,3 +78,58 @@ func TestKimiUninstallKeepsSomeoneElsesHooks(t *testing.T) {
 		t.Error("uninstall left our entry behind")
 	}
 }
+
+// An install from a newer deja has to update the entry it already owns —
+// otherwise anyone who installed once never sees a field added later, and a
+// moved binary leaves a second entry firing beside the new one.
+func TestCodexHookInstallAdoptsAnOlderEntry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	dir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// What an older version wrote: our command, no status message.
+	seed := `{"hooks":{"SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"/opt/old/deja hook-context","timeout":10}]}]}}`
+	if err := os.WriteFile(filepath.Join(dir, "hooks.json"), []byte(seed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command       string `json:"command"`
+				StatusMessage string `json:"statusMessage"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatal(err)
+	}
+	groups := root.Hooks["SessionStart"]
+	var ours []string
+	for _, g := range groups {
+		for _, h := range g.Hooks {
+			if !strings.Contains(h.Command, "deja") {
+				continue
+			}
+			ours = append(ours, h.Command)
+			if h.StatusMessage == "" {
+				t.Error("adopted entry never gained the status message")
+			}
+		}
+	}
+	if len(ours) != 1 {
+		t.Fatalf("%d deja hooks, want 1: %v", len(ours), ours)
+	}
+	if !strings.HasPrefix(ours[0], "/usr/local/bin/deja") {
+		t.Fatalf("kept the stale path: %s", ours[0])
+	}
+}
