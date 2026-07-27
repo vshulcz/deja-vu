@@ -77,8 +77,11 @@ func TestRooRootsFollowsCustomStoragePath(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DEJA_ROO_ROOTS", "")
 	t.Setenv("DEJA_ROO_CLI_ROOT", filepath.Join(home, "absent"))
-	dir := filepath.Join(home, "Library", "Application Support", "Code", "User")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// The settings file lives somewhere different on each platform; ask the
+	// resolver rather than hardcoding the mac path, which is how this test
+	// passed locally and failed on linux.
+	settingsPath := vsCodeUserSettingsPaths()[0]
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	store := filepath.Join(home, "relocated")
@@ -89,7 +92,7 @@ func TestRooRootsFollowsCustomStoragePath(t *testing.T) {
 	// strict decode treats this as invalid and silently finds nothing.
 	settings := "{\n  // moved to an external disk\n  \"roo-cline.customStoragePath\": " +
 		strconv.Quote(store) + ",\n}\n"
-	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(settings), 0o644); err != nil {
+	if err := os.WriteFile(settingsPath, []byte(settings), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	roots := RooRoots()
