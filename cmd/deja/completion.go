@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // runCompletion writes a shell-specific script so the binary stays dependency-free.
@@ -14,6 +15,9 @@ func runCompletion(args []string) error {
 	if !ok {
 		return fmt.Errorf("unknown shell %q; want bash, zsh, or fish", args[0])
 	}
+	// The target list is substituted rather than duplicated per shell: three
+	// hand-maintained copies is how this one fell seven harnesses behind.
+	script = strings.ReplaceAll(script, "%INSTALL_TARGETS%", strings.Join(installTargetNames(), " "))
 	_, err := fmt.Fprint(os.Stdout, script)
 	return err
 }
@@ -37,7 +41,7 @@ _deja_completion() {
 
     local commands="blame bench completion ctx doctor embed forget handoff index install last log mcp promote remember resume share show sources stats statusline sync uninstall update version warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja"
-    local install_targets="claude-code codex opencode cursor gemini antigravity grok qwen kimi copilot pi statusline --all --auto"
+    local install_targets="%INSTALL_TARGETS% --all --auto"
 
     if (( COMP_CWORD == 1 )); then
         COMPREPLY=( $(compgen -W "$commands --version -version --json --re --all --no-embed --harness --project --since --role --rebuild" -- "$cur") )
@@ -170,7 +174,7 @@ _deja() {
     'warmup:build or refresh the index'
   )
   harnesses=(claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja)
-  install_targets=(claude-code codex opencode cursor gemini antigravity grok qwen kimi copilot pi statusline --all --auto)
+  install_targets=(%INSTALL_TARGETS% --all --auto)
 
   if (( CURRENT == 2 )); then
     _describe -t commands 'deja command' commands
@@ -284,7 +288,7 @@ complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a 'claude co
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
-complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a 'claude-code codex opencode cursor gemini antigravity grok qwen copilot pi statusline --all --auto'
+complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidance
 complete -c deja -n '__fish_seen_subcommand_from last' -l harness -r -a 'claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja'
 complete -c deja -n '__fish_seen_subcommand_from last' -l project -r

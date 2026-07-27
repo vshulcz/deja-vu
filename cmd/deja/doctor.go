@@ -163,6 +163,7 @@ func doctorHooks(w io.Writer) {
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, path)
 	doctorCodexHook(w)
+	doctorAutoRecall(w)
 }
 
 // doctorCodexHook reports the codex session-start hook state. Codex gates
@@ -410,6 +411,8 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired},
 		{"copilot", guidancePath("copilot"), doctorFileWired},
+		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired},
+		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired},
 	}
 }
 
