@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -85,6 +86,13 @@ func removeGooseExtension(s string) string {
 func gooseConfigDir() string {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return filepath.Join(xdg, "goose")
+	}
+	// Goose is one of the few that does not use ~/.config on Windows: its
+	// config, data and state all sit under the Block vendor directory.
+	if runtime.GOOS == "windows" {
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "Block", "goose", "config")
+		}
 	}
 	return filepath.Join(homeDir(), ".config", "goose")
 }

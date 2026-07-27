@@ -29,10 +29,15 @@ func TestInstallGooseWritesTheExtension(t *testing.T) {
 	conf := gooseConf(t, cfg)
 	// Goose keys extensions by name and skips anything not enabled; a stdio
 	// entry without cmd is rejected at load.
-	for _, want := range []string{"extensions:", "  deja:", "enabled: true", "type: stdio", "cmd: /bin/deja"} {
+	for _, want := range []string{"extensions:", "  deja:", "enabled: true", "type: stdio", "cmd: "} {
 		if !strings.Contains(conf, want) {
 			t.Fatalf("config missing %q:\n%s", want, conf)
 		}
+	}
+	// Windows stdio MCP clients spawn through cmd, so the binary shows up in
+	// args there rather than as the command itself.
+	if !strings.Contains(conf, "/bin/deja") {
+		t.Fatalf("config never names the binary:\n%s", conf)
 	}
 }
 
