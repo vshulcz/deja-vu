@@ -215,3 +215,24 @@ func TestOpencodePluginToastsTheRecallReceipt(t *testing.T) {
 		t.Fatal("plugin still asks for the plain digest, which carries no receipt")
 	}
 }
+
+// Claude Code gets a relevance pass on every prompt; opencode has the same
+// opening in messages.transform, and without it recall there is only ever as
+// good as the session digest.
+func TestOpencodePluginRecallsPerPrompt(t *testing.T) {
+	src := opencodePluginJS("/bin/deja")
+	for _, want := range []string{
+		"experimental.chat.messages.transform",
+		`info?.role === "user"`, // the last user turn, not the last message
+		"hook-prompt",
+		"additionalContext",
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("generated plugin missing %q:\n%s", want, src)
+		}
+	}
+	// It appends to the prompt rather than replacing it.
+	if !strings.Contains(src, `parts[parts.length - 1].text += `) {
+		t.Fatalf("recall does not append to the user's own text:\n%s", src)
+	}
+}
