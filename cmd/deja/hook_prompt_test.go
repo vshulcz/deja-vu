@@ -330,3 +330,28 @@ func TestPromptSearchTermsCyrillic(t *testing.T) {
 		t.Errorf("mixed prompt lost one side: %v", mixed)
 	}
 }
+
+// Kimi sends the prompt as content parts, Claude Code as a string. Reading
+// only one shape is indistinguishable from recall finding nothing.
+func TestPromptHookAcceptsBothPromptShapes(t *testing.T) {
+	for name, payload := range map[string]string{
+		"string": `{"prompt":"openBucketDir makeslice panic"}`,
+		"parts":  `{"prompt":[{"type":"text","text":"openBucketDir makeslice"},{"type":"text","text":"panic"}]}`,
+	} {
+		var in promptHookInput
+		if err := json.Unmarshal([]byte(payload), &in); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !strings.Contains(string(in.Prompt), "openBucketDir") || !strings.Contains(string(in.Prompt), "panic") {
+			t.Fatalf("%s: prompt = %q", name, in.Prompt)
+		}
+	}
+	// An unfamiliar shape means no prompt, not a hook that errors out.
+	var in promptHookInput
+	if err := json.Unmarshal([]byte(`{"prompt":{"weird":true}}`), &in); err != nil {
+		t.Fatalf("unknown shape returned an error: %v", err)
+	}
+	if in.Prompt != "" {
+		t.Fatalf("unknown shape produced %q", in.Prompt)
+	}
+}

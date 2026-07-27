@@ -99,7 +99,10 @@ var commands = map[string]command{
 	"promote":       func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
 	"forget":        runForget,
 	"mcp":           func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
-	"hook-prompt":   func(dir string, _ []string) error { return runHookPrompt(dir, os.Stdin, os.Stdout) },
+	"hook-prompt": func(dir string, rest []string) error {
+		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
+		return runHookPromptMode(dir, os.Stdin, os.Stdout, plain)
+	},
 	"hook-antigravity": func(dir string, _ []string) error {
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},

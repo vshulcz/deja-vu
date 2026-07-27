@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -311,17 +312,22 @@ const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`
 // Kimi Code runs SessionStart hooks, so auto-recall works there too. Its
 // config is TOML, not JSON, and the entry is a flat table rather than the
 // nested matcher/hooks shape Claude uses.
-// Kimi runs hooks but cannot take context from them: its hook output schema is
-// {message, hookSpecificOutput:{message, permissionDecision}}, with no field
-// for injected context. A SessionStart hook there would run and be discarded,
-// so deja removes the block older versions wrote and stops at MCP plus
-// AGENTS.md guidance.
+// Kimi injects the hook's plain stdout, not a JSON field — its structured
+// output only carries permission decisions. And only UserPromptSubmit does it:
+// a SessionStart hook runs and its output goes nowhere, which is what made
+// this look like a harness that cannot take context at all.
 func installKimiAuto(exe string, uninstall bool) (installResult, error) {
-	_ = exe
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
 	old, _ := os.ReadFile(path)
 	s := strings.TrimRight(removeKimiHookBlock(string(old)), "\n")
-	if s != "" {
+	if !uninstall {
+		block := kimiHookMarker + "\n[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = " +
+			strconv.Quote(exe+" hook-prompt --plain") + "\ntimeout = 30\n"
+		if s != "" {
+			s += "\n\n"
+		}
+		s += block
+	} else if s != "" {
 		s += "\n"
 	}
 	a, err := writeIfChanged(path, old, []byte(s))
