@@ -120,8 +120,22 @@ export const DejaRecall = async ({ $, client }) => {
       try {
         const key = input.sessionID || "default"
         if (!cache.has(key)) {
-          const blob = await $%s%q %s%s.text()
-          cache.set(key, blob.trim())
+          const raw = await $%s%q %s%s.text()
+          let ctx = "", receipt = ""
+          try {
+            const parsed = JSON.parse(raw)
+            ctx = parsed?.hookSpecificOutput?.additionalContext || ""
+            receipt = parsed?.systemMessage || ""
+          } catch {
+            ctx = raw.trim()
+          }
+          cache.set(key, ctx)
+          // The receipt is the only sign the user gets that memory arrived.
+          // Once per session: repeating it every turn is wallpaper.
+          if (receipt && !told.has(key)) {
+            told.add(key)
+            await client.tui.showToast({ body: { message: receipt, variant: "info", duration: 6000 } })
+          }
         }
         const ctx = cache.get(key)
         if (ctx) {
@@ -142,7 +156,7 @@ export const DejaRecall = async ({ $, client }) => {
     },
   }
 }
-`, "`", exe, "hook-context --plain", "`", "`", exe, "warmup-status", "`")
+`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`")
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is
