@@ -322,11 +322,16 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	// Non-blocking, for the same reason searchDetailedOnce is: this runs on
+	// the session-start hook, and waiting here stalls the agent for the whole
+	// rebuild — which every user hits on an index-format upgrade.
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, nil, err
@@ -650,11 +655,13 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return nil, "", err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, "", fmt.Errorf("manifest: %w", err)
@@ -718,11 +725,13 @@ func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error)
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
@@ -753,11 +762,13 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
@@ -812,11 +823,13 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return nil, err
@@ -851,11 +864,16 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, err := lockDir(dir)
+	// Non-blocking: the session-start hook reaches this through the handoff
+	// tip, and a blocking lock made the agent wait out the entire rebuild —
+	// twelve seconds on a real corpus, on the very upgrade that triggers one.
+	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return model.Session{}, false, err
 	}
-	defer unlock()
+	if ok {
+		defer unlock()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return model.Session{}, false, err
