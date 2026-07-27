@@ -505,9 +505,10 @@ func updateClaudeSessionStartHook(root map[string]any, exe string, uninstall boo
 	return root
 }
 
-// hookStatusMessage is what Claude Code shows while the hook runs. Without it
-// the pause before the first prompt is unexplained; with it, the one moment
-// deja costs the user is the moment it announces itself.
+// hookStatusMessage labels the hook while it runs. Codex carries it through
+// to its hook run summary; Claude Code 2.1.220 parses the field but shows
+// nothing for it — there the receipt in systemMessage is what the user sees,
+// which was checked by rendering the actual TUI rather than by reading docs.
 func hookStatusMessage(event string) string {
 	switch event {
 	case "SessionStart":
@@ -518,6 +519,22 @@ func hookStatusMessage(event string) string {
 		return "Saving this session to memory…"
 	}
 	return ""
+}
+
+// isDejaHookCommand reports whether an existing hook entry is one of ours for
+// the same subcommand. Matching on the trailing subcommand rather than the
+// whole string means moving the binary replaces the old entry instead of
+// leaving a duplicate that fires alongside the new one.
+func isDejaHookCommand(existing any, cmd string) bool {
+	s, ok := existing.(string)
+	if !ok {
+		return false
+	}
+	if s == cmd {
+		return true
+	}
+	sub := cmd[strings.LastIndex(cmd, " ")+1:]
+	return strings.HasSuffix(s, " "+sub) && strings.Contains(s, "deja")
 }
 
 func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall bool) map[string]any {
@@ -546,14 +563,24 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		removed := false
 		for _, hAny := range hs {
 			h, _ := hAny.(map[string]any)
-			if h != nil && h["type"] == "command" && h["command"] == cmd {
-				found = true
+			if h != nil && h["type"] == "command" && isDejaHookCommand(h["command"], cmd) {
 				if uninstall {
 					removed = true
 					continue
 				}
+				// An entry of ours for this event already exists. Take it over
+				// rather than adding a second one: installing from a new path
+				// used to leave the old entry behind, and both would fire.
+				found = true
+				h["command"] = cmd
+				if msg := hookStatusMessage(event); msg != "" {
+					h["statusMessage"] = msg
+				}
 			}
 			kept = append(kept, hAny)
+		}
+		if len(kept) != len(hs) || found {
+			entry["hooks"] = kept
 		}
 		if removed {
 			if len(kept) == 0 {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,5 +75,56 @@ func TestClaudeHookUninstallNeverLeavesNullHooks(t *testing.T) {
 	entries2, _ := healed["hooks"].(map[string]any)["PreCompact"].([]any)
 	if len(entries2) != 1 {
 		t.Fatalf("null-hooks entry not healed: %#v", entries2)
+	}
+}
+
+// Installing from a new path used to leave the old entry behind, so both
+// fired: the digest was injected twice and hook-prompt ran twice per prompt.
+func TestClaudeHookInstallTakesOverAnOlderPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if _, err := installClaudeHook("/opt/old/deja", false); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+	if _, err := installClaudeHook("/usr/local/bin/deja", false); err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command       string `json:"command"`
+				StatusMessage string `json:"statusMessage"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatal(err)
+	}
+	for event, groups := range root.Hooks {
+		var ours []string
+		for _, g := range groups {
+			for _, h := range g.Hooks {
+				if !strings.Contains(h.Command, "deja") {
+					continue
+				}
+				ours = append(ours, h.Command)
+				// An entry we own carries the status message whether it was
+				// created now or adopted from an older install.
+				if hookStatusMessage(event) != "" && h.StatusMessage == "" {
+					t.Errorf("%s: adopted entry has no statusMessage", event)
+				}
+			}
+		}
+		if len(ours) != 1 {
+			t.Errorf("%s: %d deja hooks, want 1: %v", event, len(ours), ours)
+		}
+		if len(ours) == 1 && !strings.HasPrefix(ours[0], "/usr/local/bin/deja") {
+			t.Errorf("%s: kept the stale path: %s", event, ours[0])
+		}
 	}
 }
