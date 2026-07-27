@@ -1,0 +1,76 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    name: Snapshot build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      # A nightly that rebuilds an unchanged tree only wastes minutes and
+      # resets the release date, making the tag look fresher than the code.
+      - id: changed
+        name: Check for new commits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          last=$(gh release view nightly --json targetCommitish,tagName \
+            --jq .targetCommitish 2>/dev/null || true)
+          head=$(git rev-parse HEAD)
+          if [ "$last" = "$head" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.changed.outputs.run == 'true'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      # The nightly is only worth shipping if it passes what a release passes.
+      - if: steps.changed.outputs.run == 'true'
+        run: go test ./...
+
+      - if: steps.changed.outputs.run == 'true'
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # One rolling prerelease rather than a tag per night: the download URL
+      # stays stable and the releases page stays readable.
+      - if: steps.changed.outputs.run == 'true'
+        name: Publish the rolling nightly
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          notes=$(cat <<NOTES
+          Built from $(git rev-parse --short HEAD) on $(date -u +%Y-%m-%d).
+
+          Unreleased code — use a tagged release unless you are testing something specific.
+
+          Download with: gh release download nightly
+          NOTES
+          )
+          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+          gh release create nightly dist/deja-vu_* dist/checksums.txt \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Nightly $(date -u +%Y-%m-%d)" \
+            --notes "$notes"
