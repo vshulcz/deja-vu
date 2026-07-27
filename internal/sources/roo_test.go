@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -63,5 +65,56 @@ func TestRooTasksAreNotClaimedByCline(t *testing.T) {
 	}
 	if got := KindForPath(task); got != "roo" {
 		t.Fatalf("KindForPath(%s) = %q, want roo", task, got)
+	}
+}
+
+// Roo lets a user move its whole store with the roo-cline.customStoragePath
+// setting. deja read only the default location, so for those users it indexed
+// nothing at all and said the harness was missing.
+func TestRooRootsFollowsCustomStoragePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_ROO_ROOTS", "")
+	t.Setenv("DEJA_ROO_CLI_ROOT", filepath.Join(home, "absent"))
+	// The settings file lives somewhere different on each platform; ask the
+	// resolver rather than hardcoding the mac path, which is how this test
+	// passed locally and failed on linux.
+	settingsPath := vsCodeUserSettingsPaths()[0]
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store := filepath.Join(home, "relocated")
+	if err := os.MkdirAll(filepath.Join(store, "tasks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Written the way VS Code writes it: comments and a trailing comma. A
+	// strict decode treats this as invalid and silently finds nothing.
+	settings := "{\n  // moved to an external disk\n  \"roo-cline.customStoragePath\": " +
+		strconv.Quote(store) + ",\n}\n"
+	if err := os.WriteFile(settingsPath, []byte(settings), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	roots := RooRoots()
+	found := false
+	for _, r := range roots {
+		if r == store {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("relocated store not in roots: %v", roots)
+	}
+}
+
+func TestStripJSONCHandlesCommentsAndCommas(t *testing.T) {
+	in := []byte("{\n  \"a\": \"http://x/y\", // trailing note\n  /* block */ \"b\": [1,2,],\n}")
+	var got map[string]any
+	if err := json.Unmarshal(dropTrailingCommas(stripJSONCComments(in)), &got); err != nil {
+		t.Fatalf("jsonc not accepted: %v", err)
+	}
+	// A // inside a string is part of the value, not a comment.
+	if got["a"] != "http://x/y" {
+		t.Fatalf("a = %v", got["a"])
 	}
 }
