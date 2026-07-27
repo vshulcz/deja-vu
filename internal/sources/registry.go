@@ -177,6 +177,19 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "hermes", Load: LoadHermes, Files: HermesSessionFiles,
+			Kinds: []FileKind{{
+				Name: "hermes",
+				// One store per profile, so the match is by shape rather than
+				// a single path: ~/.hermes/profiles/<name>/state.db.
+				Match: func(p string) bool {
+					return filepath.Base(p) == "state.db" && strings.HasPrefix(p, HermesProfilesRoot())
+				},
+				Parse:     dbParse(ParseHermesDB, ParseHermesDBSince),
+				ParseFrom: dbParseFrom(ParseHermesDB, ParseHermesDBSince),
+			}},
+		},
+		{
 			Name: "goose", Load: LoadGoose, Files: GooseSessionFiles,
 			Kinds: []FileKind{{
 				Name: "goose-jsonl",
