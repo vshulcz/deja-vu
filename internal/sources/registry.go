@@ -167,13 +167,28 @@ func Registry() []Harness {
 			}},
 		},
 		{
-			Name: "grok", Load: LoadGrok, Files: GrokSessionFiles,
+			Name: "grok",
+			Load: func() []model.Session { return append(LoadGrok(), LoadGrokDB()...) },
+			Files: func() []string {
+				files := GrokSessionFiles()
+				if db := GrokDB(); fileExists(db) {
+					files = append(files, db)
+				}
+				return files
+			},
 			Kinds: []FileKind{{
 				Name: "grok",
 				Match: func(p string) bool {
 					return hasBase(p, "updates.jsonl") && strings.HasPrefix(p, filepath.Join(GrokRoot(), "sessions"))
 				},
 				Parse: fullParse(ParseGrokFile),
+			}, {
+				// The maintained CLI writes no session files at all: one
+				// SQLite store beside the config, like opencode's.
+				Name:      "grok",
+				Match:     func(p string) bool { return p == GrokDB() },
+				Parse:     dbParse(func(p string) ([]model.Session, error) { return ParseGrokDBSince(p, time.Time{}) }, ParseGrokDBSince),
+				ParseFrom: dbParseFrom(func(p string) ([]model.Session, error) { return ParseGrokDBSince(p, time.Time{}) }, ParseGrokDBSince),
 			}},
 		},
 		{
