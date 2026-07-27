@@ -128,7 +128,7 @@
    "display_name": "Gemini CLI",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "resume": false,
     "handoff": "exec",
     "prereq": ""

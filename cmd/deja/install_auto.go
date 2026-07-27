@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -72,11 +71,14 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a}, err
 }
 
+// entryHasCommand matches on the trailing subcommand rather than the whole
+// string, so an install from a new binary path replaces our old entry instead
+// of leaving it to fire alongside the new one.
 func entryHasCommand(entry map[string]any, cmd string) bool {
 	hs, _ := entry["hooks"].([]any)
 	for _, hAny := range hs {
 		h, _ := hAny.(map[string]any)
-		if h != nil && h["type"] == "command" && h["command"] == cmd {
+		if h != nil && h["type"] == "command" && isDejaHookCommand(h["command"], cmd) {
 			return true
 		}
 	}
@@ -156,15 +158,23 @@ export const DejaRecall = async ({ $, client }) => {
 //   - Qwen forked from an older Gemini and kept SessionStart with a matcher,
 //     with `timeout` in seconds.
 func installGeminiAuto(exe string, uninstall bool) (installResult, error) {
-	return installSettingsHook(
+	// Clear the settings.json hook older versions wrote: it never fired, and
+	// leaving it behind makes a dead integration look installed.
+	if _, err := installSettingsHook(
 		filepath.Join(sources.GeminiHome(), "settings.json"),
-		"BeforeAgent", "", 10000, exe, uninstall)
+		"BeforeAgent", "", 10000, exe, true); err != nil {
+		return installResult{}, err
+	}
+	return installGeminiExtension(exe, uninstall)
 }
 
+// Qwen has no hook system at all — the only SessionStart in its bundle is an
+// unrelated counter — so deja removes the entry older versions wrote and
+// leaves MCP and QWEN.md as the whole integration.
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
 	return installSettingsHook(
 		filepath.Join(sources.QwenConfigDir(), "settings.json"),
-		"SessionStart", "startup|resume", 10, exe, uninstall)
+		"SessionStart", "startup|resume", 10, exe, true)
 }
 
 // installSettingsHook merges one hook entry into a settings.json that the
@@ -231,19 +241,17 @@ const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`
 // Kimi Code runs SessionStart hooks, so auto-recall works there too. Its
 // config is TOML, not JSON, and the entry is a flat table rather than the
 // nested matcher/hooks shape Claude uses.
+// Kimi runs hooks but cannot take context from them: its hook output schema is
+// {message, hookSpecificOutput:{message, permissionDecision}}, with no field
+// for injected context. A SessionStart hook there would run and be discarded,
+// so deja removes the block older versions wrote and stops at MCP plus
+// AGENTS.md guidance.
 func installKimiAuto(exe string, uninstall bool) (installResult, error) {
+	_ = exe
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
 	old, _ := os.ReadFile(path)
-	s := removeKimiHookBlock(string(old))
-	s = strings.TrimRight(s, "\n")
-	if !uninstall {
-		block := kimiHookMarker + "\n[[hooks]]\nevent = \"SessionStart\"\ncommand = " +
-			strconv.Quote(exe+" hook-context") + "\ntimeout = 10\n"
-		if s != "" {
-			s += "\n\n"
-		}
-		s += block
-	} else if s != "" {
+	s := strings.TrimRight(removeKimiHookBlock(string(old)), "\n")
+	if s != "" {
 		s += "\n"
 	}
 	a, err := writeIfChanged(path, old, []byte(s))

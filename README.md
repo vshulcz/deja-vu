@@ -217,7 +217,7 @@ Batches are plain JSONL, redacted on the way out. Import is idempotent, so keep 
 
 ## Teach your agent to remember
 
-`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin — Grok Build, Cline, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
+`deja install --all` wires up MCP recall (Claude Code, Codex, opencode, Cursor, Gemini CLI, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, OpenClaw, Copilot CLI, pi — aider has no MCP client, pipe `deja ctx` instead); `deja install --auto` does the same and adds session-start auto-recall where the harness supports it (Claude Code hook, Codex hooks.json, an opencode plugin, Cursor hooks, a pi extension, an OpenClaw hook pack, an Antigravity plugin, a Gemini CLI extension — Grok Build, Qwen Code, Kimi Code, Cline, Copilot CLI and Roo Code have no hook that can inject context, so MCP plus guidance is their full install). To make
 the agent reach for memory on its own, add this to your `CLAUDE.md` /
 `AGENTS.md`:
 
@@ -257,7 +257,7 @@ limits, trust assumptions, and release verification.
 | Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
 | opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | — | — | — | ✅ | — |
-| Gemini CLI | `${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}`<br>`${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}` | ✅ | — | — | ✅ | — |
+| Gemini CLI | `${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}`<br>`${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}` | ✅ | ✅ | — | ✅ | — |
 | Cursor | `~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl`<br>`${DEJA_CURSOR_ROOT}`<br>`${DEJA_CURSOR_CLI_ROOT}` | ✅ | ✅ | — | ✅ | sqlite3 (IDE chats) |
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | ✅ | ✅ | paste | — |
 | Grok Build | `${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl`<br>`${DEJA_GROK_ROOT}/sessions/**/updates.jsonl` | ✅ | — | — | ✅ | — |
