@@ -36,9 +36,31 @@ func privacyDir() string {
 
 func tombstonePath() string { return filepath.Join(privacyDir(), "tombstones") }
 
+// tombstoneMirrorPath is the second copy, kept beside the index the record
+// protects. One file in ~/.config is a single point of failure for the one
+// operation people use on things they specifically do not want kept: a wiped
+// config directory, a machine migration or a changed XDG_CONFIG_HOME and the
+// next rebuild resurrects them from source history that is still on disk.
+func tombstoneMirrorPath(dir string) string {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	return filepath.Join(dir, "tombstones")
+}
+
+// readTombstones merges both copies: whichever survived is authoritative,
+// because a tombstone can only ever be removed deliberately through unforget.
 func readTombstones() map[string]bool {
+	out := readTombstoneFile(tombstonePath())
+	for key := range readTombstoneFile(tombstoneMirrorPath("")) {
+		out[key] = true
+	}
+	return out
+}
+
+func readTombstoneFile(path string) map[string]bool {
 	out := map[string]bool{}
-	f, err := os.Open(tombstonePath())
+	f, err := os.Open(path)
 	if err != nil {
 		return out
 	}
@@ -82,7 +104,44 @@ func writeTombstones(set map[string]bool) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, tombstonePath())
+	if err := os.Rename(tmp, tombstonePath()); err != nil {
+		return err
+	}
+	// The mirror is best effort: an index directory that cannot be written
+	// is a problem the caller already has, and failing here would leave the
+	// forget half-done after the authoritative copy is already on disk.
+	_ = writeTombstoneMirror(keys)
+	return nil
+}
+
+func writeTombstoneMirror(keys []string) error {
+	return writeTombstoneMirrorAt("", keys)
+}
+
+func writeTombstoneMirrorAt(dir string, keys []string) error {
+	path := tombstoneMirrorPath(dir)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if _, err := fmt.Fprintln(f, key); err != nil {
+			_ = f.Close()
+			return err
+		}
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 func filterTombstoned(ss []model.Session) []model.Session {
@@ -157,7 +216,19 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	if err := writeTombstones(dead); err != nil {
 		return result, err
 	}
-	return result, rebuildWithTombstones(dir, "", "", currentFiles(""), nil, dead)
+	if err := rebuildWithTombstones(dir, "", "", currentFiles(""), nil, dead); err != nil {
+		return result, err
+	}
+	// After the rebuild, not before: rebuilding recreates the index directory
+	// and takes the mirror with it, which is how the second copy silently
+	// failed to exist the first time this was written.
+	keys := make([]string, 0, len(dead))
+	for key := range dead {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	_ = writeTombstoneMirrorAt(dir, keys)
+	return result, nil
 }
 
 func readRecordsForForget(dir string) []OffsetRecord {

@@ -42,7 +42,9 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 `deja forget` removes matching sessions from a rebuilt index and records exact
 session tombstones so a later `deja index` cannot restore them from source
 history. Tombstones are stored at `~/.config/deja/tombstones` (or
-`$XDG_CONFIG_HOME/deja/tombstones`); use `--dry-run`, `--list`, or `--unforget`.
+`$XDG_CONFIG_HOME/deja/tombstones`) and mirrored beside the index, so losing
+either one does not resurrect what you forgot; use `--dry-run`, `--list`, or
+`--unforget`.
 Ingest exclusions are one case-insensitive project pattern per line in
 `~/.config/deja/exclude` (XDG-aware), or comma-separated in
 `DEJA_EXCLUDE_PROJECTS`. `deja stats --redaction` reports redactions by
