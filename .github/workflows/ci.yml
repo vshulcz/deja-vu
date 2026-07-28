@@ -138,6 +138,23 @@ jobs:
             | dist/unpacked/server/deja mcp | tee /tmp/out.json
           grep -q '"serverInfo"' /tmp/out.json
 
+  manifests:
+    name: windows manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+      # scoop and winget carry a version and two hashes that are updated after
+      # a release. That step is invisible when skipped — v0.16.0 shipped with
+      # them still on 0.15.6 — so it is checked rather than remembered.
+      - name: Manifests match the newest release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: go run ./scripts/pinmanifests -check
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest

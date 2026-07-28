@@ -50,6 +50,21 @@ jobs:
           go run ./scripts/mcpb -version "${GITHUB_REF_NAME#v}" -in dist -out dist/mcpb
           go run ./scripts/mcpb -registry -version "${GITHUB_REF_NAME#v}" -out dist/mcpb
 
+      # Regenerate the Windows manifests from the checksums this run produced,
+      # and attach them so the scoop and winget submissions have a canonical
+      # file even before the repository catches up.
+      - name: Pin Windows manifests
+        run: go run ./scripts/pinmanifests -version "${GITHUB_REF_NAME#v}" -checksums dist/checksums.txt
+
+      - name: Attach the manifests to the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            packaging/scoop/deja-vu.json \
+            packaging/winget/vshulcz.deja-vu.installer.yaml \
+            packaging/winget/vshulcz.deja-vu.locale.en-US.yaml --clobber
+
       - name: Attach MCP bundles to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
