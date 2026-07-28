@@ -15,7 +15,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><img src="assets/demo.gif" alt="A real Codex session: the agent calls deja on its own and answers with the decision from eight months earlier"></p>
+<p align="center"><img src="assets/demo.gif" alt="A real Claude Code session: the agent calls deja on its own and answers with the decision from eight months earlier"></p>
 
 <p align="center"><em>Nobody searched anything. The agent hit an error, called deja itself, and came back with what was decided eight months ago.</em></p>
 
