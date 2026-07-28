@@ -1,9 +1,11 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -131,6 +133,13 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 	}
 	unlock, err := lockDir(dir)
 	if err != nil {
+		// A read-only index — a container mount, a locked-down machine — can
+		// still answer every question asked of it. Failing here made deja
+		// unusable on those, while the hook path in the same situation simply
+		// stays quiet. Serve what is on disk and skip the freshness check.
+		if errors.Is(err, fs.ErrPermission) && HasManifest(dir) {
+			return nil
+		}
 		return err
 	}
 	defer unlock()

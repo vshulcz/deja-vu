@@ -3,7 +3,9 @@
 package index
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -42,10 +44,21 @@ func tryLockDir(dir string) (func(), bool, error) {
 	lockPath := dir + ".lock"
 	_ = os.Chmod(dir, 0o700)
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			return nil, false, nil
+		}
 		return nil, false, err
 	}
 	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
+		// A read-only index is not an error for a reader: a container mount
+		// or a locked-down machine can still answer every question asked of
+		// it. Treat it the way a lock already held is treated — carry on
+		// without one. The directory swap is atomic, so the snapshot read
+		// stays safe.
+		if errors.Is(err, fs.ErrPermission) {
+			return nil, false, nil
+		}
 		return nil, false, err
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
