@@ -161,7 +161,7 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 		return parseGooseDBWhere(db, "", 0)
 	}
 	sec := t.Unix()
-	rfc := sqlQuote(t.UTC().Format(time.RFC3339Nano))
+	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
 	where := fmt.Sprintf(" and (m.created_timestamp > %d or s.updated_at > '%s')", sec, rfc)
 	return parseGooseDBWhere(db, where, 0)
 }

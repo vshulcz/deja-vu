@@ -41,7 +41,7 @@ func LoadOpencode() []model.Session {
 }
 
 func LoadOpencodeMatching(q string) []model.Session {
-	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%'", sqlQuote(strings.ToLower(q)))
+	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%'", sqlEscape(strings.ToLower(q)))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 5000)
 	return ss
 }
@@ -57,7 +57,7 @@ func LoadOpencodeSince(t time.Time) []model.Session {
 }
 
 func LoadOpencodePrefix(p string) []model.Session {
-	where := fmt.Sprintf(" and s.id like '%s%%'", sqlQuote(p))
+	where := fmt.Sprintf(" and s.id like '%s%%'", sqlEscape(p))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 0)
 	return ss
 }
@@ -70,7 +70,7 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseOpencodeDBWhere(db, "", 0)
 	}
-	rfc := sqlQuote(t.UTC().Format(time.RFC3339Nano))
+	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
 	ms := t.UnixMilli()
 	where := fmt.Sprintf(" and (m.time_created > %d or m.time_created > '%s' or json_extract(p.data,'$.time.start') > %d or json_extract(p.data,'$.time.start') > '%s')", ms, rfc, ms, rfc)
 	return ParseOpencodeDBWhere(db, where, 0)
@@ -188,7 +188,12 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	return
 }
 
-func sqlQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
+// sqlEscape doubles single quotes for embedding in a SQL literal. It does not
+// add the surrounding quotes — the caller does, because half the call sites
+// build a LIKE pattern around the value. It was called sqlQuote, and that name
+// cost two bugs in one day: both times the quotes were left off and sqlite
+// rejected the query, which the parsers then reported as an empty store.
+func sqlEscape(s string) string { return strings.ReplaceAll(s, "'", "''") }
 
 func str(v any) string { s, _ := v.(string); return s }
 func parseNestedTime(m map[string]any, k, sub string) time.Time {
@@ -213,5 +218,5 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if id == "" {
 		return nil, nil
 	}
-	return ParseOpencodeDBWhere(db, " and s.id='"+sqlQuote(id)+"'", 0)
+	return ParseOpencodeDBWhere(db, " and s.id='"+sqlEscape(id)+"'", 0)
 }

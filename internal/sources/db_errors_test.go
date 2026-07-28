@@ -90,3 +90,24 @@ func TestDBParsersReportSchemaFailuresRatherThanEmptiness(t *testing.T) {
 		t.Fatal("reading an absent store created it — sqlite3 does that unless stopped")
 	}
 }
+
+// The escape helper is the one that cost two bugs in a day, both times by
+// being read as "quote". It escapes; the caller quotes.
+func TestSQLEscapeDoublesQuotesWithoutAddingThem(t *testing.T) {
+	for in, want := range map[string]string{
+		"plain":            "plain",
+		"o'brien":          "o''brien",
+		"''":               "''''",
+		"2026-01-01T00:00": "2026-01-01T00:00",
+		"":                 "",
+	} {
+		if got := sqlEscape(in); got != want {
+			t.Fatalf("sqlEscape(%q) = %q, want %q", in, got, want)
+		}
+	}
+	// The point of the name: no quotes are added, so a caller that forgets
+	// them builds a broken query rather than a working one.
+	if got := sqlEscape("value"); got == "'value'" {
+		t.Fatal("sqlEscape now quotes; the call sites double-quote and every query breaks")
+	}
+}

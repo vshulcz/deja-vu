@@ -38,7 +38,7 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	where := ""
 	if !t.IsZero() {
-		where = " and m.created_at > '" + sqlQuote(t.UTC().Format(time.RFC3339Nano)) + "'"
+		where = " and m.created_at > '" + sqlEscape(t.UTC().Format(time.RFC3339Nano)) + "'"
 	}
 	q := `select s.id as id,s.cwd_last as cwd,s.title as title,` +
 		`m.role as role,m.message_json as body,m.created_at as at ` +

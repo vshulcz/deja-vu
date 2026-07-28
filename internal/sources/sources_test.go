@@ -250,7 +250,7 @@ func TestScanJSONLSkipsMalformedLines(t *testing.T) {
 
 func TestSQLQuoteDoublesSingleQuotes(t *testing.T) {
 	in := `x' or 1=1 --`
-	if got := sqlQuote(in); got != `x'' or 1=1 --` {
-		t.Fatalf("sqlQuote(%q) = %q", in, got)
+	if got := sqlEscape(in); got != `x'' or 1=1 --` {
+		t.Fatalf("sqlEscape(%q) = %q", in, got)
 	}
 }
