@@ -205,6 +205,12 @@ func printStats(w io.Writer, r stats.Report) {
 	}
 	fmt.Fprintf(w, "%sdeja stats%s\n", bold, reset)
 	fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
+	// Section headings over an empty index read as a broken report rather
+	// than an empty one. Say what is missing and stop.
+	if r.TotalSessions == 0 {
+		fmt.Fprintln(w, emptyIndexHint("nothing indexed yet"))
+		return
+	}
 	if headline := statsHeadline(r); headline != "" {
 		fmt.Fprintf(w, "%s%s%s\n\n", bold, headline, reset)
 	}

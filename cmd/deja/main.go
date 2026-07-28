@@ -246,6 +246,13 @@ func cmdLast(dir string, rest []string) error {
 	if err != nil {
 		return err
 	}
+	// Printing nothing at all and exiting 0 leaves no way to tell whether the
+	// command worked, found nothing, or failed silently — which is what a
+	// fresh install sees. blame already answers this shape of question.
+	if len(ss) == 0 {
+		fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions indexed yet"))
+		return nil
+	}
 	for _, s := range ss {
 		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, s.Updated.Format("2006-01-02"), s.ID)
 		title := s.Title
@@ -883,4 +890,10 @@ Examples:
   deja install --all
 
 See README.md for the full CLI reference.`)
+}
+
+// emptyIndexHint phrases the nothing-here answer the same way everywhere, and
+// points at the next command rather than leaving the user to guess.
+func emptyIndexHint(what string) string {
+	return "deja: " + what + " — run `deja index`, or `deja doctor` to see which agent stores were found"
 }
