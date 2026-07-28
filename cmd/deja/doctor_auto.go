@@ -75,17 +75,27 @@ func doctorAutoRecall(w io.Writer) {
 // both nest ours under a key: a plain "deja appears in the file" check would
 // pass on a disabled entry.
 func doctorGooseWired(path string) bool {
-	b, err := os.ReadFile(path)
-	return err == nil && strings.Contains(string(b), "\n  deja:\n")
+	return yamlHasKey(path, "  deja:")
 }
 
 func doctorHermesWired(path string) bool {
+	return yamlHasKey(path, "mcp_servers:") && yamlHasKey(path, "  deja:")
+}
+
+// yamlHasKey looks for a key on its own line. Matching a leading newline
+// instead would miss a config whose first line is the key — which is exactly
+// how a hand-written file tends to start.
+func yamlHasKey(path, key string) bool {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	s := string(b)
-	return strings.Contains(s, "\nmcp_servers:\n") && strings.Contains(s, "\n  deja:\n")
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.TrimRight(line, " \t\r") == key {
+			return true
+		}
+	}
+	return false
 }
 
 // codexHookTrusted compares the hook file against the hash codex recorded

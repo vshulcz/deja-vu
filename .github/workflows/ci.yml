@@ -40,9 +40,43 @@ jobs:
           report=$(./deja bench recall --json)
           printf '%s\n' "$report"
           printf '%s\n' "$report" | jq -e '.lexical.recall_at_5 >= 0.85'
-      - name: Coverage summary
+      # Printing coverage and failing on it are different things: the bar in
+      # CONTRIBUTING said 95% while the number slid to 80%, because nothing
+      # in the build ever looked at it. The floor here is where the packages
+      # stand today — raise it as they improve, never lower it to pass.
+      - name: Coverage floor
         if: runner.os == 'Linux'
-        run: go tool cover -func=coverage.out | tail -1
+        shell: bash
+        run: |
+          go tool cover -func=coverage.out | tail -1
+          total=$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9]+\.[0-9]+')
+          floor=80.0
+          echo "total coverage ${total}%, floor ${floor}%"
+          awk -v t="$total" -v f="$floor" 'BEGIN { if (t+0 < f+0) { printf "coverage %.1f%% is below the %.1f%% floor\n", t, f; exit 1 } }'
+      # A floor per package, set at where each stands today. Raise them as
+      # coverage improves; lowering one to make a build pass is the move this
+      # gate exists to prevent.
+      - name: Per-package coverage floor
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          declare -A floor=(
+            [cmd/deja]=87 [internal/bench]=67 [internal/digest]=72 [internal/embed]=93
+            [internal/index]=87 [internal/policy]=88 [internal/redact]=94
+            [internal/search]=89 [internal/sources]=82 [internal/usage]=76
+          )
+          fail=0
+          while read -r pkg cov; do
+            short=${pkg#github.com/vshulcz/deja-vu/}
+            want=${floor[$short]:-0}
+            if awk -v c="$cov" -v f="$want" 'BEGIN { exit !(c+0 < f+0) }'; then
+              echo "$short: $cov% below floor $want%"
+              fail=1
+            else
+              echo "$short: $cov% (floor $want%)"
+            fi
+          done < <(go test -coverprofile=/dev/null ./... 2>/dev/null | awk '/^ok/ { for(i=1;i<=NF;i++) if($i=="coverage:"){gsub("%","",$(i+1)); print $2, $(i+1)} }')
+          exit $fail
 
   e2e:
     name: e2e smoke

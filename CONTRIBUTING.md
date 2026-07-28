@@ -12,8 +12,13 @@ go build ./cmd/deja
 ```
 
 Run `gofmt -s` on changed Go files. Every package touched by a change must keep
-at least 95% statement coverage. Measure each package directly so aggregate
-coverage does not hide a regression:
+at least 95% statement coverage for new packages, and never less than the
+floor CI enforces for the package you touched (`.github/workflows/ci.yml`,
+"Per-package coverage floor"). Those floors are where each package stands
+today, not where it should be: raise one when you improve it, and treat
+lowering one to make a build pass as the thing the gate exists to stop.
+Measure each package directly so aggregate coverage does not hide a
+regression:
 
 ```sh
 go test ./internal/sources/ -coverprofile=coverage.out

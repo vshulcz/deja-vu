@@ -127,3 +127,36 @@ func TestCodexHookTrustDetectsARewrittenFile(t *testing.T) {
 		t.Fatal("absence of a pin reported as untrusted")
 	}
 }
+
+// Goose and Hermes keep MCP servers in YAML and nest ours under a key, so a
+// plain "deja appears in the file" check passes on a disabled or unrelated
+// entry — these two probes exist for that and had no test.
+func TestYAMLWiringProbes(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name  string
+		body  string
+		probe func(string) bool
+		want  bool
+	}{
+		{"goose wired", "extensions:\n  deja:\n    enabled: true\n", doctorGooseWired, true},
+		{"goose absent", "extensions:\n  memory:\n    enabled: true\n", doctorGooseWired, false},
+		{"goose mentions deja elsewhere", "# installed by deja\nextensions:\n  memory:\n    enabled: true\n", doctorGooseWired, false},
+		{"hermes wired", "mcp_servers:\n  deja:\n    command: /bin/deja\n", doctorHermesWired, true},
+		{"hermes absent", "mcp_servers:\n  other:\n    command: /bin/other\n", doctorHermesWired, false},
+		{"hermes plugin only", "plugins:\n  enabled:\n    - deja\n", doctorHermesWired, false},
+	}
+	for _, tc := range cases {
+		path := filepath.Join(dir, tc.name+".yaml")
+		if err := os.WriteFile(path, []byte(tc.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := tc.probe(path); got != tc.want {
+			t.Fatalf("%s: probe = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	// A missing file is not wired, and must not panic.
+	if doctorGooseWired(filepath.Join(dir, "absent.yaml")) || doctorHermesWired(filepath.Join(dir, "absent.yaml")) {
+		t.Fatal("a missing config reported as wired")
+	}
+}
