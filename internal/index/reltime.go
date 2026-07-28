@@ -17,6 +17,43 @@ var relTimeRE = regexp.MustCompile(`(?i)\b(?:(a|an|one|two|three|four|five|six|s
 
 var relTimeNums = map[string]int{"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
+// monthNames maps what people type to a month. Russian is here because the
+// tool is used in both languages in the same session, and someone asking "что
+// делали в мае" means the same thing as "what did we do in may".
+var monthNames = map[string]time.Month{
+	"january": time.January, "february": time.February, "march": time.March,
+	"april": time.April, "may": time.May, "june": time.June, "july": time.July,
+	"august": time.August, "september": time.September, "october": time.October,
+	"november": time.November, "december": time.December,
+	"jan": time.January, "feb": time.February, "mar": time.March, "apr": time.April,
+	"jun": time.June, "jul": time.July, "aug": time.August, "sep": time.September,
+	"sept": time.September, "oct": time.October, "nov": time.November, "dec": time.December,
+	"январь": time.January, "января": time.January, "январе": time.January,
+	"февраль": time.February, "февраля": time.February, "феврале": time.February,
+	"март": time.March, "марта": time.March, "марте": time.March,
+	"апрель": time.April, "апреля": time.April, "апреле": time.April,
+	"май": time.May, "мая": time.May, "мае": time.May,
+	"июнь": time.June, "июня": time.June, "июне": time.June,
+	"июль": time.July, "июля": time.July, "июле": time.July,
+	"август": time.August, "августа": time.August, "августе": time.August,
+	"сентябрь": time.September, "сентября": time.September, "сентябре": time.September,
+	"октябрь": time.October, "октября": time.October, "октябре": time.October,
+	"ноябрь": time.November, "ноября": time.November, "ноябре": time.November,
+	"декабрь": time.December, "декабря": time.December, "декабре": time.December,
+}
+
+var wordRE = regexp.MustCompile(`[\p{L}]+`)
+
+// monthOccurrence resolves a bare month name to its most recent occurrence:
+// asking about may in july means this may, not next year's.
+func monthOccurrence(m time.Month, now time.Time) time.Time {
+	year := now.Year()
+	if m > now.Month() {
+		year--
+	}
+	return time.Date(year, m, 1, 0, 0, 0, 0, now.Location())
+}
+
 func relativeTimeTerms(q string, now time.Time) []string {
 	if now.IsZero() {
 		now = time.Now()
@@ -29,6 +66,11 @@ func relativeTimeTerms(q string, now time.Time) []string {
 				seen[tok] = true
 				out = append(out, tok)
 			}
+		}
+	}
+	for _, w := range wordRE.FindAllString(strings.ToLower(q), -1) {
+		if month, ok := monthNames[w]; ok {
+			add(monthOccurrence(month, now))
 		}
 	}
 	for _, m := range relTimeRE.FindAllStringSubmatch(q, -1) {
