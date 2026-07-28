@@ -15,7 +15,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><img src="assets/demo.gif" alt="deja demo"></p>
+<p align="center"><img src="assets/demo.gif" alt="A real Codex session: the agent calls deja on its own and answers with the decision from eight months earlier"></p>
+
+<p align="center"><em>Nobody searched anything. The agent hit an error, called deja itself, and came back with what was decided eight months ago.</em></p>
+
+<p align="center">
+<b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>zero</b> LLM calls, zero embeddings, zero API keys &middot; <b>~12&nbsp;ms</b> over 3.3&nbsp;GB<br>
+<sub>Both harnesses ship in this repo and run on the public datasets in minutes — <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a>.</sub>
+</p>
 
 Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, Goose, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
