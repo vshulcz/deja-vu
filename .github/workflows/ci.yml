@@ -50,7 +50,7 @@ jobs:
         run: |
           go tool cover -func=coverage.out | tail -1
           total=$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9]+\.[0-9]+')
-          floor=80.0
+          floor=82.0
           echo "total coverage ${total}%, floor ${floor}%"
           awk -v t="$total" -v f="$floor" 'BEGIN { if (t+0 < f+0) { printf "coverage %.1f%% is below the %.1f%% floor\n", t, f; exit 1 } }'
       # A floor per package, set at where each stands today. Raise them as
@@ -61,7 +61,7 @@ jobs:
         shell: bash
         run: |
           declare -A floor=(
-            [cmd/deja]=87 [internal/bench]=67 [internal/digest]=72 [internal/embed]=93
+            [cmd/deja]=88 [internal/bench]=100 [internal/digest]=90 [internal/embed]=93
             [internal/index]=87 [internal/policy]=88 [internal/redact]=94
             [internal/search]=89 [internal/sources]=87 [internal/usage]=95
           )

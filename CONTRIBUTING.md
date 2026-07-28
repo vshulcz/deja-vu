@@ -12,7 +12,7 @@ go build ./cmd/deja
 ```
 
 Run `gofmt -s` on changed Go files. Every package touched by a change must keep
-at least 95% statement coverage for new packages, and never less than the
+at least 90% statement coverage for new packages, and never less than the
 floor CI enforces for the package you touched (`.github/workflows/ci.yml`,
 "Per-package coverage floor"). Those floors are where each package stands
 today, not where it should be: raise one when you improve it, and treat

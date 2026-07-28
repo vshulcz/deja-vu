@@ -67,6 +67,32 @@ const PromptNegativeCount = 3
 // GeneratePrompt builds one chain per topic: three prior sessions carrying the
 // fact under working noise, and no task session — the question comes from the
 // caller, the way a prompt does.
+// promptCorpusHash fingerprints what the corpus asks, not when it was built.
+// The fresh chain is dated relative to now by design, so hashing the sessions
+// wholesale gave a different hash on every run — and a hash that changes
+// without the inputs changing cannot be used to compare two runs, which is
+// the only reason it is reported.
+func promptCorpusHash(chains []PromptChain) string {
+	type stable struct {
+		ID, Project, Topic, Question, Kind string
+		Negative                           bool
+		Texts                              []string
+	}
+	out := make([]stable, 0, len(chains))
+	for _, c := range chains {
+		s := stable{ID: c.ID, Project: c.Project, Topic: c.Topic, Question: c.Question, Kind: c.Kind, Negative: c.Negative}
+		for _, sess := range c.Sessions {
+			for _, m := range sess.Messages {
+				s.Texts = append(s.Texts, m.Role+":"+m.Text)
+			}
+		}
+		out = append(out, s)
+	}
+	b, _ := json.Marshal(out)
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}
+
 // promptShapeChain builds one chain with a given session length and start
 // time, so a gate can be measured instead of argued about.
 func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, start time.Time, turns int) PromptChain {
@@ -149,7 +175,5 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
-	b, _ := json.Marshal(chains)
-	h := sha256.Sum256(b)
-	return PromptCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+	return PromptCorpus{Chains: chains, Hash: promptCorpusHash(chains)}
 }
