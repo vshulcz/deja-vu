@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-28
+
+Every harness that can inject context now recalls on its own, and `deja doctor`
+tells you which of your integrations are actually live.
+
+### Added
+- Auto-recall in every harness that can inject context, rather than only the ones with a documented hook. (#362)
+- Installable from the Claude Code and Codex marketplaces; the same bundle installs into six registries. (#367, #391)
+- Hermes Agent sessions are indexed, with a plugin, MCP wiring and support for its flat store layout. (#376, #389)
+- pi gets `/deja` and keeps recall stats in its footer; opencode toasts the recall receipt and shows the first build as a moving bar. (#381, #384, #392)
+- aider, cline, goose and roo install to real recall: aider re-reads a `read:` context file every message, cline gets a plugin whose rule is built at session start, goose injects through MOIM (which survives compaction) plus an MCP extension, and roo installs into every host it has run in, following `roo-cline.customStoragePath` when set. (#396, #400, #405, #410, #426)
+- The plugin bundle ships the MCP server, so the six registries that install Claude-format plugins — Claude Code, Codex, Cursor, Qwen, OpenClaw, Copilot CLI — get recall tools without a second install step. (#394)
+- `deja doctor` reports every auto-recall integration as wired, stale or missing, instead of only checking the one you asked about. (#417)
+- `deja handoff` starts cline, goose and kimi directly, and hermes sessions resume by id. (#450, #452)
+- `deja bench prompt` scores recall per prompt against a per-topic corpus, with negative controls and gated marathon/fresh shapes. (#424)
+- Time queries understand month names in English and Russian, resolving to the most recent occurrence. (#456)
+- Nightly snapshot builds publish a rolling prerelease from main. (#398)
+
+### Fixed
+- Harness wiring that was installed but not working: gemini hooks live in an extension rather than `settings.json` and SessionStart was never hooked, qwen's hook needed a millisecond timeout, kimi hooked the wrong event and could not read prompts sent as parts, codex left an existing entry stale instead of adopting it, and installing twice added a second hook rather than updating the first. (#373, #378, #382, #385, #386, #388)
+- opencode recalled only at session start, and lost the transcript to compaction before it was indexed. (#383, #390)
+- Auto-recall never fired for CJK prompts, Traditional and Cantonese function words were weighed as content, and Traditional/Simplified recall only worked in one direction. (#368, #369, #370)
+- Read paths waited out a rebuild instead of serving the index they already had. (#380)
+- `deja uninstall --all` left every hook and plugin in place, pointing at a binary it had just removed. (#421)
+- Upgrading deja never repaired wiring an older version had written, so an integration could sit dead for weeks with nothing reporting it. Recorded targets are rewritten on the first session start after a version change. (#431)
+- A rewound session kept its old text in the index: the append fast path compared size and mtime, which a rewrite can leave unchanged. It now checks a hash of the prefix it already read. (#454)
+- Forgotten sessions came back if `~/.config/deja/tombstones` was lost. A second copy now lives beside the index. (#442)
+- `deja goose` and `deja aider` launched an agent when given a one-word search. (#452)
+- A harness that changes its database schema made its history vanish silently — all four SQLite parsers reported a failed query as an empty store, and grok's incremental filter had never worked at all. (#474)
+- A read-only index refused to answer instead of serving what it already held. (#472)
+- A query that happened to name a subcommand ran it. (#430)
+- MCP clients that send numeric arguments as strings were rejected. (#423)
+- doctor could not find the MCP server if it had been installed under another name, reported a codex hook as trusted when its hash no longer matched, and warned about sessions that were simply unused. (#428, #433, #440)
+- Recall skipped long sessions instead of narrowing them, withheld the answer on old sessions rather than just the déjà vu line, and required more terms than most real questions carry. (#424, #438)
+- `deja share` under-counted secrets by ignoring those redacted at index time; roo history was filed under cline; a bucket could read past the end of its posting block; an empty index printed nothing at all; `deja stats --card` appended a second `.svg`. (#432, #444, #448, #470, dc3fd84)
+
+### Changed
+- Every command spent about 650ms proving the index was fresh. Derived file state is carried forward when size and mtime match: 650ms -> 6ms. `deja doctor` no longer parses a 2.8GB database to answer a question about the newest session — 8s -> under 100ms. (#458, #460)
+- Coverage is gated in CI per package, and the contributing bar is 90%. (#462, #463)
+- Documented what `deja update` verifies and what it does not. (#446)
+
+
 ## [0.15.7] - 2026-07-25
 
 Existing indexes are rebuilt once on first use: the on-disk format changed
@@ -340,7 +382,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/vshulcz/deja-vu/compare/v0.15.7...v0.16.0
 [0.5.0]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vshulcz/deja-vu/compare/v0.2.0...v0.3.0
