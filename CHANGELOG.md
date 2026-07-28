@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-07-28
+
+### Added
+- MCP bundles: every release now ships an `.mcpb` per platform, so desktop apps that install MCP servers as bundles can install deja by opening one file. The bundle carries the binary — no runtime, no package manager, nothing hosted. Terminal agents keep using `deja install`. (#481, #482)
+- A documented machine-readable read contract: `deja last --json`, `deja show --json --harness <name>` with `--offset`/`--limit`, an explicit `--limit` on search, and a `source` field recording whether a session is local or imported. Exact reads require both id and harness, because ids collide across harnesses and a machine reader cannot notice. Thanks to @adamsitar. (#476)
+
+### Fixed
+- Windows scoop and winget manifests were pinned to 0.15.6, so those two channels were two releases behind. (#478)
+- Renamed the SQL escaping helper to say what it does; the old name had caused two silent query failures in a day. (#475)
+
+
 ## [0.16.0] - 2026-07-28
 
 Every harness that can inject context now recalls on its own, and `deja doctor`
@@ -382,7 +393,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/vshulcz/deja-vu/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vshulcz/deja-vu/compare/v0.15.7...v0.16.0
 [0.5.0]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...v0.4.0
