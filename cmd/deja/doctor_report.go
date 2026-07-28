@@ -205,8 +205,15 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 		return store, mod
 	}
 	_ = f.Close()
-	sessions, _ := check.parse(newest)
+	sessions, parseErr := check.parse(newest)
 	store.State = "ok"
+	// A parser that refuses to read the store is the loudest thing doctor can
+	// learn, and it used to be discarded: a harness that changed its schema
+	// showed up here as a healthy store while its recall was empty.
+	if parseErr != nil {
+		store.State = "unreadable"
+		return store, mod
+	}
 	// A session someone opened and closed without typing parses to nothing,
 	// correctly. Calling that a parse failure sends people looking for a bug
 	// in deja when the file simply holds no conversation — so only a file

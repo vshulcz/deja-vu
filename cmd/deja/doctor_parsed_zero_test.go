@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/vshulcz/deja-vu/internal/model"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,3 +48,40 @@ func TestParsedZeroIgnoresSessionsWithNoConversation(t *testing.T) {
 		t.Fatal("a missing file was treated as merely empty")
 	}
 }
+
+// A store deja cannot read is the loudest thing doctor can learn, and the
+// parse error used to be discarded: a harness that changed its schema showed
+// up as a healthy store while its recall was empty — indistinguishable from
+// having no history with that agent.
+func TestDoctorReportsAnUnreadableStore(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "store.db")
+	if err := os.WriteFile(path, []byte("not a database"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	failing := doctorStoreCheck{
+		name:  "goose",
+		paths: []string{dir},
+		files: []string{path},
+		parse: func(string) ([]model.Session, error) { return nil, errUnreadableStore },
+	}
+	got, _ := inspectDoctorStore(failing)
+	if got.State != "unreadable" {
+		t.Fatalf("state = %q, want unreadable", got.State)
+	}
+
+	// A store that reads fine stays quiet, or the warning becomes wallpaper.
+	working := failing
+	working.parse = func(string) ([]model.Session, error) {
+		return []model.Session{{ID: "s1", Messages: []model.Message{{Role: "user", Text: "hi"}}}}, nil
+	}
+	if got, _ := inspectDoctorStore(working); got.State != "ok" {
+		t.Fatalf("a readable store reported %q", got.State)
+	}
+}
+
+var errUnreadableStore = errStore("query failed, the store schema may have changed")
+
+type errStore string
+
+func (e errStore) Error() string { return string(e) }

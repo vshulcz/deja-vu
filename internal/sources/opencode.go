@@ -107,8 +107,16 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	dec.UseNumber()
 	tok, err := dec.Token()
 	if err != nil {
-		_ = cmd.Wait()
+		waitErr := cmd.Wait()
 		if err == io.EOF {
+			// No stdout means two very different things: a query that matched
+			// nothing, or one sqlite3 refused to run because the harness
+			// changed its schema. Reporting the second as "no sessions" makes
+			// a whole harness disappear from recall while doctor still calls
+			// the store healthy.
+			if waitErr != nil {
+				return nil, fmt.Errorf("opencode: query failed, the store schema may have changed: %w", waitErr)
+			}
 			return nil, nil
 		}
 		return nil, err

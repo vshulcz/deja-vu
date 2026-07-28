@@ -81,8 +81,14 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	}
 	doctorHarnesses(w)
 	for _, store := range report.Stores {
-		if store.State == "parsed-zero" {
+		switch store.State {
+		case "parsed-zero":
 			fmt.Fprintf(w, "  warning      %s files found but newest parsed to zero\n", store.Name)
+		case "unreadable":
+			// The store is there and deja cannot read it — usually a harness
+			// that changed its format. Silence here reads as "you have no
+			// history with that agent".
+			fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
 		}
 	}
 	fmt.Fprintln(w)

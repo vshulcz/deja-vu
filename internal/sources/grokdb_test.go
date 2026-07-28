@@ -73,7 +73,7 @@ func TestParseGrokDB(t *testing.T) {
 // everything would rebuild the whole store on every write.
 func TestParseGrokDBSinceFilters(t *testing.T) {
 	db := grokTestDB(t)
-	cut, err := time.Parse(time.RFC3339, "2026-07-27T10:00:06Z")
+	cut, err := time.Parse(time.RFC3339, "2026-07-27T10:00:02Z")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,12 +81,23 @@ func TestParseGrokDBSinceFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Both halves matter: the old message must be gone and the new one must
+	// be there. Asserting only the first passed for months while the filter
+	// returned nothing at all, because a missing quote made sqlite reject the
+	// query and the error was swallowed as "no sessions".
+	var sawNew bool
 	for _, s := range ss {
 		for _, m := range s.Messages {
 			if m.Text == "connection pool exhausted again" {
 				t.Fatalf("since filter returned an older message: %+v", s.Messages)
 			}
+			if m.Text == "raise max_conns" {
+				sawNew = true
+			}
 		}
+	}
+	if !sawNew {
+		t.Fatal("since filter returned nothing; incremental indexing would never pick up new messages")
 	}
 }
 

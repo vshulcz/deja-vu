@@ -38,7 +38,7 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	where := ""
 	if !t.IsZero() {
-		where = " and m.created_at > " + sqlQuote(t.UTC().Format(time.RFC3339Nano))
+		where = " and m.created_at > '" + sqlQuote(t.UTC().Format(time.RFC3339Nano)) + "'"
 	}
 	q := `select s.id as id,s.cwd_last as cwd,s.title as title,` +
 		`m.role as role,m.message_json as body,m.created_at as at ` +
@@ -56,8 +56,16 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 	dec := json.NewDecoder(stdout)
 	tok, err := dec.Token()
 	if err != nil {
-		_ = cmd.Wait()
+		waitErr := cmd.Wait()
 		if err == io.EOF {
+			// No stdout means two very different things: a query that matched
+			// nothing, or one sqlite3 refused to run because the harness
+			// changed its schema. Reporting the second as "no sessions" makes
+			// a whole harness disappear from recall while doctor still calls
+			// the store healthy.
+			if waitErr != nil {
+				return nil, fmt.Errorf("grok: query failed, the store schema may have changed: %w", waitErr)
+			}
 			return nil, nil
 		}
 		return nil, err
