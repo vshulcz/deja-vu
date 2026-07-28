@@ -12,7 +12,14 @@
 #   HOME=/tmp/demo-home deja index --rebuild
 #   vhs scripts/demo/agent.tape
 #
-# Dead time is cut afterwards with ffmpeg; nothing in the output is edited.
+# Afterwards, ffmpeg cuts the dead time and paints over three regions that carry
+# the recorder's identity rather than the tool: the welcome greeting, the
+# account line in the header, and the custom statusline. Nothing else is edited.
+#
+#   ffmpeg -i agent-raw.gif -filter_complex \\
+#     "drawbox=x=185:y=66:w=230:h=34:color=0x171717:t=fill, \\
+#      drawbox=x=30:y=161:w=535:h=41:color=0x171717:t=fill, \\
+#      drawbox=x=0:y=912:w=1200:h=68:color=0x171717:t=fill" out.gif
 
 Output agent-raw.gif
 
