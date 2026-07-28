@@ -195,10 +195,11 @@ func Registry() []Harness {
 			Name: "hermes", Load: LoadHermes, Files: HermesSessionFiles,
 			Kinds: []FileKind{{
 				Name: "hermes",
-				// One store per profile, so the match is by shape rather than
-				// a single path: ~/.hermes/profiles/<name>/state.db.
+				// Current Hermes uses ~/.hermes/state.db; older builds shard
+				// stores under ~/.hermes/profiles/<name>/state.db.
 				Match: func(p string) bool {
-					return filepath.Base(p) == "state.db" && strings.HasPrefix(p, HermesProfilesRoot())
+					return p == filepath.Join(HermesHome(), "state.db") ||
+						(filepath.Base(p) == "state.db" && strings.HasPrefix(p, HermesProfilesRoot()+string(filepath.Separator)))
 				},
 				Parse:     dbParse(ParseHermesDB, ParseHermesDBSince),
 				ParseFrom: dbParseFrom(ParseHermesDB, ParseHermesDBSince),

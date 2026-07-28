@@ -166,6 +166,16 @@ func TestHermesFindsTheRootStore(t *testing.T) {
 	if !contains(names, "hermes") || !contains(names, "architect") {
 		t.Fatalf("projects = %v", names)
 	}
+	for _, harness := range Registry() {
+		if harness.Name == "hermes" {
+			match := harness.Kinds[0].Match
+			if !match(got[0]) || !match(got[1]) || match(filepath.Join(root, "state.db.backup")) {
+				t.Fatalf("registry did not recognize both Hermes store layouts: %v", got)
+			}
+			return
+		}
+	}
+	t.Fatal("Hermes missing from source registry")
 }
 
 func contains(ss []string, want string) bool {
