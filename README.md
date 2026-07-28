@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg)](https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu)
+
 <p align="center"><img src="assets/logo.svg" width="340" alt="deja-vu"></p>
 
 <p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; searches 3.3&nbsp;GB in ~12&nbsp;ms, serves it back to any agent over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
