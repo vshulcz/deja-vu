@@ -14,8 +14,10 @@ import (
 // and source path of every record; 14 deflates the record payload; 15 drops
 // the derivable offset from every bucket directory entry; 16 folds Traditional
 // CJK to Simplified before keying, so an index written before it holds keys
-// this build never queries.
-const version = 16
+// this build never queries; 17 filters out deja's own injected recall, which
+// earlier builds indexed back in, so an existing index is rebuilt once to drop
+// the copies it already holds.
+const version = 17
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

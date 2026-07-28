@@ -737,6 +737,9 @@ func recordsForKey(path string, t *recordTables, key string) ([]Record, error) {
 }
 
 func redactForIngest(m *Manifest, sourcePath, text string) string {
+	// Drop deja's own injected recall before anything else looks at the text,
+	// so it is never counted, tokenized or stored.
+	text = stripSelfRecall(text)
 	// Redact the full text before capping: a secret straddling the cap
 	// boundary would otherwise lose its closing marker and store raw.
 	redacted, counts := redact.Text(text)
@@ -1384,7 +1387,7 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 			for si := range jobs {
 				s := &ss[si]
 				for mi := range s.Messages {
-					redacted, counts := redact.Text(s.Messages[mi].Text)
+					redacted, counts := redact.Text(stripSelfRecall(s.Messages[mi].Text))
 					if len(redacted) > maxIndexedText {
 						cut := maxIndexedText
 						for cut > 0 && !utf8.RuneStart(redacted[cut]) {
