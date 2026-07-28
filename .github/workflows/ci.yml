@@ -62,8 +62,8 @@ jobs:
         run: |
           declare -A floor=(
             [cmd/deja]=88 [internal/bench]=100 [internal/digest]=90 [internal/embed]=93
-            [internal/index]=90 [internal/policy]=88 [internal/redact]=94
-            [internal/search]=89 [internal/sources]=87 [internal/usage]=95
+            [internal/index]=90 [internal/policy]=100 [internal/redact]=94
+            [internal/search]=93 [internal/sources]=87 [internal/usage]=95
           )
           fail=0
           while read -r pkg cov; do
