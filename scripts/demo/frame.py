@@ -69,7 +69,19 @@ def main() -> None:
     corners.putalpha(cap.split()[3].point(lambda v: 255 - v))
     corners.save(f"{a.out}/corners.png")
 
-    print(f"{w}x{h}: chrome.png, corners.png")
+    # patch.png replaces the two header lines that name the account with
+    # neutral text. Painting them out left grey holes that read as censorship;
+    # putting plain text back reads as the header it actually is.
+    patch = Image.new("RGBA", (a.width, a.height), (0, 0, 0, 0))
+    pd = ImageDraw.Draw(patch)
+    body = ImageFont.truetype(FONT, 19)
+    pd.rectangle([238, 94, 508, 124], fill=PANEL + (255,))
+    pd.text((249, 98), "Welcome back", font=body, fill=(230, 230, 230))
+    pd.rectangle([45, 206, 695, 256], fill=PANEL + (255,))
+    pd.text((54, 212), "Opus 5 (1M context) · Claude Max", font=body, fill=(138, 138, 138))
+    patch.save(f"{a.out}/patch.png")
+
+    print(f"{w}x{h}: chrome.png, corners.png, patch.png")
 
 
 if __name__ == "__main__":
