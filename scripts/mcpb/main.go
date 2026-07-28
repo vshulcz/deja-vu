@@ -49,6 +49,7 @@ func main() {
 	in := flag.String("in", "dist", "directory holding the built binaries")
 	out := flag.String("out", "dist", "directory to write the bundles into")
 	manifestPath := flag.String("manifest", filepath.Join("packaging", "mcpb", "manifest.json"), "manifest template")
+	registry := flag.Bool("registry", false, "build the single cross-platform bundle registries take, instead of the per-platform ones")
 	flag.Parse()
 
 	if *version == "" {
@@ -60,6 +61,19 @@ func main() {
 	}
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		fail(err)
+	}
+
+	if *registry {
+		path := filepath.Join(*out, fmt.Sprintf("deja-vu_%s_registry.mcpb", *version))
+		if err := packRegistry(path, template, *version); err != nil {
+			fail(err)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			fail(err)
+		}
+		fmt.Printf("%s  %d KB\n", filepath.Base(path), info.Size()/1024)
+		return
 	}
 
 	built := 0
@@ -149,6 +163,60 @@ func pack(path string, template []byte, binary string, t target, version string)
 	// The executable bit has to survive the zip, or the host installs a server
 	// it cannot start.
 	if err := add(z, "server/"+t.exe, body, 0o755); err != nil {
+		return err
+	}
+	if err := z.Close(); err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+// packRegistry builds the bundle for MCP registries, which accept one artifact
+// per server and have no way to offer a visitor the build for their machine.
+// A per-platform bundle would therefore be wrong for most people who found us
+// there, so this one launches the published npm package, which resolves the
+// right binary at run time. It is still a local stdio server — npx only does
+// the platform selection that the bundle format cannot express.
+//
+// It also carries no tools array. The MCPB format forbids inputSchema on tool
+// entries while the Smithery registry requires it, so a bundle that declares
+// its tools is rejected outright: https://github.com/smithery-ai/cli/issues/787
+func packRegistry(path string, template []byte, version string) error {
+	var m map[string]any
+	if err := json.Unmarshal(template, &m); err != nil {
+		return fmt.Errorf("manifest template: %w", err)
+	}
+	m["version"] = version
+	delete(m, "tools")
+	m["server"] = map[string]any{
+		"type":        "node",
+		"entry_point": "server/index.js",
+		"mcp_config": map[string]any{
+			"command": "npx",
+			"args":    []any{"-y", "@vshulcz/deja-vu@" + version, "mcp"},
+			"env":     map[string]any{},
+		},
+	}
+	m["compatibility"] = map[string]any{"platforms": []any{"darwin", "linux", "win32"}}
+
+	manifest, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	z := zip.NewWriter(f)
+	if err := add(z, "manifest.json", append(manifest, '\n'), 0o644); err != nil {
+		return err
+	}
+	// A one-line entry point so the bundle is self-describing if anyone opens
+	// it; the host starts the command above, not this file.
+	shim := "#!/usr/bin/env node\n// deja runs as `npx @vshulcz/deja-vu mcp`; see manifest.json.\n"
+	if err := add(z, "server/index.js", []byte(shim), 0o644); err != nil {
 		return err
 	}
 	if err := z.Close(); err != nil {

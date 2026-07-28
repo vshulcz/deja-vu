@@ -145,3 +145,56 @@ func TestPackKeepsTheBinaryExecutable(t *testing.T) {
 		t.Fatalf("binary mode = %v, not executable", mode)
 	}
 }
+
+// The registry bundle is the one artifact MCP registries accept per server, so
+// it must work on every platform and must not declare tools — Smithery rejects
+// any bundle that does (smithery-ai/cli#787).
+func TestRegistryBundleIsCrossPlatformAndToolless(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "registry.mcpb")
+	if err := packRegistry(out, templateJSON(t), "1.2.3"); err != nil {
+		t.Fatal(err)
+	}
+	z, err := zip.OpenReader(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = z.Close() }()
+
+	var manifest map[string]any
+	found := false
+	for _, f := range z.File {
+		if f.Name != "manifest.json" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.NewDecoder(rc).Decode(&manifest); err != nil {
+			t.Fatal(err)
+		}
+		_ = rc.Close()
+		found = true
+	}
+	if !found {
+		t.Fatal("no manifest.json in the registry bundle")
+	}
+	if _, ok := manifest["tools"]; ok {
+		t.Fatal("registry bundle declares tools; Smithery rejects those outright")
+	}
+	platforms := manifest["compatibility"].(map[string]any)["platforms"].([]any)
+	if len(platforms) != 3 {
+		t.Fatalf("platforms = %v, want all three", platforms)
+	}
+	cfg := manifest["server"].(map[string]any)["mcp_config"].(map[string]any)
+	if cfg["command"] != "npx" {
+		t.Fatalf("command = %v, want npx so the platform is resolved at run time", cfg["command"])
+	}
+	// The version has to be pinned, or the listing silently drifts to whatever
+	// npm publishes next.
+	args := cfg["args"].([]any)
+	if len(args) < 2 || args[1] != "@vshulcz/deja-vu@1.2.3" {
+		t.Fatalf("args = %v, want the version pinned", args)
+	}
+}

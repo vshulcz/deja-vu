@@ -46,7 +46,9 @@ jobs:
       # One bundle per platform: the .mcpb manifest has no architecture
       # selector, so a single universal file would be wrong for half of Linux.
       - name: Pack MCP bundles
-        run: go run ./scripts/mcpb -version "${GITHUB_REF_NAME#v}" -in dist -out dist/mcpb
+        run: |
+          go run ./scripts/mcpb -version "${GITHUB_REF_NAME#v}" -in dist -out dist/mcpb
+          go run ./scripts/mcpb -registry -version "${GITHUB_REF_NAME#v}" -out dist/mcpb
 
       - name: Attach MCP bundles to the release
         env:
