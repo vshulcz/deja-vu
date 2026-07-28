@@ -116,6 +116,10 @@ func TestNotesFileFollowsItsOverride(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("USERPROFILE", dir)
+	// Windows resolves this under APPDATA rather than the home directory, so
+	// leaving it alone points the test at the real machine.
+	t.Setenv("APPDATA", filepath.Join(dir, "AppData", "Roaming"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(dir, "AppData", "Local"))
 	t.Setenv("DEJA_NOTES_FILE", "")
 	t.Setenv("XDG_DATA_HOME", "")
 	if got := NotesFile(); !strings.HasPrefix(got, dir) {
