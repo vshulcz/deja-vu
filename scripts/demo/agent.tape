@@ -12,41 +12,13 @@
 #   HOME=/tmp/demo-home deja index --rebuild
 #   vhs scripts/demo/agent.tape
 #
-# Afterwards, ffmpeg cuts the dead time and paints over three regions that carry
-# the recorder's identity rather than the tool: the welcome greeting, the
-# account line in the header, and the custom statusline. Nothing else is edited.
+# Afterwards the raw recording is finished with ffmpeg and scripts/demo/frame.py:
 #
-#   ffmpeg -i agent-raw.gif -filter_complex \\
-#     "drawbox=x=185:y=66:w=230:h=34:color=0x171717:t=fill, \\
-#      drawbox=x=30:y=161:w=535:h=41:color=0x171717:t=fill, \\
-#      drawbox=x=0:y=912:w=1200:h=68:color=0x171717:t=fill" out.gif
-
-Output agent-raw.gif
-
-Set Shell zsh
-Set FontSize 15
-Set Width 1200
-Set Height 980
-Set Padding 20
-Set TypingSpeed 45ms
-Set Framerate 24
-
-# The recording is made from inside a Claude Code session, so the child-session
-# markers have to go or the nested run writes its transcript somewhere else.
-Hide
-Type "cd /tmp/work-demo && unset CLAUDE_CODE_CHILD_SESSION CLAUDECODE CLAUDE_CODE_ENTRYPOINT && export PS1='$ ' && clear"
-Enter
-Sleep 500ms
-Type "claude --mcp-config /tmp/demo-mcp.json --allowedTools 'mcp__deja__recall,mcp__deja__recall_context'"
-Enter
-# First run in a directory asks whether the folder is trusted; accept it while
-# the recording is still hidden, or the question below lands in that prompt.
-Sleep 4s
-Enter
-Sleep 8s
-Show
-
-Type "prepared statement errors behind pgbouncer again after upgrading the driver. did we hit this before?"
-Sleep 600ms
-Enter
-Sleep 75s
+#   python3 scripts/demo/frame.py            # window chrome + rounded corners
+#   ffmpeg -i agent-raw.gif -i chrome.png -i corners.png -filter_complex "..."
+#
+# That step crops the terminal to its content, paints over the three regions
+# carrying the recorder's identity rather than the tool (the greeting, the
+# account line, the custom statusline), hard-cuts the model's thinking time
+# instead of fast-forwarding it, and composites the result into a window.
+# Nothing in the session output is edited.
