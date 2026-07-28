@@ -490,7 +490,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		if hits[i].Tier == "" {
 			hits[i].Tier = TierExact
 		}
-		hits[i].Session.SetSource(os.Getenv("DEJA_SOURCE_INSTANCE"))
+		hits[i].Session.SetSource(o.SourceInstance)
 	}
 	if o.JSON {
 		if o.Semantic {

@@ -68,6 +68,15 @@
       "files": 0
     },
     {
+      "name": "hermes",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.hermes",
+        "<tmp>/home/.hermes/profiles"
+      ],
+      "files": 0
+    },
+    {
       "name": "qwen",
       "state": "missing",
       "paths": [

@@ -83,8 +83,8 @@ func TestWrappersReportAMissingHarness(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(home, "idx"))
 	t.Setenv("PATH", filepath.Join(home, "empty"))
-	for name, run := range map[string]func(string, []string) error{"aider": cmdAider, "goose": cmdGoose} {
-		err := run(filepath.Join(home, "idx"), []string{"--version"})
+	for name, run := range map[string]func(string, []string, string) error{"aider": cmdAider, "goose": cmdGoose} {
+		err := run(filepath.Join(home, "idx"), []string{"--version"}, "")
 		if err == nil {
 			t.Fatalf("%s: no error with the harness absent", name)
 		}

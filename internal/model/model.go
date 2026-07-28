@@ -20,7 +20,7 @@ type Session struct {
 	Started  time.Time `json:"started"`
 	Updated  time.Time `json:"updated"`
 	Messages []Message `json:"messages,omitempty"`
-	Source   Source    `json:"source"`
+	Source   *Source   `json:"source,omitempty"`
 }
 
 // Source identifies where a session entered this deja index. Instance is an
@@ -35,10 +35,10 @@ type Source struct {
 // project string retained for human compatibility.
 func (s *Session) SetSource(localInstance string) {
 	if strings.HasPrefix(s.Project, "imported:") {
-		s.Source = Source{Origin: "imported"}
+		s.Source = &Source{Origin: "imported"}
 		return
 	}
-	s.Source = Source{Origin: "local", Instance: localInstance}
+	s.Source = &Source{Origin: "local", Instance: localInstance}
 }
 
 func (s *Session) Touch(t time.Time) {

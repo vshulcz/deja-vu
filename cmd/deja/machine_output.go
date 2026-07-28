@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"os"
 
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -27,10 +26,10 @@ type sessionJSON struct {
 	Window        sessionWindow `json:"window"`
 }
 
-func printRecentJSON(w io.Writer, sessions []model.Session) error {
+func printRecentJSON(w io.Writer, sessions []model.Session, sourceInstance string) error {
 	for i := range sessions {
 		sessions[i].Messages = nil
-		sessions[i].SetSource(os.Getenv("DEJA_SOURCE_INSTANCE"))
+		sessions[i].SetSource(sourceInstance)
 	}
 	if sessions == nil {
 		sessions = []model.Session{}
@@ -38,7 +37,7 @@ func printRecentJSON(w io.Writer, sessions []model.Session) error {
 	return json.NewEncoder(w).Encode(recentJSON{SchemaVersion: jsonout.Version, Sessions: sessions})
 }
 
-func printSessionJSON(w io.Writer, session model.Session, offset, limit int) error {
+func printSessionJSON(w io.Writer, session model.Session, offset, limit int, sourceInstance string) error {
 	total := len(session.Messages)
 	if offset > total {
 		offset = total
@@ -48,7 +47,7 @@ func printSessionJSON(w io.Writer, session model.Session, offset, limit int) err
 		end = total
 	}
 	session.Messages = session.Messages[offset:end]
-	session.SetSource(os.Getenv("DEJA_SOURCE_INSTANCE"))
+	session.SetSource(sourceInstance)
 	return json.NewEncoder(w).Encode(sessionJSON{
 		SchemaVersion: jsonout.Version,
 		Session:       session,

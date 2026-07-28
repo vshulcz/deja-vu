@@ -9,13 +9,10 @@ import (
 // commands start an editor, so a search could launch a whole agent.
 func TestBareWrapperNamesSearchInsteadOfLaunching(t *testing.T) {
 	for _, name := range []string{"aider", "goose"} {
-		cmd, ok := commands[name]
-		if !ok {
-			t.Fatalf("%s is not a command any more; this guard needs updating", name)
-		}
+		t.Setenv("DEJA_INDEX_DIR", t.TempDir())
 		// With no arguments the wrapper must not reach exec.LookPath at all.
 		// Searching an empty index is quiet and harmless, which is the point.
-		if err := cmd(t.TempDir(), nil); err != nil && strings.Contains(err.Error(), "not on PATH") {
+		if err := run([]string{name}); err != nil && strings.Contains(err.Error(), "not on PATH") {
 			t.Fatalf("bare `deja %s` tried to launch the harness: %v", name, err)
 		}
 	}
@@ -36,7 +33,7 @@ func TestPluginsUseTheExplicitSearchForm(t *testing.T) {
 }
 
 func TestSearchCommandNeedsAQuery(t *testing.T) {
-	if err := cmdSearch(t.TempDir(), nil); err == nil {
+	if err := cmdSearch(t.TempDir(), nil, ""); err == nil {
 		t.Fatal("empty search accepted")
 	}
 }

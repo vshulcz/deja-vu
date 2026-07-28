@@ -59,7 +59,7 @@ func TestDoctorFullReport(t *testing.T) {
 	got := out.String()
 	for _, want := range []string{
 		"Harness stores:", "Tools:", "MCP wiring:", "Hooks:", "precompact", "Index:", "Version:",
-		"claude", "opencode", "aider", "gemini", "cursor", "antigravity", "grok",
+		"claude", "opencode", "aider", "gemini", "cursor", "antigravity", "grok", "hermes",
 		"1 file", mcpLine("claude-code", "wired"), "config missing",
 		"not built", "current  1.0.0", "latest   v9.9.9", "update available",
 	} {
@@ -125,6 +125,16 @@ func TestDoctorStoreStates(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDoctorStoreChecksIncludeHermes(t *testing.T) {
+	hermeticEnv(t)
+	for _, check := range doctorStoreChecks() {
+		if check.name == "hermes" {
+			return
+		}
+	}
+	t.Fatal("Hermes store missing from machine doctor report")
 }
 
 func TestDoctorParsesOnlyNewestFile(t *testing.T) {

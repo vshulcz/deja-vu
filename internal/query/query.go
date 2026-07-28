@@ -49,6 +49,7 @@ type Options struct {
 	All, JSON, Fuzzy, Stemmed bool
 	NoEmbed                   bool
 	Semantic                  bool                `json:"-"`
+	SourceInstance            string              `json:"-"`
 	FuzzyVariants             map[string][]string `json:"-"`
 	Tier                      string              `json:"-"`
 	// RecallWorn maps session id -> agent recall count; filled by callers
