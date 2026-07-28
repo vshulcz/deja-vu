@@ -72,6 +72,12 @@ type FileState struct {
 	// A session file caught mid-write ends in a torn line; parsing skips it,
 	// and the next append must resume from here or that message is lost.
 	SafeSize int64 `json:"safe_size,omitempty"`
+	// PrefixHash fingerprints the bytes up to SafeSize. Growth alone does not
+	// prove the earlier bytes are untouched: agents rewind a session by
+	// truncating and rewriting it, and once it grows past its old length that
+	// looks exactly like an append. Without this the rewritten prefix keeps
+	// its old text in the index and the new text is never read.
+	PrefixHash uint64 `json:"prefix_hash,omitempty"`
 }
 
 type SessionMeta struct {

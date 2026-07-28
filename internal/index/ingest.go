@@ -1037,6 +1037,13 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 		if of.SafeSize == 0 && of.Size > 0 {
 			return false
 		}
+		// Growth is not proof that the earlier bytes are untouched: a rewind
+		// that truncates and regrows past the old length looks exactly like
+		// an append, and appending onto it leaves the rewritten prefix in the
+		// index with its old text. Compare the prefix before trusting it.
+		if of.PrefixHash != 0 && filePrefixHash(p, of.SafeSize) != of.PrefixHash {
+			return false
+		}
 		switch harnessForPath(p) {
 		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot":
 		default:
@@ -1248,6 +1255,7 @@ func currentFiles(h string) map[string]FileState {
 			fs := FileState{Path: p, Size: fi.Size(), MTime: fi.ModTime().UnixNano()}
 			if strings.HasSuffix(p, ".jsonl") {
 				fs.SafeSize = lastCompleteLineOffset(p, fi.Size())
+				fs.PrefixHash = filePrefixHash(p, fs.SafeSize)
 			}
 			if harnessForPath(p) == "grok" {
 				if summary, err := os.Lstat(filepath.Join(filepath.Dir(p), "summary.json")); err == nil && summary.Mode()&os.ModeSymlink == 0 && !summary.IsDir() {
@@ -1365,4 +1373,23 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 	}
 	close(jobs)
 	wg.Wait()
+}
+
+// filePrefixHash fingerprints the first n bytes of a file. Only used to decide
+// whether an append is safe, so a fast non-cryptographic hash is the right
+// tool: a collision costs one unnecessary full reparse, never a wrong index.
+func filePrefixHash(path string, n int64) uint64 {
+	if n <= 0 {
+		return 0
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = f.Close() }()
+	h := fnv.New64a()
+	if _, err := io.Copy(h, io.LimitReader(f, n)); err != nil {
+		return 0
+	}
+	return h.Sum64()
 }
