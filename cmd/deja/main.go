@@ -189,18 +189,74 @@ func cmdHookContext(dir string, rest []string) error {
 }
 
 func cmdShow(dir string, rest []string) error {
-	if len(rest) < 1 {
+	id, harness, jsonOutput, offset, limit, err := parseShow(rest)
+	if err != nil {
+		return err
+	}
+	if id == "" {
 		return fmt.Errorf("show needs id-prefix")
 	}
-	s, ok, err := findByPrefix(dir, rest[0])
+	var s model.Session
+	var ok bool
+	if harness != "" {
+		s, ok, err = index.FindByIdentity(dir, harness, id)
+	} else {
+		s, ok, err = findByPrefix(dir, id)
+	}
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no session matches %q", rest[0])
+		return fmt.Errorf("no session matches %q", id)
+	}
+	if jsonOutput {
+		return printSessionJSON(os.Stdout, s, offset, limit)
 	}
 	search.PrintSession(os.Stdout, s)
 	return nil
+}
+
+func parseShow(args []string) (id, harness string, jsonOutput bool, offset, limit int, err error) {
+	limit = 50
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; a {
+		case "--json":
+			jsonOutput = true
+		case "--harness", "--offset", "--limit":
+			if i+1 >= len(args) {
+				return "", "", false, 0, 0, fmt.Errorf("%s needs value", a)
+			}
+			i++
+			if a == "--harness" {
+				harness = args[i]
+				continue
+			}
+			n, e := strconv.Atoi(args[i])
+			if e != nil || n < 0 || (a == "--limit" && n == 0) {
+				return "", "", false, 0, 0, fmt.Errorf("%s needs a positive integer", a)
+			}
+			if a == "--offset" {
+				offset = n
+			} else {
+				limit = n
+			}
+		default:
+			if strings.HasPrefix(a, "-") {
+				return "", "", false, 0, 0, fmt.Errorf("show: unknown flag %q", a)
+			}
+			if id != "" {
+				return "", "", false, 0, 0, fmt.Errorf("show accepts one session id")
+			}
+			id = a
+		}
+	}
+	if jsonOutput && harness == "" {
+		return "", "", false, 0, 0, fmt.Errorf("show --json requires --harness for exact identity")
+	}
+	if limit > 200 {
+		return "", "", false, 0, 0, fmt.Errorf("show --limit must not exceed 200")
+	}
+	return id, harness, jsonOutput, offset, limit, nil
 }
 
 func cmdCtx(dir string, rest []string) error {
@@ -250,8 +306,14 @@ func cmdLast(dir string, rest []string) error {
 	// command worked, found nothing, or failed silently — which is what a
 	// fresh install sees. blame already answers this shape of question.
 	if len(ss) == 0 {
+		if o.JSON {
+			return printRecentJSON(os.Stdout, nil)
+		}
 		fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions indexed yet"))
 		return nil
+	}
+	if o.JSON {
+		return printRecentJSON(os.Stdout, ss)
 	}
 	for _, s := range ss {
 		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, s.Updated.Format("2006-01-02"), s.ID)
@@ -423,6 +485,8 @@ func parseLast(args []string) (int, search.Options, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
+		case "--json":
+			o.JSON = true
 		case "--harness", "--project", "--since", "--role":
 			if i+1 >= len(args) {
 				return n, o, fmt.Errorf("%s needs value", a)
@@ -524,7 +588,7 @@ func parseSearch(args []string) (search.Options, error) {
 			o.All = true
 		case "--no-embed":
 			o.NoEmbed = true
-		case "--harness", "--project", "--since", "--role":
+		case "--harness", "--project", "--since", "--role", "--limit":
 			if i+1 >= len(args) {
 				return o, fmt.Errorf("%s needs value", a)
 			}
@@ -537,6 +601,12 @@ func parseSearch(args []string) (search.Options, error) {
 				o.Project = v
 			case "--role":
 				o.Role = v
+			case "--limit":
+				n, err := strconv.Atoi(v)
+				if err != nil || n < 1 || n > 100 {
+					return o, fmt.Errorf("--limit needs an integer from 1 to 100")
+				}
+				o.Limit = n
 			default:
 				d, err := parseDur(v)
 				if err != nil {
@@ -844,7 +914,7 @@ func printUsage() {
 
 Usage:
   deja [flags] <query>
-  deja show <id-prefix>
+  deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
   deja handoff [--to <agent>] [id-prefix] [--exec]
@@ -856,7 +926,7 @@ Usage:
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]
-  deja last [n] [--project name] [--harness name] [--since duration] [--role user|assistant|tool]
+  deja last [n] [--json] [--project name] [--harness name] [--since duration] [--role user|assistant|tool]
   deja sources
   deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]

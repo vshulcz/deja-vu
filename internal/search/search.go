@@ -225,8 +225,12 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 	}
 	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks), o.RecallWorn)
 	markEarlierAttempts(hits)
-	if !o.All && len(hits) > 15 {
-		hits = hits[:15]
+	limit := o.Limit
+	if limit == 0 && !o.All {
+		limit = 15
+	}
+	if limit > 0 && len(hits) > limit {
+		hits = hits[:limit]
 	}
 	return hits, nil
 }
@@ -486,6 +490,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		if hits[i].Tier == "" {
 			hits[i].Tier = TierExact
 		}
+		hits[i].Session.SetSource(os.Getenv("DEJA_SOURCE_INSTANCE"))
 	}
 	if o.JSON {
 		if o.Semantic {

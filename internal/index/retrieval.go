@@ -888,7 +888,35 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 		return model.Session{}, false, nil
 	}
 	sort.Slice(matches, func(i, j int) bool { return matches[i].Updated.After(matches[j].Updated) })
-	meta := matches[0]
+	return loadSessionMeta(dir, m, matches[0])
+}
+
+// FindByIdentity resolves the exact composite identity emitted by machine
+// search and recent output. Unlike the human prefix command, it never guesses
+// between harnesses or accepts a shortened native ID.
+func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	meta, ok := m.Sessions[harness+":"+id]
+	if !ok {
+		return model.Session{}, false, nil
+	}
+	return loadSessionMeta(dir, m, meta)
+}
+
+func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
 	s := sessionFromMeta(meta)
 	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Harness+":"+meta.ID)
 	if err != nil {

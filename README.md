@@ -136,14 +136,14 @@ $ deja "jwt refresh token"
 
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; zero-result queries try word forms before close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--json`. |
+| `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; zero-result queries try word forms before close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--limit`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
 | `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
-| `deja show <id>` / `deja last [n]` | Read one session / list recent ones (`--project`, `--harness`, `--since`, `--role`). |
+| `deja show <id>` / `deja last [n]` | Read one session / list recent ones (`--project`, `--harness`, `--since`, `--role`). `last --json` returns versioned metadata; `show <exact-id> --harness <name> --json` returns a bounded, versioned message window (`--offset`, `--limit`). |
 | `deja resume <id> [--exec]` | Reopen a found session in its native harness (`claude --resume`, `codex resume`, `opencode -s`, `grok --resume`). |
 | `deja sources` | Discovered stores, sizes, message and redaction counts. |
 | `deja mcp` | The stdio MCP server (what `deja install` wires in). |
@@ -156,6 +156,11 @@ $ deja "jwt refresh token"
 | `deja` | On a terminal with an index: a living brief — today's sessions, recalls served, déjà vu moments, and a search suggestion from your own history. |
 
 Stemmed JSON searches set `"stemmed": true` and include the catalog variants used.
+
+Machine session objects include `source.origin` (`local` or `imported`). Set
+`DEJA_SOURCE_INSTANCE` to a stable operator-chosen installation name when a
+consumer must distinguish local store sets. Imported sessions deliberately omit
+the instance until sync carries peer provenance explicitly.
 
 Search hits carry `exact`, `close`, or `semantic` confidence tiers; close hits include the matched variant and semantic hits include cosine.
 

@@ -527,6 +527,15 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 	if got, ok, err := FindByPrefix(idx, "s"); err != nil || !ok || len(got.Messages) != 2 {
 		t.Fatalf("FindByPrefix=%#v ok=%v err=%v", got, ok, err)
 	}
+	if got, ok, err := FindByIdentity(idx, "claude", "s1"); err != nil || !ok || len(got.Messages) != 2 {
+		t.Fatalf("FindByIdentity=%#v ok=%v err=%v", got, ok, err)
+	}
+	if got, ok, err := FindByIdentity(idx, "codex", "s1"); err != nil || ok || got.ID != "" {
+		t.Fatalf("FindByIdentity missing=%#v ok=%v err=%v", got, ok, err)
+	}
+	if got, ok, err := FindByIdentity("", "claude", "s1"); err != nil || !ok || got.ID != "s1" {
+		t.Fatalf("FindByIdentity default=%#v ok=%v err=%v", got, ok, err)
+	}
 	recs, err := recordsForKey(filepath.Join(idx, "records.bin"), mustTables(t, idx), "claude:s1")
 	if err != nil || len(recs) != 2 {
 		t.Fatalf("records=%#v err=%v", recs, err)

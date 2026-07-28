@@ -45,6 +45,7 @@ type Options struct {
 	Regex                     bool
 	Harness, Project, Role    string
 	Since                     time.Duration
+	Limit                     int
 	All, JSON, Fuzzy, Stemmed bool
 	NoEmbed                   bool
 	Semantic                  bool                `json:"-"`

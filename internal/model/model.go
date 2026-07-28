@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Message struct {
 	Role string    `json:"role"`
@@ -17,6 +20,25 @@ type Session struct {
 	Started  time.Time `json:"started"`
 	Updated  time.Time `json:"updated"`
 	Messages []Message `json:"messages,omitempty"`
+	Source   Source    `json:"source"`
+}
+
+// Source identifies where a session entered this deja index. Instance is an
+// operator-configured stable name for the local store set; imported sessions
+// deliberately omit it until sync carries peer provenance of its own.
+type Source struct {
+	Origin   string `json:"origin"`
+	Instance string `json:"instance,omitempty"`
+}
+
+// SetSource fills the machine-facing provenance fields without changing the
+// project string retained for human compatibility.
+func (s *Session) SetSource(localInstance string) {
+	if strings.HasPrefix(s.Project, "imported:") {
+		s.Source = Source{Origin: "imported"}
+		return
+	}
+	s.Source = Source{Origin: "local", Instance: localInstance}
 }
 
 func (s *Session) Touch(t time.Time) {

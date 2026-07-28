@@ -30,6 +30,7 @@ Default exact search returns a JSON array of hits:
       "path": "/home/user/.claude/projects/.../session.jsonl",
       "started": "2026-01-02T03:04:05Z",
       "updated": "2026-01-02T03:10:00Z",
+      "source": {"origin": "local", "instance": "workstation"},
       "messages": [
         {"role": "user", "text": "why does the parser fail on …", "time": "2026-01-02T03:04:05Z"}
       ]
@@ -59,6 +60,60 @@ Stemmed search may also include `variants`; semantic search sets `semantic`.
 `superseded` (optional) carries the date of a newer same-project session whose
 matches overlap this hit — an earlier-attempt signal. `reused` (optional)
 counts recent agent recalls that served this session.
+
+`--limit N` bounds the ranked result set to 1–100 hits. Every machine session
+has `source.origin`, either `local` or `imported`. When
+`DEJA_SOURCE_INSTANCE` is configured, local sessions also carry that stable
+operator-chosen `source.instance`; imported sessions omit it because current
+sync batches do not carry trustworthy peer identity.
+
+## `deja last --json`
+
+Recent session metadata uses a versioned envelope and never includes messages:
+
+```json
+{
+  "schema_version": 1,
+  "sessions": [
+    {
+      "harness": "codex",
+      "id": "abc123",
+      "project": "myapp",
+      "started": "2026-01-02T03:04:05Z",
+      "updated": "2026-01-02T03:10:00Z",
+      "source": {"origin": "local", "instance": "workstation"}
+    }
+  ]
+}
+```
+
+The existing positional count remains the bound, for example
+`deja last 20 --json --harness codex`.
+
+## `deja show <exact-id> --harness <name> --json`
+
+Machine reads require the composite harness plus exact native session ID. They
+return redacted index content in a bounded message window; the default limit is
+50 and the maximum is 200.
+
+```json
+{
+  "schema_version": 1,
+  "session": {
+    "harness": "codex",
+    "id": "abc123",
+    "project": "myapp",
+    "source": {"origin": "local", "instance": "workstation"},
+    "messages": [
+      {"role": "user", "text": "bounded redacted text", "time": "2026-01-02T03:04:05Z"}
+    ]
+  },
+  "window": {"offset": 0, "limit": 50, "total": 81, "returned": 50}
+}
+```
+
+Use `--offset N --limit N` to page without parsing human output. An offset past
+the end returns an empty `messages` array and a `returned` count of zero.
 
 ## `deja stats --json`
 
