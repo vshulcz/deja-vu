@@ -21,6 +21,14 @@ fixtures/synthetic/opencode.db
 .qwen/
 .kimi-code/
 
-# compiled helpers from `go build ./scripts/...`
+# compiled helpers from `go build ./scripts/...` — one line per scripts/ package
+# so a stray binary never rides along in a commit again
 /mcpb
+/demo
+/corpus
+/pinmanifests
+/genmatrix
+/locomo
+/longmemeval
+/miracl
 /dist/
