@@ -154,7 +154,7 @@ func TestFirstIndexGreetingIncludesParsedZeroWarning(t *testing.T) {
 	// the case worth warning about. A file holding only setup records is an
 	// unused session and stays quiet.
 	bad := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "project", "bad.jsonl")
-	writeFileMkdir(t, bad, `{"type":"user","message":{"role":"user","content":"hi"` + "\n")
+	writeFileMkdir(t, bad, `{"type":"user","message":{"role":"user","content":"hi"`+"\n")
 	oldLogoWanted := logoWanted
 	logoWanted = func(*os.File) bool { return true }
 	defer func() { logoWanted = oldLogoWanted }()
