@@ -287,3 +287,28 @@ func pageSessionID(page string) string {
 	}
 	return ""
 }
+
+// What an agent needs back is what was decided, not a restatement of the
+// symptom it just described. Recording a real agent session against a synthetic
+// corpus, the model said the quiet part out loud: "the recall only preserved
+// the incident title, not the exact fix."
+func TestRecallReturnsTheDecisionNotOnlyTheQuestion(t *testing.T) {
+	hermeticEnv(t)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(root, "payments", "s1.jsonl"), "s1", []string{
+		`{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"prepared statements keep failing behind pgbouncer after the driver upgrade"}}`,
+		`{"type":"assistant","sessionId":"s1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"pgbouncer in transaction mode cannot hold those across connections. We pinned pgx to 5.4.3 and left a note to revisit later."}}`,
+	})
+
+	got, err := recallText(index.DefaultDir(), "prepared statements pgbouncer", "", 5, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "pinned pgx to 5.4.3") {
+		t.Fatalf("recall returned the question without the decision:\n%s", got)
+	}
+	// The question stays too — the pair is the unit of memory.
+	if !strings.Contains(got, "prepared statements keep failing") {
+		t.Fatalf("recall dropped the question:\n%s", got)
+	}
+}

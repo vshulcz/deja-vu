@@ -272,6 +272,45 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	return string(b), err
 }
 
+// attachAnswers puts the decision next to the question.
+//
+// A recall query describes a symptom, so the user turn wins on term overlap and
+// its snippet restates what the caller already knows. Search cannot fix this on
+// its own: it returns only the messages that matched, so the reply that resolved
+// the session is not in memory at that point. Here the index is at hand, so the
+// session is read back and the reply carried along.
+func attachAnswers(dir string, hits []search.Hit) {
+	for i := range hits {
+		h := &hits[i]
+		if len(h.Snippets) == 0 || len(h.Snippets) >= 3 {
+			continue
+		}
+		var matchedUser string
+		for _, m := range h.Session.Messages {
+			if m.Role == "user" {
+				matchedUser = m.Text
+				break
+			}
+		}
+		if matchedUser == "" {
+			continue
+		}
+		full, ok, err := index.FindByIdentity(dir, h.Session.Harness, h.Session.ID)
+		if err != nil || !ok {
+			continue
+		}
+		for mi, m := range full.Messages {
+			if m.Role != "user" || m.Text != matchedUser {
+				continue
+			}
+			if a := search.AnswerAfter(full.Messages, mi); a != "" {
+				h.Snippets = append(h.Snippets, "→ "+a)
+			}
+			break
+		}
+	}
+}
+
 func recallText(dir, q, harness string, limit, budget int) (string, error) {
 	text, _, _, _, err := recallTextResult(dir, q, harness, limit, 0, budget)
 	return text, err
@@ -335,6 +374,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		remaining = len(hits) - limit
 		hits = hits[:limit]
 	}
+	attachAnswers(dir, hits)
 	var b strings.Builder
 	served := 0
 	if stale {

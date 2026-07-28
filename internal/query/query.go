@@ -41,11 +41,15 @@ var stopWords = map[string]bool{
 // QueryParts separates ordinary terms from quoted phrases without changing
 // the query syntax used by callers.
 type Options struct {
-	Query                     string
-	Regex                     bool
-	Harness, Project, Role    string
-	Since                     time.Duration
-	Limit                     int
+	Query                  string
+	Regex                  bool
+	Harness, Project, Role string
+	Since                  time.Duration
+	Limit                  int
+	// WithAnswer carries the assistant reply next to a matched user turn.
+	// Agent-facing recall sets it; human CLI output does not, because a person
+	// reading results can open the session.
+	WithAnswer                bool
 	All, JSON, Fuzzy, Stemmed bool
 	NoEmbed                   bool
 	Semantic                  bool                `json:"-"`
