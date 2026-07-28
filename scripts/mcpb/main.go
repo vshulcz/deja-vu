@@ -192,8 +192,8 @@ func packRegistry(path string, template []byte, version string) error {
 		"type":        "node",
 		"entry_point": "server/index.js",
 		"mcp_config": map[string]any{
-			"command": "npx",
-			"args":    []any{"-y", "@vshulcz/deja-vu@" + version, "mcp"},
+			"command": "node",
+			"args":    []any{"${__dirname}/server/index.js"},
 			"env":     map[string]any{},
 		},
 	}
@@ -213,16 +213,42 @@ func packRegistry(path string, template []byte, version string) error {
 	if err := add(z, "manifest.json", append(manifest, '\n'), 0o644); err != nil {
 		return err
 	}
-	// A one-line entry point so the bundle is self-describing if anyone opens
-	// it; the host starts the command above, not this file.
-	shim := "#!/usr/bin/env node\n// deja runs as `npx @vshulcz/deja-vu mcp`; see manifest.json.\n"
-	if err := add(z, "server/index.js", []byte(shim), 0o644); err != nil {
+	if err := add(z, "server/index.js", []byte(entryJS(version)), 0o755); err != nil {
 		return err
 	}
 	if err := z.Close(); err != nil {
 		return err
 	}
 	return f.Close()
+}
+
+// entryJS is a real server, not a placeholder. Registries introspect a bundle
+// by launching it and calling tools/list — an entry point that did nothing
+// produced a listing with no tools and no description, and Smithery reported it
+// as "No values to set". So this execs the published package and gets out of
+// the way, keeping stdio wired end to end.
+func entryJS(version string) string {
+	return `#!/usr/bin/env node
+// deja is a single native binary. This launches the published npm package,
+// which resolves the build for the current platform, and passes stdio straight
+// through so the MCP session is unmodified.
+const { spawn } = require("node:child_process");
+
+const child = spawn(
+  process.platform === "win32" ? "npx.cmd" : "npx",
+  ["-y", "@vshulcz/deja-vu@` + version + `", "mcp"],
+  { stdio: "inherit", shell: false },
+);
+
+child.on("error", (err) => {
+  process.stderr.write("deja: could not start: " + err.message + "\n");
+  process.exit(1);
+});
+child.on("exit", (code, signal) => {
+  if (signal) process.kill(process.pid, signal);
+  else process.exit(code ?? 0);
+});
+`
 }
 
 func add(z *zip.Writer, name string, body []byte, mode fs.FileMode) error {

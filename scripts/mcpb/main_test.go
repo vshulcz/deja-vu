@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -188,13 +189,28 @@ func TestRegistryBundleIsCrossPlatformAndToolless(t *testing.T) {
 		t.Fatalf("platforms = %v, want all three", platforms)
 	}
 	cfg := manifest["server"].(map[string]any)["mcp_config"].(map[string]any)
-	if cfg["command"] != "npx" {
-		t.Fatalf("command = %v, want npx so the platform is resolved at run time", cfg["command"])
+	if cfg["command"] != "node" {
+		t.Fatalf("command = %v, want node running the bundled entry point", cfg["command"])
 	}
-	// The version has to be pinned, or the listing silently drifts to whatever
-	// npm publishes next.
-	args := cfg["args"].([]any)
-	if len(args) < 2 || args[1] != "@vshulcz/deja-vu@1.2.3" {
-		t.Fatalf("args = %v, want the version pinned", args)
+}
+
+// A registry introspects a bundle by launching it, so the entry point has to be
+// a working server rather than a note explaining where the real one lives. It
+// also has to pin the version: an unpinned launcher drifts onto whatever npm
+// publishes next, which is not what anyone reviewed.
+func TestRegistryEntryPointLaunchesTheServer(t *testing.T) {
+	js := entryJS("1.2.3")
+	for _, want := range []string{"spawn", "@vshulcz/deja-vu@1.2.3", "\"mcp\"", "stdio"} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("entry point is missing %q:\n%s", want, js)
+		}
+	}
+	// stdio must pass straight through; anything that buffers or rewrites it
+	// corrupts the JSON-RPC stream.
+	if !strings.Contains(js, `stdio: "inherit"`) {
+		t.Fatalf("entry point does not inherit stdio:\n%s", js)
+	}
+	if !strings.Contains(js, "npx.cmd") {
+		t.Fatalf("entry point will not start on windows:\n%s", js)
 	}
 }
