@@ -36,13 +36,13 @@
     "fixtures/registry/cline/legacy/tasks/1767225600000/api_conversation_history.json"
    ],
    "parser_source": "internal/sources/cline.go",
-   "last_verified": "2026-07-27",
+   "last_verified": "2026-07-28",
    "display_name": "Cline",
    "capabilities": {
     "mcp": true,
     "auto": true,
     "resume": true,
-    "handoff": "paste",
+    "handoff": "exec",
     "prereq": ""
    }
   },
@@ -241,13 +241,13 @@
     "fixtures/registry/goose/sessions/goose.sql"
    ],
    "parser_source": "internal/sources/goose.go",
-   "last_verified": "2026-07-27",
+   "last_verified": "2026-07-28",
    "display_name": "Goose",
    "capabilities": {
     "mcp": true,
     "auto": true,
     "resume": true,
-    "handoff": "paste",
+    "handoff": "exec",
     "prereq": "deja goose"
    }
   },
@@ -282,13 +282,13 @@
     "fixtures/registry/kimi/sessions/wd_demo_0123456789ab/session_fixture01/agents/main/wire.jsonl"
    ],
    "parser_source": "internal/sources/kimi.go",
-   "last_verified": "2026-07-21",
+   "last_verified": "2026-07-28",
    "display_name": "Kimi Code",
    "capabilities": {
     "mcp": true,
     "auto": true,
     "resume": true,
-    "handoff": "paste",
+    "handoff": "exec",
     "prereq": ""
    }
   },

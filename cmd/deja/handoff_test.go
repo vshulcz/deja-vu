@@ -40,6 +40,11 @@ func TestHandoffCommandTable(t *testing.T) {
 		"grok":     {"grok", "P"},
 		"cursor":   {"cursor-agent", "P"},
 		"copilot":  {"copilot", "-p", "P"},
+		// Verified against the running CLIs: cline answers a bare prompt
+		// argument, goose takes run -t, and kimi documents -p.
+		"cline": {"cline", "P"},
+		"goose": {"goose", "run", "-t", "P"},
+		"kimi":  {"kimi", "-p", "P"},
 	}
 	for target, want := range cases {
 		argv, ok := handoffCommand(target, "P")
@@ -47,8 +52,13 @@ func TestHandoffCommandTable(t *testing.T) {
 			t.Fatalf("handoffCommand(%s) = %v, %v", target, argv, ok)
 		}
 	}
-	if _, ok := handoffCommand("antigravity", "P"); ok {
-		t.Fatal("antigravity has no CLI prompt entry point, must stay paste-only")
+	// These have no way to take a prompt from the command line: antigravity
+	// is a GUI, openclaw has no run command, hermes only opens a chat, and
+	// roo's tasks start from the extension.
+	for _, target := range []string{"antigravity", "openclaw", "hermes", "roo"} {
+		if _, ok := handoffCommand(target, "P"); ok {
+			t.Fatalf("%s has no CLI prompt entry point, must stay paste-only", target)
+		}
 	}
 	if len(handoffTargets()) != len(cases) {
 		t.Fatalf("handoffTargets() = %v out of sync with command table", handoffTargets())

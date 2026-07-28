@@ -99,7 +99,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			t.Fatalf("%s: unknown handoff kind %q", h.ID, c.Handoff)
 		}
 	}
-	if seen != len(handoffTargets())+7 { // +7: antigravity, kimi, cline, roo, openclaw, goose and hermes are paste-only
+	if seen != len(handoffTargets())+4 { // +4: antigravity, roo, openclaw and hermes have no CLI prompt entry point
 		t.Fatalf("registry covers %d harnesses, handoff targets %d", seen, len(handoffTargets()))
 	}
 

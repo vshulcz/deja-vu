@@ -188,11 +188,19 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"cursor-agent", prompt}, true
 	case "copilot":
 		return []string{"copilot", "-p", prompt}, true
+	case "cline":
+		// The CLI runs the extension headlessly and takes the prompt as its
+		// argument; verified by running one.
+		return []string{"cline", prompt}, true
+	case "goose":
+		return []string{"goose", "run", "-t", prompt}, true
+	case "kimi":
+		return []string{"kimi", "-p", prompt}, true
 	default:
 		return nil, false
 	}
 }
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "aider", "pi", "grok"}
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "aider", "pi", "grok", "cline", "goose", "kimi"}
 }

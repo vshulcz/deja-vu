@@ -23,7 +23,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time works too: `deja "what did we do in may"`, "a week ago" |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
-| **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"` |
+| **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"`; thirteen harnesses can be started directly, the rest print the prompt to paste |
 | **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
 | **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
@@ -269,7 +269,7 @@ limits, trust assumptions, and release verification.
 | Harness | Store | MCP recall | Auto-recall | Resume | Handoff | Needs |
 | --- | --- | :-: | :-: | :-: | :-: | --- |
 | Claude Code | `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl`<br>`${DEJA_CLAUDE_ROOT}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
-| Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | ✅ | ✅ | paste | — |
+| Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
 | opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | — | ✅ | — | ✅ | deja aider |
@@ -278,9 +278,9 @@ limits, trust assumptions, and release verification.
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | ✅ | ✅ | paste | — |
 | Grok Build | `${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl`<br>`${DEJA_GROK_ROOT}/sessions/**/updates.jsonl`<br>`${GROK_HOME:-~/.grok}/grok.db` | ✅ | — | — | ✅ | sqlite3 (grok-dev store) |
 | Hermes | `~/.hermes/profiles/*/state.db`<br>`${DEJA_HERMES_PROFILES_ROOT}/*/state.db`<br>`${DEJA_HERMES_DB}` | ✅ | ✅ | ✅ | paste | sqlite3 |
-| Goose | `${GOOSE_PATH_ROOT}/data/sessions/sessions.db`<br>`~/.local/share/goose/sessions/*.jsonl`<br>`~/.local/share/goose/sessions/sessions.db`<br>`${XDG_DATA_HOME}/goose/sessions/*.jsonl`<br>`${XDG_DATA_HOME}/goose/sessions/sessions.db`<br>`${DEJA_GOOSE_ROOT}/sessions/*.jsonl`<br>`${DEJA_GOOSE_ROOT}/sessions/sessions.db`<br>`${DEJA_GOOSE_DB}` | ✅ | ✅ | ✅ | paste | deja goose |
+| Goose | `${GOOSE_PATH_ROOT}/data/sessions/sessions.db`<br>`~/.local/share/goose/sessions/*.jsonl`<br>`~/.local/share/goose/sessions/sessions.db`<br>`${XDG_DATA_HOME}/goose/sessions/*.jsonl`<br>`${XDG_DATA_HOME}/goose/sessions/sessions.db`<br>`${DEJA_GOOSE_ROOT}/sessions/*.jsonl`<br>`${DEJA_GOOSE_ROOT}/sessions/sessions.db`<br>`${DEJA_GOOSE_DB}` | ✅ | ✅ | ✅ | ✅ | deja goose |
 | Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | ✅ | — | ✅ | — |
-| Kimi Code | `${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl`<br>`${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl` | ✅ | ✅ | ✅ | paste | — |
+| Kimi Code | `${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl`<br>`${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
 | pi | `${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl`<br>`${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl` | ✅ | ✅ | — | paste | — |
 | Copilot CLI | `${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl` | ✅ | — | ✅ | ✅ | — |
