@@ -35,7 +35,12 @@ func printSanitized(w io.Writer, text string) {
 	}
 	// The boundary line goes to stderr so piped output stays clean. Precise
 	// non-claims: pattern redaction is a floor, not a guarantee.
-	masked := 0
+	// Secrets are redacted at index time, so by the time a share is built
+	// most of them are already markers in the text and this pass finds
+	// nothing new. Counting only what this pass replaced reported "0 secrets
+	// masked" on a document visibly full of them — the opposite of what the
+	// line is for.
+	masked := strings.Count(redacted, redact.Marker)
 	for _, n := range counts {
 		masked += n
 	}
