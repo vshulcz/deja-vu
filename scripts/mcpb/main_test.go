@@ -127,7 +127,7 @@ func TestPackKeepsTheBinaryExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer z.Close()
+	defer func() { _ = z.Close() }()
 	seen := map[string]os.FileMode{}
 	for _, f := range z.File {
 		seen[f.Name] = f.Mode()
