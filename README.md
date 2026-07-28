@@ -67,6 +67,12 @@ npx @vshulcz/deja-vu "query"                            # npm, no install
 brew install vshulcz/tap/deja-vu                        # Homebrew
 ```
 
+For desktop apps that install MCP servers as bundles, every release ships an
+`.mcpb` per platform — download it from the
+[latest release](https://github.com/vshulcz/deja-vu/releases/latest) and open it.
+The bundle carries the binary, so there is nothing else to install. Terminal
+agents use `deja install` below instead.
+
 ### Shell completion
 
 ```sh

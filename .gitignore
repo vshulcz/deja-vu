@@ -20,3 +20,7 @@ fixtures/synthetic/opencode.db
 .opencode/
 .qwen/
 .kimi-code/
+
+# compiled helpers from `go build ./scripts/...`
+/mcpb
+/dist/

@@ -43,6 +43,16 @@ jobs:
         with:
           subject-checksums: dist/checksums.txt
 
+      # One bundle per platform: the .mcpb manifest has no architecture
+      # selector, so a single universal file would be wrong for half of Linux.
+      - name: Pack MCP bundles
+        run: go run ./scripts/mcpb -version "${GITHUB_REF_NAME#v}" -in dist -out dist/mcpb
+
+      - name: Attach MCP bundles to the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/mcpb/*.mcpb --clobber
+
   npm:
     name: npm packages
     runs-on: ubuntu-latest

@@ -111,6 +111,33 @@ jobs:
             done
           done
 
+  mcpb:
+    name: mcpb bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Pack a bundle
+        run: |
+          mkdir -p dist/deja_linux_amd64
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/deja_linux_amd64/deja ./cmd/deja
+          go run ./scripts/mcpb -version 0.0.0-ci -in dist -out dist/mcpb
+      # The manifest is validated against the published schema rather than our
+      # reading of it: a bundle that fails here would fail on a user's machine
+      # with nothing to explain why.
+      - name: Validate against the official schema
+        run: |
+          npx -y @anthropic-ai/mcpb@latest unpack dist/mcpb/deja-vu_0.0.0-ci_linux_amd64.mcpb dist/unpacked
+          npx -y @anthropic-ai/mcpb@latest validate dist/unpacked/manifest.json
+      - name: Start the server straight out of the bundle
+        run: |
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | dist/unpacked/server/deja mcp | tee /tmp/out.json
+          grep -q '"serverInfo"' /tmp/out.json
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest

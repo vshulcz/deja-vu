@@ -20,6 +20,14 @@ builds:
     ldflags:
       - -s -w -X main.version={{ .Version }}
 
+# macOS gets one bundle instead of two: the .mcpb manifest cannot select an
+# architecture, so the two Mach-O binaries are joined before packing.
+universal_binaries:
+  - id: deja-universal
+    ids: [deja]
+    replace: false
+    name_template: deja
+
 archives:
   - id: default
     builds:
