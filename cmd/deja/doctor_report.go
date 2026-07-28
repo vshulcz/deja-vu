@@ -116,7 +116,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 	return []doctorStoreCheck{
 		{"claude", []string{sources.ClaudeRoot()}, sources.ClaudeFiles(), sources.ParseClaudeFile},
 		{"codex", []string{sources.CodexRoot()}, sources.CodexFiles(), parseDoctorCodex},
-		{"opencode", []string{sources.OpencodeDB()}, presentDoctorFile(sources.OpencodeDB()), sources.ParseOpencodeDB},
+		{"opencode", []string{sources.OpencodeDB()}, presentDoctorFile(sources.OpencodeDB()), doctorProbeOpencode},
 		{"aider", aiderPaths, sources.AiderFiles(), sources.ParseAiderFile},
 		{"gemini", []string{sources.GeminiRoot()}, sources.GeminiChatFiles(), sources.ParseGeminiFile},
 		{"cursor", []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorFiles, parseDoctorCursor},
@@ -337,4 +337,15 @@ func fileHasConversation(path string) bool {
 		}
 	}
 	return false
+}
+
+// doctorProbeOpencode answers the only question the store check asks — does
+// this store parse into sessions — without reading all of it. Parsing the
+// whole database took 6.5 seconds of doctor's 8 on a 2.8 GB store, and every
+// row after the first few adds nothing to the answer.
+func doctorProbeOpencode(db string) ([]model.Session, error) {
+	// A plain limit does not help: the query orders by session and message
+	// time, so sqlite sorts the whole join before it can take the first row.
+	// Narrowing to the newest session first is what makes this cheap.
+	return sources.ParseOpencodeNewest(db)
 }

@@ -189,3 +189,21 @@ func parseNestedTime(m map[string]any, k, sub string) time.Time {
 	}
 	return time.Time{}
 }
+
+// ParseOpencodeNewest reads only the most recent session. deja doctor asks
+// one question of a store — does it parse into sessions — and answering it by
+// reading a multi-gigabyte database took 6.5 seconds of an 8 second report.
+func ParseOpencodeNewest(db string) ([]model.Session, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, nil
+	}
+	out, err := exec.Command("sqlite3", db, "select id from session order by time_created desc limit 1").Output()
+	if err != nil {
+		return nil, err
+	}
+	id := strings.TrimSpace(string(out))
+	if id == "" {
+		return nil, nil
+	}
+	return ParseOpencodeDBWhere(db, " and s.id='"+sqlQuote(id)+"'", 0)
+}
