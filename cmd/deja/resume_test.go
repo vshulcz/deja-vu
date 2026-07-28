@@ -118,3 +118,18 @@ func TestRunResumePrintAndErrors(t *testing.T) {
 		})
 	}
 }
+
+// Hermes was the one harness deja gave up on, while its own CLI takes the
+// exact session ID deja indexes.
+func TestResumeHermes(t *testing.T) {
+	dir, cmd, err := resumeCommand(model.Session{ID: "20260727_135519_a55c71", Harness: "hermes", Project: "p"})
+	if err != nil {
+		t.Fatalf("hermes resume: %v", err)
+	}
+	if dir != "" {
+		t.Fatalf("hermes resume should not need a directory, got %q", dir)
+	}
+	if cmd != "hermes --resume 20260727_135519_a55c71" {
+		t.Fatalf("cmd = %q", cmd)
+	}
+}

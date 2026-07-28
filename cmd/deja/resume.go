@@ -100,6 +100,10 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return dir, "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
+	case "hermes":
+		// Hermes takes the same session ID deja indexes, so this resumes the
+		// exact conversation rather than the most recent one.
+		return "", "hermes --resume " + s.ID, nil
 	case "aider":
 		dir := filepath.Dir(s.Path)
 		return "", "", fmt.Errorf("aider has no session resume — run aider in %s and it continues the same history", dir)

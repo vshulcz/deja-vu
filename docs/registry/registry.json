@@ -213,12 +213,12 @@
     "fixtures/registry/hermes/profiles/architect/hermes.sql"
    ],
    "parser_source": "internal/sources/hermes.go",
-   "last_verified": "2026-07-27",
+   "last_verified": "2026-07-28",
    "display_name": "Hermes",
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "resume": false,
+    "resume": true,
     "handoff": "paste",
     "prereq": "sqlite3"
    }
