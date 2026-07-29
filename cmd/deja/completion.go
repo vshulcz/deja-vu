@@ -78,7 +78,7 @@ _deja_completion() {
             ;;
         handoff)
             if [[ "$prev" == "--to" ]]; then
-                COMPREPLY=( $(compgen -W "claude codex opencode gemini qwen aider pi grok" -- "$cur") )
+                COMPREPLY=( $(compgen -W "claude codex opencode gemini qwen antigravity agy aider pi grok" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -W "--to --exec" -- "$cur") )
             fi
@@ -204,7 +204,7 @@ _deja() {
       _arguments '--list[list tombstones]' '--dry-run[show changes without applying]' '--session=[session ID prefix]:session:' '--project=[project substring]:project:' '--before=[duration or date]:time:' '--unforget=[tombstone ID]:ID:'
       ;;
     handoff)
-      _arguments '--to=[target agent]:agent:(claude codex opencode gemini qwen aider pi grok)' '--exec[launch the target agent]' '1:session ID prefix:'
+      _arguments '--to=[target agent]:agent:(claude codex opencode gemini qwen antigravity agy aider pi grok)' '--exec[launch the target agent]' '1:session ID prefix:'
       ;;
     hook-context)
       _arguments '--plain[omit formatting]'
@@ -284,7 +284,7 @@ complete -c deja -n '__fish_seen_subcommand_from forget' -l session -r
 complete -c deja -n '__fish_seen_subcommand_from forget' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from forget' -l before -r
 complete -c deja -n '__fish_seen_subcommand_from forget' -l unforget -r
-complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a 'claude codex opencode gemini qwen aider pi grok'
+complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a 'claude codex opencode gemini qwen antigravity agy aider pi grok'
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild

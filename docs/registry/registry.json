@@ -175,7 +175,7 @@
     "mcp": true,
     "auto": true,
     "resume": true,
-    "handoff": "paste",
+    "handoff": "exec",
     "prereq": ""
    }
   },
