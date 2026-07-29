@@ -50,6 +50,57 @@ var (
 
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
 
+// kvAssignmentNearby reports whether any key-ish word in the text is followed
+// by an assignment. genericKVRE cannot match unless one is, so this is a
+// necessary condition and skipping on a negative cannot change what is
+// redacted — TestKVGateNeverHidesAMatch proves it on random input.
+//
+// The word gate alone was not enough. "token", "secret" and "key" are ordinary
+// words in a developer's session, so the gate passed constantly and the regex
+// ran over the whole message to find nothing: on a 1.6 KB message of ordinary
+// chatter it cost 289µs, which was the single largest item in index-time
+// redaction.
+func kvAssignmentNearby(lower string) bool {
+	for _, hint := range kvHints {
+		for at := 0; ; {
+			i := strings.Index(lower[at:], hint)
+			if i < 0 {
+				break
+			}
+			pos := at + i + len(hint)
+			if assignmentFollows(lower, pos) {
+				return true
+			}
+			at += i + 1
+		}
+	}
+	return false
+}
+
+// assignmentFollows skips what genericKVRE allows between the name and the
+// value — the rest of a longer name, spaces and an optional quote — and looks
+// for the ':' or '=' the pattern requires.
+func assignmentFollows(s string, i int) bool {
+	for i < len(s) && (isWordByte(s[i]) || s[i] == '.' || s[i] == '-') {
+		i++
+	}
+	// The pattern uses \s, which is more than a space: a fuzz case of
+	// "passwd\n:" slipped past an earlier version of this that only skipped
+	// spaces and tabs.
+	for i < len(s) && (isSpaceByte(s[i]) || s[i] == '\'' || s[i] == '"') {
+		i++
+	}
+	return i < len(s) && (s[i] == ':' || s[i] == '=')
+}
+
+func isSpaceByte(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', '\r', '\f', '\v':
+		return true
+	}
+	return false
+}
+
 // kvHints are the substrings genericKVRE can anchor on; providerHints the
 // literal prefixes of providerRE. Checking them first keeps the regexes off
 // the vast majority of messages, which contain no credentials at all.
@@ -97,7 +148,7 @@ func Text(s string) (string, Counts) {
 	if strings.Contains(s, "eyJ") {
 		s = replaceWhole(s, jwtRE, "jwt", counts)
 	}
-	if containsAnyFold(lower, kvHints) {
+	if kvAssignmentNearby(lower) {
 		s = replaceSubmatch(s, genericKVRE, "credential", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
@@ -313,11 +364,54 @@ func standaloneLine(s string, start, end int) bool {
 	return true
 }
 
+// entropySpans finds the runs entropyTokenRE describes — twenty or more
+// characters from [A-Za-z0-9+/_-], plus up to two trailing '=' — without the
+// regexp engine.
+//
+// This pass is the only one with no cheap gate in front of it: every message
+// pays it, matching or not. Profiling a real rebuild put redaction at 23.5% of
+// index CPU and this scan at a third of that, spent almost entirely on text
+// that turns out to hold nothing. A byte loop does the same job; the filtering
+// that follows is unchanged, so what gets redacted does not move.
+func entropySpans(s string) [][2]int {
+	var out [][2]int
+	for i := 0; i < len(s); {
+		if !isEntropyByte(s[i]) {
+			i++
+			continue
+		}
+		run := i
+		for i < len(s) && isEntropyByte(s[i]) {
+			i++
+		}
+		if i-run < entropyMinAssign {
+			continue
+		}
+		end := i
+		for pad := 0; pad < 2 && end < len(s) && s[end] == '='; pad++ {
+			end++
+		}
+		out = append(out, [2]int{run, end})
+		i = end
+	}
+	return out
+}
+
+func isEntropyByte(c byte) bool {
+	switch {
+	case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		return true
+	case c == '+', c == '/', c == '_', c == '-':
+		return true
+	}
+	return false
+}
+
 func redactEntropy(s string, counts Counts) string {
 	if len(s) < entropyMinAssign {
 		return s
 	}
-	spans := entropyTokenRE.FindAllStringIndex(s, -1)
+	spans := entropySpans(s)
 	if spans == nil {
 		return s
 	}

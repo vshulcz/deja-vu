@@ -21,10 +21,13 @@ import (
 var version = "dev"
 
 func main() {
+	stopProfiling := startProfiling()
 	if err := run(os.Args[1:]); err != nil {
+		stopProfiling()
 		fmt.Fprintln(os.Stderr, "deja:", err)
 		os.Exit(1)
 	}
+	stopProfiling()
 }
 
 func loadAll(h string) []model.Session {
