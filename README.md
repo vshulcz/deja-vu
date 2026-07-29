@@ -24,49 +24,6 @@
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes — <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a>.</sub>
 </p>
 
-<p align="center">
-<code>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code><br>
-<sub>or <code>brew install vshulcz/tap/deja-vu</code> &middot; <code>npm i -g @vshulcz/deja-vu</code> &middot; <code>scoop install deja-vu</code> &middot; <a href="https://github.com/vshulcz/deja-vu/releases/latest">.mcpb for desktop apps</a><br>
-then <code>deja install --auto</code> to wire it into every agent you have.</sub>
-</p>
-
-Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, Goose, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
-
-| Feature | What it does |
-| --- | --- |
-| **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time is a hint, not a filter: `deja "what did we do in may"` and "a week ago" push that month's sessions up the ranking, they do not exclude the rest — use `--since 30d` when you mean a window |
-| **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
-| **Knows what held** | `deja promote <id> --state rejected --note "why"` — a decision you reverted comes back marked *tried and rejected*, with the reason and the date, on every hit for that session. Nothing is deleted: the agent sees what was decided **and** that it changed |
-| **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
-| **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"`; thirteen harnesses can be started directly, the rest print the prompt to paste |
-| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
-| **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
-| **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
-| **View** | `deja view` — your whole memory in one local HTML: sessions, the recall audit trail, curated notes; no server, nothing leaves the machine |
-| **Stats** | `deja stats` — your agent work, wrapped; `--impact` reports only counted numbers: recalls served, session starts that began with memory, served-vs-raw ratio |
-| **Promote** | `deja promote <id>` — distill a session into a curated note with provenance, `--tag` keywords and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts, and promoting over an existing accepted note surfaces the conflict |
-| **Trust scopes** | `policy.json` decides what memory activates where: search / MCP / auto × local / imported / per-peer; receipts and `deja log` name the rule |
-| **Deep verify** | `deja doctor --deep` proves the index against the sources — re-parses a sample, resolves postings, separates staleness from drift |
-| **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
-| **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
-| **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
-| **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
-
-## Privacy
-
-`deja forget` removes matching sessions from a rebuilt index and records exact
-session tombstones so a later `deja index` cannot restore them from source
-history. Tombstones are stored at `~/.config/deja/tombstones` (or
-`$XDG_CONFIG_HOME/deja/tombstones`) and mirrored beside the index, so losing
-either one does not resurrect what you forgot; use `--dry-run`, `--list`, or
-`--unforget`.
-Ingest exclusions are one case-insensitive project pattern per line in
-`~/.config/deja/exclude` (XDG-aware), or comma-separated in
-`DEJA_EXCLUDE_PROJECTS`. `deja stats --redaction` reports redactions by
-harness and rule, along with tombstone and semantic-sidecar facts.
-
-One binary. No models to download, no services to run, nothing leaves your machine unless you sync or share it. (opencode and Cursor IDE indexing shell out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros; Cursor CLI transcripts do not need it.)
-
 ## Install
 
 ```sh
@@ -143,6 +100,45 @@ That's it. Next session, ask your agent:
 > have we dealt with jwt refresh rotation before? check your memory
 
 — or with `--auto`, don't ask: the agent starts each session already knowing what you solved in that project.
+
+## What it is
+
+Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, Goose, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
+
+| Feature | What it does |
+| --- | --- |
+| **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time is a hint, not a filter: `deja "what did we do in may"` and "a week ago" push that month's sessions up the ranking, they do not exclude the rest — use `--since 30d` when you mean a window |
+| **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
+| **Knows what held** | `deja promote <id> --state rejected --note "why"` — a decision you reverted comes back marked *tried and rejected*, with the reason and the date, on every hit for that session. Nothing is deleted: the agent sees what was decided **and** that it changed |
+| **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
+| **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"`; thirteen harnesses can be started directly, the rest print the prompt to paste |
+| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
+| **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
+| **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
+| **View** | `deja view` — your whole memory in one local HTML: sessions, the recall audit trail, curated notes; no server, nothing leaves the machine |
+| **Stats** | `deja stats` — your agent work, wrapped; `--impact` reports only counted numbers: recalls served, session starts that began with memory, served-vs-raw ratio |
+| **Promote** | `deja promote <id>` — distill a session into a curated note with provenance, `--tag` keywords and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts, and promoting over an existing accepted note surfaces the conflict |
+| **Trust scopes** | `policy.json` decides what memory activates where: search / MCP / auto × local / imported / per-peer; receipts and `deja log` name the rule |
+| **Deep verify** | `deja doctor --deep` proves the index against the sources — re-parses a sample, resolves postings, separates staleness from drift |
+| **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
+| **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
+| **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
+| **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
+
+## Privacy
+
+`deja forget` removes matching sessions from a rebuilt index and records exact
+session tombstones so a later `deja index` cannot restore them from source
+history. Tombstones are stored at `~/.config/deja/tombstones` (or
+`$XDG_CONFIG_HOME/deja/tombstones`) and mirrored beside the index, so losing
+either one does not resurrect what you forgot; use `--dry-run`, `--list`, or
+`--unforget`.
+Ingest exclusions are one case-insensitive project pattern per line in
+`~/.config/deja/exclude` (XDG-aware), or comma-separated in
+`DEJA_EXCLUDE_PROJECTS`. `deja stats --redaction` reports redactions by
+harness and rule, along with tombstone and semantic-sidecar facts.
+
+One binary. No models to download, no services to run, nothing leaves your machine unless you sync or share it. (opencode and Cursor IDE indexing shell out to the `sqlite3` CLI, preinstalled on macOS and most Linux distros; Cursor CLI transcripts do not need it.)
 
 ## CLI
 
