@@ -29,11 +29,12 @@ import (
 )
 
 const (
-	scoopPath  = "packaging/scoop/deja-vu.json"
-	localePath = "packaging/winget/vshulcz.deja-vu.locale.en-US.yaml"
-	installer  = "packaging/winget/vshulcz.deja-vu.installer.yaml"
-	releaseAPI = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
-	assetBase  = "https://github.com/vshulcz/deja-vu/releases/download"
+	scoopPath   = "packaging/scoop/deja-vu.json"
+	versionPath = "packaging/winget/vshulcz.deja-vu.yaml"
+	localePath  = "packaging/winget/vshulcz.deja-vu.locale.en-US.yaml"
+	installer   = "packaging/winget/vshulcz.deja-vu.installer.yaml"
+	releaseAPI  = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+	assetBase   = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
 type pins struct {
@@ -106,9 +107,10 @@ func parse(version, checksums string) (pins, error) {
 
 func write(root string, p pins) error {
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:  renderScoop,
-		localePath: renderLocale,
-		installer:  renderInstaller,
+		scoopPath:   renderScoop,
+		versionPath: renderVersion,
+		localePath:  renderLocale,
+		installer:   renderInstaller,
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -156,6 +158,12 @@ func renderScoop(p pins) ([]byte, error) {
 // The winget files are edited rather than regenerated: they carry tags and
 // descriptions that are not derived from a release, and rewriting them from a
 // template here would quietly drop whatever someone adds later.
+// renderVersion covers the winget version manifest, which carries its own
+// PackageVersion. Leaving it out pinned two of the three winget files and the
+// set failed its own consistency test — caught after 0.16.2 shipped, having
+// been fixed by hand before that.
+func renderVersion(p pins) ([]byte, error) { return edit(versionPath, p) }
+
 func renderLocale(p pins) ([]byte, error) { return edit(localePath, p) }
 
 func renderInstaller(p pins) ([]byte, error) { return edit(installer, p) }
@@ -216,9 +224,10 @@ func runCheck(root string) error {
 		return err
 	}
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:  renderScoop,
-		localePath: renderLocale,
-		installer:  renderInstaller,
+		scoopPath:   renderScoop,
+		versionPath: renderVersion,
+		localePath:  renderLocale,
+		installer:   renderInstaller,
 	} {
 		want, err := render(p)
 		if err != nil {
