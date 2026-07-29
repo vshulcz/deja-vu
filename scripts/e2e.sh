@@ -43,8 +43,9 @@ $D version | grep -q "deja" || fail "version"
 $D | grep -q "Usage" || fail "help"
 # ctx digest
 $D ctx frobnicator | grep -q "deja context" || fail "ctx"
-# json output is valid JSON
-$D --json frobnicator | head -1 | grep -q "^\[" || fail "json"
+# json output is one envelope on every path, and says which tier answered
+$D --json frobnicator | head -1 | grep -q '^{"schema_version"' || fail "json envelope"
+$D --json frobnicator | head -1 | grep -q '"match":"exact"' || fail "json match"
 # mcp handshake + recall
 printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator"}}}\n' \
   | $D mcp | tail -1 | grep -q "frobnicator" || fail "mcp recall"
