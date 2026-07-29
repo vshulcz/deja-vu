@@ -89,16 +89,43 @@
 
 <div class="note">Benchmark rows are not directly comparable across systems: most projects publish end-to-end QA accuracy (an answering LLM on top of retrieval), deja publishes retrieval-only numbers with the harness in-repo so you can rerun them. Competitor cells reflect their public READMEs as of July 2026 — corrections welcome, <a href="https://github.com/vshulcz/deja-vu/issues">open an issue</a>.</div>
 
+
+<h2>The wider field</h2>
+<p>The table above is the six systems people ask us about, which are mostly a different shape of tool. Asked for a broader atlas (<a href="https://github.com/vshulcz/deja-vu/issues/310">#310</a>), here are the four largest memory projects outside that set, on the same axes. Star counts and cells are from each project's own README, read in July 2026.</p>
+
+<div class="cmpwrap">
+<table>
+<tr><th></th><th class="us">deja-vu</th><th>MemPalace</th><th>cognee</th><th>Graphiti / Zep</th><th>Hindsight</th></tr>
+<tr><td>What it is</td><td class="us">index over agent transcripts</td><td>local-first memory store</td><td>knowledge-graph memory platform</td><td>temporal knowledge graph</td><td>memory service with typed pathways</td></tr>
+<tr><td>Stars</td><td class="us">see repo</td><td>57.9k</td><td>29.6k</td><td>29.3k</td><td>18.9k</td></tr>
+<tr><td>Starts with your history</td><td class="us y">✓ retroactive, 16 harnesses</td><td class="y">✓ mines Claude Code, Codex, Cursor</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Capture step</td><td class="us">none needed</td><td>hooks, plus a mine/sweep backfill</td><td>API calls</td><td>API (episodes)</td><td>API (<code>retain</code>)</td></tr>
+<tr><td>Stored as</td><td class="us">verbatim, redacted</td><td>verbatim, in rooms and drawers</td><td>graph entities + embeddings</td><td>entities and edges with validity windows</td><td>typed facts + sparse/dense vectors</td></tr>
+<tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td class="y">no — ships a local model (~300&nbsp;MB)</td><td>yes</td><td>yes</td><td>yes</td></tr>
+<tr><td>Background process</td><td class="us y">none</td><td>none; a vector store backend (ChromaDB by default)</td><td>Postgres + pgvector, or Neo4j</td><td>Neo4j, FalkorDB or Neptune</td><td>Docker service, or embedded</td></tr>
+<tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>semantic, optional keyword and recency boosts, optional LLM rerank</td><td>graph + vector, strategy picked for you</td><td>embeddings + BM25 + graph traversal</td><td>hybrid sparse/dense over memory banks</td></tr>
+<tr><td>Published retrieval numbers</td><td class="us">84.9% hit@1 / 93.8% hit@5 LME-S, <a href="benchmarks.html">harness in repo</a></td><td>96.6% R@5 LongMemEval (500q, no LLM); 88.9% R@10 LoCoMo</td><td>0.79 on BEAM at 100k tokens</td><td>none in README; a Zep paper reports separately</td><td class="n">—</td></tr>
+<tr><td>Install</td><td class="us">one binary</td><td><code>uv tool install</code></td><td><code>uv pip install</code> + a database</td><td>pip + a graph database</td><td>docker</td></tr>
+<tr><td>License</td><td class="us">MIT</td><td>MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td></tr>
+</table>
+</div>
+
+<div class="note">On that benchmark row, plainly: <b>MemPalace publishes a higher LongMemEval number than we do</b> — 96.6% R@5 against our 93.8% hit@5 on the same 500-question set. The metrics are defined slightly differently and neither of us has rerun the other's harness, so treat the gap as unresolved rather than as either of us winning. What we can say about our own is that the harness is in this repo and you can run it.</div>
+
 <h2>When to pick something else</h2>
 <p>Honest routing, because the categories genuinely differ:</p>
 <p><b>Mem0 / Memori</b> — you are building an application and want to give <em>your users</em> memory through an API. deja has no SDK; it is not for app-embedded memory.</p>
 <p><b>Letta</b> — you want a full agent runtime with self-editing memory and you're happy living inside it. deja is the opposite bet: memory only, bring whatever agent you already use.</p>
 <p><b>memU</b> — you want curated, distilled knowledge files and don't mind the agent doing the distilling. deja keeps the verbatim record and searches it instead.</p>
 <p><b>claude-mem</b> — you only use Claude Code and prefer compressed summaries over raw history. deja covers 16 agents and keeps recall lossless.</p>
+<p><b>MemPalace</b> — the closest overlap by far, and the honest comparison is narrow: it also reads Claude Code sessions off disk and also keeps them verbatim. It brings a local embedding model and a vector store; deja is one binary with neither, parses 16 harnesses rather than three, and adds the things built around a code history specifically — <code>deja blame</code>, SSH sync, sanitized digests. If you want semantic paraphrase matching and don't mind a Python install with a 300&nbsp;MB model, theirs is the better fit.</p>
+<p><b>cognee / Graphiti</b> — you want a knowledge graph with entities, relationships and time-valid facts to reason over, and you accept a database and an LLM key as the price. deja does not build a graph; it searches what was said.</p>
+<p><b>Hindsight</b> — you want an agent to accumulate curated beliefs about the world over time, through an API you call. deja never writes memories of its own: it indexes the record your agents already produced.</p>
 <p><b>A vector database + your own pipeline</b> — you need semantic paraphrase matching above all. deja's lexical ladder loses to embeddings on pure paraphrase (we say so in the <a href="benchmarks.html">benchmarks</a>); it wins on identifiers, error strings, and everything code-shaped, with no key and no daemon.</p>
 
 <h2>What only deja does</h2>
-<p>Across the systems we've studied, these have no equivalent elsewhere: indexing history from <em>before</em> the tool was installed; déjà&nbsp;vu recurrence detection ("you have been here" when a prompt matches solved work); origin-trust scopes on imported memory; <code>deja blame</code> — which sessions touched a file and what was decided; sanitized <code>deja share</code> digests; and the whole thing in one binary you can <code>scp</code>.</p>
+<p>Across the systems we've studied, these have no equivalent elsewhere: déjà&nbsp;vu recurrence detection ("you have been here" when a prompt matches solved work); origin-trust scopes on imported memory; <code>deja blame</code> — which sessions touched a file and what was decided; sanitized <code>deja share</code> digests; and the whole thing in one binary, with no model and no runtime, that you can <code>scp</code>.</p>
+<p>This list used to open with "indexing history from before the tool was installed". It no longer does: MemPalace mines Claude Code, Codex and Cursor transcripts off disk too. Retroactive indexing is still rare — nine of the ten systems on this page cannot do it — but it is not ours alone, and a page that claimed otherwise would be the wrong thing to trust.</p>
 
 </article>
 </div>
