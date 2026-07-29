@@ -278,7 +278,13 @@ func rotate(p string) {
 func WornSessions(indexDir string) map[string]int {
 	out := map[string]int{}
 	for _, e := range read(Path(indexDir)) {
-		if e.Kind != KindRecall && e.Kind != KindContext {
+		// Agent recalls and the user's own déjà vu moments both count. They
+		// mean different things — one is an agent pulling a session, the other
+		// is the user returning to the same ground — and both say the session
+		// keeps mattering. The bounded boost is what keeps this from becoming
+		// a feedback loop: a session that ranks higher gets surfaced more,
+		// which would compound without the ceiling in wornBoost.
+		if e.Kind != KindRecall && e.Kind != KindContext && e.Kind != KindDejaVu {
 			continue
 		}
 		for _, id := range e.SessionIDs {

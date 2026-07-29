@@ -26,6 +26,87 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
+// reportUsage asks what the reuse signal is worth. Two sessions answer the
+// question equally well on the text; one of them is the one agents keep pulling
+// back. That is the only signal deja has about what actually helped someone,
+// as opposed to what reads like an answer — and until now nothing measured
+// whether the 1.2× ceiling on it does anything at all.
+func reportUsage(sessions []model.Session, verbose bool) {
+	// Two equally-worded sessions per topic, one of them worn.
+	var corpus []model.Session
+	var probes []probe
+	worn := map[string]int{}
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	for i, t := range []string{"retry budget", "cache stampede", "leader election", "schema drift"} {
+		day := base.AddDate(0, 0, -i)
+		a := "used-" + fmt.Sprint(i)
+		b := "unused-" + fmt.Sprint(i)
+		text := t + " is the thing we keep hitting; here is what happens and why"
+		corpus = append(corpus, session(a, day, []string{text, "and a second turn about " + t}))
+		corpus = append(corpus, session(b, day, []string{text, "and a second turn about " + t}))
+		worn[a] = 6
+		probes = append(probes, probe{query: t, decision: a})
+	}
+	corpus = append(corpus, sessions...)
+
+	for _, boost := range []struct {
+		name string
+		worn map[string]int
+	}{{"off", nil}, {"on", worn}} {
+		first := 0
+		for _, p := range probes {
+			hits, err := search.Run(corpus, search.Options{Query: p.query, All: true, RecallWorn: boost.worn})
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			if len(hits) > 0 && hits[0].Session.ID == p.decision {
+				first++
+			} else if verbose && boost.name == "on" {
+				top := "—"
+				if len(hits) > 0 {
+					top = hits[0].Session.ID
+				}
+				fmt.Printf("  miss  %-38q want=%s top=%s\n", p.query, p.decision, top)
+			}
+		}
+		fmt.Printf("reuse %-4s %d · ranked first %d (%.0f%%)\n", boost.name, len(probes), first, 100*float64(first)/float64(len(probes)))
+	}
+
+	// The ceiling question is not "is it enough for a tie" but "can it win one
+	// it should lose". A heavily-used session that barely matches must not
+	// outrank one that answers the question squarely.
+	var risk []model.Session
+	riskWorn := map[string]int{}
+	kept := 0
+	for i, t := range []string{"connection pool", "index rebuild", "token refresh"} {
+		day := base.AddDate(0, 0, -i)
+		strong := "strong-" + fmt.Sprint(i)
+		wornWeak := "worn-weak-" + fmt.Sprint(i)
+		risk = append(risk, session(strong, day, []string{
+			t + " " + t + " keeps failing, and here is the whole story of " + t,
+			"more about " + t,
+		}))
+		risk = append(risk, session(wornWeak, day, []string{
+			"mostly about something else entirely, though " + t + " came up once",
+			"the rest is unrelated",
+		}))
+		riskWorn[wornWeak] = 40 // far past anything the cap allows
+		risk = append(risk, session("filler-"+fmt.Sprint(i), day, []string{"unrelated chatter"}))
+		hits, _ := search.Run(risk, search.Options{Query: t, All: true, RecallWorn: riskWorn})
+		if len(hits) > 0 && hits[0].Session.ID == strong {
+			kept++
+		} else if verbose {
+			top := "—"
+			if len(hits) > 0 {
+				top = hits[0].Session.ID
+			}
+			fmt.Printf("  miss  %-38q want=%s top=%s\n", t, strong, top)
+		}
+	}
+	fmt.Printf("reuse cap  %d · relevance still wins %d (%.0f%%)\n", 3, kept, 100*float64(kept)/3)
+}
+
 // report is the same measurement for a second set of questions.
 func report(label string, sessions []model.Session, probes []probe, verbose bool) {
 	first := 0
@@ -92,6 +173,7 @@ func main() {
 	fmt.Printf("decisions  %d · ranked first %d (%.0f%%) · in top 3 %d (%.0f%%)\n",
 		len(probes), hit1, 100*float64(hit1)/float64(len(probes)), hit3, 100*float64(hit3)/float64(len(probes)))
 	report("noise     ", sessions, noise, *verbose)
+	reportUsage(sessions, *verbose)
 }
 
 // corpus builds, for each question, one deciding session and several louder

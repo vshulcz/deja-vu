@@ -166,7 +166,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
 	out := frameRecall(lead + digest + citationLine(ss[0]))
-	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms)
+	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms, sessionIDs(ss)...)
 	if plain {
 		fmt.Fprintln(stdout, out)
 		return nil
@@ -571,6 +571,18 @@ func densestMessages(msgs []model.Message, terms []string, cap int) []model.Mess
 	for i, m := range msgs {
 		if keep[i] {
 			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// sessionIDs is what the usage log needs to attribute a déjà vu moment to the
+// sessions it was about.
+func sessionIDs(ss []model.Session) []string {
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if s.ID != "" {
+			out = append(out, s.ID)
 		}
 	}
 	return out

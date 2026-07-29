@@ -171,3 +171,29 @@ func TestRecordSilentOnMkdirFailure(t *testing.T) {
 		t.Fatalf("unexpected events recorded: %d/%d", r, b)
 	}
 }
+
+// A déjà vu moment — the user asking something their own history already
+// answered — is the only signal deja has that the *user* came back, rather than
+// an agent pulling a session. It was recorded without session ids, so it could
+// not reach ranking at all.
+func TestDejaVuMomentsCountTowardsWornSessions(t *testing.T) {
+	dir := t.TempDir()
+	RecordDigestTerms(dir, KindDejaVu, "digest", 2, 100, []string{"pgbouncer"}, "s1", "s2")
+	RecordServedSessions(dir, KindRecall, 10, 1, false, 50, []string{"s1"})
+	// Kinds that say nothing about a session mattering must not count.
+	RecordServedSessions(dir, KindSearch, 10, 1, false, 50, []string{"s3"})
+	RecordServedSessions(dir, KindHandoff, 10, 1, false, 50, []string{"s4"})
+
+	worn := WornSessions(dir)
+	if worn["s1"] != 2 {
+		t.Fatalf("s1 = %d, want the déjà vu moment and the recall", worn["s1"])
+	}
+	if worn["s2"] != 1 {
+		t.Fatalf("s2 = %d, want the déjà vu moment", worn["s2"])
+	}
+	for _, id := range []string{"s3", "s4"} {
+		if worn[id] != 0 {
+			t.Fatalf("%s = %d, want nothing: a search or a handoff is not evidence the session mattered", id, worn[id])
+		}
+	}
+}
