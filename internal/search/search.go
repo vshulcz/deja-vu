@@ -396,6 +396,15 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		if doc.hit.Session.Harness == "deja" {
 			score *= promotedNoteBoost
 		}
+		// A session that reached a conclusion outranks one that only discussed
+		// the topic. Term frequency alone ranks these backwards: the session
+		// where someone kept asking repeats the words most, and the one that
+		// answered says them once and then explains. Measured on a corpus built
+		// for exactly that shape, the deciding session was ranked last of four
+		// in every case before this.
+		if decidesSomething(doc.hit.Session) {
+			score *= decisionBoost
+		}
 		score *= freshnessDecay(doc.hit.Session.Updated, now)
 		doc.hit.Score = score
 		hits = append(hits, doc.hit)
@@ -482,6 +491,34 @@ func lifecycleSummary(h Hit) string {
 		head += ": " + h.LifecycleNote
 	}
 	return head
+}
+
+// decisionBoost is sized to the effect it has to overcome, not tuned until a
+// test passed: a session that repeats the query terms about three times more
+// than another scores roughly twice as high once BM25 saturation is accounted
+// for, and that is the ordinary shape of "someone kept asking" against "someone
+// answered". It stays a tie-breaker rather than an override — a conclusion
+// about a different topic must not outrank a session that squarely matches the
+// question, and there is a test for exactly that.
+const decisionBoost = 2.0
+
+// decidesSomething reports whether a session contains an answer rather than a
+// conversation about one. It looks only at non-user turns: a user writing "we
+// should just pin it" is a proposal, and the same words from the side that did
+// the work are a record of what happened.
+func decidesSomething(s model.Session) bool {
+	for _, m := range s.Messages {
+		if m.Role == "user" || m.Role == "" {
+			continue
+		}
+		low := strings.ToLower(m.Text)
+		for _, phrase := range decisionPhrases {
+			if strings.Contains(low, phrase) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 const promotedNoteBoost = 1.25

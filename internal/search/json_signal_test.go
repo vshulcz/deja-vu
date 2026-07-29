@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -115,5 +116,77 @@ func TestLifecycleIsPrintedBeforeTheSnippets(t *testing.T) {
 		if strings.Contains(b.String(), unwanted) {
 			t.Fatalf("an unmarked hit mentioned %q:\n%s", unwanted, b.String())
 		}
+	}
+}
+
+// Term frequency ranks these backwards: the session where someone kept asking
+// repeats the words most, and the one that answered says them once and then
+// explains. Measured on a corpus built for that shape, the deciding session was
+// last of four in every case before this existed.
+//
+// The corpus carries unrelated sessions on purpose. With only the candidates in
+// it, every document contains every query term, IDF collapses to zero, BM25
+// scores everything 0.0000 and the order is not decided by ranking at all — a
+// smaller fixture would have tested nothing.
+func TestASessionThatDecidedSomethingOutranksOneThatDidNot(t *testing.T) {
+	// Sessions need timestamps: freshnessDecay multiplies an undated session
+	// into the floor, and a fixture without dates measures the decay rather
+	// than the ranking.
+	now := time.Now()
+	filler := func(id, text string) model.Session {
+		return model.Session{ID: id, Harness: "claude", Project: "app", Started: now, Updated: now,
+			Messages: []model.Message{{Role: "user", Text: text, Time: now}}}
+	}
+	corpus := []model.Session{
+		filler("f1", "the deploy pipeline is red again"),
+		filler("f2", "renaming the config keys"),
+		filler("f3", "who owns the staging database"),
+		filler("f4", "we should write down the release checklist"),
+		filler("f5", "the linter is complaining about imports"),
+	}
+	asking := model.Session{ID: "asking", Harness: "claude", Project: "app", Started: now, Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "anyone seen prepared statements pgbouncer? prepared statements pgbouncer again today"},
+		{Role: "assistant", Text: "still looking at prepared statements pgbouncer, no idea yet"},
+	}}
+	decided := model.Session{ID: "decided", Harness: "claude", Project: "app", Started: now, Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "prepared statements pgbouncer keeps failing"},
+		{Role: "assistant", Text: "Root cause was transaction pooling. We pinned pgx to 5.4.3."},
+	}}
+	hits, err := Run(append(corpus, asking, decided), Options{Query: "prepared statements pgbouncer", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) < 2 || hits[0].Session.ID != "decided" {
+		t.Fatalf("the session that concluded something did not rank first: %s", hits[0].Session.ID)
+	}
+
+	// It is a tie-breaker, not an override: a conclusion about something else
+	// must not outrank a session that squarely matches the question.
+	elsewhere := model.Session{ID: "elsewhere", Harness: "claude", Project: "app", Started: now, Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "the icon barrel file"},
+		{Role: "assistant", Text: "Root cause was tree shaking. We dropped the barrel file."},
+	}}
+	onTopic := model.Session{ID: "on-topic", Harness: "claude", Project: "app", Started: now, Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "prepared statements pgbouncer prepared statements pgbouncer"},
+		{Role: "user", Text: "prepared statements pgbouncer once more"},
+	}}
+	hits, err = Run(append(corpus, elsewhere, onTopic), Options{Query: "prepared statements pgbouncer", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Session.ID != "on-topic" {
+		t.Fatalf("a conclusion about another topic outranked the matching session: %s", hits[0].Session.ID)
+	}
+
+	// A user proposing something is not a decision; the record is what the
+	// side that did the work wrote.
+	proposal := model.Session{ID: "proposal", Harness: "claude", Project: "app", Started: now, Updated: now, Messages: []model.Message{
+		{Role: "user", Text: "we should just pin pgx, root cause is obvious"},
+	}}
+	if decidesSomething(proposal) {
+		t.Fatal("a user proposal counted as a decision")
+	}
+	if !decidesSomething(decided) {
+		t.Fatal("an assistant conclusion did not count as a decision")
 	}
 }
