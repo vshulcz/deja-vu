@@ -23,7 +23,7 @@ could not tell which it had without inspecting the value. It now always returns
 the envelope, and the envelope answers the two questions a caller cannot answer
 from a list of hits:
 
-- `match` — which tier answered: `exact`, `close`, `stemmed`, `semantic`, or
+- `tier` — which tier answered: `exact`, `close`, `stemmed`, `semantic`, or
   `relevance`. **`relevance` means nothing matched** and these are the nearest
   sessions deja could find. Counting those as hits overstates recall, and this
   used to be readable only as a sentence on stderr.
@@ -43,7 +43,7 @@ Every search returns one envelope:
 ```json
 {
   "schema_version": 2,
-  "match": "exact",
+  "tier": "exact",
   "total": 391,
   "capped": true,
   "hits": [
@@ -71,13 +71,14 @@ Every search returns one envelope:
 }
 ```
 
-`tier` on each hit is the per-hit equivalent of `match`. The fallback flags stay
-alongside it for readers written against version 1:
+The envelope's `tier` and each hit's `tier` are the same idea at two scopes,
+which is why they share a name. The fallback flags stay alongside for readers
+written against version 1:
 
 ```json
 {
   "schema_version": 2,
-  "match": "close",
+  "tier": "close",
   "total": 4,
   "hits": [ … ],
   "fuzzy": true

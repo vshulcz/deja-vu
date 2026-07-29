@@ -30,14 +30,14 @@ func TestJSONAlwaysSaysWhichTierAnswered(t *testing.T) {
 		var b bytes.Buffer
 		Print(&b, hits, tc.opts)
 		var env struct {
-			Match string `json:"match"`
-			Hits  []Hit  `json:"hits"`
+			Tier string `json:"tier"`
+			Hits []Hit  `json:"hits"`
 		}
 		if err := json.Unmarshal(b.Bytes(), &env); err != nil {
 			t.Fatalf("%s: %v\n%s", name, err, b.String())
 		}
-		if env.Match != tc.want {
-			t.Fatalf("%s: match = %q, want %q", name, env.Match, tc.want)
+		if env.Tier != tc.want {
+			t.Fatalf("%s: match = %q, want %q", name, env.Tier, tc.want)
 		}
 		if len(env.Hits) != 1 {
 			t.Fatalf("%s: hits = %d", name, len(env.Hits))

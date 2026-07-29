@@ -56,7 +56,7 @@ type searchJSONEnvelope struct {
 	// are the nearest sessions — a different kind of answer, and the one a
 	// caller counting recall has to exclude. It used to be readable only as a
 	// sentence on stderr.
-	Match string `json:"match"`
+	Tier string `json:"tier"`
 	// Total is how many sessions matched before the cap; Capped says whether
 	// the cap hid any. Counting the returned hits alone measures the cap.
 	Total    int                 `json:"total"`
@@ -253,10 +253,10 @@ type Results struct {
 	Hits   []Hit
 	Total  int
 	Capped bool
-	// Match is the set-level tier: exact, close, stemmed, semantic or
+	// Tier is the set-level answer: exact, close, stemmed, semantic or
 	// relevance. relevance means nothing matched and these are the nearest
 	// sessions, which is not the same kind of answer.
-	Match string
+	Tier string
 }
 
 // RunDetailed is Run plus the numbers the cap would otherwise hide.
@@ -265,7 +265,7 @@ func RunDetailed(ss []model.Session, o Options) (Results, error) {
 	if err != nil {
 		return Results{}, err
 	}
-	r := Results{Hits: hits, Total: len(hits), Match: matchTier(o)}
+	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
 	limit := o.Limit
 	if limit == 0 && !o.All {
 		limit = 15
@@ -277,7 +277,7 @@ func RunDetailed(ss []model.Session, o Options) (Results, error) {
 	return r, nil
 }
 
-func matchTier(o Options) string {
+func setTier(o Options) string {
 	switch {
 	case o.Semantic:
 		return TierSemantic
@@ -555,7 +555,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// two contracts and could not tell which it had until it looked.
 		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
 			SchemaVersion: jsonout.Version,
-			Match:         matchTier(o),
+			Tier:          setTier(o),
 			Total:         o.Total,
 			Capped:        o.Capped,
 			Hits:          hits,

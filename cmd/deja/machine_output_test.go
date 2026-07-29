@@ -41,7 +41,7 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 	// a bare array here and an object on the fallback paths.
 	var env struct {
 		SchemaVersion int    `json:"schema_version"`
-		Match         string `json:"match"`
+		Tier          string `json:"tier"`
 		Total         int    `json:"total"`
 		Capped        bool   `json:"capped"`
 		Hits          []struct {
@@ -61,8 +61,8 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 	// The query is capped at one while two sessions match, which is exactly the
 	// case the envelope exists for: counting the returned hits would say one
 	// session mentions this, and two do.
-	if env.SchemaVersion != jsonout.Version || env.Match != "exact" || env.Total != 2 || !env.Capped {
-		t.Fatalf("envelope = %d/%q total=%d capped=%v", env.SchemaVersion, env.Match, env.Total, env.Capped)
+	if env.SchemaVersion != jsonout.Version || env.Tier != "exact" || env.Total != 2 || !env.Capped {
+		t.Fatalf("envelope = %d/%q total=%d capped=%v", env.SchemaVersion, env.Tier, env.Total, env.Capped)
 	}
 	if len(hits) != 1 || hits[0].Session.Source.Origin != "local" || hits[0].Session.Source.Instance != "test-workstation" {
 		t.Fatalf("hits = %#v", hits)

@@ -189,7 +189,7 @@ func TestPrintJSONSessionContextAndHelpers(t *testing.T) {
 	// the fallback cases emitted an object.
 	var decoded struct {
 		SchemaVersion int    `json:"schema_version"`
-		Match         string `json:"match"`
+		Match         string `json:"tier"`
 		Hits          []Hit  `json:"hits"`
 	}
 	if err := json.Unmarshal(b.Bytes(), &decoded); err != nil || len(decoded.Hits) != 1 {
