@@ -80,6 +80,13 @@ type Hit struct {
 	Superseded string `json:"superseded,omitempty"`
 	// Reused counts recent agent recalls that served this session.
 	Reused int `json:"reused,omitempty"`
+	// Lifecycle carries what was later recorded about this session: that its
+	// decision was rejected, superseded or has gone stale. A hit on a raw
+	// transcript used to arrive with no trace of that, so a decision someone
+	// had explicitly reverted came back reading like current truth.
+	Lifecycle     string `json:"lifecycle,omitempty"`
+	LifecycleNote string `json:"lifecycle_note,omitempty"`
+	LifecycleAt   string `json:"lifecycle_at,omitempty"`
 }
 
 const (
@@ -453,6 +460,30 @@ func proximityBoost(window, queryTokenCount int) float64 {
 
 // promotedNoteBoost lifts curated deja notes over raw transcripts on equal
 // relevance. Kept modest: a note about X must not bury a transcript about Y.
+// lifecycleSummary words a hit's recorded state for a person. It says what
+// happened rather than naming the state: "superseded" is our vocabulary, not
+// the reader's.
+func lifecycleSummary(h Hit) string {
+	var head string
+	switch h.Lifecycle {
+	case "rejected":
+		head = "tried and rejected"
+	case "superseded":
+		head = "replaced by a later decision"
+	case "stale":
+		head = "marked stale — may no longer hold"
+	default:
+		head = h.Lifecycle
+	}
+	if h.LifecycleAt != "" {
+		head += " (" + h.LifecycleAt + ")"
+	}
+	if h.LifecycleNote != "" {
+		head += ": " + h.LifecycleNote
+	}
+	return head
+}
+
 const promotedNoteBoost = 1.25
 
 // wornBoost rewards sessions agents keep recalling — capped hard at +20% so
@@ -581,6 +612,16 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			note := fmt.Sprintf("  reused %d× by agents recently", h.Reused)
 			if color {
 				note = cDim + note + cReset
+			}
+			fmt.Fprintln(w, note)
+		}
+		// What was later recorded about this decision comes before anything
+		// else about the hit: a reader who stops after one line must not stop
+		// on a conclusion that was reverted.
+		if h.Lifecycle != "" {
+			note := "  " + lifecycleSummary(h)
+			if color {
+				note = cOrange + note + cReset
 			}
 			fmt.Fprintln(w, note)
 		}

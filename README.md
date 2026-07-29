@@ -24,12 +24,19 @@
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes — <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a>.</sub>
 </p>
 
+<p align="center">
+<code>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code><br>
+<sub>or <code>brew install vshulcz/tap/deja-vu</code> &middot; <code>npm i -g @vshulcz/deja-vu</code> &middot; <code>scoop install deja-vu</code> &middot; <a href="https://github.com/vshulcz/deja-vu/releases/latest">.mcpb for desktop apps</a><br>
+then <code>deja install --auto</code> to wire it into every agent you have.</sub>
+</p>
+
 Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build, Qwen Code, Kimi Code, Cline, Roo Code, OpenClaw, Goose, pi and Copilot CLI write every conversation to local files — gigabytes of debugged problems and design decisions you can't search. deja is a zero-dependency binary that turns those histories into a memory layer:
 
 | Feature | What it does |
 | --- | --- |
 | **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time is a hint, not a filter: `deja "what did we do in may"` and "a week ago" push that month's sessions up the ranking, they do not exclude the rest — use `--since 30d` when you mean a window |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
+| **Knows what held** | `deja promote <id> --state rejected --note "why"` — a decision you reverted comes back marked *tried and rejected*, with the reason and the date, on every hit for that session. Nothing is deleted: the agent sees what was decided **and** that it changed |
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
 | **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"`; thirteen harnesses can be started directly, the rest print the prompt to paste |
 | **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |

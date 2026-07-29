@@ -423,6 +423,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	// nothing was capped the honest total is simply what survived; when it was,
 	// there is no way to know how the filters would have treated the hidden
 	// ones, so the pre-cap figure stands and `capped` says to distrust it.
+	attachLifecycles(hits)
 	if !o.Capped {
 		o.Total = len(hits)
 	}

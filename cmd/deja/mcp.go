@@ -104,7 +104,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 		return map[string]any{"tools": []map[string]any{
 			{
 				"name":        "recall",
-				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with the most specific token available: an exact error string, function name, file path, or flag (multiple words are ANDed). Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. Follow up with recall_context when one session looks right and you need its full story. Optionally filter by harness. When a result genuinely helps the task at hand — you reuse a fix, skip re-debugging, or confirm a prior decision — tell the user in one digest.Short line what deja-vu recalled and how you used it (e.g. \"deja-vu recalled: we hit this JWT skew in March — reusing that fix\"). Even a partial hint counts if it changed your approach. Say nothing about recalls that did not help.",
+				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with the most specific token available: an exact error string, function name, file path, or flag (multiple words are ANDed). Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. A result may carry a bracketed marker before its snippets — [this was tried and rejected], [a later decision replaced this], [marked stale — may no longer hold] — with the reason and the date. That is the user's own later judgement on that session: do not repeat a rejected approach, prefer the replacement over what it replaced, and treat stale results as needing confirmation before you act on them. An unmarked result carries no such judgement either way. Follow up with recall_context when one session looks right and you need its full story. Optionally filter by harness. When a result genuinely helps the task at hand — you reuse a fix, skip re-debugging, or confirm a prior decision — tell the user in one digest.Short line what deja-vu recalled and how you used it (e.g. \"deja-vu recalled: we hit this JWT skew in March — reusing that fix\"). Even a partial hint counts if it changed your approach. Say nothing about recalls that did not help.",
 				"annotations": map[string]any{"title": "Search past sessions", "readOnlyHint": true, "openWorldHint": false},
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}, "offset": map[string]any{"type": "number", "description": "Skip this many ranked matches — page through results without re-ranking."}}, "required": []string{"query"}},
 			},
@@ -375,6 +375,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		hits = hits[:limit]
 	}
 	attachAnswers(dir, hits)
+	attachLifecycles(hits)
 	var b strings.Builder
 	served := 0
 	if stale {
@@ -401,6 +402,9 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 			fmt.Fprintf(&b, " · reused %d×", h.Reused)
 		}
 		fmt.Fprintln(&b)
+		if line := lifecycleLine(h); line != "" {
+			fmt.Fprintf(&b, "%s\n", line)
+		}
 		if h.Superseded != "" {
 			fmt.Fprintf(&b, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
 		}
