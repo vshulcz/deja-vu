@@ -62,6 +62,13 @@ func ParseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 }
 
 func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseClaudeTypedFromOffset(path, offset)
+}
+
+// parseClaudeGenericFromOffset is the previous implementation, kept as the
+// reference the typed parser is proved against — including on a real store,
+// where the shapes nobody thought of live.
+func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, error) {
 	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(claudeProjectDir(path)), Path: path}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
