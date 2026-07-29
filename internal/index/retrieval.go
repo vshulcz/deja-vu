@@ -1000,6 +1000,55 @@ func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []postin
 	if len(out) == 0 {
 		return nil
 	}
+	return capPostingsPerSession(out, perSessionCandidates)
+}
+
+// perSessionCandidates bounds how many matching messages of one session are
+// read to rank it. A common word is not spread evenly: "index" resolves 3258
+// records across 162 sessions with a median of one apiece, and a single long
+// session holds 1355 of them. Ranking scores a session by its best matching
+// message, so reading the fourteen hundredth mention costs a record read and
+// decides nothing.
+const perSessionCandidates = 64
+
+// capPostingsPerSession keeps at most n postings per session, sampled evenly
+// across the session rather than truncated. Postings arrive in write order, so
+// taking the first n would read the beginning of a long session and never its
+// conclusion — which is the half that tends to be worth ranking.
+//
+// No session is ever dropped: this bounds how much of a session is read, not
+// which sessions are considered, so the candidate set still covers everything
+// the postings matched.
+func capPostingsPerSession(posts []posting, n int) []posting {
+	if n <= 0 {
+		return posts
+	}
+	bySid := make(map[uint32]int, 16)
+	over := false
+	for _, p := range posts {
+		bySid[p.Sid]++
+		if bySid[p.Sid] > n {
+			over = true
+		}
+	}
+	if !over {
+		return posts
+	}
+	seen := make(map[uint32]int, len(bySid))
+	out := make([]posting, 0, len(posts))
+	for _, p := range posts {
+		total := bySid[p.Sid]
+		if total <= n {
+			out = append(out, p)
+			continue
+		}
+		i := seen[p.Sid]
+		seen[p.Sid] = i + 1
+		// Keep index i when it lands on one of n evenly spaced slots.
+		if i*n/total != (i+1)*n/total {
+			out = append(out, p)
+		}
+	}
 	return out
 }
 
