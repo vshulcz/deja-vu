@@ -962,11 +962,23 @@ Usage:
   deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|cline|statusline|--all|--auto>
   deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
 
+Search flags (the bare "deja [flags] <query>" form above):
+  --harness <name>              only sessions from one harness (claude, codex, ...)
+  --project <name>              only sessions from one project
+  --since <duration>            only sessions newer than e.g. 30d, 12h
+  --role <user|assistant|tool>  only match turns from one role
+  --limit <1-100>               max sessions to return (default 15)
+  --all                         return every match, no cap
+  --re                          treat the query as a regular expression
+  --json                        machine-readable output
+  --no-embed                    skip the semantic (embedding) tier
+
 Examples:
   deja "jwt refresh token bug"
   deja '"connection pool exhausted"'
   deja "exhaustd"  # zero exact results try close spellings
   deja --harness claude --since 30d "panic in indexer"
+  deja --all "connection pool"  # every match, not just the first 15
   deja last 20 --harness codex
   deja last --project api-gateway
   deja last --since 7d --role user

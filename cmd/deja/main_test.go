@@ -1008,3 +1008,57 @@ func TestInstallHonorsUpstreamHomes(t *testing.T) {
 		t.Fatal("default ~/.codex must stay untouched")
 	}
 }
+
+// The bare "deja <query>" form accepts nine flags that parseSearch handles but
+// printUsage never listed, so the only way to discover them was reading the
+// source. --all in particular is the only way to lift the 15-session cap, and
+// its absence from --help led at least one user to conclude it did not exist.
+// This test pins each documented flag to the parser that implements it.
+func TestUsageDocumentsSearchFlags(t *testing.T) {
+	var b bytes.Buffer
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+	printUsage()
+	if err := w.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	os.Stdout = old
+	if _, err := b.ReadFrom(r); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	got := b.String()
+
+	for _, flag := range []string{
+		"--harness", "--project", "--since", "--role",
+		"--limit", "--all", "--re", "--json", "--no-embed",
+	} {
+		if !strings.Contains(got, flag) {
+			t.Errorf("printUsage does not document %s, but parseSearch accepts it", flag)
+		}
+		if _, err := parseSearch(flagArgsFor(flag)); err != nil {
+			t.Errorf("parseSearch rejects documented flag %s: %v", flag, err)
+		}
+	}
+}
+
+// flagArgsFor builds a minimal valid argv for one search flag.
+func flagArgsFor(flag string) []string {
+	switch flag {
+	case "--harness":
+		return []string{"--harness", "claude", "q"}
+	case "--project":
+		return []string{"--project", "api", "q"}
+	case "--since":
+		return []string{"--since", "30d", "q"}
+	case "--role":
+		return []string{"--role", "user", "q"}
+	case "--limit":
+		return []string{"--limit", "15", "q"}
+	default:
+		return []string{flag, "q"}
+	}
+}
