@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -75,5 +76,44 @@ func TestRunDetailedReportsWhatTheCapHides(t *testing.T) {
 	}
 	if len(all.Hits) != 40 || all.Capped {
 		t.Fatalf("--all returned %d hits, capped=%v", len(all.Hits), all.Capped)
+	}
+}
+
+// A hit whose decision did not hold says so above its snippets, in words a
+// reader can act on without knowing our vocabulary for them.
+func TestLifecycleIsPrintedBeforeTheSnippets(t *testing.T) {
+	base := model.Session{ID: "s1", Harness: "claude", Project: "payments",
+		Messages: []model.Message{{Role: "user", Text: "needle"}}}
+	for state, want := range map[string]string{
+		"rejected":   "tried and rejected",
+		"superseded": "replaced by a later decision",
+		"stale":      "may no longer hold",
+		"invented":   "invented",
+	} {
+		hit := Hit{Session: base, Count: 1, Snippets: []string{"needle"},
+			Lifecycle: state, LifecycleAt: "2026-07-29", LifecycleNote: "the pin was reverted"}
+		var b bytes.Buffer
+		Print(&b, []Hit{hit}, Options{Query: "needle"})
+		out := b.String()
+		if !strings.Contains(out, want) {
+			t.Fatalf("%s: %q missing from\n%s", state, want, out)
+		}
+		if !strings.Contains(out, "2026-07-29") || !strings.Contains(out, "the pin was reverted") {
+			t.Fatalf("%s dropped the date or the reason:\n%s", state, out)
+		}
+		// The marker has to come before the snippet: a reader who stops after
+		// one line must not stop on a conclusion that was reverted.
+		if strings.Index(out, want) > strings.Index(out, "needle\n") && strings.Contains(out, "needle\n") {
+			t.Fatalf("%s printed after the snippet:\n%s", state, out)
+		}
+	}
+
+	// Nothing recorded, nothing said.
+	var b bytes.Buffer
+	Print(&b, []Hit{{Session: base, Count: 1, Snippets: []string{"needle"}}}, Options{Query: "needle"})
+	for _, unwanted := range []string{"rejected", "replaced", "stale"} {
+		if strings.Contains(b.String(), unwanted) {
+			t.Fatalf("an unmarked hit mentioned %q:\n%s", unwanted, b.String())
+		}
 	}
 }
