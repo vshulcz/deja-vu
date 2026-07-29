@@ -11,7 +11,7 @@
 // eight months so the "history from before you installed deja" claim is visible
 // rather than asserted.
 //
-//	go run ./scripts/demo/corpus -out /tmp/demo-home
+//	go run ./scripts/demo -out /tmp/demo-home
 package main
 
 import (
