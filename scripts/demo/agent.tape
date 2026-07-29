@@ -12,16 +12,24 @@
 #   HOME=/tmp/demo-home deja index --rebuild
 #   vhs scripts/demo/agent.tape
 #
-# Afterwards the raw recording is finished with ffmpeg and scripts/demo/frame.py:
+# Afterwards the raw recording is finished:
 #
-#   python3 scripts/demo/frame.py --height 1058
-#   ffmpeg -i agent-raw.gif -i chrome.png -i corners.png -filter_complex "..."
+#   python3 scripts/demo/frame.py --height 1058   # window, corners, header patch
+#   python3 scripts/demo/annotate.py              # callouts and spotlight
+#   ffmpeg -i agent-raw.gif -i patch.png -i chrome.png -i corners.png \\
+#          -i callout-asked.png -i spotlight.png -i callout-recall.png ...
+#   gifsicle -O3 --lossy=20 hero-raw.gif -o assets/demo.gif
 #
 # That step crops the terminal to its content, replaces the two header lines
 # carrying the recorder's account with neutral text, drops the custom
-# statusline, hard-cuts the model's thinking time instead of fast-forwarding it,
-# and composites the result into a window. Nothing in the session output is
-# edited.
+# statusline, hard-cuts the model's thinking time rather than fast-forwarding
+# it, composites the result into a window, and fades in two callouts and a
+# spotlight over the line that matters. Nothing in the session output is edited.
+#
+# Two things worth knowing before re-cutting it. A static PNG has one frame at
+# t=0, so `fade` never fires on it — each overlay needs loop/fps first or it
+# stays invisible. And `--lossy=60` looked fine on the bright frames and turned
+# the dimmed ones to mud; 20 is the ceiling here.
 
 Output agent-raw.gif
 
