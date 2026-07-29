@@ -45,6 +45,14 @@ func TestChangedTaskFilesReadsGitState(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
+	// Spawning git twice inside 400 ms is a budget a loaded CI runner does not
+	// always meet, and when it misses, both calls return nothing and the
+	// failure reads as a parsing bug. This test is about what the output
+	// parses into, not about the budget — the budget has its own test below.
+	old := taskGitBudget
+	taskGitBudget = 20 * time.Second
+	t.Cleanup(func() { taskGitBudget = old })
+
 	repo := t.TempDir()
 	run := func(args ...string) {
 		t.Helper()
@@ -143,5 +151,26 @@ func TestHookContextReceiptNamesTaskFiles(t *testing.T) {
 	}
 	if heroPos != -1 && heroPos < authPos {
 		t.Fatalf("task-matched session must outrank fresher unrelated one:\n%s", digest)
+	}
+}
+
+// TestChangedTaskFilesRespectsItsBudget is the other half: this runs in front
+// of a waiting agent, so exceeding the budget must mean empty results rather
+// than a stalled hook.
+func TestChangedTaskFilesRespectsItsBudget(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	old := taskGitBudget
+	taskGitBudget = time.Nanosecond
+	t.Cleanup(func() { taskGitBudget = old })
+
+	started := time.Now()
+	got := changedTaskFiles(t.TempDir())
+	if len(got) != 0 {
+		t.Fatalf("expired budget returned %v", got)
+	}
+	if d := time.Since(started); d > 5*time.Second {
+		t.Fatalf("took %v — the budget did not bound the call", d)
 	}
 }

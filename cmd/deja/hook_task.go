@@ -23,12 +23,22 @@ var taskNoiseFiles = map[string]bool{
 	"gemfile.lock": true, "poetry.lock": true, "uv.lock": true,
 }
 
+// taskGitBudget is how long the two git calls together may take before recall
+// gives up on file ranking. It is deliberately short: this runs on the hook
+// path, in front of an agent that is waiting.
+//
+// A variable rather than a constant because a slow machine — a cold Windows
+// runner was the first one seen — blows through it and both calls return
+// nothing, which is indistinguishable from "no repo" and made the test for
+// this function flaky (#516).
+var taskGitBudget = 400 * time.Millisecond
+
 // changedTaskFiles returns basenames of files the repo is actively touching:
 // uncommitted changes first, then files from the last few commits. Best
 // effort — outside a repo, or with git missing or slow, it returns nil and
 // recall falls back to recency.
 func changedTaskFiles(cwd string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), taskGitBudget)
 	defer cancel()
 	var out []string
 	seen := map[string]bool{}
