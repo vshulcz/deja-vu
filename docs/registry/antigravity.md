@@ -16,6 +16,12 @@ Each line has a source, content, and creation time:
 
 Before indexing user text, deja removes the outer `<USER_REQUEST>` wrapper and complete `<ADDITIONAL_METADATA>` and `<USER_SETTINGS_CHANGE>` blocks. Assistant content is retained as written. Content is capped at 64 KiB.
 
+## Handoff
+
+Antigravity's terminal client is `agy`, and `agy -i <prompt>` opens an
+interactive session on it, so `deja handoff --to agy` — or `--to antigravity`,
+the same target — starts it directly. Verified on agy 1.1.7.
+
 ## Known quirks and drift
 
 - User-visible content and machine metadata share one string field.

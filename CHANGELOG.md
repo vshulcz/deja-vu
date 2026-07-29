@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `deja handoff --to agy` starts Antigravity with the digest as its first prompt. It was listed paste-only on the reading that it is a GUI, but its terminal client is `agy` — the binary `deja resume` already calls — and `agy -i <prompt>` opens an interactive session on it. `--to antigravity` is the same target. (#524)
 ## [0.16.3] - 2026-07-30
 
 ### Fixed

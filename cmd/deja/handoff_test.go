@@ -45,6 +45,8 @@ func TestHandoffCommandTable(t *testing.T) {
 		"cline": {"cline", "P"},
 		"goose": {"goose", "run", "-t", "P"},
 		"kimi":  {"kimi", "-p", "P"},
+		// Antigravity's CLI is `agy`, verified on 1.1.7.
+		"antigravity": {"agy", "-i", "P"},
 	}
 	for target, want := range cases {
 		argv, ok := handoffCommand(target, "P")
@@ -52,10 +54,10 @@ func TestHandoffCommandTable(t *testing.T) {
 			t.Fatalf("handoffCommand(%s) = %v, %v", target, argv, ok)
 		}
 	}
-	// These have no way to take a prompt from the command line: antigravity
-	// is a GUI, openclaw has no run command, hermes only opens a chat, and
-	// roo's tasks start from the extension.
-	for _, target := range []string{"antigravity", "openclaw", "hermes", "roo"} {
+	// These have no way to take a prompt from the command line: openclaw has
+	// no run command, hermes only opens a chat, and roo's tasks start from
+	// the extension.
+	for _, target := range []string{"openclaw", "hermes", "roo"} {
 		if _, ok := handoffCommand(target, "P"); ok {
 			t.Fatalf("%s has no CLI prompt entry point, must stay paste-only", target)
 		}
@@ -114,14 +116,10 @@ func TestHandoffPasteModes(t *testing.T) {
 	if err != nil || !strings.Contains(out, "picking up work handed off") {
 		t.Fatalf("bare handoff = %q, %v", out, err)
 	}
-	// GUI-only target prints the digest too
-	out, err = captureRun(t, "handoff", "--to", "antigravity", "c3")
+	// --to agy is the same target as --to antigravity
+	out, err = captureRun(t, "handoff", "--to", "agy", "c3")
 	if err != nil || !strings.Contains(out, "picking up work handed off") {
-		t.Fatalf("antigravity handoff = %q, %v", out, err)
-	}
-	// but cannot --exec
-	if err := runHandoff(index.DefaultDir(), []string{"--to", "antigravity", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
-		t.Fatalf("antigravity exec error = %v", err)
+		t.Fatalf("agy handoff = %q, %v", out, err)
 	}
 	if err := runHandoff(index.DefaultDir(), []string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
 		t.Fatalf("bare exec error = %v", err)
