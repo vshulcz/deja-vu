@@ -46,6 +46,11 @@ type Options struct {
 	Harness, Project, Role string
 	Since                  time.Duration
 	Limit                  int
+	// Total and Capped travel from RunDetailed to Print so the JSON envelope
+	// can report how many sessions matched before the cap, not merely how many
+	// survived it. Counting the survivors measures the cap.
+	Total  int
+	Capped bool
 	// WithAnswer carries the assistant reply next to a matched user turn.
 	// Agent-facing recall sets it; human CLI output does not, because a person
 	// reading results can open the session.

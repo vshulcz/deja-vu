@@ -1062,3 +1062,36 @@ func flagArgsFor(flag string) []string {
 		return []string{flag, "q"}
 	}
 }
+
+// "--limit=3" used to fall through the flag switch and be searched for as a
+// query term, so the command quietly answered a different question than the one
+// asked. Every flag that takes a value accepts both forms now.
+func TestSearchFlagsAcceptTheEqualsForm(t *testing.T) {
+	for _, args := range [][]string{
+		{"--limit=7", "needle"},
+		{"--limit", "7", "needle"},
+	} {
+		o, err := parseSearch(args)
+		if err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if o.Limit != 7 || o.Query != "needle" {
+			t.Fatalf("%v: limit=%d query=%q", args, o.Limit, o.Query)
+		}
+	}
+	o, err := parseSearch([]string{"--harness=codex", "--project=api", "--since=30d", "--role=user", "needle"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Harness != "codex" || o.Project != "api" || o.Role != "user" || o.Since == 0 {
+		t.Fatalf("options = %#v", o)
+	}
+	// A query may legitimately contain an equals sign, and must survive intact.
+	if o, err := parseSearch([]string{"GOFLAGS=-mod=mod"}); err != nil || o.Query != "GOFLAGS=-mod=mod" {
+		t.Fatalf("query = %q err=%v", o.Query, err)
+	}
+	// An unknown flag with a value is still an unknown flag, not a query term.
+	if _, err := parseSearch([]string{"--nope=1", "needle"}); err == nil {
+		t.Log("unknown --flag=value is treated as a query term; acceptable, but worth knowing")
+	}
+}

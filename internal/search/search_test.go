@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -184,9 +185,18 @@ func TestPrintJSONSessionContextAndHelpers(t *testing.T) {
 	hits := []Hit{{Session: s, Count: 1, Snippets: []string{"hello needle"}}}
 	var b bytes.Buffer
 	Print(&b, hits, Options{Query: "needle", JSON: true})
-	var decoded []Hit
-	if err := json.Unmarshal(b.Bytes(), &decoded); err != nil || len(decoded) != 1 {
+	// One shape on every path: the exact case used to emit a bare array while
+	// the fallback cases emitted an object.
+	var decoded struct {
+		SchemaVersion int    `json:"schema_version"`
+		Match         string `json:"match"`
+		Hits          []Hit  `json:"hits"`
+	}
+	if err := json.Unmarshal(b.Bytes(), &decoded); err != nil || len(decoded.Hits) != 1 {
 		t.Fatalf("bad json %q err=%v", b.String(), err)
+	}
+	if decoded.Match != TierExact {
+		t.Fatalf("match = %q, want %q", decoded.Match, TierExact)
 	}
 	b.Reset()
 	PrintSession(&b, s)
@@ -357,7 +367,7 @@ func TestQueryPartsDropsStopWordsButKeepsAllStopQueries(t *testing.T) {
 func TestFuzzyJSONEnvelope(t *testing.T) {
 	var b bytes.Buffer
 	Print(&b, []Hit{{Count: 1}}, Options{JSON: true, Fuzzy: true})
-	if !strings.Contains(b.String(), `"schema_version":1`) || !strings.Contains(b.String(), `"fuzzy":true`) || !strings.Contains(b.String(), `"hits"`) {
+	if !strings.Contains(b.String(), fmt.Sprintf(`"schema_version":%d`, jsonout.Version)) || !strings.Contains(b.String(), `"fuzzy":true`) || !strings.Contains(b.String(), `"hits"`) {
 		t.Fatalf("fuzzy json = %q", b.String())
 	}
 }
@@ -365,7 +375,7 @@ func TestFuzzyJSONEnvelope(t *testing.T) {
 func TestStemmedJSONEnvelope(t *testing.T) {
 	var b bytes.Buffer
 	Print(&b, []Hit{{Count: 1}}, Options{JSON: true, Stemmed: true, FuzzyVariants: map[string][]string{"rotation": {"rotated"}}})
-	if !strings.Contains(b.String(), `"schema_version":1`) || !strings.Contains(b.String(), `"stemmed":true`) || !strings.Contains(b.String(), `"rotation":["rotated"]`) {
+	if !strings.Contains(b.String(), fmt.Sprintf(`"schema_version":%d`, jsonout.Version)) || !strings.Contains(b.String(), `"stemmed":true`) || !strings.Contains(b.String(), `"rotation":["rotated"]`) {
 		t.Fatalf("stemmed json = %q", b.String())
 	}
 }
@@ -373,7 +383,7 @@ func TestStemmedJSONEnvelope(t *testing.T) {
 func TestSemanticJSONEnvelopeIncludesSource(t *testing.T) {
 	var b bytes.Buffer
 	Print(&b, []Hit{{Session: model.Session{Project: "p"}, Count: 1}}, Options{JSON: true, Semantic: true, SourceInstance: "workstation"})
-	if !strings.Contains(b.String(), `"schema_version":1`) || !strings.Contains(b.String(), `"semantic":true`) || !strings.Contains(b.String(), `"origin":"local"`) || !strings.Contains(b.String(), `"instance":"workstation"`) {
+	if !strings.Contains(b.String(), fmt.Sprintf(`"schema_version":%d`, jsonout.Version)) || !strings.Contains(b.String(), `"semantic":true`) || !strings.Contains(b.String(), `"origin":"local"`) || !strings.Contains(b.String(), `"instance":"workstation"`) {
 		t.Fatalf("semantic json = %q", b.String())
 	}
 }

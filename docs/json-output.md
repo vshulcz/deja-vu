@@ -11,17 +11,42 @@ a `schema_version` field so consumers can detect breaking changes.
 - **Bumping `schema_version`** signals a breaking change (field removal, rename,
   or type change). Consumers should branch on `schema_version` before parsing
   the rest of the envelope.
-- The current version is **1** (constant in `internal/jsonout`).
-- **Exact `deja search --json` and `deja blame --json`** return a top-level JSON
-  array (not an object envelope). Their element shapes are stable; only additive
-  fields inside `session` or hit objects are permitted.
+- The current version is **2** (constant in `internal/jsonout`).
+- **`deja blame --json`** returns a top-level JSON array. Its element shape is
+  stable; only additive fields inside `session` or hit objects are permitted.
+
+### What changed in version 2
+
+`deja search --json` used to return a bare array on the exact path and an object
+envelope on every fallback path, so a consumer had to handle two shapes and
+could not tell which it had without inspecting the value. It now always returns
+the envelope, and the envelope answers the two questions a caller cannot answer
+from a list of hits:
+
+- `match` — which tier answered: `exact`, `close`, `stemmed`, `semantic`, or
+  `relevance`. **`relevance` means nothing matched** and these are the nearest
+  sessions deja could find. Counting those as hits overstates recall, and this
+  used to be readable only as a sentence on stderr.
+- `total` and `capped` — how many sessions matched, and whether the result cap
+  hid some. Counting the returned hits measures the cap: that figure moves when
+  the window's membership changes, whether or not retrieval improved. Pass
+  `--all` for an uncapped set, in which case `total` equals the hit count.
+
+`capped` is omitted when false. When it is true, `total` is the count before
+policy scoping and reranking ran, because there is no way to know how those
+would have treated the sessions the cap removed.
 
 ## `deja search --json`
 
-Default exact search returns a JSON array of hits:
+Every search returns one envelope:
 
 ```json
-[
+{
+  "schema_version": 2,
+  "match": "exact",
+  "total": 391,
+  "capped": true,
+  "hits": [
   {
     "session": {
       "harness": "claude",
@@ -42,15 +67,18 @@ Default exact search returns a JSON array of hits:
     "tier_detail": "",
     "superseded": "2026-07-19"
   }
-]
+  ]
+}
 ```
 
-When fuzzy, stemmed, or semantic reranking is active, the output is an object
-envelope with `schema_version`:
+`tier` on each hit is the per-hit equivalent of `match`. The fallback flags stay
+alongside it for readers written against version 1:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "match": "close",
+  "total": 4,
   "hits": [ … ],
   "fuzzy": true
 }

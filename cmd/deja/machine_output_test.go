@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,7 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &recent); err != nil {
 		t.Fatalf("recent json: %v\n%s", err, out)
 	}
-	if recent.SchemaVersion != 1 || len(recent.Sessions) != 1 || recent.Sessions[0].Source.Origin != "local" || recent.Sessions[0].Source.Instance != "test-workstation" || recent.Sessions[0].Messages != nil {
+	if recent.SchemaVersion != jsonout.Version || len(recent.Sessions) != 1 || recent.Sessions[0].Source.Origin != "local" || recent.Sessions[0].Source.Instance != "test-workstation" || recent.Sessions[0].Messages != nil {
 		t.Fatalf("recent = %#v", recent)
 	}
 
@@ -36,17 +37,32 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var hits []struct {
-		Session struct {
-			ID     string `json:"id"`
-			Source struct {
-				Origin   string `json:"origin"`
-				Instance string `json:"instance"`
-			} `json:"source"`
-		} `json:"session"`
+	// Search returns one envelope on every path since schema 2; it used to be
+	// a bare array here and an object on the fallback paths.
+	var env struct {
+		SchemaVersion int    `json:"schema_version"`
+		Match         string `json:"match"`
+		Total         int    `json:"total"`
+		Capped        bool   `json:"capped"`
+		Hits          []struct {
+			Session struct {
+				ID     string `json:"id"`
+				Source struct {
+					Origin   string `json:"origin"`
+					Instance string `json:"instance"`
+				} `json:"source"`
+			} `json:"session"`
+		} `json:"hits"`
 	}
-	if err := json.Unmarshal([]byte(out), &hits); err != nil {
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
 		t.Fatalf("search json: %v\n%s", err, out)
+	}
+	hits := env.Hits
+	// The query is capped at one while two sessions match, which is exactly the
+	// case the envelope exists for: counting the returned hits would say one
+	// session mentions this, and two do.
+	if env.SchemaVersion != jsonout.Version || env.Match != "exact" || env.Total != 2 || !env.Capped {
+		t.Fatalf("envelope = %d/%q total=%d capped=%v", env.SchemaVersion, env.Match, env.Total, env.Capped)
 	}
 	if len(hits) != 1 || hits[0].Session.Source.Origin != "local" || hits[0].Session.Source.Instance != "test-workstation" {
 		t.Fatalf("hits = %#v", hits)
@@ -60,7 +76,7 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &exact); err != nil {
 		t.Fatalf("show json: %v\n%s", err, out)
 	}
-	if exact.SchemaVersion != 1 || exact.Session.ID != hits[0].Session.ID || exact.Session.Harness != "claude" || exact.Session.Source.Instance != "test-workstation" || exact.Window.Offset != 1 || exact.Window.Limit != 1 || exact.Window.Total != 3 || exact.Window.Returned != 1 || len(exact.Session.Messages) != 1 || !strings.Contains(exact.Session.Messages[0].Text, "second") {
+	if exact.SchemaVersion != jsonout.Version || exact.Session.ID != hits[0].Session.ID || exact.Session.Harness != "claude" || exact.Session.Source.Instance != "test-workstation" || exact.Window.Offset != 1 || exact.Window.Limit != 1 || exact.Window.Total != 3 || exact.Window.Returned != 1 || len(exact.Session.Messages) != 1 || !strings.Contains(exact.Session.Messages[0].Text, "second") {
 		t.Fatalf("exact = %#v", exact)
 	}
 }

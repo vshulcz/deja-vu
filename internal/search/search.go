@@ -37,6 +37,7 @@ const (
 	TierExact    = query.TierExact
 	TierClose    = query.TierClose
 	TierSemantic = query.TierSemantic
+	TierStemmed  = "stemmed"
 )
 
 func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
@@ -50,12 +51,21 @@ func MatchesParts(text string, terms, phrases []string, variants map[string][]st
 }
 
 type searchJSONEnvelope struct {
-	SchemaVersion int                 `json:"schema_version"`
-	Hits          []Hit               `json:"hits"`
-	Fuzzy         bool                `json:"fuzzy,omitempty"`
-	Stemmed       bool                `json:"stemmed,omitempty"`
-	Semantic      bool                `json:"semantic,omitempty"`
-	Variants      map[string][]string `json:"variants,omitempty"`
+	SchemaVersion int `json:"schema_version"`
+	// Match is the set-level tier. "relevance" means nothing matched and these
+	// are the nearest sessions — a different kind of answer, and the one a
+	// caller counting recall has to exclude. It used to be readable only as a
+	// sentence on stderr.
+	Match string `json:"match"`
+	// Total is how many sessions matched before the cap; Capped says whether
+	// the cap hid any. Counting the returned hits alone measures the cap.
+	Total    int                 `json:"total"`
+	Capped   bool                `json:"capped,omitempty"`
+	Hits     []Hit               `json:"hits"`
+	Fuzzy    bool                `json:"fuzzy,omitempty"`
+	Stemmed  bool                `json:"stemmed,omitempty"`
+	Semantic bool                `json:"semantic,omitempty"`
+	Variants map[string][]string `json:"variants,omitempty"`
 }
 
 type Hit struct {
@@ -115,7 +125,7 @@ func countIn(text, low string, qtoks, phrases []string, qlow string, variants ma
 	return c
 }
 
-func Run(ss []model.Session, o Options) ([]Hit, error) {
+func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
 	qlow := strings.ToLower(o.Query)
 	qtoks, phrases := QueryParts(o.Query)
@@ -225,14 +235,61 @@ func Run(ss []model.Session, o Options) ([]Hit, error) {
 	}
 	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks), o.RecallWorn)
 	markEarlierAttempts(hits)
+	return hits, nil
+}
+
+// Run returns the capped result the CLI and the MCP tools have always
+// returned. RunDetailed is the same search with the numbers the cap hides.
+func Run(ss []model.Session, o Options) ([]Hit, error) {
+	r, err := RunDetailed(ss, o)
+	return r.Hits, err
+}
+
+// Results carries what a caller needs to interpret a search rather than only
+// read it: how many sessions matched before the cap, whether the cap hid any,
+// and which tier answered. Counting hits alone measures the cap — a figure that
+// moves when the window's membership changes, whether or not recall improved.
+type Results struct {
+	Hits   []Hit
+	Total  int
+	Capped bool
+	// Match is the set-level tier: exact, close, stemmed, semantic or
+	// relevance. relevance means nothing matched and these are the nearest
+	// sessions, which is not the same kind of answer.
+	Match string
+}
+
+// RunDetailed is Run plus the numbers the cap would otherwise hide.
+func RunDetailed(ss []model.Session, o Options) (Results, error) {
+	hits, err := runScored(ss, o)
+	if err != nil {
+		return Results{}, err
+	}
+	r := Results{Hits: hits, Total: len(hits), Match: matchTier(o)}
 	limit := o.Limit
 	if limit == 0 && !o.All {
 		limit = 15
 	}
 	if limit > 0 && len(hits) > limit {
-		hits = hits[:limit]
+		r.Hits = hits[:limit]
+		r.Capped = true
 	}
-	return hits, nil
+	return r, nil
+}
+
+func matchTier(o Options) string {
+	switch {
+	case o.Semantic:
+		return TierSemantic
+	case o.Tier != "":
+		return o.Tier
+	case o.Stemmed:
+		return TierStemmed
+	case o.Fuzzy:
+		return TierClose
+	default:
+		return TierExact
+	}
 }
 
 // markEarlierAttempts flags hits that look like older passes over the same
@@ -493,28 +550,20 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		hits[i].Session.SetSource(o.SourceInstance)
 	}
 	if o.JSON {
-		if o.Semantic {
-			_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
-				SchemaVersion: jsonout.Version,
-				Hits:          hits,
-				Semantic:      true,
-			})
-		} else if o.Stemmed {
-			_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
-				SchemaVersion: jsonout.Version,
-				Hits:          hits,
-				Stemmed:       true,
-				Variants:      o.FuzzyVariants,
-			})
-		} else if o.Fuzzy {
-			_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
-				SchemaVersion: jsonout.Version,
-				Hits:          hits,
-				Fuzzy:         true,
-			})
-		} else {
-			_ = json.NewEncoder(w).Encode(hits)
-		}
+		// One shape, always. The exact path used to emit a bare array while
+		// every fallback path emitted an object, so a consumer had to handle
+		// two contracts and could not tell which it had until it looked.
+		_ = json.NewEncoder(w).Encode(searchJSONEnvelope{
+			SchemaVersion: jsonout.Version,
+			Match:         matchTier(o),
+			Total:         o.Total,
+			Capped:        o.Capped,
+			Hits:          hits,
+			Fuzzy:         o.Fuzzy,
+			Stemmed:       o.Stemmed,
+			Semantic:      o.Semantic,
+			Variants:      o.FuzzyVariants,
+		})
 		return
 	}
 	color := colorOK(w)

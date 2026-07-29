@@ -397,8 +397,16 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if result.Tier == search.TierRelevance {
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
 		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
-	} else if hits, err = search.Run(ss, o); err != nil {
-		return fmt.Errorf("run: %w", err)
+		o.Total = len(hits)
+	} else {
+		// RunDetailed rather than Run: the JSON envelope reports how many
+		// sessions matched before the cap, and that is not recoverable from a
+		// list the cap has already trimmed.
+		detailed, rerr := search.RunDetailed(ss, o)
+		if rerr != nil {
+			return fmt.Errorf("run: %w", rerr)
+		}
+		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
 	}
 	hits = policyFilterHits(policy.ActivationSearch, hits)
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
@@ -407,6 +415,14 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	o.Semantic = semantic
+	// Policy scoping, reranking and the semantic tier all run after the cap, so
+	// the pre-cap count can no longer describe what is being returned. When
+	// nothing was capped the honest total is simply what survived; when it was,
+	// there is no way to know how the filters would have treated the hidden
+	// ones, so the pre-cap figure stands and `capped` says to distrust it.
+	if !o.Capped {
+		o.Total = len(hits)
+	}
 	if len(hits) == 0 {
 		printNoMatches(os.Stderr, o.Query, len(ss))
 	}
@@ -592,6 +608,9 @@ func firstUserTitle(s model.Session) string {
 func parseSearch(args []string) (search.Options, error) {
 	o := search.Options{}
 	var q []string
+	// --limit=100 used to fall through and be searched for as a query term,
+	// silently returning results for a different question than the one asked.
+	args = splitEqualsForms(args)
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
@@ -993,4 +1012,25 @@ See README.md for the full CLI reference.`)
 // points at the next command rather than leaving the user to guess.
 func emptyIndexHint(what string) string {
 	return "deja: " + what + " — run `deja index`, or `deja doctor` to see which agent stores were found"
+}
+
+// searchValueFlags take a value, so "--flag=value" has to become two arguments
+// before the parser sees it. Anything else keeps its equals sign: a query may
+// legitimately contain one.
+var searchValueFlags = map[string]bool{
+	"--harness": true, "--project": true, "--since": true,
+	"--role": true, "--limit": true,
+}
+
+func splitEqualsForms(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		name, value, found := strings.Cut(a, "=")
+		if found && searchValueFlags[name] {
+			out = append(out, name, value)
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
