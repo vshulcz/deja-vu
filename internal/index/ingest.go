@@ -439,6 +439,16 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
 		return err
 	}
+	// The same phase reporting rebuild() has. Without it the first run of a
+	// search — which is how almost everyone builds their index the first time,
+	// rather than by typing `deja index` — showed a spinner reading "starting"
+	// and a bar frozen at one notch for the whole build.
+	total := 0
+	progressWeights = filesPerHarness(files)
+	for _, n := range progressWeights {
+		total += n
+	}
+	reportPhase("reading sessions", total)
 	ss := sources.FilterSessions(filterTombstoned(loadProgress("", progress)))
 	imported := importedSessions(dir)
 	ss = append(ss, imported.sessions...)
@@ -468,8 +478,10 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	seenMsgs := msgSeen{}
+	reportPhase("indexing messages", len(ss))
 	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
+			reportAdvance(1)
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
 			if old, ok := m.Sessions[key]; ok {
@@ -514,6 +526,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	buildCooccur(tmp, ss)
+	reportPhase("writing index", len(buckets))
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
@@ -637,6 +650,7 @@ func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
+				reportAdvance(1)
 				if err := writeBucket(filepath.Join(dir, job.name+".bin"), job.data); err != nil {
 					select {
 					case errCh <- err:
