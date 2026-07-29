@@ -118,18 +118,45 @@ def scene_question(t: float):
     return glow(base, ink)
 
 
-def column(d, x, w, title, colour, lines, reveal: float, body_font, title_font):
-    d.text((x, 150), title, font=title_font, fill=colour)
-    d.line([(x, 186), (x + w, 186)], fill=colour, width=2)
+def dim(colour, a: float):
+    """Fade towards the background rather than using alpha: the glow pass reads
+    the ink layer, and half-transparent ink blooms wrong."""
+    a = max(0.0, min(1.0, a))
+    return tuple(int(BG[i] + (colour[i] - BG[i]) * a) for i in range(3))
+
+
+def column(d, x, w, title, colour, lines, t: float, start: float, body_font):
+    """One side of the split. Lines arrive one at a time — the pause between
+    them is the point, not decoration: a reader needs a beat to notice that the
+    agent has just admitted it knows nothing."""
+    head = ease((t - start) / 0.35)
+    if head <= 0:
+        return
+    d.text((x, 150), title, font=font(21), fill=dim(colour, head))
+    d.line([(x, 186), (x + w * head, 186)], fill=dim(colour, head), width=2)
     y = 224
-    for i, (line, fill, size) in enumerate(lines):
-        if reveal < i * 0.12:
+    for i, (line, fill, size, accent) in enumerate(lines):
+        a = ease((t - start - 0.45 - i * 0.42) / 0.4)
+        if a <= 0:
             break
-        f = body_font if size == "body" else font(20)
+        f = body_font if size == "body" else font(19)
         for chunk in wrap(d, line, f, w):
-            d.text((x, y), chunk, font=f, fill=fill)
+            cx = x
+            # Dates and versions are what a developer's eye lands on, so they
+            # get the amber the site keeps for exactly that.
+            for piece, is_accent in split_accent(chunk, accent):
+                col = AMBER if is_accent else fill
+                d.text((cx, y), piece, font=f, fill=dim(col, a))
+                cx += d.textlength(piece, font=f)
             y += f.size + 12
-        y += 10
+        y += 8
+
+
+def split_accent(text: str, accent: str):
+    if not accent or accent not in text:
+        return [(text, False)]
+    head, _, tail = text.partition(accent)
+    return [(head, False), (accent, True), (tail, False)]
 
 
 def wrap(d, text, f, width):
@@ -147,40 +174,45 @@ def wrap(d, text, f, width):
 
 
 def scene_split(t: float):
-    """Both answers, side by side. The left one is the whole argument."""
+    """Both answers, side by side — but not at the same time. The left one is
+    given room to land before the right one arrives to contradict it."""
     base, ink, d = frame()
-    body = font(22)
-    title = font(22)
-    left_x, right_x, colw = 96, 640, 464
+    body = font(21)
+    left_x, right_x, colw = 92, 636, 472
 
-    fade = ease(min(1.0, t / 0.5))
     column(d, left_x, colw, "WITHOUT MEMORY", COLD, [
-        ("“No record of it.", COLD, "body"),
-        ("First time here as far as I can see.”", COLD, "body"),
-        ("then: five drivers, five knobs,", (78, 92, 104), "small"),
-        ("and a question back to you.", (78, 92, 104), "small"),
-    ], reveal=fade * 1.5, body_font=body, title_font=title)
+        ("\u201cNo record of it. First time here", COLD, "body", ""),
+        ("as far as I can see.\u201d", COLD, "body", ""),
+        ("then five drivers, five knobs,", (74, 88, 100), "small", ""),
+        ("and a question back to you.", (74, 88, 100), "small", ""),
+    ], t, start=0.0, body_font=body)
 
-    if t > 1.0:
-        r = ease(min(1.0, (t - 1.0) / 0.7))
-        column(d, right_x, colw, "WITH DEJA", PH, [
-            ("“Yes. Nov 29 2025, payments repo.", PH_HI, "body"),
-            ("Same bug.”", PH_HI, "body"),
-            ("the agent called deja on its own,", FAINT, "small"),
-            ("before debugging anything.", FAINT, "small"),
-        ], reveal=r * 1.5, body_font=body, title_font=title)
+    # The divider sweeps down as the second column is about to answer.
+    sweep = ease((t - 2.05) / 0.45)
+    if sweep > 0:
+        d.line([(586, 150), (586, 150 + 300 * sweep)], fill=dim(PH_DIM, 0.8), width=1)
+
+    column(d, right_x, colw, "WITH DEJA", PH, [
+        ("\u201cYes. Nov 29 2025, payments repo.", PH_HI, "body", "Nov 29 2025"),
+        ("Same bug.\u201d", PH_HI, "body", ""),
+        # Measured end to end on the demo corpus, process start included —
+        # not the 12 ms search figure from the benchmarks, which would be the
+        # flattering number rather than the true one for this call.
+        ("\u2192 deja/recall  \u00b7  20 ms  \u00b7  no LLM", FAINT, "small", "20 ms"),
+        ("called by the agent, unprompted.", FAINT, "small", ""),
+    ], t, start=2.2, body_font=body)
     return glow(base, ink)
 
 
 def scene_decision(t: float):
     """What was handed back: not the symptom, the decision."""
     base, ink, d = frame()
-    centred(d, 118, "what came back", font(20), FAINT)
+    centred(d, 118, "what deja handed back", font(20), FAINT)
     lines = [
         ("pgx v5.5 changed prepared-statement caching.", BODY, 26),
         ("pgbouncer cannot hold those across connections.", BODY, 26),
         ("", BODY, 12),
-        ("we pinned pgx 5.4.3", PH_HI, 34),
+        ("we pinned pgx 5.4.3", AMBER, 34),
         ("revisit when pgbouncer 1.24 ships support", PH, 26),
     ]
     y = 190
@@ -217,7 +249,7 @@ def scene_cta(t: float):
 
 SCENES = [
     (scene_question, 3.0),
-    (scene_split, 4.4),
+    (scene_split, 5.6),
     (scene_decision, 4.2),
     (scene_cta, 3.6),
 ]
