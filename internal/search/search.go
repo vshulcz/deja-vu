@@ -405,6 +405,12 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		if decidesSomething(doc.hit.Session) {
 			score *= decisionBoost
 		}
+		// A pasted log outranks a human answer on term frequency alone: it
+		// repeats the words fourteen times and says nothing. Measured before
+		// this existed, the paste won every question of that shape.
+		if looksPasted(doc.hit.Session) {
+			score *= pastePenalty
+		}
 		score *= freshnessDecay(doc.hit.Session.Updated, now)
 		doc.hit.Score = score
 		hits = append(hits, doc.hit)
@@ -519,6 +525,42 @@ func decidesSomething(s model.Session) bool {
 		}
 	}
 	return false
+}
+
+// pastePenalty damps a session whose matched text is a dump rather than a
+// conversation. It is deliberately mild: some pastes are the answer — a stack
+// trace someone diagnosed, a config that turned out to be wrong — so this
+// lowers them behind real discussion rather than hiding them.
+const pastePenalty = 0.5
+
+// pasteMinLines is the length below which repetition means nothing. Three
+// identical short lines are a list; fourteen are a log.
+const pasteMinLines = 8
+
+// pasteDistinctRatio is the share of distinct lines below which a message reads
+// as machine output. A conversation almost never repeats two thirds of itself.
+const pasteDistinctRatio = 0.35
+
+// looksPasted reports whether a session's text is dominated by repeated lines.
+// Line repetition rather than vocabulary: a log repeats its shape, and a person
+// explaining something at length does not.
+func looksPasted(s model.Session) bool {
+	dump, total := 0, 0
+	for _, m := range s.Messages {
+		lines := strings.Split(strings.TrimSpace(m.Text), "\n")
+		if len(lines) < pasteMinLines {
+			continue
+		}
+		total++
+		distinct := make(map[string]struct{}, len(lines))
+		for _, l := range lines {
+			distinct[strings.TrimSpace(l)] = struct{}{}
+		}
+		if float64(len(distinct))/float64(len(lines)) < pasteDistinctRatio {
+			dump++
+		}
+	}
+	return total > 0 && dump*2 >= total
 }
 
 const promotedNoteBoost = 1.25

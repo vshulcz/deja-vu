@@ -26,6 +26,30 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
+// report is the same measurement for a second set of questions.
+func report(label string, sessions []model.Session, probes []probe, verbose bool) {
+	first := 0
+	for _, p := range probes {
+		hits, err := search.Run(sessions, search.Options{Query: p.query, All: true})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if len(hits) > 0 && hits[0].Session.ID == p.decision {
+			first++
+			continue
+		}
+		if verbose {
+			top := "—"
+			if len(hits) > 0 {
+				top = hits[0].Session.ID
+			}
+			fmt.Printf("  miss  %-38q want=%s top=%s\n", p.query, p.decision, top)
+		}
+	}
+	fmt.Printf("%s %d · ranked first %d (%.0f%%)\n", label, len(probes), first, 100*float64(first)/float64(len(probes)))
+}
+
 type probe struct {
 	query    string
 	decision string // session id that concluded something
@@ -35,7 +59,7 @@ func main() {
 	verbose := flag.Bool("v", false, "print every miss")
 	flag.Parse()
 
-	sessions, probes := corpus()
+	sessions, probes, noise := corpus()
 	hit1, hit3 := 0, 0
 	for _, p := range probes {
 		hits, err := search.Run(sessions, search.Options{Query: p.query, All: true})
@@ -65,18 +89,19 @@ func main() {
 			fmt.Printf("  miss  %-34q decision=%s rank=%d top=%s\n", p.query, p.decision, rank, top)
 		}
 	}
-	fmt.Printf("questions %d · decision ranked first %d (%.0f%%) · in top 3 %d (%.0f%%)\n",
+	fmt.Printf("decisions  %d · ranked first %d (%.0f%%) · in top 3 %d (%.0f%%)\n",
 		len(probes), hit1, 100*float64(hit1)/float64(len(probes)), hit3, 100*float64(hit3)/float64(len(probes)))
+	report("noise     ", sessions, noise, *verbose)
 }
 
 // corpus builds, for each question, one deciding session and several louder
 // distractors. The distractors repeat the query terms more than the decision
 // does — that is the trap, and it is the ordinary case in a real store, where
 // most sessions that mention a topic never settled anything about it.
-func corpus() ([]model.Session, []probe) {
+func corpus() ([]model.Session, []probe, []probe) {
 	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	var out []model.Session
-	var probes []probe
+	var probes, noise []probe
 
 	topics := []struct {
 		id       string
@@ -114,8 +139,26 @@ func corpus() ([]model.Session, []probe) {
 			"see the upstream page on " + t.terms + " and the " + t.terms + " faq",
 		}))
 		probes = append(probes, probe{query: t.terms, decision: t.id + "-decided"})
+
+		// A second shape, where nobody concluded anything: a human answer with
+		// no decision vocabulary against a pasted log that repeats the terms.
+		// The decision boost cannot help here — this is the case that asks
+		// whether noise costs a session anything.
+		// The exact tier requires the query terms to meet inside one message,
+		// not merely inside one session — cross-message co-occurrence is what
+		// the relevance tier is for. A fixture that spreads them across turns
+		// measures the ladder, not the ranking.
+		out = append(out, session(t.id+"-answer", day.AddDate(0, 0, -6), []string{
+			"what is going on with " + t.terms + "?",
+			t.terms + " only happens on staging after a deploy, never locally",
+		}))
+		out = append(out, session(t.id+"-paste", day.AddDate(0, 0, -7), []string{
+			"pasting the output",
+			strings.Repeat("WARN "+t.terms+" staging deploy retry=3 conn=17 elapsed=812ms\n", 14),
+		}))
+		noise = append(noise, probe{query: t.terms + " staging deploy", decision: t.id + "-answer"})
 	}
-	return out, probes
+	return out, probes, noise
 }
 
 func session(id string, when time.Time, texts []string) model.Session {

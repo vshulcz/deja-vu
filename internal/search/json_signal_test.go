@@ -190,3 +190,70 @@ func TestASessionThatDecidedSomethingOutranksOneThatDidNot(t *testing.T) {
 		t.Fatal("an assistant conclusion did not count as a decision")
 	}
 }
+
+// A pasted log outranks a human answer on term frequency alone: it repeats the
+// query words a dozen times and says nothing. The signal is line repetition
+// rather than vocabulary — a log repeats its shape, a person explaining
+// something at length does not.
+func TestAPastedLogRanksBelowAnAnswer(t *testing.T) {
+	now := time.Now()
+	sess := func(id string, texts ...string) model.Session {
+		s := model.Session{ID: id, Harness: "claude", Project: "app", Started: now, Updated: now}
+		for i, txt := range texts {
+			role := "user"
+			if i%2 == 1 {
+				role = "assistant"
+			}
+			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: now})
+		}
+		return s
+	}
+	answer := sess("answer",
+		"what is going on with connection pool exhausted?",
+		"connection pool exhausted only happens on staging after a deploy, never locally")
+	paste := sess("paste",
+		"pasting the output",
+		strings.Repeat("WARN connection pool exhausted staging deploy retry=3 conn=17\n", 14))
+	filler := sess("f1", "the linter is complaining about imports")
+
+	hits, err := Run([]model.Session{filler, paste, answer}, Options{Query: "connection pool exhausted staging deploy", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Session.ID != "answer" {
+		t.Fatalf("the paste outranked the answer: %s", hits[0].Session.ID)
+	}
+	// Damped, not hidden: some pastes are the answer.
+	found := false
+	for _, h := range hits {
+		if h.Session.ID == "paste" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("the paste was dropped from the results entirely")
+	}
+}
+
+func TestPasteDetectionBoundaries(t *testing.T) {
+	msg := func(text string) model.Session {
+		return model.Session{Messages: []model.Message{{Role: "assistant", Text: text}}}
+	}
+	if looksPasted(msg(strings.Repeat("same line\n", 7))) {
+		t.Fatal("seven repeated lines counted as a dump; a short list is not a log")
+	}
+	if !looksPasted(msg(strings.Repeat("same line\n", 14))) {
+		t.Fatal("fourteen identical lines did not count as a dump")
+	}
+	// Long prose with distinct lines is not a dump however long it runs.
+	var prose strings.Builder
+	for i := 0; i < 30; i++ {
+		fmt.Fprintf(&prose, "paragraph %d saying something different about the pool\n", i)
+	}
+	if looksPasted(msg(prose.String())) {
+		t.Fatal("thirty distinct lines counted as a dump")
+	}
+	if looksPasted(model.Session{}) {
+		t.Fatal("an empty session counted as a dump")
+	}
+}
