@@ -1,7 +1,6 @@
 package redact
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -55,6 +54,6 @@ func TestBenchCorpusShape(t *testing.T) {
 		"plain": plain, "chatty": chatty, "hashy": hashy, "secret": withSecret,
 	} {
 		_, c := Text(s)
-		t.Log(fmt.Sprintf("%-7s %6d bytes  %d redactions", name, len(s), c.Total()))
+		t.Logf("%-7s %6d bytes  %d redactions", name, len(s), c.Total())
 	}
 }
