@@ -48,9 +48,15 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          go tool cover -func=coverage.out | tail -1
-          total=$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9]+\.[0-9]+')
-          floor=82.0
+          # Measurement harnesses under scripts/ are developer tools, never
+          # part of the binary, and they have no tests by design. Counting them
+          # meant every new benchmark cost six points of coverage, so the gate
+          # taxed measuring the product. Excluded here and the floor raised to
+          # match what the shipped packages actually stand at.
+          grep -v '/scripts/' coverage.out > shipped.out
+          go tool cover -func=shipped.out | tail -1
+          total=$(go tool cover -func=shipped.out | tail -1 | grep -oE '[0-9]+\.[0-9]+')
+          floor=87.5
           echo "total coverage ${total}%, floor ${floor}%"
           awk -v t="$total" -v f="$floor" 'BEGIN { if (t+0 < f+0) { printf "coverage %.1f%% is below the %.1f%% floor\n", t, f; exit 1 } }'
       # A floor per package, set at where each stands today. Raise them as
