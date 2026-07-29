@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/logo.svg" width="340" alt="deja-vu"></p>
 
-<p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; searches 3.3&nbsp;GB in ~12&nbsp;ms, serves it back to any agent over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
+<p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; searches 3.3&nbsp;GB in ~1&nbsp;ms, serves it back to any agent over MCP, and moves with you between machines over SSH. One zero-dependency binary, fully local.</p>
 
 <p align="center"><strong>84.9% hit@1</strong> on LongMemEval-S retrieval &mdash; no LLM, no embeddings, no API key. <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Harness in-repo, run it yourself.</a></p>
 
@@ -20,7 +20,7 @@
 <p align="center"><em>Every line is quoted from two real Claude Code sessions &mdash; the same question, the same agent, once without memory and once with deja. Nobody searched anything: the agent called deja itself.</em></p>
 
 <p align="center">
-<b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>zero</b> LLM calls, zero embeddings, zero API keys &middot; <b>~12&nbsp;ms</b> over 3.3&nbsp;GB<br>
+<b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>zero</b> LLM calls, zero embeddings, zero API keys &middot; <b>~1&nbsp;ms</b> median search over 3.3&nbsp;GB<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes — <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a>.</sub>
 </p>
 
@@ -107,7 +107,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 
 | Feature | What it does |
 | --- | --- |
-| **Search** | `deja "connection pool exhausted"` — ~12 ms over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time is a hint, not a filter: `deja "what did we do in may"` and "a week ago" push that month's sessions up the ranking, they do not exclude the rest — use `--since 30d` when you mean a window |
+| **Search** | `deja "connection pool exhausted"` — ~1 ms median over gigabytes, retroactive: months of logs from before you installed it; natural-language questions fall back to a relevance tier — 84.9% hit@1 on LongMemEval-S session retrieval, harness in-repo; time is a hint, not a filter: `deja "what did we do in may"` and "a week ago" push that month's sessions up the ranking, they do not exclude the rest — use `--since 30d` when you mean a window |
 | **Agent recall** | MCP `recall` tool — the agent answers *"we fixed this three weeks ago"* instead of re-debugging, across harnesses: solve it in Codex, Claude remembers |
 | **Knows what held** | `deja promote <id> --state rejected --note "why"` — a decision you reverted comes back marked *tried and rejected*, with the reason and the date, on every hit for that session. Nothing is deleted: the agent sees what was decided **and** that it changed |
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
@@ -323,7 +323,7 @@ Measured on a real corpus — 1,250+ sessions, ~3.3GB across three harnesses:
 
 | Measurement | Result |
 | --- | --- |
-| Warm search | **~12 ms** typical, ~25 ms worst-case |
+| Warm search | **~1.3 ms** median, ~17 ms on the most common word in the store (`go run ./scripts/searchbench`) |
 | Cold index (once) | ~10 s |
 | Index size | ~2.4% of corpus |
 
