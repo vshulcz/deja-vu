@@ -34,6 +34,8 @@ stopped reading a session it was never going to rank on.
 - deja indexed its own recall blocks, so a session could be answered with deja's own earlier answer. (#480, #488)
 - Recall returned the question rather than the decision that followed it. (#490, #491)
 - `deja-stats.svg`, a generated card from a local run, had been committed to the repo. (#514)
+- The front page quoted a search latency measured before two changes to the read path. It is 1.3 ms median and 17 ms on the most common word, both from `scripts/searchbench`; the LongMemEval median search was quoted at 40 ms and is 19 ms. (#519)
+- The file-ranking test gave two git calls 400 ms and failed on runners that miss it. (#516, #520)
 
 ## [0.16.1] - 2026-07-28
 
