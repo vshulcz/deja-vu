@@ -15,9 +15,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><img src="assets/demo.gif" alt="A real Claude Code session: the agent calls deja on its own and answers with the decision from eight months earlier"></p>
+<p align="center"><img src="assets/demo.gif" alt="The same question asked twice in Claude Code: without deja the agent has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
-<p align="center"><em>Nobody searched anything. The agent hit an error, called deja itself, and came back with what was decided eight months ago.</em></p>
+<p align="center"><em>The same question, the same agent, twice. Without deja: &ldquo;no record of it &mdash; first time here as far as I can see.&rdquo; With deja: the cause, the fix that was chosen, and the note left to revisit it &mdash; from eight months earlier. Nobody searched anything.</em></p>
 
 <p align="center">
 <b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>zero</b> LLM calls, zero embeddings, zero API keys &middot; <b>~12&nbsp;ms</b> over 3.3&nbsp;GB<br>
