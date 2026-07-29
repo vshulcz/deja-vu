@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-07-29
+
+Ranking learned to tell a conclusion from a conversation about one, and search
+stopped reading a session it was never going to rank on.
+
+### Added
+- Search output says which tier answered (`exact`, `close`, `stemmed`, `semantic`, `relevance`), how many sessions matched, and whether the cap hid any. Both the text and JSON forms carry it. Thanks to @AliceLJY for the naming. (#494, #495, #496)
+- A decision that was later reversed comes back marked — `[this was tried and rejected, 2026-07-29]` with the reason — instead of being served as current truth. (#506)
+- `.mcpb` bundles for the registries that install MCP servers from one, with the entry point fixed to a real server rather than a stub. (#484, #487)
+- `deja --help` lists the search flags. Thanks to @AliceLJY. (#493)
+
+### Changed
+- A session that concluded something now outranks one that only discussed it, and a pasted log ranks below a human answer to the same question. Measured on a benchmark built for it: 8/8 and 8/8, LongMemEval-S unchanged. (#509, #510)
+- Reuse counts a déjà vu moment — the user returning to the same ground — alongside agent recalls, and the 1.2× ceiling on it is now covered by a test rather than a judgement. (#511)
+- Coverage is measured on shipped packages; benchmark harnesses under `scripts/` no longer count, and the floor rose from 82.0% to 87.5%. (#515)
+
+### Performance
+- A query over a common word reads at most 64 matching messages of any one session, sampled across it. `"index"` on a 3.5 GB store: 61.8 ms → 26.9 ms. Nothing under the bound is touched, and no session is ever dropped from the candidates. (#513, #515)
+- Records are read in coalesced spans instead of three syscalls apiece. (#504, #512)
+- Full rebuild is 12% faster: redaction scans bytes instead of running a regex, and the opencode query stops parsing rows that cannot match. (#498)
+- Claude transcripts decode into declared types — a third fewer allocations. (#502)
+
+### Fixed
+- The first index built by running a search — which is how nearly everyone builds their first one — reported no progress at all: a spinner reading "starting" and a bar frozen at one notch for the whole build. (#505, #517)
+- deja indexed its own recall blocks, so a session could be answered with deja's own earlier answer. (#480, #488)
+- Recall returned the question rather than the decision that followed it. (#490, #491)
+- `deja-stats.svg`, a generated card from a local run, had been committed to the repo. (#514)
+
 ## [0.16.1] - 2026-07-28
 
 ### Added
