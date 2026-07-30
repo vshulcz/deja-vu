@@ -26,6 +26,32 @@ var selfRecallMarkers = [][2]string{
 	{"&lt;deja-recall&gt;", "&lt;/deja-recall&gt;"},
 }
 
+// Harness plumbing is the same problem one step out: text a harness injects
+// into its own transcript, which deja then indexes as if a person had said it.
+// Measured on a real index (#551): 833 records, 0.82 MB — 1.2% of records and
+// 1.9% of the text. `[Request interrupted by user]` is not memory, and the hook
+// envelope is deja's own output arriving by a route the #488 filter did not
+// cover.
+//
+// Only wrappers whose *content* is the harness talking are listed. `<bash-stdout>`
+// deliberately is not: the tags are noise but what they wrap is real command
+// output, which is the most useful thing in a transcript.
+var injectedBlocks = [][2]string{
+	{"<system-reminder>", "</system-reminder>"},
+	{"<local-command-caveat>", "</local-command-caveat>"},
+	{"<command-name>", "</command-args>"},
+}
+
+// Whole-line markers: a harness note that occupies its own line, with no
+// closing tag. Matched at line granularity so a line quoting one inside a real
+// message does not take the message with it.
+var injectedLines = []string{
+	"[Request interrupted by user",
+	"[Your previous response had no visible output",
+	"UserPromptSubmit hook additional context:",
+	"SessionStart hook additional context:",
+}
+
 // stripSelfRecall removes every recall block from a message, keeping whatever
 // the user or agent actually wrote around it. Most harnesses prepend the block
 // to a real user turn, so dropping the whole message would lose the question
@@ -34,7 +60,50 @@ func stripSelfRecall(text string) string {
 	for _, m := range selfRecallMarkers {
 		text = stripBetween(text, m[0], m[1])
 	}
+	for _, m := range injectedBlocks {
+		text = stripBetweenClosed(text, m[0], m[1])
+	}
+	return stripInjectedLines(text)
+}
+
+// stripInjectedLines drops lines that are entirely a harness marker. The line
+// has to *start* with the marker: a message discussing one — this file, an
+// issue, a bug report — keeps it.
+func stripInjectedLines(text string) string {
+	for _, m := range injectedLines {
+		if !strings.Contains(text, m) {
+			continue
+		}
+		lines := strings.Split(text, "\n")
+		kept := lines[:0]
+		for _, ln := range lines {
+			if strings.HasPrefix(strings.TrimSpace(ln), m) {
+				continue
+			}
+			kept = append(kept, ln)
+		}
+		text = strings.Join(kept, "\n")
+	}
 	return text
+}
+
+// stripBetweenClosed removes only *complete* blocks. An unclosed marker is
+// treated as prose, which is the opposite of the rule for deja's own recall: a
+// truncated <deja-recall> is still ours, but a sentence mentioning
+// <system-reminder> — a bug report, this file's own tests — is not, and
+// swallowing the rest of it loses what the person actually wrote.
+func stripBetweenClosed(text, open, close string) string {
+	for {
+		start := strings.Index(text, open)
+		if start < 0 {
+			return text
+		}
+		rel := strings.Index(text[start+len(open):], close)
+		if rel < 0 {
+			return text
+		}
+		text = text[:start] + text[start+len(open)+rel+len(close):]
+	}
 }
 
 func stripBetween(text, open, close string) string {

@@ -288,6 +288,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				}
 				// Already redacted (and length-capped) by preRedactSessions.
 				text := msg.Text
+				// A message that is nothing but harness plumbing strips to empty
+				// (#551). Writing it would store a record with no content and give
+				// it a posting.
+				if strings.TrimSpace(text) == "" {
+					continue
+				}
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -508,6 +514,12 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 					continue
 				}
 				text := redactForIngest(&m, s.Path, msg.Text)
+				// A message that is nothing but harness plumbing strips to empty
+				// (#551). Writing it would store a record with no content and give
+				// it a posting.
+				if strings.TrimSpace(text) == "" {
+					continue
+				}
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return err
@@ -1166,6 +1178,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
 				text := redactForIngest(&m, s.Path, msg.Text)
+				// A message that is nothing but harness plumbing strips to empty
+				// (#551). Writing it would store a record with no content and give
+				// it a posting.
+				if strings.TrimSpace(text) == "" {
+					continue
+				}
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
 					return filesTouched, messages, err
