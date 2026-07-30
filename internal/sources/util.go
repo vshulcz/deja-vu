@@ -52,6 +52,32 @@ func unixGuess(n int64) time.Time {
 	return time.Time{}
 }
 
+// textFromContentKind is textFromContent plus the attribution question: did
+// everything it joined come from tool results? Claude files those inside `user`
+// messages, and labelling them as speech was wrong for 89% of that role (#559).
+func textFromContentKind(v any) (string, bool) {
+	c, ok := v.([]any)
+	if !ok {
+		return textFromContent(v), false
+	}
+	var sawTool, sawSpeech bool
+	for _, it := range c {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		typ, _ := m["type"].(string)
+		txt, _ := m["text"].(string)
+		str, _ := m["content"].(string)
+		if typ == "tool_result" {
+			sawTool = true
+		} else if txt != "" || str != "" {
+			sawSpeech = true
+		}
+	}
+	return textFromContent(v), sawTool && !sawSpeech
+}
+
 func textFromContent(v any) string {
 	switch c := v.(type) {
 	case string:

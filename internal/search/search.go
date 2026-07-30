@@ -512,9 +512,15 @@ const decisionBoost = 2.0
 // conversation about one. It looks only at non-user turns: a user writing "we
 // should just pin it" is a proposal, and the same words from the side that did
 // the work are a record of what happened.
+// roleToolOutput mirrors sources.RoleToolOutput; this package sits below it.
+const roleToolOutput = "tool-output"
+
 func decidesSomething(s model.Session) bool {
 	for _, m := range s.Messages {
-		if m.Role == "user" || m.Role == "" {
+		// Tool output is not the assistant concluding something. Before #559 it
+		// arrived labelled `user` and was skipped here by accident; now it is
+		// labelled honestly and has to be skipped on purpose.
+		if m.Role == "user" || m.Role == "" || m.Role == roleToolOutput {
 			continue
 		}
 		low := strings.ToLower(m.Text)

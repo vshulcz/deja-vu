@@ -86,7 +86,11 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 			if r, _ := msg["role"].(string); r != "" {
 				role = r
 			}
-			txt = textFromContent(msg["content"])
+			var toolOut bool
+			txt, toolOut = textFromContentKind(msg["content"])
+			if toolOut {
+				role = RoleToolOutput
+			}
 		}
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})

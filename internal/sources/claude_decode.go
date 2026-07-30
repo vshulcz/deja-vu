@@ -67,7 +67,11 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 			if v.Message.Role != "" {
 				role = v.Message.Role
 			}
-			txt = claudeText(v.Message.Content)
+			var toolOut bool
+			txt, toolOut = claudeTextKind(v.Message.Content)
+			if toolOut {
+				role = RoleToolOutput
+			}
 		}
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
@@ -125,23 +129,39 @@ func claudeTime(raw json.RawMessage) time.Time {
 // objects with neither key, are skipped rather than failing the line — a
 // transcript mixing shapes must not cost the whole message.
 func claudeText(raw json.RawMessage) string {
+	txt, _ := claudeTextKind(raw)
+	return txt
+}
+
+// RoleToolOutput marks text a tool produced. Claude Code files tool results
+// inside `user` messages, so without this the index labels 89% of its user-role
+// content as if a person had typed it — 33,027 of 37,077 messages, 77.8 MB
+// (#559). The text is worth keeping and searching; only the attribution was
+// wrong.
+const RoleToolOutput = "tool-output"
+
+// claudeTextKind joins a message's text and reports whether what it joined came
+// from tool results rather than from speech. A message mixing both counts as
+// speech: the person said something, and the tool output rode along with it.
+func claudeTextKind(raw json.RawMessage) (string, bool) {
+	var sawToolResult, sawSpeech bool
 	raw = trimJSONSpace(raw)
 	if len(raw) == 0 {
-		return ""
+		return "", false
 	}
 	if raw[0] == '"' {
 		var s string
 		if json.Unmarshal(raw, &s) != nil {
-			return ""
+			return "", false
 		}
-		return s
+		return s, false
 	}
 	if raw[0] != '[' {
-		return ""
+		return "", false
 	}
 	var items []json.RawMessage
 	if json.Unmarshal(raw, &items) != nil {
-		return ""
+		return "", false
 	}
 	var b strings.Builder
 	for _, item := range items {
@@ -150,6 +170,7 @@ func claudeText(raw json.RawMessage) string {
 			continue
 		}
 		var part struct {
+			Type    string `json:"type"`
 			Text    string `json:"text"`
 			Content string `json:"content"`
 		}
@@ -160,6 +181,11 @@ func claudeText(raw json.RawMessage) string {
 		if chunk == "" {
 			chunk = part.Content
 		}
+		if part.Type == "tool_result" {
+			sawToolResult = true
+		} else if chunk != "" {
+			sawSpeech = true
+		}
 		if chunk == "" {
 			continue
 		}
@@ -168,7 +194,7 @@ func claudeText(raw json.RawMessage) string {
 		}
 		b.WriteString(chunk)
 	}
-	return b.String()
+	return b.String(), sawToolResult && !sawSpeech
 }
 
 func trimJSONSpace(b []byte) []byte {
