@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -47,7 +48,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		case "--limit":
 			if i+1 < len(args) {
 				i++
-				fmt.Sscanf(args[i], "%d", &limit)
+				n, err := strconv.Atoi(args[i])
+				if err != nil || n <= 0 {
+					return fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
+				}
+				limit = n
 			}
 		case "--project":
 			if i+1 < len(args) {
@@ -95,8 +100,13 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		if err != nil || !ok {
 			continue
 		}
-		hitTimes := topicTimes(meaningful(full.Messages), needles)
-		if len(hitTimes) == 0 {
+		// The window is counted over speech and file events only. Tool output is
+		// two thirds of the records in a session, so a raw message count would be
+		// a few seconds of one command — far too narrow to connect a subject to
+		// the files it was about.
+		msgs := meaningful(full.Messages)
+		hit := topicTimes(msgs, needles)
+		if len(hit) == 0 {
 			// The search tier that produced this hit can be semantic, so a session
 			// can arrive without the words ever being said in it. Counting its
 			// files would put a one-off touch from an unrelated project at the top
@@ -104,12 +114,6 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			continue
 		}
 		scanned++
-		// The window is counted over speech and file events only. Tool output is
-		// two thirds of the records in a session, so twenty raw messages can be
-		// a few seconds of one command — far too narrow to connect a subject to
-		// the files it was about.
-		msgs := meaningful(full.Messages)
-		hit := hitTimes
 		seenHere := map[string]bool{}
 		nearHere := map[string]bool{}
 		for _, m := range msgs {
@@ -245,10 +249,12 @@ func lowerAll(in []string) []string {
 // output, a probe script written to measure something. They are touched
 // constantly while a subject is being worked on, so they outrank the code on
 // proximity alone, and they are not what anyone means by "which files matter".
-// Same class as the harness plumbing filtered in #551.
+// Same class as the harness plumbing filtered in #551. The markers are
+// agent-specific on purpose: excluding all of /tmp also excludes a repository
+// someone happens to have checked out there.
 func isScratch(p string) bool {
 	for _, seg := range []string{
-		"/scratchpad/", "/tasks/", "/.claude/", "/tmp/", "/var/folders/",
+		"/scratchpad/", "/tasks/", "/.claude/", "/.cache/", "/claude-501/",
 		"/node_modules/", "/.git/", "/testdata/fixtures/",
 	} {
 		if strings.Contains(p, seg) {
