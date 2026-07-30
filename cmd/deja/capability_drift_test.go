@@ -91,16 +91,22 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			if !execOK {
 				t.Fatalf("%s: registry says handoff exec, command table disagrees", h.ID)
 			}
+			if handoffPasteOnly[h.ID] {
+				t.Fatalf("%s: registry says handoff exec, but handoffPasteOnly lists it", h.ID)
+			}
 		case "paste":
 			if execOK {
 				t.Fatalf("%s: registry says paste-only, but an exec entry exists", h.ID)
+			}
+			if !handoffPasteOnly[h.ID] {
+				t.Fatalf("%s: registry says paste-only, but handoffPasteOnly does not list it", h.ID)
 			}
 		default:
 			t.Fatalf("%s: unknown handoff kind %q", h.ID, c.Handoff)
 		}
 	}
-	if seen != len(handoffTargets())+3 { // +3: roo, openclaw and hermes have no CLI prompt entry point
-		t.Fatalf("registry covers %d harnesses, handoff targets %d", seen, len(handoffTargets()))
+	if seen != len(handoffTargets())+len(handoffPasteOnly) {
+		t.Fatalf("registry covers %d harnesses, handoff targets %d + %d paste-only", seen, len(handoffTargets()), len(handoffPasteOnly))
 	}
 
 	// The published README matrix must contain a row for every harness.

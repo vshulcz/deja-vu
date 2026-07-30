@@ -121,6 +121,15 @@ func TestHandoffPasteModes(t *testing.T) {
 	if err != nil || !strings.Contains(out, "picking up work handed off") {
 		t.Fatalf("agy handoff = %q, %v", out, err)
 	}
+	// a paste-only target prints the digest too
+	out, err = captureRun(t, "handoff", "--to", "hermes", "c3")
+	if err != nil || !strings.Contains(out, "picking up work handed off") {
+		t.Fatalf("hermes handoff = %q, %v", out, err)
+	}
+	// but cannot --exec
+	if err := runHandoff(index.DefaultDir(), []string{"--to", "hermes", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
+		t.Fatalf("hermes exec error = %v", err)
+	}
 	if err := runHandoff(index.DefaultDir(), []string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
 		t.Fatalf("bare exec error = %v", err)
 	}
