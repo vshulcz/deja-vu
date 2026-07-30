@@ -1,6 +1,12 @@
 package index
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+)
 
 func TestPostingRoundTripCarriesTheToolBit(t *testing.T) {
 	in := []posting{
@@ -100,5 +106,30 @@ func TestTokenizedPartIndexesOnlyThePathOfASpan(t *testing.T) {
 	// A span with no body still has to yield its path rather than nothing.
 	if got := tokenizedPart(roleEdit, "/w/only.go"); got != "/w/only.go" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestTopTouchedFilesRanksAndFiltersAgentFiles(t *testing.T) {
+	ms := []model.Message{
+		{Role: roleFiles, Text: "/w/app.go\n/w/app.go"},
+		{Role: roleFiles, Text: "/w/app.go\n/w/util.go\n/Users/x/.claude/notes.md\n/w/build.log"},
+		{Role: "user", Text: "/w/never.go"},
+	}
+	got := topTouchedFiles(ms)
+	if len(got) != 2 || got[0] != "/w/app.go" || got[1] != "/w/util.go" {
+		t.Fatalf("got %v, want the busiest repository files only", got)
+	}
+	if topTouchedFiles(nil) != nil {
+		t.Fatal("no file records, nothing stored")
+	}
+}
+
+func TestTopTouchedFilesIsCapped(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 40; i++ {
+		fmt.Fprintf(&b, "/w/f%02d.go\n", i)
+	}
+	if got := topTouchedFiles([]model.Message{{Role: roleFiles, Text: b.String()}}); len(got) != touchedFileCap {
+		t.Fatalf("stored %d paths, want the cap of %d", len(got), touchedFileCap)
 	}
 }

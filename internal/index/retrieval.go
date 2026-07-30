@@ -1029,7 +1029,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		}
 		s := by[r.Key]
 		if s == nil {
-			cp := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Title: meta.Title, Started: meta.Started, Updated: meta.Updated}
+			cp := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Title: meta.Title, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched}
 			s = &cp
 			by[r.Key] = s
 		}

@@ -88,7 +88,18 @@ type SessionMeta struct {
 	ID, Harness, Project, Path, Title string
 	Started, Updated                  time.Time
 	Ord                               uint32
+	// Touched holds the few files this session worked on most, so a caller can
+	// ask about them without loading the session. Reading one back cost 130-220
+	// ms, which is not a price worth paying for a footnote under a search hit.
+	// The field is additive: a manifest written before it existed decodes with
+	// it empty and the caller degrades to saying nothing.
+	Touched []string `json:",omitempty"`
 }
+
+// touchedFileCap bounds what goes in SessionMeta.Touched. Enough to say
+// something useful about a session, small enough that a store of a thousand
+// sessions pays kilobytes for it.
+const touchedFileCap = 6
 
 type Manifest struct {
 	Version          int                    `json:"version"`

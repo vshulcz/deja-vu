@@ -84,6 +84,10 @@ type Hit struct {
 	// decision was rejected, superseded or has gone stale. A hit on a raw
 	// transcript used to arrive with no trace of that, so a decision someone
 	// had explicitly reverted came back reading like current truth.
+	// Moved is set by the CLI when some of the files this session touched have
+	// commits since it ended. Computing it means forking git, which this
+	// package does not do, so it arrives filled in rather than derived here.
+	Moved         string `json:"moved,omitempty"`
 	Lifecycle     string `json:"lifecycle,omitempty"`
 	LifecycleNote string `json:"lifecycle_note,omitempty"`
 	LifecycleAt   string `json:"lifecycle_at,omitempty"`
@@ -707,6 +711,13 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			note := "  " + lifecycleSummary(h)
 			if color {
 				note = cOrange + note + cReset
+			}
+			fmt.Fprintln(w, note)
+		}
+		if h.Moved != "" {
+			note := h.Moved
+			if color {
+				note = cDim + note + cReset
 			}
 			fmt.Fprintln(w, note)
 		}

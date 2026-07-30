@@ -720,7 +720,53 @@ func metaForSession(s model.Session) SessionMeta {
 	// composer name, the first user message — and are persisted in
 	// sessions.gob, so they need the same scrubbing as record text.
 	title, _ = redact.Text(title)
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated}
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages)}
+}
+
+// agentOwnedFile drops the agent's own working files. They are touched
+// constantly while a subject is being worked on, so left in they take the top
+// slots from the source that was actually being changed — measured: the six
+// stored paths held no repository file at all for a session whose work was
+// entirely in one.
+func agentOwnedFile(p string) bool {
+	for _, seg := range []string{"/scratchpad/", "/tasks/", "/.claude/", "/.cache/", "/claude-501/", "/node_modules/", "/.git/"} {
+		if strings.Contains(p, seg) {
+			return true
+		}
+	}
+	return strings.HasSuffix(p, ".log") || strings.HasSuffix(p, ".output")
+}
+
+// topTouchedFiles returns the files a session worked on most, busiest first.
+func topTouchedFiles(ms []model.Message) []string {
+	count := map[string]int{}
+	for _, m := range ms {
+		if m.Role != roleFiles {
+			continue
+		}
+		for _, p := range strings.Split(m.Text, "\n") {
+			if p = strings.TrimSpace(p); p != "" && !agentOwnedFile(p) {
+				count[p]++
+			}
+		}
+	}
+	if len(count) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(count))
+	for p := range count {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if count[out[i]] != count[out[j]] {
+			return count[out[i]] > count[out[j]]
+		}
+		return out[i] < out[j]
+	})
+	if len(out) > touchedFileCap {
+		out = out[:touchedFileCap]
+	}
+	return out
 }
 
 func metaWithOrd(meta SessionMeta, ord uint32) SessionMeta {

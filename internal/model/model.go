@@ -21,6 +21,11 @@ type Session struct {
 	Updated  time.Time `json:"updated"`
 	Messages []Message `json:"messages,omitempty"`
 	Source   *Source   `json:"source,omitempty"`
+	// Touched lists the few files this session worked on most. Parsers do not
+	// set it; the index fills it from what it stored, so a caller holding a
+	// search result can ask a cheap question about those files without reading
+	// the session back.
+	Touched []string `json:"touched,omitempty"`
 }
 
 // Source identifies where a session entered this deja index. Instance is an
