@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-07-30
+
+### Fixed
+- Relevance results reported the window instead of the pool they came from: `total: 50, capped: false` however deep the candidate set went. `total` is now the pre-truncation count and `capped` says whether anything was withheld, on every relevance exit including the merged close-tier tail. Found, diagnosed and fixed by @AliceLJY. (#497, #554)
+- Harness plumbing was indexed as if a person had said it — `[Request interrupted by user]`, system reminders and slash-command echoes were searchable and counted in stats. 304 records on a real index. Only complete blocks are stripped, so a message that merely mentions a marker keeps its text. (#551, #555)
+- The winget version manifest was left at the previous release by `pinmanifests`, so the manifest set failed its own consistency test after every release. (#523)
+
+### Changed
+- The comparison page covers the four largest memory projects beyond the six it started with, and no longer claims retroactive indexing is unique to deja — MemPalace mines Claude Code, Codex and Cursor transcripts too. (#310, #525)
+
 ## [0.16.2] - 2026-07-29
 
 Ranking learned to tell a conclusion from a conversation about one, and search
