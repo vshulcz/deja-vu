@@ -82,6 +82,14 @@ func runBrief(dir string, w io.Writer) error {
 		}
 	}
 
+	// The one line on this screen that says something a person could not have
+	// noticed themselves: a question they asked in more than one session. A
+	// count of sessions is reporting; this is the thing the tool is for.
+	if a, ok := index.FindAskedTwice(dir); ok {
+		fmt.Fprintf(w, "asked      %s%s%s\n", bold, trimBriefTitle(a.Text), reset)
+		fmt.Fprintf(w, "before     %s%s%s\n", dim, askedWhen(a), reset)
+	}
+
 	// The greeting printed on a first build already ends with this exact
 	// suggestion. Printing it twice on the one screen that has to be legible
 	// is worse than not printing it at all.
@@ -135,4 +143,26 @@ func printNoHistory(w io.Writer) {
 	fmt.Fprintln(w, "  deja sources     what was looked for, and where")
 	fmt.Fprintln(w, "  deja doctor      check the setup")
 	fmt.Fprintln(w, "  deja help        every command")
+}
+
+// askedWhen says how far apart the askings were, which is the point of the
+// line: the same question in May and again in June is worth a reader's
+// attention in a way that "asked 4 times" is not.
+func askedWhen(a index.AskedTwice) string {
+	n := len(a.Sessions)
+	newest := a.Sessions[0].Updated
+	oldest := a.Sessions[n-1].Updated
+	span := fmt.Sprintf("%s → %s", oldest.Format("Jan 2"), search.RelativeDate(newest))
+	project := a.Sessions[0].Project
+	for _, m := range a.Sessions {
+		if m.Project != project {
+			project = ""
+			break
+		}
+	}
+	times := fmt.Sprintf("%d sessions", n)
+	if project != "" && project != "-" {
+		times += " in " + project
+	}
+	return times + " · " + span
 }

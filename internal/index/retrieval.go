@@ -2201,3 +2201,91 @@ func isCyrToken(term string) bool {
 	}
 	return false
 }
+
+// askedMinSpan is how far apart two askings must be to mean anything.
+const askedMinSpan = 48 * time.Hour
+
+// AskedTwice is one question this store has been asked in more than one
+// session, with the sessions that asked it, newest first. Empty when nothing
+// repeats — which is the honest answer for a store a few days old.
+type AskedTwice struct {
+	Text     string
+	Sessions []SessionMeta
+}
+
+// FindAskedTwice picks the question worth showing: the one asked in the most
+// sessions, and among equals the one spanning the longest stretch of time. A
+// thing asked twice in one afternoon is a person working; the same thing asked
+// in March and again in July is the thing this tool exists for.
+//
+// The search runs entirely over the manifest. Only the matching sessions are
+// read back, and only to recover the text the hashes stand for.
+func FindAskedTwice(dir string) (AskedTwice, bool) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return AskedTwice{}, false
+	}
+	byHash := map[uint64][]SessionMeta{}
+	for _, meta := range m.Sessions {
+		for _, h := range meta.Asked {
+			byHash[h] = append(byHash[h], meta)
+		}
+	}
+	var best []SessionMeta
+	var bestSpan time.Duration
+	var bestHash uint64
+	for h, metas := range byHash {
+		if len(metas) < 2 {
+			continue
+		}
+		sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+		span := metas[0].Updated.Sub(metas[len(metas)-1].Updated)
+		// Time between the askings, not the number of them. The same question
+		// sixteen times in one afternoon is somebody retrying; the same question
+		// in March and again in July is the thing worth showing. Below a couple
+		// of days it is the former.
+		if span < askedMinSpan {
+			continue
+		}
+		if span > bestSpan || (span == bestSpan && len(metas) > len(best)) {
+			best, bestSpan, bestHash = metas, span, h
+		}
+	}
+	if len(best) < 2 {
+		return AskedTwice{}, false
+	}
+	text := askedTextFor(dir, m, best, bestHash)
+	if text == "" {
+		return AskedTwice{}, false
+	}
+	return AskedTwice{Text: text, Sessions: best}, true
+}
+
+// askedTextFor recovers what a hash stood for by reading back the sessions that
+// carry it, stopping at the first one that yields the question.
+func askedTextFor(dir string, m Manifest, metas []SessionMeta, want uint64) string {
+	for _, meta := range metas {
+		s, ok, err := loadSessionMeta(dir, m, meta)
+		if err != nil || !ok {
+			continue
+		}
+		for _, msg := range s.Messages {
+			if msg.Role != "user" {
+				continue
+			}
+			stem := questionStem(msg.Text)
+			if stem == "" {
+				continue
+			}
+			h := fnv.New64a()
+			_, _ = h.Write([]byte(stem))
+			if h.Sum64() == want {
+				return strings.TrimSpace(msg.Text)
+			}
+		}
+	}
+	return ""
+}

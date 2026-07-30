@@ -88,6 +88,13 @@ type SessionMeta struct {
 	ID, Harness, Project, Path, Title string
 	Started, Updated                  time.Time
 	Ord                               uint32
+	// Asked holds hashes of the substantial questions this session opened with.
+	// Hashes rather than text: the text of six questions per session would add
+	// a third of a megabyte to a manifest that is read on every search, and the
+	// only thing a caller needs from it is whether two sessions asked the same
+	// thing. The text is recovered from the two or three sessions that matched,
+	// which is a bounded cost paid once, on a screen a person is reading.
+	Asked []uint64 `json:",omitempty"`
 	// Touched holds the few files this session worked on most, so a caller can
 	// ask about them without loading the session. Reading one back cost 130-220
 	// ms, which is not a price worth paying for a footnote under a search hit.
@@ -100,6 +107,9 @@ type SessionMeta struct {
 // something useful about a session, small enough that a store of a thousand
 // sessions pays kilobytes for it.
 const touchedFileCap = 6
+
+// askedQuestionCap bounds the hashes stored per session.
+const askedQuestionCap = 8
 
 type Manifest struct {
 	Version          int                    `json:"version"`

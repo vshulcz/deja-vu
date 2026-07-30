@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -720,7 +721,7 @@ func metaForSession(s model.Session) SessionMeta {
 	// composer name, the first user message — and are persisted in
 	// sessions.gob, so they need the same scrubbing as record text.
 	title, _ = redact.Text(title)
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages)}
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages)}
 }
 
 // agentOwnedFile drops the agent's own working files. They are touched
@@ -735,6 +736,106 @@ func agentOwnedFile(p string) bool {
 		}
 	}
 	return strings.HasSuffix(p, ".log") || strings.HasSuffix(p, ".output")
+}
+
+// askedHashes fingerprints the substantial things a person asked in a session.
+// Short turns are excluded the way stats excludes them: "ok" and "continue"
+// repeat in every session and mean nothing.
+func askedHashes(ms []model.Message) []uint64 {
+	var out []uint64
+	seen := map[uint64]bool{}
+	for _, m := range ms {
+		if m.Role != "user" {
+			continue
+		}
+		if notAsked(m.Text) || !looksLikeQuestion(m.Text) {
+			continue
+		}
+		stem := questionStem(m.Text)
+		if stem == "" {
+			continue
+		}
+		h := fnv.New64a()
+		_, _ = h.Write([]byte(stem))
+		v := h.Sum64()
+		if seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+		if len(out) >= askedQuestionCap {
+			break
+		}
+	}
+	return out
+}
+
+// notAsked rejects the text a harness writes under the user role: hook
+// envelopes, interruption notices, resume preambles, the compaction summary.
+// It repeats across sessions by construction, so without this the most
+// "repeated question" in any store is a piece of plumbing — measured: the first
+// candidate this produced was "The following tool was executed by the user",
+// spanning April to July.
+func notAsked(text string) bool {
+	t := strings.TrimSpace(text)
+	for _, p := range []string{
+		"<local-command", "<command-", "<task-notification", "<teammate-message",
+		"<bash-", "<system-reminder", "<deja-recall", "Caveat:",
+		"[Request interrupted", "The following tool was executed",
+		"This session is being continued", "Continue from where you left off",
+	} {
+		if strings.HasPrefix(t, p) {
+			return true
+		}
+	}
+	return strings.Contains(t, "no visible output")
+}
+
+// looksLikeQuestion keeps this to things a person actually asked. Without it
+// the candidates a real store produces are overwhelmingly instructions to an
+// agent — "Use the X tool", "Call Y with scope all", "Reply with only the raw
+// JSON" — which repeat verbatim by construction and say nothing about the work.
+//
+// A question mark, or an interrogative opening in either language deja sees
+// most. This under-includes on purpose: a missed repeat costs a line on one
+// screen, a wrong one costs the reader's trust in the screen.
+func looksLikeQuestion(text string) bool {
+	t := strings.TrimSpace(text)
+	if strings.Contains(t, "?") || strings.Contains(t, "？") {
+		return true
+	}
+	fields := strings.Fields(t)
+	if len(fields) == 0 {
+		return false
+	}
+	first := strings.Trim(strings.ToLower(fields[0]), ",.:;!\"'")
+	switch first {
+	case "what", "why", "how", "when", "where", "which", "who", "whose",
+		"did", "does", "do", "is", "are", "was", "were", "can", "should", "would",
+		"что", "чем", "почему", "зачем", "как", "какой", "какая", "какие", "когда",
+		"где", "куда", "откуда", "сколько", "кто", "чей", "можно", "нужно", "надо":
+		return true
+	}
+	return false
+}
+
+// questionStem folds a message to the form two askings of the same question
+// share: lowercase, letters and digits only. Fewer than five words is not a
+// question worth matching on.
+func questionStem(text string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(text) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte(' ')
+		}
+	}
+	fields := strings.Fields(b.String())
+	if len(fields) < 5 {
+		return ""
+	}
+	return strings.Join(fields, " ")
 }
 
 // topTouchedFiles returns the files a session worked on most, busiest first.
