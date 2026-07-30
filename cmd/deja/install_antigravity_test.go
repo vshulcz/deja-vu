@@ -113,3 +113,44 @@ func TestHookAntigravitySurvivesGarbageStdin(t *testing.T) {
 		t.Fatalf("output is not JSON: %q", out.String())
 	}
 }
+
+func TestAntigravityGuidanceLandsInsideThePlugin(t *testing.T) {
+	hermeticEnv(t)
+	if err := runInstall(t.TempDir(), []string{"antigravity"}, false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	dir := filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName)
+	skill := filepath.Join(dir, "skills", "deja-history", "SKILL.md")
+	if _, err := os.Stat(skill); err != nil {
+		t.Fatalf("the skill has to sit inside the plugin, not beside it: %v", err)
+	}
+	// Antigravity ingests a directory only when plugin.json marks it; without
+	// the marker the skill is skipped in silence.
+	if _, err := os.Stat(filepath.Join(dir, "plugin.json")); err != nil {
+		t.Fatalf("plugin.json must accompany the skill: %v", err)
+	}
+	// And nothing should be written to the path that reads like a plugin root
+	// but is not one.
+	if _, err := os.Stat(filepath.Join(antigravityConfigHome(), "skills")); err == nil {
+		t.Fatal("guidance was also written beside the plugin, where nothing reads it")
+	}
+}
+
+func TestAntigravityMarkerIsNotRewritten(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	custom := []byte(`{"name":"deja","version":"kept"}` + "\n")
+	if err := os.WriteFile(filepath.Join(dir, "plugin.json"), custom, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureAntigravityPluginMarker(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "plugin.json"))
+	if err != nil || string(got) != string(custom) {
+		t.Fatalf("an existing marker belongs to install_antigravity, got %q", got)
+	}
+}

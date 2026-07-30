@@ -71,3 +71,22 @@ func installAntigravityPlugin(exe string, uninstall bool) (installResult, error)
 	}
 	return installResult{Path: dir, Action: a}, nil
 }
+
+// ensureAntigravityPluginMarker writes plugin.json if it is not already there,
+// so a skill installed on its own lands in a directory antigravity recognises.
+// It never rewrites an existing marker: `antigravity-auto` owns that file.
+func ensureAntigravityPluginMarker() error {
+	dir := filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName)
+	path := filepath.Join(dir, "plugin.json")
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	manifest, err := json.MarshalIndent(map[string]any{"name": antigravityPluginName}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(manifest, '\n'), 0o600)
+}

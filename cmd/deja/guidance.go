@@ -28,7 +28,13 @@ func guidancePath(harness string) string {
 	case "claude-code", "claude":
 		return filepath.Join(sources.ClaudeConfigDir(), "skills", "deja-history", "SKILL.md")
 	case "antigravity":
-		return filepath.Join(antigravityConfigHome(), "skills", "deja-history", "SKILL.md")
+		// Inside the plugin, not beside it. Antigravity ingests skills/ from a
+		// directory marked by plugin.json — which is what `agy plugin validate`
+		// confirms ("skills: 1 processed") — and a SKILL.md written one level up
+		// is read by nothing. doctor checked the same wrong path, so it reported
+		// guidance missing on a machine where the skill was installed and
+		// working.
+		return filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName, "skills", "deja-history", "SKILL.md")
 	case "copilot":
 		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
 	case "pi":
@@ -111,6 +117,17 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "removed"}, nil
 		} else {
 			next = []byte(guidanceText(harness))
+			// A skill inside an antigravity plugin directory is ingested only
+			// when plugin.json marks that directory as a plugin — without it the
+			// whole directory is skipped silently, which `agy plugin validate`
+			// reports as "missing plugin.json". `install antigravity-auto`
+			// writes the marker; plain `install antigravity` did not, so the
+			// guidance landed somewhere nothing would read.
+			if harness == "antigravity" {
+				if err := ensureAntigravityPluginMarker(); err != nil {
+					return installResult{}, err
+				}
+			}
 		}
 	} else {
 		next = []byte(updateGuidanceBlock(string(old), uninstall))

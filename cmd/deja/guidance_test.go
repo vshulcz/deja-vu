@@ -22,7 +22,10 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("opencode"); got != filepath.Join(xdg, "opencode", "AGENTS.md") {
 		t.Fatalf("opencode path = %q", got)
 	}
-	if got := guidancePath("antigravity"); got != filepath.Join(home, ".gemini", "config", "skills", "deja-history", "SKILL.md") {
+	// Inside the plugin: antigravity ingests skills/ from a directory marked by
+	// plugin.json, and `agy plugin validate` confirms it there. Beside the
+	// plugin nothing reads it.
+	if got := guidancePath("antigravity"); got != filepath.Join(home, ".gemini", "config", "plugins", "deja", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("antigravity path = %q", got)
 	}
 	if got := guidancePath("qwen"); got != filepath.Join(home, ".qwen", "QWEN.md") {
