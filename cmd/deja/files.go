@@ -279,12 +279,19 @@ func inRepository(p string) bool {
 }
 
 func inRepositoryUncached(p string) bool {
-	for d := filepath.Dir(p); d != "/" && d != "." && d != ""; d = filepath.Dir(d) {
+	// Stop when the parent stops changing rather than on "/": on Windows the
+	// walk ends at `D:\`, whose parent is itself, and comparing against the
+	// unix root spins there forever.
+	for d := filepath.Dir(p); ; {
 		if _, err := os.Stat(filepath.Join(d, ".git")); err == nil {
 			return true
 		}
+		up := filepath.Dir(d)
+		if up == d || up == "." {
+			return false
+		}
+		d = up
 	}
-	return false
 }
 
 var repoCheck sync.Map
