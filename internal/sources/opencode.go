@@ -91,6 +91,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	q := `select s.id,s.directory,s.time_created,s.time_updated,` +
 		`json_extract(m.data,'$.role') as role,` +
 		`json_extract(p.data,'$.text') as text,` +
+		`json_extract(p.data,'$.state.input.filePath') as path,` +
 		`json_extract(p.data,'$.time.start') as pt,` +
 		`json_extract(m.data,'$.time.created') as mt ` +
 		`from session s join message m on m.session_id=s.id join part p on p.message_id=m.id ` +
@@ -102,8 +103,15 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		// writes. The exact test still decides: the cheap one only avoids
 		// parsing rows that cannot match. Measured on a 2.8 GB store: 6.9s to
 		// 5.6s, byte-identical output.
-		`where instr(substr(p.data,1,120),'"type":"text"')>0 ` +
-		`and json_extract(p.data,'$.type')='text'` + where + ` order by s.id,m.time_created,p.id` + lim
+		// Read calls join the text parts: they are where the answer to "which
+		// file was this session about" lives, and prose mentions are not a
+		// substitute — measured at 43% present and wrong more often than right.
+		// The same two-test trick applies, with `"tool":"read"` as the cheap
+		// gate. Measured on a 3 GB store: 5.79s to 6.60s for 26,466 paths.
+		`where ((instr(substr(p.data,1,120),'"type":"text"')>0 ` +
+		`and json_extract(p.data,'$.type')='text')` +
+		` or (instr(substr(p.data,1,200),'"tool":"read"')>0 ` +
+		`and json_extract(p.data,'$.tool')='read'))` + where + ` order by s.id,m.time_created,p.id` + lim
 	cmd := exec.Command("sqlite3", "-json", db, q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -153,6 +161,18 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		}
 		role := str(r["role"])
 		txt := str(r["text"])
+		// A read call carries no text, only the file it opened. Recorded under
+		// the files role so it can answer "which files" without competing in
+		// ordinary search.
+		if path := str(r["path"]); path != "" && IndexToolPaths() {
+			t := parseTimeAny(r["pt"])
+			if t.IsZero() {
+				t = parseTimeAny(r["mt"])
+			}
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: path, Time: t})
+			continue
+		}
 		if txt == "" {
 			continue
 		}
