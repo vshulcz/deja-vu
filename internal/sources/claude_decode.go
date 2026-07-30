@@ -213,11 +213,15 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 // has no material at all.
 const RoleFiles = "files"
 
-// IndexToolPaths reports whether file paths from tool calls are indexed. Off by
-// default while the cost is measured. This is the cheapest slice of #547 — 0.6 MB
-// of path text across a 644 MB corpus, against 13.6 MB for commands and 80 MB
-// for the bodies of files that were read.
-func IndexToolPaths() bool { return os.Getenv("DEJA_INDEX_PATHS") == "1" }
+// IndexToolPaths reports whether file paths from tool calls are indexed. On by
+// default: a feature behind a flag does not exist for the people who would
+// benefit from it, and this one costs 2% of the index. `DEJA_INDEX_PATHS=0`
+// turns it off for anyone who wants the smaller index back.
+//
+// This is the cheapest slice of #547 — 0.6 MB of path text across a 644 MB
+// corpus, against 13.6 MB for commands and 80 MB for the bodies of files that
+// were read — and three features rest on it: #542, #531 and #534.
+func IndexToolPaths() bool { return os.Getenv("DEJA_INDEX_PATHS") != "0" }
 
 // pathTools are the calls whose input names a file. Bash is deliberately absent:
 // a path inside a shell command is guesswork, and guessing is what made the

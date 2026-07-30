@@ -17,7 +17,9 @@ import (
 // this build never queries; 17 filters out deja's own injected recall, which
 // earlier builds indexed back in, so an existing index is rebuilt once to drop
 // the copies it already holds.
-const version = 17
+// 18: file paths from tool calls are indexed (#558). An index built before this
+// has none of them, so it is rebuilt rather than reused.
+const version = 18
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

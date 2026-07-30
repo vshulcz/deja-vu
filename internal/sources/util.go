@@ -196,3 +196,36 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 	}
 	return all
 }
+
+// toolPathsFromContent is claudeToolPaths for the reference parser, which walks
+// decoded maps rather than raw JSON. The two must agree or the differential
+// test in #502 stops meaning anything.
+func toolPathsFromContent(v any) string {
+	items, ok := v.([]any)
+	if !ok {
+		return ""
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, it := range items {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		if t, _ := m["type"].(string); t != "tool_use" {
+			continue
+		}
+		name, _ := m["name"].(string)
+		if !pathTools[name] {
+			continue
+		}
+		in, _ := m["input"].(map[string]any)
+		p, _ := in["file_path"].(string)
+		if p == "" || seen[p] {
+			continue
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	return strings.Join(out, "\n")
+}
