@@ -1,12 +1,12 @@
 {
     "architecture": {
         "64bit": {
-            "hash": "affa6e6883d07ad9675efd2e27923de25f65a26437e4a2c6a9a40cee29a4f7c0",
-            "url": "https://github.com/vshulcz/deja-vu/releases/download/v0.16.2/deja-vu_0.16.2_windows_amd64.zip"
+            "hash": "ba7d97644a01a4d770d4c212dfa812c749c3784217bbc9a047abf3d838fdf905",
+            "url": "https://github.com/vshulcz/deja-vu/releases/download/v0.16.3/deja-vu_0.16.3_windows_amd64.zip"
         },
         "arm64": {
-            "hash": "62a091c3e0916f9fcf22a37d583e70bc24dd2aab14671a6b7cf942668e10a930",
-            "url": "https://github.com/vshulcz/deja-vu/releases/download/v0.16.2/deja-vu_0.16.2_windows_arm64.zip"
+            "hash": "0a2e3b02bebccc76f30d70ec02318fd862ae90a26323296f76ccd170f2f85946",
+            "url": "https://github.com/vshulcz/deja-vu/releases/download/v0.16.3/deja-vu_0.16.3_windows_arm64.zip"
         }
     },
     "autoupdate": {
@@ -24,5 +24,5 @@
     "description": "Persistent memory for coding agents",
     "homepage": "https://github.com/vshulcz/deja-vu",
     "license": "MIT",
-    "version": "0.16.2"
+    "version": "0.16.3"
 }
