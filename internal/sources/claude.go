@@ -111,6 +111,9 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	if p := projectFromPaths(s.Messages); p != "" {
+		s.Project = p
+	}
 	return []model.Session{s}, err
 }
 

@@ -92,6 +92,11 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	// The directory a session was started from is a weak guess at what it was
+	// about; the files it touched are a strong one.
+	if p := projectFromPaths(s.Messages); p != "" {
+		s.Project = p
+	}
 	return []model.Session{s}, err
 }
 
