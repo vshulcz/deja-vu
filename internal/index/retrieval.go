@@ -980,12 +980,15 @@ const roleCommand = "command"
 // roleToolOutput mirrors sources.RoleToolOutput.
 const roleToolOutput = "tool-output"
 
+// roleEdit mirrors sources.RoleEdit.
+const roleEdit = "edit"
+
 // isToolRole says whether a record holds the work rather than the talk about
 // it. Tool records are bulk-repetitive by nature — the same command, the same
 // paths, session after session — so a query that matches one matches hundreds,
 // and the per-session bound has to spend its budget on speech first.
 func isToolRole(role string) bool {
-	return role == roleFiles || role == roleCommand || role == roleToolOutput
+	return role == roleFiles || role == roleCommand || role == roleToolOutput || role == roleEdit
 }
 
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
@@ -1016,6 +1019,12 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		}
 		// Same rule for commands: an invocation is an action, not an answer.
 		if r.Role == roleCommand && o.Role != roleCommand {
+			return
+		}
+		// A replaced span is the file's old contents, not a statement about
+		// anything. It is stored so `deja restore` can find it and served only
+		// when asked for by role.
+		if r.Role == roleEdit && o.Role != roleEdit {
 			return
 		}
 		s := by[r.Key]

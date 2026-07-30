@@ -82,6 +82,11 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
 				}
 			}
+			if IndexEdits() {
+				for _, e := range claudeEditSpans(v.Message.Content) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
+				}
+			}
 			if IndexCommands() {
 				for _, cmd := range claudeCommands(v.Message.Content) {
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
@@ -305,6 +310,72 @@ func claudeToolPaths(raw json.RawMessage) string {
 		out = append(out, part.Input.FilePath)
 	}
 	return strings.Join(out, "\n")
+}
+
+// RoleEdit holds a span an agent replaced, with the file it belonged to on the
+// first line. It is the one part of a transcript that cannot be reconstructed
+// from anything else: `old_string` is the exact bytes that stopped existing,
+// and on this corpus it is 3,836 spans across 862 files for 1.09 MB.
+const RoleEdit = "edit"
+
+// IndexEdits reports whether replaced spans are indexed. On by default for the
+// same reason as paths: a recovery feature nobody enabled recovers nothing.
+func IndexEdits() bool { return os.Getenv("DEJA_INDEX_EDITS") != "0" }
+
+// editSpanMax bounds a single stored span. The measured maximum is 8.5 KB and
+// p90 is 578 B; the bound is there so one pathological patch cannot put a
+// megabyte of someone else's file into the index.
+const editSpanMax = 32 * 1024
+
+// claudeEditSpans returns "path\nreplaced bytes" for every edit in a turn,
+// including the sub-edits of a MultiEdit call.
+func claudeEditSpans(raw json.RawMessage) []string {
+	raw = trimJSONSpace(raw)
+	if len(raw) == 0 || raw[0] != '[' {
+		return nil
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) != nil {
+		return nil
+	}
+	var out []string
+	for _, item := range items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		var part struct {
+			Type  string `json:"type"`
+			Input struct {
+				FilePath  string `json:"file_path"`
+				OldString string `json:"old_string"`
+				Edits     []struct {
+					OldString string `json:"old_string"`
+				} `json:"edits"`
+			} `json:"input"`
+		}
+		if json.Unmarshal(item, &part) != nil || part.Type != "tool_use" {
+			continue
+		}
+		path := part.Input.FilePath
+		if path == "" {
+			continue
+		}
+		spans := []string{part.Input.OldString}
+		for _, e := range part.Input.Edits {
+			spans = append(spans, e.OldString)
+		}
+		for _, span := range spans {
+			if span == "" {
+				continue
+			}
+			if len(span) > editSpanMax {
+				span = span[:editSpanMax]
+			}
+			out = append(out, path+"\n"+span)
+		}
+	}
+	return out
 }
 
 // RoleCommand marks a command that ran. Tool *output* has always been indexed —

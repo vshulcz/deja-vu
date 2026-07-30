@@ -120,6 +120,7 @@ var commands = map[string]command{
 	"resume":          func(dir string, rest []string) error { return runResume(dir, rest, os.Stdout) },
 	"handoff":         func(dir string, rest []string) error { return runHandoff(dir, rest, os.Stdout) },
 	"files":           func(dir string, rest []string) error { return runFiles(dir, rest, os.Stdout) },
+	"restore":         func(dir string, rest []string) error { return runRestore(dir, rest, os.Stdout) },
 	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,

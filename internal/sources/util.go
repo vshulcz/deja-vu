@@ -256,6 +256,51 @@ func toolPathsFromContent(v any) string {
 	return strings.Join(out, "\n")
 }
 
+// editSpansFromContent is claudeEditSpans for the reference parser.
+func editSpansFromContent(v any) []string {
+	items, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, it := range items {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		if t, _ := m["type"].(string); t != "tool_use" {
+			continue
+		}
+		in, _ := m["input"].(map[string]any)
+		path, _ := in["file_path"].(string)
+		if path == "" {
+			continue
+		}
+		old, _ := in["old_string"].(string)
+		spans := []string{old}
+		if edits, ok := in["edits"].([]any); ok {
+			for _, e := range edits {
+				em, ok := e.(map[string]any)
+				if !ok {
+					continue
+				}
+				o, _ := em["old_string"].(string)
+				spans = append(spans, o)
+			}
+		}
+		for _, span := range spans {
+			if span == "" {
+				continue
+			}
+			if len(span) > editSpanMax {
+				span = span[:editSpanMax]
+			}
+			out = append(out, path+"\n"+span)
+		}
+	}
+	return out
+}
+
 // commandsFromContent is claudeCommands for the reference parser.
 func commandsFromContent(v any) []string {
 	items, ok := v.([]any)

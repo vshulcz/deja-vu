@@ -101,6 +101,11 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
 				}
 			}
+			if IndexEdits() {
+				for _, e := range editSpansFromContent(msg["content"]) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
+				}
+			}
 			if IndexCommands() {
 				for _, cmd := range commandsFromContent(msg["content"]) {
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})

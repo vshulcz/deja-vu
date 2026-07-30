@@ -88,3 +88,17 @@ func TestIsToolRole(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenizedPartIndexesOnlyThePathOfASpan(t *testing.T) {
+	span := "/w/pkg/retry.go\nfunc retry() error {\n\treturn nil\n}"
+	if got := tokenizedPart(roleEdit, span); got != "/w/pkg/retry.go" {
+		t.Fatalf("got %q, want the path alone", got)
+	}
+	if got := tokenizedPart("user", span); got != span {
+		t.Fatal("speech is indexed whole")
+	}
+	// A span with no body still has to yield its path rather than nothing.
+	if got := tokenizedPart(roleEdit, "/w/only.go"); got != "/w/only.go" {
+		t.Fatalf("got %q", got)
+	}
+}

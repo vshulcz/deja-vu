@@ -123,6 +123,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
 | **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
+| **Restore** | `deja restore <path>` — hand back a span an agent replaced, from the `old_string` its edit recorded; never writes over the original |
 | **Files** | `deja files <topic>` — the other direction: which files the work on a subject actually touched, ranked by how specific they are to it |
 | **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
 
@@ -157,6 +158,7 @@ $ deja "jwt refresh token"
 | `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; zero-result queries try word forms before close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--limit`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
+| `deja restore <path>` | List the spans an agent replaced in that file, newest first, and print or write one back with `--span n [-o file]`. Output is what the agent recorded, not the file, and a span that passed through redaction says so. |
 | `deja files <topic>` | Which files were opened or edited while that subject was being worked on. Ranked by how specific a file is to the topic, so a file every session touches does not win. `--project`, `--limit`. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |

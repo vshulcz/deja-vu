@@ -299,7 +299,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 					return err
 				}
 				writtenMessages++
-				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
+				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
 		}
 		return nil
@@ -525,7 +525,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 					return err
 				}
 				writtenMessages++
-				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
+				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
 		}
 		return nil
@@ -622,6 +622,21 @@ func dateTokens(when time.Time) []string {
 		"t" + when.Format("2006"),
 		"t" + when.Format("2006-01"),
 	}
+}
+
+// tokenizedPart is what of a record earns postings. For most records that is
+// the whole text; for a replaced span it is only the path on the first line.
+// Nobody searches for the body of a span — `deja restore` finds it by path —
+// and indexing 1 MB of source code puts every `func` and `return` in it into
+// the postings, which cost the median query 0.5 ms for nothing.
+func tokenizedPart(role, text string) string {
+	if role != roleEdit {
+		return text
+	}
+	if i := strings.IndexByte(text, '\n'); i >= 0 {
+		return text[:i]
+	}
+	return text
 }
 
 func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time, tool bool) {
