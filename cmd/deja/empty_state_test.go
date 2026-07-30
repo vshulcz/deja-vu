@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"github.com/vshulcz/deja-vu/internal/stats"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -42,6 +43,14 @@ func TestStatsStillPrintsSectionsWithData(t *testing.T) {
 }
 
 func TestEmptyIndexHintNamesTheNextCommand(t *testing.T) {
+	// With a store present but nothing indexed from it, a rebuild is the right
+	// advice. The other branch — no history anywhere — is covered in
+	// empty_advice_test.go, where repeating the build would achieve nothing.
+	dir := t.TempDir()
+	t.Setenv("DEJA_CLAUDE_ROOT", dir)
+	writeClaudeFixture(t, filepath.Join(dir, "proj", "s.jsonl"), "s", []string{
+		`{"type":"user","sessionId":"s","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"anything at all"}}`,
+	})
 	got := emptyIndexHint("no sessions indexed yet")
 	for _, want := range []string{"no sessions indexed yet", "deja index", "deja doctor"} {
 		if !strings.Contains(got, want) {

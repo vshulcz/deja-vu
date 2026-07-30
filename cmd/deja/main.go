@@ -739,7 +739,7 @@ func runBlame(dir string, args []string) error {
 		return nil
 	}
 	if len(hits) == 0 {
-		fmt.Fprintf(os.Stderr, "deja: no sessions mention %s; run deja index if the index is stale\n", target.Base)
+		fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions mention "+target.Base))
 		return nil
 	}
 	search.PrintBlame(os.Stdout, hits, false)
@@ -760,9 +760,22 @@ func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions,
 func parseDur(s string) (time.Duration, error) {
 	if strings.HasSuffix(s, "d") {
 		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
-		return time.Duration(n) * 24 * time.Hour, err
+		if err != nil {
+			return 0, durationError(s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
 	}
-	return time.ParseDuration(s)
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		// time.ParseDuration's own message names Go's syntax, not deja's, and
+		// it does not mention days — which is the unit people reach for here.
+		return 0, durationError(s)
+	}
+	return d, nil
+}
+
+func durationError(s string) error {
+	return fmt.Errorf("%q is not a duration deja understands — try 30d, 12h, or 90m", s)
 }
 
 func printSources(dir string) {
@@ -1028,8 +1041,28 @@ See README.md for the full CLI reference.`)
 
 // emptyIndexHint phrases the nothing-here answer the same way everywhere, and
 // points at the next command rather than leaving the user to guess.
+//
+// Which command depends on why it is empty. Every path that reaches here has
+// already built the index — the build narration prints a line above this one —
+// so telling someone to run `deja index` sends them to do again what just
+// happened, and they are left where they started. When no agent history was
+// found at all, the useful next step is finding out where deja looked.
 func emptyIndexHint(what string) string {
+	if noAgentHistoryFound() {
+		return "deja: " + what + " — no agent history was found on this machine; `deja sources` shows where deja looked"
+	}
 	return "deja: " + what + " — run `deja index`, or `deja doctor` to see which agent stores were found"
+}
+
+// noAgentHistoryFound reports whether the stores themselves are empty, as
+// opposed to an index that merely has not been built yet.
+func noAgentHistoryFound() bool {
+	for _, check := range doctorStoreChecks() {
+		if store, _ := inspectDoctorStore(check); store.Files > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // searchValueFlags take a value, so "--flag=value" has to become two arguments
