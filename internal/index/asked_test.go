@@ -162,3 +162,34 @@ func TestFindAskedTwiceStaysQuietWithoutARepeat(t *testing.T) {
 		t.Fatal("an empty store has nothing to say")
 	}
 }
+
+func TestPrefixMatchesCounts(t *testing.T) {
+	dir := askedFixture(t,
+		map[string][]string{
+			"aa1": {"why does the pool exhaust under load?"},
+			"aa2": {"why does the cache stampede?"},
+			"bb1": {"why is the build slow?"},
+		},
+		map[string]string{
+			"aa1": "2026-03-01T10:00:00Z",
+			"aa2": "2026-03-02T10:00:00Z",
+			"bb1": "2026-03-03T10:00:00Z",
+		})
+	if got := PrefixMatches(dir, "aa"); got != 2 {
+		t.Fatalf("PrefixMatches(aa) = %d, want 2", got)
+	}
+	if got := PrefixMatches(dir, "aa1"); got != 1 {
+		t.Fatalf("an exact id matches once, got %d", got)
+	}
+	if got := PrefixMatches(dir, "zz"); got != 0 {
+		t.Fatalf("got %d, want none", got)
+	}
+	if got := PrefixMatches(dir, ""); got != 0 {
+		t.Fatal("an empty prefix is not a question worth answering")
+	}
+	// FindByPrefix keeps picking the newest of the matches.
+	s, ok, err := FindByPrefix(dir, "aa")
+	if err != nil || !ok || s.ID != "aa2" {
+		t.Fatalf("got %q ok=%v err=%v, want the newest match", s.ID, ok, err)
+	}
+}

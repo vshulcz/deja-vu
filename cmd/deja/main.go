@@ -225,6 +225,14 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.json {
 		return printSessionJSON(os.Stdout, s, o.offset, o.limit, sourceInstance)
 	}
+	// The prefix picks the newest of its matches, which is the right default
+	// and, until now, a silent one: "2" resolved eleven sessions on a real
+	// store and the reader had no way to know they were shown a choice.
+	if o.harness == "" {
+		if n := index.PrefixMatches(dir, o.id); n > 1 {
+			fmt.Fprintf(os.Stderr, "deja: %d sessions start with %q — showing the most recent; use a longer prefix for another\n", n, o.id)
+		}
+	}
 	search.PrintSession(os.Stdout, s)
 	return nil
 }

@@ -929,6 +929,31 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	return loadSessionMeta(dir, m, matches[0])
 }
 
+// PrefixMatches counts the sessions a prefix resolves to. FindByPrefix picks
+// the newest of them, which is the right default and a silent one: a
+// single-character prefix matched eleven sessions on a real store and the
+// reader had no way to know they were looking at a choice rather than at the
+// only answer.
+func PrefixMatches(dir, p string) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if p == "" {
+		return 0
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, meta := range m.Sessions {
+		if strings.HasPrefix(meta.ID, p) {
+			n++
+		}
+	}
+	return n
+}
+
 // FindByIdentity resolves the exact composite identity emitted by machine
 // search and recent output. Unlike the human prefix command, it never guesses
 // between harnesses or accepts a shortened native ID.
