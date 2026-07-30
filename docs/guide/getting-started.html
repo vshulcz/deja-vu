@@ -63,10 +63,10 @@ npm  install -g @vshulcz/deja-vu
 go   install github.com/vshulcz/deja-vu/cmd/deja@latest</pre>
 <p>Desktop apps that install MCP servers as bundles take the <code>.mcpb</code> file published with every release — one per platform, carrying the binary, so nothing else is needed. Open it and the app installs the server. Terminal agents use <code>deja install</code>, described under <a href="harnesses.html">harnesses</a>.</p>
 <h2>Search your history</h2>
-<p>The first search builds the index automatically from every agent history it finds — retroactively, including sessions from before you installed deja.</p>
+<p>Running <code>deja</code> on its own builds the index from every agent history it finds — retroactively, including sessions from before you installed it — and then shows what it found: the harnesses, the projects, and a question you have asked in more than one session. <code>deja install</code> does the same while wiring your agents, so the first agent turn is instant rather than paying for the build.</p>
 <pre>deja "connection pool exhausted"
 deja "have we dealt with jwt refresh rotation before"</pre>
-<div class="note">No <code>deja index</code> step is required — any search, recall, or install builds and refreshes the index as needed.</div>
+<div class="note">No <code>deja index</code> step is required — any search, recall, or install builds and refreshes the index as needed. Pass <code>--no-index</code> to <code>deja install</code> if you are scripting an install and want to defer the build.</div>
 <h2>Wire it into your agents</h2>
 <pre>deja install --all      # MCP recall for every agent found on this machine
 deja install --auto     # same, plus session-start auto-recall where supported</pre>

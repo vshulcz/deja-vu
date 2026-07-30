@@ -378,12 +378,14 @@ footer .spacer{flex:1}
       <dt>deja "query"</dt><dd>search everything your agents ever wrote — phrases, fuzzy, semantic tiers. <span class="dim">Retroactive: months of logs from before you installed it.</span></dd>
       <dt>recall / recall_context</dt><dd>MCP tools, answers under ~4 KB. A fix found in Codex is recalled inside Claude Code.</dd>
       <dt>deja blame &lt;path&gt;</dt><dd>which sessions touched this file, what was decided and why. <span class="dim">git blame, but for the discussions behind the code.</span></dd>
+      <dt>deja restore &lt;path&gt;</dt><dd>a span an agent replaced, handed back from the edit that replaced it. <span class="dim">Never writes over the original.</span></dd>
+      <dt>deja files &lt;topic&gt;</dt><dd>which files the work on a subject actually touched — the other direction from blame.</dd>
       <dt>deja handoff --to codex</dt><dd>stuck in one agent? package the live context and continue in another.</dd>
       <dt>deja remember "text"</dt><dd>keep durable decisions next to the recalled history — same index, same redaction.</dd>
       <dt>deja sync ssh laptop</dt><dd>memory follows you between machines. Watermarked, idempotent, no cloud in the middle.</dd>
       <dt>deja share &lt;id&gt;</dt><dd>hand a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</dd>
       <dt>deja view</dt><dd>your whole memory in one local HTML — sessions, recalls, notes. <span class="dim">No server; nothing leaves the machine.</span></dd>
-      <dt>deja stats</dt><dd>sessions, top projects, activity sparkline. <span class="dim">Your agent year, one screenshot.</span></dd>
+      <dt>deja stats</dt><dd>sessions, top projects, activity sparkline. <span class="dim">Totals per harness, per project, per month.</span></dd>
       <dt>deja log</dt><dd>audit trail: what was recalled or injected, when, into which agent — <span class="dim">--last prints the exact digest an agent received.</span></dd>
       <dt>deja</dt><dd>bare, on a terminal: the living brief — today's sessions, recalls served, déjà vu moments, a suggested search from your own history.</dd>
     </dl>

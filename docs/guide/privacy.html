@@ -54,6 +54,8 @@
 
 <h1>Privacy</h1>
 <p>deja indexes credential-bearing histories, so privacy is a first-order concern, not an afterthought.</p>
+<h2>What gets indexed</h2>
+<p>The conversation, and what the agent did while having it: the file paths its tool calls named, the commands it ran, the spans its edits replaced, and what its tools printed. That last part is why redaction matters — command output carries far more credentials than prose does — and every one of these paths goes through the same redaction pass as the conversation itself. Replaced spans are source code from your own files; they are stored so <code>deja restore</code> can hand work back, and they stay on the machine like everything else.</p>
 <h2>Local by default</h2>
 <p>Indexing and search have no network path. The index and its usage sidecar never leave the machine. Network access happens only when you run <code>deja update</code>, <code>deja sync ssh</code>, or the <code>doctor</code> version check (which <code>--offline</code> disables).</p>
 <h2>Redaction</h2>

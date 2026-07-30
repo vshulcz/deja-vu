@@ -32,8 +32,21 @@ Default path: `~/.cache/deja/index.db`.
 Files:
 
 - `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp.
-- `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset plus session ordinal.
-- `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, sync export watermarks, imported-record dedupe keys, session metadata (including ordinals), build time, and search scope.
+- `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset, session ordinal, and one bit marking the posting as a work record.
+- `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, sync export watermarks, imported-record dedupe keys, session metadata (including ordinals, the files a session touched most, and hashes of the questions it asked), build time, and search scope.
+
+### Roles
+
+Beyond `user`, `assistant` and `developer`, records carry what the agent did:
+
+| role | holds |
+| --- | --- |
+| `tool-output` | what a tool printed. Claude files this under the user role in its own transcripts, which is why it used to arrive labelled as something a person said |
+| `files` | the paths a turn opened or edited |
+| `command` | a shell command worth keeping — an allowlist of build, test, VCS and deployment tooling, single-line only |
+| `edit` | a span an edit replaced: the path on the first line, the exact removed bytes after it. Only the path earns postings, since nothing searches the body |
+
+These are indexed and searchable by `--role`, and served in ordinary results only when asked for by role: a path that happens to contain the words of a question is not an answer to it. The postings carry a bit for them so the per-session read bound can spend its budget on speech first.
 
 ## Secret redaction
 

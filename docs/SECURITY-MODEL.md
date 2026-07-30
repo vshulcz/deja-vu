@@ -18,6 +18,15 @@ Indexing reads session messages and metadata needed for search, including
 session IDs, project paths, titles, roles, and timestamps. It does not modify
 the source session stores.
 
+It also reads what the agent did, from the tool calls the same transcripts
+record: the file paths a turn named, the shell commands it ran, the text its
+tools printed, and the exact spans its edits replaced. Replaced spans are
+verbatim source from the user's own files, kept so a lost change can be handed
+back. All of it goes through the same redaction pass as conversation text, which
+matters more here than elsewhere: command output carries credentials far more
+often than prose does. `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0` and
+`DEJA_INDEX_EDITS=0` each disable one of these at ingest.
+
 ### Local writes
 
 The default index is `~/.cache/deja/index.db`; `DEJA_INDEX_DIR` changes that
@@ -26,8 +35,9 @@ location. The directory contains:
 - `records.bin`, with redacted message records;
 - `buckets/*.bin`, with token postings into those records;
 - `manifest.gob` and `sessions.gob`, with source file state, session metadata,
-  redaction counts by rule, sync watermarks, and imported-record deduplication
-  keys.
+  redaction counts by rule, sync watermarks, imported-record deduplication keys,
+  the few files each session touched most, and hashes — not text — of the
+  questions it asked.
 
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being

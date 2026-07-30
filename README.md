@@ -118,9 +118,13 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
 | **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"`; fourteen harnesses can be started directly, the rest print the prompt to paste |
 | **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
+| **Indexes the work** | not just the talk about it: the files each turn opened, the commands that ran, and the exact spans an edit replaced — the part every summary throws away |
+| **After a compaction** | the summary keeps what was decided and drops what it rested on — measured over 43 compactions: 77% of decisions survive, 0.2% of the commands. deja hands the session its own specifics back: what it ran, and where |
+| **Has the ground moved** | a hit says *4 files this session touched have changed since* when they have, and says nothing when it cannot tell — no claim that anything is unchanged |
 | **Déjà vu moments** | When a prompt matches work your history already answered, deja announces it — *you have been here* — with the session and its age, and counts the moment in `deja stats` |
 | **Redaction** | API keys, JWTs, private keys are stripped at index time — the cache is safe to keep |
 | **View** | `deja view` — your whole memory in one local HTML: sessions, the recall audit trail, curated notes; no server, nothing leaves the machine |
+| **Starts full** | `deja` on a fresh install builds the index and shows what it found — every agent, every project, and a question you have asked in more than one session |
 | **Stats** | `deja stats` — your agent work, wrapped; `--impact` reports only counted numbers: recalls served, session starts that began with memory, served-vs-raw ratio |
 | **Promote** | `deja promote <id>` — distill a session into a curated note with provenance, `--tag` keywords and a lifecycle state (accepted / rejected / superseded / stale); notes outrank raw transcripts, and promoting over an existing accepted note surfaces the conflict |
 | **Trust scopes** | `policy.json` decides what memory activates where: search / MCP / auto × local / imported / per-peer; receipts and `deja log` name the rule |
@@ -319,6 +323,8 @@ limits, trust assumptions, and release verification.
 <!-- matrix:end -->
 
 Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_QWEN_ROOT`, `DEJA_INDEX_DIR`. Each agent's own relocation variable is honored too: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GEMINI_CLI_HOME`, `CURSOR_CONFIG_DIR`, `GROK_HOME`, `AIDER_CHAT_HISTORY_FILE`, and `XDG_DATA_HOME` for opencode on Linux.
+
+deja also indexes what the agent did — the file paths its tool calls named, the commands it ran, and the spans its edits replaced. Each can be turned off at ingest: `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_EDITS=0`. They go through the same redaction pass as conversation text.
 
 `DEJA_RECALL=safe` is the default: SessionStart recall stays in the current project, filters weak or duplicate results, prefers the last 90 days, and injects at most 2KB. `DEJA_RECALL=aggressive` searches across projects and raises the injection cap to 4KB. `DEJA_RECALL=off` disables SessionStart recall output.
 
