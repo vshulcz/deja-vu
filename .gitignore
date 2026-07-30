@@ -2,6 +2,21 @@ fixtures/private/
 .venv/
 /deja
 .build.log
+
+# Every `go build ./scripts/<name>` drops a binary named <name> in the repo
+# root, and `git add -A` then sweeps it into a commit — a 3.7 MB Mach-O reached
+# main that way. Build probes with `-o /tmp/...` instead; these names are the
+# backstop for when someone forgets.
+/frictionprobe
+/corpusprobe
+/decisionbench
+/genmatrix
+/miracl
+/rankdiff
+/searchbench
+/demo
+/pinmanifests
+/mcpb
 fixtures/synthetic/opencode.db
 .deja-bench/
 /longmemeval
