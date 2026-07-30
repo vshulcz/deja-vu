@@ -27,14 +27,36 @@ from a list of hits:
   `relevance`. **`relevance` means nothing matched** and these are the nearest
   sessions deja could find. Counting those as hits overstates recall, and this
   used to be readable only as a sentence on stderr.
-- `total` and `capped` — how many sessions matched, and whether the result cap
-  hid some. Counting the returned hits measures the cap: that figure moves when
-  the window's membership changes, whether or not retrieval improved. Pass
-  `--all` for an uncapped set, in which case `total` equals the hit count.
+- `total` and `capped` — how many sessions matched, and whether a cap hid some.
+  Counting the returned hits measures the cap: that figure moves when the
+  window's membership changes, whether or not retrieval improved.
+  **`capped: false` means the response holds everything that matched, on every
+  tier**; when it is `true`, `total` is the figure to read and the hit count is
+  not.
 
 `capped` is omitted when false. When it is true, `total` is the count before
 policy scoping and reranking ran, because there is no way to know how those
 would have treated the sessions the cap removed.
+
+### `hits` is not a fixed window across tiers
+
+The number of hits a tier returns is that tier's own decision, so the same
+invocation can return 15 on one tier and 50 on another. Read `total` and
+`capped` for coverage; the length of `hits` answers a different question.
+
+- `exact`, `close`, `stemmed` and `semantic` serve the ranked result cap:
+  `--limit N` (1–100), 15 by default, and `--all` for no cap. With `--all`,
+  `total` equals the hit count.
+- `relevance` ranks the candidate pool and serves the top 50. That bound belongs
+  to the ranking rather than to output: it is applied during retrieval, and
+  `--limit` and `--all` act on the result set downstream of it, so neither moves
+  it. A relevance response can therefore come back `capped: true` with `--all`
+  passed, and `total` can exceed the 50 hits it returned.
+
+Reporting `total` as the length of that window instead of the pool behind it was
+[#497](https://github.com/vshulcz/deja-vu/issues/497): deeper queries all came
+back `"total": 50, "capped": false`, which reads as "50 matched, none withheld"
+in the one case where a consumer most needs to keep looking.
 
 ## `deja search --json`
 
@@ -90,8 +112,10 @@ Stemmed search may also include `variants`; semantic search sets `semantic`.
 matches overlap this hit — an earlier-attempt signal. `reused` (optional)
 counts recent agent recalls that served this session.
 
-`--limit N` bounds the ranked result set to 1–100 hits. Every machine session
-has `source.origin`, either `local` or `imported`. When
+`--limit N` bounds the ranked result set to 1–100 hits, on the tiers that serve
+that cap (see [`hits` is not a fixed
+window](#hits-is-not-a-fixed-window-across-tiers)). Every machine session has
+`source.origin`, either `local` or `imported`. When
 `DEJA_SOURCE_INSTANCE` is configured, local sessions also carry that stable
 operator-chosen `source.instance`; imported sessions omit it because current
 sync batches do not carry trustworthy peer identity.

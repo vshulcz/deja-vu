@@ -400,7 +400,18 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if result.Tier == search.TierRelevance {
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
 		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
-		o.Total = len(hits)
+		// This tier ranks and truncates inside retrieval, so counting the
+		// sessions it handed back measures its window, not the match: every
+		// query deeper than the window reported the window's own size and
+		// capped: false, which told a consumer to stop checking exactly when
+		// there was something to check. Take the tier's figures when it has
+		// them; the paths that report none (a quoted query retried without
+		// its quotes, served here under the relevance label) never truncated,
+		// so what arrived is the whole of it.
+		o.Total, o.Capped = result.Total, result.Capped
+		if o.Total < len(hits) {
+			o.Total = len(hits)
+		}
 	} else {
 		// RunDetailed rather than Run: the JSON envelope reports how many
 		// sessions matched before the cap, and that is not recoverable from a

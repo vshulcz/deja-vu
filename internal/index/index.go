@@ -171,6 +171,14 @@ type SearchResult struct {
 	Stemmed  bool
 	Variants map[string][]string
 	Tier     string
+	// Total is how many sessions the tier matched before its own window
+	// trimmed them, and Capped whether that trimming withheld any. The
+	// relevance tier is the one that needs them: it ranks and truncates
+	// inside retrieval, so a caller counting Sessions is measuring the
+	// window rather than the match. Zero Total means the tier reports no
+	// figure of its own and the caller's count stands.
+	Total  int
+	Capped bool
 }
 
 func DefaultDir() string {

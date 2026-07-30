@@ -130,7 +130,14 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 									merged = append(merged, c)
 								}
 							}
-							return SearchResult{Sessions: merged, Tier: query.TierRelevance}, nil
+							// The tail carries sessions the relevance pool did
+							// not hold, so they are matches too and count
+							// toward the total. Adding them on both sides
+							// leaves `capped` reading the relevance window,
+							// which is still the only thing that withheld
+							// anything here.
+							tail := len(merged) - len(rel.Sessions)
+							return relevanceResult(merged, rel.Total+tail), nil
 						}
 					}
 				}
@@ -238,6 +245,13 @@ func RelevanceMatchTerms(q string) []string {
 	return out
 }
 
+// relevanceWindow bounds how many ranked sessions the relevance tier serves.
+// It belongs to the ranking rather than to output: --limit and --all act on the
+// result set, which is downstream of this. That is also why this tier has to
+// report Total and Capped — the pool the window was taken from does not survive
+// the return, so a caller counting sessions is counting the window.
+const relevanceWindow = 50
+
 // relevanceSearch is the ladder's last resort: no AND survived, so rank every
 // session by IDF-weighted overlap with the query's informative words. Order
 // carries the ranking; callers must not re-sort by exact-match BM25 (the whole
@@ -254,7 +268,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched, termsKnown := relevantMetasCounts(dir, m, nil, terms, 50, func(meta SessionMeta) bool {
+	metas, _, anyMatched, termsKnown, matched := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
 		return sessionMetaMatches(meta, o)
 	})
 	if len(metas) == 0 {
@@ -280,26 +294,40 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		if len(weak) == 0 || len(terms) < 3 || termsKnown < 2 {
 			return SearchResult{}, nil
 		}
-		if len(weak) > 50 {
-			weak = weak[:50]
+		if len(weak) > relevanceWindow {
+			weak = weak[:relevanceWindow]
 		}
 		ss, err := sessionsForMetas(dir, weak)
 		if err != nil {
 			return SearchResult{}, err
 		}
-		return SearchResult{Sessions: ss, Tier: query.TierRelevance}, nil
+		return relevanceResult(ss, matched), nil
 	}
 	// Single-term sessions ride BEHIND every strong candidate: they widen
 	// deep recall without letting a lucky word outrank a real match.
-	if len(keep)+len(weak) > 50 {
-		weak = weak[:50-len(keep)]
+	if len(keep)+len(weak) > relevanceWindow {
+		weak = weak[:relevanceWindow-len(keep)]
 	}
 	keep = append(keep, weak...)
 	ss, err := sessionsForMetas(dir, keep)
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return SearchResult{Sessions: ss, Tier: query.TierRelevance}, nil
+	return relevanceResult(ss, matched), nil
+}
+
+// relevanceResult labels a relevance answer with the pool it was drawn from:
+// matched is every session the ranking scored, counted before the window
+// trimmed it, so capped can say plainly whether the caller is holding all of
+// them. Reporting len(ss) as the total was the bug in #497 — the window is
+// exactly the thing the number was supposed to see past.
+func relevanceResult(ss []model.Session, matched int) SearchResult {
+	return SearchResult{
+		Sessions: ss,
+		Tier:     query.TierRelevance,
+		Total:    matched,
+		Capped:   matched > len(ss),
+	}
 }
 
 // ProjectRelevant ranks the current project's sessions by how well they match
@@ -348,7 +376,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int) {
-	metas, informative, _, _ := relevantMetasCounts(dir, m, projects, terms, n, nil)
+	metas, informative, _, _, _ := relevantMetasCounts(dir, m, projects, terms, n, nil)
 	return metas, informative
 }
 
@@ -360,7 +388,14 @@ func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n in
 // search tier used to rank the whole index, take the top n and only then
 // apply the scope, so a --harness or --project search came back empty
 // whenever the unfiltered head was full of other sessions.
-func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int) {
+// The last return value is how many sessions the ranking scored in total,
+// counted before n truncated the slice. Everything above it is already
+// computed and sorted by then, so the count is free — and it is the only
+// place it exists: after the return, the pool the top n came out of is gone.
+// Returns, in order: the ranked metas, their informative-term counts, their
+// any-frequency term counts, how many query terms the corpus knows at all,
+// and that pre-truncation total.
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int, int) {
 	inProject := map[uint32]SessionMeta{}
 	for _, meta := range m.Sessions {
 		if keep != nil && !keep(meta) {
@@ -380,7 +415,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	if len(inProject) == 0 {
-		return nil, nil, nil, 0
+		return nil, nil, nil, 0, 0
 	}
 	br := newBucketReader(dir)
 	defer br.close()
@@ -605,7 +640,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 	}
 	if len(ranked) == 0 {
-		return nil, nil, nil, termsKnown
+		return nil, nil, nil, termsKnown, 0
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score != ranked[j].score {
@@ -618,6 +653,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// what the user sees first.
 		return ranked[i].meta.ID < ranked[j].meta.ID
 	})
+	// Counted here, one line above the truncation, because this is the last
+	// moment the pool exists.
+	matchedTotal := len(ranked)
 	if n > 0 && len(ranked) > n {
 		ranked = ranked[:n]
 	}
@@ -629,7 +667,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		matched = append(matched, r.matched)
 		anyMatched = append(anyMatched, r.any)
 	}
-	return metas, matched, anyMatched, termsKnown
+	return metas, matched, anyMatched, termsKnown, matchedTotal
 }
 
 // loadSessionRecords materializes one session's transcript from the index.
