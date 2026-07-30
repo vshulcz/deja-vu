@@ -49,3 +49,31 @@ func TestSuggestFirstQueryEmptyOnThinCorpus(t *testing.T) {
 		t.Fatalf("thin corpus suggested %q", got)
 	}
 }
+
+func TestSuggestTokenRejectsCodeAndNoise(t *testing.T) {
+	for _, tok := range []string{
+		"map[string]any{",
+		"button_result_hd_price",
+		"internal/index/store.go",
+		"http://example.com",
+		"key=value",
+	} {
+		if suggestToken(tok) != "" {
+			t.Errorf("%q came out of source, not a sentence", tok)
+		}
+	}
+	for _, tok := range []string{"pgbouncer", "задачки", "compaction"} {
+		if suggestToken(tok) == "" {
+			t.Errorf("%q is a word someone would type", tok)
+		}
+	}
+}
+
+func TestSuggestPhraseTokensMarksGaps(t *testing.T) {
+	// "the" is a stop word: the two content words either side of it were not
+	// adjacent, and a suggestion built from them would read as a fragment.
+	got := suggestPhraseTokens("retry the budget")
+	if len(got) != 3 || got[0] == "" || got[1] != "" || got[2] == "" {
+		t.Fatalf("got %q, want the dropped word marked", got)
+	}
+}

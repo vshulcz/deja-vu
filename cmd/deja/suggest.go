@@ -49,9 +49,17 @@ func suggestFirstQuery(dir string) string {
 			if m.Role != "user" || digest.IsAgentArtifact(m.Text) {
 				continue
 			}
-			toks := suggestTokens(m.Text)
+			toks := suggestPhraseTokens(m.Text)
 			for i := 0; i+1 < len(toks); i++ {
 				a, b := toks[i], toks[i+1]
+				// Adjacent in the text, not merely adjacent after filtering.
+				// Dropping stop words joins words that were sentences apart, and
+				// the suggestion then reads as a fragment rather than as
+				// something anyone would type — "приятной фишечек" came from two
+				// unrelated halves of one message.
+				if a == "" || b == "" {
+					continue
+				}
 				// Both words must recur (a search should hit more than this
 				// one session) yet stay rare enough to be distinctive.
 				if df[a] < 2 || df[b] < 2 {
@@ -71,6 +79,25 @@ func suggestFirstQuery(dir string) string {
 	return best
 }
 
+// suggestPhraseTokens is suggestTokens with a gap marker: an empty string
+// wherever a word was dropped, so callers can tell a real phrase from two words
+// that only became neighbours after filtering.
+func suggestPhraseTokens(text string) []string {
+	if strings.Contains(text, "[redacted:") {
+		return nil
+	}
+	raw := query.Tokens(text)
+	out := make([]string, 0, len(raw))
+	for _, tok := range raw {
+		if keep := suggestToken(tok); keep != "" {
+			out = append(out, keep)
+		} else {
+			out = append(out, "")
+		}
+	}
+	return out
+}
+
 // suggestTokens keeps the informative words of a message: lowercase, no stop
 // words, no redaction markers, no digits-only noise.
 func suggestTokens(text string) []string {
@@ -80,20 +107,40 @@ func suggestTokens(text string) []string {
 	raw := query.Tokens(text)
 	out := make([]string, 0, len(raw))
 	for _, tok := range raw {
-		tok = strings.Trim(tok, "*#`~_-")
-		if len(tok) < 4 || len(tok) > 24 || query.IsStopWord(tok) {
-			continue
+		if keep := suggestToken(tok); keep != "" {
+			out = append(out, keep)
 		}
-		letters := 0
-		for _, r := range tok {
-			if r >= 'a' && r <= 'z' || r >= 'а' && r <= 'я' {
-				letters++
-			}
-		}
-		if letters*2 < len(tok) {
-			continue
-		}
-		out = append(out, tok)
 	}
 	return out
+}
+
+// suggestToken returns the word if it carries information, or "" if it is a
+// stop word, a marker, or mostly punctuation and digits.
+func suggestToken(tok string) string {
+	tok = strings.Trim(tok, "*#`~_-")
+	if len(tok) < 4 || len(tok) > 24 || query.IsStopWord(tok) {
+		return ""
+	}
+	// Identifiers and code fragments are rare by nature, so IDF loves them and
+	// the suggestion becomes something nobody would type: a struct literal, a
+	// field name from a pasted payload.
+	if isCodeToken(tok) {
+		return ""
+	}
+	letters := 0
+	for _, r := range tok {
+		if r >= 'a' && r <= 'z' || r >= 'а' && r <= 'я' {
+			letters++
+		}
+	}
+	if letters*2 < len(tok) {
+		return ""
+	}
+	return tok
+}
+
+// isCodeToken spots a word that came out of source rather than out of a
+// sentence: internal punctuation a person does not type mid-word.
+func isCodeToken(tok string) bool {
+	return strings.ContainsAny(tok, "_{}[]()<>/\\:;=|@$")
 }
