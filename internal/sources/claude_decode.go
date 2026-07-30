@@ -396,11 +396,25 @@ func IndexCommands() bool { return os.Getenv("DEJA_INDEX_COMMANDS") != "0" }
 // The dropped ones are not merely cheap to store, they are actively bad to keep:
 // `cat internal/index/index.go` matches a query about the index and answers
 // nothing.
-var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run)|golangci-lint|pytest|npm (run )?(test|build)|yarn |cargo |make\b|gh (pr|run|release|issue|workflow)|git (commit|push|rebase|merge|revert|tag|bisect)|docker|kubectl|terraform|deja )`)
+// meaningfulCommand is an allowlist on purpose. Inverting it — index anything
+// that is not trivial — was measured on an 85,623-command store: 98% of them
+// pass, 6.3 MB, and the families it lets through are `if`, `for`, `const`,
+// `def` — code from multi-line scripts, not commands anyone ran.
+//
+// It stays an allowlist and gets wider instead. The narrow version covered one
+// ecosystem: `git status` and `git log` missed it 2,270 times, and a person
+// working in LaTeX, Python or the JVM saw nothing at all. Widening it takes the
+// same store from 6,770 commands to 12,661, and 1.03 MB to 1.41 MB.
+var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run)|golangci-lint|gofmt|pytest|python3? -m|uv (run|pip)|pip install|ruff|mypy|npm|npx|pnpm|yarn|bun |cargo |make\b|cmake|gh (pr|run|release|issue|workflow|api)|git [a-z-]+|docker|kubectl|helm|terraform|psql|mysql|latexmk|mvn|gradle|dotnet|swift (build|test)|bundle exec|rails|deja )`)
 
 var trivialCommand = regexp.MustCompile(`^\s*(ls|cd|pwd|cat|head|tail|echo|grep|rg|find|which|wc|sed|awk|sleep|mkdir|rm|cp|mv|chmod|export|source|touch|open|printf)\b`)
 
 func worthIndexing(cmd string) bool {
+	// One line only: a multi-line command is a heredoc or a pasted script, and
+	// what it says about the work is already in what it produced.
+	if strings.Contains(cmd, "\n") {
+		return false
+	}
 	return meaningfulCommand.MatchString(cmd) && !trivialCommand.MatchString(cmd)
 }
 

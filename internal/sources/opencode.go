@@ -92,6 +92,8 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`json_extract(m.data,'$.role') as role,` +
 		`json_extract(p.data,'$.text') as text,` +
 		`json_extract(p.data,'$.state.input.filePath') as path,` +
+		`json_extract(p.data,'$.state.input.command') as cmd,` +
+		`json_extract(p.data,'$.state.input.patchText') as patch,` +
 		`json_extract(p.data,'$.time.start') as pt,` +
 		`json_extract(m.data,'$.time.created') as mt ` +
 		`from session s join message m on m.session_id=s.id join part p on p.message_id=m.id ` +
@@ -111,7 +113,15 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`where ((instr(substr(p.data,1,120),'"type":"text"')>0 ` +
 		`and json_extract(p.data,'$.type')='text')` +
 		` or (instr(substr(p.data,1,200),'"tool":"read"')>0 ` +
-		`and json_extract(p.data,'$.tool')='read'))` + where + ` order by s.id,m.time_created,p.id` + lim
+		`and json_extract(p.data,'$.tool')='read')` +
+		// bash and apply_patch are the other half of what a session did: 20,425
+		// commands and 6,021 patches on this store against 26,466 reads. Same
+		// two-test shape — the cheap substring gate first, so json_extract never
+		// parses a blob that cannot match.
+		` or (instr(substr(p.data,1,200),'"tool":"bash"')>0 ` +
+		`and json_extract(p.data,'$.tool')='bash')` +
+		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
+		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
 	cmd := exec.Command("sqlite3", "-json", db, q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -165,12 +175,23 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		// the files role so it can answer "which files" without competing in
 		// ordinary search.
 		if path := str(r["path"]); path != "" && IndexToolPaths() {
-			t := parseTimeAny(r["pt"])
-			if t.IsZero() {
-				t = parseTimeAny(r["mt"])
-			}
+			t := partTime(r)
 			s.Touch(t)
 			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: path, Time: t})
+			continue
+		}
+		if cmd := str(r["cmd"]); cmd != "" && IndexCommands() && worthIndexing(cmd) {
+			t := partTime(r)
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+			continue
+		}
+		if patch := str(r["patch"]); patch != "" && IndexEdits() {
+			t := partTime(r)
+			for _, span := range patchSpans(patch) {
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
+			}
 			continue
 		}
 		if txt == "" {
@@ -248,4 +269,47 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return ParseOpencodeDBWhere(db, " and s.id='"+sqlEscape(id)+"'", 0)
+}
+
+// partTime prefers the part's own timestamp and falls back to the message's.
+func partTime(r map[string]any) time.Time {
+	t := parseTimeAny(r["pt"])
+	if t.IsZero() {
+		t = parseTimeAny(r["mt"])
+	}
+	return t
+}
+
+// patchSpans turns an apply_patch payload into the same "path\nreplaced bytes"
+// records a Claude Edit produces, so `deja restore` does not have to care which
+// harness did the work. Only removed lines count: the added ones are on disk.
+func patchSpans(patch string) []string {
+	var out []string
+	path := ""
+	var removed []string
+	flush := func() {
+		if path != "" && len(removed) > 0 {
+			span := strings.Join(removed, "\n")
+			if len(span) > editSpanMax {
+				span = span[:editSpanMax]
+			}
+			out = append(out, path+"\n"+span)
+		}
+		removed = nil
+	}
+	for _, line := range strings.Split(patch, "\n") {
+		switch {
+		case strings.HasPrefix(line, "*** Update File:"),
+			strings.HasPrefix(line, "*** Delete File:"),
+			strings.HasPrefix(line, "*** Add File:"):
+			flush()
+			path = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+		case strings.HasPrefix(line, "@@"), line == "*** End Patch":
+			flush()
+		case strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---"):
+			removed = append(removed, line[1:])
+		}
+	}
+	flush()
+	return out
 }
