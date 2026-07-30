@@ -84,7 +84,8 @@ func runHookContext(dir string, plain bool) error {
 	// says which. After a compaction the model just lost its working context,
 	// so the lead line changes to say the memory below survived it.
 	var input struct {
-		Source string `json:"source"`
+		Source    string `json:"source"`
+		SessionID string `json:"session_id"`
 	}
 	_ = json.Unmarshal(readHookStdin(), &input)
 	digest, sessions, raw, taskMatched := cachedHookDigest(dir)
@@ -112,6 +113,13 @@ func runHookContext(dir string, plain bool) error {
 	lead := "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, tell the user in one digest.Short line what deja-vu recalled and how you reused it; otherwise do not mention it.\n"
 	if input.Source == "compact" {
 		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
+		// The generic digest is about the project. What a compacted session
+		// most needs is its own evidence: measured on this corpus, a summary
+		// keeps ~77% of the decisions and 0.2% of the commands that produced
+		// them (#543).
+		if ev := compactEvidence(dir, input.SessionID); ev != "" {
+			lead += "\n" + ev + "\n"
+		}
 	}
 	digest = lead + digest
 	if tip := limitHandoffTip(dir); tip != "" {

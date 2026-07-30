@@ -954,6 +954,35 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	return loadSessionMeta(dir, m, meta)
 }
 
+// FindByID looks a session up when only its id is known. Hook payloads carry
+// one without naming the harness, and the id is unique in practice: the
+// harnesses that generate them use uuids or their own prefixed ids.
+func FindByID(dir, id string) (model.Session, bool, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if id == "" {
+		return model.Session{}, false, nil
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return model.Session{}, false, err
+	}
+	for _, meta := range m.Sessions {
+		if meta.ID == id {
+			return loadSessionMeta(dir, m, meta)
+		}
+	}
+	return model.Session{}, false, nil
+}
+
 func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, bool, error) {
 	s := sessionFromMeta(meta)
 	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Harness+":"+meta.ID)
