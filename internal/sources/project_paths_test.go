@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -86,5 +87,20 @@ func TestProjectFromPathsNeedsEvidence(t *testing.T) {
 	}
 	if got := projectFromPaths(nil); got != "" {
 		t.Fatalf("project = %q, want no answer with no files", got)
+	}
+}
+
+func TestRepoRootTerminatesAtTheVolumeRoot(t *testing.T) {
+	// The walk used to stop only at "/", so on Windows it spun forever at the
+	// volume root. A timeout rather than an assertion: the failure mode is a
+	// hang, and it only reproduces on the OS whose root is not "/".
+	done := make(chan string, 1)
+	go func() {
+		done <- repoRoot(filepath.Join(filepath.VolumeName(os.TempDir())+string(filepath.Separator), "nowhere", "deep"))
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("repoRoot did not terminate at the volume root")
 	}
 }

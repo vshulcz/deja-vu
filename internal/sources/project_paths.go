@@ -98,11 +98,19 @@ func repoRoot(dir string) string {
 		return v.(string)
 	}
 	root := ""
-	for d := dir; d != "/" && d != "." && d != ""; d = filepath.Dir(d) {
+	// Stop when the parent stops changing rather than on "/": on Windows the
+	// walk ends at `D:\`, whose parent is itself, and a unix-root check spins
+	// there until the process is killed.
+	for d := dir; d != "." && d != ""; {
 		if fi, err := os.Stat(filepath.Join(d, ".git")); err == nil && (fi.IsDir() || fi.Mode().IsRegular()) {
 			root = d
 			break
 		}
+		up := filepath.Dir(d)
+		if up == d {
+			break
+		}
+		d = up
 	}
 	repoRootCache.Store(dir, root)
 	return root
