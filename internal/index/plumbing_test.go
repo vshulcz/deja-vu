@@ -1,6 +1,14 @@
 package index
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
+)
 
 // TestStripsHarnessPlumbing pins what comes out of a transcript that a harness
 // wrote to itself. Measured on a real index before this existed: 304 records
@@ -36,5 +44,54 @@ func TestKeepsWhatIsNotPlumbing(t *testing.T) {
 		if got := stripSelfRecall(in); got != in {
 			t.Errorf("stripped a mention rather than plumbing:\n in:  %q\n out: %q", in, got)
 		}
+	}
+}
+
+// TestFileRecordsStayOutOfOrdinaryRanking is the same rule tool records follow:
+// a list of files a turn touched answers "which files", never "what did we
+// decide", and left in the ordinary ranking a path would lift a session because
+// it contained the words of a question.
+func TestFileRecordsStayOutOfOrdinaryRanking(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "idx")
+	ss := []model.Session{{
+		ID: "s1", Harness: "claude", Project: "app",
+		Started: time.Unix(1700000000, 0), Updated: time.Unix(1700000000, 0),
+		Messages: []model.Message{
+			{Role: "user", Text: "why is the pool slow", Time: time.Unix(1700000000, 0)},
+			{Role: roleFiles, Text: "/repo/internal/db/pool_slow_path.go", Time: time.Unix(1700000001, 0)},
+		},
+	}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := Search(dir, search.Options{Query: "pool slow", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range hits {
+		for _, m := range s.Messages {
+			if m.Role == roleFiles {
+				t.Fatalf("file record served to an ordinary query: %q", m.Text)
+			}
+		}
+	}
+	byRole, err := Search(dir, search.Options{Query: "pool slow", Role: roleFiles, All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range byRole {
+		for _, m := range s.Messages {
+			if m.Role == roleFiles {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("asking by role returned no file records")
 	}
 }

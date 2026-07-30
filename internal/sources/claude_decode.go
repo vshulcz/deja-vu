@@ -71,6 +71,11 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
+		if IndexToolPaths() && v.Message != nil {
+			if p := claudeToolPaths(v.Message.Content); p != "" {
+				s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
+			}
+		}
 	})
 	if len(s.Messages) == 0 {
 		return nil, err
@@ -198,4 +203,63 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 			return err
 		}
 	}
+}
+
+// RoleFiles marks a record that lists the files a turn touched, rather than
+// anything said. It exists because the reliable answer to "which file is this
+// session about" is what the agent opened and edited, and that lives in
+// tool_use inputs — measured three times over: #542 works with these paths and
+// not with prose mentions, #531 fails its kill condition without them, and #537
+// has no material at all.
+const RoleFiles = "files"
+
+// IndexToolPaths reports whether file paths from tool calls are indexed. Off by
+// default while the cost is measured. This is the cheapest slice of #547 — 0.6 MB
+// of path text across a 644 MB corpus, against 13.6 MB for commands and 80 MB
+// for the bodies of files that were read.
+func IndexToolPaths() bool { return os.Getenv("DEJA_INDEX_PATHS") == "1" }
+
+// pathTools are the calls whose input names a file. Bash is deliberately absent:
+// a path inside a shell command is guesswork, and guessing is what made the
+// prose-mention approach unusable.
+var pathTools = map[string]bool{"Read": true, "Edit": true, "Write": true, "MultiEdit": true, "NotebookEdit": true}
+
+// claudeToolPaths returns the distinct file paths a message's tool calls name,
+// one per line, or "" when it names none.
+func claudeToolPaths(raw json.RawMessage) string {
+	raw = trimJSONSpace(raw)
+	if len(raw) == 0 || raw[0] != '[' {
+		return ""
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) != nil {
+		return ""
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, item := range items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		var part struct {
+			Type  string `json:"type"`
+			Name  string `json:"name"`
+			Input struct {
+				FilePath string `json:"file_path"`
+			} `json:"input"`
+		}
+		if json.Unmarshal(item, &part) != nil {
+			continue
+		}
+		if part.Type != "tool_use" || !pathTools[part.Name] || part.Input.FilePath == "" {
+			continue
+		}
+		if seen[part.Input.FilePath] {
+			continue
+		}
+		seen[part.Input.FilePath] = true
+		out = append(out, part.Input.FilePath)
+	}
+	return strings.Join(out, "\n")
 }

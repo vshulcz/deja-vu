@@ -970,6 +970,10 @@ func scanRecords(dir string, m Manifest, o query.Options, offsets []int64) ([]mo
 	return scanRecordsWithVariants(dir, m, o, offsets, nil)
 }
 
+// roleFiles mirrors sources.RoleFiles without importing it: this package sits
+// below sources, not above it.
+const roleFiles = "files"
+
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	add := func(r Record) {
@@ -987,6 +991,13 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 			return
 		}
 		if o.Role != "" && r.Role != o.Role {
+			return
+		}
+		// A file list is a record of what a turn touched, not something said.
+		// Left in ordinary ranking it lifts a session because a path happened
+		// to contain the words of a question, so it is indexed and searchable
+		// but served only when asked for by role.
+		if r.Role == roleFiles && o.Role != roleFiles {
 			return
 		}
 		s := by[r.Key]
