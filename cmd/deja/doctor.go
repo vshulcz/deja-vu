@@ -403,7 +403,22 @@ func doctorMCP(w io.Writer) {
 			}
 		}
 		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)
+		if note := doctorWiringNote(c.name); note != "" && status == "wired" {
+			fmt.Fprintf(w, "  %-12s %s\n", "", note)
+		}
 	}
+}
+
+// doctorWiringNote adds what "wired" cannot promise for a given harness. Three
+// CLIs share ~/.grok and read different files; one of them — @vibe-kit/grok-cli
+// — has no user-level MCP config at all, so `grok mcp list` reports nothing no
+// matter what an installer writes to the home directory. Saying "wired" without
+// that caveat is how someone concludes deja is broken.
+func doctorWiringNote(name string) string {
+	if name != "grok" {
+		return ""
+	}
+	return "@vibe-kit/grok-cli reads MCP only from <cwd>/.grok/settings.json — run `grok mcp add deja -c deja -a mcp` in a project to wire that one"
 }
 
 type doctorMCPConfig struct {
