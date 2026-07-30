@@ -688,7 +688,14 @@ func encodePostings(posts []posting) []byte {
 	var prev int64
 	for _, p := range s {
 		b = binary.AppendUvarint(b, uint64(p.Off-prev))
-		b = binary.AppendUvarint(b, uint64(p.Sid))
+		// The tool bit rides in the low bit of the session field: a separate
+		// varint would cost a byte on every posting in the store, and the shift
+		// costs nothing until a corpus passes two billion sessions.
+		v := uint64(p.Sid) << 1
+		if p.Tool {
+			v |= 1
+		}
+		b = binary.AppendUvarint(b, v)
 		prev = p.Off
 	}
 	return b
@@ -708,7 +715,7 @@ func decodePostings(b []byte) []posting {
 		if n <= 0 {
 			return out
 		}
-		out = append(out, posting{Off: prev, Sid: uint32(sid)})
+		out = append(out, posting{Off: prev, Sid: uint32(sid >> 1), Tool: sid&1 == 1})
 		b = b[n:]
 	}
 	return out

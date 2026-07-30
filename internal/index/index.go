@@ -19,7 +19,7 @@ import (
 // the copies it already holds.
 // 18: file paths from tool calls are indexed (#558). An index built before this
 // has none of them, so it is rebuilt rather than reused.
-const version = 18
+const version = 19
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -165,6 +165,12 @@ type OffsetRecord struct {
 type posting struct {
 	Off int64
 	Sid uint32
+	// Tool marks a posting that came from a tool record — a command, a path, a
+	// tool result — rather than from something a person or the agent said. The
+	// bit rides in the posting because the per-session cap has to choose which
+	// postings to keep *before* any record is read, which is the whole point of
+	// the cap.
+	Tool bool
 }
 
 type SearchResult struct {
@@ -205,6 +211,7 @@ type tokenJob struct {
 	offset int64
 	sid    uint32
 	when   time.Time
+	tool   bool
 }
 
 type bucketPostings map[string]map[string][]posting

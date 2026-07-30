@@ -977,6 +977,17 @@ const roleFiles = "files"
 // roleCommand mirrors sources.RoleCommand.
 const roleCommand = "command"
 
+// roleToolOutput mirrors sources.RoleToolOutput.
+const roleToolOutput = "tool-output"
+
+// isToolRole says whether a record holds the work rather than the talk about
+// it. Tool records are bulk-repetitive by nature — the same command, the same
+// paths, session after session — so a query that matches one matches hundreds,
+// and the per-session bound has to spend its budget on speech first.
+func isToolRole(role string) bool {
+	return role == roleFiles || role == roleCommand || role == roleToolOutput
+}
+
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	add := func(r Record) {
@@ -1080,9 +1091,13 @@ func capPostingsPerSession(posts []posting, n int) []posting {
 		return posts
 	}
 	bySid := make(map[uint32]int, 16)
+	speechBySid := make(map[uint32]int, 16)
 	over := false
 	for _, p := range posts {
 		bySid[p.Sid]++
+		if !p.Tool {
+			speechBySid[p.Sid]++
+		}
 		if bySid[p.Sid] > n {
 			over = true
 		}
@@ -1090,18 +1105,33 @@ func capPostingsPerSession(posts []posting, n int) []posting {
 	if !over {
 		return posts
 	}
+	// Speech first, tool records with whatever budget is left. A long session
+	// holds thousands of matching command lines and a handful of sentences about
+	// the subject; sampling the two together spends the budget on the commands
+	// and the sentence that would have ranked the session is never read.
 	seen := make(map[uint32]int, len(bySid))
+	seenTool := make(map[uint32]int, len(bySid))
 	out := make([]posting, 0, len(posts))
 	for _, p := range posts {
-		total := bySid[p.Sid]
-		if total <= n {
+		if bySid[p.Sid] <= n {
 			out = append(out, p)
 			continue
 		}
-		i := seen[p.Sid]
-		seen[p.Sid] = i + 1
-		// Keep index i when it lands on one of n evenly spaced slots.
-		if i*n/total != (i+1)*n/total {
+		budget, total, counter := n, speechBySid[p.Sid], seen
+		if p.Tool {
+			budget, total, counter = n-speechBySid[p.Sid], bySid[p.Sid]-speechBySid[p.Sid], seenTool
+			if budget <= 0 {
+				continue
+			}
+		}
+		if total <= budget {
+			out = append(out, p)
+			continue
+		}
+		i := counter[p.Sid]
+		counter[p.Sid] = i + 1
+		// Keep index i when it lands on one of budget evenly spaced slots.
+		if i*budget/total != (i+1)*budget/total {
 			out = append(out, p)
 		}
 	}

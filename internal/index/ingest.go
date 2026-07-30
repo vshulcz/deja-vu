@@ -299,7 +299,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 					return err
 				}
 				writtenMessages++
-				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time})
+				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
 		}
 		return nil
@@ -525,7 +525,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 					return err
 				}
 				writtenMessages++
-				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time})
+				push(tokenJob{text: text, offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
 		}
 		return nil
@@ -574,7 +574,7 @@ func indexTextParallel(feed func(push func(tokenJob)) error) (bucketPostings, er
 			defer wg.Done()
 			for batch := range jobs {
 				for _, job := range batch {
-					addIndexKeys(partials[i], job.text, job.offset, job.sid, job.when)
+					addIndexKeys(partials[i], job.text, job.offset, job.sid, job.when, job.tool)
 				}
 			}
 		}()
@@ -624,7 +624,7 @@ func dateTokens(when time.Time) []string {
 	}
 }
 
-func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time) {
+func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time, tool bool) {
 	seen := map[string]bool{}
 	for _, tok := range append(indexKeys(text), dateTokens(when)...) {
 		if seen[tok] {
@@ -635,7 +635,7 @@ func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, wh
 		if buckets[b] == nil {
 			buckets[b] = map[string][]posting{}
 		}
-		buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: sid})
+		buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: sid, Tool: tool})
 	}
 }
 

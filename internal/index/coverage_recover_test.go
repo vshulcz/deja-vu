@@ -352,7 +352,7 @@ func TestUpdateIndexAppendNonCorruptErrorWrapped(t *testing.T) {
 
 func TestAddIndexKeysDedupBranch(t *testing.T) {
 	buckets := bucketPostings{}
-	addIndexKeys(buckets, "alpha alpha alpha", 5, 1, time.Time{})
+	addIndexKeys(buckets, "alpha alpha alpha", 5, 1, time.Time{}, false)
 	total := 0
 	for _, toks := range buckets {
 		for _, posts := range toks {
