@@ -123,6 +123,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Share** | `deja share <id>` — hand a colleague a sanitized digest of a session, secrets already scrubbed |
 | **Remember** | `deja remember "text"` or MCP `remember` — keep durable decisions and conclusions |
 | **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
+| **Files** | `deja files <topic>` — the other direction: which files the work on a subject actually touched, ranked by how specific they are to it |
 | **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
 
 ## Privacy
@@ -156,6 +157,7 @@ $ deja "jwt refresh token"
 | `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; zero-result queries try word forms before close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--limit`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
+| `deja files <topic>` | Which files were opened or edited while that subject was being worked on. Ranked by how specific a file is to the topic, so a file every session touches does not win. `--project`, `--limit`. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |

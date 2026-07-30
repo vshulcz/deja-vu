@@ -119,6 +119,7 @@ var commands = map[string]command{
 	"share":           func(dir string, rest []string) error { return runShare(dir, rest, os.Stdout) },
 	"resume":          func(dir string, rest []string) error { return runResume(dir, rest, os.Stdout) },
 	"handoff":         func(dir string, rest []string) error { return runHandoff(dir, rest, os.Stdout) },
+	"files":           func(dir string, rest []string) error { return runFiles(dir, rest, os.Stdout) },
 	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,
