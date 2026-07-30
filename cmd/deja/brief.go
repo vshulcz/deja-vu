@@ -14,10 +14,28 @@ import (
 // Manifest metadata and the usage sidecar only — it must feel instant.
 // Pipes and scripts still get the usage text; `deja help` always works.
 func runBrief(dir string, w io.Writer) error {
+	justGreeted := false
 	ov, err := index.Overview(dir)
 	if err != nil || ov.Sessions == 0 {
-		printUsage()
-		return nil
+		// Nothing indexed yet. Printing usage here is what a fresh install used
+		// to do, and it is the wrong answer to `deja`: the reader has just
+		// installed the thing and gets forty lines of command syntax instead of
+		// one fact about their own work. Build the index — the progress display
+		// and the per-harness summary already exist — and show the brief.
+		if !index.HasManifest(dir) {
+			greeted, err := buildForFirstRun(dir)
+			if err != nil {
+				return err
+			}
+			justGreeted = greeted
+			if ov, err = index.Overview(dir); err != nil {
+				return err
+			}
+		}
+		if ov.Sessions == 0 {
+			printNoHistory(w)
+			return nil
+		}
 	}
 	color := statColorOK(os.Stdout)
 	bold, dim, reset := "", "", ""
@@ -64,7 +82,10 @@ func runBrief(dir string, w io.Writer) error {
 		}
 	}
 
-	if q := suggestFirstQuery(dir); q != "" {
+	// The greeting printed on a first build already ends with this exact
+	// suggestion. Printing it twice on the one screen that has to be legible
+	// is worse than not printing it at all.
+	if q := suggestFirstQuery(dir); q != "" && !justGreeted {
 		fmt.Fprintf(w, "try        %sdeja \"%s\"%s %s(from your own history)%s\n", bold, q, reset, dim, reset)
 	}
 	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
@@ -84,4 +105,34 @@ func trimBriefTitle(t string) string {
 		return string(r[:44]) + "…"
 	}
 	return t
+}
+
+// buildForFirstRun indexes with the same narration `deja warmup` uses, so the
+// wait is legible and ends in the per-harness summary rather than in silence.
+// It reports whether the greeting was actually printed, so the brief does not
+// repeat the suggestion the greeting already ends with.
+func buildForFirstRun(dir string) (bool, error) {
+	prepareFirstIndexGreeting(dir)
+	if err := withBuildProgress(func() error { return index.Ensure(dir, "", false, os.Stderr) }); err != nil {
+		return false, err
+	}
+	before := index.LastBuild
+	maybeFirstIndexGreeting(dir)
+	return before.Initial && before.Messages > 0 && logoWanted(os.Stdout), nil
+}
+
+// printNoHistory is the honest empty state: the index built and found nothing.
+// It names where deja looked, because the usual cause is that the agent stores
+// live somewhere this machine does not have.
+func printNoHistory(w io.Writer) {
+	fmt.Fprintln(w, "deja-vu "+version+" · no agent history found yet")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "deja reads the session stores your agents already write —")
+	fmt.Fprintln(w, "Claude Code, Codex, opencode, Cursor, Gemini, Copilot and ten more.")
+	fmt.Fprintln(w, "Nothing was found on this machine, which usually means no agent has")
+	fmt.Fprintln(w, "run here yet, or its store lives somewhere else.")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  deja sources     what was looked for, and where")
+	fmt.Fprintln(w, "  deja doctor      check the setup")
+	fmt.Fprintln(w, "  deja help        every command")
 }

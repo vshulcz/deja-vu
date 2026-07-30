@@ -59,6 +59,11 @@ deja install --all     # MCP recall for every agent it finds on this machine
 deja install --auto    # same, plus session-start auto-recall where supported
 ```
 
+Install also builds the index from the histories it finds, so the first agent
+session after it is instant rather than paying for the build. `--no-index`
+skips that for scripted installs; running `deja` with nothing indexed builds it
+too.
+
 Claude Code users can skip that step and install everything as a plugin instead:
 
 ```sh

@@ -19,10 +19,16 @@ type installResult struct{ Path, Action string }
 
 func runInstall(dir string, args []string, uninstall bool) error {
 	guidance := true
+	noIndex := false
 	var targetArgs []string
 	for _, arg := range args {
 		if arg == "--no-guidance" {
 			guidance = false
+			continue
+		}
+		// For scripted installs that do not want to spend the build here.
+		if arg == "--no-index" {
+			noIndex = true
 			continue
 		}
 		targetArgs = append(targetArgs, arg)
@@ -131,8 +137,13 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			hookCount++
 		}
 	}
-	if !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") {
-		installIndexWarmup(dir, mcpCount, hookCount, guidanceCount)
+	// Every install builds, not only --auto and --all. Installing is the one
+	// moment a person has already accepted a wait — they just ran an installer
+	// — and spending the build here is what keeps the first real use, usually
+	// the first agent turn, instant.
+	if !uninstall && !noIndex {
+		installIndexWarmup(dir, mcpCount, hookCount, guidanceCount,
+			targetArgs[0] == "--auto" || targetArgs[0] == "--all")
 	}
 	if banner {
 		info := append(brandInfo(), "")
@@ -153,7 +164,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	return nil
 }
 
-func installIndexWarmup(dir string, mcp, hooks, guidance int) {
+func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 	built := false
 	detected := 0
 	if !index.HasManifest(dir) {
@@ -161,12 +172,22 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int) {
 			store, _ := inspectDoctorStore(check)
 			if store.Files > 0 {
 				detected++
-				if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
-					built = true
-				}
+				// With the progress display, so twenty seconds of silence does
+				// not look like a hang on the very first command.
+				prepareFirstIndexGreeting(dir)
+				err := withBuildProgress(func() error { return index.Ensure(dir, "", false, os.Stderr) })
+				index.SuppressHarnessNarration = false
+				built = err == nil
 				break
 			}
 		}
+	}
+	if !summary {
+		if built {
+			b := index.LastBuild
+			fmt.Fprintf(os.Stderr, "index: built (%d sessions, %d messages)\n", b.Sessions, b.Messages)
+		}
+		return
 	}
 	fmt.Fprintf(os.Stderr, "installed: %d MCP, %d hooks, %d guidance files\n", mcp, hooks, guidance)
 	if built {
