@@ -39,7 +39,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]}"
     action="${COMP_WORDS[2]}"
 
-    local commands="blame bench completion ctx doctor embed forget handoff index install last log mcp promote remember resume share show sources stats statusline sync uninstall update version warmup"
+    local commands="blame bench completion ctx doctor embed files forget handoff help index install last log mcp promote remember restore resume share show sources stats statusline sync uninstall update version view warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja"
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
@@ -150,22 +150,26 @@ _deja() {
     'bench:run benchmarks'
     'completion:generate shell completion'
     'ctx:print a compact context digest'
+    'files:which files the work on a topic touched'
     'doctor:diagnose local stores and wiring'
     'promote:distill a session into a curated note'
     'embed:build the semantic sidecar'
     'forget:remove indexed sessions'
     'handoff:continue a session in another agent'
+    'help:print the command reference'
     'index:build or refresh the index'
     'install:wire deja into an agent'
     'last:list recent sessions'
     'log:show what deja served to agents'
     'mcp:serve the MCP protocol'
     'remember:store a durable note'
+    'restore:hand back a span an agent replaced'
     'resume:reopen a session'
     'share:print a sanitized session digest'
     'show:print a session'
     'sources:list discovered stores'
     'stats:print usage statistics'
+    'view:browse your memory in one local HTML page'
     'statusline:print status bar data'
     'sync:move memory between machines'
     'uninstall:remove deja agent wiring'
@@ -253,7 +257,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed forget handoff index install last log mcp promote remember resume share show sources stats statusline sync uninstall update version warmup'
+complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed files forget handoff help index install last log mcp promote remember restore resume share show sources stats statusline sync uninstall update version view warmup'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
