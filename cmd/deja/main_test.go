@@ -74,7 +74,7 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 		{"stats", []string{"stats"}, "deja stats", ""},
 		{"ctx missing", []string{"ctx"}, "", "ctx needs query"},
 		{"show missing", []string{"show"}, "", "show needs id-prefix"},
-		{"bad duration", []string{"--since", "nope", "needle"}, "", "invalid duration"},
+		{"bad duration", []string{"--since", "nope", "needle"}, "", "not a duration deja understands"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

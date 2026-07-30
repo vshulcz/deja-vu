@@ -24,7 +24,10 @@ func TestStatsSaysWhatIsMissingWhenNothingIsIndexed(t *testing.T) {
 			t.Fatalf("empty section %q printed over an empty index:\n%s", heading, got)
 		}
 	}
-	if !strings.Contains(got, "deja index") {
+	// Which next step depends on why it is empty — a rebuild when stores exist,
+	// `deja sources` when there is no agent history at all — so assert that one
+	// is offered rather than pinning the wording.
+	if !strings.Contains(got, "deja index") && !strings.Contains(got, "deja sources") {
 		t.Fatalf("no next step offered:\n%s", got)
 	}
 }
