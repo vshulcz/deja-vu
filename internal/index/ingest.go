@@ -801,7 +801,14 @@ func notAsked(text string) bool {
 // screen, a wrong one costs the reader's trust in the screen.
 func looksLikeQuestion(text string) bool {
 	t := strings.TrimSpace(text)
-	if strings.Contains(t, "?") || strings.Contains(t, "？") {
+	// A person's question is short. A pasted report that happens to contain a
+	// question mark two paragraphs in is not one, and shown truncated on a
+	// screen it reads as noise — measured: the first candidate to survive the
+	// earlier version was a 900-character critique of some charts.
+	if len([]rune(t)) > askedMaxRunes {
+		return false
+	}
+	if strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") {
 		return true
 	}
 	fields := strings.Fields(t)

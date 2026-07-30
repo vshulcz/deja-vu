@@ -111,6 +111,10 @@ const touchedFileCap = 6
 // askedQuestionCap bounds the hashes stored per session.
 const askedQuestionCap = 8
 
+// askedMaxRunes is how long a thing someone asked can be. Beyond this it is a
+// report, a paste, or an instruction with a question buried in it.
+const askedMaxRunes = 240
+
 type Manifest struct {
 	Version          int                    `json:"version"`
 	Files            map[string]FileState   `json:"files"`

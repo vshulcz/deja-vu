@@ -13,7 +13,11 @@ func statsHeadline(r stats.Report) string {
 		parts = append(parts, fmt.Sprintf("%s sessions indexed", formatStatNumber(r.TotalSessions)))
 	}
 	if r.Recall.Recalls > 0 {
-		parts = append(parts, fmt.Sprintf("memory served %s times", formatStatNumber(r.Recall.Recalls)))
+		served := "times"
+		if r.Recall.Recalls == 1 {
+			served = "time"
+		}
+		parts = append(parts, fmt.Sprintf("memory served %s %s", formatStatNumber(r.Recall.Recalls), served))
 	}
 	if r.RepeatQuestions > 0 {
 		parts = append(parts, fmt.Sprintf("%s questions asked more than once", formatStatNumber(r.RepeatQuestions)))

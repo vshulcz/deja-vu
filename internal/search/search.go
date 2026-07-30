@@ -785,6 +785,16 @@ func PrintSession(w io.Writer, s model.Session) {
 	}
 }
 
+// isWorkRecord reports whether a message records what an agent did rather than
+// what was said. Mirrors index.isToolRole, which cannot be imported here.
+func isWorkRecord(role string) bool {
+	switch role {
+	case roleToolOutput, "files", "command", "edit":
+		return true
+	}
+	return false
+}
+
 func PrintContext(w io.Writer, s model.Session, query string) {
 	fmt.Fprintf(w, "# deja context: %s · %s · %s", s.Harness, s.Project, s.ID)
 	if !s.Updated.IsZero() {
@@ -814,6 +824,15 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	for _, m := range s.Messages {
 		if written >= budget {
 			break
+		}
+		// A digest is what someone pipes into a prompt, so it carries the
+		// conversation. The work records — tool output, the files a turn
+		// touched, the commands it ran, the spans it replaced — are indexed and
+		// searchable by role, and they are not what anyone means by context.
+		// Before they were labelled honestly (#560) they arrived as `user` and
+		// filled this with `## tool-output` blocks.
+		if isWorkRecord(m.Role) {
+			continue
 		}
 		ok, matched := include(m)
 		if !ok {

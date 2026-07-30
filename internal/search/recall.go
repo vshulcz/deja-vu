@@ -201,6 +201,17 @@ func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 	if problem == "" && len(conclusions) == 0 {
 		return ""
 	}
+	// A harness smoke test is a real session and gets indexed like any other:
+	// "Reply with the single word OK" → "OK". Injected into an agent's context
+	// it teaches the reader that deja recalls worthless things.
+	//
+	// The test is deliberately narrow — a prompt asking for a token back,
+	// answered with a token. An earlier version cut on total length instead and
+	// dropped a one-line question with a short answer, which is memory worth
+	// having.
+	if isSmokeTest(problem, conclusions) {
+		return ""
+	}
 	var b strings.Builder
 	if provenance {
 		fmt.Fprintf(&b, "✓ recalled from %s session · %s\n", s.Harness, relativeDay(s.Updated, now))
@@ -267,4 +278,32 @@ func firstLine(s string, n int) string {
 		return s
 	}
 	return strings.TrimSpace(string(r[:n])) + "…"
+}
+
+// smokeAnswerMax is how short a reply has to be to read as a token rather than
+// an answer: "OK", "5", "NONE".
+const smokeAnswerMax = 20
+
+// smokeAsks are the openings of a prompt that asks for a token back.
+var smokeAsks = []string{
+	"reply with", "respond with", "answer with", "output only", "print only",
+	"quote the first", "say the word", "скажи ", "ответь ", "напиши слово",
+}
+
+// isSmokeTest reports whether a session is a harness check rather than work.
+func isSmokeTest(problem string, conclusions []string) bool {
+	total := 0
+	for _, c := range conclusions {
+		total += len(c)
+	}
+	if total > smokeAnswerMax {
+		return false
+	}
+	low := strings.ToLower(strings.TrimSpace(problem))
+	for _, p := range smokeAsks {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	return false
 }

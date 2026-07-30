@@ -345,6 +345,45 @@ func TrimRunes(s string, n int) string {
 	return string(r[:n-1]) + "…"
 }
 
+// AskedByAPerson keeps this count to questions a person asked. Without it the
+// number is mostly harness plumbing and instructions to an agent — "Use the X
+// tool", "Reply with only the raw JSON" — which repeat verbatim by
+// construction. The brief applies the same rule (index.FindAskedTwice), and two
+// screens reporting the same claim under different rules is worse than either.
+func AskedByAPerson(text string) bool {
+	t := strings.TrimSpace(text)
+	if Noise(t) || len([]rune(t)) > askedMaxRunes {
+		return false
+	}
+	for _, p := range []string{
+		"<deja-recall", "[Request interrupted", "The following tool was executed",
+		"This session is being continued", "Continue from where you left off",
+	} {
+		if strings.HasPrefix(t, p) {
+			return false
+		}
+	}
+	if strings.HasSuffix(t, "?") || strings.HasSuffix(t, "？") {
+		return true
+	}
+	fields := strings.Fields(t)
+	if len(fields) == 0 {
+		return false
+	}
+	switch strings.Trim(strings.ToLower(fields[0]), ",.:;!\"'") {
+	case "what", "why", "how", "when", "where", "which", "who", "whose",
+		"did", "does", "do", "is", "are", "was", "were", "can", "should", "would",
+		"что", "чем", "почему", "зачем", "как", "какой", "какая", "какие", "когда",
+		"где", "куда", "откуда", "сколько", "кто", "чей", "можно", "нужно", "надо":
+		return true
+	}
+	return false
+}
+
+// askedMaxRunes mirrors the index-side bound: past this it is a report or a
+// paste with a question mark somewhere in it.
+const askedMaxRunes = 240
+
 // RepeatQuestions is a corpus proxy because the usage sidecar does not store query text.
 func RepeatQuestions(ss []model.Session) int {
 	// Exact stem match only: questionStemFor already folds case and
@@ -354,7 +393,7 @@ func RepeatQuestions(ss []model.Session) int {
 	for _, s := range ss {
 		seen := map[string]bool{}
 		for _, m := range s.Messages {
-			if m.Role != "user" {
+			if m.Role != "user" || !AskedByAPerson(m.Text) {
 				continue
 			}
 			stem := questionStemFor(m.Text)
