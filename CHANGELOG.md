@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `deja handoff --to agy` starts Antigravity with the digest as its first prompt. It was listed paste-only on the reading that it is a GUI, but its terminal client is `agy` — the binary `deja resume` already calls — and `agy -i <prompt>` opens an interactive session on it. `--to antigravity` is the same target. (#524)
 
+### Fixed
+- `deja handoff --to hermes|openclaw|roo` answered `don't know how to hand off` instead of printing the digest to paste; the paste path now covers every harness the registry marks paste, kept in sync by the capability drift test. (#524)
+
 ## [0.16.2] - 2026-07-29
 
 Ranking learned to tell a conclusion from a conversation about one, and search
