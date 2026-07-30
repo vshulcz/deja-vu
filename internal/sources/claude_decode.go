@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -71,9 +72,16 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
-		if IndexToolPaths() && v.Message != nil {
-			if p := claudeToolPaths(v.Message.Content); p != "" {
-				s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
+		if v.Message != nil {
+			if IndexToolPaths() {
+				if p := claudeToolPaths(v.Message.Content); p != "" {
+					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
+				}
+			}
+			if IndexCommands() {
+				for _, cmd := range claudeCommands(v.Message.Content) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+				}
 			}
 		}
 	})
@@ -266,4 +274,67 @@ func claudeToolPaths(raw json.RawMessage) string {
 		out = append(out, part.Input.FilePath)
 	}
 	return strings.Join(out, "\n")
+}
+
+// RoleCommand marks a command that ran. Tool *output* has always been indexed —
+// Claude files it under the user role, which is why the index holds megabytes of
+// test output — but the invocation that produced it was dropped, so output sat
+// there with nothing saying what it came from.
+const RoleCommand = "command"
+
+// IndexCommands reports whether commands are indexed. On by default, because a
+// flag nobody enables is a feature nobody has; `DEJA_INDEX_COMMANDS=0` turns it
+// off. Only the commands worth keeping — see worthIndexing.
+func IndexCommands() bool { return os.Getenv("DEJA_INDEX_COMMANDS") != "0" }
+
+// worthIndexing keeps the commands that say what happened — a test run, a build,
+// a deploy, a git or gh operation — and drops navigation. Measured on a real
+// corpus: 5,051 of 23,774 commands, 3.5 MB of 13.1 MB.
+//
+// The dropped ones are not merely cheap to store, they are actively bad to keep:
+// `cat internal/index/index.go` matches a query about the index and answers
+// nothing.
+var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run)|golangci-lint|pytest|npm (run )?(test|build)|yarn |cargo |make\b|gh (pr|run|release|issue|workflow)|git (commit|push|rebase|merge|revert|tag|bisect)|docker|kubectl|terraform|deja )`)
+
+var trivialCommand = regexp.MustCompile(`^\s*(ls|cd|pwd|cat|head|tail|echo|grep|rg|find|which|wc|sed|awk|sleep|mkdir|rm|cp|mv|chmod|export|source|touch|open|printf)\b`)
+
+func worthIndexing(cmd string) bool {
+	return meaningfulCommand.MatchString(cmd) && !trivialCommand.MatchString(cmd)
+}
+
+// claudeCommands pulls the shell commands worth keeping out of a message.
+func claudeCommands(raw json.RawMessage) []string {
+	raw = trimJSONSpace(raw)
+	if len(raw) == 0 || raw[0] != '[' {
+		return nil
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) != nil {
+		return nil
+	}
+	var out []string
+	for _, item := range items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		var part struct {
+			Type  string `json:"type"`
+			Name  string `json:"name"`
+			Input struct {
+				Command string `json:"command"`
+			} `json:"input"`
+		}
+		if json.Unmarshal(item, &part) != nil {
+			continue
+		}
+		if part.Type != "tool_use" || part.Name != "Bash" || part.Input.Command == "" {
+			continue
+		}
+		if !worthIndexing(part.Input.Command) {
+			continue
+		}
+		out = append(out, "$ "+part.Input.Command)
+	}
+	return out
 }

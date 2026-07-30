@@ -229,3 +229,31 @@ func toolPathsFromContent(v any) string {
 	}
 	return strings.Join(out, "\n")
 }
+
+// commandsFromContent is claudeCommands for the reference parser.
+func commandsFromContent(v any) []string {
+	items, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, it := range items {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		if t, _ := m["type"].(string); t != "tool_use" {
+			continue
+		}
+		if n, _ := m["name"].(string); n != "Bash" {
+			continue
+		}
+		in, _ := m["input"].(map[string]any)
+		cmd, _ := in["command"].(string)
+		if cmd == "" || !worthIndexing(cmd) {
+			continue
+		}
+		out = append(out, "$ "+cmd)
+	}
+	return out
+}

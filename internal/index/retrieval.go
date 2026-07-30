@@ -974,6 +974,9 @@ func scanRecords(dir string, m Manifest, o query.Options, offsets []int64) ([]mo
 // below sources, not above it.
 const roleFiles = "files"
 
+// roleCommand mirrors sources.RoleCommand.
+const roleCommand = "command"
+
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	add := func(r Record) {
@@ -998,6 +1001,10 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		// to contain the words of a question, so it is indexed and searchable
 		// but served only when asked for by role.
 		if r.Role == roleFiles && o.Role != roleFiles {
+			return
+		}
+		// Same rule for commands: an invocation is an action, not an answer.
+		if r.Role == roleCommand && o.Role != roleCommand {
 			return
 		}
 		s := by[r.Key]
