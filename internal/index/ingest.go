@@ -631,13 +631,78 @@ func dateTokens(when time.Time) []string {
 // and indexing 1 MB of source code puts every `func` and `return` in it into
 // the postings, which cost the median query 0.5 ms for nothing.
 func tokenizedPart(role, text string) string {
-	if role != roleEdit {
+	switch role {
+	case roleEdit:
+		if i := strings.IndexByte(text, '\n'); i >= 0 {
+			return text[:i]
+		}
 		return text
-	}
-	if i := strings.IndexByte(text, '\n'); i >= 0 {
-		return text[:i]
+	case roleToolOutput:
+		return signalLines(text)
 	}
 	return text
+}
+
+// signalLines keeps the part of a command's output anyone would search for.
+//
+// A build log is mostly progress: files compiled, tests named, packages
+// downloaded. Measured over 147,575 lines of real output, 3% carry an error or
+// a warning and they are 7% of the bytes — the rest is noise that nobody
+// queries and that doubles the sessions a common word matches. Indexing all of
+// it took the commonest word in a 1150-session store from 22 ms to 59 ms.
+//
+// The full text is still stored and still served: this decides what earns
+// postings, exactly as a replaced span stores its body and indexes its path.
+func signalLines(text string) string {
+	if len(text) < signalFloor {
+		return text
+	}
+	var b strings.Builder
+	b.Grow(len(text) / 8)
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if !signalLine(line) {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+		// The line after a verdict is usually what the verdict was about — the
+		// assertion, the missing symbol, the path. Keeping the marker and
+		// dropping the explanation made a test name unfindable while its
+		// "--- FAIL" line was indexed.
+		if i+1 < len(lines) && !signalLine(lines[i+1]) {
+			b.WriteString(lines[i+1])
+			b.WriteByte('\n')
+		}
+	}
+	if b.Len() == 0 {
+		// Nothing matched: index the head rather than nothing, so a short
+		// unusual output is still findable.
+		if len(text) > signalFloor {
+			return text[:signalFloor]
+		}
+		return text
+	}
+	return b.String()
+}
+
+// signalFloor is the length below which output is indexed whole. A short
+// output is usually the answer to something — a test run, a failed build, a
+// one-line error — and filtering it costs recall on exactly the queries this
+// data exists to serve. Only the long logs get filtered: measured on a real
+// store, outputs above this threshold are 7% of the records and 74% of the
+// bytes, and they are where the posting explosion comes from.
+const signalFloor = 8192
+
+func signalLine(l string) bool {
+	for _, p := range []string{"FAIL", "fail", "Error", "error", "panic:", "fatal",
+		"Traceback", "not found", "undefined", "cannot", "refused", "denied",
+		"timeout", "exit status", "warning", "WARN", "Exception", "No such"} {
+		if strings.Contains(l, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time, tool bool) {

@@ -133,3 +133,56 @@ func TestTopTouchedFilesIsCapped(t *testing.T) {
 		t.Fatalf("stored %d paths, want the cap of %d", len(got), touchedFileCap)
 	}
 }
+
+// Tool output is indexed whole below a threshold and filtered above it. A short
+// output is usually the answer to something; a 50 KB build log is progress
+// nobody searches, and indexing all of it took the commonest word on a
+// 1150-session store from 22 ms to 57 ms.
+func TestSignalLinesKeepsShortOutputWhole(t *testing.T) {
+	short := "--- FAIL: TestRetry (0.01s)\n    retry_test.go:42: got 3 want 4\nFAIL\tpkg\t0.1s"
+	if got := tokenizedPart(roleToolOutput, short); got != short {
+		t.Fatalf("short output must be indexed whole:\n%s", got)
+	}
+}
+
+func TestSignalLinesFiltersLongLogs(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 400; i++ {
+		fmt.Fprintf(&b, "downloading github.com/example/module/v%d\n", i)
+	}
+	b.WriteString("--- FAIL: TestRetry (0.01s)\n")
+	b.WriteString("    retry_test.go:42: got 3 want 4\n")
+	got := tokenizedPart(roleToolOutput, b.String())
+	if len(got) >= b.Len() {
+		t.Fatalf("a long log should shrink: %d of %d bytes", len(got), b.Len())
+	}
+	// The verdict and the line explaining it both survive.
+	if !strings.Contains(got, "--- FAIL: TestRetry") {
+		t.Error("the verdict must be indexed")
+	}
+	if !strings.Contains(got, "retry_test.go:42") {
+		t.Error("the line after a verdict is what it was about")
+	}
+	if strings.Contains(got, "downloading github.com/example/module/v200") {
+		t.Error("progress lines are what the filter exists to drop")
+	}
+}
+
+func TestSignalLinesFallsBackWhenNothingMatches(t *testing.T) {
+	// A long output with no error-shaped line still has to be findable.
+	quiet := strings.Repeat("all quiet on the build front\n", 500)
+	got := tokenizedPart(roleToolOutput, quiet)
+	if got == "" {
+		t.Fatal("indexing nothing makes the record unreachable")
+	}
+	if len(got) > signalFloor+64 {
+		t.Fatalf("the fallback should be bounded, got %d bytes", len(got))
+	}
+}
+
+func TestSignalLinesLeavesOtherRolesAlone(t *testing.T) {
+	long := strings.Repeat("a sentence someone actually typed. ", 500)
+	if got := tokenizedPart("assistant", long); got != long {
+		t.Fatal("speech is indexed whole however long it is")
+	}
+}

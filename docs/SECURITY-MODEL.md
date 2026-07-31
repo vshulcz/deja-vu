@@ -24,8 +24,9 @@ tools printed, and the exact spans its edits replaced. Replaced spans are
 verbatim source from the user's own files, kept so a lost change can be handed
 back. All of it goes through the same redaction pass as conversation text, which
 matters more here than elsewhere: command output carries credentials far more
-often than prose does. `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0` and
-`DEJA_INDEX_EDITS=0` each disable one of these at ingest.
+often than prose does. `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`,
+`DEJA_INDEX_EDITS=0` and `DEJA_INDEX_TOOL_OUTPUT=0` each disable one of these at
+ingest.
 
 ### Local writes
 

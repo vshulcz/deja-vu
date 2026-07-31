@@ -114,3 +114,66 @@ insert into part values('p3','m1','{"type":"tool","tool":"apply_patch","state":{
 		t.Fatalf("edits = %v", edits)
 	}
 }
+
+func TestOpencodeIndexesCommandOutputAndExitStatus(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	tmp := t.TempDir()
+	db := filepath.Join(tmp, "opencode.db")
+	script := `create table session(id text, directory text, time_created any, time_updated any);
+create table message(id text, session_id text, time_created any, data text);
+create table part(id text, message_id text, data text);
+insert into session values('s1','/w','2026-01-02T03:00:00Z','2026-01-03T03:00:00Z');
+insert into message values('m1','s1',1767409200000,'{"role":"assistant"}');
+insert into part values('p1','m1','{"type":"tool","tool":"bash","state":{"input":{"command":"go test ./pkg/"},"output":"--- FAIL: TestRetry\nFAIL\tpkg 0.1s","metadata":{"exit":1}},"time":{"start":"2026-01-02T03:00:00Z"}}');
+insert into part values('p2','m1','{"type":"tool","tool":"bash","state":{"input":{"command":"go build ./..."},"output":"","metadata":{"exit":0}},"time":{"start":"2026-01-02T03:00:01Z"}}');
+insert into part values('p3','m1','{"type":"tool","tool":"read","state":{"input":{"filePath":"/w/big.go"},"output":"package main\n// thousands of lines of file content"},"time":{"start":"2026-01-02T03:00:02Z"}}');`
+	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite setup: %v %s", err, out)
+	}
+	ss, err := ParseOpencodeDB(db)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("len=%d err=%v", len(ss), err)
+	}
+	var cmds, outs []string
+	for _, m := range ss[0].Messages {
+		switch m.Role {
+		case RoleCommand:
+			cmds = append(cmds, m.Text)
+		case RoleToolOutput:
+			outs = append(outs, m.Text)
+		}
+	}
+	// A failure carries its status; a success does not — saying "exit 0" on
+	// every passing run is noise, and zero is the default reading.
+	if len(cmds) != 2 {
+		t.Fatalf("commands = %v", cmds)
+	}
+	if !strings.Contains(cmds[0], "→ exit 1") {
+		t.Errorf("a non-zero exit belongs on the command: %q", cmds[0])
+	}
+	if strings.Contains(cmds[1], "exit") {
+		t.Errorf("a successful run needs no annotation: %q", cmds[1])
+	}
+	// The output of a command is indexed; the body of a file read is not —
+	// file contents are 119 MB against 49 MB of command output on a real store.
+	if len(outs) != 1 || !strings.Contains(outs[0], "--- FAIL") {
+		t.Fatalf("tool output = %v", outs)
+	}
+	for _, o := range outs {
+		if strings.Contains(o, "thousands of lines") {
+			t.Error("read bodies must not be indexed as tool output")
+		}
+	}
+}
+
+func TestExitCodeReadsEveryShapeSQLiteEmits(t *testing.T) {
+	for in, want := range map[any]int{
+		float64(1): 1, float64(0): 0, "127": 127, "": 0, nil: 0, "junk": 0,
+	} {
+		if got := exitCode(in); got != want {
+			t.Errorf("exitCode(%#v) = %d, want %d", in, got, want)
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,6 +95,13 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`json_extract(p.data,'$.state.input.filePath') as path,` +
 		`json_extract(p.data,'$.state.input.command') as cmd,` +
 		`json_extract(p.data,'$.state.input.patchText') as patch,` +
+		// The output of a bash call and its exit status. Only bash: `read`
+		// output is 119 MB of file contents on this store against 49 MB of
+		// command output, and #547 measured file bodies as the weakest slice
+		// deja could index. What a command printed is where the errors live.
+		`case when json_extract(p.data,'$.tool')='bash' ` +
+		`then json_extract(p.data,'$.state.output') end as out,` +
+		`json_extract(p.data,'$.state.metadata.exit') as exit,` +
 		`json_extract(p.data,'$.time.start') as pt,` +
 		`json_extract(m.data,'$.time.created') as mt ` +
 		`from session s join message m on m.session_id=s.id join part p on p.message_id=m.id ` +
@@ -180,10 +188,28 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: path, Time: t})
 			continue
 		}
-		if cmd := str(r["cmd"]); cmd != "" && IndexCommands() && worthIndexing(cmd) {
+		if cmd := str(r["cmd"]); cmd != "" {
 			t := partTime(r)
-			s.Touch(t)
-			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+			if IndexCommands() && worthIndexing(cmd) {
+				// A non-zero exit rides with the command. opencode records it on
+				// 99% of runs, which is the one thing Claude's transcripts
+				// cannot give: there the verdict has to be inferred from output
+				// text and only ~17% of runs can be scored. Zero is left off —
+				// it is the common case, and saying so on 18,000 records would
+				// be noise rather than information.
+				line := "$ " + cmd
+				if code := exitCode(r["exit"]); code > 0 {
+					line += fmt.Sprintf("  → exit %d", code)
+				}
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: line, Time: t})
+			}
+			// The output is a separate record under the same role Claude's tool
+			// results use, so `--role tool-output` means the same thing on both.
+			if out := str(r["out"]); out != "" && IndexToolOutput() {
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
+			}
 			continue
 		}
 		if patch := str(r["patch"]); patch != "" && IndexEdits() {
@@ -312,4 +338,32 @@ func patchSpans(patch string) []string {
 	}
 	flush()
 	return out
+}
+
+// IndexToolOutput reports whether what a command printed is indexed. On by
+// default: it is where errors live, and every feature that reasons about what
+// went wrong needs it. Off is for people who want a smaller index — measured at
+// 49 MB of bash output on a 1150-session store.
+func IndexToolOutput() bool { return os.Getenv("DEJA_INDEX_TOOL_OUTPUT") != "0" }
+
+// exitCode reads the status opencode records for a command. sqlite3 -json
+// hands numbers back as json.Number or float64 depending on the shape.
+func exitCode(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case json.Number:
+		i, err := n.Int64()
+		if err != nil {
+			return 0
+		}
+		return int(i)
+	case string:
+		i, err := strconv.Atoi(n)
+		if err != nil {
+			return 0
+		}
+		return i
+	}
+	return 0
 }

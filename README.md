@@ -324,7 +324,7 @@ limits, trust assumptions, and release verification.
 
 Custom locations via `DEJA_CLAUDE_ROOT`, `DEJA_CODEX_ROOT`, `DEJA_OPENCODE_DB`, `DEJA_AIDER_ROOTS`, `DEJA_GEMINI_ROOT`, `DEJA_CURSOR_ROOT`, `DEJA_CURSOR_CLI_ROOT`, `DEJA_ANTIGRAVITY_ROOT`, `DEJA_GROK_ROOT`, `DEJA_QWEN_ROOT`, `DEJA_INDEX_DIR`. Each agent's own relocation variable is honored too: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GEMINI_CLI_HOME`, `CURSOR_CONFIG_DIR`, `GROK_HOME`, `AIDER_CHAT_HISTORY_FILE`, and `XDG_DATA_HOME` for opencode on Linux.
 
-deja also indexes what the agent did — the file paths its tool calls named, the commands it ran, and the spans its edits replaced. Each can be turned off at ingest: `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_EDITS=0`. They go through the same redaction pass as conversation text.
+deja also indexes what the agent did — the file paths its tool calls named, the commands it ran with their exit status, what those commands printed, and the spans its edits replaced. Each can be turned off at ingest: `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`, `DEJA_INDEX_EDITS=0`, `DEJA_INDEX_TOOL_OUTPUT=0`. They go through the same redaction pass as conversation text.
 
 `DEJA_RECALL=safe` is the default: SessionStart recall stays in the current project, filters weak or duplicate results, prefers the last 90 days, and injects at most 2KB. `DEJA_RECALL=aggressive` searches across projects and raises the injection cap to 4KB. `DEJA_RECALL=off` disables SessionStart recall output.
 
