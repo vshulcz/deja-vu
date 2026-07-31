@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"io/fs"
 	"strings"
 	"testing"
 	"time"
@@ -52,5 +54,29 @@ func TestParseDurExplainsItselfOnJunk(t *testing.T) {
 		if !strings.Contains(err.Error(), "30d") {
 			t.Errorf("parseDur(%q) should say what is accepted: %v", in, err)
 		}
+	}
+}
+
+func TestEnsureErrorSaysWhatToChange(t *testing.T) {
+	// A denied write surfaced as `ensure: open /…/index.db.lock: permission
+	// denied` — an internal lock path and a syscall error, neither of which
+	// tells the reader what to do.
+	err := ensureError("/some/index.db", fs.ErrPermission)
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	got := err.Error()
+	for _, want := range []string{"/some/index.db", "permissions", "DEJA_INDEX_DIR"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("message should mention %q: %s", want, got)
+		}
+	}
+	if strings.Contains(got, ".lock") {
+		t.Errorf("the lock file is deja's business, not the reader's: %s", got)
+	}
+	// Anything else keeps its original wording rather than being guessed at.
+	other := ensureError("/x", errors.New("disk on fire"))
+	if !strings.Contains(other.Error(), "disk on fire") {
+		t.Errorf("unrelated failures must not be rewritten: %v", other)
 	}
 }

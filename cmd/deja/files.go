@@ -71,7 +71,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	q := strings.Join(terms, " ")
 	o := search.Options{Query: q, All: true, Project: project}
 	if err := index.EnsureForSearch(dir, o, false, nil); err != nil {
-		return fmt.Errorf("ensure: %w", err)
+		return ensureError(dir, err)
 	}
 	hits, err := index.Search(dir, o)
 	if err != nil {

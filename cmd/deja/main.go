@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -385,7 +387,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
 	if err := withBuildProgress(func() error { return index.EnsureForSearch(dir, o, force, os.Stderr) }); err != nil {
-		return fmt.Errorf("ensure: %w", err)
+		return ensureError(dir, err)
 	}
 	maybeFirstIndexGreeting(dir)
 	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
@@ -1071,6 +1073,20 @@ func noAgentHistoryFound() bool {
 		}
 	}
 	return true
+}
+
+// ensureError turns an index-build failure into something a reader can act on.
+// A denied write surfaced as `ensure: open /…/index.db.lock: permission denied`
+// — the path of an internal lock file and a syscall error, which says nothing
+// about what to change.
+func ensureError(dir string, err error) error {
+	if errors.Is(err, fs.ErrPermission) {
+		if dir == "" {
+			dir = index.DefaultDir()
+		}
+		return fmt.Errorf("cannot write the index at %s — check the directory's permissions, or point DEJA_INDEX_DIR somewhere writable", dir)
+	}
+	return fmt.Errorf("ensure: %w", err)
 }
 
 // searchValueFlags take a value, so "--flag=value" has to become two arguments
