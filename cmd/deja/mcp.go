@@ -268,8 +268,54 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	if !o.All && len(hits) > limit {
 		hits = hits[:limit]
 	}
-	b, err := json.Marshal(hits)
-	return string(b), err
+	// Strip the embedded transcript. A hit carries the whole session, messages
+	// and all, so one blame call returned 495 KB into an agent's context —
+	// against the ~4 KB the other tools answer in. The snippets that sit beside
+	// it are the part an agent reads; the full session is one recall_context
+	// away when it genuinely needs it.
+	return string(mustMarshalBlame(hits)), nil
+}
+
+// blameHitJSON is what the MCP blame tool returns: the same shape as the CLI's
+// --json minus the session's message list.
+type blameHitJSON struct {
+	Session  blameSessionJSON `json:"session"`
+	Title    string           `json:"title,omitempty"`
+	Count    int              `json:"count"`
+	Score    float64          `json:"score"`
+	Tier     string           `json:"tier,omitempty"`
+	Snippets []string         `json:"snippets,omitempty"`
+}
+
+type blameSessionJSON struct {
+	ID      string    `json:"id"`
+	Harness string    `json:"harness"`
+	Project string    `json:"project,omitempty"`
+	Path    string    `json:"path,omitempty"`
+	Title   string    `json:"title,omitempty"`
+	Started time.Time `json:"started,omitempty"`
+	Updated time.Time `json:"updated,omitempty"`
+	Touched []string  `json:"touched,omitempty"`
+}
+
+func mustMarshalBlame(hits []search.BlameHit) []byte {
+	out := make([]blameHitJSON, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, blameHitJSON{
+			Session: blameSessionJSON{
+				ID: h.Session.ID, Harness: h.Session.Harness, Project: h.Session.Project,
+				Path: h.Session.Path, Title: h.Session.Title,
+				Started: h.Session.Started, Updated: h.Session.Updated, Touched: h.Session.Touched,
+			},
+			Title: h.Session.Title, Count: h.Count, Score: h.Score,
+			Tier: h.Tier, Snippets: h.Snippets,
+		})
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return []byte("[]")
+	}
+	return b
 }
 
 // attachAnswers puts the decision next to the question.
