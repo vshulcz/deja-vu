@@ -1,7 +1,6 @@
 package main
 
 import (
-	"sort"
 	"strings"
 	"time"
 
@@ -45,12 +44,17 @@ func findReusedMemory(dir string) (reusedMemory, bool) {
 	if err != nil {
 		return reusedMemory{}, false
 	}
-	// The usage log keys sessions by id alone, while the manifest keys them by
-	// harness and id, so both forms have to resolve.
-	byKey := make(map[string]index.SessionMeta, len(metas)*2)
+	// The usage log records a bare session id (cmd/deja/mcp.go logs
+	// h.Session.ID), while the manifest keys sessions by harness and id. So the
+	// lookup is by id — and an id carried by two harnesses is ambiguous in a
+	// way no tie-break can fix: the recall count under that id is the *sum* of
+	// both sessions, so naming either one attaches a number that belongs to
+	// two. Those ids are dropped rather than guessed. Latent on this store
+	// (1153 sessions, 1153 distinct ids), but a duplicate makes the answer
+	// flip between runs on identical data, because the metas come out of a map.
+	byID := make(map[string][]index.SessionMeta, len(metas))
 	for _, m := range metas {
-		byKey[m.Harness+":"+m.ID] = m
-		byKey[m.ID] = m
+		byID[m.ID] = append(byID[m.ID], m)
 	}
 	cutoff := time.Now().Add(-reusedSettleAge)
 	var best reusedMemory
@@ -59,11 +63,17 @@ func findReusedMemory(dir string) (reusedMemory, bool) {
 		if times < reusedMinTimes {
 			continue
 		}
-		m, ok := byKey[key]
-		if !ok || strings.TrimSpace(m.Title) == "" {
+		found := byID[key]
+		if len(found) != 1 {
 			continue
 		}
-		if !m.Updated.Before(cutoff) {
+		m := found[0]
+		if strings.TrimSpace(m.Title) == "" {
+			continue
+		}
+		// A session with no parseable timestamp is not old, it is undated —
+		// the zero time passes any cutoff and then prints as "Jan 1 0001".
+		if m.Updated.IsZero() || !m.Updated.Before(cutoff) {
 			continue
 		}
 		if times > best.Times || (times == best.Times && key < bestKey) {
@@ -75,43 +85,4 @@ func findReusedMemory(dir string) (reusedMemory, bool) {
 		return reusedMemory{}, false
 	}
 	return best, true
-}
-
-// reusedTitles are the sessions worth naming, most-reused first — used where
-// several fit rather than one.
-func reusedTitles(dir string, n int) []reusedMemory {
-	worn := usage.WornSessions(dir)
-	metas, err := index.AllMeta(dir)
-	if err != nil {
-		return nil
-	}
-	byKey := make(map[string]index.SessionMeta, len(metas)*2)
-	for _, m := range metas {
-		byKey[m.Harness+":"+m.ID] = m
-		byKey[m.ID] = m
-	}
-	cutoff := time.Now().Add(-reusedSettleAge)
-	var out []reusedMemory
-	seen := map[string]bool{}
-	for key, times := range worn {
-		m, ok := byKey[key]
-		if times < reusedMinTimes || !ok || strings.TrimSpace(m.Title) == "" {
-			continue
-		}
-		if !m.Updated.Before(cutoff) || seen[m.Title] {
-			continue
-		}
-		seen[m.Title] = true
-		out = append(out, reusedMemory{Title: m.Title, Times: times, Age: m.Updated})
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Times != out[j].Times {
-			return out[i].Times > out[j].Times
-		}
-		return out[i].Title < out[j].Title
-	})
-	if n > 0 && len(out) > n {
-		out = out[:n]
-	}
-	return out
 }

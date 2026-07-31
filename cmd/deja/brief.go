@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -114,7 +116,11 @@ func runBrief(dir string, w io.Writer) error {
 	// person repeats to a colleague (#579).
 	if r, ok := findReusedMemory(dir); ok {
 		fmt.Fprintf(w, "reused     %s%s%s\n", bold, trimBriefTitle(r.Title), reset)
-		fmt.Fprintf(w, "           %s%d× by agents · last worked %s%s\n", dim, r.Times, search.RelativeDate(r.Age), reset)
+		// Not "by agents": the count includes the déjà vu events written when
+		// the user's own prompt returns to the same ground, which is a person
+		// coming back rather than an agent pulling. And not "so far": the
+		// usage log keeps a rolling window, so the count is recent history.
+		fmt.Fprintf(w, "           %s%d× re-used recently · last worked %s%s\n", dim, r.Times, search.RelativeDate(r.Age), reset)
 	}
 
 	// The other line drawn from the reader's own data rather than from a
@@ -155,7 +161,20 @@ func pluralS(n int) string {
 	return "s"
 }
 
+// trimBriefTitle bounds a title for the brief and strips what a terminal would
+// act on rather than print. Titles are user-typed text arriving verbatim: a
+// carriage return rewinds the line, an escape recolours the rest of the
+// screen, a bell rings on every refresh. The `recent` lines have printed them
+// raw since they existed; this is one place for all of them (#634 set the same
+// rule for the status bar).
 func trimBriefTitle(t string) string {
+	t = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, t)
+	t = strings.Join(strings.Fields(t), " ")
 	r := []rune(t)
 	if len(r) > 44 {
 		return string(r[:44]) + "…"

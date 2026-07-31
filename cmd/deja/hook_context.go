@@ -180,7 +180,7 @@ func runHookContext(dir string, plain bool) error {
 		// on a screen someone has to decide to open (#579).
 		earned := ""
 		if r, ok := findReusedMemory(dir); ok {
-			earned = fmt.Sprintf(" · most re-used so far: %q, %d×", trimBriefTitle(r.Title), r.Times)
+			earned = fmt.Sprintf(" · most re-used recently: %q, %d×", trimBriefTitle(r.Title), r.Times)
 		}
 		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote, earned)
 	}
