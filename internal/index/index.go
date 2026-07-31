@@ -19,7 +19,10 @@ import (
 // the copies it already holds.
 // 18: file paths from tool calls are indexed (#558). An index built before this
 // has none of them, so it is rebuilt rather than reused.
-const version = 19
+// 20: opencode tool output is parsed (#621) and each session records what it
+// tripped over (#576). An index built before this has neither, and neither can
+// be derived from what it does hold.
+const version = 20
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -101,6 +104,11 @@ type SessionMeta struct {
 	// The field is additive: a manifest written before it existed decodes with
 	// it empty and the caller degrades to saying nothing.
 	Touched []string `json:",omitempty"`
+	// Hit holds hashes of the specific errors this session tripped over, so
+	// the first screen can name a wall the machine keeps running into without
+	// reading a single session. Same trade as Asked: the text is recovered
+	// from the two or three sessions that matched.
+	Hit []uint64 `json:",omitempty"`
 }
 
 // touchedFileCap bounds what goes in SessionMeta.Touched. Enough to say

@@ -109,6 +109,16 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintf(w, "before     %s%s%s\n", dim, askedWhen(a), reset)
 	}
 
+	// The other line drawn from the reader's own data rather than from a
+	// counter: a wall this machine keeps running into. Manifest-only, like the
+	// asked line above it — the command that reports the full list reads the
+	// record log, which is a hundred times this screen's budget.
+	if f, ok := index.FindFriction(dir); ok {
+		fmt.Fprintf(w, "hit        %s%s%s\n", bold, trimBriefTitle(f.Text), reset)
+		fmt.Fprintf(w, "again      %s%d sessions · last %s · deja friction%s\n",
+			dim, len(f.Sessions), search.RelativeDate(f.Last), reset)
+	}
+
 	// The greeting printed on a first build already ends with this exact
 	// suggestion. Printing it twice on the one screen that has to be legible
 	// is worse than not printing it at all.

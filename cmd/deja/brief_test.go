@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,5 +123,50 @@ func TestBriefReplacesAQuietWeekWithTheSpanItHolds(t *testing.T) {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("a zero line survived: %q\n%s", unwanted, got)
 		}
+	}
+}
+
+// The first screen names a wall and the count beside it; running the command
+// it points at must produce the same number, or the tool reads as broken.
+func TestBriefNamesTheWallAndAgreesWithTheCommand(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-f")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	for i := 0; i < index.FrictionMinSessions; i++ {
+		sid := fmt.Sprintf("wf%02d", i)
+		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/f","timestamp":"2026-07-2` +
+			fmt.Sprint(i) + `T10:00:00Z","message":{"role":"user","content":"run the linters"}}` + "\n" +
+			`{"type":"user","sessionId":"` + sid + `","cwd":"/w/f","timestamp":"2026-07-2` +
+			fmt.Sprint(i) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
+			`"content":"zsh:` + fmt.Sprint(i+1) + `: command not found: shellcheck"}]}}` + "\n"
+		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var brief bytes.Buffer
+	if err := runBrief(dir, &brief); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(brief.String(), "command not found: shellcheck") {
+		t.Fatalf("the wall is missing from the first screen:\n%s", brief.String())
+	}
+	want := fmt.Sprintf("%d sessions", index.FrictionMinSessions)
+	if !strings.Contains(brief.String(), want) {
+		t.Fatalf("want %q on the screen:\n%s", want, brief.String())
+	}
+	var cmd bytes.Buffer
+	if err := runFriction(dir, nil, &cmd); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cmd.String(), want) {
+		t.Fatalf("the command disagrees with the screen:\n%s", cmd.String())
 	}
 }

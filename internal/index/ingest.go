@@ -786,7 +786,7 @@ func metaForSession(s model.Session) SessionMeta {
 	// composer name, the first user message — and are persisted in
 	// sessions.gob, so they need the same scrubbing as record text.
 	title, _ = redact.Text(title)
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages)}
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages)}
 }
 
 // agentOwnedFile drops the agent's own working files. They are touched

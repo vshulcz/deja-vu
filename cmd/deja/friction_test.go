@@ -12,59 +12,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-func TestFrictionLineKeepsSpecificErrors(t *testing.T) {
-	for _, l := range []string{
-		"zsh:1: command not found: shellcheck",
-		"ModuleNotFoundError: No module named 'yaml'",
-		"internal/index/store.go:41:2: undefined: signalLines",
-		"dial tcp 127.0.0.1:5432: connect: connection refused",
-	} {
-		if !frictionLine(normalizeFriction(l)) {
-			t.Errorf("dropped a specific error: %q", l)
-		}
-	}
-	for _, l := range []string{
-		"Traceback (most recent call last):",
-		"Error: exit status 1",
-		"--- FAIL: TestThing (0.01s)",
-		"not found",                          // too short to name anything
-		`echo "❌ App not found: $APP"`,       // source, not a result
-		`  9 sessions  command not found: x`, // this command's own output
-		"ok  github.com/vshulcz/deja-vu/internal/index  1.2s",
-	} {
-		if frictionLine(normalizeFriction(l)) {
-			t.Errorf("kept a line that names nothing: %q", l)
-		}
-	}
-}
-
-// The same missing command reaches the corpus under three shell prefixes. Left
-// unnormalized each lands below the threshold and none of them is ever
-// reported, which is the bug this function exists for.
-func TestNormalizeFrictionStripsShellPosition(t *testing.T) {
-	want := "command not found: timeout"
-	for _, l := range []string{
-		"zsh:1: command not found: timeout",
-		"(eval):2: command not found: timeout",
-		"  bash:15: command not found: timeout  ",
-	} {
-		if got := normalizeFriction(l); got != want {
-			t.Errorf("normalize(%q) = %q, want %q", l, got, want)
-		}
-	}
-	// A colon that is not a line number keeps the line intact — a Go compile
-	// error names its file and column and both matter.
-	for _, l := range []string{
-		"sh: tsc: command not found",
-		"Error: cannot find module x: y",
-		"ModuleNotFoundError: No module named 'PIL'",
-	} {
-		if got := normalizeFriction(l); got != l {
-			t.Errorf("normalize(%q) = %q, want it unchanged", l, got)
-		}
-	}
-}
-
 func TestTrimFriction(t *testing.T) {
 	long := strings.Repeat("x", 90)
 	got := trimFriction(long)
@@ -133,7 +80,7 @@ func frictionEnv(t *testing.T) string {
 
 func TestFrictionReportsRecurringErrors(t *testing.T) {
 	root := frictionEnv(t)
-	writeFrictionCorpus(t, root, frictionMinSessions)
+	writeFrictionCorpus(t, root, index.FrictionMinSessions)
 	var buf bytes.Buffer
 	if err := runFriction(index.DefaultDir(), nil, &buf); err != nil {
 		t.Fatal(err)
@@ -145,7 +92,7 @@ func TestFrictionReportsRecurringErrors(t *testing.T) {
 	if !strings.Contains(out, "claude") {
 		t.Fatalf("the harness is missing:\n%s", out)
 	}
-	if !strings.Contains(out, fmt.Sprintf("%d sessions", frictionMinSessions)) {
+	if !strings.Contains(out, fmt.Sprintf("%d sessions", index.FrictionMinSessions)) {
 		t.Fatalf("wrong session count:\n%s", out)
 	}
 	// exit status 127 sits beside the error in every one of those sessions and
@@ -159,7 +106,7 @@ func TestFrictionReportsRecurringErrors(t *testing.T) {
 // store, which is the whole reason for the threshold.
 func TestFrictionStaysQuietBelowThreshold(t *testing.T) {
 	root := frictionEnv(t)
-	writeFrictionCorpus(t, root, frictionMinSessions-1)
+	writeFrictionCorpus(t, root, index.FrictionMinSessions-1)
 	var buf bytes.Buffer
 	if err := runFriction(index.DefaultDir(), nil, &buf); err != nil {
 		t.Fatal(err)
@@ -171,7 +118,7 @@ func TestFrictionStaysQuietBelowThreshold(t *testing.T) {
 
 func TestFrictionLimit(t *testing.T) {
 	root := frictionEnv(t)
-	writeFrictionCorpus(t, root, frictionMinSessions)
+	writeFrictionCorpus(t, root, index.FrictionMinSessions)
 	var buf bytes.Buffer
 	if err := runFriction(index.DefaultDir(), []string{"--limit", "1"}, &buf); err != nil {
 		t.Fatal(err)

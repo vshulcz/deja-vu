@@ -23,14 +23,6 @@ import (
 //
 // So this reports friction, not knowledge, and it is deliberately a small
 // claim: the same specific error, in N separate sessions.
-const (
-	// frictionMinSessions is how many separate sessions must hit an error
-	// before it is worth saying. Twice is a coincidence; three times is the
-	// machine telling you something.
-	frictionMinSessions = 3
-	frictionLineMin     = 20
-	frictionLineMax     = 120
-)
 
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
@@ -61,8 +53,8 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		key := meta.Harness + ":" + meta.ID
 		sessions[key] = true
 		for _, line := range strings.Split(r.Text, "\n") {
-			line = normalizeFriction(line)
-			if !frictionLine(line) {
+			line, ok := index.FrictionLine(line)
+			if !ok {
 				continue
 			}
 			s := found[line]
@@ -88,7 +80,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	}
 	var rows []row
 	for line, s := range found {
-		if len(s.sessions) < frictionMinSessions {
+		if len(s.sessions) < index.FrictionMinSessions {
 			continue
 		}
 		hs := make([]string, 0, len(s.harness))
@@ -106,7 +98,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	})
 	if len(rows) == 0 {
 		fmt.Fprintf(stdout, "nothing recurring in %d session%s — no error hit %d separate sessions\n",
-			len(sessions), pluralS(len(sessions)), frictionMinSessions)
+			len(sessions), pluralS(len(sessions)), index.FrictionMinSessions)
 		return nil
 	}
 	if len(rows) > limit {
@@ -123,75 +115,6 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout)
 	}
 	return nil
-}
-
-// normalizeFriction strips the shell's position prefix so the same missing
-// command counts once. `zsh:1: command not found: timeout` and
-// `(eval):2: command not found: timeout` are one piece of friction; left
-// alone they were three separate rows, each below the threshold that would
-// have reported any of them.
-func normalizeFriction(l string) string {
-	l = strings.TrimSpace(l)
-	// The prefix is `<where>:<line>: `, where <where> is a shell name or an
-	// `(eval)`/`(anon)` marker. Only strip it when the middle field is a
-	// number — `Error: cannot find x: y` must keep its shape.
-	first := strings.Index(l, ":")
-	if first <= 0 || first > 16 {
-		return l
-	}
-	rest := l[first+1:]
-	second := strings.Index(rest, ": ")
-	if second <= 0 {
-		return l
-	}
-	if _, err := strconv.Atoi(rest[:second]); err != nil {
-		return l
-	}
-	return strings.TrimSpace(rest[second+2:])
-}
-
-// frictionLine keeps the error shapes that name something specific. The
-// generic ones carry no information — every Python failure prints `Traceback
-// (most recent call last):`, and clustering those put an empty line at the top
-// of every measurement this feature was built from.
-func frictionLine(l string) bool {
-	if len(l) < frictionLineMin || len(l) > frictionLineMax {
-		return false
-	}
-	for _, generic := range []string{
-		"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL",
-	} {
-		if strings.HasPrefix(l, generic) {
-			return false
-		}
-	}
-	// Tool output carries source as often as it carries results — a `cat` of a
-	// script, a diff, a heredoc. An `echo "App not found: $APP"` inside a
-	// deploy script reached second place on the first run: it is a line about
-	// an error, not an error.
-	for _, source := range []string{"echo ", "\"", "$(", "=~", "print("} {
-		if strings.Contains(l, source) {
-			return false
-		}
-	}
-	// This command's own output is tool output in the next session, and every
-	// line of it contains an error by construction. Drop the report shape so
-	// running it does not slowly teach it about itself.
-	if i := strings.Index(l, " sessions  "); i > 0 {
-		if _, err := strconv.Atoi(strings.TrimSpace(l[:i])); err == nil {
-			return false
-		}
-	}
-	for _, p := range []string{
-		"command not found", "ModuleNotFoundError", "No module named",
-		"not found: ", "cannot find", "no such file or directory",
-		"undefined:", "connection refused", "permission denied",
-	} {
-		if strings.Contains(l, p) {
-			return true
-		}
-	}
-	return false
 }
 
 func trimFriction(l string) string {
