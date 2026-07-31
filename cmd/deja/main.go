@@ -123,6 +123,7 @@ var commands = map[string]command{
 	"handoff":         func(dir string, rest []string) error { return runHandoff(dir, rest, os.Stdout) },
 	"files":           func(dir string, rest []string) error { return runFiles(dir, rest, os.Stdout) },
 	"restore":         func(dir string, rest []string) error { return runRestore(dir, rest, os.Stdout) },
+	"friction":        func(dir string, rest []string) error { return runFriction(dir, rest, os.Stdout) },
 	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,
@@ -1032,6 +1033,8 @@ Usage:
   deja view          (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
+  deja files <topic> [--project name] [--limit n]
+  deja friction [--limit n]
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]

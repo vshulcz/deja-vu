@@ -134,6 +134,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
 | **Restore** | `deja restore <path>` — hand back a span an agent replaced, from the `old_string` its edit recorded; never writes over the original |
 | **Files** | `deja files <topic>` — the other direction: which files the work on a subject actually touched, ranked by how specific they are to it |
+| **Friction** | `deja friction` — the errors this machine keeps hitting across sessions: a missing tool, an uninstalled module, a command that does not exist here |
 | **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
 
 ## Privacy
@@ -169,6 +170,7 @@ $ deja "jwt refresh token"
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
 | `deja restore <path>` | List the spans an agent replaced in that file, newest first, and print or write one back with `--span n [-o file]`. Output is what the agent recorded, not the file, and a span that passed through redaction says so. |
 | `deja files <topic>` | Which files were opened or edited while that subject was being worked on. Ranked by how specific a file is to the topic, so a file every session touches does not win. `--project`, `--limit`. |
+| `deja friction` | Errors that hit three or more separate sessions, newest occurrence and harnesses named. Specific failures only — a missing binary, an uninstalled Python module — not `Traceback` or `exit status 1`. `--limit`. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
 | `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
