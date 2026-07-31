@@ -59,3 +59,60 @@ func TestEachToolOutputOnMissingStore(t *testing.T) {
 		t.Fatal("a missing store should report an error")
 	}
 }
+
+// recordsForKey skips the body of records belonging to other sessions. It must
+// still return exactly what a full decode of the log would have returned for
+// this one — the shortcut is a decode it avoids, not a record it drops.
+func TestRecordsForKeyMatchesAFullScan(t *testing.T) {
+	tmp := t.TempDir()
+	proj := filepath.Join(tmp, "claude", "-tmp-keys")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, sid := range []string{"k1", "k2"} {
+		lines := []string{
+			`{"type":"user","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"first turn in ` + sid + `"}}`,
+			`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"answer for ` + sid + `"}}`,
+		}
+		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "records.bin")
+	tbl := tablesFromManifest(m)
+	for key := range m.Sessions {
+		var want []Record
+		if err := eachRecord(path, tbl, func(r Record) {
+			if r.Key == key {
+				want = append(want, r)
+			}
+		}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := recordsForKey(path, tbl, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != len(want) || len(want) == 0 {
+			t.Fatalf("%s: got %d records, full scan found %d", key, len(got), len(want))
+		}
+		for i := range want {
+			if got[i].Text != want[i].Text || got[i].Role != want[i].Role || !got[i].Time.Equal(want[i].Time) {
+				t.Fatalf("%s record %d differs: %#v vs %#v", key, i, got[i], want[i])
+			}
+		}
+	}
+}

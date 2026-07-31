@@ -986,12 +986,14 @@ func truncateTitle(s string, n int) string {
 	return strings.TrimSpace(string(r[:n])) + "…"
 }
 
+// recordsForKey collects one session's records. It peeks the key field and
+// skips the body of everything else: decoding all of them to keep a few
+// hundred cost 300 ms per session on an 80 MB log, paid twice on every bare
+// `deja` by the two lines that recover text from a hash (#625).
 func recordsForKey(path string, t *recordTables, key string) ([]Record, error) {
 	var out []Record
-	err := eachRecord(path, t, func(r Record) {
-		if r.Key == key {
-			out = append(out, r)
-		}
+	err := eachRecordForKeys(path, t, map[string]bool{key: true}, func(r Record) {
+		out = append(out, r)
 	})
 	return out, err
 }

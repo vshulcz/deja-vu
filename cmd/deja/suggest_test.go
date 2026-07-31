@@ -77,3 +77,47 @@ func TestSuggestPhraseTokensMarksGaps(t *testing.T) {
 		t.Fatalf("got %q, want the dropped word marked", got)
 	}
 }
+
+// The suggestion is scored on what people typed, not on what the agents wrote
+// back. A subject the assistant repeats in every session is still distinctive
+// if the person only raised it twice — and the change that made this true is
+// also what took the line from 2.2 s to 0.19 s (#625).
+func TestSuggestScoresUserTurnsNotAssistantEcho(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-e")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	const now = "2026-07-20T10:00:00Z"
+	user := func(id, text string) string {
+		return `{"type":"user","sessionId":"` + id + `","cwd":"/w/e","timestamp":"` + now +
+			`","message":{"role":"user","content":"` + text + `"}}` + "\n"
+	}
+	assistant := func(id, text string) string {
+		return `{"type":"assistant","sessionId":"` + id + `","cwd":"/w/e","timestamp":"` + now +
+			`","message":{"role":"assistant","content":"` + text + `"}}` + "\n"
+	}
+	// The agent echoes "quantum harvester" in all five sessions; the person
+	// raised it in two. Counting the echo would score it as common and the
+	// suggestion would fall back to filler.
+	files := map[string]string{
+		"e1": user("e1", "quantum harvester latency spike") + assistant("e1", "the quantum harvester is fine"),
+		"e2": user("e2", "quantum harvester retries again") + assistant("e2", "the quantum harvester is fine"),
+		"e3": user("e3", "please update readme wording") + assistant("e3", "the quantum harvester is fine"),
+		"e4": user("e4", "update readme header image") + assistant("e4", "the quantum harvester is fine"),
+		"e5": user("e5", "update readme badges please") + assistant("e5", "the quantum harvester is fine"),
+	}
+	for id, body := range files {
+		if err := os.WriteFile(filepath.Join(root, id+".jsonl"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := suggestFirstQuery(dir); !strings.Contains(got, "quantum") {
+		t.Fatalf("suggestion = %q, want the subject the person raised", got)
+	}
+}

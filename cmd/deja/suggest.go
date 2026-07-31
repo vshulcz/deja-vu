@@ -15,17 +15,25 @@ import (
 // print after the first index build: counts impress, but seeing your own
 // three-week-old problem come back is the argument. Empty string means "use
 // the generic hint" — a thin corpus never gets a made-up suggestion.
+// Both halves read the user role only. That is what the suggestion is made of
+// — a phrase someone would type — and it is also what makes this affordable on
+// the first screen: tokenizing every message in the store to score a two-word
+// phrase cost 2.2 s of the brief's 3.2 s, against 0.19 s for the turns a person
+// actually wrote (#625).
 func suggestFirstQuery(dir string) string {
-	ss, err := index.SearchWithRecovery(dir, query.Options{All: true}, nil)
+	ss, err := index.SearchWithRecovery(dir, query.Options{All: true, Role: "user"}, nil)
 	if err != nil || len(ss) < 3 {
 		return ""
 	}
-	// Document frequency over every session; candidate phrases only from
-	// recent, human-typed messages.
+	// Document frequency over what was typed across the whole store; candidate
+	// phrases only from the recent part of it.
 	df := map[string]int{}
 	for _, s := range ss {
 		seen := map[string]bool{}
 		for _, m := range s.Messages {
+			if digest.IsAgentArtifact(m.Text) {
+				continue
+			}
 			for _, tok := range suggestTokens(m.Text) {
 				if !seen[tok] {
 					seen[tok] = true
