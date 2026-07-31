@@ -174,7 +174,15 @@ func runHookContext(dir string, plain bool) error {
 		if polName != "local+imported" {
 			polNote = " · policy: " + polName
 		}
-		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote)
+		// A count says deja did something; a name says what. The receipt is
+		// the one place a person reliably sees, so when a piece of work has
+		// earned its keep more than once, it is named here rather than only
+		// on a screen someone has to decide to open (#579).
+		earned := ""
+		if r, ok := findReusedMemory(dir); ok {
+			earned = fmt.Sprintf(" · most re-used so far: %q, %d×", trimBriefTitle(r.Title), r.Times)
+		}
+		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote, earned)
 	}
 	// Nothing to recall yet because the index is still being built: say so
 	// rather than starting in silence. The build runs detached, so the agent

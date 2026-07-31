@@ -109,6 +109,14 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintf(w, "before     %s%s%s\n", dim, askedWhen(a), reset)
 	}
 
+	// What the counters above cannot say: which memory kept being worth
+	// recalling. "63 recalls" is a rate; a named piece of work is the thing a
+	// person repeats to a colleague (#579).
+	if r, ok := findReusedMemory(dir); ok {
+		fmt.Fprintf(w, "reused     %s%s%s\n", bold, trimBriefTitle(r.Title), reset)
+		fmt.Fprintf(w, "           %s%d× by agents · last worked %s%s\n", dim, r.Times, search.RelativeDate(r.Age), reset)
+	}
+
 	// The other line drawn from the reader's own data rather than from a
 	// counter: a wall this machine keeps running into. Manifest-only, like the
 	// asked line above it — the command that reports the full list reads the
