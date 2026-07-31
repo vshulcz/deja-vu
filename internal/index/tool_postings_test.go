@@ -175,9 +175,12 @@ func TestSignalLinesFallsBackWhenNothingMatches(t *testing.T) {
 	if got == "" {
 		t.Fatal("indexing nothing makes the record unreachable")
 	}
-	// Head plus tail since #614: the head alone is the least informative part
-	// of exactly the records that matched nothing.
-	if len(got) > signalFloor+signalTail+64 {
+	// A literal, not signalFloor+signalTail: written in terms of the constant
+	// it is meant to bound, this assertion passes for any value of signalTail
+	// — including signalFloor*8. The tail is pinned from the other side by
+	// TestSignalLinesKeepsBothEndsWhenNothingMatches, but a bound that cannot
+	// discriminate should not look like one.
+	if len(got) > 13000 {
 		t.Fatalf("the fallback should be bounded, got %d bytes", len(got))
 	}
 }
@@ -208,6 +211,15 @@ func TestSignalLinesKeepsBothEndsWhenNothingMatches(t *testing.T) {
 	}
 	if !strings.Contains(got, "TAILTOKEN") {
 		t.Error("dropped the tail, so the end of a long output stays unreachable")
+	}
+	// In order: a reader of the indexed text should meet the output the way it
+	// was written. Reversing the splice indexes the same content, so only an
+	// assertion catches it.
+	if strings.Index(got, "HEADTOKEN") > strings.Index(got, "TAILTOKEN") {
+		t.Errorf("tail spliced ahead of head: %.60q", got)
+	}
+	if !strings.HasPrefix(got, "HEADTOKEN") {
+		t.Errorf("the head is no longer the prefix: %.60q", got)
 	}
 	// Both ends, not the whole thing: the byte saving is the reason the filter
 	// exists.

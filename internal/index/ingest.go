@@ -643,6 +643,11 @@ func tokenizedPart(role, text string) string {
 	return text
 }
 
+// signalTail is how much of the end of an unmatched output is kept beside the
+// head. Half the head: measured on a 1637-output store it adds 1.6 MB to the
+// postings, and the end of a long output is where a failure states itself.
+const signalTail = signalFloor / 2
+
 // signalLines keeps the part of a command's output anyone would search for.
 //
 // A build log is mostly progress: files compiled, tests named, packages
@@ -653,11 +658,6 @@ func tokenizedPart(role, text string) string {
 //
 // The full text is still stored and still served: this decides what earns
 // postings, exactly as a replaced span stores its body and indexes its path.
-// signalTail is how much of the end of an unmatched output is kept beside the
-// head. Half the head: measured on a 1637-output store it adds 1.6 MB to the
-// postings, and the end of a long output is where a failure states itself.
-const signalTail = signalFloor / 2
-
 func signalLines(text string) string {
 	if len(text) < signalFloor {
 		return text
