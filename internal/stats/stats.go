@@ -35,6 +35,13 @@ type Report struct {
 	AgentCredits    int            `json:"agent_credits"`
 	WeekCredits     int            `json:"week_agent_credits"`
 	SidecarSize     int64          `json:"sidecar_size,omitempty"`
+	// Spans and SpanFiles are what `deja restore` can hand back: the exact
+	// bytes an agent replaced, which no other tool keeps. Filled by the
+	// caller, not by Build — replaced spans are deliberately kept out of
+	// ordinary retrieval (a span is the file's old contents, not a statement),
+	// so they never reach the sessions Build is given.
+	Spans     int `json:"spans,omitempty"`
+	SpanFiles int `json:"span_files,omitempty"`
 }
 
 type HarnessStats struct {

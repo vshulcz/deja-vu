@@ -1,6 +1,7 @@
 package index
 
 import (
+	"github.com/vshulcz/deja-vu/internal/query"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,5 +115,71 @@ func TestRecordsForKeyMatchesAFullScan(t *testing.T) {
 				t.Fatalf("%s record %d differs: %#v vs %#v", key, i, got[i], want[i])
 			}
 		}
+	}
+}
+
+// A replaced span is served only when asked for by role, so it never reaches
+// a caller loading sessions the ordinary way — the inventory needs its own
+// pass, and that is the whole reason this function exists.
+func TestSpanInventoryCountsWhatRestoreCanHandBack(t *testing.T) {
+	tmp := t.TempDir()
+	proj := filepath.Join(tmp, "claude", "-tmp-spans")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	edit := func(sid, path, old string) string {
+		return `{"type":"assistant","sessionId":"` + sid + `","cwd":"/w","timestamp":"2026-07-20T10:00:00Z",` +
+			`"message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + path +
+			`","old_string":"` + old + `","new_string":"replacement"}}]}}` + "\n"
+	}
+	// Two sessions, three spans, two distinct files — the same file edited in
+	// both sessions must count once.
+	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(
+		`{"type":"user","sessionId":"s1","cwd":"/w","timestamp":"2026-07-20T10:00:00Z","message":{"role":"user","content":"fix it"}}`+"\n"+
+			edit("s1", "/w/pool.go", "old pool code")+
+			edit("s1", "/w/retry.go", "old retry code")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "s2.jsonl"), []byte(
+		`{"type":"user","sessionId":"s2","cwd":"/w","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":"again"}}`+"\n"+
+			edit("s2", "/w/pool.go", "another old pool")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	spans, files, err := SpanInventory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spans != 3 {
+		t.Fatalf("spans = %d, want 3", spans)
+	}
+	if files != 2 {
+		t.Fatalf("files = %d, want 2 — the same file in two sessions is one file", files)
+	}
+	// The ordinary load path cannot see them, which is why this exists.
+	ss, err := SearchWithRecovery(dir, query.Options{All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			if m.Role == roleEdit {
+				t.Fatal("a span reached ordinary retrieval; SpanInventory would be unnecessary")
+			}
+		}
+	}
+}
+
+func TestSpanInventoryOnAStoreWithNoSpans(t *testing.T) {
+	if _, _, err := SpanInventory(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("no index should report an error rather than zero")
 	}
 }

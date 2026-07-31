@@ -172,7 +172,7 @@ $ deja "jwt refresh token"
 | `deja files <topic>` | Which files were opened or edited while that subject was being worked on. Ranked by how specific a file is to the topic, so a file every session touches does not win. `--project`, `--limit`. Built from the file and command records read out of Claude Code, opencode, Cursor and Codex transcripts. |
 | `deja friction` | Errors that hit three or more separate sessions, newest occurrence and harnesses named. Specific failures only — a missing binary, an uninstalled Python module — not `Traceback` or `exit status 1`. `--limit`. |
 | `deja share <id>` | Sanitized session digest for a colleague: secrets redacted, tool noise stripped. |
-| `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline. `--json` too. |
+| `deja stats` | Headline counts, totals, per-harness split, top projects, monthly sparkline, and how many replaced spans `deja restore` could hand back. `--json` too. |
 | `deja doctor [--json]` | Self-diagnosis: store parse state, sqlite3 presence, MCP wiring per agent, index health, version; `--json` emits the same checks for scripts. |
 | `deja sync export <dir> [--full]` / `import <dir>` / `ssh <host> [--pull]` | Move memory between machines — via a shared folder or one ssh command. Watermarked, append-only, idempotent. |
 | `deja show <id>` / `deja last [n]` | Read one session / list recent ones (`--project`, `--harness`, `--since`, `--role`). `last --json` returns versioned metadata; `show <exact-id> --harness <name> --json` returns a bounded, versioned message window (`--offset`, `--limit`). |

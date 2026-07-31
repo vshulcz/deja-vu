@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -919,4 +920,41 @@ func EachToolOutput(dir string, fn func(SessionMeta, Record)) error {
 			fn(meta, r)
 		}
 	})
+}
+
+// SpanInventory counts the replaced spans the store holds and the files they
+// belong to.
+//
+// It needs its own pass: a span is served only when asked for by role, because
+// it is the file's old contents rather than a statement about anything, so it
+// never reaches a caller loading sessions the ordinary way.
+//
+// This is what `deja restore` has to hand back, stated as a number before
+// anyone needs it — the command matters entirely at one panicked moment, and
+// nobody reads a command list then (#577). Measured at ~180 ms on a
+// 160k-record store, so it belongs on a page someone opens deliberately.
+func SpanInventory(dir string) (spans, files int, err error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0, 0, err
+	}
+	seen := map[string]bool{}
+	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		if r.Role != roleEdit {
+			return
+		}
+		spans++
+		// The path is the first line of a span; one without a path still
+		// counts as something recoverable.
+		if i := strings.IndexByte(r.Text, '\n'); i > 0 {
+			seen[r.Text[:i]] = true
+		}
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return spans, len(seen), nil
 }

@@ -121,6 +121,11 @@ func runStats(dir string, args []string) error {
 		return err
 	}
 	report := stats.Build(stats.Filter(ss, options), time.Now())
+	// Replaced spans are kept out of ordinary retrieval, so they are not in
+	// the sessions above and take a pass of their own.
+	if spans, files, err := index.SpanInventory(dir); err == nil {
+		report.Spans, report.SpanFiles = spans, files
+	}
 	sshTip := sshSyncTip(dir, ss)
 	report.Recall = usage.Totals(dir)
 	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(dir)
@@ -217,6 +222,16 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintf(w, "Sessions  %s%d%s\n", bold, r.TotalSessions, reset)
 	fmt.Fprintf(w, "Messages  %s%d%s\n", bold, r.TotalMessages, reset)
 	fmt.Fprintf(w, "Range     %s → %s\n\n", valueOrDash(r.DateRange.Start), valueOrDash(r.DateRange.End))
+	// `deja restore` matters entirely at one moment — an agent replaced a
+	// function with something worse and the work was not committed — and
+	// nobody reads a command list while panicking. So the number is stated
+	// here, where someone reads calmly, and it is their own: the spans deja
+	// holds are the part of a transcript every other tool discards (#577).
+	if r.Spans > 0 {
+		fmt.Fprintf(w, "Recover   %s%d%s span%s your agents replaced, across %d file%s\n",
+			bold, r.Spans, reset, pluralS(r.Spans), r.SpanFiles, pluralS(r.SpanFiles))
+		fmt.Fprintf(w, "          %sif something got clobbered:%s deja restore <file>\n\n", faint, reset)
+	}
 	if r.SidecarSize > 0 {
 		fmt.Fprintf(w, "Semantic  sidecar %s\n\n", humanBytes(r.SidecarSize))
 	}
