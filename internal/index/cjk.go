@@ -2,6 +2,7 @@ package index
 
 import (
 	"unicode"
+	"unicode/utf8"
 )
 
 // CJK text carries no spaces, so the base tokenizer collapses whole phrases
@@ -25,6 +26,21 @@ func isCJK(r rune) bool {
 // to 系, which is a content character in 系統 and 關係, so a filter applied
 // after folding could not tell the two apart.
 func cjkBigrams(s string) []string {
+	// indexKeys hands this the whole message body, so a transcript with no CJK in
+	// it would otherwise decode every rune and run all four unicode.Is searches
+	// to build nothing. A CJK rune is never a single UTF-8 byte, so one byte scan
+	// answers the question before any decoding starts.
+	ascii := true
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return nil
+	}
+
 	var out []string
 	seen := map[string]bool{}
 	var run []rune
