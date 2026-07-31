@@ -203,13 +203,19 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 			dead[key] = true
 		}
 	}
-	if o.DryRun || result.Sessions == 0 {
+	if result.Sessions == 0 {
 		return result, nil
 	}
+	// Count the messages on the dry run too. It is the same single pass over
+	// records, and without it `--dry-run` answers "0 messages" to the only
+	// question it exists to answer: how much am I about to lose.
 	for _, r := range readRecordsForForget(dir) {
 		if matched[r.Record.Key] {
 			result.Messages++
 		}
+	}
+	if o.DryRun {
+		return result, nil
 	}
 	// Persist tombstones before the rebuild: a crash between the two must
 	// leave sessions forgotten, not resurrect them on the next index pass.

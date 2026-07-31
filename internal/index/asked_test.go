@@ -227,3 +227,36 @@ func TestMissingBucketsForcesARebuild(t *testing.T) {
 		t.Fatal("a healthy index must not be reported as broken")
 	}
 }
+
+// `forget --dry-run` exists to answer "how much am I about to lose". It used to
+// return zero messages, because the count ran after the dry-run branch, and to
+// report its result in the past tense as though the deletion had happened.
+func TestForgetDryRunPredictsWhatTheRealRunDoes(t *testing.T) {
+	mk := func() string {
+		return askedFixture(t,
+			map[string][]string{
+				"keep": {"why does the cache stampede under load?"},
+				"drop": {"why does the pool exhaust under load?"},
+			},
+			map[string]string{"keep": "2026-03-01T10:00:00Z", "drop": "2026-03-02T10:00:00Z"})
+	}
+	dir := mk()
+	dry, err := Forget(dir, ForgetOptions{Session: "drop", DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dry.Sessions != 1 || dry.Messages != 1 || dry.Tombstones != 1 {
+		t.Fatalf("dry run reported %+v, want one of each", dry)
+	}
+	// Nothing may have changed.
+	if _, ok, _ := FindByID(dir, "drop"); !ok {
+		t.Fatal("a dry run must leave the session in place")
+	}
+	real, err := Forget(dir, ForgetOptions{Session: "drop"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if real.Sessions != dry.Sessions || real.Messages != dry.Messages {
+		t.Fatalf("the dry run promised %+v and the real run did %+v", dry, real)
+	}
+}

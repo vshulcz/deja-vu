@@ -935,6 +935,14 @@ func runForget(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
+	// A dry run changes nothing, so reporting it in the past tense — the same
+	// three lines the real command prints — tells the reader their sessions are
+	// gone when they are not.
+	if o.DryRun {
+		fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
+			result.Sessions, result.Messages, result.Tombstones)
+		return nil
+	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
 	return nil
 }
