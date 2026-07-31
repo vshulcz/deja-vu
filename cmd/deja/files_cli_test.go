@@ -103,7 +103,10 @@ func TestFilesDistinguishesFilteredFromAbsent(t *testing.T) {
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// A path that was recorded but has no .git above it now.
-	gone := filepath.Join(tmp, "vanished-repo", "pipeline.go")
+	// Forward slashes: the path is embedded in JSON, and a Windows separator
+	// would be read as an escape sequence, so the file record never forms and
+	// the test would pass for the wrong reason.
+	gone := filepath.ToSlash(filepath.Join(tmp, "vanished-repo", "pipeline.go"))
 	body := `{"type":"user","sessionId":"f1","cwd":"/w/f","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":"fix the widget pipeline retry"}}` + "\n" +
 		`{"type":"assistant","sessionId":"f1","cwd":"/w/f","timestamp":"2026-07-21T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"` + gone + `"}}]}}` + "\n"
 	if err := os.WriteFile(filepath.Join(root, "f1.jsonl"), []byte(body), 0o644); err != nil {
