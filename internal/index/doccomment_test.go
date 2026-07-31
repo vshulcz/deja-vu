@@ -25,8 +25,19 @@ func TestDocCommentsNameWhatTheyDocument(t *testing.T) {
 	seen := 0
 	for _, root := range roots {
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-				return err
+			// Other tests create and delete scratch trees while this walks, so
+			// a vanished entry is normal rather than a failure.
+			if err != nil {
+				return nil //nolint:nilerr // a file that disappeared mid-walk is not this test's business
+			}
+			if info.IsDir() {
+				if strings.HasPrefix(info.Name(), ".") && info.Name() != "." && info.Name() != ".." {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
 			}
 			fset := token.NewFileSet()
 			f, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)
