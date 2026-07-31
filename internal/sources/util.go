@@ -226,7 +226,43 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 // toolPathsFromContent is claudeToolPaths for the reference parser, which walks
 // decoded maps rather than raw JSON. The two must agree or the differential
 // test in #502 stops meaning anything.
-func toolPathsFromContent(v any) string {
+// toolDialect names one harness's tool-call vocabulary. The wire shape is the
+// same everywhere — a `tool_use` part with a name and an input object — but the
+// vocabulary is not, and it is not guessable: Claude names the file key
+// `file_path` and its shell tool `Bash`, Cursor names them `path` and `Shell`.
+// Both were read off transcripts the vendor's own CLI had just written.
+type toolDialect struct {
+	pathKey   string
+	pathTools map[string]bool
+	shellTool string
+	// editTools bounds which calls carry a replaced span. Empty means any call
+	// with a path and an old_string, which is how the Claude decoder has always
+	// read MultiEdit's sub-edits.
+	editTools map[string]bool
+}
+
+var claudeDialect = toolDialect{
+	pathKey:   "file_path",
+	pathTools: pathTools,
+	shellTool: "Bash",
+}
+
+func toolPart(it any, d toolDialect) (name string, in map[string]any, ok bool) {
+	m, ok := it.(map[string]any)
+	if !ok {
+		return "", nil, false
+	}
+	if t, _ := m["type"].(string); t != "tool_use" {
+		return "", nil, false
+	}
+	name, _ = m["name"].(string)
+	in, _ = m["input"].(map[string]any)
+	return name, in, in != nil
+}
+
+func toolPathsFromContent(v any) string { return toolPathsIn(v, claudeDialect) }
+
+func toolPathsIn(v any, d toolDialect) string {
 	items, ok := v.([]any)
 	if !ok {
 		return ""
@@ -234,19 +270,11 @@ func toolPathsFromContent(v any) string {
 	var out []string
 	seen := map[string]bool{}
 	for _, it := range items {
-		m, ok := it.(map[string]any)
-		if !ok {
+		name, in, ok := toolPart(it, d)
+		if !ok || !d.pathTools[name] {
 			continue
 		}
-		if t, _ := m["type"].(string); t != "tool_use" {
-			continue
-		}
-		name, _ := m["name"].(string)
-		if !pathTools[name] {
-			continue
-		}
-		in, _ := m["input"].(map[string]any)
-		p, _ := in["file_path"].(string)
+		p, _ := in[d.pathKey].(string)
 		if p == "" || seen[p] {
 			continue
 		}
@@ -257,22 +285,23 @@ func toolPathsFromContent(v any) string {
 }
 
 // editSpansFromContent is claudeEditSpans for the reference parser.
-func editSpansFromContent(v any) []string {
+func editSpansFromContent(v any) []string { return editSpansIn(v, claudeDialect) }
+
+func editSpansIn(v any, d toolDialect) []string {
 	items, ok := v.([]any)
 	if !ok {
 		return nil
 	}
 	var out []string
 	for _, it := range items {
-		m, ok := it.(map[string]any)
+		name, in, ok := toolPart(it, d)
 		if !ok {
 			continue
 		}
-		if t, _ := m["type"].(string); t != "tool_use" {
+		if len(d.editTools) > 0 && !d.editTools[name] {
 			continue
 		}
-		in, _ := m["input"].(map[string]any)
-		path, _ := in["file_path"].(string)
+		path, _ := in[d.pathKey].(string)
 		if path == "" {
 			continue
 		}
@@ -302,24 +331,19 @@ func editSpansFromContent(v any) []string {
 }
 
 // commandsFromContent is claudeCommands for the reference parser.
-func commandsFromContent(v any) []string {
+func commandsFromContent(v any) []string { return commandsIn(v, claudeDialect) }
+
+func commandsIn(v any, d toolDialect) []string {
 	items, ok := v.([]any)
 	if !ok {
 		return nil
 	}
 	var out []string
 	for _, it := range items {
-		m, ok := it.(map[string]any)
-		if !ok {
+		name, in, ok := toolPart(it, d)
+		if !ok || name != d.shellTool {
 			continue
 		}
-		if t, _ := m["type"].(string); t != "tool_use" {
-			continue
-		}
-		if n, _ := m["name"].(string); n != "Bash" {
-			continue
-		}
-		in, _ := m["input"].(map[string]any)
 		cmd, _ := in["command"].(string)
 		if cmd == "" || !worthIndexing(cmd) {
 			continue

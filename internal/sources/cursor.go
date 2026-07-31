@@ -253,6 +253,18 @@ func epochMS(v any) time.Time {
 	return time.Time{}
 }
 
+// cursorDialect is Cursor CLI's tool vocabulary, read off transcripts its own
+// binary wrote: `Read`, `Write`, `StrReplace`, `Delete` name a file under
+// `path` (not Claude's `file_path`), and the shell tool is `Shell`. Cursor
+// records no tool results at all, so its transcripts yield files, commands and
+// replaced spans but never tool output.
+var cursorDialect = toolDialect{
+	pathKey:   "path",
+	pathTools: map[string]bool{"Read": true, "Write": true, "StrReplace": true, "Delete": true},
+	shellTool: "Shell",
+	editTools: map[string]bool{"StrReplace": true},
+}
+
 // ParseCursorTranscript reads a CLI agent transcript: Anthropic wire-shaped
 // JSONL; control lines (turn_ended etc.) carry no role and are skipped.
 func ParseCursorTranscript(path string) ([]model.Session, error) {
@@ -271,11 +283,27 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 		if msg == nil {
 			return
 		}
-		txt := textFromContent(msg["content"])
-		if txt == "" {
-			return
+		if txt := textFromContent(msg["content"]); txt != "" {
+			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: s.Updated})
 		}
-		s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: s.Updated})
+		// A turn that only called tools has no text, so this cannot sit behind
+		// the text check: reading a file and running a build is exactly the
+		// turn that carries no prose.
+		if IndexToolPaths() {
+			if p := toolPathsIn(msg["content"], cursorDialect); p != "" {
+				s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: s.Updated})
+			}
+		}
+		if IndexEdits() {
+			for _, e := range editSpansIn(msg["content"], cursorDialect) {
+				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: s.Updated})
+			}
+		}
+		if IndexCommands() {
+			for _, cmd := range commandsIn(msg["content"], cursorDialect) {
+				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: s.Updated})
+			}
+		}
 	})
 	if len(s.Messages) == 0 {
 		return nil, err
