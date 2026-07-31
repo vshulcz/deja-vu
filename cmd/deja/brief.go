@@ -47,7 +47,14 @@ func runBrief(dir string, w io.Writer) error {
 		bold, ov.Harnesses, reset, pluralS(ov.Harnesses))
 
 	recalls, bytes, _ := usage.TodayWithInjections(dir)
-	quietWeek := ov.SessionsToday == 0 && ov.SessionsWeek == 0 && !ov.Oldest.IsZero()
+	weekRecalls, _, _, _ := usage.Week(dir)
+	dejaVu := usage.DejaVuWeek(dir)
+	// Only when the week has nothing at all to report. Recalls and déjà vu
+	// moments are counted from usage, not from session age, so a store whose
+	// sessions are old can still have served memory this week — and hiding that
+	// was exactly the wrong trade.
+	quietWeek := ov.SessionsToday == 0 && ov.SessionsWeek == 0 &&
+		recalls == 0 && weekRecalls == 0 && dejaVu == 0 && !ov.Oldest.IsZero()
 	line := fmt.Sprintf("today      %d session%s", ov.SessionsToday, pluralS(ov.SessionsToday))
 	if recalls > 0 {
 		line += fmt.Sprintf(" · %d recall%s served (%s", recalls, pluralS(recalls), humanBytes(int64(bytes)))
@@ -60,8 +67,8 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintln(w, line)
 	}
 
-	wr, _, _, _ := usage.Week(dir)
-	if ov.SessionsToday == 0 && ov.SessionsWeek == 0 && !ov.Oldest.IsZero() {
+	wr := weekRecalls
+	if quietWeek {
 		// Nothing this week. Two zero lines is the worst possible opening for
 		// someone whose agent history is real but older — and the interesting
 		// fact is right there: how far back the memory goes.
@@ -69,8 +76,8 @@ func runBrief(dir string, w io.Writer) error {
 			ov.Oldest.Local().Format("Jan 2 2006"), ov.Newest.Local().Format("Jan 2 2006"), reset)
 	} else {
 		week := fmt.Sprintf("this week  %d session%s · %d recall%s", ov.SessionsWeek, pluralS(ov.SessionsWeek), wr, pluralS(wr))
-		if dv := usage.DejaVuWeek(dir); dv > 0 {
-			week += fmt.Sprintf(" · %s%d déjà vu moment%s%s", bold, dv, pluralS(dv), reset)
+		if dejaVu > 0 {
+			week += fmt.Sprintf(" · %s%d déjà vu moment%s%s", bold, dejaVu, pluralS(dejaVu), reset)
 		}
 		fmt.Fprintln(w, week)
 	}
