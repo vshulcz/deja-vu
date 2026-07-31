@@ -42,6 +42,31 @@ var injectedBlocks = [][2]string{
 	{"<command-name>", "</command-args>"},
 }
 
+// Codex writes its preamble as a user turn rather than under its own role, so
+// a role filter does not reach it. Measured on two stores: it is the first
+// user message in 28 of 28 sessions here and titles 81 of 82 there (#636).
+// Identical in every session and lexically broad — plugin names, tool
+// descriptions, an AGENTS.md persona paragraph — so it outranks real turns on
+// aggregate match count, which makes it a ranking bug rather than a cosmetic
+// one.
+//
+// These are stripped only at the *start* of a message, unlike injectedBlocks.
+// The tags are ordinary enough that a person quotes them: on this store nine
+// Claude sessions contain `<environment_context>` and two contain
+// `<user_instructions>`, every one of them a real turn discussing the very
+// filtering this list implements. A preamble is always the head of the
+// message, so requiring that costs nothing and stops the filter from eating
+// someone's sentence.
+var injectedPrefixBlocks = [][2]string{
+	{"<environment_context>", "</environment_context>"},
+	{"<recommended_plugins>", "</recommended_plugins>"},
+	{"<permissions instructions>", "</permissions instructions>"},
+	{"<skills_instructions>", "</skills_instructions>"},
+	{"<user_instructions>", "</user_instructions>"},
+	{"<INSTRUCTIONS>", "</INSTRUCTIONS>"},
+	{"# AGENTS.md instructions", "</INSTRUCTIONS>"},
+}
+
 // Whole-line markers: a harness note that occupies its own line, with no
 // closing tag. Matched at line granularity so a line quoting one inside a real
 // message does not take the message with it.
@@ -63,6 +88,7 @@ func stripSelfRecall(text string) string {
 	for _, m := range injectedBlocks {
 		text = stripBetweenClosed(text, m[0], m[1])
 	}
+	text = stripInjectedPrefixes(text)
 	return stripInjectedLines(text)
 }
 
@@ -92,6 +118,28 @@ func stripInjectedLines(text string) string {
 // truncated <deja-recall> is still ours, but a sentence mentioning
 // <system-reminder> — a bug report, this file's own tests — is not, and
 // swallowing the rest of it loses what the person actually wrote.
+// stripInjectedPrefixes removes a harness preamble from the head of a message,
+// repeatedly: Codex stacks several of them before the first real turn.
+func stripInjectedPrefixes(text string) string {
+	for again := true; again; {
+		again = false
+		trimmed := strings.TrimSpace(text)
+		for _, m := range injectedPrefixBlocks {
+			if !strings.HasPrefix(trimmed, m[0]) {
+				continue
+			}
+			rel := strings.Index(trimmed[len(m[0]):], m[1])
+			if rel < 0 {
+				continue
+			}
+			text = trimmed[len(m[0])+rel+len(m[1]):]
+			again = true
+			break
+		}
+	}
+	return text
+}
+
 func stripBetweenClosed(text, open, close string) string {
 	for {
 		start := strings.Index(text, open)

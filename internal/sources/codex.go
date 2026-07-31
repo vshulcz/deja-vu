@@ -86,7 +86,23 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			return
 		}
 		if typ, _ := m["type"].(string); typ == "session_meta" {
-			if id, _ := payload["session_id"].(string); id != "" {
+			// The ThreadId, not the SessionId. One rollout file is one thread;
+			// a session groups every thread that branched from it, so keying on
+			// session_id merges the whole fork tree into a single deja session
+			// and every thread but one becomes unreachable. Measured by a
+			// contributor on a fork-heavy store: 811 rollouts, 811 ThreadIds,
+			// 74 SessionIds — 91% of threads collapsed (#635).
+			//
+			// payload.id equals the filename, so this agrees with the id
+			// derived above; it is set explicitly because agreeing by accident
+			// is not the same as agreeing on purpose.
+			if id, _ := payload["id"].(string); id != "" {
+				s.ID = id
+			} else if id, _ := payload["session_id"].(string); id != "" {
+				// Rollouts written before Codex split the two carry only a
+				// SessionId, and without threads there is nothing to collapse:
+				// keeping it preserves the identity those sessions already
+				// have in existing indexes.
 				s.ID = id
 			}
 			if c, _ := payload["cwd"].(string); c != "" {
@@ -107,6 +123,9 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			return
 		}
 		role, _ := payload["role"].(string)
+		if HarnessAuthored(role) {
+			return
+		}
 		txt := textFromContent(payload["content"])
 		if txt == "" {
 			if msg, _ := payload["message"].(string); msg != "" {

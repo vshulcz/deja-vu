@@ -108,3 +108,35 @@ func TestIndexDoesNotSwallowItsOwnRecall(t *testing.T) {
 		}
 	}
 }
+
+// Codex injects its preamble as a user turn, so it survives any role filter.
+// It is stripped only at the head of a message: the tags are ordinary enough
+// that people quote them, and nine Claude sessions on the store this was
+// measured against do exactly that (#636).
+func TestStripsCodexPreambleOnlyAtTheHead(t *testing.T) {
+	preamble := "<environment_context>\n  <cwd>/w</cwd>\n</environment_context>\n" +
+		"<recommended_plugins>a long list</recommended_plugins>\n" +
+		"# AGENTS.md instructions\n\n<INSTRUCTIONS>project rules</INSTRUCTIONS>\n"
+	got := stripSelfRecall(preamble + "the actual question")
+	if strings.TrimSpace(got) != "the actual question" {
+		t.Fatalf("got %q, want only the question", got)
+	}
+	if stripSelfRecall(preamble) != "" && strings.TrimSpace(stripSelfRecall(preamble)) != "" {
+		t.Fatalf("a message that is nothing but preamble should strip to empty, got %q", stripSelfRecall(preamble))
+	}
+	// A person discussing the tag keeps their sentence.
+	for _, real := range []string{
+		"why does <environment_context> outrank everything?",
+		"the parser should drop <user_instructions> blocks",
+		"see the note about # AGENTS.md instructions in the issue",
+		// A complete pair quoted mid-sentence — the shape that a
+		// strip-anywhere rule eats and a strip-at-the-head rule keeps. Real
+		// messages on this store look exactly like this.
+		"the injected block is <environment_context><cwd>/w</cwd></environment_context> and it wins on match count",
+		"codex sends <recommended_plugins>a list</recommended_plugins> before the first turn",
+	} {
+		if got := stripSelfRecall(real); got != real {
+			t.Errorf("ate a real message:\n  in  %q\n  out %q", real, got)
+		}
+	}
+}

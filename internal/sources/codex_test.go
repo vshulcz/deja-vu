@@ -121,3 +121,84 @@ func TestCodexOutputWithoutCallIDDoesNotPanic(t *testing.T) {
 		t.Fatalf("tool output records = %d, want 2", out)
 	}
 }
+
+// One rollout file is one thread; a session groups every thread that branched
+// from it. Keying on the SessionId merges the whole fork tree into a single
+// deja session — measured by a contributor at 811 rollouts collapsing into 74
+// (#635).
+func TestCodexRolloutKeysOnThreadNotSession(t *testing.T) {
+	dir := t.TempDir()
+	var ids []string
+	for _, tid := range []string{"thread-a", "thread-b", "thread-c"} {
+		p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-"+tid+".jsonl")
+		lines := []string{
+			`{"timestamp":"2026-07-31T00:00:00Z","type":"session_meta","payload":{"session_id":"SHARED","id":"` + tid +
+				`","forked_from_id":"thread-a","cwd":"/w"}}`,
+			`{"timestamp":"2026-07-31T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"work in ` + tid + `"}]}}`,
+		}
+		if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ss, err := ParseCodexRollout(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ss) != 1 {
+			t.Fatalf("sessions = %d", len(ss))
+		}
+		ids = append(ids, ss[0].ID)
+	}
+	seen := map[string]bool{}
+	for i, id := range ids {
+		if id == "SHARED" {
+			t.Fatalf("thread %d took the shared SessionId as its identity", i)
+		}
+		if seen[id] {
+			t.Fatalf("two threads share the id %q", id)
+		}
+		seen[id] = true
+	}
+	// The filename carries the ThreadId, so the two agree — but on purpose,
+	// not by accident.
+	if ids[1] != "thread-b" {
+		t.Fatalf("id = %q, want the ThreadId", ids[1])
+	}
+}
+
+// Codex writes its preamble under its own role as well as as a user turn.
+func TestCodexDropsHarnessAuthoredRoles(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-dev.jsonl")
+	lines := []string{
+		`{"timestamp":"2026-07-31T00:00:00Z","type":"session_meta","payload":{"session_id":"s","id":"dev","cwd":"/w"}}`,
+		`{"timestamp":"2026-07-31T00:00:01Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"text","text":"You are the Codex CLI, a terminal assistant"}]}}`,
+		`{"timestamp":"2026-07-31T00:00:02Z","type":"response_item","payload":{"type":"message","role":"system","content":[{"type":"text","text":"system framing"}]}}`,
+		`{"timestamp":"2026-07-31T00:00:03Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"the actual question"}]}}`,
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCodexRollout(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || len(ss[0].Messages) != 1 {
+		t.Fatalf("messages = %#v", ss)
+	}
+	if ss[0].Messages[0].Text != "the actual question" {
+		t.Fatalf("kept %q", ss[0].Messages[0].Text)
+	}
+}
+
+func TestHarnessAuthored(t *testing.T) {
+	for _, r := range []string{"developer", "system"} {
+		if !HarnessAuthored(r) {
+			t.Errorf("%q is the harness talking to the model", r)
+		}
+	}
+	for _, r := range []string{"user", "assistant", "tool", ""} {
+		if HarnessAuthored(r) {
+			t.Errorf("%q is not harness plumbing", r)
+		}
+	}
+}

@@ -352,3 +352,19 @@ func commandsIn(v any, d toolDialect) []string {
 	}
 	return out
 }
+
+// HarnessAuthored reports whether a role marks text the harness wrote to the
+// model rather than anything a person or the assistant said.
+//
+// #551 removed the Claude-side markers and asked for one place that recognises
+// harness-injected wrappers across parsers instead of a list per parser. This
+// is that place, and Codex is why it now exists: its preamble is not a string
+// to add to a list, it is a whole role. Measured on one store — 28 of 28
+// sessions took their title from it — and on a contributor's, 81 of 82 (#636).
+//
+// It is dropped rather than stored under an ignored role: the text is
+// identical in every session, so it is not memory, and it is lexically broad
+// enough to outrank real turns on aggregate match count.
+func HarnessAuthored(role string) bool {
+	return role == "developer" || role == "system"
+}

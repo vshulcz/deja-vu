@@ -22,7 +22,10 @@ import (
 // 20: opencode tool output is parsed (#621) and each session records what it
 // tripped over (#576). An index built before this has neither, and neither can
 // be derived from what it does hold.
-const version = 20
+// 21: Codex sessions are keyed on the ThreadId rather than the SessionId
+// (#635), so every existing Codex entry has the wrong identity, and the
+// harness preamble Codex injects as a user turn is stripped (#636).
+const version = 21
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
