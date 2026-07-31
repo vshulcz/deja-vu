@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -210,5 +211,36 @@ func TestStatuslineMemoryLineWithoutATitle(t *testing.T) {
 	base.Title = "   "
 	if got := statuslineMemoryLine(base); strings.Contains(got, `""`) {
 		t.Fatalf("empty quotes in the line: %q", got)
+	}
+}
+
+// The title is whatever the user typed first, and it lands in a status bar. A
+// carriage return rewrites the line, an ANSI escape recolours the whole bar
+// for everything printed after it, and a bell makes the terminal beep on every
+// refresh — several times a minute.
+func TestStatuslineTitleCannotBreakTheBar(t *testing.T) {
+	for _, title := range []string{
+		"has\ttab", "has\rcarriage", "esc\x1b[31mred\x1b[0m", "bell\x07here",
+		"nul\x00byte", "vertical\vtab",
+	} {
+		got := trimStatuslineTitle(title)
+		for _, r := range got {
+			if r == '\x1b' || unicode.IsControl(r) {
+				t.Errorf("control character %q survived in %q -> %q", r, title, got)
+			}
+		}
+	}
+	// Words must not run together where a control character was.
+	if got := trimStatuslineTitle("has\ttab"); got != "has tab" {
+		t.Errorf("got %q, want the words kept apart", got)
+	}
+	// Runs of whitespace collapse rather than padding the bar.
+	if got := trimStatuslineTitle("a   \n\n  b"); got != "a b" {
+		t.Errorf("got %q", got)
+	}
+	// Truncation counts runes, so a multi-byte character is never split.
+	long := trimStatuslineTitle(strings.Repeat("→", 60))
+	if !strings.HasSuffix(long, "…") || strings.ContainsRune(long, '�') {
+		t.Errorf("truncation damaged the text: %q", long)
 	}
 }

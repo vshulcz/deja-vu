@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -123,8 +124,19 @@ func statuslineMemoryLine(m fileMemory) string {
 	return fmt.Sprintf("%s · %d earlier %s · %s", name, m.Sessions, noun, search.RelativeDate(m.Last))
 }
 
+// trimStatuslineTitle makes a session title safe for a status bar. The title
+// is whatever the user typed first, so it can carry a carriage return that
+// rewrites the line, an ANSI escape that recolours the whole bar, or a bell.
+// Control characters become spaces rather than being dropped, so words do not
+// run together.
 func trimStatuslineTitle(t string) string {
-	t = strings.TrimSpace(strings.ReplaceAll(t, "\n", " "))
+	t = strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\n' || r == '\r' || unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, t)
+	t = strings.Join(strings.Fields(t), " ")
 	r := []rune(t)
 	if len(r) > statuslineMaxTitle {
 		return strings.TrimSpace(string(r[:statuslineMaxTitle])) + "…"
