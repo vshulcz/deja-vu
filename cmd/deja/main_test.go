@@ -295,11 +295,11 @@ func TestLastFiltersSinceAndRole(t *testing.T) {
 }
 
 func TestLastParserAndSourceFilters(t *testing.T) {
-	n, o, raw, err := parseLast([]string{"25", "--harness", "codex", "--project", "api"})
+	n, o, _, err := parseLast([]string{"25", "--harness", "codex", "--project", "api"})
 	if err != nil || n != 25 || o.Harness != "codex" || o.Project != "api" {
 		t.Fatalf("parseLast = n:%d options:%#v err:%v", n, o, err)
 	}
-	n, o, raw, err = parseLast([]string{"5", "--since", "7d", "--role", "assistant"})
+	n, o, raw, err := parseLast([]string{"5", "--since", "7d", "--role", "assistant"})
 	if err != nil || n != 5 || o.Since != 7*24*time.Hour || o.Role != "assistant" {
 		t.Fatalf("parseLast since/role = n:%d options:%#v err:%v", n, o, err)
 	}
