@@ -202,3 +202,76 @@ func TestHarnessAuthored(t *testing.T) {
 		}
 	}
 }
+
+// An appended rollout is parsed from an offset, so the session_meta line is
+// never read again. Without re-reading the head the id falls back to the
+// filename — which matches the real ThreadId in 0 of 28 rollouts here — and
+// one session becomes two, undoing #635 for the sessions still in use.
+func TestCodexIncrementalParseKeepsTheThreadID(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-thread-x.jsonl")
+	head := `{"timestamp":"2026-07-31T00:00:00Z","type":"session_meta","payload":{"session_id":"SESS","id":"thread-x","cwd":"/w/app"}}` + "\n" +
+		`{"timestamp":"2026-07-31T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"first"}]}}` + "\n"
+	if err := os.WriteFile(p, []byte(head), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	full, err := ParseCodexRollout(p)
+	if err != nil || len(full) != 1 {
+		t.Fatalf("full parse: %v %#v", err, full)
+	}
+	extra := `{"timestamp":"2026-07-31T00:00:02Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"second"}]}}` + "\n"
+	if err := os.WriteFile(p, []byte(head+extra), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	inc, err := ParseCodexRolloutFromOffset(p, int64(len(head)))
+	if err != nil || len(inc) != 1 {
+		t.Fatalf("offset parse: %v %#v", err, inc)
+	}
+	if inc[0].ID != full[0].ID {
+		t.Fatalf("append split the session: %q then %q", full[0].ID, inc[0].ID)
+	}
+	if inc[0].ID != "thread-x" {
+		t.Fatalf("id = %q, want the ThreadId", inc[0].ID)
+	}
+	// The project comes from the same record and must survive the same way.
+	if inc[0].Project != full[0].Project {
+		t.Fatalf("project changed on append: %q then %q", full[0].Project, inc[0].Project)
+	}
+}
+
+// A present-but-malformed id is a shape deja does not understand. Falling back
+// to the SessionId there would silently reintroduce the collapse #635 fixes,
+// so the filename-derived id stands instead.
+func TestCodexMalformedThreadIDDoesNotCollapse(t *testing.T) {
+	dir := t.TempDir()
+	for _, shape := range []string{`123`, `null`, `{"x":1}`, `""`, `[]`, `true`} {
+		p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-shape.jsonl")
+		body := `{"timestamp":"2026-07-31T00:00:00Z","type":"session_meta","payload":{"session_id":"SHARED","id":` + shape + `,"cwd":"/w"}}` + "\n" +
+			`{"timestamp":"2026-07-31T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"x"}]}}` + "\n"
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ss, err := ParseCodexRollout(p)
+		if err != nil || len(ss) != 1 {
+			t.Fatalf("id %s: %v %#v", shape, err, ss)
+		}
+		if ss[0].ID == "SHARED" {
+			t.Errorf("id %s collapsed onto the SessionId", shape)
+		}
+	}
+	// Absent is different from malformed: an old rollout with only a SessionId
+	// keeps the identity it already has in existing indexes.
+	p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-old.jsonl")
+	body := `{"timestamp":"2026-07-31T00:00:00Z","type":"session_meta","payload":{"session_id":"LEGACY","cwd":"/w"}}` + "\n" +
+		`{"timestamp":"2026-07-31T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"x"}]}}` + "\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCodexRollout(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatal(err)
+	}
+	if ss[0].ID != "LEGACY" {
+		t.Fatalf("id = %q, want the SessionId when no ThreadId exists", ss[0].ID)
+	}
+}

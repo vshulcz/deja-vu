@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -73,6 +75,20 @@ func ParseCodexRollout(path string) ([]model.Session, error) {
 
 func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, error) {
 	s := model.Session{Harness: "codex", ID: strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "rollout-"), ".jsonl"), Project: projectName(filepath.Dir(path)), Path: path}
+	// An appended rollout is parsed from where the last read stopped, so the
+	// session_meta line at the top is never seen again and the id falls back
+	// to the filename — which matches the real ThreadId in 0 of 28 rollouts on
+	// this machine. The session then splits in two and every further turn
+	// lands in the second half, undoing #635 for exactly the sessions someone
+	// is still talking in. One line re-read is cheaper than carrying state.
+	if offset > 0 {
+		if id, cwd := codexRolloutHead(path); id != "" {
+			s.ID = id
+			if cwd != "" {
+				s.Project = projectName(cwd)
+			}
+		}
+	}
 	// A command and its exit code arrive in separate records joined by call_id,
 	// so the command line is annotated after the fact — the same shape opencode
 	// gets for free from a column.
@@ -96,14 +112,22 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			// payload.id equals the filename, so this agrees with the id
 			// derived above; it is set explicitly because agreeing by accident
 			// is not the same as agreeing on purpose.
-			if id, _ := payload["id"].(string); id != "" {
-				s.ID = id
-			} else if id, _ := payload["session_id"].(string); id != "" {
-				// Rollouts written before Codex split the two carry only a
-				// SessionId, and without threads there is nothing to collapse:
-				// keeping it preserves the identity those sessions already
-				// have in existing indexes.
-				s.ID = id
+			if id, ok := payload["id"].(string); ok {
+				// Present and a string: the ThreadId, even if empty.
+				if id != "" {
+					s.ID = id
+				}
+			} else if _, present := payload["id"]; !present {
+				// Absent, not malformed. Rollouts written before Codex split
+				// the two carry only a SessionId, and without threads there is
+				// nothing to collapse: keeping it preserves the identity those
+				// sessions already have in existing indexes. A present-but-not-
+				// a-string id is a shape deja does not understand, and falling
+				// back to the SessionId there would silently reintroduce the
+				// collapse (#635) — the filename-derived id stands instead.
+				if id, _ := payload["session_id"].(string); id != "" {
+					s.ID = id
+				}
 			}
 			if c, _ := payload["cwd"].(string); c != "" {
 				cwd = c
@@ -259,4 +283,35 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 		}
 		s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: f + "\n" + span, Time: t})
 	}
+}
+
+// codexRolloutHead reads the identity a rollout declares in its first record.
+func codexRolloutHead(path string) (id, cwd string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	// The meta record is the first line in every rollout Codex writes; a few
+	// lines of slack costs nothing and covers a format that adds a preamble.
+	for i := 0; i < 8 && sc.Scan(); i++ {
+		var rec struct {
+			Type    string `json:"type"`
+			Payload struct {
+				ID        string `json:"id"`
+				SessionID string `json:"session_id"`
+				CWD       string `json:"cwd"`
+			} `json:"payload"`
+		}
+		if json.Unmarshal(sc.Bytes(), &rec) != nil || rec.Type != "session_meta" {
+			continue
+		}
+		if rec.Payload.ID != "" {
+			return rec.Payload.ID, rec.Payload.CWD
+		}
+		return rec.Payload.SessionID, rec.Payload.CWD
+	}
+	return "", ""
 }
