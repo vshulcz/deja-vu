@@ -50,7 +50,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		if s.Policy != "" {
 			pol = " · policy: " + s.Policy
 		}
-		fmt.Fprintf(w, "# %s · %s · %d sessions · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, humanBytes(int64(s.Bytes)), pol)
+		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), pol)
 		fmt.Fprintln(w, s.Digest)
 		return nil
 	}
@@ -71,7 +71,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		}
 		sess := ""
 		if e.Sessions > 0 {
-			sess = fmt.Sprintf(" · %d sessions", e.Sessions)
+			sess = fmt.Sprintf(" · %d session%s", e.Sessions, pluralS(e.Sessions))
 		}
 		fmt.Fprintf(w, "%s  %-14s %s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, mark)
 	}

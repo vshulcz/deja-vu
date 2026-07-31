@@ -141,7 +141,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(near) == 0 {
-		fmt.Fprintf(stdout, "%d sessions mention %q, none of them recorded a file near it\n", scanned, q)
+		fmt.Fprintf(stdout, "%d session%s mention%s %q, none of them recorded a file near it\n", scanned, plural(scanned), verbS(scanned), q)
 		return nil
 	}
 
@@ -175,7 +175,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	if len(rows) > limit {
 		rows = rows[:limit]
 	}
-	fmt.Fprintf(stdout, "files touched while working on %q — %d sessions\n", q, scanned)
+	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s\n", q, scanned, plural(scanned))
 	for _, r := range rows {
 		fmt.Fprintf(stdout, "  %-56s %d\n", trimPath(r.path), r.n)
 	}

@@ -42,8 +42,9 @@ func runBrief(dir string, w io.Writer) error {
 	if color {
 		bold, dim, reset = logoBold, logoDim, logoReset
 	}
-	fmt.Fprintf(w, "%sdeja-vu%s %s · %s%d%s sessions across %s%d%s agents\n",
-		bold, reset, version, bold, ov.Sessions, reset, bold, ov.Harnesses, reset)
+	fmt.Fprintf(w, "%sdeja-vu%s %s · %s%d%s session%s across %s%d%s agent%s\n",
+		bold, reset, version, bold, ov.Sessions, reset, pluralS(ov.Sessions),
+		bold, ov.Harnesses, reset, pluralS(ov.Harnesses))
 
 	recalls, bytes, _ := usage.TodayWithInjections(dir)
 	line := fmt.Sprintf("today      %d session%s", ov.SessionsToday, pluralS(ov.SessionsToday))
@@ -57,7 +58,7 @@ func runBrief(dir string, w io.Writer) error {
 	fmt.Fprintln(w, line)
 
 	wr, _, _, _ := usage.Week(dir)
-	week := fmt.Sprintf("this week  %d sessions · %d recalls", ov.SessionsWeek, wr)
+	week := fmt.Sprintf("this week  %d session%s · %d recall%s", ov.SessionsWeek, pluralS(ov.SessionsWeek), wr, pluralS(wr))
 	if dv := usage.DejaVuWeek(dir); dv > 0 {
 		week += fmt.Sprintf(" · %s%d déjà vu moment%s%s", bold, dv, pluralS(dv), reset)
 	}
@@ -98,6 +99,17 @@ func runBrief(dir string, w io.Writer) error {
 	}
 	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
 	return nil
+}
+
+// plural and verbS keep "1 session mentions" from reading as "1 sessions
+// mention" — the noun and the verb disagree in opposite directions.
+func plural(n int) string { return pluralS(n) }
+
+func verbS(n int) string {
+	if n == 1 {
+		return "s"
+	}
+	return ""
 }
 
 func pluralS(n int) string {
@@ -160,7 +172,7 @@ func askedWhen(a index.AskedTwice) string {
 			break
 		}
 	}
-	times := fmt.Sprintf("%d sessions", n)
+	times := fmt.Sprintf("%d session%s", n, pluralS(n))
 	if project != "" && project != "-" {
 		times += " in " + project
 	}

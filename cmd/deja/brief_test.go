@@ -42,7 +42,9 @@ func TestBriefShowsMemoryAlive(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := out.String()
-	for _, want := range []string{"sessions across", "recent", "déjà vu moment", "deja log"} {
+	// "session across" rather than "sessions across": the count is pluralised,
+	// and a fixture with one session used to read "1 sessions across 1 agents".
+	for _, want := range []string{"session", "across", "recent", "déjà vu moment", "deja log"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("brief missing %q:\n%s", want, s)
 		}

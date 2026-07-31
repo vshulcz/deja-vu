@@ -530,7 +530,7 @@ func serviceReceipt(dir string) string {
 	}
 	raw := usage.TodayRaw(dir)
 	if raw/int64(bytes) < 2 {
-		return fmt.Sprintf(" · today: %d recalls", recalls)
+		return fmt.Sprintf(" · today: %d recall%s", recalls, pluralS(recalls))
 	}
-	return fmt.Sprintf(" · today: %d recalls, %s distilled from %s", recalls, humanBytes(int64(bytes)), humanBytes(raw))
+	return fmt.Sprintf(" · today: %d recall%s, %s distilled from %s", recalls, pluralS(recalls), humanBytes(int64(bytes)), humanBytes(raw))
 }
