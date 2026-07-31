@@ -1058,6 +1058,17 @@ func runForget(dir string, args []string) error {
 			result.Sessions, result.Messages, result.Tombstones)
 		return nil
 	}
+	// A promoted note borrows the source session's first line as its title, and
+	// the note is a separate record — so forgetting a session left that line on
+	// screen in `deja last` (#666). The note stays; only the borrowed title
+	// goes, and the parser falls back to "promoted from <src>".
+	if result.Sessions > 0 && o.Session != "" {
+		if n, err := sources.ForgetPromotedTitles(func(src string) bool {
+			return strings.Contains(src, o.Session)
+		}); err == nil && n > 0 {
+			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s\n", n, pluralS(n))
+		}
+	}
 	// Nothing matched is a different answer from nothing was dropped: the
 	// first means the selector found no session, and reporting it as a
 	// successful removal of zero leaves the reader believing they deleted

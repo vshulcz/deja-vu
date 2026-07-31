@@ -118,3 +118,87 @@ func TestConflictingNotes(t *testing.T) {
 		t.Fatalf("weak overlap conflicted: %+v", got)
 	}
 }
+
+// `promote` copies the source session's first line into the note as its title.
+// The note is a separate record, so `forget --session` removed the session and
+// left that line visible in `deja last` — the sentence most likely to carry a
+// customer name or a ticket id (#666).
+func TestForgetPromotedTitles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", path)
+	lines := []string{
+		`{"ts":"2026-07-21T10:00:00Z","project":"p","text":"cap retries at 3","kind":"promoted","session":"claude:ps1","state":"accepted","title":"our customer ACME-4471 hit the retry storm"}`,
+		`{"ts":"2026-07-21T10:00:00Z","project":"p","text":"other decision","kind":"promoted","session":"claude:other","state":"accepted","title":"an unrelated session title"}`,
+		`{"ts":"2026-07-21T10:00:00Z","project":"p","text":"a plain note","kind":"note"}`,
+		// A note of another kind that happens to name the same session: only
+		// `promote` borrows a title, so only promoted notes lose one.
+		`{"ts":"2026-07-21T10:00:00Z","project":"p","text":"a linked note","kind":"note","session":"claude:ps1","title":"a title this command must not touch"}`,
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	n, err := ForgetPromotedTitles(func(src string) bool { return strings.Contains(src, "ps1") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("cleared %d titles, want 1", n)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if strings.Contains(got, "ACME-4471") {
+		t.Errorf("the forgotten session's first line survived:\n%s", got)
+	}
+	// The decision it was promoted for is often why the raw session was safe
+	// to forget — the note itself must stay.
+	if !strings.Contains(got, "cap retries at 3") {
+		t.Errorf("the promoted decision was destroyed:\n%s", got)
+	}
+	// Unrelated notes are untouched, including plain ones.
+	if !strings.Contains(got, "an unrelated session title") || !strings.Contains(got, "a plain note") ||
+		!strings.Contains(got, "a title this command must not touch") {
+		t.Errorf("touched a note it should not have:\n%s", got)
+	}
+	// Idempotent: a second run has nothing left to clear.
+	if again, err := ForgetPromotedTitles(func(src string) bool { return strings.Contains(src, "ps1") }); err != nil || again != 0 {
+		t.Fatalf("second run cleared %d, err %v", again, err)
+	}
+}
+
+// Nothing matched must leave the file alone. Rewriting it in place for a
+// no-op risks the notes of every other session on a crash between write and
+// rename, for no change at all.
+func TestForgetPromotedTitlesLeavesTheFileAloneWhenNothingMatches(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", path)
+	line := `{"ts":"2026-07-21T10:00:00Z","project":"p","text":"d","kind":"promoted","session":"claude:other","title":"t"}`
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := ForgetPromotedTitles(func(string) bool { return false }); err != nil || n != 0 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Errorf("rewrote the notes file for a no-op: %v -> %v", before.ModTime(), after.ModTime())
+	}
+}
+
+func TestForgetPromotedTitlesWithNoNotesFile(t *testing.T) {
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(t.TempDir(), "missing.jsonl"))
+	if n, err := ForgetPromotedTitles(func(string) bool { return true }); err != nil || n != 0 {
+		t.Fatalf("n=%d err=%v — a missing notes file is not an error", n, err)
+	}
+}

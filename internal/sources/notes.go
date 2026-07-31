@@ -328,3 +328,64 @@ func noteWordSet(s string) map[string]bool {
 	}
 	return out
 }
+
+// ForgetPromotedTitles strips the source session's opening line from every
+// promoted note whose provenance matches.
+//
+// `promote` copies that line into the note as its title, and the note is a
+// separate record, so `forget --session` removed the session and left its
+// first sentence on screen in `deja last` — the sentence most likely to carry
+// a customer name or a ticket id (#666).
+//
+// The note itself survives: the decision it was promoted for is often the
+// reason the raw session was safe to forget. Only the borrowed title goes; the
+// parser already falls back to "promoted from <src>" when it is absent.
+func ForgetPromotedTitles(match func(session string) bool) (int, error) {
+	path := NotesFile()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	lines := strings.Split(string(b), "\n")
+	changed := 0
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var m map[string]any
+		if json.Unmarshal([]byte(line), &m) != nil {
+			continue
+		}
+		if kind, _ := m["kind"].(string); kind != "promoted" {
+			continue
+		}
+		src, _ := m["session"].(string)
+		if src == "" || !match(src) {
+			continue
+		}
+		if title, _ := m["title"].(string); title == "" {
+			continue
+		}
+		delete(m, "title")
+		out, err := json.Marshal(m)
+		if err != nil {
+			continue
+		}
+		lines[i] = string(out)
+		changed++
+	}
+	if changed == 0 {
+		return 0, nil
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		return 0, err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return 0, err
+	}
+	return changed, nil
+}
