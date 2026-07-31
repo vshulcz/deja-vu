@@ -94,3 +94,116 @@ func TestAntigravityRootsGlob(t *testing.T) {
 		t.Fatalf("roots = %v, want %s", roots, want)
 	}
 }
+
+// Antigravity puts prose and tool transcripts in the same MODEL stream, and
+// reading only the source made shell dumps into assistant speech — 333 of 369
+// rows on a real store, 90%, ranked as things the agent said. The step's kind
+// is what separates them, and the same header that identifies a tool step
+// carries the work: a command on "Task Description:", a file on "File Path:".
+func TestAntigravityStepSeparatesProseFromTools(t *testing.T) {
+	dir := t.TempDir()
+	logs := filepath.Join(dir, "brain", "conv-1", ".system_generated", "logs")
+	if err := os.MkdirAll(logs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The workspace the session belongs to, which the parser used to ignore.
+	cache := filepath.Join(dir, "cache")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "conversation_metadata.json"),
+		[]byte(`{"conversations":{"conv-1":{"summary":{"WorkspaceURIs":["file:///Users/me/coding/api-gateway"]}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", dir)
+	rows := []string{
+		`{"source":"USER_EXPLICIT","type":"USER_REQUEST","created_at":"2026-07-20T10:00:00Z","content":"<USER_REQUEST>\nfix the retry loop\n</USER_REQUEST>"}`,
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-07-20T10:01:00Z","content":"I will start by reading the file."}`,
+		`{"source":"MODEL","type":"RUN_COMMAND","created_at":"2026-07-20T10:02:00Z","content":"Created At: 2026-07-20T10:02:00Z\nTask Description: go test ./...\nOutput:\nFAIL\tgithub.com/x/y"}`,
+		`{"source":"MODEL","type":"VIEW_FILE","created_at":"2026-07-20T10:03:00Z","content":"Created At: 2026-07-20T10:03:00Z\nCompleted At: 2026-07-20T10:03:01Z\nFile Path: ` + "`" + `file:///w/app/retry.go` + "`" + `\nTotal Lines: 40"}`,
+		`{"source":"MODEL","type":"GREP_SEARCH","created_at":"2026-07-20T10:04:00Z","content":"Created At: 2026-07-20T10:04:00Z\nCompleted At: 2026-07-20T10:04:00Z"}`,
+	}
+	p := filepath.Join(logs, "transcript.jsonl")
+	if err := os.WriteFile(p, []byte(strings.Join(rows, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseAntigravityFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("%v %#v", err, ss)
+	}
+	// Reachable by project: every session used to report "-".
+	if ss[0].Project != "api-gateway" {
+		t.Errorf("project = %q, want the workspace from the metadata", ss[0].Project)
+	}
+	byRole := map[string][]string{}
+	for _, m := range ss[0].Messages {
+		byRole[m.Role] = append(byRole[m.Role], m.Text)
+	}
+	// Prose is the only thing that counts as speech.
+	if len(byRole["assistant"]) != 1 || !strings.Contains(byRole["assistant"][0], "reading the file") {
+		t.Errorf("assistant = %q, want only the planner prose", byRole["assistant"])
+	}
+	for _, blob := range byRole["assistant"] {
+		if strings.Contains(blob, "Task Description") || strings.Contains(blob, "File Path") {
+			t.Errorf("a tool transcript is still speech: %q", blob)
+		}
+	}
+	if len(byRole[RoleCommand]) != 1 || byRole[RoleCommand][0] != "$ go test ./..." {
+		t.Errorf("commands = %q", byRole[RoleCommand])
+	}
+	if len(byRole[RoleFiles]) != 1 || byRole[RoleFiles][0] != "/w/app/retry.go" {
+		t.Errorf("files = %q, want the plain path without the file:// scheme or backticks", byRole[RoleFiles])
+	}
+	// A step whose whole body is its own timestamps has nothing to index.
+	for _, out := range byRole[RoleToolOutput] {
+		if strings.HasPrefix(out, "Created At:") || out == "" {
+			t.Errorf("indexed a step with no content but its header: %q", out)
+		}
+	}
+}
+
+func TestAntigravityBodyDropsTheHeader(t *testing.T) {
+	got := antigravityBody("Created At: 2026-07-20T10:02:00Z\nCompleted At: 2026-07-20T10:02:01Z\nthe real output")
+	if got != "the real output" {
+		t.Fatalf("got %q", got)
+	}
+	if got := antigravityBody("Created At: x\nCompleted At: y"); got != "" {
+		t.Fatalf("a header-only step should strip to empty, got %q", got)
+	}
+}
+
+func TestAntigravityPathForms(t *testing.T) {
+	for in, want := range map[string]string{
+		"File Path: `file:///w/a.go`":              "/w/a.go",
+		"File Path: file:///w/b.go":                "/w/b.go",
+		"Created file file:///w/c.md with content": "/w/c.md",
+		"File Path: not-a-uri":                     "",
+	} {
+		if got := antigravityPath(in); got != want {
+			t.Errorf("antigravityPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Every antigravity session reported project "-", so the harness was
+// unreachable from any --project query — while the workspace sat in plain
+// JSON in a directory deja already walks.
+func TestAntigravityProjectComesFromTheMetadata(t *testing.T) {
+	root := t.TempDir()
+	cache := filepath.Join(root, "cache")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := `{"conversations":{"conv-1-abc":{"summary":{"WorkspaceURIs":["file:///Users/me/coding/api-gateway"]}}}}`
+	if err := os.WriteFile(filepath.Join(cache, "conversation_metadata.json"), []byte(meta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+	if got := antigravityProject("conv-1-abc"); got != "api-gateway" {
+		t.Fatalf("project = %q, want the workspace from the metadata", got)
+	}
+	// A conversation the metadata does not know still has to parse.
+	if got := antigravityProject("never-seen"); got != "-" {
+		t.Fatalf("unknown conversation = %q, want the placeholder", got)
+	}
+}

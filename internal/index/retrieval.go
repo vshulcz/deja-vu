@@ -1025,6 +1025,19 @@ func scanRecords(dir string, m Manifest, o query.Options, offsets []int64) ([]mo
 	return scanRecordsWithVariants(dir, m, o, offsets, nil)
 }
 
+// harnessMatches accepts the name deja prints as well as the one it stores.
+//
+// Notes are stored under the harness "deja" and narrated during indexing as
+// "notes" — so `deja index` said "notes: 5 sessions" and `--harness notes`
+// then answered "no sessions match" and exited 0. A filter that rejects the
+// name the tool just printed is a silent miss, which is the worst kind.
+func harnessMatches(stored, want string) bool {
+	if stored == want {
+		return true
+	}
+	return stored == "deja" && want == "notes"
+}
+
 // roleFiles mirrors sources.RoleFiles without importing it: this package sits
 // below sources, not above it.
 const roleFiles = "files"
@@ -1053,7 +1066,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		if !ok {
 			return
 		}
-		if o.Harness != "" && meta.Harness != o.Harness {
+		if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
 			return
 		}
 		if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
@@ -1211,7 +1224,7 @@ func sessionMetaByOrd(m Manifest) map[uint32]SessionMeta {
 }
 
 func sessionMetaMatches(meta SessionMeta, o query.Options) bool {
-	if o.Harness != "" && meta.Harness != o.Harness {
+	if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
 		return false
 	}
 	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {

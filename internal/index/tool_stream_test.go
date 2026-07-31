@@ -271,3 +271,25 @@ func TestRecentCarriesTouched(t *testing.T) {
 		t.Fatalf("Touched = %v", recent[0].Touched)
 	}
 }
+
+// Notes are stored under the harness "deja" and narrated during indexing as
+// "notes", so `deja index` printed "notes: 5 sessions" and `--harness notes`
+// answered "no sessions match" and exited 0. A filter that rejects the name
+// the tool just printed is a silent miss.
+func TestHarnessFilterAcceptsTheNameItPrints(t *testing.T) {
+	for _, c := range []struct {
+		stored, want string
+		ok           bool
+	}{
+		{"deja", "notes", true},
+		{"deja", "deja", true},
+		{"claude", "claude", true},
+		{"claude", "notes", false},
+		{"notes", "deja", false},
+		{"codex", "claude", false},
+	} {
+		if got := harnessMatches(c.stored, c.want); got != c.ok {
+			t.Errorf("harnessMatches(%q, %q) = %v, want %v", c.stored, c.want, got, c.ok)
+		}
+	}
+}
