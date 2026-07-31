@@ -177,6 +177,8 @@ the end returns an empty `messages` array and a `returned` count of zero.
   "total_sessions": 42,
   "total_messages": 318,
   "repeat_questions": 3,
+  "spans": 3836,
+  "span_files": 862,
   "harnesses": [
     {"harness": "claude", "sessions": 30, "messages": 240}
   ],
@@ -215,6 +217,10 @@ the end returns an empty `messages` array and a `returned` count of zero.
   "sidecar_size": 12345
 }
 ```
+
+`spans` and `span_files` count the replaced spans `deja restore` can hand back
+and the files they belong to. Both are omitted when the index holds none.
+
 
 Optional fields are omitted when zero or empty — `sidecar_size`, for one,
 appears only after `deja embed` has built a semantic sidecar. The heatmap grid used by

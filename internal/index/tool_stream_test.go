@@ -183,3 +183,43 @@ func TestSpanInventoryOnAStoreWithNoSpans(t *testing.T) {
 		t.Fatal("no index should report an error rather than zero")
 	}
 }
+
+// SpanInventory guards against a span whose first line is empty, and that
+// guard cannot be exercised through a parser: both extractors drop an edit
+// with no path, so no such record can be written. Measured on a real store:
+// 0 edit records with an empty first line, 0 with no newline at all.
+//
+// So this pins the invariant the guard rests on rather than the guard itself.
+// If a future parser starts recording pathless spans, the file count here
+// changes and this fails — which is the moment the guard starts mattering.
+func TestSpanInventorySkipsSpansWithNoPath(t *testing.T) {
+	tmp := t.TempDir()
+	proj := filepath.Join(tmp, "claude", "-tmp-blank")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// old_string carrying a leading newline makes the stored span begin with
+	// its own newline once the path line is written above it.
+	body := `{"type":"user","sessionId":"b1","cwd":"/w","timestamp":"2026-07-20T10:00:00Z","message":{"role":"user","content":"edit it"}}` + "\n" +
+		`{"type":"assistant","sessionId":"b1","cwd":"/w","timestamp":"2026-07-20T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"","old_string":"orphan span with no path","new_string":"x"}}]}}` + "\n" +
+		`{"type":"assistant","sessionId":"b1","cwd":"/w","timestamp":"2026-07-20T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/real.go","old_string":"real old bytes","new_string":"y"}}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "b1.jsonl"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, files, err := SpanInventory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if files != 1 {
+		t.Fatalf("files = %d, want the one span that names a file", files)
+	}
+}

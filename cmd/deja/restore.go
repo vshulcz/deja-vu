@@ -105,35 +105,42 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 	return nil
 }
 
+// findRestoreSpans scans rather than searches.
+//
+// Ranked retrieval was the wrong instrument here: it samples postings per
+// session before ranking, so in a session with hundreds of edit records the
+// one being looked for never reached the candidate set and the session did not
+// surface at all. Measured on a 1153-session store: 41 of 1,621 recorded paths
+// were unreachable that way, 76 spans in total, and both traced cases sat in
+// the two largest sessions — which is the worst place to lose them, since a
+// session where an agent replaced a lot of code is exactly the large one
+// (#647).
+//
+// Everywhere else in deja ranking is right, because the reader wants the most
+// relevant session. Restore is the opposite: the file name is an exact key,
+// the person knows what they lost, and a near-miss is worth nothing. The scan
+// costs ~180 ms on an 82 MB log, which for a command run once, in a panic, is
+// not a cost.
 func findRestoreSpans(dir string, path string) ([]restoreSpan, error) {
-	base := filepath.Base(path)
-	o := search.Options{Query: base, All: true, Role: "edit"}
+	o := search.Options{Query: filepath.Base(path), All: true, Role: "edit"}
 	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
 		return nil, ensureError(dir, err)
 	}
-	hits, err := index.Search(dir, o)
-	if err != nil {
-		return nil, fmt.Errorf("search: %w", err)
-	}
-	if len(hits) > restoreMaxSessions {
-		hits = hits[:restoreMaxSessions]
-	}
 	var spans []restoreSpan
-	for _, h := range hits {
-		full, ok, err := index.FindByIdentity(dir, h.Harness, h.ID)
-		if err != nil || !ok {
-			continue
+	seen := map[string]bool{}
+	err := index.EachRecordOfRole(dir, index.RoleEdit, func(meta index.SessionMeta, r index.Record) {
+		if len(seen) >= restoreMaxSessions && !seen[meta.Harness+":"+meta.ID] {
+			return
 		}
-		for _, m := range full.Messages {
-			if m.Role != "edit" {
-				continue
-			}
-			recorded, body, found := strings.Cut(m.Text, "\n")
-			if !found || !pathMatches(recorded, path) {
-				continue
-			}
-			spans = append(spans, restoreSpan{when: m.Time, session: h.ID, harness: h.Harness, body: body})
+		recorded, body, found := strings.Cut(r.Text, "\n")
+		if !found || !pathMatches(recorded, path) {
+			return
 		}
+		seen[meta.Harness+":"+meta.ID] = true
+		spans = append(spans, restoreSpan{when: r.Time, session: meta.ID, harness: meta.Harness, body: body})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("restore: %w", err)
 	}
 	// Newest first: the span someone wants back is almost always the last one
 	// that was replaced.

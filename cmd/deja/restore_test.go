@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func writeEditFixture(t *testing.T) string {
@@ -122,5 +124,71 @@ func TestShortID(t *testing.T) {
 	}
 	if got := shortID("short"); got != "short" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// Ranked retrieval samples postings per session, so in a session with hundreds
+// of edit records the one being looked for never reached the candidate set and
+// the whole session stayed invisible. Measured on a real store: 41 of 1,621
+// recorded paths were unreachable, and both traced cases sat in the two
+// largest sessions — the worst place to lose them (#647).
+func TestRestoreFindsSpansInACrowdedSession(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-big")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	edit := func(path, old string) string {
+		return `{"type":"assistant","sessionId":"big","cwd":"/w","timestamp":"2026-07-20T10:00:00Z",` +
+			`"message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + path +
+			`","old_string":"` + old + `","new_string":"new"}}]}}` + "\n"
+	}
+	var b strings.Builder
+	// A session with hundreds of edit records, which is the shape restore has
+	// to handle.
+	//
+	// Worth stating plainly: this test does not fail against the ranked
+	// implementation. I tried to reproduce the miss synthetically — 400 edits,
+	// then 2,000 and 9,000 speech messages carrying the needle word — and the
+	// ranked path found the span every time. The failure is real but its
+	// trigger is something the fixtures do not capture: on the live store
+	// `index.Search("telebot.go", Role:"edit")` returns 0 sessions while the
+	// log holds 3 matching spans, and `deja restore telebot.go` went from "no
+	// replaced spans recorded" to listing all three. So this pins the scan's
+	// correctness; the regression it guards against is documented in #647
+	// with the numbers, not reproduced here.
+	b.WriteString(`{"type":"user","sessionId":"big","cwd":"/w","timestamp":"2026-07-20T09:00:00Z","message":{"role":"user","content":"a long refactor"}}` + "\n")
+	b.WriteString(edit("/w/needle.go", "the bytes that stopped existing"))
+	for i := 0; i < 200; i++ {
+		b.WriteString(fmt.Sprintf(`{"type":"assistant","sessionId":"big","cwd":"/w","timestamp":"2026-07-20T10:00:00Z","message":{"role":"assistant","content":"step %d of the refactor, needle and other words"}}`, i) + "\n")
+	}
+	for i := 0; i < 400; i++ {
+		b.WriteString(edit(fmt.Sprintf("/w/filler%03d.go", i), fmt.Sprintf("old filler %d", i)))
+	}
+	if err := os.WriteFile(filepath.Join(root, "big.jsonl"), []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	spans, err := findRestoreSpans(dir, "needle.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spans) != 1 {
+		t.Fatalf("found %d spans for a file buried in a crowded session, want 1", len(spans))
+	}
+	if !strings.Contains(spans[0].body, "stopped existing") {
+		t.Fatalf("wrong span: %q", spans[0].body)
+	}
+	// What stats counts and what restore hands back must be the same number.
+	total, files, err := index.SpanInventory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 401 || files != 401 {
+		t.Fatalf("inventory = %d spans / %d files, want 401 each", total, files)
 	}
 }

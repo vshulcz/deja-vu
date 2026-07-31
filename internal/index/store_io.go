@@ -908,12 +908,23 @@ func decodeRecordIn(b []byte, rel int, t *recordTables) (Record, bool) {
 // because every lookup walks the whole log. One pass over records.bin, keyed
 // by the manifest, is the same data in a single scan.
 func EachToolOutput(dir string, fn func(SessionMeta, Record)) error {
+	return EachRecordOfRole(dir, roleToolOutput, fn)
+}
+
+// EachRecordOfRole streams every record of one role with the session it came
+// from. Ranked retrieval is the wrong instrument when the caller has an exact
+// key and needs every match rather than the best ones — restore is that case
+// (#647), and so is any inventory of what the store holds.
+func EachRecordOfRole(dir, role string, fn func(SessionMeta, Record)) error {
+	if dir == "" {
+		dir = DefaultDir()
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return err
 	}
 	return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		if r.Role != roleToolOutput {
+		if r.Role != role {
 			return
 		}
 		if meta, ok := m.Sessions[r.Key]; ok {
@@ -921,6 +932,9 @@ func EachToolOutput(dir string, fn func(SessionMeta, Record)) error {
 		}
 	})
 }
+
+// RoleEdit is the record kind holding the exact bytes an agent replaced.
+const RoleEdit = roleEdit
 
 // SpanInventory counts the replaced spans the store holds and the files they
 // belong to.
