@@ -227,3 +227,17 @@ func AllMeta(dir string) ([]SessionMeta, error) {
 	}
 	return out, nil
 }
+
+// SessionCount reports how many sessions the store holds, without reading a
+// record. A caller reporting an empty result needs the size of the corpus, not
+// the size of whatever it just loaded.
+func SessionCount(dir string) (int, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0, err
+	}
+	return len(m.Sessions), nil
+}

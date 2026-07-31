@@ -339,6 +339,14 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		if o.JSON {
 			return printRecentJSON(os.Stdout, nil, sourceInstance)
 		}
+		// "Run deja index" is advice for an empty store. With a filter set it
+		// is advice for a state the tool is not in: indexing changes nothing
+		// and doctor reports the stores as found. Name what emptied the result
+		// instead (#637).
+		if where := activeFilters(o); where != "" {
+			fmt.Fprintf(os.Stderr, "deja: no sessions match %s\n", where)
+			return nil
+		}
 		fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions indexed yet"))
 		return nil
 	}
@@ -453,7 +461,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		o.Total = len(hits)
 	}
 	if len(hits) == 0 {
-		printNoMatches(os.Stderr, o.Query, len(ss))
+		printNoMatches(os.Stderr, dir, o.Query)
 	}
 	search.Print(os.Stdout, hits, o)
 	return nil
@@ -478,8 +486,48 @@ func printStemmed(w io.Writer, variants map[string][]string) {
 	}
 }
 
-func printNoMatches(w io.Writer, q string, n int) {
-	fmt.Fprintf(w, "deja: no matches in %d indexed sessions — try fewer words or --re (query %q)\n", n, q)
+// printNoMatches says how big the store actually is, not how many sessions the
+// query happened to load.
+//
+// On the index-backed path the loaded set is empty by definition when nothing
+// matched, so this printed "no matches in 0 indexed sessions" for a perfectly
+// healthy index — and internal/index/manifest.go reserves that exact sentence
+// as the signature of a corrupt store, on the grounds that a reader told the
+// index holds zero sessions concludes the tool is broken rather than that
+// their query missed. It fired on every ordinary miss, so the signature could
+// not be used to recognise the failure it was written for (#637).
+func printNoMatches(w io.Writer, dir, q string) {
+	if n, err := index.SessionCount(dir); err == nil {
+		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
+		return
+	}
+	fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
+}
+
+// activeFilters names the filters a caller set, so an empty result can say
+// which of them emptied it rather than blaming the index.
+func activeFilters(o search.Options) string {
+	var parts []string
+	if o.Harness != "" {
+		parts = append(parts, fmt.Sprintf("harness %q", o.Harness))
+	}
+	if o.Project != "" {
+		parts = append(parts, fmt.Sprintf("project %q", o.Project))
+	}
+	if o.Role != "" {
+		parts = append(parts, fmt.Sprintf("role %q", o.Role))
+	}
+	if o.Since != 0 {
+		parts = append(parts, fmt.Sprintf("since %s", o.Since))
+	}
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	default:
+		return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
+	}
 }
 
 func clearWarmupSentinel() {

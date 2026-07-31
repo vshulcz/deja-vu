@@ -33,6 +33,26 @@ func withTempStores(t *testing.T) string {
 	return h
 }
 
+// captureRunStderr is captureRun for the channel advice goes to.
+func captureRunStderr(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	old := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
+	err = run(args)
+	_ = w.Close()
+	os.Stderr = old
+	return <-done, err
+}
+
 func captureRun(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	old := os.Stdout
@@ -551,12 +571,41 @@ func TestStemmedOutputIsDeterministic(t *testing.T) {
 	}
 }
 
-func TestPrintNoMatchesHelpfulMessage(t *testing.T) {
+// The count is the size of the store, not the size of whatever the query
+// loaded — which on the index-backed path is zero by definition when nothing
+// matched. "no matches in 0 indexed sessions" is reserved in
+// internal/index/manifest.go as the signature of a corrupt store, and it was
+// printing on every ordinary miss (#637).
+func TestPrintNoMatchesReportsTheStoreSize(t *testing.T) {
+	dir := seedBriefIndex(t)
 	var b bytes.Buffer
-	printNoMatches(&b, "jwt refresh token", 3)
+	printNoMatches(&b, dir, "jwt refresh token")
 	out := b.String()
-	if !strings.Contains(out, `deja: no matches in 3 indexed sessions — try fewer words or --re`) || !strings.Contains(out, `query "jwt refresh token"`) {
+	if strings.Contains(out, "in 0 indexed session") {
+		t.Fatalf("printed the corruption signature for a healthy index: %q", out)
+	}
+	if !strings.Contains(out, "in 1 indexed session ") || !strings.Contains(out, `query "jwt refresh token"`) {
 		t.Fatalf("bad no-match message: %q", out)
+	}
+	// No index at all: say nothing rather than a wrong number.
+	var b2 bytes.Buffer
+	printNoMatches(&b2, filepath.Join(t.TempDir(), "gone"), "q")
+	if strings.Contains(b2.String(), "indexed session") {
+		t.Fatalf("invented a count with no index: %q", b2.String())
+	}
+}
+
+func TestActiveFiltersNamesWhatEmptiedTheResult(t *testing.T) {
+	if got := activeFilters(search.Options{}); got != "" {
+		t.Fatalf("no filters set, got %q", got)
+	}
+	if got := activeFilters(search.Options{Harness: "codex"}); got != `harness "codex"` {
+		t.Fatalf("got %q", got)
+	}
+	got := activeFilters(search.Options{Harness: "codex", Role: "command", Since: 24 * time.Hour})
+	if !strings.Contains(got, `harness "codex"`) || !strings.Contains(got, `role "command"`) ||
+		!strings.Contains(got, "since 24h") || !strings.Contains(got, " and ") {
+		t.Fatalf("got %q", got)
 	}
 }
 
@@ -1093,5 +1142,35 @@ func TestSearchFlagsAcceptTheEqualsForm(t *testing.T) {
 	// An unknown flag with a value is still an unknown flag, not a query term.
 	if _, err := parseSearch([]string{"--nope=1", "needle"}); err == nil {
 		t.Log("unknown --flag=value is treated as a query term; acceptable, but worth knowing")
+	}
+}
+
+// "run deja index" is advice for an empty store. With a filter set it is
+// advice for a state the tool is not in: indexing changes nothing and doctor
+// reports the stores as found (#637).
+func TestLastWithFiltersNamesTheFilter(t *testing.T) {
+	dir := seedBriefIndex(t)
+	_ = dir
+	out, err := captureRunStderr(t, "last", "3", "--harness", "nosuchharness")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "no sessions indexed yet") {
+		t.Fatalf("blamed the index for a filter: %q", out)
+	}
+	if !strings.Contains(out, `harness "nosuchharness"`) {
+		t.Fatalf("did not name the filter: %q", out)
+	}
+	// Unfiltered on an empty store keeps the original advice, which is right
+	// for the fresh-install case it was written for.
+	empty := t.TempDir()
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(empty, "index.db"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(empty, "none"))
+	out, err = captureRunStderr(t, "last", "3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "no sessions indexed yet") {
+		t.Fatalf("lost the empty-store advice: %q", out)
 	}
 }

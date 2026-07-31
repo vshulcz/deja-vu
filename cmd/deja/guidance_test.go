@@ -285,3 +285,54 @@ func TestInstallGuidanceSkillErrorBranches(t *testing.T) {
 		t.Fatalf("antigravity re-uninstall = %#v err=%v", r, err)
 	}
 }
+
+// Guidance is "written" when deja's block is in the file, not when the file
+// exists. Anyone keeping their own AGENTS.md was told deja had written
+// guidance there on a machine where install had never run (#637).
+func TestGuidanceStatusReadsTheMarkerNotTheFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(home, ".codex", "AGENTS.md")
+
+	if got := guidanceStatus("codex"); got != "missing" {
+		t.Fatalf("no file at all: got %q", got)
+	}
+	if err := os.WriteFile(path, []byte("# my own agents file\n\nnothing from deja\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := guidanceStatus("codex"); got != "absent" {
+		t.Fatalf("someone else's file: got %q, want absent", got)
+	}
+	if err := os.WriteFile(path, []byte("# mine\n\n"+guidanceStart+"\nbody\n"+guidanceEnd+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := guidanceStatus("codex"); got != "written" {
+		t.Fatalf("our block is in it: got %q", got)
+	}
+}
+
+// A skill file is deja's own, written whole, and carries no marker — so the
+// marker check must not apply to it.
+func TestGuidanceStatusForAFileDejaOwnsWhole(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	skill := filepath.Join(home, ".claude", "skills", "deja-history")
+	if err := os.MkdirAll(skill, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := guidanceStatus("claude-code"); got != "missing" {
+		t.Fatalf("no skill file: got %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "SKILL.md"), []byte("---\nname: deja-history\n---\n\nbody with no marker\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := guidanceStatus("claude-code"); got != "written" {
+		t.Fatalf("a skill file deja wrote whole: got %q, want written", got)
+	}
+}
