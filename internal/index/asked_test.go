@@ -260,3 +260,45 @@ func TestForgetDryRunPredictsWhatTheRealRunDoes(t *testing.T) {
 		t.Fatalf("the dry run promised %+v and the real run did %+v", dry, real)
 	}
 }
+
+// deepverify compares what a source parses to what the index holds. It has to
+// count what ingestion would *keep*: a message that is empty, or that strips to
+// empty once deja's own injected recall is removed, is never written — so
+// counting it reported drift on a healthy index and told the reader to rebuild,
+// which reproduces it. Seen on a real codex session: "source parses 6 messages,
+// index holds 5", surviving every rebuild.
+func TestDeepVerifyIgnoresMessagesIngestionWouldDrop(t *testing.T) {
+	msgs := []model.Message{
+		{Role: "user", Text: "a real question about the pool"},
+		{Role: "user", Text: "   "},
+		{Role: "user", Text: ""},
+		{Role: "assistant", Text: "a real answer about pgx"},
+	}
+	seen := msgSeen{}
+	want := 0
+	for _, m := range msgs {
+		if strings.TrimSpace(stripSelfRecall(m.Text)) == "" {
+			continue
+		}
+		if !seen.dup("k", m.Role, m.Time, m.Text) {
+			want++
+		}
+	}
+	if want != 2 {
+		t.Fatalf("counted %d messages, want the two with content", want)
+	}
+	// A genuinely missing message must still count, or the check stops working.
+	seen2 := msgSeen{}
+	n := 0
+	for _, m := range append(msgs, model.Message{Role: "user", Text: "a third real one"}) {
+		if strings.TrimSpace(stripSelfRecall(m.Text)) == "" {
+			continue
+		}
+		if !seen2.dup("k", m.Role, m.Time, m.Text) {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("counted %d, want three — real content must never be skipped", n)
+	}
+}

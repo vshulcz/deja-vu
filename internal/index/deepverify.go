@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -113,10 +114,16 @@ func DeepVerify(dir string) (DeepReport, error) {
 				report.Findings = append(report.Findings, DeepFinding{Kind: "parse-drift", Detail: key + " parses from " + p + " but is absent from the index"})
 				continue
 			}
-			// Count with the same dedup ingestion applies, so duplicate
-			// messages in the source do not read as lost memory.
+			// Count exactly what ingestion would keep, or the check reports
+			// drift on a healthy index and tells the reader to rebuild — which
+			// reproduces it. Two rules apply beyond dedup: a message that is
+			// empty, or that strips to empty once deja's own injected recall
+			// and harness plumbing are removed (#551), is never written.
 			want := 0
 			for _, msg := range s.Messages {
+				if strings.TrimSpace(stripSelfRecall(msg.Text)) == "" {
+					continue
+				}
 				if !seen.dup(key, msg.Role, msg.Time, msg.Text) {
 					want++
 				}
