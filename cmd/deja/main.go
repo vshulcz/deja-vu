@@ -324,7 +324,7 @@ func cmdCtx(dir string, rest []string) error {
 }
 
 func cmdLast(dir string, rest []string, sourceInstance string) error {
-	n, o, err := parseLast(rest)
+	n, o, sinceRaw, err := parseLast(rest)
 	if err != nil {
 		return err
 	}
@@ -343,7 +343,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// is advice for a state the tool is not in: indexing changes nothing
 		// and doctor reports the stores as found. Name what emptied the result
 		// instead (#637).
-		if where := activeFilters(o); where != "" {
+		if where := activeFilters(o, sinceRaw); where != "" {
 			fmt.Fprintf(os.Stderr, "deja: no sessions match %s\n", where)
 			return nil
 		}
@@ -505,8 +505,9 @@ func printNoMatches(w io.Writer, dir, q string) {
 }
 
 // activeFilters names the filters a caller set, so an empty result can say
-// which of them emptied it rather than blaming the index.
-func activeFilters(o search.Options) string {
+// which of them emptied it rather than blaming the index. sinceRaw carries
+// what the reader actually typed: "168h0m0s" is not the flag they passed.
+func activeFilters(o search.Options, sinceRaw string) string {
 	var parts []string
 	if o.Harness != "" {
 		parts = append(parts, fmt.Sprintf("harness %q", o.Harness))
@@ -517,8 +518,16 @@ func activeFilters(o search.Options) string {
 	if o.Role != "" {
 		parts = append(parts, fmt.Sprintf("role %q", o.Role))
 	}
-	if o.Since != 0 {
-		parts = append(parts, fmt.Sprintf("since %s", o.Since))
+	// The same predicate filterRecentSources uses. parseDur accepts a negative
+	// duration, and a negative Since filters nothing — naming it would report a
+	// filter that was never applied and hide the empty-store advice, which is
+	// the right answer there.
+	if o.Since > 0 {
+		since := sinceRaw
+		if since == "" {
+			since = o.Since.String()
+		}
+		parts = append(parts, "since "+since)
 	}
 	switch len(parts) {
 	case 0:
@@ -608,7 +617,8 @@ func recentMatching(dir string, n int, o search.Options) ([]model.Session, error
 	return search.Recent(ss, n), nil
 }
 
-func parseLast(args []string) (int, search.Options, error) {
+func parseLast(args []string) (int, search.Options, string, error) {
+	sinceRaw := ""
 	n := 10
 	seenN := false
 	o := search.Options{}
@@ -619,7 +629,7 @@ func parseLast(args []string) (int, search.Options, error) {
 			o.JSON = true
 		case "--harness", "--project", "--since", "--role":
 			if i+1 >= len(args) {
-				return n, o, fmt.Errorf("%s needs value", a)
+				return n, o, sinceRaw, fmt.Errorf("%s needs value", a)
 			}
 			i++
 			v := args[i]
@@ -633,13 +643,14 @@ func parseLast(args []string) (int, search.Options, error) {
 			default:
 				d, err := parseDur(v)
 				if err != nil {
-					return n, o, err
+					return n, o, sinceRaw, err
 				}
 				o.Since = d
+				sinceRaw = v
 			}
 		default:
 			if strings.HasPrefix(a, "-") {
-				return n, o, fmt.Errorf("last: unknown flag %q", a)
+				return n, o, sinceRaw, fmt.Errorf("last: unknown flag %q", a)
 			}
 			if !seenN {
 				if x, err := strconv.Atoi(a); err == nil {
@@ -649,7 +660,7 @@ func parseLast(args []string) (int, search.Options, error) {
 			}
 		}
 	}
-	return n, o, nil
+	return n, o, sinceRaw, nil
 }
 
 func filterRecentSources(ss []model.Session, o search.Options) []model.Session {

@@ -150,9 +150,13 @@ func recordsIntact(dir string, m Manifest) bool {
 	// The postings live in buckets/, and losing that directory is not
 	// hypothetical: a partial copy, an interrupted sync, a `find -delete` that
 	// caught too much. The manifest survives, so the index reads as built and
-	// up to date while every search answers "no matches in 0 indexed sessions"
-	// — the one failure a memory tool must not present as an empty result,
-	// because the reader concludes it is useless rather than broken.
+	// up to date while every search answers with nothing — the one failure a
+	// memory tool must not present as an empty result, because the reader
+	// concludes it is useless rather than broken.
+	//
+	// This check is the detector. The wording of the empty-result message
+	// never was: it said "no matches in 0 indexed sessions" on every ordinary
+	// miss too, and since #637 it reports the manifest count instead.
 	if len(m.Sessions) > 0 {
 		bi, err := os.Stat(filepath.Join(dir, "buckets"))
 		if err != nil || !bi.IsDir() {
