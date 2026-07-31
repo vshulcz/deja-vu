@@ -159,9 +159,13 @@ func codexCallOutput(s *model.Session, payload map[string]any, calls map[string]
 	if out == "" {
 		return
 	}
-	if m := codexExit.FindStringSubmatch(out); m != nil {
+	// The id is read with the comma-ok form on purpose: a record without a
+	// call_id is not an error, and asserting it bare turns one into a panic
+	// that takes the whole parse down.
+	id, _ := payload["call_id"].(string)
+	if m := codexExit.FindStringSubmatch(out); m != nil && id != "" {
 		if code, err := strconv.Atoi(m[1]); err == nil && code > 0 {
-			if i, ok := calls[payload["call_id"].(string)]; ok && i < len(s.Messages) {
+			if i, ok := calls[id]; ok && i < len(s.Messages) {
 				s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 			}
 		}
@@ -196,6 +200,7 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 		return
 	}
 	var files []string
+	seen := map[string]bool{}
 	removed := map[string][]string{}
 	current := ""
 	for _, line := range strings.Split(body, "\n") {
@@ -204,7 +209,10 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 			if cwd != "" && !filepath.IsAbs(current) {
 				current = filepath.Join(cwd, current)
 			}
-			files = append(files, current)
+			if !seen[current] {
+				seen[current] = true
+				files = append(files, current)
+			}
 			continue
 		}
 		// A removed line, not the "--- a/x" header of a unified diff: this
