@@ -41,7 +41,7 @@ func (r *chunkReader) Read(p []byte) (int, error) {
 
 func TestDrainStdinNonFileReader(t *testing.T) {
 	r := &chunkReader{chunks: []string{"{}", "ignored"}}
-	drainStdin(r)
+	readStatuslineInput(r)
 	if r.reads != len(r.chunks) {
 		t.Fatalf("reads = %d, want %d", r.reads, len(r.chunks))
 	}

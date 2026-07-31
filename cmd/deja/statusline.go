@@ -10,8 +10,11 @@ import (
 )
 
 // runStatusline prints one line for a status bar: how much memory deja served
-// to agents today. It must stay fast and quiet — no index access, no locks —
-// because status bars call it constantly.
+// to agents today, and what earlier sessions decided about the file this one
+// is working on. It must stay fast and quiet — no lock, no fork, no record
+// read — because status bars call it constantly. Since #581 it does read the
+// manifest: measured at 2 ms cold on a 1149-session store, and it is one file
+// rather than the log.
 func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	in := readStatuslineInput(stdin)
 	// A first build takes a while and runs detached. The status bar is the
@@ -55,17 +58,6 @@ func warmupBar(st *warmupStatus) string {
 		}
 	}
 	return "▕" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "▏"
-}
-
-// Claude Code pipes session JSON to statusline commands. Leaving the pipe
-// unread can block the caller on some platforms, so it is always consumed —
-// and since #581 it is also parsed, for the transcript path that identifies
-// the current session.
-func drainStdin(r io.Reader) {
-	if !pipedStdin(r) {
-		return
-	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(r, 1<<20))
 }
 
 // pipedStdin reports whether anything was actually piped in. An interactive
