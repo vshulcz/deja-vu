@@ -103,3 +103,20 @@ func TestRooGuidanceGoesToGlobalRules(t *testing.T) {
 		t.Fatalf("uninstall left the block:\n%s", b)
 	}
 }
+
+// Roo only writes MCP settings into hosts it has actually run in, so on a
+// machine without one nothing is written — and the message used to be
+// "unchanged roo", naming a path that does not exist and explaining nothing.
+func TestRooSaysWhyNothingWasWritten(t *testing.T) {
+	hermeticEnv(t)
+	res, err := installRoo("/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Path != "" {
+		t.Fatalf("no host means no path to report, got %q", res.Path)
+	}
+	if !strings.Contains(res.Action, "no Roo host") {
+		t.Fatalf("the reader needs to know why: %q", res.Action)
+	}
+}

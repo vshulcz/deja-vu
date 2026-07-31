@@ -45,7 +45,11 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 		}
 	}
 	if !wrote && last.Path == "" {
-		return installResult{Path: "roo", Action: "unchanged"}, nil
+		// No host has ever run Roo here, so there is no settings file to write
+		// into and creating one would leave configuration for an editor that is
+		// not installed. Say that, rather than "unchanged roo", which names a
+		// path that does not exist and explains nothing.
+		return installResult{Action: "no Roo host found — open Roo in VS Code once, then re-run"}, nil
 	}
 	return last, nil
 }

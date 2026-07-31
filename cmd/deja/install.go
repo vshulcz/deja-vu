@@ -128,7 +128,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
 		} else {
-			fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
+			if r.Path == "" {
+				fmt.Printf("%s: %s\n", t, r.Action)
+			} else {
+				fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
+			}
 		}
 		if !uninstall && t != "statusline" {
 			mcpCount++
