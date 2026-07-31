@@ -28,10 +28,6 @@ const (
 	// before it is worth saying. Twice is a coincidence; three times is the
 	// machine telling you something.
 	frictionMinSessions = 3
-	// frictionMaxSessions bounds the read. Errors that recur do so early and
-	// often; scanning the whole store to find a third occurrence is not worth
-	// the wait on a command someone runs interactively.
-	frictionMaxSessions = 600
 	frictionLineMin     = 20
 	frictionLineMax     = 120
 )
@@ -51,44 +47,37 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	metas, err := index.Recent(dir, frictionMaxSessions)
-	if err != nil {
-		return fmt.Errorf("friction: %w", err)
-	}
-
 	type seen struct {
 		sessions map[string]bool
 		harness  map[string]bool
 		last     time.Time
 	}
 	found := map[string]*seen{}
-	for _, m := range metas {
-		full, ok, err := index.FindByIdentity(dir, m.Harness, m.ID)
-		if err != nil || !ok {
-			continue
-		}
-		key := m.Harness + ":" + m.ID
-		for _, msg := range full.Messages {
-			if msg.Role != "tool-output" {
+	sessions := map[string]bool{}
+	// One pass over the record log rather than a load per session: loading by
+	// identity walks the whole log each time, which put this command at 2m46s
+	// on a 1150-session store.
+	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
+		key := meta.Harness + ":" + meta.ID
+		sessions[key] = true
+		for _, line := range strings.Split(r.Text, "\n") {
+			line = normalizeFriction(line)
+			if !frictionLine(line) {
 				continue
 			}
-			for _, line := range strings.Split(msg.Text, "\n") {
-				line = normalizeFriction(line)
-				if !frictionLine(line) {
-					continue
-				}
-				s := found[line]
-				if s == nil {
-					s = &seen{sessions: map[string]bool{}, harness: map[string]bool{}}
-					found[line] = s
-				}
-				s.sessions[key] = true
-				s.harness[m.Harness] = true
-				if msg.Time.After(s.last) {
-					s.last = msg.Time
-				}
+			s := found[line]
+			if s == nil {
+				s = &seen{sessions: map[string]bool{}, harness: map[string]bool{}}
+				found[line] = s
+			}
+			s.sessions[key] = true
+			s.harness[meta.Harness] = true
+			if r.Time.After(s.last) {
+				s.last = r.Time
 			}
 		}
+	}); err != nil {
+		return fmt.Errorf("friction: %w", err)
 	}
 
 	type row struct {
@@ -116,14 +105,14 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		return rows[i].line < rows[j].line
 	})
 	if len(rows) == 0 {
-		fmt.Fprintf(stdout, "nothing recurring in %d sessions — no error hit %d separate sessions\n",
-			len(metas), frictionMinSessions)
+		fmt.Fprintf(stdout, "nothing recurring in %d session%s — no error hit %d separate sessions\n",
+			len(sessions), pluralS(len(sessions)), frictionMinSessions)
 		return nil
 	}
 	if len(rows) > limit {
 		rows = rows[:limit]
 	}
-	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d sessions read\n", len(metas))
+	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d session%s read\n", len(sessions), pluralS(len(sessions)))
 	for _, r := range rows {
 		where := strings.Join(r.harnesses, ", ")
 		fmt.Fprintf(stdout, "  %2d sessions  %s\n", r.n, trimFriction(r.line))

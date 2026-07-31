@@ -898,3 +898,25 @@ func decodeRecordIn(b []byte, rel int, t *recordTables) (Record, bool) {
 	r, err := decodeRecord(b[rel+4:rel+4+int(size)], t)
 	return r, err == nil
 }
+
+// EachToolOutput streams every tool-output record in the store together with
+// the session it came from.
+//
+// The alternative is loading each session by identity and reading its
+// messages, which is what `deja friction` did first: 600 sessions took 2m46s,
+// because every lookup walks the whole log. One pass over records.bin, keyed
+// by the manifest, is the same data in a single scan.
+func EachToolOutput(dir string, fn func(SessionMeta, Record)) error {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return err
+	}
+	return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		if r.Role != roleToolOutput {
+			return
+		}
+		if meta, ok := m.Sessions[r.Key]; ok {
+			fn(meta, r)
+		}
+	})
+}
