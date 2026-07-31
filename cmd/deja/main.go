@@ -493,13 +493,35 @@ func printFuzzy(w io.Writer, variants map[string][]string) {
 		keys = append(keys, token)
 	}
 	sort.Strings(keys)
+	hinted := false
 	for _, token := range keys {
 		for _, variant := range variants[token] {
 			if variant != token {
 				fmt.Fprintf(w, "deja: no exact match, trying close spellings: %s -> %s\n", token, variant)
+				// A misspelled subcommand is searched for as a word: `deja
+				// isntall` corrects to "install" and returns sessions that
+				// mention installing, which is not what the typist wanted.
+				// Spelled correctly it would have run the command, so the only
+				// case this fires on is the one where the hint is wanted.
+				if !hinted && isSubcommand(variant) {
+					fmt.Fprintf(w, "deja: `%s` is also a command — run `deja %s` if that is what you meant\n", variant, variant)
+					hinted = true
+				}
 			}
 		}
 	}
+}
+
+// isSubcommand reports whether a word names something deja can run.
+func isSubcommand(word string) bool {
+	if _, ok := commands[word]; ok {
+		return true
+	}
+	switch word {
+	case "show", "last", "help":
+		return true
+	}
+	return false
 }
 
 func findByPrefix(dir, p string) (model.Session, bool, error) {
