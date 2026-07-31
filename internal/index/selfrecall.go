@@ -58,6 +58,14 @@ var injectedBlocks = [][2]string{
 // message, so requiring that costs nothing and stops the filter from eating
 // someone's sentence.
 var injectedPrefixBlocks = [][2]string{
+	// Gemini opens every session with a context block of its own — "This is
+	// the Gemini CLI. We are setting up the context for our chat." — which
+	// titled 9 of 9 sessions on this machine. Same shape as Codex's preamble,
+	// different harness: the class was not Codex-specific and looking only
+	// where a contributor pointed would have left the rest.
+	{"<session_context>", "</session_context>"},
+	// Cursor stamps a timestamp block ahead of the question it wraps.
+	{"<timestamp>", "</timestamp>"},
 	{"<environment_context>", "</environment_context>"},
 	{"<recommended_plugins>", "</recommended_plugins>"},
 	{"<permissions instructions>", "</permissions instructions>"},
@@ -85,10 +93,23 @@ const (
 // closing tag. Matched at line granularity so a line quoting one inside a real
 // message does not take the message with it.
 var injectedLines = []string{
+	// The preamble a harness writes when it resumes a compacted session. It is
+	// the harness explaining itself to the model, and it titled real sessions
+	// on this store.
+	"This session is being continued from a previous conversation",
 	"[Request interrupted by user",
 	"[Your previous response had no visible output",
 	"UserPromptSubmit hook additional context:",
 	"SessionStart hook additional context:",
+}
+
+// unwrapBlocks are wrappers whose *contents* are what the person said. The
+// tags go, the text stays — dropping the block would delete the question.
+// Cursor puts every user turn inside <user_query>; Gemini wraps deja's own
+// injected recall in <hook_context>, which is how deja's output came back
+// through the front door and got indexed as if a person had written it.
+var unwrapBlocks = [][2]string{
+	{"<user_query>", "</user_query>"},
 }
 
 // stripSelfRecall removes every recall block from a message, keeping whatever
@@ -101,6 +122,12 @@ func stripSelfRecall(text string) string {
 	}
 	for _, m := range injectedBlocks {
 		text = stripBetweenClosed(text, m[0], m[1])
+	}
+	// <hook_context> wraps deja's own recall. The recall itself is stripped by
+	// the markers above — including the HTML-escaped form Gemini stores — so
+	// what is left inside the wrapper is whatever the person typed around it.
+	for _, m := range append(unwrapBlocks, [2]string{"<hook_context>", "</hook_context>"}) {
+		text = unwrapBlock(text, m[0], m[1])
 	}
 	text = stripInjectedPrefixes(text)
 	return stripInjectedLines(text)
@@ -196,6 +223,22 @@ func closerAfter(text, open, close string) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// unwrapBlock removes a wrapper's tags and keeps what is between them.
+func unwrapBlock(text, open, close string) string {
+	for {
+		start := strings.Index(text, open)
+		if start < 0 {
+			return text
+		}
+		rest := text[start+len(open):]
+		end := strings.Index(rest, close)
+		if end < 0 {
+			return text
+		}
+		text = text[:start] + rest[:end] + rest[end+len(close):]
+	}
 }
 
 // stripBetweenClosed removes only *complete* blocks. An unclosed marker is

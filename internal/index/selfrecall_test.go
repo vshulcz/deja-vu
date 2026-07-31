@@ -182,3 +182,58 @@ func TestUnclosedPrefixBlockIsLeftAlone(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// The preamble class is not Codex-specific. Looking only where a contributor
+// pointed left Cursor and Gemini titling every session with plumbing: 13 of 13
+// and 9 of 9 on this machine.
+func TestStripsCursorAndGeminiWrappers(t *testing.T) {
+	// Cursor wraps the real question; the tags go, the question stays.
+	cursor := "<timestamp>Friday, Jul 31, 2026, 2:07 PM (UTC+3)</timestamp>\n<user_query>\nCreate notes.txt containing alpha\n</user_query>"
+	if got := strings.TrimSpace(stripSelfRecall(cursor)); got != "Create notes.txt containing alpha" {
+		t.Fatalf("cursor: got %q", got)
+	}
+	// Gemini opens with its own context block.
+	gemini := "<session_context>\nThis is the Gemini CLI. We are setting up the context for our chat.\nMy operating system is: darwin\n</session_context>\nwhy is the pool sized like this"
+	if got := strings.TrimSpace(stripSelfRecall(gemini)); got != "why is the pool sized like this" {
+		t.Fatalf("gemini: got %q", got)
+	}
+	// The compaction preamble titled real sessions.
+	compacted := "This session is being continued from a previous conversation that ran out of context.\nfix the retry loop"
+	if got := strings.TrimSpace(stripSelfRecall(compacted)); got != "fix the retry loop" {
+		t.Fatalf("compaction preamble: got %q", got)
+	}
+}
+
+// deja's own injected recall came back through the front door: Gemini stores
+// it wrapped in <hook_context> and HTML-escaped, so the marker filter never
+// saw it and deja indexed its own output as if a person had written it.
+func TestUnwrapsHookContextAroundOwnRecall(t *testing.T) {
+	in := "hi <hook_context>&lt;deja-recall&gt;\nRecalled history from prior sessions.\n1. [claude] proj · abc\n&lt;/deja-recall&gt;</hook_context>"
+	got := strings.TrimSpace(stripSelfRecall(in))
+	if got != "hi" {
+		t.Fatalf("got %q, want only what the person typed", got)
+	}
+	for _, leak := range []string{"deja-recall", "Recalled history", "hook_context"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("%q survived into the index", leak)
+		}
+	}
+}
+
+// Unwrapping keeps text; stripping removes it. A wrapper whose contents are
+// the person's words must never be dropped whole.
+func TestUnwrapBlockKeepsContents(t *testing.T) {
+	if got := unwrapBlock("a <user_query>the question</user_query> b", "<user_query>", "</user_query>"); got != "a the question b" {
+		t.Fatalf("got %q", got)
+	}
+	// Unclosed: leave it alone rather than eating the rest of the message.
+	in := "a <user_query>the question"
+	if got := unwrapBlock(in, "<user_query>", "</user_query>"); got != in {
+		t.Fatalf("got %q", got)
+	}
+	// Repeated wrappers all unwrap.
+	got := unwrapBlock("<user_query>one</user_query> and <user_query>two</user_query>", "<user_query>", "</user_query>")
+	if got != "one and two" {
+		t.Fatalf("got %q", got)
+	}
+}
