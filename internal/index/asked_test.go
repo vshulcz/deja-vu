@@ -193,3 +193,37 @@ func TestPrefixMatchesCounts(t *testing.T) {
 		t.Fatalf("got %q ok=%v err=%v, want the newest match", s.ID, ok, err)
 	}
 }
+
+// A lost buckets/ directory used to read as a healthy index: the manifest is
+// intact, so freshness passed and every search answered "no matches in 0
+// indexed sessions". That is the one failure a memory tool must not present as
+// an empty result — the reader concludes it is useless rather than broken.
+func TestMissingBucketsForcesARebuild(t *testing.T) {
+	dir := askedFixture(t,
+		map[string][]string{"a": {"why does the pool exhaust under load?"}},
+		map[string]string{"a": "2026-03-01T10:00:00Z"})
+	if err := os.RemoveAll(filepath.Join(dir, "buckets")); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordsIntact(dir, m) {
+		t.Fatal("an index with no postings is not intact")
+	}
+	if HasManifest(dir) {
+		t.Fatal("HasManifest should not vouch for an index whose postings are gone")
+	}
+	// And a healthy index still passes, or every command would rebuild.
+	fresh := askedFixture(t,
+		map[string][]string{"b": {"why does the cache stampede?"}},
+		map[string]string{"b": "2026-03-02T10:00:00Z"})
+	fm, err := readManifest(fresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !recordsIntact(fresh, fm) || !HasManifest(fresh) {
+		t.Fatal("a healthy index must not be reported as broken")
+	}
+}

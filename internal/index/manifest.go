@@ -28,8 +28,18 @@ func HasManifest(dir string) bool {
 	if err != nil {
 		return false
 	}
-	_, err = os.Stat(filepath.Join(dir, "sessions.gob"))
-	return err == nil
+	if _, err = os.Stat(filepath.Join(dir, "sessions.gob")); err != nil {
+		return false
+	}
+	// The postings live in buckets/, and losing that directory is not a
+	// hypothetical: a partial copy, an interrupted sync, a `find -delete` that
+	// caught too much. The manifest survives intact, so the index reads as
+	// built and up to date while every search answers "no matches in 0 indexed
+	// sessions" — the one failure mode a memory tool must never present as an
+	// empty result, because the reader concludes the tool is useless rather
+	// than broken.
+	fi, err := os.Stat(filepath.Join(dir, "buckets"))
+	return err == nil && fi.IsDir()
 }
 
 // ManifestBuiltAt returns when the index was last built. Older manifests may
@@ -144,7 +154,22 @@ func recordsIntact(dir string, m Manifest) bool {
 	}
 	// Shorter: a crash truncated the log. Longer: a crash landed records the
 	// manifest never committed; re-appending them would duplicate messages.
-	return fi.Size() == m.RecordsSize
+	if fi.Size() != m.RecordsSize {
+		return false
+	}
+	// The postings live in buckets/, and losing that directory is not
+	// hypothetical: a partial copy, an interrupted sync, a `find -delete` that
+	// caught too much. The manifest survives, so the index reads as built and
+	// up to date while every search answers "no matches in 0 indexed sessions"
+	// — the one failure a memory tool must not present as an empty result,
+	// because the reader concludes it is useless rather than broken.
+	if len(m.Sessions) > 0 {
+		bi, err := os.Stat(filepath.Join(dir, "buckets"))
+		if err != nil || !bi.IsDir() {
+			return false
+		}
+	}
+	return true
 }
 
 // Overview summarizes the index from manifest metadata alone — no record
