@@ -28,18 +28,8 @@ func HasManifest(dir string) bool {
 	if err != nil {
 		return false
 	}
-	if _, err = os.Stat(filepath.Join(dir, "sessions.gob")); err != nil {
-		return false
-	}
-	// The postings live in buckets/, and losing that directory is not a
-	// hypothetical: a partial copy, an interrupted sync, a `find -delete` that
-	// caught too much. The manifest survives intact, so the index reads as
-	// built and up to date while every search answers "no matches in 0 indexed
-	// sessions" — the one failure mode a memory tool must never present as an
-	// empty result, because the reader concludes the tool is useless rather
-	// than broken.
-	fi, err := os.Stat(filepath.Join(dir, "buckets"))
-	return err == nil && fi.IsDir()
+	_, err = os.Stat(filepath.Join(dir, "sessions.gob"))
+	return err == nil
 }
 
 // ManifestBuiltAt returns when the index was last built. Older manifests may

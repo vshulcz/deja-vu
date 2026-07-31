@@ -212,9 +212,9 @@ func TestMissingBucketsForcesARebuild(t *testing.T) {
 	if recordsIntact(dir, m) {
 		t.Fatal("an index with no postings is not intact")
 	}
-	if HasManifest(dir) {
-		t.Fatal("HasManifest should not vouch for an index whose postings are gone")
-	}
+	// HasManifest deliberately still says yes: it answers "is there a manifest
+	// here", which doctor uses to tell a missing index from a stale one.
+	// Wholeness is recordsIntact's question.
 	// And a healthy index still passes, or every command would rebuild.
 	fresh := askedFixture(t,
 		map[string][]string{"b": {"why does the cache stampede?"}},
