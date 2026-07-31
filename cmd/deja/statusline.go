@@ -13,7 +13,7 @@ import (
 // to agents today. It must stay fast and quiet — no index access, no locks —
 // because status bars call it constantly.
 func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
-	drainStdin(stdin)
+	in := readStatuslineInput(stdin)
 	// A first build takes a while and runs detached. The status bar is the
 	// one surface the user is already looking at, so the build reports there
 	// instead of leaving them to wonder why recall is quiet.
@@ -24,10 +24,10 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	recalls, bytes, injected := usage.TodayWithInjections(dir)
 	if recalls == 0 {
 		if wr, wb, _, _ := usage.Week(dir); wr > 0 {
-			fmt.Fprintf(stdout, "deja · quiet today · %d agent recalls, %s re-used this week", wr, humanBytes(int64(wb)))
+			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · quiet today · %d agent recalls, %s re-used this week", wr, humanBytes(int64(wb)))))
 			return nil
 		}
-		fmt.Fprint(stdout, "deja · no recalls yet today · 0 B injected")
+		fmt.Fprint(stdout, withFileMemory(dir, in, "deja · no recalls yet today · 0 B injected"))
 		return nil
 	}
 	noun := "recalls"
@@ -38,7 +38,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	if raw := usage.TodayRaw(dir); bytes > 0 && raw/int64(bytes) >= 2 {
 		line += fmt.Sprintf(" · ~%d× less than replaying", raw/int64(bytes))
 	}
-	fmt.Fprint(stdout, line)
+	fmt.Fprint(stdout, withFileMemory(dir, in, line))
 	return nil
 }
 
@@ -57,13 +57,24 @@ func warmupBar(st *warmupStatus) string {
 	return "▕" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "▏"
 }
 
-// Claude Code pipes session JSON to statusline commands. We don't need it,
-// but leaving the pipe unread can block the caller on some platforms.
+// Claude Code pipes session JSON to statusline commands. Leaving the pipe
+// unread can block the caller on some platforms, so it is always consumed —
+// and since #581 it is also parsed, for the transcript path that identifies
+// the current session.
 func drainStdin(r io.Reader) {
-	if f, ok := r.(*os.File); ok {
-		if fi, err := f.Stat(); err != nil || fi.Mode()&os.ModeCharDevice != 0 {
-			return // interactive terminal: nothing piped, don't block
-		}
+	if !pipedStdin(r) {
+		return
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(r, 1<<20))
+}
+
+// pipedStdin reports whether anything was actually piped in. An interactive
+// terminal has not, and reading it would block until the user typed.
+func pipedStdin(r io.Reader) bool {
+	if f, ok := r.(*os.File); ok {
+		if fi, err := f.Stat(); err != nil || fi.Mode()&os.ModeCharDevice != 0 {
+			return false
+		}
+	}
+	return true
 }

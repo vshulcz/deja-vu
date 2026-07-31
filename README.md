@@ -183,7 +183,7 @@ $ deja "jwt refresh token"
 | `deja warmup` | Build/refresh the index without searching — handy in cron or shell startup. |
 | `deja index [--rebuild]` | Same as warmup; `--rebuild` forces a full rebuild. Cold builds narrate per-harness progress. |
 | `deja update` | Download the latest GitHub release, verify its checksum, and replace the current binary. |
-| `deja statusline` | One line for your status bar: recalls served to agents today. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
+| `deja statusline` | One line for your status bar: recalls served to agents today, plus the file this session works on most and what an earlier session decided about it. Silent when there is no earlier session to name. `deja install statusline` wires it into Claude Code (won't touch an existing statusline). |
 | `deja log [n] [--last] [--json]` | Audit what deja actually served: recent recalls and injections, or the exact text of the last injected digest with `--last`. |
 | `deja` | On a terminal with an index: a living brief — today's sessions, recalls served, déjà vu moments, a question you asked in more than one session, a wall your agents keep hitting, and a search suggestion from your own history. |
 

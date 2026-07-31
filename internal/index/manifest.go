@@ -207,3 +207,23 @@ func Overview(dir string) (OverviewStats, error) {
 	o.Harnesses = len(hs)
 	return o, nil
 }
+
+// AllMeta returns every session's metadata, no records read and no lock taken.
+//
+// The session-metadata constructors used elsewhere drop Touched, Asked and Hit
+// (#633), so a caller that needs those has to see the manifest entries
+// themselves. This is the read a status line can afford: one file, no fork.
+func AllMeta(dir string) ([]SessionMeta, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SessionMeta, 0, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		out = append(out, meta)
+	}
+	return out, nil
+}

@@ -69,7 +69,7 @@
 <tr><td><code>deja last [n]</code></td><td>Recent sessions. <code>--project</code>, <code>--harness</code>, <code>--since</code>, <code>--role</code>, <code>--json</code>.</td></tr>
 <tr><td><code>deja resume &lt;id&gt;</code></td><td>Reopen a session in the agent that wrote it. Prints the command; <code>--exec</code> runs it.</td></tr>
 <tr><td><code>deja warmup</code></td><td>Build or refresh the index without searching — for a shell profile or a provisioning script.</td></tr>
-<tr><td><code>deja statusline</code></td><td>One line for an agent's status bar: today's sessions and what deja has served.</td></tr>
+<tr><td><code>deja statusline</code></td><td>One line for an agent's status bar: today's sessions and what deja has served, and — when the host pipes its session payload — the file this session is working on most with what earlier sessions decided about it. Silent when no earlier session touched it.</td></tr>
 <tr><td><code>deja completion &lt;bash|zsh|fish&gt;</code></td><td>Print a completion script for your shell.</td></tr>
 <tr><td><code>deja uninstall &lt;target|--all&gt;</code></td><td>Remove deja's wiring from an agent. Other servers in shared config files are left alone.</td></tr>
 <tr><td><code>deja version</code></td><td>Print the version.</td></tr>
