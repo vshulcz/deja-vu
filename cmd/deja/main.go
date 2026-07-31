@@ -814,6 +814,10 @@ func printSources(dir string) {
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.LoadGoose},
 		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.LoadHermes},
 		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.LoadCopilot},
+		{"cline", sources.ClineSessionsDir(), append([]string{sources.ClineSessionsDir()}, sources.ClineLegacyRoots()...), sources.LoadCline},
+		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.LoadRoo},
+		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.LoadPi},
+		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.LoadOpenClaw},
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, sources.LoadNotes},
 	}
 	for _, it := range items {
