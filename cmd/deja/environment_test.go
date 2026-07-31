@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // seedWalls lays down n sessions that each hit the same two errors.
@@ -42,7 +43,7 @@ func seedWalls(t *testing.T, n int) string {
 
 func TestEnvironmentBlockNamesWallsAndWhatToDo(t *testing.T) {
 	dir := seedWalls(t, index.FrictionMinSessions)
-	got := environmentBlock(dir)
+	got := environmentBlock(dir, policy.ActivationAuto)
 	for _, want := range []string{
 		"command not found: shellcheck",
 		"No module named 'yaml'",
@@ -67,7 +68,7 @@ func TestEnvironmentBlockNamesWallsAndWhatToDo(t *testing.T) {
 // explicit that a noisy warning gets the feature turned off.
 func TestEnvironmentBlockSilentBelowThreshold(t *testing.T) {
 	dir := seedWalls(t, index.FrictionMinSessions-1)
-	if got := environmentBlock(dir); got != "" {
+	if got := environmentBlock(dir, policy.ActivationAuto); got != "" {
 		t.Fatalf("want silence, got:\n%s", got)
 	}
 }
@@ -115,5 +116,42 @@ func TestEnvironmentServedOncePerMCPSession(t *testing.T) {
 	}
 	if strings.Contains(second, "This machine") {
 		t.Fatalf("second recall repeats the block:\n%s", second)
+	}
+}
+
+// Every other recall path runs its results through the policy table. This one
+// read the manifest directly, so a user who denied a path still received error
+// text drawn from the sessions that denial had just hidden (#659).
+func TestEnvironmentBlockObeysThePolicy(t *testing.T) {
+	dir := seedWalls(t, index.FrictionMinSessions)
+	if environmentBlock(dir, policy.ActivationMCP) == "" {
+		t.Fatal("nothing to test: the block is empty before any policy is applied")
+	}
+	pol := filepath.Join(t.TempDir(), "policy.json")
+	if err := os.WriteFile(pol, []byte(`{"activations":{"mcp":{"local":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", pol)
+	if got := environmentBlock(dir, policy.ActivationMCP); got != "" {
+		t.Fatalf("denied path still received machine facts drawn from hidden sessions:\n%s", got)
+	}
+	// A rule denying one path must not silence the others.
+	if environmentBlock(dir, policy.ActivationAuto) == "" {
+		t.Fatal("denying mcp also silenced auto")
+	}
+}
+
+// The count is what a reader acts on, so a wall whose evidence is mostly
+// hidden must not keep claiming the full number.
+func TestEnvironmentBlockDropsWallsBelowThresholdAfterFiltering(t *testing.T) {
+	dir := seedWalls(t, index.FrictionMinSessions)
+	pol := filepath.Join(t.TempDir(), "policy.json")
+	// Deny every origin the seeded sessions could have.
+	if err := os.WriteFile(pol, []byte(`{"activations":{"auto":{"*":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", pol)
+	if got := environmentBlock(dir, policy.ActivationAuto); got != "" {
+		t.Fatalf("a wall survived with all its evidence denied:\n%s", got)
 	}
 }

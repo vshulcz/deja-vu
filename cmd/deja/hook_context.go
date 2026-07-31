@@ -94,7 +94,7 @@ func runHookContext(dir string, plain bool) error {
 		// checkout — and exactly where knowing what this machine is missing
 		// helps most. The block is about the machine, not the project, so it
 		// does not depend on the digest having found anything.
-		if env := environmentBlock(dir); env != "" {
+		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
 			out := frameRecall(env)
 			usage.RecordDigestPolicy(dir, usage.KindHook, out, 0, 0, policy.Load().Describe(policy.ActivationAuto))
 			if plain {
@@ -445,7 +445,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	// Inside the cached result, not after it: this costs a manifest scan plus
 	// one session read, which is ten times the rest of the hook, and the
 	// clusters it reports change over weeks rather than turns.
-	if env := environmentBlock(dir); env != "" {
+	if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
 		text += "\n" + env + "\n"
 	}
 	mark("environment")

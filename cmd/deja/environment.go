@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"strings"
 	"sync"
 
@@ -28,11 +30,40 @@ const (
 
 // environmentBlock names what the machine keeps failing on, or "" when nothing
 // has failed in enough separate sessions to be worth an agent's attention.
-func environmentBlock(dir string) string {
+//
+// activation is the path asking. Every other recall route runs its results
+// through the policy table, and this one did not: a user who denied `mcp` still
+// received error text drawn from the sessions that denial had just hidden, plus
+// the harnesses and dates behind it (#659). The block reads the manifest
+// directly, so nothing upstream could have filtered it.
+func environmentBlock(dir, activation string) string {
+	// Origin is a property of the sessions the walls came from, so the gate has
+	// to be per wall rather than one check up front: a machine can hold both
+	// local and imported sessions hitting the same error.
+	pol := policy.Load()
 	walls := index.TopFriction(dir, environmentWalls)
 	if len(walls) == 0 {
 		return ""
 	}
+	var allowed []index.Friction
+	for _, w := range walls {
+		var keep []index.SessionMeta
+		for _, s := range w.Sessions {
+			if pol.Allows(activation, s.Project) {
+				keep = append(keep, s)
+			}
+		}
+		// The count is what the reader acts on, so a wall whose evidence is
+		// mostly hidden must not keep claiming the full number.
+		if len(keep) >= index.FrictionMinSessions {
+			w.Sessions = keep
+			allowed = append(allowed, w)
+		}
+	}
+	if len(allowed) == 0 {
+		return ""
+	}
+	walls = allowed
 	var b strings.Builder
 	b.WriteString("This machine, from deja's index of past sessions across every agent used here:\n")
 	for _, w := range walls {
@@ -63,7 +94,7 @@ var environmentServed sync.Once
 func environmentOnce(dir string) string {
 	out := ""
 	environmentServed.Do(func() {
-		if env := environmentBlock(dir); env != "" {
+		if env := environmentBlock(dir, policy.ActivationMCP); env != "" {
 			out = "\n\n" + env
 		}
 	})
