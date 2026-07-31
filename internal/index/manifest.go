@@ -169,6 +169,10 @@ type OverviewStats struct {
 	Harnesses     int
 	SessionsToday int
 	SessionsWeek  int
+	// Oldest and Newest bound what the index holds. A store whose work is all
+	// older than a week has nothing to say under "today" and "this week", and
+	// two zero lines is a poor way to open the first screen someone sees.
+	Oldest, Newest time.Time
 }
 
 func Overview(dir string) (OverviewStats, error) {
@@ -189,6 +193,12 @@ func Overview(dir string) (OverviewStats, error) {
 		hs[meta.Harness] = true
 		if meta.Updated.After(day) {
 			o.SessionsToday++
+		}
+		if o.Oldest.IsZero() || (!meta.Updated.IsZero() && meta.Updated.Before(o.Oldest)) {
+			o.Oldest = meta.Updated
+		}
+		if meta.Updated.After(o.Newest) {
+			o.Newest = meta.Updated
 		}
 		if meta.Updated.After(week) {
 			o.SessionsWeek++

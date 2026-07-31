@@ -88,3 +88,39 @@ func TestDejaVuLineShape(t *testing.T) {
 		t.Fatalf("dejaVuLine = %q", line)
 	}
 }
+
+// A store whose work is all older than a week opened with two zero lines —
+// "today 0 sessions" and "this week 0 sessions · 0 recalls" — which is the
+// worst possible first screen for someone whose history is real but not recent.
+func TestBriefReplacesAQuietWeekWithTheSpanItHolds(t *testing.T) {
+	tmp := hermeticEnv(t)
+	proj := filepath.Join(tmp, "claude", "proj")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i, day := range []string{"11", "13", "15"} {
+		line := `{"type":"user","sessionId":"s` + day + `","cwd":"/w","timestamp":"2026-04-` + day +
+			`T03:04:05Z","message":{"role":"user","content":"why does the pool exhaust under load ` +
+			string(rune('a'+i)) + `?"}}`
+		if err := os.WriteFile(filepath.Join(proj, "s"+day+".jsonl"), []byte(line+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runBrief(dir, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "covering") || !strings.Contains(got, "Apr 11 2026") {
+		t.Fatalf("want the span the index holds:\n%s", got)
+	}
+	for _, unwanted := range []string{"today      0", "this week  0"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("a zero line survived: %q\n%s", unwanted, got)
+		}
+	}
+}

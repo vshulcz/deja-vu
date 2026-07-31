@@ -47,6 +47,7 @@ func runBrief(dir string, w io.Writer) error {
 		bold, ov.Harnesses, reset, pluralS(ov.Harnesses))
 
 	recalls, bytes, _ := usage.TodayWithInjections(dir)
+	quietWeek := ov.SessionsToday == 0 && ov.SessionsWeek == 0 && !ov.Oldest.IsZero()
 	line := fmt.Sprintf("today      %d session%s", ov.SessionsToday, pluralS(ov.SessionsToday))
 	if recalls > 0 {
 		line += fmt.Sprintf(" · %d recall%s served (%s", recalls, pluralS(recalls), humanBytes(int64(bytes)))
@@ -55,14 +56,24 @@ func runBrief(dir string, w io.Writer) error {
 		}
 		line += ")"
 	}
-	fmt.Fprintln(w, line)
+	if !quietWeek {
+		fmt.Fprintln(w, line)
+	}
 
 	wr, _, _, _ := usage.Week(dir)
-	week := fmt.Sprintf("this week  %d session%s · %d recall%s", ov.SessionsWeek, pluralS(ov.SessionsWeek), wr, pluralS(wr))
-	if dv := usage.DejaVuWeek(dir); dv > 0 {
-		week += fmt.Sprintf(" · %s%d déjà vu moment%s%s", bold, dv, pluralS(dv), reset)
+	if ov.SessionsToday == 0 && ov.SessionsWeek == 0 && !ov.Oldest.IsZero() {
+		// Nothing this week. Two zero lines is the worst possible opening for
+		// someone whose agent history is real but older — and the interesting
+		// fact is right there: how far back the memory goes.
+		fmt.Fprintf(w, "covering   %s%s → %s%s\n", bold,
+			ov.Oldest.Local().Format("Jan 2 2006"), ov.Newest.Local().Format("Jan 2 2006"), reset)
+	} else {
+		week := fmt.Sprintf("this week  %d session%s · %d recall%s", ov.SessionsWeek, pluralS(ov.SessionsWeek), wr, pluralS(wr))
+		if dv := usage.DejaVuWeek(dir); dv > 0 {
+			week += fmt.Sprintf(" · %s%d déjà vu moment%s%s", bold, dv, pluralS(dv), reset)
+		}
+		fmt.Fprintln(w, week)
 	}
-	fmt.Fprintln(w, week)
 
 	// Read the index as-is: the brief must never trigger a rebuild or let
 	// indexing narration tear through its layout.
