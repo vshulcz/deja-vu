@@ -259,8 +259,8 @@ func TestBriefTitlesCannotBreakTheScreen(t *testing.T) {
 		"fix pool\rDEJA · 999 recalls",
 		"esc\x1b[31mred",
 		"bell\x07here",
-		"rlo ‮reversed",
-		"zwsp a​b",
+		"rlo \u202ereversed",
+		"zwsp a\u200bb",
 	} {
 		got := trimBriefTitle(in)
 		for _, r := range got {
