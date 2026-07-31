@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/index"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,5 +88,50 @@ func TestFilesCommandArgumentErrors(t *testing.T) {
 	}
 	if err := runFiles(t.TempDir(), []string{"topic", "--limit", "zero"}, os.Stdout); err == nil {
 		t.Fatal("--limit wants a number")
+	}
+}
+
+// `friction`, `restore` and `stats` all agree that a file was worked on;
+// `files` said no file was ever recorded. It was — the path simply is not
+// under a repository on this disk today, which is a fact about the disk rather
+// than about the past (#664).
+func TestFilesDistinguishesFilteredFromAbsent(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-f")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	// A path that was recorded but has no .git above it now.
+	gone := filepath.Join(tmp, "vanished-repo", "pipeline.go")
+	body := `{"type":"user","sessionId":"f1","cwd":"/w/f","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":"fix the widget pipeline retry"}}` + "\n" +
+		`{"type":"assistant","sessionId":"f1","cwd":"/w/f","timestamp":"2026-07-21T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"` + gone + `"}}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "f1.jsonl"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runFiles(dir, []string{"pipeline"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if strings.Contains(got, "none of them recorded a file") {
+		t.Fatalf("claimed nothing was recorded when a file was:\n%s", got)
+	}
+	if !strings.Contains(got, "not under a repository") {
+		t.Fatalf("does not say why the file is missing from the answer:\n%s", got)
+	}
+
+	// And the genuinely-empty case keeps its own wording.
+	out.Reset()
+	if err := runFiles(dir, []string{"nothing-mentions-this"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "none of them recorded a file") &&
+		!strings.Contains(out.String(), "no sessions mention") {
+		t.Fatalf("the empty case lost its wording:\n%s", out.String())
 	}
 }

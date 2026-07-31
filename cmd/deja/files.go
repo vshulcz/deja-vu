@@ -89,6 +89,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// to eighteen stemmed forms for a two-word query, and requiring most of them
 	// in one message matches nothing.
 	needles := lowerAll(terms)
+	filtered := 0                    // recorded paths dropped by the repository filter
 	near := map[string]int{}         // path -> times touched near the topic
 	nearSessions := map[string]int{} // path -> how many sessions touched it near the topic
 	total := map[string]int{}        // path -> times touched anywhere in these sessions
@@ -122,7 +123,16 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			}
 			for _, p := range strings.Split(m.Text, "\n") {
 				p = strings.TrimSpace(p)
-				if p == "" || isScratch(p) || !inRepository(p) {
+				if p == "" || isScratch(p) {
+					continue
+				}
+				if !inRepository(p) {
+					// Recorded, but not under a repository on this disk today.
+					// Usually a probe script; sometimes a repo that was
+					// archived, renamed, or lives on a volume that is not
+					// mounted. Counted rather than forgotten, so the empty
+					// answer can say which of the two happened (#664).
+					filtered++
 					continue
 				}
 				total[p]++
@@ -141,6 +151,13 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(near) == 0 {
+		// "Recorded nothing" and "recorded files this build will not show" are
+		// different answers, and only the first is a fact about the past.
+		if filtered > 0 {
+			fmt.Fprintf(stdout, "%d session%s mention%s %q; %d recorded file%s %s not under a repository on this disk — moved, archived, or an unmounted volume\n",
+				scanned, plural(scanned), verbS(scanned), q, filtered, plural(filtered), verbIs(filtered))
+			return nil
+		}
 		fmt.Fprintf(stdout, "%d session%s mention%s %q, none of them recorded a file near it\n", scanned, plural(scanned), verbS(scanned), q)
 		return nil
 	}
@@ -304,4 +321,12 @@ func trimPath(p string) string {
 		return strings.Join(parts[len(parts)-4:], "/")
 	}
 	return strings.TrimPrefix(p, "/")
+}
+
+// verbIs keeps "1 file is" from reading as "1 file are".
+func verbIs(n int) string {
+	if n == 1 {
+		return "is"
+	}
+	return "are"
 }
