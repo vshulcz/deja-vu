@@ -107,6 +107,7 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 	// gets for free from a column.
 	calls := map[string]int{}
 	cwd := ""
+	var events []model.Message
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		t := parseTimeAny(m["timestamp"])
 		s.Touch(t)
@@ -159,28 +160,54 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			codexPatch(&s, payload, cwd, t)
 			return
 		}
-		// Codex writes every turn twice: once as a response_item carrying a
-		// role, and once as an event_msg whose payload has none. Reading the
-		// second and defaulting it to "user" stored each assistant answer a
-		// second time as something the person said — 40 mis-roled and 28
-		// duplicated across 25 of 28 rollouts, 35% of indexed codex messages,
-		// and `--role user` returned the agent's own words.
-		//
-		// Measured before removing it: all 68 event_msg turns duplicate a
-		// response_item exactly, none is unique. So the event stream carries
-		// no information the roled one lacks.
-		if typ, _ := m["type"].(string); typ == "event_msg" {
-			return
-		}
 		role, _ := payload["role"].(string)
 		if HarnessAuthored(role) {
 			return
 		}
 		txt := textFromContent(payload["content"])
+		if txt == "" {
+			if msg, _ := payload["message"].(string); msg != "" {
+				txt = msg
+				// The event stream names the speaker in its payload type, and
+				// reading it as "user" regardless stored every assistant answer
+				// a second time as something the person said: 40 mis-roled and
+				// 28 duplicated across 25 of 28 rollouts, 35% of indexed codex
+				// messages, and `--role user` returned the agent's own words.
+				if role == "" {
+					switch pt, _ := payload["type"].(string); pt {
+					case "agent_message":
+						role = "assistant"
+					default:
+						// user_message, and any shape that names no speaker:
+						// a bare message with no type has been read as the
+						// person's since the first parser, and only the agent
+						// stream was ever wrong.
+						role = "user"
+					}
+				}
+			}
+		}
+		// Collected rather than appended: a rollout that also carries roled
+		// response_items has each turn twice, and the two copies differ by
+		// microseconds so the ingest de-duplicator never collapses them.
+		// Measured on this store: all 68 event turns duplicate a response_item
+		// exactly, none is unique. Older rollouts carry only the event stream,
+		// which is why it is kept rather than skipped outright.
+		if typ, _ := m["type"].(string); typ == "event_msg" {
+			if role != "" && txt != "" {
+				events = append(events, model.Message{Role: role, Text: txt, Time: t})
+			}
+			return
+		}
 		if role != "" && txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
 	})
+	// Only when the roled stream said nothing: an older rollout that carries
+	// its turns as events alone still has to be readable.
+	if len(s.Messages) == 0 {
+		s.Messages = events
+	}
 	if len(s.Messages) == 0 {
 		return nil, err
 	}

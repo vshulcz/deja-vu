@@ -1304,7 +1304,10 @@ func TestShowAcceptsAPrefixWithHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	full := ss[0].ID
-	prefix := full[:6]
+	prefix := full
+	if len(prefix) > 6 {
+		prefix = prefix[:6]
+	}
 	out, err := captureRun(t, "show", prefix, "--harness", ss[0].Harness)
 	if err != nil {
 		t.Fatal(err)
@@ -1314,8 +1317,7 @@ func TestShowAcceptsAPrefixWithHarness(t *testing.T) {
 	}
 	// The harness still has to match: a prefix belonging to another harness
 	// must not be served.
-	out, _ = captureRunStderr(t, "show", prefix, "--harness", "nosuchharness")
-	if !strings.Contains(out, "no session matches") {
-		t.Fatalf("served a session from the wrong harness: %q", out)
+	if _, err := captureRun(t, "show", prefix, "--harness", "nosuchharness"); err == nil {
+		t.Fatal("served a session from the wrong harness")
 	}
 }

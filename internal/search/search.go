@@ -785,7 +785,6 @@ func PrintSession(w io.Writer, s model.Session) {
 	}
 }
 
-// isWorkRecord reports whether a message records what an agent did rather than
 // roleMatches accepts the role names the help text documents. `--role tool`
 // is what `deja help` promises and "tool-output" is what is stored, so the
 // documented spelling matched nothing — silently, with a healthy exit. Mirrors
@@ -797,6 +796,7 @@ func roleMatches(stored, want string) bool {
 	return want == "tool" && stored == roleToolOutput
 }
 
+// isWorkRecord reports whether a message records what an agent did rather than
 // what was said. Mirrors index.isToolRole, which cannot be imported here.
 func isWorkRecord(role string) bool {
 	switch role {

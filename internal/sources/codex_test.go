@@ -347,3 +347,36 @@ func TestCodexHistorySkipsSessionsThatHaveARollout(t *testing.T) {
 		t.Fatalf("orphan history entry lost: %v", byID)
 	}
 }
+
+// An older rollout carries its turns only as events, and there the payload
+// type is the only thing naming the speaker. Reading it as "user" regardless
+// is what stored the agent's answers as the person's.
+func TestCodexEventStreamNamesTheSpeaker(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "rollout-2026-07-27T10-38-00-old.jsonl")
+	lines := []string{
+		`{"timestamp":"2026-07-27T10:38:00Z","type":"session_meta","payload":{"session_id":"old","id":"old","cwd":"/w"}}`,
+		`{"timestamp":"2026-07-27T10:38:07Z","type":"event_msg","payload":{"type":"user_message","message":"the question"}}`,
+		`{"timestamp":"2026-07-27T10:38:09Z","type":"event_msg","payload":{"type":"agent_message","message":"the answer"}}`,
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCodexRollout(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("%v %#v", err, ss)
+	}
+	if len(ss[0].Messages) != 2 {
+		t.Fatalf("a rollout with only events must still be readable, got %d messages", len(ss[0].Messages))
+	}
+	byText := map[string]string{}
+	for _, m := range ss[0].Messages {
+		byText[m.Text] = m.Role
+	}
+	if byText["the question"] != "user" {
+		t.Errorf("question role = %q", byText["the question"])
+	}
+	if byText["the answer"] != "assistant" {
+		t.Errorf("answer role = %q — the agent's words stored as the person's", byText["the answer"])
+	}
+}
