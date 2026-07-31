@@ -445,8 +445,10 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	// Inside the cached result, not after it: this costs a manifest scan plus
 	// one session read, which is ten times the rest of the hook, and the
 	// clusters it reports change over weeks rather than turns.
-	if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
-		text += "\n" + env + "\n"
+	if !environmentServedRecently(dir) {
+		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
+			text += "\n" + env + "\n"
+		}
 	}
 	mark("environment")
 	return text, result.Sessions, rawSize(ss), matched

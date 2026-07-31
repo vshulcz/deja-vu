@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -153,5 +155,39 @@ func TestEnvironmentBlockDropsWallsBelowThresholdAfterFiltering(t *testing.T) {
 	t.Setenv("DEJA_POLICY_FILE", pol)
 	if got := environmentBlock(dir, policy.ActivationAuto); got != "" {
 		t.Fatalf("a wall survived with all its evidence denied:\n%s", got)
+	}
+}
+
+// The hook and the MCP server are separate processes, so the per-process guard
+// cannot see across them: a session got the block twice, once at start-up and
+// once on its first recall — five identical lines each time, in the context
+// window the block exists to leave room in.
+func TestEnvironmentBlockIsNotDeliveredTwice(t *testing.T) {
+	dir := seedWalls(t, index.FrictionMinSessions)
+	marker := filepath.Join(filepath.Dir(dir), filepath.Base(dir)+".envblock")
+	_ = os.Remove(marker)
+
+	if environmentServedRecently(dir) {
+		t.Fatal("a fresh store must not claim a recent delivery")
+	}
+	// The stamp is written by the first call, so the second sees it.
+	if !environmentServedRecently(dir) {
+		t.Fatal("the delivery was not recorded, so both paths will send it")
+	}
+
+	// An old stamp must not silence a later session for ever.
+	old := time.Now().Add(-environmentTTL - time.Minute).Unix()
+	if err := os.WriteFile(marker, []byte(strconv.FormatInt(old, 10)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if environmentServedRecently(dir) {
+		t.Fatal("a stamp older than the TTL still suppressed the block")
+	}
+	// A corrupt stamp is not a licence to stay silent.
+	if err := os.WriteFile(marker, []byte("not a timestamp"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if environmentServedRecently(dir) {
+		t.Fatal("an unreadable stamp suppressed the block")
 	}
 }

@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"strings"
@@ -85,6 +89,32 @@ func environmentBlock(dir, activation string) string {
 // this side: an MCP server lives for the whole session.
 var environmentServed sync.Once
 
+// environmentTTL is how long a delivered block suppresses the next one.
+//
+// The hook and the MCP server are separate processes, so a per-process guard
+// cannot see across them: measured on one session, the block arrived twice —
+// once at session start and once on the first recall, five identical lines
+// each time. Fifteen minutes covers "the hook injected, the agent called
+// recall a moment later" without silencing a session that starts an hour on,
+// which gets its own copy from the hook.
+const environmentTTL = 15 * time.Minute
+
+// environmentServedRecently reports whether a block went out within the TTL,
+// and stamps the marker when it has not.
+func environmentServedRecently(dir string) bool {
+	p := filepath.Join(filepath.Dir(dir), filepath.Base(dir)+".envblock")
+	if b, err := os.ReadFile(p); err == nil {
+		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil {
+			if time.Since(time.Unix(ts, 0)) < environmentTTL {
+				return true
+			}
+		}
+	}
+	_ = os.MkdirAll(filepath.Dir(p), 0o700)
+	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	return false
+}
+
 // environmentOnce appends the block to the first recall an MCP session serves.
 //
 // The session-start injection reaches the thirteen harnesses deja can wire a
@@ -94,6 +124,9 @@ var environmentServed sync.Once
 func environmentOnce(dir string) string {
 	out := ""
 	environmentServed.Do(func() {
+		if environmentServedRecently(dir) {
+			return
+		}
 		if env := environmentBlock(dir, policy.ActivationMCP); env != "" {
 			out = "\n\n" + env
 		}
