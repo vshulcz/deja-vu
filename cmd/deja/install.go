@@ -400,7 +400,7 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "statusline":
 		return installStatusline(exe, uninstall)
 	default:
-		return installResult{}, fmt.Errorf("unknown target %q", target)
+		return installResult{}, unknownTargetError(target)
 	}
 }
 
@@ -1081,6 +1081,75 @@ func withAutoTargets(targets []string) []string {
 		}
 	}
 	return out
+}
+
+// unknownTargetError names what would have worked. There are two dozen targets
+// and the difference between them is a few characters, so a bare "unknown
+// target" leaves someone who typed `claud` guessing — while `deja completion`
+// two commands away lists its three valid values.
+func unknownTargetError(target string) error {
+	names := installTargetNames()
+	if near := nearestTarget(target, names); near != "" {
+		return fmt.Errorf("unknown target %q — did you mean %q? (`deja install --all` wires every agent it finds)", target, near)
+	}
+	return fmt.Errorf("unknown target %q — try one of: %s, or --all / --auto", target, strings.Join(names, ", "))
+}
+
+// nearestTarget finds a target within one edit of what was typed, which covers
+// the ways a name is actually got wrong: a dropped letter, a doubled one, a
+// transposition.
+func nearestTarget(typed string, names []string) string {
+	typed = strings.ToLower(strings.TrimSpace(typed))
+	if typed == "" {
+		return ""
+	}
+	// A truncated name is the commonest miss — `claud` for claude-code — and it
+	// is far from the full string by edit distance, so check prefixes first.
+	for _, n := range names {
+		if strings.HasPrefix(n, typed) {
+			return n
+		}
+	}
+	best, bestDist := "", 3
+	for _, n := range names {
+		if d := editDistance(typed, n); d < bestDist {
+			best, bestDist = n, d
+		}
+	}
+	return best
+}
+
+func editDistance(a, b string) int {
+	if a == b {
+		return 0
+	}
+	prev := make([]int, len(b)+1)
+	cur := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min3(cur[j-1]+1, prev[j]+1, prev[j-1]+cost)
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(b)]
+}
+
+func min3(a, b, c int) int {
+	if b < a {
+		a = b
+	}
+	if c < a {
+		a = c
+	}
+	return a
 }
 
 func installTargetNames() []string {
