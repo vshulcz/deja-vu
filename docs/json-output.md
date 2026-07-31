@@ -12,8 +12,9 @@ a `schema_version` field so consumers can detect breaking changes.
   or type change). Consumers should branch on `schema_version` before parsing
   the rest of the envelope.
 - The current version is **2** (constant in `internal/jsonout`).
-- **`deja blame --json`** returns a top-level JSON array. Its element shape is
-  stable; only additive fields inside `session` or hit objects are permitted.
+- **`deja blame --json`** and **`deja log --json`** return a top-level JSON
+  array rather than an envelope, so neither carries `schema_version`. Their
+  element shapes are stable; only additive fields inside them are permitted.
 
 ### What changed in version 2
 
@@ -126,7 +127,7 @@ Recent session metadata uses a versioned envelope and never includes messages:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "sessions": [
     {
       "harness": "codex",
@@ -151,7 +152,7 @@ return redacted index content in a bounded message window; the default limit is
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "session": {
     "harness": "codex",
     "id": "abc123",
@@ -172,7 +173,7 @@ the end returns an empty `messages` array and a `returned` count of zero.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "total_sessions": 42,
   "total_messages": 318,
   "repeat_questions": 3,
@@ -215,14 +216,15 @@ the end returns an empty `messages` array and a `returned` count of zero.
 }
 ```
 
-Optional fields are omitted when zero or empty. The heatmap grid used by
+Optional fields are omitted when zero or empty — `sidecar_size`, for one,
+appears only after `deja embed` has built a semantic sidecar. The heatmap grid used by
 `--card` is intentionally excluded from `--json` output.
 
 ## `deja doctor --json`
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "stores": [
     {
       "name": "claude",
