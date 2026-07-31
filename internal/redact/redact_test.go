@@ -224,3 +224,43 @@ func TestEntropySkipsAlreadyRedacted(t *testing.T) {
 		t.Fatalf("double redaction: %q %v", out, counts)
 	}
 }
+
+// A secret named in prose and quoted rather than assigned. Tool output is full
+// of this shape, and the key=value rule cannot reach it: no delimiter, value
+// punctuation outside its character class, and under its length floor.
+// Measured with six planted secret forms — five were redacted at ingest and
+// this one sat in records.bin in the clear, readable through `deja show`.
+func TestQuotedSecretsAreRedacted(t *testing.T) {
+	for _, c := range []struct{ in, gone string }{
+		{`password authentication failed for user "admin" with password "S3cr3tP@ssw0rd!"`, "S3cr3tP@ssw0rd!"},
+		{`the password is "hunter2secret"`, "hunter2secret"},
+		{`token 'ghp_abcdefghijklmno'`, "ghp_abcdefghijklmno"},
+		{"api_key `sk-abcdefghijklmnop`", "sk-abcdefghijklmnop"},
+	} {
+		got, _ := Text(c.in)
+		if strings.Contains(got, c.gone) {
+			t.Errorf("secret survived: %q -> %q", c.in, got)
+		}
+		if !strings.Contains(got, "[redacted:") {
+			t.Errorf("nothing was marked as removed: %q", got)
+		}
+	}
+}
+
+// The quotes are what make the rule safe to be loose about delimiters. Prose
+// that merely mentions a secret must survive intact — an over-eager redactor
+// destroys the message, which is its own failure (#653).
+func TestQuotedSecretRuleLeavesProseAlone(t *testing.T) {
+	for _, in := range []string{
+		`password authentication failed for user admin`,
+		`we discussed the password policy at length`,
+		`set a token in the config before running`,
+		`the secret is that there is no secret`,
+		`connection to server failed: FATAL: role "postgres" does not exist`,
+	} {
+		got, _ := Text(in)
+		if got != in {
+			t.Errorf("altered ordinary prose:\n  in  %q\n  out %q", in, got)
+		}
+	}
+}

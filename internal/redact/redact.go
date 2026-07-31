@@ -32,9 +32,20 @@ var (
 	// x-api-key) and, in JSON, a closing quote can sit between the key and the
 	// delimiter ("api_key": "..."). Tolerate both so env-var and JSON forms are
 	// caught, not just a bare `api_key=`.
-	genericKVRE  = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
-	bearerRE     = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
-	pemPrivateRE = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
+	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
+	bearerRE    = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	// A secret named in prose and quoted rather than assigned. Tool output is
+	// full of this shape — `password authentication failed for user "admin"
+	// with password "S3cr3tP@ssw0rd!"` — and genericKVRE cannot reach it:
+	// there is no `=` or `:`, the value carries punctuation its class excludes,
+	// and at 15 characters it is under the 16-char floor. Measured: five of six
+	// planted secret forms were redacted at ingest and this one sat in
+	// records.bin in the clear, visible through `deja show`.
+	//
+	// The quotes are what make it safe to be this loose: "password
+	// authentication failed" has no quoted value and matches nothing.
+	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(["'` + "`" + `])`)
+	pemPrivateRE   = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
 	// sk-<alnum> keys. xai- stays alphanumeric-only: real xAI keys have no
@@ -139,6 +150,14 @@ func Text(s string) (string, Counts) {
 	}
 	if strings.Contains(s, "AKIA") || strings.Contains(s, "ASIA") {
 		s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", counts)
+	}
+	if strings.Contains(lower, "password") || strings.Contains(lower, "passwd") ||
+		strings.Contains(lower, "pwd") || strings.Contains(lower, "secret") ||
+		strings.Contains(lower, "token") || strings.Contains(lower, "api key") ||
+		strings.Contains(lower, "api_key") || strings.Contains(lower, "apikey") {
+		s = replaceSubmatch(s, quotedSecretRE, "quoted-secret", counts, func(m []string) string {
+			return m[1] + m[2] + m[3] + "[redacted:quoted-secret]" + m[5]
+		})
 	}
 	if strings.Contains(lower, "bearer") || strings.Contains(lower, "basic ") {
 		s = replaceSubmatch(s, bearerRE, "bearer-token", counts, func(m []string) string {
