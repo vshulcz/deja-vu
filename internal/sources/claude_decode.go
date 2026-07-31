@@ -389,13 +389,6 @@ const RoleCommand = "command"
 // off. Only the commands worth keeping — see worthIndexing.
 func IndexCommands() bool { return os.Getenv("DEJA_INDEX_COMMANDS") != "0" }
 
-// worthIndexing keeps the commands that say what happened — a test run, a build,
-// a deploy, a git or gh operation — and drops navigation. Measured on a real
-// corpus: 5,051 of 23,774 commands, 3.5 MB of 13.1 MB.
-//
-// The dropped ones are not merely cheap to store, they are actively bad to keep:
-// `cat internal/index/index.go` matches a query about the index and answers
-// nothing.
 // meaningfulCommand is an allowlist on purpose. Inverting it — index anything
 // that is not trivial — was measured on an 85,623-command store: 98% of them
 // pass, 6.3 MB, and the families it lets through are `if`, `for`, `const`,
@@ -409,6 +402,13 @@ var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run)|golangci-
 
 var trivialCommand = regexp.MustCompile(`^\s*(ls|cd|pwd|cat|head|tail|echo|grep|rg|find|which|wc|sed|awk|sleep|mkdir|rm|cp|mv|chmod|export|source|touch|open|printf)\b`)
 
+// worthIndexing keeps the commands that say what happened — a test run, a build,
+// a deploy, a git or gh operation — and drops navigation. Measured on a real
+// corpus: 5,051 of 23,774 commands, 3.5 MB of 13.1 MB.
+//
+// The dropped ones are not merely cheap to store, they are actively bad to keep:
+// `cat internal/index/index.go` matches a query about the index and answers
+// nothing.
 func worthIndexing(cmd string) bool {
 	// One line only: a multi-line command is a heredoc or a pasted script, and
 	// what it says about the work is already in what it produced.

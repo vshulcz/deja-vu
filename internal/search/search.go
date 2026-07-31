@@ -477,8 +477,6 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	return boost
 }
 
-// promotedNoteBoost lifts curated deja notes over raw transcripts on equal
-// relevance. Kept modest: a note about X must not bury a transcript about Y.
 // lifecycleSummary words a hit's recorded state for a person. It says what
 // happened rather than naming the state: "superseded" is our vocabulary, not
 // the reader's.
@@ -512,13 +510,13 @@ func lifecycleSummary(h Hit) string {
 // question, and there is a test for exactly that.
 const decisionBoost = 2.0
 
+// roleToolOutput mirrors sources.RoleToolOutput; this package sits below it.
+const roleToolOutput = "tool-output"
+
 // decidesSomething reports whether a session contains an answer rather than a
 // conversation about one. It looks only at non-user turns: a user writing "we
 // should just pin it" is a proposal, and the same words from the side that did
 // the work are a record of what happened.
-// roleToolOutput mirrors sources.RoleToolOutput; this package sits below it.
-const roleToolOutput = "tool-output"
-
 func decidesSomething(s model.Session) bool {
 	for _, m := range s.Messages {
 		// Tool output is not the assistant concluding something. Before #559 it
@@ -573,6 +571,8 @@ func looksPasted(s model.Session) bool {
 	return total > 0 && dump*2 >= total
 }
 
+// promotedNoteBoost lifts curated deja notes over raw transcripts on equal
+// relevance. Kept modest: a note about X must not bury a transcript about Y.
 const promotedNoteBoost = 1.25
 
 // wornBoost rewards sessions agents keep recalling — capped hard at +20% so

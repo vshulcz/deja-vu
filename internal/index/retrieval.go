@@ -330,17 +330,18 @@ func relevanceResult(ss []model.Session, matched int) SearchResult {
 	}
 }
 
-// ProjectRelevant ranks the current project's sessions by how well they match
-// the prompt terms — without reconstructing an AND query, which poisons on
-// filler words. Each session scores the IDF-weighted sum of prompt terms it
-// contains (rare topical terms dominate; common filler barely moves it), from
-// bucket postings only. The best sessions are materialized with transcripts.
 // dejaVuIDFFloor is the informativeness bar for a term to count toward a
 // déjà vu match: ln(N/df) >= 2 keeps terms present in at most ~13% of
 // sessions. Conversational filler ("post", "text", "claude") is frequent in
 // any large corpus and clears nothing. Terms living in one or two sessions
 // are informative regardless — small corpora never reach the ratio bar.
 const dejaVuIDFFloor = 2.0
+
+// ProjectRelevant ranks the current project's sessions by how well they match
+// the prompt terms — without reconstructing an AND query, which poisons on
+// filler words. Each session scores the IDF-weighted sum of prompt terms it
+// contains (rare topical terms dominate; common filler barely moves it), from
+// bucket postings only. The best sessions are materialized with transcripts.
 
 // ProjectRelevant ranks the project's sessions by IDF-weighted overlap with
 // the prompt terms. matched reports, per returned session, how many distinct
@@ -1083,7 +1084,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		}
 		s := by[r.Key]
 		if s == nil {
-			cp := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Title: meta.Title, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched}
+			cp := sessionFromMeta(meta)
 			s = &cp
 			by[r.Key] = s
 		}

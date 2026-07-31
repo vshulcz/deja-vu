@@ -77,9 +77,6 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a}, err
 }
 
-// entryHasCommand matches on the trailing subcommand rather than the whole
-// string, so an install from a new binary path replaces our old entry instead
-// of leaving it to fire alongside the new one.
 // adoptCodexHookEntry rewrites the command and status message of an entry deja
 // already owns.
 func adoptCodexHookEntry(entry map[string]any, cmd string) {
@@ -96,6 +93,9 @@ func adoptCodexHookEntry(entry map[string]any, cmd string) {
 	}
 }
 
+// entryHasCommand matches on the trailing subcommand rather than the whole
+// string, so an install from a new binary path replaces our old entry instead
+// of leaving it to fire alongside the new one.
 func entryHasCommand(entry map[string]any, cmd string) bool {
 	hs, _ := entry["hooks"].([]any)
 	for _, hAny := range hs {

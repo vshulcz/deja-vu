@@ -9,10 +9,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
-// relativeTimeTerms turns relative-time phrases in a query into the month
-// tokens the ingest writes for every message, so "which book did I finish a
-// week ago" can meet sessions from that month structurally. Only the
-// relevance tier consumes these — they are OR-scored hints, never an AND.
+// relTimeRE matches the relative-time phrases relativeTimeTerms understands.
 var relTimeRE = regexp.MustCompile(`(?i)\b(?:(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d{1,3})\s+(day|week|month|year)s?\s+ago|(yesterday)|last\s+(week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b`)
 
 var relTimeNums = map[string]int{"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
@@ -54,6 +51,10 @@ func monthOccurrence(m time.Month, now time.Time) time.Time {
 	return time.Date(year, m, 1, 0, 0, 0, 0, now.Location())
 }
 
+// relativeTimeTerms turns relative-time phrases in a query into the month
+// tokens the ingest writes for every message, so "which book did I finish a
+// week ago" can meet sessions from that month structurally. Only the
+// relevance tier consumes these — they are OR-scored hints, never an AND.
 func relativeTimeTerms(q string, now time.Time) []string {
 	if now.IsZero() {
 		now = time.Now()

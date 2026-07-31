@@ -127,11 +127,6 @@ func stripInjectedLines(text string) string {
 	return text
 }
 
-// stripBetweenClosed removes only *complete* blocks. An unclosed marker is
-// treated as prose, which is the opposite of the rule for deja's own recall: a
-// truncated <deja-recall> is still ours, but a sentence mentioning
-// <system-reminder> — a bug report, this file's own tests — is not, and
-// swallowing the rest of it loses what the person actually wrote.
 // stripInjectedPrefixes removes a harness preamble from the head of a message,
 // repeatedly: Codex stacks several of them before the first real turn.
 func stripInjectedPrefixes(text string) string {
@@ -203,6 +198,11 @@ func closerAfter(text, open, close string) (int, bool) {
 	return 0, false
 }
 
+// stripBetweenClosed removes only *complete* blocks. An unclosed marker is
+// treated as prose, which is the opposite of the rule for deja's own recall: a
+// truncated <deja-recall> is still ours, but a sentence mentioning
+// <system-reminder> — a bug report, this file's own tests — is not, and
+// swallowing the rest of it loses what the person actually wrote.
 func stripBetweenClosed(text, open, close string) string {
 	for {
 		start := strings.Index(text, open)

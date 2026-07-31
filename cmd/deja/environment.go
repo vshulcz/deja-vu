@@ -50,16 +50,16 @@ func environmentBlock(dir string) string {
 	return b.String()
 }
 
+// environmentServed is per process, which is what makes "once" countable on
+// this side: an MCP server lives for the whole session.
+var environmentServed sync.Once
+
 // environmentOnce appends the block to the first recall an MCP session serves.
 //
 // The session-start injection reaches the thirteen harnesses deja can wire a
 // hook into. The rest — and every agent whose user declined the hook — reach
-// deja only through MCP, and there the server process lives for the whole
-// session, so "once" is a thing this side can actually count. Appending it to
-// every recall would spend a tenth of the response budget repeating a fact the
-// model already has.
-var environmentServed sync.Once
-
+// deja only through MCP. Appending the block to every recall would spend a
+// tenth of the response budget repeating a fact the model already has.
 func environmentOnce(dir string) string {
 	out := ""
 	environmentServed.Do(func() {

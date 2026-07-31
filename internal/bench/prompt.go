@@ -64,9 +64,6 @@ func promptTopics() []promptTopic {
 
 const PromptNegativeCount = 3
 
-// GeneratePrompt builds one chain per topic: three prior sessions carrying the
-// fact under working noise, and no task session — the question comes from the
-// caller, the way a prompt does.
 // promptCorpusHash fingerprints what the corpus asks, not when it was built.
 // The fresh chain is dated relative to now by design, so hashing the sessions
 // wholesale gave a different hash on every run — and a hash that changes
@@ -121,6 +118,9 @@ func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, sta
 	return chain
 }
 
+// GeneratePrompt builds one chain per topic: three prior sessions carrying the
+// fact under working noise, and no task session — the question comes from the
+// caller, the way a prompt does.
 func GeneratePrompt(seed int64) PromptCorpus {
 	rng := rand.New(rand.NewSource(seed))
 	topics := promptTopics()

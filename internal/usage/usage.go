@@ -193,8 +193,6 @@ func Totals(indexDir string) Summary {
 	return out
 }
 
-// Today sums events since local midnight: agent recalls (recall, context,
-// hook) and the context bytes they served.
 // Week aggregates the trailing seven days, split by who initiated: recalls
 // counts only what the AGENT asked for and got (non-empty recall/context
 // calls) — the honest demand-side number — while injected counts the hook
@@ -217,6 +215,8 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 	return recalls, bytes, injected, injectedBytes
 }
 
+// Today sums events since local midnight: agent recalls (recall, context,
+// hook) and the context bytes they served.
 func Today(indexDir string) (recalls int, bytes int) {
 	recalls, bytes, _ = TodayWithInjections(indexDir)
 	return recalls, bytes

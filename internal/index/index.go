@@ -45,14 +45,15 @@ func IsCorrupt(err error) bool { return errors.Is(err, errCorruptIndex) }
 
 var lastIngestFiles int
 
-// BuildSummary describes the most recent (re)build in this process; the CLI
-// uses it to greet a first-ever index with a summary instead of silence.
+// HarnessCount is one harness's share of a build.
 type HarnessCount struct {
 	Name     string
 	Sessions int
 	Messages int
 }
 
+// BuildSummary describes the most recent (re)build in this process; the CLI
+// uses it to greet a first-ever index with a summary instead of silence.
 type BuildSummary struct {
 	Initial    bool
 	Sessions   int

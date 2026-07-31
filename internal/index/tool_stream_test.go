@@ -223,3 +223,51 @@ func TestSpanInventorySkipsSpansWithNoPath(t *testing.T) {
 		t.Fatalf("files = %d, want the one span that names a file", files)
 	}
 }
+
+// A manifest entry becomes a session in one place. Two constructors existed
+// and only one carried Touched, so a caller reading it from Recent got an
+// empty slice on every session and no error — silence, which is how it cost a
+// wrong measurement before it was noticed (#633).
+func TestRecentCarriesTouched(t *testing.T) {
+	tmp := t.TempDir()
+	proj := filepath.Join(tmp, "claude", "-tmp-touch")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"type":"user","sessionId":"t1","cwd":"/w","timestamp":"2026-07-20T10:00:00Z","message":{"role":"user","content":"look at the pool"}}` + "\n" +
+		`{"type":"assistant","sessionId":"t1","cwd":"/w","timestamp":"2026-07-20T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"/w/pool.go"}}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(proj, "t1.jsonl"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	// The manifest holds it...
+	metas, err := AllMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metas) != 1 || len(metas[0].Touched) == 0 {
+		t.Fatalf("manifest carries no Touched: %#v", metas)
+	}
+	// ...and every path that hands back a session must too.
+	recent, err := Recent(dir, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recent) != 1 {
+		t.Fatalf("sessions = %d", len(recent))
+	}
+	if len(recent[0].Touched) == 0 {
+		t.Fatal("Recent dropped Touched, so a caller sees an empty slice and no error")
+	}
+	if recent[0].Touched[0] != "/w/pool.go" {
+		t.Fatalf("Touched = %v", recent[0].Touched)
+	}
+}

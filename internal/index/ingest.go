@@ -366,8 +366,6 @@ func importedSessions(dir string) importedState {
 
 func load(h string) []model.Session { return loadProgress(h, nil) }
 
-// loadProgress narrates a full rebuild per harness: a cold pass over a large
-// corpus takes seconds and used to look hung.
 // safeLoad shields a cold rebuild from a panicking harness loader: one broken
 // store costs that harness's sessions this pass, not the whole index.
 func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss []model.Session) {
@@ -386,6 +384,8 @@ func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss 
 // that already walked the filesystem so the bar advances proportionally.
 var progressWeights = map[string]int{}
 
+// loadProgress narrates a full rebuild per harness: a cold pass over a large
+// corpus takes seconds and used to look hung.
 func loadProgress(h string, progress io.Writer) []model.Session {
 	// Harness stores are independent files owned by different tools; parsing
 	// them is CPU-bound JSON/regex work with no shared state, so the cold
@@ -973,8 +973,20 @@ func nextSessionOrd(sessions map[string]SessionMeta) uint32 {
 	return maxOrd + 1
 }
 
+// sessionFromMeta is the one place a manifest entry becomes a session. It
+// carries Touched, which retrieval used to copy by hand in a second, nearly
+// identical constructor — so a caller reading it off `Recent` got an empty
+// slice on every session and no error. Silence is the failure mode, and it
+// already cost one wrong measurement: reading Touched from Recent reported 0
+// of 1153 sessions carrying files while the manifest held them (#633).
+//
+// SessionMeta.Asked and SessionMeta.Hit have no counterpart on model.Session
+// and are read from the manifest directly; they are not dropped here.
 func sessionFromMeta(meta SessionMeta) model.Session {
-	return model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path, Title: meta.Title, Started: meta.Started, Updated: meta.Updated}
+	return model.Session{
+		ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path,
+		Title: meta.Title, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
+	}
 }
 
 func sessionTitle(s model.Session) string {

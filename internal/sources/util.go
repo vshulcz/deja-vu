@@ -223,9 +223,6 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 	return all
 }
 
-// toolPathsFromContent is claudeToolPaths for the reference parser, which walks
-// decoded maps rather than raw JSON. The two must agree or the differential
-// test in #502 stops meaning anything.
 // toolDialect names one harness's tool-call vocabulary. The wire shape is the
 // same everywhere — a `tool_use` part with a name and an input object — but the
 // vocabulary is not, and it is not guessable: Claude names the file key
@@ -260,6 +257,9 @@ func toolPart(it any, d toolDialect) (name string, in map[string]any, ok bool) {
 	return name, in, in != nil
 }
 
+// toolPathsFromContent is claudeToolPaths for the reference parser, which walks
+// decoded maps rather than raw JSON. The two must agree or the differential
+// test in #502 stops meaning anything.
 func toolPathsFromContent(v any) string { return toolPathsIn(v, claudeDialect) }
 
 func toolPathsIn(v any, d toolDialect) string {

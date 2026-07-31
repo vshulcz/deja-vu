@@ -293,10 +293,6 @@ func hasCJKRune(s string) bool {
 	return false
 }
 
-// techTerm keeps tokens that can actually identify past work: identifiers,
-// error codes, paths, or long plain-ASCII words. Ordinary prose — any
-// language — matches by theme, not by task, and theme matches are what made
-// déjà vu fire on every prompt.
 // hasIdentifierTerm reports whether the question contains a word specific
 // enough to carry a match on its own. In a small corpus even "file" clears the
 // informativeness bar, so a single hit is only trusted when the question named
@@ -332,6 +328,10 @@ var promptFiller = map[string]bool{
 	"give": true, "take": true, "come": true, "seen": true, "said": true,
 }
 
+// techTerm keeps tokens that can actually identify past work: identifiers,
+// error codes, paths, or long plain-ASCII words. Ordinary prose — any
+// language — matches by theme, not by task, and theme matches are what made
+// déjà vu fire on every prompt.
 func techTerm(f string) bool {
 	if promptFiller[f] {
 		return false
@@ -426,8 +426,6 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 	}
 }
 
-// dejaVuLine is the one visible line a déjà vu moment earns: which past
-// session answered, and how old it is.
 // dejaVuLineDue rate-limits the visible line: a déjà vu that fires every
 // prompt is wallpaper, and wallpaper trains the user to ignore the real
 // moments. Context still flows to the agent regardless.
@@ -442,6 +440,8 @@ func dejaVuLineDue(dir string) bool {
 	return true
 }
 
+// dejaVuLine is the one visible line a déjà vu moment earns: which past
+// session answered, and how old it is.
 func dejaVuLine(s model.Session, terms ...string) string {
 	topic := dejaVuTopic(s)
 	if topic == "" {

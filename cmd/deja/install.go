@@ -813,8 +813,6 @@ func antigravityConfigHome() string {
 	return filepath.Join(homeDir(), ".gemini", "config")
 }
 
-// installCursor wires the MCP server into Cursor's global config
-// (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
 // mcpServerEntry is the JSON mcpServers value for deja. Windows stdio MCP
 // clients (Claude Code among them) spawn through cmd, so the entry uses the
 // cmd /c wrapper there; elsewhere it is the executable directly.
@@ -829,6 +827,9 @@ func mcpCommandArgs(exe string) (string, []string) {
 	}
 	return exe, []string{"mcp"}
 }
+
+// installCursor wires the MCP server into Cursor's global config
+// (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
 
 // mcpServers shape in their own files.
 func installCursor(exe string, uninstall bool) (installResult, error) {
@@ -1044,10 +1045,6 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) []byte {
 	return []byte(strings.Join(out, "\n") + "\n")
 }
 
-// installTargetNames is the one list of what `deja install` accepts. Shell
-// completion and doctor's coverage test both read it, so a harness added to
-// installTarget without appearing here is caught rather than quietly missing
-// from both.
 // withAutoTargets pairs each target with its -auto sibling where one exists,
 // keeping the original order so the report reads harness by harness.
 func withAutoTargets(targets []string) []string {
@@ -1152,6 +1149,10 @@ func min3(a, b, c int) int {
 	return a
 }
 
+// installTargetNames is the one list of what `deja install` accepts. Shell
+// completion and doctor's coverage test both read it, so a harness added to
+// installTarget without appearing here is caught rather than quietly missing
+// from both.
 func installTargetNames() []string {
 	return []string{
 		"claude-code", "claude-auto",

@@ -102,12 +102,6 @@ func readManifest(dir string) (Manifest, error) {
 	return m, nil
 }
 
-// writeManifest commits the two-file manifest crash-safely. sessions.gob is
-// written (and renamed into place) before manifest.gob, and both go through a
-// temp file + rename. manifest.gob carries the version/file sizes that decide
-// whether the index is fresh, so it must land last: a crash between the two
-// leaves the old manifest pointing at old data, and the next run reindexes
-// rather than serving a fresh-looking index whose sessions are stale.
 // writeManifestOnly persists manifest.gob without rewriting sessions.gob —
 // for updates that change only core fields (e.g. export watermarks) where the
 // caller has not loaded sessions and must not clobber them.
@@ -119,6 +113,12 @@ func writeManifestOnly(dir string, m Manifest) error {
 	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
 }
 
+// writeManifest commits the two-file manifest crash-safely. sessions.gob is
+// written (and renamed into place) before manifest.gob, and both go through a
+// temp file + rename. manifest.gob carries the version/file sizes that decide
+// whether the index is fresh, so it must land last: a crash between the two
+// leaves the old manifest pointing at old data, and the next run reindexes
+// rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
 	mergeIngestDiag(&m)
 	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth}
@@ -166,8 +166,7 @@ func recordsIntact(dir string, m Manifest) bool {
 	return true
 }
 
-// Overview summarizes the index from manifest metadata alone — no record
-// reads — so the zero-argument brief stays instant.
+// OverviewStats is what the brief needs about a whole store.
 type OverviewStats struct {
 	Sessions      int
 	Harnesses     int
@@ -179,6 +178,8 @@ type OverviewStats struct {
 	Oldest, Newest time.Time
 }
 
+// Overview summarizes the index from manifest metadata alone — no record
+// reads — so the zero-argument brief stays instant.
 func Overview(dir string) (OverviewStats, error) {
 	if dir == "" {
 		dir = DefaultDir()

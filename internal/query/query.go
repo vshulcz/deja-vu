@@ -38,8 +38,7 @@ var stopWords = map[string]bool{
 	"говори": true, "покажи": true, "посмотри": true, "пожалуйста": true,
 }
 
-// QueryParts separates ordinary terms from quoted phrases without changing
-// the query syntax used by callers.
+// Options is one search request: what to look for and what to narrow it to.
 type Options struct {
 	Query                  string
 	Regex                  bool
@@ -79,6 +78,8 @@ const (
 	TierRelevance = "relevance"
 )
 
+// QueryParts separates ordinary terms from quoted phrases without changing
+// the query syntax used by callers.
 func QueryParts(q string) (terms []string, phrases []string) {
 	start := -1
 	var plain strings.Builder
