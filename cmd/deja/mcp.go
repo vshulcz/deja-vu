@@ -180,7 +180,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), 4096-recallFrameOverhead)
 		if err == nil {
-			text = frameRecall(text)
+			text = frameRecall(text) + environmentOnce(dir)
 			usage.RecordServedSessions(dir, usage.KindRecall, len(text), sessions, sessions == 0, raw, ids)
 			usage.SnapshotPolicy(dir, usage.KindRecall, text, sessions, policy.Load().Describe(policy.ActivationMCP))
 		}

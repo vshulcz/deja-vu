@@ -90,6 +90,25 @@ func runHookContext(dir string, plain bool) error {
 	_ = json.Unmarshal(readHookStdin(), &input)
 	digest, sessions, raw, taskMatched := cachedHookDigest(dir)
 	if digest == "" {
+		// No session from this project, which is the usual state in a new
+		// checkout — and exactly where knowing what this machine is missing
+		// helps most. The block is about the machine, not the project, so it
+		// does not depend on the digest having found anything.
+		if env := environmentBlock(dir); env != "" {
+			out := frameRecall(env)
+			usage.RecordDigestPolicy(dir, usage.KindHook, out, 0, 0, policy.Load().Describe(policy.ActivationAuto))
+			if plain {
+				fmt.Fprintln(os.Stdout, out)
+				return nil
+			}
+			var resp sessionStartHookResponse
+			resp.HookSpecificOutput.HookEventName = "SessionStart"
+			resp.HookSpecificOutput.AdditionalContext = out
+			if b, err := json.Marshal(resp); err == nil {
+				fmt.Fprintln(os.Stdout, string(b))
+			}
+			return nil
+		}
 		// A first build (or one forced by a new index format) is running in
 		// the background. It never blocks the agent, but starting in silence
 		// looks like deja is simply not working — so say what is happening.
@@ -414,7 +433,15 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	if result.Sessions == 0 {
 		matched = nil
 	}
-	return result.Text, result.Sessions, rawSize(ss), matched
+	text := result.Text
+	// Inside the cached result, not after it: this costs a manifest scan plus
+	// one session read, which is ten times the rest of the hook, and the
+	// clusters it reports change over weeks rather than turns.
+	if env := environmentBlock(dir); env != "" {
+		text += "\n" + env + "\n"
+	}
+	mark("environment")
+	return text, result.Sessions, rawSize(ss), matched
 }
 
 func requestWarmup(dir string) {

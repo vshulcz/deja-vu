@@ -134,7 +134,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Blame** | `deja blame <path>` — which sessions touched this file, what was decided and why |
 | **Restore** | `deja restore <path>` — hand back a span an agent replaced, from the `old_string` its edit recorded; never writes over the original |
 | **Files** | `deja files <topic>` — the other direction: which files the work on a subject actually touched, ranked by how specific they are to it |
-| **Friction** | `deja friction` — the errors this machine keeps hitting across sessions: a missing tool, an uninstalled module, a command that does not exist here |
+| **Friction** | `deja friction` — the errors this machine keeps hitting across sessions: a missing tool, an uninstalled module, a command that does not exist here. The same facts reach your agent by itself, once per session, so it stops rediscovering them one failed command at a time |
 | **Semantic** | optional: point `deja embed` at a local Ollama/LM Studio and rephrased queries still hit |
 
 ## Privacy

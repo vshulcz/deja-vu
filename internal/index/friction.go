@@ -151,17 +151,27 @@ func frictionHashes(ms []model.Message) []uint64 {
 	return out
 }
 
-// FindFriction picks the wall worth showing: the one the most separate
-// sessions hit. It runs over the manifest alone, so a caller on the first
-// screen pays nothing for it; only the sessions that carry the winning hash
-// are read back, and only to recover the text the hash stands for.
+// FindFriction picks the wall worth showing on a screen with room for one.
 func FindFriction(dir string) (Friction, bool) {
+	out := TopFriction(dir, 1)
+	if len(out) == 0 {
+		return Friction{}, false
+	}
+	return out[0], true
+}
+
+// TopFriction returns the walls this machine keeps running into, most-hit
+// first. It runs over the manifest alone, so a caller on the first screen or
+// in a session-start hook pays nothing for the search; only the sessions
+// carrying a winning hash are read back, and only to recover the text the
+// hash stands for.
+func TopFriction(dir string, n int) []Friction {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return Friction{}, false
+		return nil
 	}
 	byHash := map[uint64][]SessionMeta{}
 	for _, meta := range m.Sessions {
@@ -169,27 +179,51 @@ func FindFriction(dir string) (Friction, bool) {
 			byHash[h] = append(byHash[h], meta)
 		}
 	}
-	var best []SessionMeta
-	var bestHash uint64
+	type cluster struct {
+		hash  uint64
+		metas []SessionMeta
+	}
+	var cs []cluster
 	for h, metas := range byHash {
 		if len(metas) < FrictionMinSessions {
 			continue
 		}
-		// Most sessions wins; among equals the one hit most recently, because
-		// a wall the machine stopped running into is history, not friction.
-		if len(metas) > len(best) || (len(metas) == len(best) && newestOf(metas).After(newestOf(best))) {
-			best, bestHash = metas, h
+		sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+		cs = append(cs, cluster{h, metas})
+	}
+	sort.Slice(cs, func(i, j int) bool {
+		if len(cs[i].metas) != len(cs[j].metas) {
+			return len(cs[i].metas) > len(cs[j].metas)
 		}
+		// A wall the machine stopped running into is history, not friction.
+		if !cs[i].metas[0].Updated.Equal(cs[j].metas[0].Updated) {
+			return cs[i].metas[0].Updated.After(cs[j].metas[0].Updated)
+		}
+		return cs[i].hash < cs[j].hash
+	})
+	if n > 0 && len(cs) > n {
+		cs = cs[:n]
 	}
-	if len(best) < FrictionMinSessions {
-		return Friction{}, false
+	// Recover every winning text in one pass per session rather than one pass
+	// per wall: the same session usually carries several of them.
+	want := map[uint64]string{}
+	for _, c := range cs {
+		want[c.hash] = ""
 	}
-	sort.Slice(best, func(i, j int) bool { return best[i].Updated.After(best[j].Updated) })
-	text := frictionTextFor(dir, m, best, bestHash)
-	if text == "" {
-		return Friction{}, false
+	for _, c := range cs {
+		if want[c.hash] != "" {
+			continue
+		}
+		frictionTexts(dir, m, c.metas, want, c.hash)
 	}
-	return Friction{Text: text, Sessions: best, Last: best[0].Updated}, true
+	var out []Friction
+	for _, c := range cs {
+		if want[c.hash] == "" {
+			continue
+		}
+		out = append(out, Friction{Text: want[c.hash], Sessions: c.metas, Last: c.metas[0].Updated})
+	}
+	return out
 }
 
 func newestOf(ms []SessionMeta) time.Time {
@@ -202,9 +236,11 @@ func newestOf(ms []SessionMeta) time.Time {
 	return out
 }
 
-// frictionTextFor recovers what a hash stood for by reading back the sessions
-// that carry it, stopping at the first one that yields the line.
-func frictionTextFor(dir string, m Manifest, metas []SessionMeta, want uint64) string {
+// frictionTexts recovers what the wanted hashes stood for by reading back the
+// sessions that carry one of them, filling in every hash a session yields —
+// one session usually carries several walls, and reading it once per wall was
+// the difference between one lookup and N.
+func frictionTexts(dir string, m Manifest, metas []SessionMeta, want map[uint64]string, target uint64) {
 	for _, meta := range metas {
 		s, ok, err := loadSessionMeta(dir, m, meta)
 		if err != nil || !ok {
@@ -216,11 +252,19 @@ func frictionTextFor(dir string, m Manifest, metas []SessionMeta, want uint64) s
 			}
 			for _, line := range strings.Split(msg.Text, "\n") {
 				line, ok := FrictionLine(line)
-				if ok && frictionHash(line) == want {
-					return line
+				if !ok {
+					continue
+				}
+				h := frictionHash(line)
+				if cur, wanted := want[h]; wanted && cur == "" {
+					want[h] = line
 				}
 			}
 		}
+		// Stop on this cluster's own text, not on any text: a session can fill
+		// in a neighbour's hash while carrying nothing for this one.
+		if want[target] != "" {
+			return
+		}
 	}
-	return ""
 }

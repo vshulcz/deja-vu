@@ -63,6 +63,7 @@
 </tbody></table>
 <h2>Auto-recall</h2>
 <p><code>deja install --auto</code> adds a SessionStart hook (Claude Code, Codex, an opencode plugin). Relevant project memory is injected before you ask — read-only, capped at 2&nbsp;KB, framed as untrusted historical data so it never acts as an instruction. It also fires right after a context compaction, re-anchoring the model in what it just lost.</p>
+<p>The same injection carries what this machine keeps failing on: an error that hit three or more separate sessions — a binary that is not installed, a Python module that was never added — counted from the transcripts themselves. Agents rediscover those one failed command at a time, so the block says the count and what to do instead. It is served once per session, appears at session start where a hook is wired and on the first <code>recall</code> where only MCP is, and stays silent until something has failed in three separate sessions.</p>
 <h2>Windows</h2>
 <div class="note">On Windows, stdio MCP clients spawn through <code>cmd /c deja mcp</code>. <code>deja install</code> writes that form automatically.</div>
 
