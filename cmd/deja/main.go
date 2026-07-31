@@ -831,7 +831,15 @@ func runBlame(dir string, args []string) error {
 		return nil
 	}
 	if len(hits) == 0 {
-		fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions mention "+target.Base))
+		// "run deja index" is advice for an empty store. With sessions in the
+		// index it is advice for a state the tool is not in — indexing changes
+		// nothing and doctor reports the stores as found — and it sends the
+		// reader to fix an index that is fine (#637, same shape).
+		if n, err := index.SessionCount(dir); err == nil && n > 0 {
+			fmt.Fprintf(os.Stderr, "deja: no sessions mention %s — searched %d indexed session%s\n", target.Base, n, pluralS(n))
+		} else {
+			fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions mention "+target.Base))
+		}
 		return nil
 	}
 	search.PrintBlame(os.Stdout, hits, false)
@@ -1029,8 +1037,35 @@ func runForget(dir string, args []string) error {
 			result.Sessions, result.Messages, result.Tombstones)
 		return nil
 	}
+	// Nothing matched is a different answer from nothing was dropped: the
+	// first means the selector found no session, and reporting it as a
+	// successful removal of zero leaves the reader believing they deleted
+	// something that is in fact still there under a different id.
+	if result.Sessions == 0 && result.Messages == 0 {
+		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped\n", forgetSelector(o))
+		return nil
+	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
 	return nil
+}
+
+// forgetSelector names what the caller asked to forget, so the empty answer
+// says which selector came back empty.
+func forgetSelector(o index.ForgetOptions) string {
+	var parts []string
+	if o.Session != "" {
+		parts = append(parts, fmt.Sprintf("session %q", o.Session))
+	}
+	if o.Project != "" {
+		parts = append(parts, fmt.Sprintf("project %q", o.Project))
+	}
+	if !o.Before.IsZero() {
+		parts = append(parts, "before "+o.Before.Format("2006-01-02"))
+	}
+	if len(parts) == 0 {
+		return "the given selector"
+	}
+	return strings.Join(parts, " and ")
 }
 
 func parseForgetDate(s string) (time.Time, error) {

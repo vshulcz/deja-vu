@@ -1242,3 +1242,54 @@ func TestSessionCountCountsSessionsNotFiles(t *testing.T) {
 		t.Fatalf("message = %q", b.String())
 	}
 }
+
+// "run deja index" is advice for an empty store. With sessions indexed it
+// describes a state the tool is not in, and it sends the reader to fix an
+// index that is fine — the same shape as #637, found by walking every command
+// with a nonsense argument.
+func TestBlameDoesNotBlameTheIndexWhenItIsFull(t *testing.T) {
+	dir := seedBriefIndex(t)
+	_ = dir
+	out, err := captureRunStderr(t, "blame", "/nowhere/nothing.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "run `deja index`") {
+		t.Fatalf("told the reader to rebuild a healthy index: %q", out)
+	}
+	if !strings.Contains(out, "searched 1 indexed session") {
+		t.Fatalf("does not say what was searched: %q", out)
+	}
+}
+
+// Nothing matched is a different answer from nothing was dropped: reporting a
+// missing session as a successful removal of zero leaves the reader believing
+// they deleted something that is still there under another id.
+func TestForgetSaysWhenNothingMatched(t *testing.T) {
+	seedBriefIndex(t)
+	out, err := captureRun(t, "forget", "--session", "no-such-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "sessions dropped") {
+		t.Fatalf("reported a removal that did not happen: %q", out)
+	}
+	if !strings.Contains(out, "nothing matched") || !strings.Contains(out, `session "no-such-session"`) {
+		t.Fatalf("does not name the selector that came back empty: %q", out)
+	}
+}
+
+func TestForgetSelectorNamesEverySelector(t *testing.T) {
+	if got := forgetSelector(index.ForgetOptions{Session: "abc"}); got != `session "abc"` {
+		t.Fatalf("got %q", got)
+	}
+	got := forgetSelector(index.ForgetOptions{Session: "abc", Project: "api", Before: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)})
+	for _, want := range []string{`session "abc"`, `project "api"`, "before 2026-07-20"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%q missing from %q", want, got)
+		}
+	}
+	if got := forgetSelector(index.ForgetOptions{}); got == "" {
+		t.Fatal("an empty selector still needs a name")
+	}
+}
