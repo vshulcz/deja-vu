@@ -108,7 +108,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 func findRestoreSpans(dir string, path string) ([]restoreSpan, error) {
 	base := filepath.Base(path)
 	o := search.Options{Query: base, All: true, Role: "edit"}
-	if err := index.EnsureForSearch(dir, o, false, nil); err != nil {
+	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
 		return nil, ensureError(dir, err)
 	}
 	hits, err := index.Search(dir, o)
