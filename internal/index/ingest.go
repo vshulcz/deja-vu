@@ -653,6 +653,11 @@ func tokenizedPart(role, text string) string {
 //
 // The full text is still stored and still served: this decides what earns
 // postings, exactly as a replaced span stores its body and indexes its path.
+// signalTail is how much of the end of an unmatched output is kept beside the
+// head. Half the head: measured on a 1637-output store it adds 1.6 MB to the
+// postings, and the end of a long output is where a failure states itself.
+const signalTail = signalFloor / 2
+
 func signalLines(text string) string {
 	if len(text) < signalFloor {
 		return text
@@ -676,10 +681,21 @@ func signalLines(text string) string {
 		}
 	}
 	if b.Len() == 0 {
-		// Nothing matched: index the head rather than nothing, so a short
-		// unusual output is still findable.
+		// Nothing matched, which is the common case rather than the safety net:
+		// a contributor measured 234 of 533 filtered records on their store
+		// matching none of the substrings, and found a vendor error — `Model
+		// name is not valid`, present verbatim in 8 rollouts — unrecoverable
+		// because it sat past the head and "not valid" is not "not found"
+		// (#614). The list of substrings is the limit, not its contents, so
+		// the fallback keeps both ends: errors cluster at the end of a long
+		// output, and the head alone is the least informative part of exactly
+		// the records that matched nothing.
 		if len(text) > signalFloor {
-			return text[:signalFloor]
+			head := text[:signalFloor]
+			if len(text) <= signalFloor+signalTail {
+				return text
+			}
+			return head + "\n" + text[len(text)-signalTail:]
 		}
 		return text
 	}

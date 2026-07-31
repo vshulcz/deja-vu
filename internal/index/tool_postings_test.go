@@ -175,7 +175,9 @@ func TestSignalLinesFallsBackWhenNothingMatches(t *testing.T) {
 	if got == "" {
 		t.Fatal("indexing nothing makes the record unreachable")
 	}
-	if len(got) > signalFloor+64 {
+	// Head plus tail since #614: the head alone is the least informative part
+	// of exactly the records that matched nothing.
+	if len(got) > signalFloor+signalTail+64 {
 		t.Fatalf("the fallback should be bounded, got %d bytes", len(got))
 	}
 }
@@ -184,5 +186,65 @@ func TestSignalLinesLeavesOtherRolesAlone(t *testing.T) {
 	long := strings.Repeat("a sentence someone actually typed. ", 500)
 	if got := tokenizedPart("assistant", long); got != long {
 		t.Fatal("speech is indexed whole however long it is")
+	}
+}
+
+// An output that matches none of the signal substrings used to be indexed by
+// its head alone, and the head is the least informative part of exactly those
+// records. Measured on a 1153-session store: 394 outputs match no signal line,
+// 262 are long enough to have a tail, and 186 of those carry a token the head
+// does not — text no query could reach (#614).
+func TestSignalLinesKeepsBothEndsWhenNothingMatches(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("HEADTOKEN starts here\n")
+	for b.Len() < signalFloor*2 {
+		b.WriteString("ordinary chatter about nothing in particular\n")
+	}
+	b.WriteString("TAILTOKEN the vendor said the model name is not valid\n")
+	got := signalLines(b.String())
+
+	if !strings.Contains(got, "HEADTOKEN") {
+		t.Error("dropped the head")
+	}
+	if !strings.Contains(got, "TAILTOKEN") {
+		t.Error("dropped the tail, so the end of a long output stays unreachable")
+	}
+	// Both ends, not the whole thing: the byte saving is the reason the filter
+	// exists.
+	if len(got) >= b.Len() {
+		t.Fatalf("kept %d of %d bytes — the filter stopped filtering", len(got), b.Len())
+	}
+	if len(got) > signalFloor+signalTail+64 {
+		t.Fatalf("kept %d bytes, budget is %d", len(got), signalFloor+signalTail)
+	}
+}
+
+// Short enough to fit in head plus tail: keep it whole rather than splicing
+// two overlapping halves together.
+func TestSignalLinesKeepsAShortUnmatchedOutputWhole(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("nothing here matches a signal substring\n")
+	for b.Len() < signalFloor+100 {
+		b.WriteString("more ordinary chatter\n")
+	}
+	in := b.String()
+	if got := signalLines(in); got != in {
+		t.Fatalf("spliced a %d-byte output that fits in %d", len(in), signalFloor+signalTail)
+	}
+}
+
+// A matched output is unchanged by any of this.
+func TestSignalLinesUnchangedWhenSomethingMatches(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("--- FAIL: TestThing\n    thing_test.go:12: wrong\n")
+	for b.Len() < signalFloor*2 {
+		b.WriteString("filler line\n")
+	}
+	got := signalLines(b.String())
+	if !strings.Contains(got, "--- FAIL: TestThing") || !strings.Contains(got, "thing_test.go:12") {
+		t.Fatalf("lost the verdict: %q", got)
+	}
+	if strings.Contains(got, "filler line") {
+		t.Error("kept the filler around a matched line")
 	}
 }
