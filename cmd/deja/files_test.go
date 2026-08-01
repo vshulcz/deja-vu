@@ -100,8 +100,10 @@ func TestInRepositoryWalksUpForGit(t *testing.T) {
 }
 
 func TestTrimPath(t *testing.T) {
+	// The head that was dropped is marked, or two files under one directory
+	// read as relative paths starting in different places (#727).
 	got := trimPath("/Users/x/coding/goprojects/deja-vu/internal/index/store.go")
-	if got != "deja-vu/internal/index/store.go" {
+	if got != "…/deja-vu/internal/index/store.go" {
 		t.Fatalf("got %q", got)
 	}
 	if got := trimPath("/a/b.go"); got != "a/b.go" {

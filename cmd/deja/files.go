@@ -78,6 +78,13 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		return fmt.Errorf("search: %w", err)
 	}
 	if len(hits) == 0 {
+		// A filter the caller set is not the topic's fault: three sessions can
+		// mention it and still be absent because they are in another project
+		// (#727, the same shape as #715 in search).
+		if project != "" {
+			fmt.Fprintf(stdout, "no sessions mention %q in project %q\n", q, project)
+			return nil
+		}
 		fmt.Fprintf(stdout, "no sessions mention %q\n", q)
 		return nil
 	}
@@ -315,12 +322,21 @@ var repoCheck sync.Map
 
 // trimPath keeps the tail that identifies a file without the home directory in
 // front of it.
+//
+// The cut is marked: two files under /tmp/b7/repo printed as "tmp/b7/repo/x.go"
+// and "b7/repo/internal/y.go", which read as relative paths starting in
+// different places rather than as one tree with its head removed (#727).
 func trimPath(p string) string {
 	parts := strings.Split(filepath.Clean(p), string(filepath.Separator))
-	if len(parts) > 4 {
-		return strings.Join(parts[len(parts)-4:], "/")
+	// Clean leaves an empty first element for an absolute path. Dropping it is
+	// not a truncation, so it must not draw an ellipsis.
+	if len(parts) > 0 && parts[0] == "" {
+		parts = parts[1:]
 	}
-	return strings.TrimPrefix(p, "/")
+	if len(parts) > 4 {
+		return "…/" + strings.Join(parts[len(parts)-4:], "/")
+	}
+	return strings.Join(parts, "/")
 }
 
 // verbIs keeps "1 file is" from reading as "1 file are".
