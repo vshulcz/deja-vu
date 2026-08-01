@@ -118,7 +118,7 @@ func TestDemoteRejected(t *testing.T) {
 		{Session: model.Session{ID: "bad", Project: "p", Updated: newer}, Lifecycle: "rejected"},
 		{Session: model.Session{ID: "good", Project: "p", Updated: older}, Superseded: "2026-07-28"},
 	}
-	demoteRejected(hits)
+	_ = demoteRejected(hits)
 	if hits[0].Session.ID != "good" || hits[1].Session.ID != "bad" {
 		t.Fatalf("order = %s, %s", hits[0].Session.ID, hits[1].Session.ID)
 	}
@@ -140,7 +140,7 @@ func TestDemoteRejectedLeavesOtherStatesAlone(t *testing.T) {
 			{Session: model.Session{ID: "first", Project: "p"}, Lifecycle: state},
 			{Session: model.Session{ID: "second", Project: "p"}},
 		}
-		demoteRejected(hits)
+		_ = demoteRejected(hits)
 		if hits[0].Session.ID != "first" {
 			t.Errorf("state %q reordered the hits", state)
 		}
@@ -153,7 +153,7 @@ func TestDemoteRejectedLeavesOtherStatesAlone(t *testing.T) {
 		{Session: model.Session{ID: "a", Project: "p"}, Lifecycle: "rejected", Superseded: "2026-07-28"},
 		{Session: model.Session{ID: "b", Project: "p", Updated: day}, Lifecycle: "rejected"},
 	}
-	demoteRejected(hits)
+	_ = demoteRejected(hits)
 	if hits[0].Session.ID != "a" || hits[0].Superseded != "2026-07-28" {
 		t.Errorf("all-rejected set was rewritten: %#v", hits)
 	}
@@ -176,7 +176,7 @@ func TestDemoteRejectedKeepsTheRankingOrder(t *testing.T) {
 		}
 		hits = append(hits, h)
 	}
-	demoteRejected(hits)
+	_ = demoteRejected(hits)
 	var got []string
 	for _, h := range hits {
 		if h.Lifecycle != "rejected" {
@@ -201,11 +201,46 @@ func TestDemoteRejectedMatchesTheRightRival(t *testing.T) {
 		{Session: model.Session{ID: "other", Project: "elsewhere", Updated: newer}, Lifecycle: "rejected"},
 		{Session: model.Session{ID: "mine", Project: "p"}, Superseded: "2026-07-28"},
 	}
-	demoteRejected(hits)
+	_ = demoteRejected(hits)
 	if hits[0].Session.ID != "mine" {
 		t.Fatalf("order = %s", hits[0].Session.ID)
 	}
 	if hits[0].Superseded != "2026-07-28" {
 		t.Errorf("cleared the label using another project's rejection")
+	}
+}
+
+// Read top-down, an older session above a newer one with no explanation is
+// what a broken ranking looks like; the reason sat four lines further down,
+// attached to the result that moved (#694).
+func TestDemotedNote(t *testing.T) {
+	hits := []search.Hit{
+		{Session: model.Session{ID: "bad", Project: "p"}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "good", Project: "p"}},
+	}
+	moved := demoteRejected(hits)
+	if moved == 0 {
+		t.Fatal("nothing moved")
+	}
+	note := demotedNote(hits, moved)
+	if !strings.Contains(note, "1 session you marked rejected is below") {
+		t.Errorf("note = %q", note)
+	}
+	// Nothing moved, nothing to explain: a line on every result is noise.
+	quiet := []search.Hit{
+		{Session: model.Session{ID: "a", Project: "p"}},
+		{Session: model.Session{ID: "b", Project: "p"}, Lifecycle: "rejected"},
+	}
+	if got := demotedNote(quiet, demoteRejected(quiet)); got != "" {
+		t.Errorf("already in order, said %q", got)
+	}
+	// Plural, and counting the rejected hits rather than the moves.
+	many := []search.Hit{
+		{Session: model.Session{ID: "x", Project: "p"}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "y", Project: "p"}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "z", Project: "p"}},
+	}
+	if got := demotedNote(many, demoteRejected(many)); !strings.Contains(got, "2 sessions you marked rejected are below") {
+		t.Errorf("plural note = %q", got)
 	}
 }

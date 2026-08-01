@@ -432,7 +432,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	}
 	attachAnswers(dir, hits)
 	attachLifecycles(hits)
-	demoteRejected(hits)
+	demoted := demoteRejected(hits)
 	var b strings.Builder
 	served := 0
 	if stale {
@@ -444,6 +444,9 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Tier == search.TierRelevance {
 		fmt.Fprintln(&b, "No exact match; sessions ranked by relevance to the whole query.")
+	}
+	if note := demotedNote(hits, demoted); note != "" {
+		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
 	}
 	if offset > 0 {
 		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+len(hits), total)

@@ -464,10 +464,13 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	// there is no way to know how the filters would have treated the hidden
 	// ones, so the pre-cap figure stands and `capped` says to distrust it.
 	attachLifecycles(hits)
-	demoteRejected(hits)
+	demoted := demoteRejected(hits)
 	attachMoved(hits)
 	if !o.Capped {
 		o.Total = len(hits)
+	}
+	if note := demotedNote(hits, demoted); note != "" {
+		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
 	}
 	if len(hits) == 0 {
 		// The policy is named before the generic advice: "try fewer words" is

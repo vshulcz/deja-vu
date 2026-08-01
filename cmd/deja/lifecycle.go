@@ -85,7 +85,7 @@ func lifecycleLine(h search.Hit) string {
 // Only rejected demotes. superseded and stale say "this was true once", which
 // is still the best record of how the current answer was reached; rejected
 // says "this did not work".
-func demoteRejected(hits []search.Hit) {
+func demoteRejected(hits []search.Hit) int {
 	var rejected []search.Hit
 	for _, h := range hits {
 		if h.Lifecycle == lifecycleRejected {
@@ -93,7 +93,7 @@ func demoteRejected(hits []search.Hit) {
 		}
 	}
 	if len(rejected) == 0 {
-		return
+		return 0
 	}
 	for i := range hits {
 		h := &hits[i]
@@ -109,7 +109,45 @@ func demoteRejected(hits []search.Hit) {
 			}
 		}
 	}
+	before := make([]string, len(hits))
+	for i, h := range hits {
+		before[i] = h.Session.Harness + ":" + h.Session.ID
+	}
 	sort.SliceStable(hits, func(i, j int) bool {
 		return hits[i].Lifecycle != lifecycleRejected && hits[j].Lifecycle == lifecycleRejected
 	})
+	moved := 0
+	for i, h := range hits {
+		if before[i] != h.Session.Harness+":"+h.Session.ID {
+			moved++
+		}
+	}
+	return moved
+}
+
+// demotedNote is the line that says the order was changed, and by whom.
+//
+// Read top-down, an older session above a newer one with no explanation is
+// what a broken ranking looks like; the reason sat four lines further down,
+// attached to the result that moved (#694). deja narrates the other times it
+// changes what it returns — word forms, ignored terms, the trust policy — and
+// a reordering the reader themselves caused is the same kind of fact.
+func demotedNote(hits []search.Hit, moved int) string {
+	if moved == 0 {
+		return ""
+	}
+	n := 0
+	for _, h := range hits {
+		if h.Lifecycle == lifecycleRejected {
+			n++
+		}
+	}
+	return fmt.Sprintf("%d session%s you marked rejected %s below the rest", n, pluralS(n), verbWere2(n))
+}
+
+func verbWere2(n int) string {
+	if n == 1 {
+		return "is"
+	}
+	return "are"
 }
