@@ -995,14 +995,22 @@ func sessionTitle(s model.Session) string {
 			continue
 		}
 		t := strings.TrimSpace(msg.Text)
-		if t == "" || strings.HasPrefix(t, "<local-command") || strings.HasPrefix(t, "<command-") ||
-			strings.HasPrefix(t, "<task-notification") || strings.HasPrefix(t, "<teammate-message") ||
-			strings.HasPrefix(t, "Caveat:") {
+		if !titleWorthy(t) {
 			continue
 		}
 		return truncateTitle(t, 60)
 	}
 	return ""
+}
+
+// titleWorthy reports whether a user turn is the sentence a person would
+// recognise the session by. Harness plumbing arrives with the user role — a
+// slash command's expansion, a task notification, the compaction caveat — and
+// naming a session after one of those is how the titles in #636 happened.
+func titleWorthy(t string) bool {
+	return t != "" && !strings.HasPrefix(t, "<local-command") && !strings.HasPrefix(t, "<command-") &&
+		!strings.HasPrefix(t, "<task-notification") && !strings.HasPrefix(t, "<teammate-message") &&
+		!strings.HasPrefix(t, "Caveat:")
 }
 
 func truncateTitle(s string, n int) string {

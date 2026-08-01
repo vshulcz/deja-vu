@@ -264,6 +264,7 @@ func Import(dir, inDir string) (int, error) {
 	sort.Strings(paths)
 	recsByKey := map[string][]Record{}
 	metas := map[string]SessionMeta{}
+	titleAt := map[string]time.Time{} // key -> time of the turn the title came from
 	added := 0
 	for _, p := range paths {
 		if err := readSyncFile(p, func(sr SyncRecord) error {
@@ -306,6 +307,17 @@ func Import(dir, inDir string) (int, error) {
 			}
 			if sr.Time.After(meta.Updated) {
 				meta.Updated = sr.Time
+			}
+			// The title does not travel in the record stream, and without it the
+			// receiving machine's `last` is a column of hashes — the content
+			// arrived, the one line that makes the list readable did not (#670).
+			// Derive it the way ingest does, from the earliest user turn that is
+			// speech rather than harness plumbing.
+			if sr.Role == "user" && titleWorthy(strings.TrimSpace(text)) {
+				if at, seen := titleAt[key]; !seen || (!sr.Time.IsZero() && sr.Time.Before(at)) {
+					meta.Title = truncateTitle(strings.TrimSpace(text), 60)
+					titleAt[key] = sr.Time
+				}
 			}
 			metas[key] = meta
 			m.ImportedRecords[dedupe] = true

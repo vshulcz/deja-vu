@@ -191,3 +191,59 @@ func TestImportKeepsSameTimestampMessages(t *testing.T) {
 		t.Fatalf("re-import n=%d err=%v", n, err)
 	}
 }
+
+// The title does not travel in the record stream. Without deriving one, the
+// receiving machine's `deja last` is a column of hashes even though the whole
+// conversation arrived (#670).
+func TestImportGivesSessionsATitle(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+	base := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	batch := filepath.Join(tmp, "batch")
+	writeSyncBatch(t, batch, []SyncRecord{
+		// Out of order on purpose, and the first user turn by time is harness
+		// plumbing: the title must be the earliest turn a person would
+		// recognise, not the earliest record in the file.
+		{Harness: "claude", SessionID: "s1", Project: "p", Role: "assistant", Text: "capped at three", Time: base.Add(2 * time.Minute)},
+		{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "and what about jitter", Time: base.Add(3 * time.Minute)},
+		{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "the retry storm on checkout", Time: base.Add(time.Minute)},
+		{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "<local-command-stdout>ok</local-command-stdout>", Time: base},
+		// A session whose only user turns are plumbing keeps no title rather
+		// than being named after a slash command's output.
+		{Harness: "claude", SessionID: "s2", Project: "p", Role: "user", Text: "<command-name>/clear</command-name>", Time: base},
+		{Harness: "claude", SessionID: "s2", Project: "p", Role: "assistant", Text: "cleared", Time: base.Add(time.Minute)},
+	})
+	if _, err := Import(dir, batch); err != nil {
+		t.Fatal(err)
+	}
+	metas, err := AllMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := map[string]string{}
+	for _, m := range metas {
+		titles[m.ID] = m.Title
+	}
+	if len(titles) != 2 {
+		t.Fatalf("expected two imported sessions, got %#v", titles)
+	}
+	var withTitle, blank int
+	for _, ti := range titles {
+		switch ti {
+		case "the retry storm on checkout":
+			withTitle++
+		case "":
+			blank++
+		default:
+			t.Errorf("unexpected title %q", ti)
+		}
+	}
+	if withTitle != 1 || blank != 1 {
+		t.Errorf("titles = %#v", titles)
+	}
+}
