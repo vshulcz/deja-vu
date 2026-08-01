@@ -135,13 +135,20 @@ func runBrief(dir string, w io.Writer) error {
 	// the same work more often than not — and then the screen printed one title
 	// twice and made the reader diff two lines to notice (#843). The two facts
 	// differ, so both are kept; the second copy of the title is not.
-	sameWork := haveAsked && haveReused && trimBriefTitle(r.Title) == askedText
+	sameWork := haveAsked && haveReused && sameBriefWork(r.Title, asked.Text)
 
 	if haveAsked {
 		fmt.Fprintf(w, "asked      %s%s%s\n", bold, askedText, reset)
 		when := askedWhen(asked)
 		if sameWork {
 			when += fmt.Sprintf(" · %d× re-used recently", r.Times)
+			// The span ends at the newest asking, and the memory being recalled
+			// is often an older one — the answer people keep coming back to,
+			// not the last time they asked. Then this date is a second fact and
+			// folding it away loses it (#843).
+			if last := search.RelativeDate(r.Age); last != search.RelativeDate(asked.Sessions[0].Updated) {
+				when += " · last worked " + last
+			}
 		}
 		fmt.Fprintf(w, "before     %s%s%s\n", dim, when, reset)
 	}
@@ -220,6 +227,29 @@ func trimBriefTitle(t string) string {
 		return string(r[:44]) + "…"
 	}
 	return t
+}
+
+// sameBriefWork reports whether the reused memory and the repeated question
+// name the same work.
+//
+// Judging that on the 44 columns the screen shows is judging the wrong text:
+// two questions about the same build that end "on the arm64 runner" and "on the
+// raspberry pi" are identical for the first 44 characters, and the reused one
+// then vanished from the screen instead of being printed (#843). The manifest
+// cuts a title at 60 characters while the question is stored whole, so neither
+// side is guaranteed complete — prefix agreement over everything both sides
+// kept is the strongest test available here.
+func sameBriefWork(title, asked string) bool {
+	t, a := briefWorkKey(title), briefWorkKey(asked)
+	if t == "" || a == "" {
+		return false
+	}
+	return strings.HasPrefix(a, t) || strings.HasPrefix(t, a)
+}
+
+func briefWorkKey(s string) string {
+	s = strings.Join(strings.Fields(strings.ToLower(s)), " ")
+	return strings.TrimSpace(strings.TrimSuffix(s, "…"))
 }
 
 // buildForFirstRun indexes with the same narration `deja warmup` uses, so the

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -164,5 +166,110 @@ func TestBriefKeepsReusedLineWhenItNamesOtherWork(t *testing.T) {
 	}
 	if !strings.Contains(s, "reused     pgbouncer prepared statements blow up") {
 		t.Fatalf("reused line collapsed into a different question:\n%s", s)
+	}
+	if !strings.Contains(s, "last worked ") {
+		t.Fatalf("reused block lost the date it was last worked:\n%s", s)
+	}
+}
+
+// Two questions can agree for the 44 columns the screen has room for and still
+// be different work. Judging sameness on the cut text deleted the second one
+// (#843).
+func TestBriefKeepsReusedLineWhenTitlesOnlyShareTheirOpening(t *testing.T) {
+	const asked = "why does the docker build keep failing on the arm64 runner"
+	const other = "why does the docker build keep failing on the raspberry pi"
+	dir := seedAgedSessions(t, map[string]agedSession{
+		"a1": {asked, 40 * 24 * time.Hour},
+		"a2": {asked, 6 * 24 * time.Hour},
+		"a3": {other, 5 * 24 * time.Hour},
+	})
+	for i := 0; i < 4; i++ {
+		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"a3"})
+	}
+	var out bytes.Buffer
+	if err := runBrief(dir, &out); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	if !strings.Contains(s, "asked      ") {
+		t.Fatalf("no asked line to judge:\n%s", s)
+	}
+	if !strings.Contains(s, "reused     ") {
+		t.Fatalf("a different question was folded away because its first 44 columns matched:\n%s", s)
+	}
+}
+
+// The asked span ends at the newest asking; the memory agents keep recalling
+// is often an older one. Folding the reuse count into the asked line must not
+// carry away the date that says which (#843).
+func TestBriefKeepsLastWorkedWhenTheReusedMemoryIsOlderThanTheNewestAsking(t *testing.T) {
+	const q = "why does the docker build fail on arm64"
+	dir := seedAgedSessions(t, map[string]agedSession{
+		"a1": {q, 40 * 24 * time.Hour},
+		"a2": {q, 2 * 24 * time.Hour},
+	})
+	for i := 0; i < 4; i++ {
+		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"a1"})
+	}
+	var out bytes.Buffer
+	if err := runBrief(dir, &out); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	if !strings.Contains(s, "4× re-used recently") {
+		t.Fatalf("reuse count missing:\n%s", s)
+	}
+	want := "last worked " + search.RelativeDate(time.Now().Add(-40*24*time.Hour))
+	if !strings.Contains(s, want) {
+		t.Fatalf("the recalled memory is 40 days old, not 2 — %q missing:\n%s", want, s)
+	}
+}
+
+// The other half: when the reused memory is the newest asking, its date is the
+// right end of the span already and printing it twice is the repetition #843
+// removed.
+func TestBriefDropsLastWorkedWhenItRepeatsTheSpan(t *testing.T) {
+	dir := seedAskedAndReused(t, "why does the docker build fail on arm64")
+	var out bytes.Buffer
+	if err := runBrief(dir, &out); err != nil {
+		t.Fatal(err)
+	}
+	if s := out.String(); strings.Contains(s, "last worked") {
+		t.Fatalf("last worked repeats the span's right end:\n%s", s)
+	}
+}
+
+// A week that served recalls on days that are not today carries a number the
+// today line never had, so it is not an echo (#842).
+func TestBriefKeepsWeekLineForRecallsServedEarlierInTheWeek(t *testing.T) {
+	dir := seedAgedSessions(t, map[string]agedSession{
+		"d1": {"fix the flaky auth test in the login handler", 20 * time.Minute},
+	})
+	writeUsageEvents(t, dir, 2, 60*time.Hour)
+	var out bytes.Buffer
+	if err := runBrief(dir, &out); err != nil {
+		t.Fatal(err)
+	}
+	if s := out.String(); !strings.Contains(s, "this week  1 session · 2 recalls") {
+		t.Fatalf("week line dropped two recalls today never served:\n%s", s)
+	}
+}
+
+// writeUsageEvents backdates recall events, which the usage recorders cannot
+// do: they stamp time.Now().
+func writeUsageEvents(t *testing.T, dir string, n int, age time.Duration) {
+	t.Helper()
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		e := usage.Event{Time: time.Now().Add(-age).UTC(), Kind: usage.KindRecall, Bytes: 100, Sessions: 1}
+		raw, err := json.Marshal(e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.Write(raw)
+		b.WriteByte('\n')
+	}
+	if err := os.WriteFile(usage.Path(dir), []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
