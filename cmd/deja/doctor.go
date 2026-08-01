@@ -276,6 +276,11 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 			// that changed its format. Silence here reads as "you have no
 			// history with that agent".
 			fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
+		case "denied":
+			// Not a format change and not an empty history: deja is not
+			// allowed to read the files. On macOS this is usually Full Disk
+			// Access rather than the file mode (#802).
+			fmt.Fprintf(w, "  warning      %s store cannot be read — permission denied on %s; check its permissions (on macOS, also Full Disk Access for your terminal)\n", store.Name, store.Denied)
 		case "needs-sqlite3":
 			// Not a format change: the parser could not run at all. Saying so
 			// points at installing one package instead of at a bug report

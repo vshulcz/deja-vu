@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,6 +23,9 @@ type doctorStore struct {
 	State string   `json:"state"`
 	Paths []string `json:"paths"`
 	Files int      `json:"files"`
+	// Denied names the path that refused to be read, so the warning can point
+	// at the directory to fix rather than at the harness (#802).
+	Denied string `json:"denied,omitempty"`
 }
 
 type doctorComponent struct {
@@ -87,6 +91,44 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	report.Version = collectDoctorVersion(lookup)
 	report.Embed = collectDoctorEmbed(dir)
 	return report
+}
+
+// firstDeniedDir walks the store roots until something refuses to be read and
+// returns that path. The walk is bounded: doctor is a diagnostic command, but
+// a harness root can hold tens of thousands of transcripts.
+func firstDeniedDir(paths []string) string {
+	const budget = 5000
+	visited := 0
+	home := sources.Home()
+	for _, root := range paths {
+		// aider's root is the home directory itself: any locked directory
+		// anywhere under $HOME would be blamed on aider, and the walk would
+		// cost the whole tree.
+		if root == "" || root == home {
+			continue
+		}
+		denied := ""
+		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if visited++; visited > budget {
+				return filepath.SkipAll
+			}
+			if err != nil {
+				if os.IsPermission(err) {
+					denied = p
+					return filepath.SkipAll
+				}
+				return nil
+			}
+			if !d.IsDir() {
+				return nil
+			}
+			return nil
+		})
+		if denied != "" {
+			return denied
+		}
+	}
+	return ""
 }
 
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
@@ -179,7 +221,8 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 		fi, err := os.Stat(path)
 		if err != nil {
 			if os.IsPermission(err) {
-				store.State = "unreadable"
+				store.State = "denied"
+				store.Denied = path
 				return store, time.Time{}
 			}
 			continue
@@ -188,7 +231,8 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 			f, err := os.Open(path)
 			if err != nil {
 				if os.IsPermission(err) {
-					store.State = "unreadable"
+					store.State = "denied"
+					store.Denied = path
 					return store, time.Time{}
 				}
 				continue
@@ -196,12 +240,20 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 			_, err = f.Readdirnames(1)
 			_ = f.Close()
 			if err != nil && err != io.EOF && os.IsPermission(err) {
-				store.State = "unreadable"
+				store.State = "denied"
+				store.Denied = path
 				return store, time.Time{}
 			}
 		}
 	}
 	if len(check.files) == 0 {
+		// The file collectors swallow EACCES, so a readable root with a
+		// locked subdirectory produced "found (0 files)" — the same answer as
+		// a harness nobody has used (#802).
+		if denied := firstDeniedDir(check.paths); denied != "" {
+			store.State = "denied"
+			store.Denied = denied
+		}
 		return store, time.Time{}
 	}
 	newest, mod := newestDoctorFile(check.files)
