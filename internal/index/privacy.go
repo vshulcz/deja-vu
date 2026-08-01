@@ -23,6 +23,15 @@ type ForgetResult struct {
 	Sessions   int
 	Messages   int
 	Tombstones int
+	// Keys of the sessions that matched, harness:id. The caller needs them to
+	// clean up what lives outside the index — the titles promoted notes
+	// borrowed from these sessions (#666, #690).
+	Keys []string
+	// Notes is how many of Sessions were promoted notes rather than raw
+	// transcripts. They are the decisions the user deliberately kept, so one
+	// combined number reads as "four conversations" when half of it is their
+	// own записи.
+	Notes int
 }
 
 func privacyDir() string {
@@ -196,6 +205,10 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		}
 		matched[key] = true
 		result.Sessions++
+		result.Keys = append(result.Keys, key)
+		if meta.Harness == "deja" {
+			result.Notes++
+		}
 		if !dead[key] {
 			result.Tombstones++
 		}
@@ -206,6 +219,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	if result.Sessions == 0 {
 		return result, nil
 	}
+	sort.Strings(result.Keys)
 	// Count the messages on the dry run too. It is the same single pass over
 	// records, and without it `--dry-run` answers "0 messages" to the only
 	// question it exists to answer: how much am I about to lose.

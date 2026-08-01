@@ -1202,15 +1202,29 @@ func runForget(dir string, args []string) error {
 	if o.DryRun {
 		fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
 			result.Sessions, result.Messages, result.Tombstones)
+		if result.Notes > 0 {
+			fmt.Fprintf(os.Stdout, "%d of them %s promoted note%s — the decisions you kept, not raw sessions\n",
+				result.Notes, verbWere(result.Notes), pluralS(result.Notes))
+		}
 		return nil
 	}
 	// A promoted note borrows the source session's first line as its title, and
 	// the note is a separate record — so forgetting a session left that line on
 	// screen in `deja last` (#666). The note stays; only the borrowed title
 	// goes, and the parser falls back to "promoted from <src>".
-	if result.Sessions > 0 && o.Session != "" {
+	//
+	// Matching on the keys that were actually dropped rather than on the
+	// selector: --project and --before drop sessions too, and keying off
+	// o.Session left the borrowed line — a customer name, in the case that
+	// found this — sitting in notes.jsonl after the project was forgotten
+	// (#690).
+	if len(result.Keys) > 0 {
+		dropped := make(map[string]bool, len(result.Keys))
+		for _, k := range result.Keys {
+			dropped[k] = true
+		}
 		if n, err := sources.ForgetPromotedTitles(func(src string) bool {
-			return strings.Contains(src, o.Session)
+			return dropped[src]
 		}); err == nil && n > 0 {
 			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s\n", n, pluralS(n))
 		}
@@ -1224,7 +1238,22 @@ func runForget(dir string, args []string) error {
 		return nil
 	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
+	// The notes are decisions the reader deliberately kept, so folding them
+	// into the session count reads as "four conversations" when half of it is
+	// their own writing (#690).
+	if result.Notes > 0 {
+		fmt.Fprintf(os.Stdout, "%d of them %s promoted note%s — the decisions you kept, not raw sessions\n",
+			result.Notes, verbWere(result.Notes), pluralS(result.Notes))
+	}
 	return nil
+}
+
+// verbWere keeps "1 of them are promoted notes" off the screen.
+func verbWere(n int) string {
+	if n == 1 {
+		return "is a"
+	}
+	return "are"
 }
 
 // forgetSelector names what the caller asked to forget, so the empty answer

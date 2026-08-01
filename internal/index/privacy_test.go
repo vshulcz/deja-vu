@@ -135,7 +135,8 @@ func TestTombstonePersistenceAndForgetNoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err := Forget(dir, ForgetOptions{Project: "missing"})
-	if err != nil || result != (ForgetResult{}) {
+	if err != nil || result.Sessions != 0 || result.Messages != 0 || result.Tombstones != 0 ||
+		result.Notes != 0 || len(result.Keys) != 0 {
 		t.Fatalf("no-op forget=%#v err=%v", result, err)
 	}
 }
