@@ -1418,6 +1418,7 @@ func printUsage() {
 
 Usage:
   deja [flags] <query>
+  deja search [flags] <query>   (same, but a query may start with a dash)
   deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
