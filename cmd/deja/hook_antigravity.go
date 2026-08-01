@@ -29,10 +29,16 @@ type antigravityHookResponse struct {
 
 func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input antigravityHookInput
-	_ = json.NewDecoder(io.LimitReader(stdin, 1<<20)).Decode(&input)
+	// Bounded, like the other hooks: an unbounded decode waited for the host to
+	// close the pipe, which cost 20 s per turn on a host that holds it (#846).
+	payload := readHookPayload(stdin, hookStdinWait)
+	decoded := json.Unmarshal(payload, &input) == nil && len(payload) > 0
 	// invocationNum is 1-based; anything past the first turn already has the
-	// digest in its transcript.
-	if input.InvocationNum > 1 {
+	// digest in its transcript. A payload deja could not read leaves it at 0,
+	// which reads as the first turn — so bounding the read without this would
+	// turn "blocks once per turn" into "injects the whole digest before every
+	// model call" (#846).
+	if !decoded || input.InvocationNum > 1 {
 		fmt.Fprintln(stdout, "{}")
 		return nil
 	}
