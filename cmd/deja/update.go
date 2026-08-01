@@ -142,6 +142,10 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 	if _, _, err := updateAssetNames("version", cfg.goos, cfg.goarch); err != nil {
 		return err
 	}
+	if mgr, cmd := packageManagerOwning(cfg.executable); mgr != "" && !cfg.force {
+		fmt.Fprintf(out, "this binary is managed by %s — `%s` keeps its records straight; `deja update --force` writes over it, and the next %s run puts the old one back\n", mgr, cmd, mgr)
+		return nil
+	}
 
 	body, err := cfg.download(cfg.latestURL, maxReleaseJSON, "latest release")
 	if err != nil {
@@ -228,6 +232,30 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 	}
 	fmt.Fprintf(out, "updated deja %s -> v%s at %s\n", from, latest, cfg.executable)
 	return nil
+}
+
+// packageManagerOwning reports the package manager whose tree the binary lives
+// in. Writing into that tree succeeds and then quietly comes undone: the
+// manager still records the old version and its next upgrade overwrites the
+// file (#775).
+func packageManagerOwning(exe string) (manager, command string) {
+	// Backslashes explicitly: a Windows path can be inspected on any platform,
+	// and filepath.ToSlash only rewrites the separator of the running OS.
+	p := strings.ReplaceAll(filepath.ToSlash(exe), "\\", "/")
+	lower := strings.ToLower(p)
+	switch {
+	case strings.Contains(p, "/Cellar/"), strings.Contains(lower, "/homebrew/"), strings.Contains(lower, "/linuxbrew/"):
+		return "Homebrew", "brew upgrade deja-vu"
+	case strings.Contains(lower, "/scoop/apps/"):
+		return "scoop", "scoop update deja"
+	case strings.HasPrefix(p, "/nix/store/"):
+		return "Nix", "nix profile upgrade deja"
+	case strings.Contains(lower, "/winget/packages/"):
+		return "winget", "winget upgrade deja"
+	case strings.Contains(p, "/node_modules/"):
+		return "npm", "npm update -g deja-vu"
+	}
+	return "", ""
 }
 
 func normalizeUpdateVersion(v string) string {
