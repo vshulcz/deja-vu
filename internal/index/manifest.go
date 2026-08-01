@@ -176,6 +176,11 @@ type OverviewStats struct {
 	// older than a week has nothing to say under "today" and "this week", and
 	// two zero lines is a poor way to open the first screen someone sees.
 	Oldest, Newest time.Time
+	// Future counts sessions stamped after now. A wrong clock, a transcript
+	// written in another timezone, a harness stamping UTC while the reader is
+	// behind it — all produce them, and counting them as today's work made the
+	// first screen's top line wrong upward and only upward (#696).
+	Future int
 }
 
 // Overview summarizes the index from manifest metadata alone — no record
@@ -191,12 +196,19 @@ func Overview(dir string) (OverviewStats, error) {
 	var o OverviewStats
 	now := time.Now()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	// now bounds both counters from above. Without it every session ahead of
+	// the clock was today's, this week's, and the newest thing in the store —
+	// permanently (#696). The bound is now rather than tomorrow's midnight on
+	// purpose: work that has not happened yet is not today's work either.
 	week := now.AddDate(0, 0, -7)
 	hs := map[string]bool{}
 	for _, meta := range m.Sessions {
 		o.Sessions++
 		hs[meta.Harness] = true
-		if meta.Updated.After(day) {
+		if meta.Updated.After(now) {
+			o.Future++
+		}
+		if meta.Updated.After(day) && !meta.Updated.After(now) {
 			o.SessionsToday++
 		}
 		if o.Oldest.IsZero() || (!meta.Updated.IsZero() && meta.Updated.Before(o.Oldest)) {
@@ -205,7 +217,7 @@ func Overview(dir string) (OverviewStats, error) {
 		if meta.Updated.After(o.Newest) {
 			o.Newest = meta.Updated
 		}
-		if meta.Updated.After(week) {
+		if meta.Updated.After(week) && !meta.Updated.After(now) {
 			o.SessionsWeek++
 		}
 	}

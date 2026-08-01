@@ -84,6 +84,14 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintln(w, week)
 	}
 
+	// Sessions ahead of the clock sit at the top of "recent" with dates that
+	// have not happened, and the counters above deliberately leave them out —
+	// so the screen has to say they exist, or the two disagree with no
+	// explanation (#696).
+	if ov.Future > 0 {
+		fmt.Fprintf(w, "ahead      %d session%s stamped later than this machine's clock\n", ov.Future, pluralS(ov.Future))
+	}
+
 	// Read the index as-is: the brief must never trigger a rebuild or let
 	// indexing narration tear through its layout.
 	if recent, err := index.RecentMatching(dir, 3, search.Options{}); err == nil && len(recent) > 0 {
