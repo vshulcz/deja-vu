@@ -36,6 +36,10 @@ const dejaVuMinAge = 15 * time.Minute
 type promptHookInput struct {
 	Prompt    hookPromptText `json:"prompt"`
 	SessionID string         `json:"session_id"`
+	// CWD is what the harness says the project is. Reading only the
+	// environment meant a host that sends the payload without exporting
+	// CLAUDE_PROJECT_DIR recalled nothing (#759).
+	CWD string `json:"cwd"`
 }
 
 // hookPromptText reads a prompt that arrives either as a string (Claude Code,
@@ -85,6 +89,7 @@ func runHookPrompt(dir string, stdin io.Reader, stdout io.Writer) error {
 func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
 	var input promptHookInput
 	_ = json.NewDecoder(io.LimitReader(stdin, 1<<20)).Decode(&input)
+	adoptHookCWD(input.CWD)
 	terms := promptSearchTerms(string(input.Prompt))
 	if len(terms) < 2 {
 		return nil

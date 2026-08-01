@@ -86,8 +86,14 @@ func runHookContext(dir string, plain bool) error {
 	var input struct {
 		Source    string `json:"source"`
 		SessionID string `json:"session_id"`
+		CWD       string `json:"cwd"`
 	}
 	_ = json.Unmarshal(readHookStdin(), &input)
+	// The harness tells us which project this is; deja read only the
+	// environment, so a host that sends the payload without exporting
+	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
+	// none (#759).
+	adoptHookCWD(input.CWD)
 	digest, sessions, raw, taskMatched := cachedHookDigest(dir)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
@@ -254,6 +260,16 @@ func hookCachePath(dir, cwd string) string {
 func hookGate() string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	return mode + "|" + policy.Load().Describe(policy.ActivationAuto)
+}
+
+// adoptHookCWD takes the working directory out of a hook payload when the
+// environment does not already name one. The harness knows the project; the
+// environment variable is a Claude Code convenience the others do not share.
+func adoptHookCWD(cwd string) {
+	if cwd == "" || os.Getenv("CLAUDE_PROJECT_DIR") != "" {
+		return
+	}
+	_ = os.Setenv("CLAUDE_PROJECT_DIR", cwd)
 }
 
 func cachedHookDigest(dir string) (string, int, int64, []string) {
