@@ -922,6 +922,13 @@ func parseSearch(args []string) (search.Options, error) {
 				o.Since = d
 			}
 		default:
+			// A query may legitimately start with a dash — `deja search
+			// "--retry budget"` is a real search. A token one edit away from a
+			// real flag is not: folding `--limti` into the query turned a
+			// working search into "you have no such memory" (#755).
+			if near := nearestSearchFlag(a); near != "" {
+				return o, fmt.Errorf("unknown flag %q — did you mean %s?", a, near)
+			}
 			q = append(q, a)
 		}
 	}
@@ -930,6 +937,27 @@ func parseSearch(args []string) (search.Options, error) {
 		return o, fmt.Errorf("query required")
 	}
 	return o, nil
+}
+
+// searchFlags is every flag the bare search form accepts, for the typo check.
+var searchFlags = []string{
+	"--json", "--re", "--all", "--no-embed", "--rebuild",
+	"--harness", "--project", "--since", "--role", "--limit",
+}
+
+// nearestSearchFlag names the flag a token was probably meant to be. It stays
+// silent unless the token looks like a flag and is within one edit of a real
+// one, so ordinary queries — including those containing a dash — are untouched.
+func nearestSearchFlag(a string) string {
+	if !strings.HasPrefix(a, "--") || len([]rune(a)) < 4 {
+		return ""
+	}
+	for _, f := range searchFlags {
+		if a == f {
+			return ""
+		}
+	}
+	return nearestTarget(a, searchFlags)
 }
 
 func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
