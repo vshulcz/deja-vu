@@ -173,6 +173,12 @@ func Build(ss []model.Session, now time.Time) Report {
 			}
 			considerTime(&minT, &maxT, t)
 			if !t.IsZero() {
+				// The reader's zone, not the timestamp's: work done at 01:00
+				// local is stored as 22:00 UTC the day before, and taking the
+				// calendar date in UTC put it on the wrong day here while the
+				// brief — which renders locally since #767 — put it on the
+				// right one. Two screens of one tool disagreed by a day (#849).
+				t = t.In(now.Location())
 				day := t.Format("2006-01-02")
 				byDay[day]++
 				if i, ok := monthIndex[firstMonth(t).Format("2006-01")]; ok {
@@ -207,8 +213,8 @@ func Build(ss []model.Session, now time.Time) Report {
 	out.Heatmap = buildHeatmap(byDay, now)
 	out.Sparkline = sparkline(months)
 	if !minT.IsZero() {
-		out.DateRange.Start = minT.Format("2006-01-02")
-		out.DateRange.End = maxT.Format("2006-01-02")
+		out.DateRange.Start = minT.In(now.Location()).Format("2006-01-02")
+		out.DateRange.End = maxT.In(now.Location()).Format("2006-01-02")
 	}
 	out.RepeatQuestions = RepeatQuestions(ss)
 	weekCut := now.Add(-7 * 24 * time.Hour)

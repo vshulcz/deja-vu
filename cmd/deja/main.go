@@ -479,7 +479,10 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// follow the convention (#765).
 		when := "-"
 		if !s.Updated.IsZero() {
-			when = s.Updated.Format("2006-01-02")
+			// The reader's zone, like the brief and stats: a session stamped
+			// 22:00 UTC is 01:00 tomorrow for its author, and this line put it
+			// on the day before the other two screens did (#849).
+			when = s.Updated.Local().Format("2006-01-02")
 		}
 		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
 		title := s.Title
