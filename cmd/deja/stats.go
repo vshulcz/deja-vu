@@ -271,6 +271,12 @@ func printStats(w io.Writer, r stats.Report) {
 		}
 	} else {
 		fmt.Fprintf(w, "  %s  %s\n", r.Sparkline, monthLabels(r.Monthly))
+		// The chart is a window, and a store that mostly predates it reads as
+		// if the visible bar were the whole shape — while Range, two lines
+		// above, names months the chart never draws (#854).
+		if shown, total := monthlyTotal(r.Monthly), r.TotalMessages; total > shown && shown*2 < total {
+			fmt.Fprintf(w, "  %d of %d messages are older than the chart — see the range above\n", total-shown, total)
+		}
 	}
 	fmt.Fprintln(w)
 
