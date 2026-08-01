@@ -163,7 +163,7 @@ in the release workflow logs, and set the version embedded by GoReleaser:
 ```sh
 git checkout vX.Y.Z
 export CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-trimpath
-go build -ldflags='-s -w -trimpath -X main.version=X.Y.Z' -o deja ./cmd/deja
+go build -ldflags='-s -w -X main.version=X.Y.Z' -o deja ./cmd/deja
 sha256sum deja
 ```
 

@@ -269,8 +269,12 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
 }
 ```
 
-`embed` and `ingest_health` are omitted when unavailable. Store `state` values
-include `ok`, `missing`, `empty`, `unreadable`, and `parsed-zero`.
+`embed` and `ingest_health` are omitted when unavailable. `index.path` points at
+the index directory; `index.db` is that directory's name, not a file. Store
+`state` values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which
+adds a `denied` field naming the unreadable path), and `needs-sqlite3`; an
+existing but empty store directory reports `missing`. Version `state` is `ok`,
+`update-available`, `ahead`, `dev`, `offline` (under `--offline`), or `unknown`.
 
 ## `deja blame <path> --json`
 
