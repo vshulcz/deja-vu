@@ -452,12 +452,19 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 		}
 	}
 	mark("task-scores")
+	// A rejected session belongs last, and the mark has to travel with it: the
+	// block listed the correction as a separate item and left the session it
+	// corrects unmarked (#761).
+	ss, rejectedWarning := orderForInjection(ss)
 	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names, TaskScores: scores})
 	mark("build-digest")
 	if result.Sessions == 0 {
 		matched = nil
 	}
 	text := result.Text
+	if rejectedWarning != "" && result.Sessions > 0 {
+		text = rejectedWarning + text
+	}
 	// Inside the cached result, not after it: this costs a manifest scan plus
 	// one session read, which is ten times the rest of the hook, and the
 	// clusters it reports change over weeks rather than turns.

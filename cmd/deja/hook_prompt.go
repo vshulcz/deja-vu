@@ -161,6 +161,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if len(ss) == 0 {
 		return nil
 	}
+	// A rejected session is not an equal answer, and the mark has to travel
+	// with it into the block the agent reads (#761).
+	ss, rejectedWarning := orderForInjection(ss)
 	rememberInjected(dir, input.SessionID, ss)
 	// "You have been here" on the strength of one word teaches the user to
 	// ignore the line. The recall itself still goes in.
@@ -169,7 +172,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if strings.TrimSpace(digest) == "" {
 		return nil
 	}
-	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n"
+	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n" + rejectedWarning
 	out := frameRecall(lead + digest + citationLine(ss[0]))
 	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms, sessionIDs(ss)...)
 	if plain {
