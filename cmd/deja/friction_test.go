@@ -142,3 +142,67 @@ func TestFrictionOnBlockedIndex(t *testing.T) {
 		t.Fatal("friction accepted a blocked index")
 	}
 }
+
+// The count is sessions-with-tool-output and it read as sessions-indexed, so a
+// store with six conversations reported zero — the sentence #637 was about
+// (#705).
+func TestFrictionEmptyAnswerDistinguishesThreeStores(t *testing.T) {
+	t.Run("no sessions at all", func(t *testing.T) {
+		seedFrictionStore(t, nil)
+		out := runFrictionFor(t)
+		if !strings.Contains(out, "no sessions are indexed yet") {
+			t.Errorf("empty store: %q", out)
+		}
+	})
+	t.Run("sessions without tool output", func(t *testing.T) {
+		seedFrictionStore(t, []string{
+			`{"type":"user","sessionId":"a","cwd":"/w/p","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":"plain talk only"}}`,
+			`{"type":"user","sessionId":"b","cwd":"/w/p","timestamp":"2026-07-22T10:00:00Z","message":{"role":"user","content":"more plain talk"}}`,
+		})
+		out := runFrictionFor(t)
+		if !strings.Contains(out, "none of the 2 indexed sessions recorded tool output") {
+			t.Errorf("no tool output: %q", out)
+		}
+	})
+	t.Run("tool output but nothing recurring", func(t *testing.T) {
+		// Three sessions, two of which recorded tool output: the two numbers
+		// have to differ, or either one passes for the other.
+		seedFrictionStore(t, []string{
+			`{"type":"user","sessionId":"a","cwd":"/w/p","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":[{"type":"tool_result","content":"ERROR: one of a kind"}]}}`,
+			`{"type":"user","sessionId":"b","cwd":"/w/p","timestamp":"2026-07-22T10:00:00Z","message":{"role":"user","content":[{"type":"tool_result","content":"ERROR: also unique"}]}}`,
+			`{"type":"user","sessionId":"c","cwd":"/w/p","timestamp":"2026-07-23T10:00:00Z","message":{"role":"user","content":"no commands were run here"}}`,
+		})
+		out := runFrictionFor(t)
+		if !strings.Contains(out, "in the 2 sessions that recorded tool output (of 3 indexed)") {
+			t.Errorf("tool output present: %q", out)
+		}
+	})
+}
+
+func seedFrictionStore(t *testing.T, lines []string) {
+	t.Helper()
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-p")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	for i, line := range lines {
+		name := fmt.Sprintf("s%d.jsonl", i)
+		if err := os.WriteFile(filepath.Join(root, name), []byte(line+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runFrictionFor(t *testing.T) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := runFriction(index.DefaultDir(), nil, &buf); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}

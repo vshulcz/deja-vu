@@ -97,8 +97,21 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		return rows[i].line < rows[j].line
 	})
 	if len(rows) == 0 {
-		fmt.Fprintf(stdout, "nothing recurring in %d session%s — no error hit %d separate sessions\n",
-			len(sessions), pluralS(len(sessions)), index.FrictionMinSessions)
+		// The count is sessions-with-tool-output, and it reads as
+		// sessions-indexed: a store with six conversations reported zero,
+		// which is the sentence #637 was about — a reader told the index holds
+		// nothing concludes the tool is broken (#705).
+		total, err := index.SessionCount(dir)
+		switch {
+		case err != nil || total == 0:
+			fmt.Fprintln(stdout, "nothing recurring — no sessions are indexed yet")
+		case len(sessions) == 0:
+			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
+				total, pluralS(total))
+		default:
+			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output (of %d indexed) — no error hit %d separate sessions\n",
+				len(sessions), pluralS(len(sessions)), total, index.FrictionMinSessions)
+		}
 		return nil
 	}
 	if len(rows) > limit {
