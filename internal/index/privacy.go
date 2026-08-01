@@ -3,6 +3,7 @@ package index
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -325,7 +326,14 @@ func Tombstones() []string {
 // Unforget lifts tombstones and reports how many it lifted. The count is not
 // bookkeeping: the command printed nothing at all, so "restored one session"
 // and "that prefix matched nothing" looked identical (#672).
-func Unforget(prefix string) (int, error) {
+// Unforget lifts the tombstones matching prefix and rebuilds so the sessions
+// come back. The rebuild runs first and the reduced tombstone set is persisted
+// only once it succeeds: interrupted the other way round, the tombstone that
+// would let a retry work was already gone while the index had not been rebuilt
+// yet, and nothing on the machine could say the session was missing (#810).
+// A crash in the remaining window leaves the session present but still listed
+// by `forget --list`, which is visible and fixed by running unforget again.
+func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 	set := readTombstones()
 	// A prefix containing ':' is a key/harness-scoped prefix (claude:abc,
 	// z:); a bare prefix is an id-prefix symmetric with forget --session, so
@@ -351,7 +359,31 @@ func Unforget(prefix string) (int, error) {
 	if lifted == 0 {
 		return 0, nil
 	}
-	return lifted, writeTombstones(set)
+	// The transcript on disk has not changed since it was indexed, so an
+	// incremental pass would skip it and the session would stay invisible
+	// (#672) — hence a full rebuild, with the lifted tombstones already gone
+	// from the set this pass applies.
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return 0, err
+	}
+	defer unlock()
+	if err := rebuildWithTombstones(dir, "", "", currentFiles(""), progress, set); err != nil {
+		return 0, err
+	}
+	if err := writeTombstones(set); err != nil {
+		return lifted, err
+	}
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	_ = writeTombstoneMirrorAt(dir, keys)
+	return lifted, nil
 }
 
 func RedactionReport(dir string) (RedactionStats, error) { return Redactions(dir) }

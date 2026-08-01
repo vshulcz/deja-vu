@@ -1301,20 +1301,17 @@ func runForget(dir string, args []string) error {
 		return nil
 	}
 	if unforget != "" {
-		lifted, err := index.Unforget(unforget)
-		if err != nil {
+		var lifted int
+		if err := withBuildProgress(func() error {
+			var err error
+			lifted, err = index.Unforget(dir, unforget, os.Stderr)
+			return err
+		}); err != nil {
 			return err
 		}
 		if lifted == 0 {
 			fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
 			return nil
-		}
-		// The transcript on disk has not changed since it was indexed, so the
-		// incremental pass skips it and the session stays invisible — which is
-		// every ordinary run of `deja index` (#672). Rebuild here instead, so
-		// the command that says "restored" has actually restored something.
-		if err := withBuildProgress(func() error { return index.Ensure(dir, "", true, os.Stderr) }); err != nil {
-			return err
 		}
 		fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index\n", lifted, pluralS(lifted))
 		return nil
