@@ -162,6 +162,14 @@ func verbS(n int) string {
 	return ""
 }
 
+// pluralY is pluralS for words ending in -y: one query, two queries.
+func pluralY(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
+}
+
 func pluralS(n int) string {
 	if n == 1 {
 		return ""

@@ -441,7 +441,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 			if label == "deja" {
 				label = "notes"
 			}
-			fmt.Fprintf(progress, "deja: %s: %d sessions, %d messages\n", label, len(r.ss), msgs)
+			fmt.Fprintf(progress, "deja: %s: %d session%s, %d message%s\n", label, len(r.ss), pluralS(len(r.ss)), msgs, pluralS(msgs))
 		}
 	}
 	return ss
@@ -1047,6 +1047,14 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 		return true, false
 	}
 	return s.Path < held.Path, true
+}
+
+// pluralS keeps "1 sessions" off the first line anyone sees from deja (#737).
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func sessionTitle(s model.Session) string {

@@ -191,14 +191,14 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 	if !summary {
 		if built {
 			b := index.LastBuild
-			fmt.Fprintf(os.Stderr, "index: built (%d sessions, %d messages)\n", b.Sessions, b.Messages)
+			fmt.Fprintf(os.Stderr, "index: built (%d session%s, %d message%s)\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 		}
 		return
 	}
 	fmt.Fprintf(os.Stderr, "installed: %d MCP, %d hooks, %d guidance files\n", mcp, hooks, guidance)
 	if built {
 		b := index.LastBuild
-		fmt.Fprintf(os.Stderr, "index: built (%d sessions, %d messages)\n", b.Sessions, b.Messages)
+		fmt.Fprintf(os.Stderr, "index: built (%d session%s, %d message%s)\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 	} else if !index.HasManifest(dir) && detected > 0 {
 		fmt.Fprintln(os.Stderr, "next: run `deja index` to finish building memory")
 	} else if !index.HasManifest(dir) {

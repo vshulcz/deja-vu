@@ -26,7 +26,7 @@ func TestStatsImpactCountsAndArithmetic(t *testing.T) {
 	for _, want := range []string{
 		"2 agent-initiated recalls",
 		"1 session starts began with project memory",
-		"1 sessions recalled 2+ times",
+		"1 session recalled 2+ times",
 		"1 prompts matched work",
 		"50× less",
 	} {

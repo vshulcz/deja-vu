@@ -255,7 +255,7 @@ func benchmarkTempDir() (string, error) {
 }
 
 func printBenchReport(w io.Writer, report benchReport) {
-	fmt.Fprintf(w, "deja bench recall\ncorpus: %d sessions, %d queries\n", report.Sessions, report.Queries)
+	fmt.Fprintf(w, "deja bench recall\ncorpus: %d session%s, %d quer%s\n", report.Sessions, pluralS(report.Sessions), report.Queries, pluralY(report.Queries))
 	fmt.Fprintln(w, "mode    recall@5  recall@10  median latency")
 	fmt.Fprintf(w, "lexical %.2f      %.2f       %.2f ms\n", report.Lexical.RecallAt5, report.Lexical.RecallAt10, report.Lexical.MedianMS)
 	if report.Hybrid != nil {

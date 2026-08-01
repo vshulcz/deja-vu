@@ -48,7 +48,7 @@ func printImpact(w io.Writer, r usage.ImpactReport, jsonOut bool) error {
 		}
 	}
 	if r.ReusedTwice > 0 {
-		fmt.Fprintf(w, "  knowledge re-used  %d sessions recalled 2+ times — fixes that keep paying\n", r.ReusedTwice)
+		fmt.Fprintf(w, "  knowledge re-used  %d session%s recalled 2+ times — fixes that keep paying\n", r.ReusedTwice, pluralS(r.ReusedTwice))
 	}
 	if r.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  déjà vu moments    %d prompts matched work you had already done\n", r.DejaVuMoments)

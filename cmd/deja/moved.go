@@ -148,7 +148,7 @@ func movedNote(r movedReport) string {
 	if r.Changed == 1 {
 		return "  1 file this session touched has changed since"
 	}
-	return fmt.Sprintf("  %d files this session touched have changed since", r.Changed)
+	return fmt.Sprintf("  %d file%s this session touched have changed since", r.Changed, pluralS(r.Changed))
 }
 
 // attachMoved annotates the hits that are actually going to be read. Only the

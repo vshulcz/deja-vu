@@ -294,7 +294,7 @@ func printStats(w io.Writer, r stats.Report) {
 		fmt.Fprintf(w, "  Credited aloud   agents said \"deja-vu recalled\" %d times (%d this week)\n", r.AgentCredits, r.WeekCredits)
 	}
 	if r.HandoffsIn > 0 {
-		fmt.Fprintf(w, "  Handoffs         %d sessions started from a handoff\n", r.HandoffsIn)
+		fmt.Fprintf(w, "  Handoffs         %d session%s started from a handoff\n", r.HandoffsIn, pluralS(r.HandoffsIn))
 	}
 	fmt.Fprintf(w, "  Injections       %d · %d sessions · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, humanBytes(int64(r.Recall.InjectedBytes)))
 	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)

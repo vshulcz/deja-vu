@@ -200,7 +200,7 @@ func cmdIndex(dir string, rest []string) error {
 	// of it: the indexer counted every session on disk while the manifest held
 	// fewer, and nothing connected the two numbers (#698).
 	if n := index.ReportCollisions(); n > 0 {
-		fmt.Fprintf(os.Stderr, "deja: %d session%s share an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n))
+		fmt.Fprintf(os.Stderr, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
 	}
 	maybeFirstIndexGreeting(dir)
 	return nil
@@ -1314,6 +1314,14 @@ func runForget(dir string, args []string) error {
 			result.Notes, verbWere(result.Notes), pluralS(result.Notes))
 	}
 	return nil
+}
+
+// verbShare keeps "1 session share" off the screen.
+func verbShare(n int) string {
+	if n == 1 {
+		return "shares"
+	}
+	return "share"
 }
 
 // verbWere keeps "1 of them are promoted notes" off the screen.
