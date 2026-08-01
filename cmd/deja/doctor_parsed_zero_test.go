@@ -60,7 +60,10 @@ func TestDoctorReportsAnUnreadableStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	failing := doctorStoreCheck{
-		name:  "goose",
+		// A file-backed harness: for the five deja reads through the sqlite3
+		// CLI a parse failure on a machine without it means the tool, not the
+		// format (#792), and the subject here is the format case.
+		name:  "cline",
 		paths: []string{dir},
 		files: []string{path},
 		parse: func(string) ([]model.Session, error) { return nil, errUnreadableStore },
