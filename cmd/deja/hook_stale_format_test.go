@@ -17,10 +17,14 @@ import (
 // asked for the rebuild that would fix it (#777).
 func TestStaleFormatHooksAskForARebuild(t *testing.T) {
 	hermeticEnv(t)
-	// hermeticEnv suppresses the warmup spawn; the point here is whether the
-	// hooks ask for one at all, so let the request through. The spawned child
-	// is this test binary, which exits without work.
+	// hermeticEnv suppresses the request entirely; the point here is whether
+	// the hooks ask for one at all, so let it through and count the spawn
+	// instead of starting a real child.
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	spawned := 0
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { spawned++; return nil }
+	t.Cleanup(func() { spawnWarmup = oldSpawn })
 	dir := filepath.Join(t.TempDir(), "idx")
 	writeStaleFormatIndex(t, dir)
 	if !index.HasManifest(dir) {
@@ -30,14 +34,13 @@ func TestStaleFormatHooksAskForARebuild(t *testing.T) {
 		t.Fatal("fixture claims the current format version")
 	}
 
-	sentinel := filepath.Join(dir, "warmup.sentinel")
 	if err := runHookPromptMode(dir, strings.NewReader(`{"session_id":"s","prompt":"zeppelin throttle regulator"}`), &bytes.Buffer{}, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(sentinel); err != nil {
-		t.Errorf("hook-prompt did not request a rebuild on a stale-format index: %v", err)
+	if spawned != 1 {
+		t.Errorf("hook-prompt requested %d rebuilds on a stale-format index, want 1", spawned)
 	}
-	if err := os.Remove(sentinel); err != nil {
+	if err := os.Remove(filepath.Join(dir, "warmup.sentinel")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,8 +52,8 @@ func TestStaleFormatHooksAskForARebuild(t *testing.T) {
 	if d, _, _, _ := cachedHookDigest(dir); d == "" {
 		t.Error("a cache hit stopped serving the user's own history")
 	}
-	if _, err := os.Stat(sentinel); err != nil {
-		t.Errorf("a cache hit swallowed the rebuild request: %v", err)
+	if spawned != 2 {
+		t.Errorf("a cache hit swallowed the rebuild request: %d spawns, want 2", spawned)
 	}
 }
 
