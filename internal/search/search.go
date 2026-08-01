@@ -1050,6 +1050,11 @@ func harnessTag(h string, color bool) string {
 
 func relativeDate(t time.Time) string {
 	now := time.Now()
+	// In the reader's zone, not the timestamp's: work done at 00:30 local time
+	// is stored as 21:30 UTC the day before, and taking its calendar date in
+	// UTC made this morning read as "1d ago" — while the counter above it, which
+	// compares instants, said "today" (#767).
+	t = t.In(now.Location())
 	y1, m1, d1 := now.Date()
 	y2, m2, d2 := t.Date()
 	today := time.Date(y1, m1, d1, 0, 0, 0, 0, now.Location())
