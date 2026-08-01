@@ -247,3 +247,41 @@ func TestImportGivesSessionsATitle(t *testing.T) {
 		t.Errorf("titles = %#v", titles)
 	}
 }
+
+// A wrong path imported nothing and exited 0 — including the case that matters,
+// a typo for a directory that is right there with records in it (#678).
+func TestImportRejectsAPathThatIsNotADirectoryOfRecords(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
+	dir := filepath.Join(tmp, "index.db")
+
+	missing := filepath.Join(tmp, "no-such-batch")
+	_, err := Import(dir, missing)
+	if err == nil {
+		t.Error("importing a directory that does not exist succeeded")
+		// The reader is looking for a typo, so the message has to name the
+		// path they typed rather than repeat Go's stat syntax.
+	} else if !strings.HasPrefix(err.Error(), "no such directory: ") || !strings.Contains(err.Error(), missing) {
+		t.Errorf("error was %q", err)
+	}
+	plain := filepath.Join(tmp, "a-file")
+	if err := os.WriteFile(plain, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Import(dir, plain); err == nil {
+		t.Error("importing a plain file succeeded")
+	}
+	// An empty directory that exists is a different answer: nothing to import
+	// is not a mistake.
+	empty := filepath.Join(tmp, "empty")
+	if err := os.MkdirAll(empty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := Import(dir, empty); err != nil || n != 0 {
+		t.Errorf("empty batch: n=%d err=%v — an existing empty directory is not an error", n, err)
+	}
+}

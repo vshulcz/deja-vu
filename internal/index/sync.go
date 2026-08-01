@@ -238,6 +238,20 @@ func Import(dir, inDir string) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	// A wrong path used to import nothing and exit 0 — including the case that
+	// matters, a typo for a directory that is right there with records in it
+	// (#678). An empty directory that exists is a different answer and stays a
+	// quiet zero.
+	fi, err := os.Stat(inDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, fmt.Errorf("no such directory: %s", inDir)
+		}
+		return 0, err
+	}
+	if !fi.IsDir() {
+		return 0, fmt.Errorf("%s is a file; sync import wants the directory a `sync export` wrote", inDir)
+	}
 	unlock, err := lockDir(dir)
 	if err != nil {
 		return 0, err

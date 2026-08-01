@@ -153,3 +153,19 @@ func TestUnforgetBringsTheSessionBackWithoutAFullRebuild(t *testing.T) {
 		t.Errorf("a prefix matching nothing said %q", miss)
 	}
 }
+
+// --before takes a duration or a date, so an error naming neither leaves the
+// reader guessing which one they got wrong (#678).
+func TestForgetBeforeErrorNamesBothForms(t *testing.T) {
+	withTempStores(t)
+	_, err := captureRun(t, "forget", "--before", "yesterdayish")
+	if err == nil {
+		t.Fatal("a bad --before succeeded")
+	}
+	msg := err.Error()
+	for _, want := range []string{"yesterdayish", "30d", "2026-01-31"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q does not mention %q", msg, want)
+		}
+	}
+}

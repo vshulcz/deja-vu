@@ -874,7 +874,7 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 		}
 	}
 	if path == "" {
-		return "", o, false, fmt.Errorf("blame needs path")
+		return "", o, false, fmt.Errorf("blame needs a path — `deja blame internal/index/sync.go` says who last worked on it")
 	}
 	return path, o, jsonOutput, nil
 }
@@ -1072,7 +1072,9 @@ func runForget(dir string, args []string) error {
 				} else if t, e := parseForgetDate(args[i]); e == nil {
 					o.Before = t
 				} else {
-					return fmt.Errorf("forget: invalid before %q", args[i])
+					// --before takes either form, so naming only one of them
+					// leaves the reader guessing which they got wrong.
+					return fmt.Errorf("forget: %q is neither a duration nor a date — try 30d, 12h, or 2026-01-31", args[i])
 				}
 			}
 		default:
