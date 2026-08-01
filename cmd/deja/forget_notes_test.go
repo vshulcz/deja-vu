@@ -45,7 +45,11 @@ func TestForgetByProjectClearsBorrowedTitlesAndNamesTheNotes(t *testing.T) {
 
 	// The dry run has to warn about the notes too — it exists to answer "how
 	// much am I about to lose", and the notes are the part worth keeping.
-	dry, err := captureRun(t, "forget", "--project", "proj/p", "--dry-run")
+	// The project name is derived from the store's directory layout, so it
+	// carries the platform's separator — hard-coding "proj/p" passes on unix
+	// and matches nothing on Windows.
+	project := projectOf(t, dir, "a1")
+	dry, err := captureRun(t, "forget", "--project", project, "--dry-run")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +57,7 @@ func TestForgetByProjectClearsBorrowedTitlesAndNamesTheNotes(t *testing.T) {
 		t.Errorf("dry run does not mention the note: %q", dry)
 	}
 
-	out, err := captureRun(t, "forget", "--project", "proj/p")
+	out, err := captureRun(t, "forget", "--project", project)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +108,7 @@ func TestForgetLeavesOtherProjectsNotesAlone(t *testing.T) {
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "forget", "--project", "proj/p"); err != nil {
+	if _, err := captureRun(t, "forget", "--project", projectOf(t, index.DefaultDir(), "a1")); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(notes)
@@ -114,4 +118,21 @@ func TestForgetLeavesOtherProjectsNotesAlone(t *testing.T) {
 	if !strings.Contains(string(b), "a title from another project") {
 		t.Errorf("cleared a title belonging to a project that was not forgotten:\n%s", b)
 	}
+}
+
+// projectOf reads a session's project back out of the manifest, so a test can
+// name it the way this platform recorded it.
+func projectOf(t *testing.T, dir, id string) string {
+	t.Helper()
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range metas {
+		if m.ID == id {
+			return m.Project
+		}
+	}
+	t.Fatalf("session %q not in the manifest", id)
+	return ""
 }
