@@ -7,11 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.6] - 2026-08-02
+
+Two weeks of reading deja's own output on states it had never been run in: no
+sqlite3, no git, a locked store, a full disk, a killed rebuild, a machine with
+no history at all. Most of what came back was deja knowing something and not
+saying it.
+
+The index format is now 22, so the first run after upgrading rebuilds. Titles
+derived under the older rules were being carried forward untouched, and a
+rebuild is the only way to re-derive them.
+
 ### Added
-- `deja handoff --to agy` starts Antigravity with the digest as its first prompt. It was listed paste-only on the reading that it is a GUI, but its terminal client is `agy` — the binary `deja resume` already calls — and `agy -i <prompt>` opens an interactive session on it. `--to antigravity` is the same target. Thanks to @shgpavel. (#524)
+- `deja friction` — the errors that recur across sessions, read in one pass over the record log. (#622, #624, #626)
+- The first screen names the memory agents keep returning to, and the statusline says what earlier sessions decided about the file in hand. (#634, #638)
+- Codex and Cursor transcripts now yield commands, output, file paths and edits, the way Claude and opencode already did. (#621, #628, #629)
+- `deja stats` says what `deja restore` could hand back, before anyone needs it. (#644)
+- The session-start block tells the agent what this machine is missing before it trips over it. (#632)
 
 ### Fixed
-- `deja handoff --to hermes|openclaw|roo` answered `don't know how to hand off` instead of printing the digest to paste; the paste path now covers every harness the registry marks paste, kept in sync by the capability drift test. Thanks to @shgpavel. (#524)
+- Recall stayed dead after an upgrade: the hooks read an index written by another format version and matched nothing, and neither they nor the digest cache asked for the rebuild that would fix it. The same hole was open for a damaged index. (#777, #800)
+- A promoted note served its oldest correction. After a hundred careful corrections the hook handed the agent the first answer as fact; the note now leads with the latest, as its title already did. (#812)
+- An interrupted `deja forget --unforget` lost the session: the tombstone was gone, the index did not have it back, and no ordinary command restored it. The tombstone now outlives the rebuild. (#810)
+- `forget` reported success when it could not clear the title a note borrowed from the forgotten session — the first turn of that session, on disk, after deja said it was gone. It also now says which peers already have a copy. (#804, #808, #788)
+- `doctor` blamed the harness format for a missing `sqlite3` CLI and for a store it had no permission to read, and said nothing at all when only a subdirectory was locked. It now names the cause, and lists `git` alongside `sqlite3`. (#792, #802, #816, #796)
+- `deja index` said nothing when there was nothing to do, when it skipped a whole harness for a missing tool, or when a directory refused to be read. (#824, #794, #818)
+- Wiring repair only triggered on a version change, so a moved binary left every config pointing at a path that no longer exists. `deja update` now defers to Homebrew, npm, scoop, Nix and winget instead of writing into their trees. (#773, #775)
+- Answers that could not be acted on: `try fewer words` for a query whose every word was too short, or for two words that never co-occur (deja now names each word's own count), and query advice on a machine with no history at all — in search, `files`, `ctx` and `restore`. (#828, #826, #832, #834)
+- `deja install` with no target named none of the targets it knows, on the first command a new machine runs. (#830)
+- A command that landed in the window where a rebuild recreates the index directory reported a missing `manifest.gob`. (#822)
+- Notes without a project, and promoted notes without a state, were dropped at index time — the one class of content deja cannot re-derive from anywhere else. A promoted note with no source session is still dropped, but now counted. (#771, #814)
+- Relative dates used the timestamp's zone rather than the reader's, `deja last` printed `0001-01-01` for a session with no time, and the brief's `covering` line started from the earliest *last* activity, hiding the early history of long-running sessions. (#767, #765, #786)
+- Denied writes reported syscalls: `deja index`, `promote` and the notes rewrite now say what to change, and the notes rewrite names a full disk as a full disk. (#798, #806, #808)
+- Ranking and identity: an imported session no longer outranks an identical local one by accident, two transcripts sharing an id are attributed the same way on every build, and a rejected session is moved below the rest with a line saying so. (#711, #699, #694)
+
+### Changed
+- Skipping the CJK scan on bodies that contain no CJK: 118–158 µs down to 5.5 µs per body, byte-identical index. Found and fixed by @AliceLJY. (#640)
+- The first screen went from 3.2 s to 0.6 s. (#627)
+
+## [0.16.5] - 2026-07-31
+
+### Added
+- `deja files` and `deja restore` build the index instead of hanging silently, the brief shows a question this store has been asked before, and a compacted session is handed back its own evidence. (#617, #590, #588)
+- The index is built on install and on a bare first run. (#587)
+- Search says when the files a session touched have moved since. (#571)
+
+### Fixed
+- `--deep` reported drift on a healthy index; `install` said nothing useful on an unknown target; `forget --dry-run` described work it had not done; MCP `blame` sent whole transcripts to the agent. (#613, #612, #610, #611)
+
+## [0.16.4] - 2026-07-30
+
+### Added
+- `deja restore` recovers a span an agent replaced, and `deja files` says which files a topic's work actually touched. (#569, #566)
+- Sessions are named after the repository they worked in, and tool calls' file paths and commands are indexed. (#563, #558, #561)
+- `deja handoff --to agy` starts Antigravity through its CLI. Thanks to @shgpavel. (#524)
+
+### Fixed
+- `deja handoff --to hermes|openclaw|roo` answered `don't know how to hand off` instead of printing the digest to paste. Thanks to @shgpavel. (#524)
+- Tool output was labelled as the user. (#560)
 
 ## [0.16.3] - 2026-07-30
 
