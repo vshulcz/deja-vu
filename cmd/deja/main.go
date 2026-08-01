@@ -289,6 +289,9 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		return err
 	}
 	if !ok {
+		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
+			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", o.id)), "deja: "))
+		}
 		return fmt.Errorf("no session matches %q", o.id)
 	}
 	if o.json {
@@ -422,6 +425,11 @@ func cmdCtx(dir string, rest []string) error {
 		return err
 	}
 	if len(hits) == 0 {
+		// Same as #834 in files and restore: an empty store is not a miss on
+		// the query.
+		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
+			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", q)), "deja: "))
+		}
 		return fmt.Errorf("no session matches %q", q)
 	}
 	search.PrintContext(os.Stdout, hits[0].Session, q)

@@ -85,6 +85,13 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "no sessions mention %q in project %q\n", q, project)
 			return nil
 		}
+		// An empty store is not a miss on the topic: deja has nothing to look
+		// in, and saying "no sessions mention it" reads as "looked, not there"
+		// (#834).
+		if n, err := index.SessionCount(dir); err == nil && n == 0 {
+			fmt.Fprintln(stdout, emptyIndexHint(fmt.Sprintf("no sessions mention %q", q)))
+			return nil
+		}
 		fmt.Fprintf(stdout, "no sessions mention %q\n", q)
 		return nil
 	}
