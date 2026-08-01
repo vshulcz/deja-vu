@@ -130,6 +130,73 @@ func TestPromotedNoteOutranksTranscriptInSearch(t *testing.T) {
 	}
 }
 
+// A mark is not a verdict for life: the user who wrote "rejected" has to be
+// able to say they judged it wrong. Re-marking accepted is the undo — the
+// latest mark wins — and this pins both halves: the label and the demotion go,
+// and the receipt says a mark was taken back rather than leaving the user to
+// guess whether anything happened (#845).
+func TestPromoteAcceptedTakesTheRejectedMarkBack(t *testing.T) {
+	dir := promoteFixture(t)
+	if err := runPromote(dir, []string{"sess1234", "--state", "rejected", "--note", "the JWKS double-publish broke old clients"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	hits := searchHits(t, dir, "signing key")
+	attachLifecycles(hits)
+	if len(hits) == 0 || hits[0].Lifecycle != "rejected" {
+		t.Fatalf("rejected mark must land on the transcript hit: %#v", hits)
+	}
+	if !strings.Contains(lifecycleLine(hits[0]), "tried and rejected") {
+		t.Fatalf("label missing: %q", lifecycleLine(hits[0]))
+	}
+
+	var out bytes.Buffer
+	if err := runPromote(dir, []string{"sess1234", "--state", "accepted", "--note", "misjudged: old clients were the separate bug"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, want := range []string{"takes back the rejected mark", "no longer labelled", "deja show deja-note-claude-sess1234"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("receipt must say the mark was taken back (%q):\n%s", want, got)
+		}
+	}
+
+	hits = searchHits(t, dir, "signing key")
+	attachLifecycles(hits)
+	for _, h := range hits {
+		if h.Lifecycle != "" {
+			t.Fatalf("accepted must clear the mark, %s:%s still %q", h.Session.Harness, h.Session.ID, h.Lifecycle)
+		}
+	}
+	if moved := demoteRejected(hits); moved != 0 {
+		t.Fatalf("nothing may stay demoted after the mark is taken back, moved %d", moved)
+	}
+}
+
+// The states that sound like an undo — none, clear, off — are all invalid, so
+// the error for an unknown state is where a user learns which one is (#845).
+func TestPromoteBadStateNamesTheUndo(t *testing.T) {
+	dir := promoteFixture(t)
+	err := runPromote(dir, []string{"sess1234", "--state", "none"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("bad state must fail")
+	}
+	if !strings.Contains(err.Error(), "`--state accepted` takes an earlier mark back") {
+		t.Fatalf("error must name the undo: %v", err)
+	}
+}
+
+// The undo is a rule, not a command, so the only place a user can learn it is
+// the docs. This pins the README to the behavior the test above proves (#845).
+func TestReadmeDocumentsTakingAMarkBack(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "--state accepted` takes the mark back") {
+		t.Fatal("README must say how to take a rejected mark back")
+	}
+}
+
 func searchHits(t *testing.T, dir, q string) []search.Hit {
 	t.Helper()
 	o := search.Options{Query: q, All: true}
