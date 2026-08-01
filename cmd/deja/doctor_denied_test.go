@@ -49,6 +49,23 @@ func TestDoctorSeparatesADeniedStoreFromAChangedFormat(t *testing.T) {
 		t.Errorf("a permission problem is still reported as a format change:\n%s", got)
 	}
 
+	// Some files readable, one directory not: the store is only partly
+	// readable, which is quieter than losing it all — sessions disappear from
+	// recall while everything else looks whole (#816).
+	readable := filepath.Join(root, "seen.jsonl")
+	if err := os.WriteFile(readable, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	partial, _ := inspectDoctorStore(doctorStoreCheck{name: "codex", paths: []string{root}, files: []string{readable}, parse: nil})
+	if partial.State != "denied" || !partial.Partial {
+		t.Fatalf("state = %q partial = %v, want denied and partial", partial.State, partial.Partial)
+	}
+	var partialOut strings.Builder
+	printDoctorStoreWarnings(&partialOut, []doctorStore{partial})
+	if !strings.Contains(partialOut.String(), "only partly readable") {
+		t.Errorf("the partial case does not say so:\n%s", partialOut.String())
+	}
+
 	// A readable store with nothing in it stays quiet: "no history" is not a
 	// problem to warn about.
 	empty := filepath.Join(root, "empty")

@@ -279,8 +279,14 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 		case "denied":
 			// Not a format change and not an empty history: deja is not
 			// allowed to read the files. On macOS this is usually Full Disk
-			// Access rather than the file mode (#802).
-			fmt.Fprintf(w, "  warning      %s store cannot be read — permission denied on %s; check its permissions (on macOS, also Full Disk Access for your terminal)\n", store.Name, store.Denied)
+			// Access rather than the file mode (#802). A store that is only
+			// partly unreadable loses sessions from recall while looking whole
+			// everywhere else, so it says which half it is (#816).
+			what := "store cannot be read"
+			if store.Partial {
+				what = "store is only partly readable — some sessions are missing from recall"
+			}
+			fmt.Fprintf(w, "  warning      %s %s — permission denied on %s; check its permissions (on macOS, also Full Disk Access for your terminal)\n", store.Name, what, store.Denied)
 		case "needs-sqlite3":
 			// Not a format change: the parser could not run at all. Saying so
 			// points at installing one package instead of at a bug report

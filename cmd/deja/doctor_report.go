@@ -24,8 +24,11 @@ type doctorStore struct {
 	Paths []string `json:"paths"`
 	Files int      `json:"files"`
 	// Denied names the path that refused to be read, so the warning can point
-	// at the directory to fix rather than at the harness (#802).
-	Denied string `json:"denied,omitempty"`
+	// at the directory to fix rather than at the harness (#802). Partial says
+	// the rest of the store was readable: sessions are missing from recall
+	// rather than the whole harness (#816).
+	Denied  string `json:"denied,omitempty"`
+	Partial bool   `json:"partial,omitempty"`
 }
 
 type doctorComponent struct {
@@ -246,14 +249,17 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 			}
 		}
 	}
+	// The file collectors swallow EACCES, so a locked directory silently takes
+	// its sessions out of recall. With no files at all that read as a harness
+	// nobody has used (#802); with some files it read as a complete store
+	// missing a few, which is quieter still (#816).
+	if denied := firstDeniedDir(check.paths); denied != "" {
+		store.State = "denied"
+		store.Denied = denied
+		store.Partial = len(check.files) > 0
+		return store, time.Time{}
+	}
 	if len(check.files) == 0 {
-		// The file collectors swallow EACCES, so a readable root with a
-		// locked subdirectory produced "found (0 files)" — the same answer as
-		// a harness nobody has used (#802).
-		if denied := firstDeniedDir(check.paths); denied != "" {
-			store.State = "denied"
-			store.Denied = denied
-		}
 		return store, time.Time{}
 	}
 	newest, mod := newestDoctorFile(check.files)

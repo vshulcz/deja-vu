@@ -107,7 +107,10 @@ func TestDoctorStoreStates(t *testing.T) {
 		})
 	}
 
-	file := filepath.Join(tmp, "session.jsonl")
+	// Its own directory: tmp still holds the locked one above, and a store root
+	// containing it is reported as denied now (#816).
+	parseRoot := t.TempDir()
+	file := filepath.Join(parseRoot, "session.jsonl")
 	// The file has to look like a transcript: a store whose newest file holds
 	// no conversation at all is an unused session, not a parse failure.
 	if err := os.WriteFile(file, []byte(`{"type":"user","message":{"role":"user","content":"hi"}}`+"\n"), 0o600); err != nil {
@@ -122,7 +125,7 @@ func TestDoctorStoreStates(t *testing.T) {
 		{"parsed-zero", func(string) ([]model.Session, error) { return nil, nil }, "parsed-zero"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, _ := inspectDoctorStore(doctorStoreCheck{name: "x", paths: []string{tmp}, files: []string{file}, parse: tc.parse})
+			got, _ := inspectDoctorStore(doctorStoreCheck{name: "x", paths: []string{parseRoot}, files: []string{file}, parse: tc.parse})
 			if got.State != tc.want {
 				t.Fatalf("state = %q, want %q", got.State, tc.want)
 			}
