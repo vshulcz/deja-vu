@@ -20,6 +20,11 @@ const (
 	KindContext = "recall_context"
 	KindHook    = "hook"
 	KindSearch  = "search"
+	// KindBlame is the MCP blame tool. It answers the agent like recall does,
+	// and it is the largest thing the server hands over — whole sessions
+	// rather than budgeted snippets — so leaving it out understated what the
+	// agent was given (#682).
+	KindBlame   = "blame"
 	KindHandoff = "handoff"
 	// KindDejaVu marks a per-prompt recall: the user asked something their
 	// own history already answers — the product's namesake moment.
@@ -119,7 +124,7 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 			continue
 		}
 		switch e.Kind {
-		case KindRecall, KindContext:
+		case KindRecall, KindContext, KindBlame:
 			recalls++
 			bytes += e.Bytes
 		case KindHook, KindDejaVu:
@@ -154,7 +159,7 @@ func TodayRaw(indexDir string) int64 {
 			continue
 		}
 		switch e.Kind {
-		case KindRecall, KindContext, KindHook, KindDejaVu:
+		case KindRecall, KindContext, KindBlame, KindHook, KindDejaVu:
 			raw += e.RawBytes
 		}
 	}
@@ -167,7 +172,7 @@ func Totals(indexDir string) Summary {
 	empty := 0
 	for _, e := range read(Path(indexDir)) {
 		switch e.Kind {
-		case KindRecall, KindContext:
+		case KindRecall, KindContext, KindBlame:
 			out.Recalls++
 			out.RecallSessions += e.Sessions
 			out.Bytes += e.Bytes
@@ -204,7 +209,7 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 			continue
 		}
 		switch e.Kind {
-		case KindRecall, KindContext:
+		case KindRecall, KindContext, KindBlame:
 			recalls++
 			bytes += e.Bytes
 		case KindHook, KindDejaVu:

@@ -226,7 +226,16 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 				return "", err
 			}
 		}
-		return blameTextResult(dir, search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
+		text, hits, err := blameTextResult(dir, search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
+		if err == nil {
+			// blame answers the agent the way recall does, and hands over more
+			// than either — whole sessions rather than budgeted snippets. Not
+			// recording it left `deja log` understating what the agent was
+			// given (#682).
+			usage.RecordResult(dir, usage.KindBlame, len(text), hits, hits == 0)
+			usage.SnapshotPolicy(dir, usage.KindBlame, text, hits, policy.Load().Describe(policy.ActivationMCP))
+		}
+		return text, err
 	case "remember":
 		var a struct {
 			Text    string `json:"text"`
@@ -253,14 +262,15 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	}
 }
 
-func blameTextResult(dir string, o search.BlameOptions, path string, limit int) (string, error) {
+// blameTextResult returns the answer and how many sessions it names.
+func blameTextResult(dir string, o search.BlameOptions, path string, limit int) (string, int, error) {
 	target, err := search.ResolveBlamePath(path)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	hits, err := findBlameHits(dir, target, o, policy.ActivationMCP, mcpProgress())
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if limit <= 0 {
 		limit = 10
@@ -273,7 +283,7 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	// against the ~4 KB the other tools answer in. The snippets that sit beside
 	// it are the part an agent reads; the full session is one recall_context
 	// away when it genuinely needs it.
-	return string(mustMarshalBlame(hits)), nil
+	return string(mustMarshalBlame(hits)), len(hits), nil
 }
 
 // blameHitJSON is what the MCP blame tool returns: the same shape as the CLI's

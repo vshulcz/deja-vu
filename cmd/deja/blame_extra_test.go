@@ -25,7 +25,7 @@ func TestBlameErrorAndEmptyBranches(t *testing.T) {
 	if err := runBlame(index.DefaultDir(), []string{"parser.go"}); err == nil {
 		t.Fatal("expected blame error for squatted index dir")
 	}
-	if _, err := blameTextResult(index.DefaultDir(), search.BlameOptions{}, "parser.go", 5); err == nil {
+	if _, _, err := blameTextResult(index.DefaultDir(), search.BlameOptions{}, "parser.go", 5); err == nil {
 		t.Fatal("expected MCP blame error for squatted index dir")
 	}
 	// Healthy empty index: the no-mentions message path.
@@ -34,7 +34,7 @@ func TestBlameErrorAndEmptyBranches(t *testing.T) {
 	if err != nil || out != "" {
 		t.Fatalf("blame on empty index: %v (out=%q)", err, out)
 	}
-	if s, err := blameTextResult(index.DefaultDir(), search.BlameOptions{}, "never-mentioned.go", 5); err != nil || s == "" {
+	if s, _, err := blameTextResult(index.DefaultDir(), search.BlameOptions{}, "never-mentioned.go", 5); err != nil || s == "" {
 		t.Fatalf("mcp empty = %q err=%v", s, err)
 	}
 }

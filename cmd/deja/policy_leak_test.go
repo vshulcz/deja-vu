@@ -101,7 +101,7 @@ func TestBlameHonorsPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_POLICY_FILE", pol)
-	got, err := blameTextResult(dir, search.BlameOptions{All: true}, "handler_test.go", 10)
+	got, _, err := blameTextResult(dir, search.BlameOptions{All: true}, "handler_test.go", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
