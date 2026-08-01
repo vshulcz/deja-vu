@@ -255,12 +255,16 @@ func Tombstones() []string {
 	return out
 }
 
-func Unforget(prefix string) error {
+// Unforget lifts tombstones and reports how many it lifted. The count is not
+// bookkeeping: the command printed nothing at all, so "restored one session"
+// and "that prefix matched nothing" looked identical (#672).
+func Unforget(prefix string) (int, error) {
 	set := readTombstones()
 	// A prefix containing ':' is a key/harness-scoped prefix (claude:abc,
 	// z:); a bare prefix is an id-prefix symmetric with forget --session, so
 	// "c" cannot resurrect every claude/codex/cursor session at once.
 	scoped := strings.ContainsRune(prefix, ':')
+	lifted := 0
 	for key := range set {
 		var match bool
 		if scoped {
@@ -274,9 +278,13 @@ func Unforget(prefix string) error {
 		}
 		if match {
 			delete(set, key)
+			lifted++
 		}
 	}
-	return writeTombstones(set)
+	if lifted == 0 {
+		return 0, nil
+	}
+	return lifted, writeTombstones(set)
 }
 
 func RedactionReport(dir string) (RedactionStats, error) { return Redactions(dir) }

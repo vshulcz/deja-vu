@@ -58,7 +58,7 @@ func TestForgetTombstoneLifecycle(t *testing.T) {
 	if got := Tombstones(); len(got) != 1 || got[0] != "claude:abc123" {
 		t.Fatalf("tombstones=%v", got)
 	}
-	if err := Unforget("abc123"); err != nil {
+	if _, err := Unforget("abc123"); err != nil {
 		t.Fatal(err)
 	}
 	if len(Tombstones()) != 0 {
@@ -114,13 +114,13 @@ func TestTombstonePersistenceAndForgetNoop(t *testing.T) {
 	if got := Tombstones(); len(got) != 2 || got[0] != "a:first" || got[1] != "z:last" {
 		t.Fatalf("tombstones=%v", got)
 	}
-	if err := Unforget("first"); err != nil {
+	if _, err := Unforget("first"); err != nil {
 		t.Fatal(err)
 	}
 	if got := Tombstones(); len(got) != 1 || got[0] != "z:last" {
 		t.Fatalf("after suffix unforget=%v", got)
 	}
-	if err := Unforget("z:"); err != nil {
+	if _, err := Unforget("z:"); err != nil {
 		t.Fatal(err)
 	}
 	if len(Tombstones()) != 0 {
@@ -206,24 +206,62 @@ func TestUnforgetDoesNotOverMatchHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A bare "c" is an id-prefix: it must NOT resurrect whole harnesses.
-	if err := Unforget("c"); err != nil {
+	if _, err := Unforget("c"); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(Tombstones()); got != 3 {
 		t.Fatalf("bare prefix c wrongly matched harnesses: %v", Tombstones())
 	}
 	// An id-prefix that really matches an id works.
-	if err := Unforget("ab"); err != nil {
+	if _, err := Unforget("ab"); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(Tombstones()); got != 1 {
 		t.Fatalf("id-prefix ab: %v", Tombstones())
 	}
 	// A harness-scoped prefix still works.
-	if err := Unforget("cursor:"); err != nil {
+	if _, err := Unforget("cursor:"); err != nil {
 		t.Fatal(err)
 	}
 	if len(Tombstones()) != 0 {
 		t.Fatalf("harness scope left: %v", Tombstones())
+	}
+}
+
+// The command printed nothing at all, so "restored one session" and "that
+// prefix matched nothing" looked the same to the person running it (#672).
+func TestUnforgetReportsHowManyItLifted(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("XDG_CONFIG_HOME", "")
+	if err := writeTombstones(map[string]bool{"claude:a1": true, "claude:a2": true, "cursor:b1": true}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := Unforget("claude:"); err != nil || n != 2 {
+		t.Fatalf("lifted %d err=%v, want 2", n, err)
+	}
+	if n, err := Unforget("claude:"); err != nil || n != 0 {
+		t.Fatalf("second run lifted %d err=%v, want 0", n, err)
+	}
+	// A prefix that matches nothing must not rewrite the file: on a crash
+	// between write and rename it would take every other tombstone with it,
+	// and there is nothing to change.
+	before, err := os.Stat(tombstonePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := Unforget("nosuch"); err != nil || n != 0 {
+		t.Fatalf("a prefix matching nothing lifted %d err=%v", n, err)
+	}
+	after, err := os.Stat(tombstonePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Errorf("rewrote the tombstone file for a no-op")
+	}
+	// The one that was never named is still forgotten.
+	if got := Tombstones(); len(got) != 1 || got[0] != "cursor:b1" {
+		t.Fatalf("tombstones = %v", got)
 	}
 }
