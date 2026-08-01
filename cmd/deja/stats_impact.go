@@ -12,7 +12,10 @@ import (
 // Every line is counted from this machine's usage log; the closing note says
 // exactly what was counted so nobody has to take the numbers on faith.
 func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
-	r := usage.Impact(dir)
+	return printImpact(w, usage.Impact(dir), jsonOut)
+}
+
+func printImpact(w io.Writer, r usage.ImpactReport, jsonOut bool) error {
 	if jsonOut {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
@@ -26,9 +29,23 @@ func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
 	fmt.Fprintf(w, "  recalls served     %d agent-initiated recalls returned matches\n", r.Recalls)
 	fmt.Fprintf(w, "  memory at start    %d session starts began with project memory\n", r.Injections)
 	if r.RawBytes > 0 && r.ServedBytes > 0 {
+		// The frame, the header and the session lines cost more than the text
+		// they wrap when sessions are short — which is exactly the state a new
+		// user is in when they first run this. Calling that "distilled (0×
+		// less)" claims a saving that did not happen, and prints a ratio no
+		// one can read (#731).
 		ratio := float64(r.RawBytes) / float64(r.ServedBytes)
-		fmt.Fprintf(w, "  context distilled  %s served instead of %s of raw transcripts (%.0f× less)\n",
-			humanBytes(int64(r.ServedBytes)), humanBytes(r.RawBytes), ratio)
+		switch {
+		case ratio >= 2:
+			fmt.Fprintf(w, "  context distilled  %s served instead of %s of raw transcripts (%.0f× less)\n",
+				humanBytes(int64(r.ServedBytes)), humanBytes(r.RawBytes), ratio)
+		case ratio >= 1:
+			fmt.Fprintf(w, "  context served     %s from %s of raw transcripts\n",
+				humanBytes(int64(r.ServedBytes)), humanBytes(r.RawBytes))
+		default:
+			fmt.Fprintf(w, "  context served     %s from %s of raw transcripts — short sessions, so the digest frame costs more than the text\n",
+				humanBytes(int64(r.ServedBytes)), humanBytes(r.RawBytes))
+		}
 	}
 	if r.ReusedTwice > 0 {
 		fmt.Fprintf(w, "  knowledge re-used  %d sessions recalled 2+ times — fixes that keep paying\n", r.ReusedTwice)
