@@ -89,6 +89,15 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	return report
 }
 
+// storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
+func storeNeedsSQLite3(name string) bool {
+	switch name {
+	case "opencode", "cursor", "grok", "hermes", "goose":
+		return true
+	}
+	return false
+}
+
 func collectDoctorEmbed(dir string) *doctorEmbedReport {
 	r := &doctorEmbedReport{State: "unavailable"}
 	reachable := false
@@ -208,6 +217,14 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	_ = f.Close()
 	sessions, parseErr := check.parse(newest)
 	store.State = "ok"
+	// A parser that could not run is not a store that could not be understood.
+	// Without this, removing the sqlite3 CLI told the user their harness had
+	// changed its format and asked them to report it — two lines above deja
+	// naming the missing CLI itself (#792).
+	if parseErr != nil && storeNeedsSQLite3(check.name) && !sources.SQLite3Available() {
+		store.State = "needs-sqlite3"
+		return store, mod
+	}
 	// A parser that refuses to read the store is the loudest thing doctor can
 	// learn, and it used to be discarded: a harness that changed its schema
 	// showed up here as a healthy store while its recall was empty.

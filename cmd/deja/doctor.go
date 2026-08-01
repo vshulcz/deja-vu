@@ -82,17 +82,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 		return deepDriftErr(deepReport)
 	}
 	doctorHarnesses(w)
-	for _, store := range report.Stores {
-		switch store.State {
-		case "parsed-zero":
-			fmt.Fprintf(w, "  warning      %s files found but newest parsed to zero\n", store.Name)
-		case "unreadable":
-			// The store is there and deja cannot read it — usually a harness
-			// that changed its format. Silence here reads as "you have no
-			// history with that agent".
-			fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
-		}
-	}
+	printDoctorStoreWarnings(w, report.Stores)
 	fmt.Fprintln(w)
 	doctorTools(w)
 	fmt.Fprintln(w)
@@ -272,6 +262,26 @@ func unplacedFiles(root string, seen []string) int {
 		return nil
 	})
 	return extra
+}
+
+// printDoctorStoreWarnings says what deja could not read and why.
+func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
+	for _, store := range stores {
+		switch store.State {
+		case "parsed-zero":
+			fmt.Fprintf(w, "  warning      %s files found but newest parsed to zero\n", store.Name)
+		case "unreadable":
+			// The store is there and deja cannot read it — usually a harness
+			// that changed its format. Silence here reads as "you have no
+			// history with that agent".
+			fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
+		case "needs-sqlite3":
+			// Not a format change: the parser could not run at all. Saying so
+			// points at installing one package instead of at a bug report
+			// against the harness (#792).
+			fmt.Fprintf(w, "  warning      %s store needs the sqlite3 CLI — install it, then run `deja index`\n", store.Name)
+		}
+	}
 }
 
 func doctorHarnesses(w io.Writer) {
