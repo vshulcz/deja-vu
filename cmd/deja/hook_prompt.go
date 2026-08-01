@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -90,8 +91,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	var input promptHookInput
 	// Bounded, like the session-start hooks: a host that opens stdin and holds
 	// it without finishing the payload used to stall this hook until the
-	// harness killed it — on every user message (#846).
-	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &input)
+	// harness killed it — on every user message (#846). Still decoded rather
+	// than unmarshalled, so a host that writes anything after the object (a
+	// second line, a trailing NUL) keeps its recall instead of losing the
+	// whole payload to a syntax error.
+	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
 	adoptHookCWD(input.CWD)
 	terms := promptSearchTerms(string(input.Prompt))
 	if len(terms) < 2 {

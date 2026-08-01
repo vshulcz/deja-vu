@@ -414,9 +414,95 @@ func TestHookPromptDoesNotWaitForTheHostToCloseStdin(t *testing.T) {
 func TestReadHookPayloadKeepsWhatArrivedBeforeTheDeadline(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
-	payload := `{"session_id":"s","prompt":"gateway_timeout"}`
-	got := readHookPayload(&heldPipe{head: []byte(payload), stop: stop}, 200*time.Millisecond)
+	for _, payload := range []string{
+		`{"session_id":"s","prompt":"gateway_timeout"}`,
+		// Half a payload is kept too: the deadline decides when to stop
+		// waiting, not what to do with what is already in hand.
+		`{"session_id":"s","prompt":"gateway_ti`,
+	} {
+		got := readHookPayload(&heldPipe{head: []byte(payload), stop: stop}, 200*time.Millisecond)
+		if string(got) != payload {
+			t.Fatalf("payload = %q, want %q", got, payload)
+		}
+	}
+}
+
+// The deadline is the fallback, not the price of admission: a host that sends
+// the whole payload and leaves the pipe open must not pay it on every message.
+func TestReadHookPayloadReturnsAsSoonAsTheValueIsWhole(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+	payload := `{"session_id":"s","prompt":"gateway_timeout"}` + "\n"
+	start := time.Now()
+	got := readHookPayload(&heldPipe{head: []byte(payload), stop: stop}, 2*time.Second)
 	if string(got) != payload {
 		t.Fatalf("payload = %q, want %q", got, payload)
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Fatalf("waited %v for a payload that had already arrived", elapsed)
+	}
+}
+
+// Kept reading past a brace that closes nothing, or the deadline would fire on
+// every payload with a nested object in it.
+func TestReadHookPayloadWaitsOutAnInnerBrace(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+	payload := `{"prompt":[{"type":"text","text":"gateway_timeout"}]}`
+	got := readHookPayload(&splitPipe{parts: []string{
+		`{"prompt":[{"type":"text","text":"gateway_timeout"}`, `]}`,
+	}, stop: stop}, 2*time.Second)
+	if string(got) != payload {
+		t.Fatalf("payload = %q, want %q", got, payload)
+	}
+}
+
+// splitPipe hands over one part per Read and then holds the pipe open.
+type splitPipe struct {
+	parts []string
+	stop  chan struct{}
+}
+
+func (s *splitPipe) Read(p []byte) (int, error) {
+	if len(s.parts) > 0 {
+		n := copy(p, s.parts[0])
+		if n < len(s.parts[0]) {
+			s.parts[0] = s.parts[0][n:]
+			return n, nil
+		}
+		s.parts = s.parts[1:]
+		return n, nil
+	}
+	<-s.stop
+	return 0, io.EOF
+}
+
+// json.Unmarshal rejects the whole buffer over one byte after the object, so
+// decoding it that way turned a host with a chatty pipe into a host with no
+// memory. Recall must survive what follows the value (#846).
+func TestHookPromptSurvivesBytesAfterThePayload(t *testing.T) {
+	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "trail.jsonl"), "trail", []string{
+		`{"type":"user","sessionId":"trail","timestamp":"` + old + `","message":{"role":"user","content":"gateway_timeout on the reconnect_loop keeps dropping heartbeats"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "beta")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	payload := `{"prompt":"seeing gateway_timeout in the reconnect_loop again"}`
+	for _, trailer := range []string{"", "\n", "\x00", "\n" + `{"prompt":"next"}`} {
+		var out bytes.Buffer
+		if err := runHookPrompt(index.DefaultDir(), strings.NewReader(payload+trailer), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Len() == 0 {
+			t.Fatalf("trailer %q lost the recall", trailer)
+		}
 	}
 }
