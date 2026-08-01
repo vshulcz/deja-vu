@@ -955,11 +955,23 @@ func countAllVariants(low string, toks []string, variants map[string][]string) i
 	}
 	return total
 }
+
+// short keeps a result line narrow without destroying the one field that
+// identifies the session.
+//
+// A flat 12-character cut printed `deja-note-cl` for every promoted note and
+// `00000000-000` for UUID sessions — twelve identical rows in one answer, and
+// the cut string is what a reader copies into `deja show` (#707). Ids are
+// meaningful at both ends, so the middle goes.
 func short(s string) string {
-	if len(s) > 12 {
-		return s[:12]
+	const width = 20
+	r := []rune(s)
+	if len(r) <= width {
+		return s
 	}
-	return s
+	head := width/2 - 1
+	tail := width - head - 1
+	return string(r[:head]) + "…" + string(r[len(r)-tail:])
 }
 func highlight(s, q string, isRe bool, color bool) string {
 	if !color {

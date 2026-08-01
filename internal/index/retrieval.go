@@ -924,9 +924,28 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 		}
 	}
 	if len(matches) == 0 {
+		// Result lines elide the middle of a long id, so what a reader copies
+		// out of a search is a head and a tail rather than a prefix (#707).
+		// Falling back to a substring match costs nothing when the prefix
+		// worked and saves the copy-paste when it did not.
+		for _, meta := range m.Sessions {
+			if strings.Contains(meta.ID, p) {
+				matches = append(matches, meta)
+			}
+		}
+	}
+	if len(matches) == 0 {
 		return model.Session{}, false, nil
 	}
-	sort.Slice(matches, func(i, j int) bool { return matches[i].Updated.After(matches[j].Updated) })
+	sort.Slice(matches, func(i, j int) bool {
+		if !matches[i].Updated.Equal(matches[j].Updated) {
+			return matches[i].Updated.After(matches[j].Updated)
+		}
+		if matches[i].Harness != matches[j].Harness {
+			return matches[i].Harness < matches[j].Harness
+		}
+		return matches[i].ID < matches[j].ID
+	})
 	return loadSessionMeta(dir, m, matches[0])
 }
 
