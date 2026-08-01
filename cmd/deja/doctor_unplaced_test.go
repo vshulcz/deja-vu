@@ -62,7 +62,7 @@ func TestDoctorHarnessRowSaysNothingWhenEverythingIsPlaced(t *testing.T) {
 	}
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
 	var buf bytes.Buffer
-	doctorHarnesses(&buf)
+	doctorHarnesses(&buf, t.TempDir())
 	for _, line := range strings.Split(buf.String(), "\n") {
 		if strings.Contains(line, "qwen") && strings.Contains(line, "not recognised") {
 			t.Errorf("clean store complains: %q", line)
@@ -74,7 +74,7 @@ func TestDoctorHarnessRowSaysNothingWhenEverythingIsPlaced(t *testing.T) {
 		t.Fatal(err)
 	}
 	buf.Reset()
-	doctorHarnesses(&buf)
+	doctorHarnesses(&buf, t.TempDir())
 	found := false
 	for _, line := range strings.Split(buf.String(), "\n") {
 		if strings.Contains(line, "qwen") && strings.Contains(line, "1 not recognised here") {

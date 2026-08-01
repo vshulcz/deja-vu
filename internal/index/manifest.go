@@ -48,6 +48,28 @@ func ManifestBuiltAt(dir string) time.Time {
 	return time.Time{}
 }
 
+// HarnessSessionCounts reports how many indexed sessions each harness holds.
+//
+// doctor counts transcript files; the number of sessions those files became is
+// the other half of the same question, and until now no single command showed
+// both. A harness whose ids collide folds many files into one session — 811
+// codex rollouts into 74 sessions in #635 — and every doctor row still read as
+// a healthy store.
+func HarnessSessionCounts(dir string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]int{}
+	for _, meta := range m.Sessions {
+		out[meta.Harness]++
+	}
+	return out
+}
+
 func Redactions(dir string) (RedactionStats, error) {
 	if dir == "" {
 		dir = DefaultDir()

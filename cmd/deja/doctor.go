@@ -82,7 +82,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 		}
 		return deepDriftErr(deepReport)
 	}
-	doctorHarnesses(w)
+	doctorHarnesses(w, dir)
 	printDoctorStoreWarnings(w, report.Stores)
 	fmt.Fprintln(w)
 	doctorTools(w)
@@ -296,14 +296,28 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 	}
 }
 
-func doctorHarnesses(w io.Writer) {
+func doctorHarnesses(w io.Writer, dir string) {
 	fmt.Fprintln(w, "Harness stores:")
 	sqlite := sources.SQLite3Available()
+
+	// Files are what deja found; sessions are what they became. The two differ
+	// whenever ids collide — a resumed transcript, a copied one, a harness that
+	// reuses a thread id — and the difference is invisible in a row that only
+	// counts files (#861).
+	indexed := index.HarnessSessionCounts(dir)
 
 	printRow := func(name, path string, present bool, detail string) {
 		status := "missing"
 		if present {
 			status = "found"
+		}
+		if present {
+			if n, ok := indexed[name]; ok {
+				if detail != "" {
+					detail += ", "
+				}
+				detail += doctorCount(n, "indexed session")
+			}
 		}
 		line := fmt.Sprintf("  %-12s %-8s %s", name, status, path)
 		if detail != "" {
