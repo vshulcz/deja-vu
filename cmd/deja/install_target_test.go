@@ -1,47 +1,47 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// Two dozen targets differ by a few characters, so a bare "unknown target"
-// left someone who typed `claud` with nowhere to go — while `deja completion`
-// has always listed its three valid values.
-func TestUnknownTargetSuggestsWhatWasMeant(t *testing.T) {
-	for typed, want := range map[string]string{
-		"claud":   "claude-code",
-		"opencde": "opencode",
-		"cursorr": "cursor",
-		"gemin":   "gemini",
-		"qwn":     "qwen",
-	} {
-		got := unknownTargetError(typed).Error()
-		if !strings.Contains(got, want) {
-			t.Errorf("install %q should suggest %q: %s", typed, want, got)
-		}
-	}
-	// Nothing close: list what would work rather than guessing.
-	full := unknownTargetError("zzzz").Error()
-	if strings.Contains(full, "did you mean") {
-		t.Errorf("no near match should mean no guess: %s", full)
-	}
-	for _, want := range []string{"claude-code", "codex", "--all"} {
-		if !strings.Contains(full, want) {
-			t.Errorf("the list should name %q: %s", want, full)
-		}
-	}
-}
+// The first command a new machine runs, and it answered with a word the reader
+// has to go look up (#830).
+func TestInstallWithoutATargetNamesWhatIsHere(t *testing.T) {
+	hermeticEnv(t)
 
-func TestEditDistance(t *testing.T) {
-	cases := map[[2]string]int{
-		{"", ""}: 0, {"a", ""}: 1, {"", "ab"}: 2,
-		{"cursor", "cursor"}: 0, {"cursorr", "cursor"}: 1,
-		{"qwen", "qwn"}: 1, {"kitten", "sitting"}: 3,
+	// Nothing installed: point at the list rather than at nothing.
+	err := runInstall(t.TempDir(), nil, false)
+	if err == nil {
+		t.Fatal("install with no target succeeded")
 	}
-	for in, want := range cases {
-		if got := editDistance(in[0], in[1]); got != want {
-			t.Errorf("editDistance(%q, %q) = %d, want %d", in[0], in[1], got, want)
+	if !strings.Contains(err.Error(), "deja help") {
+		t.Errorf("a bare machine gets no pointer: %v", err)
+	}
+
+	// Agents present: name them, and the two bulk flags the README uses.
+	home := os.Getenv("HOME")
+	for _, d := range []string{".claude", ".codex"} {
+		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
+			t.Fatal(err)
 		}
+	}
+	err = runInstall(t.TempDir(), nil, false)
+	if err == nil {
+		t.Fatal("install with no target succeeded")
+	}
+	msg := err.Error()
+	for _, want := range []string{"claude-code", "codex", "--all", "--auto"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message does not name %q: %v", want, err)
+		}
+	}
+
+	// uninstall says uninstall, not install.
+	err = runInstall(t.TempDir(), nil, true)
+	if err == nil || !strings.HasPrefix(err.Error(), "uninstall") {
+		t.Errorf("uninstall error = %v", err)
 	}
 }

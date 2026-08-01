@@ -105,11 +105,11 @@ func TestInstallTargetErrorsAndAliases(t *testing.T) {
 		t.Fatalf("unknown target err = %v", err)
 	}
 	for _, args := range [][]string{nil, {"a", "b"}} {
-		if err := runInstall(index.DefaultDir(), args, false); err == nil || !strings.Contains(err.Error(), "install needs target") {
+		if err := runInstall(index.DefaultDir(), args, false); err == nil || !strings.Contains(err.Error(), "install needs a target") {
 			t.Fatalf("install args %v err = %v", args, err)
 		}
 	}
-	if err := runInstall(index.DefaultDir(), nil, true); err == nil || !strings.Contains(err.Error(), "uninstall needs target") {
+	if err := runInstall(index.DefaultDir(), nil, true); err == nil || !strings.Contains(err.Error(), "uninstall needs a target") {
 		t.Fatalf("uninstall err = %v", err)
 	}
 

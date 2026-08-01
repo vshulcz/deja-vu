@@ -36,10 +36,19 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		targetArgs = append(targetArgs, arg)
 	}
 	if len(targetArgs) != 1 {
+		// The first command a new machine runs, so a bare word they have to go
+		// look up is the worst possible answer. Every other command in this
+		// position prints the shape it wants (#830), and this one can do
+		// better still: name the agents actually present here.
+		verb := "install"
 		if uninstall {
-			return fmt.Errorf("uninstall needs target")
+			verb = "uninstall"
 		}
-		return fmt.Errorf("install needs target")
+		if found := existingTargets(); len(found) > 0 {
+			sort.Strings(found)
+			return fmt.Errorf("%s needs a target — found here: %s (or --all, --auto)", verb, strings.Join(found, ", "))
+		}
+		return fmt.Errorf("%s needs a target — no agent config found here; `deja help` lists every target deja knows", verb)
 	}
 	targets := []string{targetArgs[0]}
 	if targetArgs[0] == "--auto" {
