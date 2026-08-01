@@ -1058,32 +1058,44 @@ func pluralS(n int) string {
 }
 
 func sessionTitle(s model.Session) string {
-	for _, msg := range s.Messages {
-		if msg.Role != "user" {
+	// A user turn always wins; the assistant's opening line fills in when
+	// there is none — a session the agent opened itself, or one whose prompts
+	// are all harness plumbing. The alternative was the blank line these
+	// printed in `deja last` and on the first screen (#692).
+	if t := earliestTitle(s.Messages, "user"); t != "" {
+		return t
+	}
+	return earliestTitle(s.Messages, "assistant")
+}
+
+// earliestTitle picks the first turn of a role by the clock, falling back to
+// file order for records that carry no time.
+//
+// Taking whichever line sat first in the file disagreed with the import path,
+// which grew this fallback in #692 and orders by time — so one store titled
+// locally and the same store imported elsewhere could disagree (#769).
+func earliestTitle(ms []model.Message, role string) string {
+	best := ""
+	var bestAt time.Time
+	for _, msg := range ms {
+		if msg.Role != role {
 			continue
 		}
 		t := strings.TrimSpace(msg.Text)
 		if !titleWorthy(t) {
 			continue
 		}
-		return truncateTitle(t, 60)
-	}
-	// No user turn worth naming the session after: a session the agent opened
-	// itself, or one whose prompts are all harness plumbing. The assistant's
-	// first sentence is a worse title than the question that prompted it, and
-	// it is far better than the blank line these sessions used to print in
-	// `deja last` and on the first screen (#692).
-	for _, msg := range s.Messages {
-		if msg.Role != "assistant" {
+		switch {
+		case best == "":
+		case bestAt.IsZero(), msg.Time.IsZero():
+			// Nothing to compare: the first one found stands.
+			continue
+		case !msg.Time.Before(bestAt):
 			continue
 		}
-		t := strings.TrimSpace(msg.Text)
-		if !titleWorthy(t) {
-			continue
-		}
-		return truncateTitle(t, 60)
+		best, bestAt = truncateTitle(t, 60), msg.Time
 	}
-	return ""
+	return best
 }
 
 // titleWorthy reports whether a user turn is the sentence a person would
