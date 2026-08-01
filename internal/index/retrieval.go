@@ -756,6 +756,34 @@ func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer)
 	return SearchDetailed(dir, o)
 }
 
+// newestFirstMeta orders sessions for every "most recent" answer deja gives.
+//
+// A timestamp alone is not an order. Sessions come out of a map, so a store
+// where several share a stamp — a day's work imported in one go, a harness
+// that stamps per-day, transcripts restored from a backup — reordered itself
+// on every run: six calls to `deja last`, six different answers (#713).
+// Identity breaks the tie because it is the one thing that does not change.
+func newestFirstMeta(a, b SessionMeta) bool {
+	if !a.Updated.Equal(b.Updated) {
+		return a.Updated.After(b.Updated)
+	}
+	if a.Harness != b.Harness {
+		return a.Harness < b.Harness
+	}
+	return a.ID < b.ID
+}
+
+// newestFirstSession is newestFirstMeta for loaded sessions.
+func newestFirstSession(a, b model.Session) bool {
+	if !a.Updated.Equal(b.Updated) {
+		return a.Updated.After(b.Updated)
+	}
+	if a.Harness != b.Harness {
+		return a.Harness < b.Harness
+	}
+	return a.ID < b.ID
+}
+
 func Recent(dir string, n int) ([]model.Session, error) {
 	return RecentMatching(dir, n, query.Options{})
 }
@@ -782,7 +810,7 @@ func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error)
 		}
 		out = append(out, sessionFromMeta(meta))
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
+	sort.Slice(out, func(i, j int) bool { return newestFirstSession(out[i], out[j]) })
 	if n > 0 && len(out) > n {
 		out = out[:n]
 	}
@@ -820,7 +848,7 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 			metas = append(metas, meta)
 		}
 	}
-	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 	if n > 0 && len(metas) > n {
 		metas = metas[:n]
 	}
@@ -884,7 +912,7 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 				mine = append(mine, meta)
 			}
 		}
-		sort.Slice(mine, func(i, j int) bool { return mine[i].Updated.After(mine[j].Updated) })
+		sort.Slice(mine, func(i, j int) bool { return newestFirstMeta(mine[i], mine[j]) })
 		if perName > 0 && len(mine) > perName {
 			mine = mine[:perName]
 		}
@@ -937,15 +965,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if len(matches) == 0 {
 		return model.Session{}, false, nil
 	}
-	sort.Slice(matches, func(i, j int) bool {
-		if !matches[i].Updated.Equal(matches[j].Updated) {
-			return matches[i].Updated.After(matches[j].Updated)
-		}
-		if matches[i].Harness != matches[j].Harness {
-			return matches[i].Harness < matches[j].Harness
-		}
-		return matches[i].ID < matches[j].ID
-	})
+	sort.Slice(matches, func(i, j int) bool { return newestFirstMeta(matches[i], matches[j]) })
 	return loadSessionMeta(dir, m, matches[0])
 }
 
@@ -2313,7 +2333,7 @@ func FindAskedTwice(dir string) (AskedTwice, bool) {
 		if len(metas) < 2 {
 			continue
 		}
-		sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+		sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 		span := metas[0].Updated.Sub(metas[len(metas)-1].Updated)
 		// Time between the askings, not the number of them. The same question
 		// sixteen times in one afternoon is somebody retrying; the same question
