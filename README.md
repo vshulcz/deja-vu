@@ -146,7 +146,8 @@ history. Tombstones are stored at `~/.config/deja/tombstones` (or
 either one does not resurrect what you forgot; use `--dry-run`, `--list`, or
 `--unforget`. `--unforget` lifts the tombstone and rebuilds, so the session is
 searchable again straight away — the transcript on disk never changed, and an
-incremental pass would skip it.
+incremental pass would skip it. `--before` takes an age (`30d`) or a date; an age of
+zero or less is refused, because "older than now" is every session.
 Ingest exclusions are one case-insensitive project pattern per line in
 `~/.config/deja/exclude` (XDG-aware), or comma-separated in
 `DEJA_EXCLUDE_PROJECTS`. `deja stats --redaction` reports redactions by

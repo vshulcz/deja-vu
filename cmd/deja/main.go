@@ -1219,6 +1219,14 @@ func runForget(dir string, args []string) error {
 				unforget = args[i]
 			case "--before":
 				if d, err := parseDur(args[i]); err == nil {
+					// "older than 0 days" is the whole store, and the typo that
+					// produces it is 0 for 30. The neighbouring value behaves
+					// the opposite way — --before 9999d matches nothing — and a
+					// negative duration filters nothing in `last` while
+					// deleting everything here (#739).
+					if d <= 0 {
+						return fmt.Errorf("forget: --before %s means older than now, which is every session — use a real age like 30d, or --project/--session", args[i])
+					}
 					o.Before = time.Now().Add(-d)
 				} else if t, e := parseForgetDate(args[i]); e == nil {
 					o.Before = t
