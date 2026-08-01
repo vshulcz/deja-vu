@@ -256,7 +256,15 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	// store and the reader had no way to know they were shown a choice.
 	if o.harness == "" {
 		if n := index.PrefixMatches(dir, o.id); n > 1 {
-			fmt.Fprintf(os.Stderr, "deja: %d sessions start with %q — showing the most recent; use a longer prefix for another\n", n, o.id)
+			// When the matches are the same id in different harnesses there is
+			// no longer prefix to reach for, and --harness is the only thing
+			// that separates them (#719).
+			if hs := index.PrefixHarnesses(dir, o.id); len(hs) > 1 {
+				fmt.Fprintf(os.Stderr, "deja: %d sessions share the id %q — showing the most recent; use --harness %s\n",
+					len(hs), o.id, strings.Join(hs, "|"))
+			} else {
+				fmt.Fprintf(os.Stderr, "deja: %d sessions start with %q — showing the most recent; use a longer prefix for another\n", n, o.id)
+			}
 		}
 	}
 	search.PrintSession(os.Stdout, s)

@@ -994,6 +994,34 @@ func PrefixMatches(dir, p string) int {
 	return n
 }
 
+// PrefixHarnesses names the harnesses holding a session whose id is exactly the
+// given string.
+//
+// Two harnesses can carry the same id — that is what #698 is about, and it
+// happens naturally when a transcript is copied between tools. There the advice
+// "use a longer prefix" cannot be followed, because the ids are the same
+// string; --harness is the only thing that separates them (#719).
+func PrefixHarnesses(dir, id string) []string {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if id == "" {
+		return nil
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, meta := range m.Sessions {
+		if meta.ID == id {
+			out = append(out, meta.Harness)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // FindByIdentity resolves the exact composite identity emitted by machine
 // search and recent output. Unlike the human prefix command, it never guesses
 // between harnesses or accepts a shortened native ID.
