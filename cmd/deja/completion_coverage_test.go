@@ -20,7 +20,16 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 		"zsh":  zshCompletion,
 		"fish": fishCompletion,
 	}
+	names := make([]string, 0, len(commands))
 	for name := range commands {
+		names = append(names, name)
+	}
+	// The switch in run() handles these before the map is consulted, so the
+	// map alone misses them — which is how `search` stayed out of all three
+	// shells (#749). `aider` and `goose` are deliberately absent: bare
+	// `deja goose` is a search for the word, not a command.
+	names = append(names, "search", "show", "last")
+	for _, name := range names {
 		if internal[name] || strings.HasPrefix(name, "-") {
 			continue
 		}

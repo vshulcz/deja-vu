@@ -39,7 +39,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]}"
     action="${COMP_WORDS[2]}"
 
-    local commands="blame bench completion ctx doctor embed files forget friction handoff help index install last log mcp promote remember restore resume share show sources stats statusline sync uninstall update version view warmup"
+    local commands="blame bench completion ctx doctor embed files forget friction handoff help index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup"
     local harnesses="claude codex opencode aider gemini cursor antigravity grok qwen pi copilot deja"
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
@@ -166,6 +166,7 @@ _deja() {
     'remember:store a durable note'
     'restore:hand back a span an agent replaced'
     'resume:reopen a session'
+    'search:search your history explicitly'
     'share:print a sanitized session digest'
     'show:print a session'
     'sources:list discovered stores'
@@ -258,7 +259,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed files forget friction handoff help index install last log mcp promote remember restore resume share show sources stats statusline sync uninstall update version view warmup'
+complete -c deja -n '__deja_needs_command' -a 'blame bench completion ctx doctor embed files forget friction handoff help index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
