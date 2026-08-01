@@ -200,7 +200,11 @@ func cmdIndex(dir string, rest []string) error {
 	// memory is on its way; an interactive run draws the live display.
 	build := func() error { return index.Ensure(dir, "", force, os.Stderr) }
 	if err := withWarmupStatus(dir, func() error { return withBuildProgress(build) }); err != nil {
-		return err
+		// The command whose whole job is building the index used to pass the
+		// syscall through — `mkdir /…/index.db.tmp: permission denied` names
+		// an internal temp path and no fix, while every reading command has
+		// said what to change since ensureError was written (#798).
+		return ensureError(dir, err)
 	}
 	clearWarmupSentinel()
 	// Two transcripts can carry the same harness:id — two files with the same
