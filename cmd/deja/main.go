@@ -84,13 +84,22 @@ func loadFileSources() []model.Session {
 type command func(dir string, rest []string) error
 
 var commands = map[string]command{
-	"version":       cmdVersion,
-	"help":          func(_ string, _ []string) error { printUsage(); return nil },
-	"--help":        func(_ string, _ []string) error { printUsage(); return nil },
-	"-h":            func(_ string, _ []string) error { printUsage(); return nil },
-	"--version":     cmdVersion,
-	"-version":      cmdVersion,
-	"sources":       func(dir string, _ []string) error { printSources(dir); return nil },
+	"version":   cmdVersion,
+	"help":      func(_ string, _ []string) error { printUsage(); return nil },
+	"--help":    func(_ string, _ []string) error { printUsage(); return nil },
+	"-h":        func(_ string, _ []string) error { printUsage(); return nil },
+	"--version": cmdVersion,
+	"-version":  cmdVersion,
+	"sources": func(dir string, rest []string) error {
+		// The command takes nothing, and --json exists on seven of its
+		// neighbours — a script that reaches for it here got the
+		// tab-separated table back and parsed it as JSON (#747).
+		for _, a := range rest {
+			return fmt.Errorf("sources takes no arguments — got %q", a)
+		}
+		printSources(dir)
+		return nil
+	},
 	"completion":    func(_ string, rest []string) error { return runCompletion(rest) },
 	"doctor":        func(dir string, rest []string) error { return runDoctor(os.Stdout, rest, doctorLookup, dir) },
 	"warmup":        cmdWarmup,
