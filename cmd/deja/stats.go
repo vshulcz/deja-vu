@@ -260,7 +260,18 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "%sLast 12 months%s\n", bold, reset)
-	fmt.Fprintf(w, "  %s  %s\n", r.Sparkline, monthLabels(r.Monthly))
+	// Twelve empty bars is what a broken index looks like, and a store whose
+	// work is simply older than a year draws exactly that. The first screen
+	// already answers this case with the range it does cover (#703).
+	if monthlyTotal(r.Monthly) == 0 {
+		if r.DateRange.Start != "" {
+			fmt.Fprintf(w, "  none — this store covers %s → %s\n", r.DateRange.Start, r.DateRange.End)
+		} else {
+			fmt.Fprintln(w, "  none")
+		}
+	} else {
+		fmt.Fprintf(w, "  %s  %s\n", r.Sparkline, monthLabels(r.Monthly))
+	}
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "%sHighlights%s\n", bold, reset)

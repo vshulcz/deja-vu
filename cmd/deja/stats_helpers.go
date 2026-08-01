@@ -10,6 +10,17 @@ import (
 	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
+// monthlyTotal is how much work falls inside the window the sparkline draws.
+// Twelve empty bars is what a broken index looks like, and a store whose work
+// is simply older than a year draws exactly that (#703).
+func monthlyTotal(months []stats.MonthStats) int {
+	n := 0
+	for _, m := range months {
+		n += m.Messages
+	}
+	return n
+}
+
 func monthLabels(months []stats.MonthStats) string {
 	labels := make([]string, 0, len(months))
 	for _, m := range months {
