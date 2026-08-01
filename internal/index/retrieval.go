@@ -1360,6 +1360,30 @@ func postingsFor(dir, tok string) ([]posting, error) {
 	return readBucketToken(filepath.Join(dir, "buckets", bucket(tok)+".bin"), tok)
 }
 
+// TermSessionCounts says how many sessions each term appears in on its own.
+// When an AND query finds no intersection, "try fewer words" is right in
+// direction and empty in content — the reader has to guess which of their words
+// to drop, while deja already read these counts to decide there was none (#826).
+func TermSessionCounts(dir string, terms []string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	out := make(map[string]int, len(terms))
+	for _, t := range terms {
+		key := "t" + t
+		posts, err := postingsFor(dir, key)
+		if err != nil {
+			continue
+		}
+		seen := map[uint32]bool{}
+		for _, p := range posts {
+			seen[p.Sid] = true
+		}
+		out[t] = len(seen)
+	}
+	return out
+}
+
 func intersectPostings(dir string, keys []string) ([]posting, error) {
 	if len(keys) == 0 {
 		return nil, nil

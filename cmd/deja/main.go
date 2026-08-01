@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -614,6 +615,27 @@ func printStemmed(w io.Writer, variants map[string][]string) {
 	}
 }
 
+// termCountLine names the terms that do match on their own, so "try fewer
+// words" says which. It stays quiet when every term is already unknown to the
+// store — there is nothing to drop then, and a row of zeroes is noise.
+func termCountLine(dir, q string) string {
+	terms := query.Tokens(q)
+	if len(terms) < 2 || len(terms) > 6 {
+		return ""
+	}
+	counts := index.TermSessionCounts(dir, terms)
+	var parts []string
+	for _, t := range terms {
+		if counts[t] > 0 {
+			parts = append(parts, fmt.Sprintf("%q in %d", t, counts[t]))
+		}
+	}
+	if len(parts) == 0 || len(parts) == len(terms) && len(terms) > 3 {
+		return ""
+	}
+	return fmt.Sprintf("deja: on their own: %s — no session has them together\n", strings.Join(parts, ", "))
+}
+
 // printNoMatches says how big the store actually is, not how many sessions the
 // query happened to load.
 //
@@ -629,6 +651,11 @@ func printNoMatches(w io.Writer, dir, q string) {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
 	} else {
 		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
+	}
+	// Which word to drop is the reader's next question, and deja read the
+	// per-term counts to decide there was no intersection (#826).
+	if line := termCountLine(dir, q); line != "" {
+		fmt.Fprint(w, line)
 	}
 	// The first thing anyone types is a guess at a command name, and a wrong
 	// guess falls through to search — where the advice is to use fewer words,
