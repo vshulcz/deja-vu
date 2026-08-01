@@ -92,8 +92,11 @@ func TestDoctorStoreStates(t *testing.T) {
 		want  string
 	}{
 		{"missing", doctorStoreCheck{name: "x", paths: []string{filepath.Join(tmp, "missing")}}, "missing"},
-		{"empty", doctorStoreCheck{name: "x", paths: []string{tmp}}, "missing"},
-		{"unreadable", doctorStoreCheck{name: "x", paths: []string{unreadable}}, "unreadable"},
+		// Its own directory: a root holding a locked subdirectory is reported
+		// as denied now, which is the point of #802 and not what this case is
+		// about.
+		{"empty", doctorStoreCheck{name: "x", paths: []string{t.TempDir()}}, "missing"},
+		{"denied", doctorStoreCheck{name: "x", paths: []string{unreadable}}, "denied"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
