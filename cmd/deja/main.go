@@ -334,6 +334,15 @@ func cmdCtx(dir string, rest []string) error {
 	if len(rest) < 1 {
 		return fmt.Errorf("ctx needs query or id-prefix")
 	}
+	// ctx takes no flags, and --json/--harness/--project/--since all exist on
+	// neighbouring commands — so reaching for one here is the obvious mistake.
+	// Folding it into the query answered "no session matches", which is a
+	// false statement about the store (#721).
+	for _, a := range rest {
+		if strings.HasPrefix(a, "--") {
+			return fmt.Errorf("ctx takes no flags, only a query or id-prefix — got %q", a)
+		}
+	}
 	q := strings.Join(rest, " ")
 	if !strings.Contains(q, " ") && len(q) >= 6 {
 		s, ok, err := findByPrefix(dir, q)
