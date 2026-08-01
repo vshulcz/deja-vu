@@ -413,3 +413,72 @@ func TestStatuslineMemoryLooksPastTheBusiestFile(t *testing.T) {
 		t.Fatalf("reported %q, want the file that actually has a memory", m.Path)
 	}
 }
+
+// The bar redraws every few hundred milliseconds. Sessions stamped the same
+// second — a shared shutdown, an import, anything below second granularity —
+// used to swap places between two of those redraws, because the sort was over
+// AllMeta's map order on Updated alone. Measured 40/20 over 60 runs (#668).
+func TestStatuslineMemoryNamesTheSameSessionEveryTime(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-t")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	// Every session ends on the same stamp, so Updated decides nothing.
+	for i := 0; i < 6; i++ {
+		sid := fmt.Sprintf("tie%d", i)
+		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-11T10:00:00Z","message":{"role":"user","content":"subject number ` + fmt.Sprint(i) + `"}}` + "\n" +
+			`{"type":"assistant","sessionId":"` + sid + `","cwd":"/w/t","timestamp":"2026-07-11T10:00:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"/w/t/shared.go"}}]}}` + "\n"
+		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	in := transcriptSource{TranscriptPath: filepath.Join(root, "tie0.jsonl")}
+	first, ok := statuslineMemory(dir, in)
+	if !ok {
+		t.Fatal("no memory reported for a file five other sessions touched")
+	}
+	// Each call re-reads the manifest, so each one sees a fresh map order.
+	for i := 0; i < 40; i++ {
+		got, ok := statuslineMemory(dir, in)
+		if !ok {
+			t.Fatalf("run %d reported nothing", i)
+		}
+		if got.Title != first.Title || got.Path != first.Path {
+			t.Fatalf("run %d named a different session: %q then %q", i, first.Title, got.Title)
+		}
+	}
+}
+
+func TestNewestFirstIsATotalOrder(t *testing.T) {
+	early := time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC)
+	late := early.Add(time.Hour)
+	meta := func(h, id string, at time.Time) index.SessionMeta {
+		return index.SessionMeta{Harness: h, ID: id, Updated: at}
+	}
+	cases := []struct {
+		name string
+		a, b index.SessionMeta
+		want bool
+	}{
+		{"newer wins", meta("claude", "z", late), meta("claude", "a", early), true},
+		{"older loses", meta("claude", "a", early), meta("claude", "z", late), false},
+		// Same second: the pair that identifies a session decides, so both
+		// directions answer and answer opposite things.
+		{"tie falls to harness", meta("claude", "z", early), meta("cursor", "a", early), true},
+		{"tie falls to harness, other way", meta("cursor", "a", early), meta("claude", "z", early), false},
+		{"tie falls to id within one harness", meta("claude", "a", early), meta("claude", "b", early), true},
+		{"tie falls to id, other way", meta("claude", "b", early), meta("claude", "a", early), false},
+		{"identical is not less", meta("claude", "a", early), meta("claude", "a", early), false},
+	}
+	for _, c := range cases {
+		if got := newestFirst(c.a, c.b); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

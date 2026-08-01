@@ -113,7 +113,12 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 		if len(others) == 0 {
 			continue
 		}
-		sort.Slice(others, func(i, j int) bool { return others[i].Updated.After(others[j].Updated) })
+		// Newest first, then by identity. Timestamp alone is not an order:
+		// AllMeta comes out of a map, so two sessions stamped the same second
+		// — a shared shutdown, an import, anything below second granularity —
+		// swapped places between two refreshes 300ms apart and the bar named a
+		// different session each time (#668, measured 40/20 over 60 runs).
+		sort.Slice(others, func(i, j int) bool { return newestFirst(others[i], others[j]) })
 		return fileMemory{
 			Path:     here,
 			Sessions: len(others),
@@ -124,6 +129,23 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 	// Silence, not a zero: a file nobody else has worked on has no memory to
 	// report, and printing "0 sessions" makes the line noise forever.
 	return fileMemory{}, false
+}
+
+// newestFirst orders the earlier sessions the bar can name.
+//
+// Timestamp alone is not an order: AllMeta comes out of a map, so two sessions
+// stamped the same second — a shared shutdown, an import, anything below second
+// granularity — swapped places between two refreshes 300ms apart and the bar
+// named a different session each time (#668, measured 40/20 over 60 runs).
+// Identity breaks the tie because it is the one thing that does not change.
+func newestFirst(a, b index.SessionMeta) bool {
+	if !a.Updated.Equal(b.Updated) {
+		return a.Updated.After(b.Updated)
+	}
+	if a.Harness != b.Harness {
+		return a.Harness < b.Harness
+	}
+	return a.ID < b.ID
 }
 
 // sessionsTouching returns the sessions other than self that worked on path.
