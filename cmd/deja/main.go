@@ -1453,11 +1453,11 @@ Usage:
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt   (UserPromptSubmit hook: relevance recall per prompt)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
-  deja view          (browse your memory: sessions, recalls, notes — one local HTML)
+  deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja files <topic> [--project name] [--limit n]
-  deja restore <path> [--span n] [-o file] [--force]
+  deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n]
   deja sync export <dir> [--full]
   deja sync import <dir>
@@ -1467,16 +1467,16 @@ Usage:
   deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
   deja forget --list | --unforget <id>
-  deja doctor [--json] [--deep]
+  deja doctor [--json] [--deep] [--offline]
   deja warmup
   deja index [--rebuild]
   deja embed
-  deja bench recall [--json]
+  deja bench recall|context|prompt [--json] [--seed n]
   deja log [n] [--last] [--json]
   deja statusline
-  deja stats [--json] [--impact] [--card [path]] [--html [path]]
-	deja remember "text" [--project name]
-  deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--to path]
+  deja stats [--json] [--impact] [--redaction] [--card [path]] [--html [path]]
+	deja remember "text" [--project name] [--tag name]
+  deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja mcp
   deja version
   deja update [--force]
