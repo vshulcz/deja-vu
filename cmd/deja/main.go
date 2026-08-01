@@ -346,6 +346,11 @@ func parseShow(args []string) (showOptions, error) {
 			o.id = a
 		}
 	}
+	// The id first: it is what the command is for, and checking the flag ahead
+	// of it cost two runs to learn two missing things (#820).
+	if o.id == "" {
+		return o, fmt.Errorf("show needs id-prefix")
+	}
 	if o.json && o.harness == "" {
 		return o, fmt.Errorf("show --json requires --harness for exact identity")
 	}
