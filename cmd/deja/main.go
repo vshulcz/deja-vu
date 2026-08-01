@@ -413,7 +413,16 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		return printRecentJSON(os.Stdout, ss, sourceInstance)
 	}
 	for _, s := range ss {
-		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, s.Updated.Format("2006-01-02"), s.ID)
+		// A session whose timestamp was missing or unparseable carries the Go
+		// zero time, and "0001-01-01" reads as corrupted data rather than as a
+		// missing field. Search prints a dash here and the first screen leaves
+		// such sessions out of its range; this was the one place that did not
+		// follow the convention (#765).
+		when := "-"
+		if !s.Updated.IsZero() {
+			when = s.Updated.Format("2006-01-02")
+		}
+		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
 		title := s.Title
 		if title == "" {
 			title = firstUserTitle(s)
