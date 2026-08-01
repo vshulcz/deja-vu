@@ -73,7 +73,9 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintf(os.Stderr, "deja: handing off %s · %s · %s · %s\n", s.Harness, s.Project, digest.Short(s.ID), age)
 	if !s.Updated.IsZero() && time.Since(s.Updated) > 7*24*time.Hour {
-		fmt.Fprintf(os.Stderr, "deja: note — this session is %s old; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
+		// humanAge already ends in "old"; appending the word again printed
+		// "this session is 11d old old" (#743).
+		fmt.Fprintf(os.Stderr, "deja: note — this session is %s; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
 	}
 	digest := digest.Handoff(s, handoffBudget)
 	usage.RecordDigest(dir, usage.KindHandoff, digest, 1, rawSize([]model.Session{s}))
