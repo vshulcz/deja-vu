@@ -824,9 +824,13 @@ func filterRecentSources(ss []model.Session, o search.Options) []model.Session {
 	return out
 }
 
+// sessionHasRole accepts the role names the help text documents. `--role tool`
+// is what `deja help` promises and "tool-output" is what is stored, so the
+// documented spelling matched nothing here while `deja search --role tool` —
+// which grew the alias in #623 — worked (#717).
 func sessionHasRole(s model.Session, role string) bool {
 	for _, m := range s.Messages {
-		if m.Role == role {
+		if m.Role == role || (role == "tool" && m.Role == "tool-output") {
 			return true
 		}
 	}
