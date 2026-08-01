@@ -24,6 +24,34 @@ func TestSearchOnAnEmptyStorePointsAtTheStores(t *testing.T) {
 		t.Errorf("advice that cannot be followed is still printed:\n%s", out)
 	}
 
+	// Everything forgotten is not the same as nothing indexed: `deja index`
+	// cannot bring back a tombstoned session, and the forgotten count is the
+	// line that ends the search (#844).
+	forgetStore := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-gone")
+	if err := os.MkdirAll(forgetStore, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gone := `{"type":"user","message":{"role":"user","content":"the winch brake pads"},"timestamp":"2026-07-02T10:00:00Z","sessionId":"g1","cwd":"/gone"}`
+	if err := os.WriteFile(filepath.Join(forgetStore, "g.jsonl"), []byte(gone+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "forget", "--session", "g1"); err != nil {
+		t.Fatal(err)
+	}
+	emptied, err := captureRunStderr(t, "winch", "brake")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(emptied, "forgotten (`deja forget --list`)") {
+		t.Errorf("a store emptied by forget does not name what was forgotten:\n%s", emptied)
+	}
+	if strings.Contains(emptied, "run `deja index`") {
+		t.Errorf("advice that cannot bring a tombstoned session back:\n%s", emptied)
+	}
+
 	// With history indexed, an ordinary miss keeps the ordinary answer.
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
 	if err := os.MkdirAll(store, 0o755); err != nil {

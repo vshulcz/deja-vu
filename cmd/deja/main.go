@@ -664,6 +664,15 @@ func printNoMatches(w io.Writer, dir, q string) {
 	// nothing is indexed, and `last`, `blame` and the brief all say what to do
 	// instead. Search is the command a new machine reaches for first (#832).
 	if n, err := index.SessionCount(dir); err == nil && n == 0 {
+		// "Zero indexed sessions" has two very different causes, and the early
+		// return named only the first: a machine with no history, and a machine
+		// where the reader forgot everything themselves. `deja index` cannot
+		// bring back a tombstoned session (#844).
+		if note := hiddenByOwnSettings(); note != "" {
+			fmt.Fprintf(w, "deja: no matches for %q\n", q)
+			fmt.Fprint(w, note)
+			return
+		}
 		fmt.Fprintln(w, emptyIndexHint(fmt.Sprintf("no matches for %q", q)))
 		return
 	}
