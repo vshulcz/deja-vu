@@ -144,7 +144,7 @@ session tombstones so a later `deja index` cannot restore them from source
 history. Tombstones are stored at `~/.config/deja/tombstones` (or
 `$XDG_CONFIG_HOME/deja/tombstones`) and mirrored beside the index, so losing
 either one does not resurrect what you forgot; use `--dry-run`, `--list`, or
-`--unforget`. `--unforget` lifts the tombstone and rebuilds, so the session is
+`--unforget <id>` with an ID from `--list`. `--unforget` lifts the tombstone and rebuilds, so the session is
 searchable again straight away — the transcript on disk never changed, and an
 incremental pass would skip it. `--before` takes an age (`30d`) or a date; an age of
 zero or less is refused, because "older than now" is every session.
@@ -213,15 +213,16 @@ Run `deja stats --html` to write a self-contained, browsable `deja-stats.html` t
 
 ```json
 {
+  "schema_version": 2,
   "stores": [{"name": "claude", "state": "ok", "paths": ["/home/me/.claude/projects"], "files": 42}],
-  "index": {"state": "stale", "path": "/home/me/.cache/deja/index.db"},
+  "index": {"state": "stale", "path": "/home/me/.cache/deja"},
   "mcp": [{"name": "claude-code", "state": "wired", "path": "/home/me/.claude.json"}],
   "sqlite3": {"state": "ok"},
   "version": {"state": "ok", "current": "1.2.3", "latest": "1.2.3"}
 }
 ```
 
-Index states are `ok`, `missing`, or `stale`; MCP states are `wired`, `not-wired`, or `config-missing`. The sqlite3 state is `ok` or `missing`. Version state is `ok`, `update-available`, `ahead`, `dev`, or `unknown`.
+The index `path` is the index directory, not a single file. Index states are `ok`, `missing`, or `stale`; MCP states are `wired`, `not-wired`, or `config-missing`. The sqlite3 state is `ok` or `missing`. Version state is `ok`, `update-available`, `ahead`, `dev`, `offline` (with `--offline`), or `unknown`.
 
 Context piping without MCP:
 
@@ -366,7 +367,7 @@ Run with the default seed (`1`):
 
 | Arm | Median tokens | P10-P90 tokens | Median coverage | Negative-control median tokens |
 | --- | ---: | ---: | ---: | ---: |
-| deja-recall | 278 | 278-278 | 1.00 | 0 |
+| deja-recall | 286 | 286-286 | 1.00 | 0 |
 | full-history | 16,919 | 11,899-22,092 | 1.00 | 14,920 |
 | naive-grep | 57,489 | 40,413-74,837 | 1.00 | 0 |
 | cold | 0 | 0-0 | 0.00 | 0 |

@@ -241,7 +241,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   ],
   "index": {
     "state": "ok",
-    "path": "/home/user/.cache/deja/index.db",
+    "path": "/home/user/.cache/deja",
     "stale_stores": 0
   },
   "mcp": [
@@ -269,8 +269,10 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
 }
 ```
 
-`embed` and `ingest_health` are omitted when unavailable. Store `state` values
-include `ok`, `missing`, `empty`, `unreadable`, and `parsed-zero`.
+`embed` and `ingest_health` are omitted when unavailable. `index.path` is the
+index directory, not a single file. Store `state` values include `ok`,
+`missing`, `empty`, `unreadable`, and `parsed-zero`. Version `state` is `ok`,
+`update-available`, `ahead`, `dev`, `offline` (under `--offline`), or `unknown`.
 
 ## `deja blame <path> --json`
 
