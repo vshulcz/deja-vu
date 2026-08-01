@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
@@ -43,23 +44,47 @@ type precompactHookInput struct {
 	Trigger        string `json:"trigger"`
 }
 
+// hookStdinWait bounds how long any hook waits for its payload.
+const hookStdinWait = 300 * time.Millisecond
+
 // readHookStdin reads the hook payload without trusting the host to close
 // stdin. Codex keeps the pipe open and silent, and a hook that blocks on
 // stdin hangs the whole session start — the harness then disables the hook
 // and the user just sees memory quietly stop working.
 func readHookStdin() []byte {
-	in := os.Stdin // capture before the goroutine: tests swap the global
-	ch := make(chan []byte, 1)
+	return readHookPayload(os.Stdin, hookStdinWait) // os.Stdin read here: tests swap the global
+}
+
+// readHookPayload reads at most 1MB from r and gives up after wait, keeping
+// whatever arrived by then. Waiting for EOF is waiting for the host: a payload
+// can be complete on the wire while the pipe stays open behind it (#846).
+func readHookPayload(r io.Reader, wait time.Duration) []byte {
+	var mu sync.Mutex
+	var buf []byte
+	done := make(chan struct{})
 	go func() {
-		b, _ := io.ReadAll(io.LimitReader(in, 1<<20))
-		ch <- b
+		defer close(done)
+		lr := io.LimitReader(r, 1<<20)
+		chunk := make([]byte, 32<<10)
+		for {
+			n, err := lr.Read(chunk)
+			if n > 0 {
+				mu.Lock()
+				buf = append(buf, chunk[:n]...)
+				mu.Unlock()
+			}
+			if err != nil {
+				return
+			}
+		}
 	}()
 	select {
-	case b := <-ch:
-		return b
-	case <-time.After(300 * time.Millisecond):
-		return nil
+	case <-done:
+	case <-time.After(wait):
 	}
+	mu.Lock()
+	defer mu.Unlock()
+	return append([]byte(nil), buf...)
 }
 
 // runHookPrecompact is deliberately best effort: Claude must be able to
