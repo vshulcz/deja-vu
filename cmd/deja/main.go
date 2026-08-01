@@ -27,10 +27,27 @@ func main() {
 	stopProfiling := startProfiling()
 	if err := run(os.Args[1:]); err != nil {
 		stopProfiling()
-		fmt.Fprintln(os.Stderr, "deja:", err)
+		fmt.Fprintln(os.Stderr, "deja:", rebuildWindowError(err))
 		os.Exit(1)
 	}
 	stopProfiling()
+}
+
+// rebuildInProgress is a seam: a test can put the process in the window
+// without racing a real rebuild.
+var rebuildInProgress = index.RebuildInProgress
+
+// rebuildWindowError names the one state that looks like a broken store and is
+// not: a rebuild recreates the index directory, and a reader that lands in that
+// window gets `open …/manifest.gob: no such file or directory` (#822).
+func rebuildWindowError(err error) error {
+	if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if !rebuildInProgress(index.DefaultDir()) {
+		return err
+	}
+	return fmt.Errorf("the index is being rebuilt right now — run this again in a moment")
 }
 
 func loadAll(h string) []model.Session {

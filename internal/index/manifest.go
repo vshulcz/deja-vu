@@ -185,6 +185,25 @@ func Damaged(dir string) bool {
 	return !recordsIntact(dir, m)
 }
 
+// RebuildInProgress reports whether another process holds the index lock. A
+// rebuild recreates the directory, so a reader can land in a window where the
+// manifest does not exist and get the syscall for it — a moment mistaken for a
+// broken store (#822).
+func RebuildInProgress(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return false
+	}
+	if ok {
+		unlock()
+		return false
+	}
+	return true
+}
+
 // OverviewStats is what the brief needs about a whole store.
 type OverviewStats struct {
 	Sessions      int
