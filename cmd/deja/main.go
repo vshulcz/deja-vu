@@ -321,7 +321,14 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 				fmt.Fprintf(os.Stderr, "deja: %d sessions share the id %q — showing the most recent; use --harness %s\n",
 					len(hs), o.id, strings.Join(hs, "|"))
 			} else {
-				fmt.Fprintf(os.Stderr, "deja: %d sessions start with %q — showing the most recent; use a longer prefix for another\n", n, o.id)
+				// "A longer prefix" is not available when the reader copied an
+				// elided id off a result line: the characters that would
+				// disambiguate are the ones the elision replaced (#859).
+				advice := "use a longer prefix for another"
+				if strings.Contains(o.id, "…") {
+					advice = "the ids differ in the middle the line elides — `deja last` prints them whole"
+				}
+				fmt.Fprintf(os.Stderr, "deja: %d sessions match %q — showing the most recent; %s\n", n, o.id, advice)
 			}
 		}
 	}
@@ -1432,6 +1439,13 @@ func runForget(dir string, args []string) error {
 	// A dry run changes nothing, so reporting it in the past tense — the same
 	// three lines the real command prints — tells the reader their sessions are
 	// gone when they are not.
+	// An id copied off a result line can stand for more than one session — the
+	// characters that would tell them apart are the ones the line elided. A
+	// destructive command must not drop twice what the reader named once
+	// (#859).
+	if o.Session != "" && strings.Contains(o.Session, "…") && result.Sessions > 1 {
+		return fmt.Errorf("%q matches %d sessions — the ids differ in the middle the line elides; `deja last` prints them whole", o.Session, result.Sessions)
+	}
 	if o.DryRun {
 		fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
 			result.Sessions, result.Messages, result.Tombstones)
