@@ -28,8 +28,13 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			last = true
 		default:
 			x, err := strconv.Atoi(a)
-			if err != nil || x <= 0 {
+			if err != nil {
 				return fmt.Errorf("log: unknown flag %q", a)
+			}
+			// A number is not a flag, and saying so sends the reader looking
+			// for a flag they never typed (#733).
+			if x <= 0 {
+				return fmt.Errorf("log: how many entries to show must be positive, got %q", a)
 			}
 			n = x
 		}
@@ -56,6 +61,13 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 	}
 	events := usage.Events(dir, n)
 	if jsonOut {
+		// A nil slice encodes as null, and null is not an empty list: len()
+		// raises, iteration raises, `jq '.[]'` errors. Every other
+		// machine-readable output in deja keeps its shape when there is
+		// nothing to report, and this is the one a script polls (#733).
+		if events == nil {
+			events = []usage.Event{}
+		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(events)
