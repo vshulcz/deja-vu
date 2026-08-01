@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"time"
@@ -79,6 +81,12 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		title = firstLine(text)
 	}
 	if err := sources.AppendPromotedTagged(s.Project, title, text, src, state, tags, time.Now()); err != nil {
+		// A decision the user wants to keep is what this command exists for,
+		// and `open …: permission denied` names a syscall and nothing to do
+		// about it — while index and forget both say what to change (#806).
+		if errors.Is(err, fs.ErrPermission) {
+			return fmt.Errorf("cannot write %s — check that file and its directory's permissions, or set DEJA_NOTES_FILE somewhere writable", sources.NotesFile())
+		}
 		return err
 	}
 	if exportPath != "" {
