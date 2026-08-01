@@ -30,8 +30,60 @@ type ForgetResult struct {
 	// Notes is how many of Sessions were promoted notes rather than raw
 	// transcripts. They are the decisions the user deliberately kept, so one
 	// combined number reads as "four conversations" when half of it is their
-	// own записи.
+	// own writing.
 	Notes int
+	// Peers names the hosts a forgotten session was already pushed to, and
+	// Exported reports the same for unnamed directory exports. Forgetting
+	// removes the local copy and keeps the session out of later pushes, but it
+	// cannot reach a machine that already has it — and saying nothing read as
+	// "it is gone everywhere" (#788).
+	Peers    []string
+	Exported bool
+}
+
+// pushedTo reports where records from the matched sessions have already gone.
+// A watermark at or past a session's earliest record means that session was in
+// a push: watermarks are keyed by peer and by the source file, and a session's
+// Path is that source.
+func pushedTo(m Manifest, matched map[string]bool) ([]string, bool) {
+	if len(m.ExportWatermarks) == 0 {
+		return nil, false
+	}
+	peers := map[string]bool{}
+	unnamed := false
+	for key := range matched {
+		meta, ok := m.Sessions[key]
+		if !ok {
+			continue
+		}
+		from := meta.Started
+		if from.IsZero() {
+			from = meta.Updated
+		}
+		for wk, wm := range m.ExportWatermarks {
+			peer, source, named := strings.Cut(wk, "\x00")
+			if !named {
+				peer, source = "", wk
+			}
+			if source != meta.Path && source != key {
+				continue
+			}
+			if from.IsZero() || wm < from.UnixNano() {
+				continue
+			}
+			if peer == "" {
+				unnamed = true
+			} else {
+				peers[peer] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(peers))
+	for p := range peers {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out, unnamed
 }
 
 func privacyDir() string {
@@ -220,6 +272,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		return result, nil
 	}
 	sort.Strings(result.Keys)
+	result.Peers, result.Exported = pushedTo(m, matched)
 	// Count the messages on the dry run too. It is the same single pass over
 	// records, and without it `--dry-run` answers "0 messages" to the only
 	// question it exists to answer: how much am I about to lose.

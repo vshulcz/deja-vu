@@ -1360,6 +1360,14 @@ func runForget(dir string, args []string) error {
 		return nil
 	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
+	// Forgetting keeps the session out of later pushes but cannot reach a
+	// machine that already has it. Three lines about what was dropped read as
+	// "it is gone everywhere" to someone forgetting a customer name (#788).
+	if len(result.Peers) > 0 {
+		fmt.Fprintf(os.Stdout, "already pushed to %s — forgetting here does not remove it there\n", strings.Join(result.Peers, ", "))
+	} else if result.Exported {
+		fmt.Fprintln(os.Stdout, "already exported once — forgetting here does not remove copies elsewhere")
+	}
 	// The notes are decisions the reader deliberately kept, so folding them
 	// into the session count reads as "four conversations" when half of it is
 	// their own writing (#690).
