@@ -1349,9 +1349,19 @@ func runForget(dir string, args []string) error {
 		for _, k := range result.Keys {
 			dropped[k] = true
 		}
-		if n, err := sources.ForgetPromotedTitles(func(src string) bool {
+		n, err := sources.ForgetPromotedTitles(func(src string) bool {
 			return dropped[src]
-		}); err == nil && n > 0 {
+		})
+		switch {
+		case err != nil:
+			// The borrowed title is the forgotten session's first turn — a
+			// customer name in the case that found this (#666, #690). Dropping
+			// the error left three success lines standing over a line still on
+			// disk, which is the one thing the privacy command must not do
+			// (#804).
+			fmt.Fprintf(os.Stdout, "could not clear the title borrowed from the forgotten session%s: %v\n", pluralS(len(result.Keys)), err)
+			fmt.Fprintf(os.Stdout, "it is still in %s — fix that file's permissions and run this again\n", sources.NotesFile())
+		case n > 0:
 			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s\n", n, pluralS(n))
 		}
 	}
