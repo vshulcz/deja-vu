@@ -1321,3 +1321,39 @@ func TestShowAcceptsAPrefixWithHarness(t *testing.T) {
 		t.Fatal("served a session from the wrong harness")
 	}
 }
+
+// A wrong guess at a command name falls through to search, where the advice is
+// to use fewer words — which cannot help someone who was not searching (#674).
+func TestCommandHint(t *testing.T) {
+	cases := []struct{ query, want string }{
+		{"stat", "stats"},
+		{"serch pool", "search"},
+		{"shwo abc", "show"},
+		{"lasr", "last"},
+		// A real search stays quiet: a hint on every miss is noise that
+		// teaches people to skip the last line.
+		{"moria", ""},
+		{"projects", ""},
+		{"connection pool starving", ""},
+		// Words that are commands never reach the search path as a guess.
+		{"stats", ""},
+		{"search something", ""},
+		{"", ""},
+		{"--json", ""},
+		// Hidden plumbing is not something anyone means to type, so it is not
+		// offered as a suggestion.
+		{"hook-promt", ""},
+	}
+	for _, c := range cases {
+		got := commandHint(c.query)
+		if c.want == "" {
+			if got != "" {
+				t.Errorf("%q: said %q, want silence", c.query, got)
+			}
+			continue
+		}
+		if !strings.Contains(got, "`deja "+c.want+"`") {
+			t.Errorf("%q: said %q, want a pointer at %q", c.query, got, c.want)
+		}
+	}
+}

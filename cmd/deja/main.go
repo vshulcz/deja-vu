@@ -507,9 +507,54 @@ func printStemmed(w io.Writer, variants map[string][]string) {
 func printNoMatches(w io.Writer, dir, q string) {
 	if n, err := index.SessionCount(dir); err == nil {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
-		return
+	} else {
+		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
 	}
-	fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
+	// The first thing anyone types is a guess at a command name, and a wrong
+	// guess falls through to search — where the advice is to use fewer words,
+	// which cannot help someone who was not searching (#674). Falling through
+	// stays the default; an empty result is where the other reading is worth
+	// naming.
+	if hint := commandHint(q); hint != "" {
+		fmt.Fprint(w, hint)
+	}
+}
+
+// commandHint reads an empty search as a possible mistyped subcommand. It
+// stays quiet unless a command name is within one edit of the first word: an
+// empty search is usually an empty search, and a hint on every miss is noise
+// that teaches people to skip the last line.
+func commandHint(q string) string {
+	first, _, _ := strings.Cut(strings.TrimSpace(q), " ")
+	if first == "" || strings.HasPrefix(first, "-") {
+		return ""
+	}
+	low := strings.ToLower(first)
+	if _, ok := commands[low]; ok {
+		return "" // reached search only because it was used as a word
+	}
+	for _, name := range []string{"search", "show", "last", "aider", "goose"} {
+		if low == name {
+			return ""
+		}
+	}
+	// The switch in run() handles these before the map is consulted, so the
+	// map alone would miss the commonest words of all — "serch" landed on
+	// "bench" while `search` was one letter away.
+	names := []string{"search", "show", "last", "aider", "goose"}
+	for name := range commands {
+		// Hidden plumbing is not something anyone means to type.
+		if strings.HasPrefix(name, "-") || strings.HasPrefix(name, "hook-") {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	near := nearestTarget(first, names)
+	if near == "" {
+		return ""
+	}
+	return fmt.Sprintf("deja: %q is not a command — did you mean `deja %s`?\n", first, near)
 }
 
 // activeFilters names the filters a caller set, so an empty result can say
