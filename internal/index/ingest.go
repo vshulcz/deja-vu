@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -282,7 +283,13 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+			owns, collided := attributeSession(m.Sessions[key], s)
+			if collided {
+				collisions.Add(1)
+			}
+			if owns {
+				m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+			}
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
@@ -440,6 +447,14 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	return ss
 }
 
+// ReportCollisions returns how many transcripts shared an id with another since
+// the last build, and clears the counter. Silence was the worst part of #698:
+// the indexer counted every session on disk while the manifest held fewer, and
+// nothing connected the two numbers.
+func ReportCollisions() int {
+	return int(collisions.Swap(0))
+}
+
 func rebuildForSearch(dir string, o query.Options, scope string, files map[string]FileState, progress io.Writer) error {
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
@@ -509,7 +524,13 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+			owns, collided := attributeSession(m.Sessions[key], s)
+			if collided {
+				collisions.Add(1)
+			}
+			if owns {
+				m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+			}
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
@@ -989,6 +1010,45 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 	}
 }
 
+// sortedKeys makes a map iteration reproducible.
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// collidedIDs counts sessions that share harness:id with a transcript at a
+// different path.
+//
+// Identity is harness:id and nothing guarantees it is unique: two files named
+// session-1.jsonl in different projects produce one manifest row, and which
+// transcript's project and title it carried used to depend on map order — so
+// the same store described a conversation differently between two builds
+// (#698). Both conversations stay searchable; what is at stake is which
+// project they are filed under, and the trust policy, --project and the
+// exclude patterns all key on that.
+//
+// Qualifying the key with the path was tried and reverted: records already on
+// disk carry the old key, so an incremental pass that reassigned one dropped
+// the session it renamed.
+// collisions counts the transcripts that shared an id with another during the
+// current build. The two full-build paths index sessions in parallel, so the
+// counter is atomic.
+var collisions atomic.Int64
+
+// attributeSession decides which of two transcripts sharing an id owns the
+// manifest row, and whether they collided at all. Lexicographically smallest
+// path wins, so the answer does not depend on which file was read first.
+func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
+	if held.Path == "" || s.Path == "" || held.Path == s.Path {
+		return true, false
+	}
+	return s.Path < held.Path, true
+}
+
 func sessionTitle(s model.Session) string {
 	for _, msg := range s.Messages {
 		if msg.Role != "user" {
@@ -1326,7 +1386,20 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			nextOrd++
 			ord = nextOrd
 		}
-		m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+		held, ok := m.Sessions[key]
+		if !ok {
+			// The row may exist only in the manifest being replaced.
+			held = old.Sessions[key]
+		}
+		owns, collided := attributeSession(held, s)
+		if collided {
+			collisions.Add(1)
+		}
+		if owns {
+			m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+		} else if _, present := m.Sessions[key]; !present {
+			m.Sessions[key] = held
+		}
 		for _, msg := range s.Messages {
 			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 				continue
@@ -1429,7 +1502,10 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		m.Sessions = map[string]SessionMeta{}
 	}
 	filesTouched, messages := 0, 0
-	for p := range changed {
+	// Sorted, not map order: two sessions can claim the same harness:id, and
+	// which one wins decided the project a whole conversation was filed under
+	// — differently on every run (#698).
+	for _, p := range sortedKeys(changed) {
 		ss, err := parseAppendedFile(harness, p, old.Files[p])
 		if err != nil {
 			if of, ok := old.Files[p]; ok {
@@ -1453,10 +1529,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			if s.Updated.After(meta.Updated) {
 				meta.Updated = s.Updated
 			}
-			if s.Project != "" && s.Project != "-" {
+			owns, collided := attributeSession(meta, s)
+			if collided {
+				collisions.Add(1)
+			}
+			if s.Project != "" && s.Project != "-" && owns {
 				meta.Project = s.Project
 			}
-			if s.Path != "" {
+			if s.Path != "" && owns {
 				meta.Path = s.Path
 			}
 			if meta.Title == "" {

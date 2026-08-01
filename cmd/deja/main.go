@@ -194,6 +194,14 @@ func cmdIndex(dir string, rest []string) error {
 		return err
 	}
 	clearWarmupSentinel()
+	// Two transcripts can carry the same harness:id — two files with the same
+	// name in different projects. Both stay searchable, but one manifest row
+	// holds them, so one project name covers both. Silence was the worst part
+	// of it: the indexer counted every session on disk while the manifest held
+	// fewer, and nothing connected the two numbers (#698).
+	if n := index.ReportCollisions(); n > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d session%s share an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n))
+	}
 	maybeFirstIndexGreeting(dir)
 	return nil
 }
