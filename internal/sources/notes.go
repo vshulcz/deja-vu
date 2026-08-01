@@ -110,18 +110,30 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		project, _ := m["project"].(string)
 		text, _ := m["text"].(string)
 		t, parseErr := time.Parse(time.RFC3339Nano, ts)
-		if parseErr != nil || strings.TrimSpace(project) == "" || strings.TrimSpace(text) == "" {
+		if parseErr != nil || strings.TrimSpace(text) == "" {
 			return
 		}
+		// A note written before deja recorded a project — or by a caller that
+		// omitted it — is still the user's own decision, and the one class of
+		// content deja cannot re-derive from anything else. It used to vanish
+		// at index time with nothing reported (#771).
 		project = strings.TrimSpace(project)
+		if project == "" {
+			project = "notes"
+		}
 		if kind, _ := m["kind"].(string); kind == "promoted" {
 			// One session per promoted source session; corrections append as
 			// further messages and the title tracks the latest state.
 			src, _ := m["session"].(string)
 			state, _ := m["state"].(string)
 			title, _ := m["title"].(string)
-			if src == "" || !NoteStates[state] {
+			if src == "" {
 				return
+			}
+			// Older promoted notes carry no state; the state is how the note is
+			// labelled, not whether it is a note (#771).
+			if !NoteStates[state] {
+				state = "accepted"
 			}
 			key := "promoted\x00" + src
 			s := byDay[key]
