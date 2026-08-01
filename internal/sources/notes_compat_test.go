@@ -47,6 +47,13 @@ func TestParseNotesKeepsOlderShapes(t *testing.T) {
 			t.Errorf("kept %q, which has nothing to attach to", unwanted)
 		}
 	}
+	// Dropping it is right; dropping it invisibly is not. A promoted line with
+	// no source used to leave no trace at all — not in the index, not in the
+	// skipped count (#814).
+	malformed, _ := DiagSnapshot()
+	if malformed[path] == 0 {
+		t.Errorf("a promoted note with no source was dropped without being counted")
+	}
 	// A note with no project is filed under one rather than losing its home.
 	var found bool
 	for _, s := range ss {

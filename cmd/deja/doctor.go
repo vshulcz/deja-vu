@@ -713,7 +713,10 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	sort.Strings(names)
 	for _, h := range names {
 		e := health[h]
-		fmt.Fprintf(w, "  ingest   %s: %d malformed lines skipped, %d files failed — see `deja doctor --json`\n", h, e.MalformedLines, e.FailedFiles)
+		// "malformed" covered only unparseable lines; valid JSON deja cannot
+		// use is skipped just as invisibly, and the reader needs the same
+		// warning either way (#814).
+		fmt.Fprintf(w, "  ingest   %s: %d unusable lines skipped, %d files failed — see `deja doctor --json`\n", h, e.MalformedLines, e.FailedFiles)
 	}
 }
 

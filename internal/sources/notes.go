@@ -128,6 +128,11 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 			state, _ := m["state"].(string)
 			title, _ := m["title"].(string)
 			if src == "" {
+				// Valid JSON deja cannot use: a promoted note has nothing to
+				// attach to without its source session. Dropping it is right,
+				// counting it as dropped is the part that was missing — the
+				// line vanished with no trace anywhere (#814).
+				diagMalformedLine(path)
 				return
 			}
 			// Older promoted notes carry no state; the state is how the note is
