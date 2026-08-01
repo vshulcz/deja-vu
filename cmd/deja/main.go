@@ -647,6 +647,16 @@ func termCountLine(dir, q string) string {
 // their query missed. It fired on every ordinary miss, so the signature could
 // not be used to recognise the failure it was written for (#637).
 func printNoMatches(w io.Writer, dir, q string) {
+	// Nothing to look up: very short tokens are dropped and punctuation is
+	// trimmed, so this query never reached the index. "Try fewer words"
+	// cannot be followed with one word, or none (#828). The message does not
+	// state the rule — the cut is on bytes, so "л" and "舵" are long enough
+	// while "p" is not, and a rule that reads false to half the world's
+	// alphabets is worse than none.
+	if len(query.Tokens(q)) == 0 {
+		fmt.Fprintf(w, "deja: nothing to search for in %q — every word in it is too short to look up\n", q)
+		return
+	}
 	if n, err := index.SessionCount(dir); err == nil {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
 	} else {
