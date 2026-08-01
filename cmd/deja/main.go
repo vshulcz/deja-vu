@@ -499,10 +499,15 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	}
 	if len(hits) == 0 {
 		// The policy is named before the generic advice: "try fewer words" is
-		// wrong counsel for someone whose words were fine (#680).
-		if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
+		// wrong counsel for someone whose words were fine (#680). A filter the
+		// caller set is the same kind of fact, and `deja last` has named it all
+		// along (#715).
+		switch note := policyHiddenNote(policy.ActivationSearch, policyHidden); {
+		case note != "":
 			fmt.Fprint(os.Stderr, note)
-		} else {
+		case activeFilters(o, "") != "":
+			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, ""))
+		default:
 			printNoMatches(os.Stderr, dir, o.Query)
 		}
 	}
@@ -585,6 +590,13 @@ func commandHint(q string) string {
 		return ""
 	}
 	low := strings.ToLower(first)
+	// A one- or two-letter word is a word, not a mistyped command name. Any
+	// prefix counts as "near" — so "a" reached `deja aider` and every sentence
+	// starting with a short word got a hint (#715, my own regression from
+	// #674).
+	if len([]rune(low)) < 4 {
+		return ""
+	}
 	if _, ok := commands[low]; ok {
 		return "" // reached search only because it was used as a word
 	}
