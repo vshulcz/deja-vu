@@ -1030,9 +1030,14 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 	if err != nil {
 		return ss
 	}
-	have := make(map[string]bool, len(ss))
-	for _, s := range ss {
-		have[s.Harness+":"+s.ID] = true
+	// Where each session sits, not merely whether it is here: search returns
+	// sessions with only their matching messages attached, so one that matched
+	// on speech arrives with its `files` record stripped. Skipping it as
+	// "already present" is how mentioning the subject removed a session from
+	// its own file's blame (#723) — it has to be replaced by the full record.
+	at := make(map[string]int, len(ss))
+	for i, s := range ss {
+		at[s.Harness+":"+s.ID] = i
 	}
 	base := strings.ToLower(filepath.Base(target.FullPath))
 	// Newest first, so the cap below keeps the sessions a "who last worked on
@@ -1049,17 +1054,19 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 			break
 		}
 		key := meta.Harness + ":" + meta.ID
-		if have[key] {
-			continue
-		}
 		for _, p := range meta.Touched {
 			if strings.ToLower(filepath.Base(filepath.FromSlash(p))) != base {
 				continue
 			}
 			full, ok, err := index.FindByIdentity(dir, meta.Harness, meta.ID)
 			if err == nil && ok {
-				ss = append(ss, full)
-				have[key] = true
+				// The manifest is keyed by identity, so each session reaches
+				// this once — there is no second visit to record a position for.
+				if i, present := at[key]; present {
+					ss[i] = full
+				} else {
+					ss = append(ss, full)
+				}
 				added++
 			}
 			break

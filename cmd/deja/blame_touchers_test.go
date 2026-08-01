@@ -98,3 +98,46 @@ func TestBlameTouchersMatchTheWholeName(t *testing.T) {
 		t.Errorf("poolmanager.go answered a blame for pool.go: %#v", hits)
 	}
 }
+
+// Search returns sessions with only their matching messages attached, so one
+// that matched on speech arrives with its `files` record stripped — and #688
+// skipped it as "already present". Mentioning the subject in the same session
+// therefore removed it from that file's blame (#723).
+func TestBlameFindsASessionThatBothMentionsAndTouchesTheFile(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-p")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	edited := filepath.ToSlash(filepath.Join(tmp, "repo", "internal", "parser.go"))
+	b, _ := json.Marshal(map[string]any{"file_path": edited, "old_string": "a", "new_string": "b"})
+	body := `{"type":"user","sessionId":"s2","cwd":"/w/p","timestamp":"2026-07-21T10:00:00Z","message":{"role":"user","content":"the parser choked on a nested block"}}` + "\n" +
+		`{"type":"assistant","sessionId":"s2","cwd":"/w/p","timestamp":"2026-07-21T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":` + string(b) + `}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "s2.jsonl"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	target, err := search.ResolveBlamePath("parser.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].Session.ID != "s2" {
+		t.Fatalf("hits = %#v — the session that edited the file is missing", hits)
+	}
+	// One session, one row: replacing the trimmed copy must not duplicate it.
+	seen := map[string]int{}
+	for _, h := range hits {
+		seen[h.Session.ID]++
+	}
+	if seen["s2"] != 1 {
+		t.Errorf("session appears %d times", seen["s2"])
+	}
+}
