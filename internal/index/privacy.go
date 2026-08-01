@@ -224,7 +224,11 @@ func filterTombstonedSet(ss []model.Session, dead map[string]bool) []model.Sessi
 }
 
 func sessionMatches(meta SessionMeta, o ForgetOptions) bool {
-	if o.Session != "" && !strings.HasPrefix(meta.ID, o.Session) {
+	// The same reading of an id as everywhere else: a result line elides the
+	// middle of a long one, and forget was the last command that would not take
+	// what the reader copied off the screen — answering "nothing was changed"
+	// on a session that is there (#855).
+	if o.Session != "" && !strings.HasPrefix(meta.ID, o.Session) && !idMatchesElided(meta.ID, o.Session) {
 		return false
 	}
 	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
@@ -349,7 +353,9 @@ func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 			if i := strings.IndexByte(key, ':'); i >= 0 {
 				id = key[i+1:]
 			}
-			match = key == prefix || strings.HasPrefix(id, prefix)
+			// Same widening as the forget selector: the id a reader copies off
+			// a result line carries the elision (#855).
+			match = key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix)
 		}
 		if match {
 			delete(set, key)

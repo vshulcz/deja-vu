@@ -1004,10 +1004,22 @@ func PrefixMatches(dir, p string) int {
 // a tail rather than a prefix (#707) — and it carries the "…" itself, which
 // appears in no id, so a prefix or substring test can never hit it (#853).
 func idLooselyMatches(id, p string) bool {
-	if head, tail, ok := strings.Cut(p, "…"); ok {
-		return strings.HasPrefix(id, head) && strings.HasSuffix(id, tail)
+	if idElided(p) {
+		return idMatchesElided(id, p)
 	}
 	return strings.Contains(id, p)
+}
+
+// idElided reports whether p is an id as a result line printed it.
+func idElided(p string) bool { return strings.Contains(p, "…") }
+
+// idMatchesElided reads the printed form back: the head and tail it stands for.
+// A destructive selector takes only this half of idLooselyMatches — a substring
+// selector would make `forget --session s1` also match `deja-note-claude-s1`
+// and destroy the decision #690 and #841 keep (#855).
+func idMatchesElided(id, p string) bool {
+	head, tail, ok := strings.Cut(p, "…")
+	return ok && strings.HasPrefix(id, head) && strings.HasSuffix(id, tail)
 }
 
 // PrefixHarnesses names the harnesses holding a session whose id is exactly the
