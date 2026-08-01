@@ -29,6 +29,7 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 	}
 
 	// Pretend the binary was somewhere else when the configs were written.
+	moved := wired.Exe
 	wired.Exe = filepath.Join(home, "old-location", "deja")
 	b, err := json.Marshal(wired)
 	if err != nil {
@@ -42,7 +43,7 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(claudeJSON, []byte(strings.ReplaceAll(string(before), wired.Exe, filepath.Join(home, "old-location", "deja"))), 0o644); err != nil {
+	if err := os.WriteFile(claudeJSON, []byte(strings.ReplaceAll(string(before), moved, wired.Exe)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
