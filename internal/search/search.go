@@ -419,16 +419,34 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		doc.hit.Score = score
 		hits = append(hits, doc.hit)
 	}
+	sortHits(hits)
+	return hits
+}
+
+// sortHits orders a ranked result set.
+func sortHits(hits []Hit) {
 	sort.Slice(hits, func(i, j int) bool {
 		if hits[i].Score == hits[j].Score {
 			if hits[i].Session.Updated.Equal(hits[j].Session.Updated) {
+				// Same evidence, same moment: prefer this machine's own work.
+				// The tie used to fall to the id, and "imported-…" sorts ahead
+				// of most session ids — so a peer's copy outranked the local
+				// session for no reason anyone chose (#711).
+				if li, lj := isLocalProject(hits[i].Session.Project), isLocalProject(hits[j].Session.Project); li != lj {
+					return li
+				}
 				return hits[i].Session.ID < hits[j].Session.ID
 			}
 			return hits[i].Session.Updated.After(hits[j].Session.Updated)
 		}
 		return hits[i].Score > hits[j].Score
 	})
-	return hits
+}
+
+// isLocalProject reports whether a session came from this machine. Imported
+// sessions carry the peer prefix the sync path gives them.
+func isLocalProject(project string) bool {
+	return !strings.HasPrefix(project, "imported:")
 }
 
 func freshnessDecay(updated, now time.Time) float64 {
