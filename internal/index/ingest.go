@@ -428,6 +428,13 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	var ss []model.Session
 	for _, r := range results {
 		if len(r.ss) == 0 {
+			// A harness deja can see but could not read is worth a line: an
+			// index run that narrates every store it read and stays silent
+			// about the one it skipped makes an empty deja look like an empty
+			// history (#794).
+			if reason := sources.SkipReason(r.name); reason != "" && progress != nil && !SuppressHarnessNarration {
+				fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
+			}
 			continue
 		}
 		ss = append(ss, r.ss...)
