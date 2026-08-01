@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -360,5 +361,62 @@ func TestPromptHookAcceptsBothPromptShapes(t *testing.T) {
 	}
 	if in.Prompt != "" {
 		t.Fatalf("unknown shape produced %q", in.Prompt)
+	}
+}
+
+// heldPipe delivers head and then keeps the pipe open, the way a host that
+// never closes the hook's stdin does.
+type heldPipe struct {
+	head []byte
+	stop chan struct{}
+}
+
+func (h *heldPipe) Read(p []byte) (int, error) {
+	if len(h.head) > 0 {
+		n := copy(p, h.head)
+		h.head = h.head[n:]
+		return n, nil
+	}
+	<-h.stop
+	return 0, io.EOF
+}
+
+// This hook runs on every user message, so a host holding stdin open stalls
+// every turn until the harness kills it (#846).
+func TestHookPromptDoesNotWaitForTheHostToCloseStdin(t *testing.T) {
+	withStatsStores(t)
+	for name, head := range map[string]string{
+		"silent":    "",
+		"truncated": `{"session_id":"s","prompt":"gateway_timeout on the`,
+		"complete":  `{"session_id":"s","prompt":"gateway_timeout on the reconnect_loop"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			stop := make(chan struct{})
+			t.Cleanup(func() { close(stop) })
+			done := make(chan error, 1)
+			go func() {
+				done <- runHookPrompt(index.DefaultDir(), &heldPipe{head: []byte(head), stop: stop}, io.Discard)
+			}()
+			select {
+			case err := <-done:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("hook still blocked on stdin after 5s")
+			}
+		})
+	}
+}
+
+// A payload can be complete on the wire while the pipe stays open behind it;
+// giving up on the deadline must not throw away what already arrived.
+func TestReadHookPayloadKeepsWhatArrivedBeforeTheDeadline(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+	payload := `{"session_id":"s","prompt":"gateway_timeout"}`
+	got := readHookPayload(&heldPipe{head: []byte(payload), stop: stop}, 200*time.Millisecond)
+	if string(got) != payload {
+		t.Fatalf("payload = %q, want %q", got, payload)
 	}
 }
