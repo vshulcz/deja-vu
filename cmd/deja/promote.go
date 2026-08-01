@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -90,9 +91,15 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if exportPath != "" {
-		if err := exportPromoted(exportPath, title, text, src, state, s.Updated); err != nil {
+		masked, err := exportPromoted(exportPath, title, text, src, state, s.Updated)
+		if err != nil {
 			return err
 		}
+		// The one outbound path that said nothing: `--to` exists to hand a
+		// decision to someone, and `share` and `sync export` both end with this
+		// floor. The note is the user's own writing, so the text is not
+		// rewritten — the warning is what was missing (#848).
+		fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this file. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked, pluralS(masked))
 	}
 	fmt.Fprintf(stdout, "promoted %s as %s: %s\n", src, state, title)
 	if state == "accepted" {
@@ -157,10 +164,19 @@ func firstLine(s string) string {
 
 // exportPromoted appends a Markdown block to a repo-visible notes file.
 // Append-only like the store: a correction adds a new block below the old.
-func exportPromoted(path, title, text, src, state string, updated time.Time) error {
+// exportPromoted appends the note to a file meant for someone else, and reports
+// how many secrets the redaction pass replaced on the way out — the same floor
+// `share` and `sync export` print, on the path that had none (#848).
+func exportPromoted(path, title, text, src, state string, updated time.Time) (int, error) {
+	body, counts := redact.Text(title + "\n" + text)
+	masked := strings.Count(body, redact.Marker)
+	for _, n := range counts {
+		masked += n
+	}
+	title, text, _ = strings.Cut(body, "\n")
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer func() { _ = f.Close() }()
 	day := updated.UTC().Format("2006-01-02")
@@ -168,5 +184,5 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) err
 		day = time.Now().UTC().Format("2006-01-02")
 	}
 	_, err = fmt.Fprintf(f, "\n## %s\n\n- state: %s\n- source: %s (%s)\n\n%s\n", title, state, src, day, text)
-	return err
+	return masked, err
 }
