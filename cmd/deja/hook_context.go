@@ -280,6 +280,13 @@ func cachedHookDigest(dir string) (string, int, int64, []string) {
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
 		return "", 0, 0, nil
 	}
+	// Before the cache read: a hit returns without reaching the version guard
+	// in hookDigestResult, so an index left behind by an upgrade was served
+	// stale and never rebuilt (#777). The cached digest is still the user's
+	// own history, so serve it — just ask for the rebuild too.
+	if index.HasManifest(dir) && !index.IsCurrentVersion(dir) {
+		requestWarmup(dir)
+	}
 	gate := hookGate()
 	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {

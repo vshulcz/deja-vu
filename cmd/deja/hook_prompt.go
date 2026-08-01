@@ -94,7 +94,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if len(terms) < 2 {
 		return nil
 	}
-	if !index.HasManifest(dir) {
+	// Version, not just presence: terms hash into buckets an index from
+	// another format never wrote, so a stale store answers every prompt with
+	// nothing and looks exactly like a user with no history (#777).
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) {
+		requestWarmup(dir)
 		return nil
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
