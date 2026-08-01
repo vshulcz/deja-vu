@@ -279,6 +279,7 @@ func Import(dir, inDir string) (int, error) {
 	recsByKey := map[string][]Record{}
 	metas := map[string]SessionMeta{}
 	titleAt := map[string]time.Time{} // key -> time of the turn the title came from
+	titleRankOf := map[string]int{}   // key -> how good that turn was as a title
 	added := 0
 	for _, p := range paths {
 		if err := readSyncFile(p, func(sr SyncRecord) error {
@@ -327,10 +328,15 @@ func Import(dir, inDir string) (int, error) {
 			// arrived, the one line that makes the list readable did not (#670).
 			// Derive it the way ingest does, from the earliest user turn that is
 			// speech rather than harness plumbing.
-			if sr.Role == "user" && titleWorthy(strings.TrimSpace(text)) {
-				if at, seen := titleAt[key]; !seen || (!sr.Time.IsZero() && sr.Time.Before(at)) {
+			// A user turn always wins; the assistant's first sentence fills in
+			// when there is none, the same order ingest uses (#692).
+			if rank := titleRank(sr.Role); rank > 0 && titleWorthy(strings.TrimSpace(text)) {
+				better := rank > titleRankOf[key]
+				sameRank := rank == titleRankOf[key] && !sr.Time.IsZero() && sr.Time.Before(titleAt[key])
+				if _, seen := titleAt[key]; !seen || better || sameRank {
 					meta.Title = truncateTitle(strings.TrimSpace(text), 60)
 					titleAt[key] = sr.Time
+					titleRankOf[key] = rank
 				}
 			}
 			metas[key] = meta
@@ -363,6 +369,18 @@ func initEmptyIndex(dir string) error {
 	}
 	m := Manifest{Version: version, Files: currentFiles(""), Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{}}
 	return writeManifest(dir, m)
+}
+
+// titleRank orders the roles a title may come from: a user turn beats the
+// assistant's, and nothing else is a title at all.
+func titleRank(role string) int {
+	switch role {
+	case "user":
+		return 2
+	case "assistant":
+		return 1
+	}
+	return 0
 }
 
 func readSyncFile(path string, fn func(SyncRecord) error) error {

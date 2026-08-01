@@ -751,7 +751,10 @@ func TestRequestedPureCheapIndexCoverageBranches(t *testing.T) {
 		{name: "command", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<command-name>"}, {Role: "user", Text: "next"}}}, want: "next"},
 		{name: "task notification", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<task-notification z"}, {Role: "user", Text: "task"}}}, want: "task"},
 		{name: "teammate", s: model.Session{Messages: []model.Message{{Role: "user", Text: "<teammate-message z"}, {Role: "user", Text: "team"}}}, want: "team"},
-		{name: "caveat", s: model.Session{Messages: []model.Message{{Role: "user", Text: "Caveat: noisy"}, {Role: "assistant", Text: "skip"}}}, want: ""},
+		// The caveat is not a title, and with no other user turn the assistant's
+		// first sentence fills in rather than leaving a blank line (#692).
+		{name: "caveat", s: model.Session{Messages: []model.Message{{Role: "user", Text: "Caveat: noisy"}, {Role: "assistant", Text: "skip"}}}, want: "skip"},
+		{name: "nothing worth naming", s: model.Session{Messages: []model.Message{{Role: "tool-output", Text: "panic: boom"}}}, want: ""},
 	} {
 		t.Run("title "+tc.name, func(t *testing.T) {
 			if got := sessionTitle(tc.s); got != tc.want {

@@ -221,7 +221,9 @@ func TestLastFiltersProjectAndHarness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "[claude · gamma · 2026-01-05 · claude-gamma]") || strings.Contains(out, "assistant-only memory") {
+	// No user turn: the assistant's first sentence is the title, because the
+	// alternative is a row that says nothing at all (#692).
+	if !strings.Contains(out, "[claude · gamma · 2026-01-05 · claude-gamma] assistant-only memory") {
 		t.Fatalf("title-less last output = %q", out)
 	}
 

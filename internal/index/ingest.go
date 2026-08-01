@@ -1000,6 +1000,21 @@ func sessionTitle(s model.Session) string {
 		}
 		return truncateTitle(t, 60)
 	}
+	// No user turn worth naming the session after: a session the agent opened
+	// itself, or one whose prompts are all harness plumbing. The assistant's
+	// first sentence is a worse title than the question that prompted it, and
+	// it is far better than the blank line these sessions used to print in
+	// `deja last` and on the first screen (#692).
+	for _, msg := range s.Messages {
+		if msg.Role != "assistant" {
+			continue
+		}
+		t := strings.TrimSpace(msg.Text)
+		if !titleWorthy(t) {
+			continue
+		}
+		return truncateTitle(t, 60)
+	}
 	return ""
 }
 

@@ -213,10 +213,17 @@ func TestImportGivesSessionsATitle(t *testing.T) {
 		{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "and what about jitter", Time: base.Add(3 * time.Minute)},
 		{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "the retry storm on checkout", Time: base.Add(time.Minute)},
 		{Harness: "claude", SessionID: "s1", Project: "p", Role: "user", Text: "<local-command-stdout>ok</local-command-stdout>", Time: base},
-		// A session whose only user turns are plumbing keeps no title rather
-		// than being named after a slash command's output.
+		// A session whose only user turns are plumbing falls back to the
+		// assistant's first sentence rather than printing a blank line (#692).
 		{Harness: "claude", SessionID: "s2", Project: "p", Role: "user", Text: "<command-name>/clear</command-name>", Time: base},
-		{Harness: "claude", SessionID: "s2", Project: "p", Role: "assistant", Text: "cleared", Time: base.Add(time.Minute)},
+		{Harness: "claude", SessionID: "s2", Project: "p", Role: "assistant", Text: "cleared the branch", Time: base.Add(time.Minute)},
+		// Even when the assistant spoke first, a later user turn still wins.
+		{Harness: "claude", SessionID: "s3", Project: "p", Role: "assistant", Text: "capped the pool", Time: base},
+		{Harness: "claude", SessionID: "s3", Project: "p", Role: "user", Text: "the pool starves", Time: base.Add(time.Minute)},
+		// Two assistant turns: the earlier one is the title, or the last record
+		// in the file decides instead of the clock.
+		{Harness: "claude", SessionID: "s4", Project: "p", Role: "assistant", Text: "started the migration", Time: base},
+		{Harness: "claude", SessionID: "s4", Project: "p", Role: "assistant", Text: "and then rolled it back", Time: base.Add(2 * time.Minute)},
 	})
 	if _, err := Import(dir, batch); err != nil {
 		t.Fatal(err)
@@ -229,22 +236,17 @@ func TestImportGivesSessionsATitle(t *testing.T) {
 	for _, m := range metas {
 		titles[m.ID] = m.Title
 	}
-	if len(titles) != 2 {
-		t.Fatalf("expected two imported sessions, got %#v", titles)
+	if len(titles) != 4 {
+		t.Fatalf("expected four imported sessions, got %#v", titles)
 	}
-	var withTitle, blank int
+	seen := map[string]bool{}
 	for _, ti := range titles {
-		switch ti {
-		case "the retry storm on checkout":
-			withTitle++
-		case "":
-			blank++
-		default:
-			t.Errorf("unexpected title %q", ti)
-		}
+		seen[ti] = true
 	}
-	if withTitle != 1 || blank != 1 {
-		t.Errorf("titles = %#v", titles)
+	for _, want := range []string{"the retry storm on checkout", "cleared the branch", "the pool starves", "started the migration"} {
+		if !seen[want] {
+			t.Errorf("title %q missing from %#v", want, titles)
+		}
 	}
 }
 
