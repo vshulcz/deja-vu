@@ -230,8 +230,16 @@ func Overview(dir string) (OverviewStats, error) {
 		if meta.Updated.After(day) && !meta.Updated.After(now) {
 			o.SessionsToday++
 		}
-		if o.Oldest.IsZero() || (!meta.Updated.IsZero() && meta.Updated.Before(o.Oldest)) {
-			o.Oldest = meta.Updated
+		// Started, not Updated: the earliest bound is when the oldest work
+		// began. A session that ran from January to March last touched the
+		// index in March, and taking that as the floor hid two months of its
+		// own transcript (#786).
+		from := meta.Started
+		if from.IsZero() {
+			from = meta.Updated
+		}
+		if o.Oldest.IsZero() || (!from.IsZero() && from.Before(o.Oldest)) {
+			o.Oldest = from
 		}
 		if meta.Updated.After(o.Newest) {
 			o.Newest = meta.Updated
