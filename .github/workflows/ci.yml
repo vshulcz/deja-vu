@@ -18,6 +18,7 @@ jobs:
   test:
     name: test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -30,7 +31,10 @@ jobs:
           cache: false
       - run: go mod verify
       - run: go vet ./...
-      - run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      # -timeout below the job's own patience: a hung test then dies with every
+      # goroutine's stack in the log, instead of the runner sitting on it until
+      # the queue times out and the log says only "go test -race" (#838).
+      - run: go test -race -timeout 6m -coverprofile=coverage.out -covermode=atomic ./...
         shell: bash
       - run: go build ./cmd/deja
       - name: Benchmark lexical recall floor
