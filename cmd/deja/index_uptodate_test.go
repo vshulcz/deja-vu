@@ -39,6 +39,20 @@ func TestIndexSaysWhenThereIsNothingToDo(t *testing.T) {
 		t.Errorf("a no-op run said nothing:\n%s", second)
 	}
 
+	// The warmup child runs this command; returning before the sentinel is
+	// cleared leaves a build that is not running (#839).
+	sentinel := filepath.Join(t.TempDir(), "warmup.sentinel")
+	if err := os.WriteFile(sentinel, []byte("1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_WARMUP_SENTINEL", sentinel)
+	if _, err := captureRunStderr(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(sentinel); err == nil {
+		t.Error("a run with nothing to do left its warmup sentinel behind")
+	}
+
 	// --rebuild is explicit work, never "nothing to do".
 	forced, err := captureRunStderr(t, "index", "--rebuild")
 	if err != nil {

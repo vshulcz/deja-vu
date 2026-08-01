@@ -218,6 +218,11 @@ func cmdIndex(dir string, rest []string) error {
 	// `doctor` on a fresh index both say so; this one returned to the prompt
 	// with nothing (#824). Only here: on a search the same line would be noise.
 	if fresh, n := index.UpToDate(dir, ""); fresh && !force {
+		// The warmup child runs this command, so returning before the sentinel
+		// is cleared leaves a build that is not running: the next request is
+		// suppressed until the retry window, and readWarmupStatus tells the
+		// agent memory is on its way (#839).
+		clearWarmupSentinel()
 		fmt.Fprintf(os.Stderr, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
 		return nil
 	}
