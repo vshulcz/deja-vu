@@ -178,7 +178,7 @@ func TestPerformUpdateAssetAndChecksumLookupErrors(t *testing.T) {
 	if err := os.WriteFile(target, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg := updateConfig{currentVersion: "dev", goos: "linux", goarch: "amd64", executable: target, latestURL: testLatestReleaseURL}
+	cfg := updateConfig{force: true, currentVersion: "dev", goos: "linux", goarch: "amd64", executable: target, latestURL: testLatestReleaseURL}
 
 	noAsset := cfg
 	noAsset.download = func(url string, limit int64, label string) ([]byte, error) {
@@ -248,6 +248,7 @@ func TestPerformUpdateExtractAndInstallErrors(t *testing.T) {
 	emptyArchive := makeUpdateArchive(t, "linux", "not-"+binaryName, []byte("x"))
 	sum := fmt.Sprintf("%x", sha256.Sum256(emptyArchive))
 	cfg := updateConfig{
+		force:          true,
 		currentVersion: "dev",
 		goos:           "linux",
 		goarch:         "amd64",

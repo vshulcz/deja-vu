@@ -94,6 +94,9 @@ func newHTTPUpdateDownloader(client *http.Client) updateDownloader {
 }
 
 type updateConfig struct {
+	// force replaces a source build with the latest release; without it a dev
+	// binary is left alone (#751).
+	force          bool
 	currentVersion string
 	goos           string
 	goarch         string
@@ -103,8 +106,13 @@ type updateConfig struct {
 }
 
 func runUpdate(args []string, out io.Writer) error {
-	if len(args) != 0 {
-		return fmt.Errorf("update takes no arguments")
+	force := false
+	for _, a := range args {
+		if a == "--force" {
+			force = true
+			continue
+		}
+		return fmt.Errorf("update takes no arguments except --force, got %q", a)
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -114,6 +122,7 @@ func runUpdate(args []string, out io.Writer) error {
 		executable = resolved
 	}
 	return performUpdate(updateConfig{
+		force:          force,
 		currentVersion: version,
 		goos:           runtime.GOOS,
 		goarch:         runtime.GOARCH,
@@ -147,6 +156,13 @@ func performUpdate(cfg updateConfig, out io.Writer) error {
 		return fmt.Errorf("latest release did not include a tag")
 	}
 	current := normalizeUpdateVersion(cfg.currentVersion)
+	// A binary built from source is by definition ahead of the newest tag —
+	// it is whatever the person just compiled — so replacing it in place is a
+	// downgrade that discards their build (#751).
+	if current == "dev" && !cfg.force {
+		fmt.Fprintf(out, "this binary was built from source (dev), and the latest release is v%s — `deja update --force` replaces it anyway\n", latest)
+		return nil
+	}
 	if current != "" && current != "dev" {
 		if order, ok := compareUpdateVersions(current, latest); ok {
 			switch {

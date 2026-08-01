@@ -314,7 +314,7 @@ func TestPerformUpdateSuccessUnknownVersionAndPermissionBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chmod(dir, 0o755) }()
-	err = performUpdate(updateConfig{currentVersion: "dev", goos: "linux", goarch: "amd64", executable: dest, latestURL: testLatestReleaseURL, download: download}, io.Discard)
+	err = performUpdate(updateConfig{force: true, currentVersion: "dev", goos: "linux", goarch: "amd64", executable: dest, latestURL: testLatestReleaseURL, download: download}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "replace") || !strings.Contains(err.Error(), "rerun with permission") {
 		t.Fatalf("permission-denied replace err = %v", err)
 	}

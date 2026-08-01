@@ -1450,7 +1450,7 @@ Usage:
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--to path]
   deja mcp
   deja version
-  deja update
+  deja update [--force]
   deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|cline|statusline|--all|--auto>
   deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
 

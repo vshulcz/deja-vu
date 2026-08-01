@@ -139,6 +139,9 @@ func TestPerformUpdateChecksumFailurePreservesBinary(t *testing.T) {
 	download, _ := newUpdateDownloader(t, "1.2.0", "linux", "amd64", []byte("new binary"), true)
 
 	err := performUpdate(updateConfig{
+		// The subject here is the checksum guard, not the dev-build policy
+		// added in #751.
+		force:          true,
 		currentVersion: "dev",
 		goos:           "linux",
 		goarch:         "amd64",
