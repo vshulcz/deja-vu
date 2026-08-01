@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
+
+const lifecycleRejected = "rejected"
 
 // attachLifecycles marks hits whose decision was later rejected, superseded or
 // left to go stale.
@@ -67,4 +70,46 @@ func lifecycleLine(h search.Hit) string {
 		b.WriteString(" " + h.LifecycleNote)
 	}
 	return b.String()
+}
+
+// demoteRejected moves the attempts a person marked rejected below the ones
+// they did not, and drops the "earlier attempt" label from a hit whose newer
+// rival is one of them.
+//
+// rejected is the strongest statement someone can make about a piece of their
+// own history, and it used to move nothing: the wrong answer stayed first
+// while the decision that replaced it was labelled as superseded *by* the
+// rejected one, so an agent reading top-down got the wrong answer with a
+// recommendation attached (#684).
+//
+// Only rejected demotes. superseded and stale say "this was true once", which
+// is still the best record of how the current answer was reached; rejected
+// says "this did not work".
+func demoteRejected(hits []search.Hit) {
+	var rejected []search.Hit
+	for _, h := range hits {
+		if h.Lifecycle == lifecycleRejected {
+			rejected = append(rejected, h)
+		}
+	}
+	if len(rejected) == 0 {
+		return
+	}
+	for i := range hits {
+		h := &hits[i]
+		if h.Superseded == "" || h.Lifecycle == lifecycleRejected {
+			continue
+		}
+		// The label carries a date, not an identity, so the rival is the
+		// rejected hit in the same project stamped that day.
+		for _, r := range rejected {
+			if r.Session.Project == h.Session.Project && r.Session.Updated.Format("2006-01-02") == h.Superseded {
+				h.Superseded = ""
+				break
+			}
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		return hits[i].Lifecycle != lifecycleRejected && hits[j].Lifecycle == lifecycleRejected
+	})
 }

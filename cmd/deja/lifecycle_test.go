@@ -1,12 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -102,4 +105,107 @@ func TestLifecycleWordingSaysWhatHappened(t *testing.T) {
 
 func hitWithLifecycle(state, at, note string) search.Hit {
 	return search.Hit{Lifecycle: state, LifecycleAt: at, LifecycleNote: note}
+}
+
+// rejected is the strongest statement someone can make about their own
+// history, and it used to move nothing: the wrong answer stayed first while
+// the decision that replaced it was labelled as superseded *by* the rejected
+// one (#684).
+func TestDemoteRejected(t *testing.T) {
+	newer := time.Date(2026, 7, 28, 10, 0, 0, 0, time.UTC)
+	older := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
+	hits := []search.Hit{
+		{Session: model.Session{ID: "bad", Project: "p", Updated: newer}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "good", Project: "p", Updated: older}, Superseded: "2026-07-28"},
+	}
+	demoteRejected(hits)
+	if hits[0].Session.ID != "good" || hits[1].Session.ID != "bad" {
+		t.Fatalf("order = %s, %s", hits[0].Session.ID, hits[1].Session.ID)
+	}
+	// The surviving answer must not be labelled as replaced by the attempt
+	// that was thrown out.
+	if hits[0].Superseded != "" {
+		t.Errorf("still labelled an earlier attempt: %q", hits[0].Superseded)
+	}
+	if hits[1].Superseded != "" {
+		t.Errorf("the rejected hit gained a label: %q", hits[1].Superseded)
+	}
+}
+
+// superseded and stale say "this was true once", which is still the best
+// record of how the current answer was reached. Only rejected demotes.
+func TestDemoteRejectedLeavesOtherStatesAlone(t *testing.T) {
+	for _, state := range []string{"superseded", "stale", "accepted", ""} {
+		hits := []search.Hit{
+			{Session: model.Session{ID: "first", Project: "p"}, Lifecycle: state},
+			{Session: model.Session{ID: "second", Project: "p"}},
+		}
+		demoteRejected(hits)
+		if hits[0].Session.ID != "first" {
+			t.Errorf("state %q reordered the hits", state)
+		}
+	}
+	// Everything rejected: there is nothing to promote above it, the ranking's
+	// order stands, and a rejected hit keeps its own "earlier attempt" label —
+	// being outranked by another rejected attempt is still what happened.
+	day := time.Date(2026, 7, 28, 10, 0, 0, 0, time.UTC)
+	hits := []search.Hit{
+		{Session: model.Session{ID: "a", Project: "p"}, Lifecycle: "rejected", Superseded: "2026-07-28"},
+		{Session: model.Session{ID: "b", Project: "p", Updated: day}, Lifecycle: "rejected"},
+	}
+	demoteRejected(hits)
+	if hits[0].Session.ID != "a" || hits[0].Superseded != "2026-07-28" {
+		t.Errorf("all-rejected set was rewritten: %#v", hits)
+	}
+}
+
+// Demotion is a reordering, not a re-ranking: everything the ranking decided
+// among the hits that were not rejected has to survive it.
+func TestDemoteRejectedKeepsTheRankingOrder(t *testing.T) {
+	// Long enough that an unstable sort actually reorders: Go's pattern-defeating
+	// quicksort falls back to insertion sort — which is stable — below twelve.
+	var hits []search.Hit
+	var want []string
+	for i := 0; i < 24; i++ {
+		id := fmt.Sprintf("h%02d", i)
+		h := search.Hit{Session: model.Session{ID: id, Project: "p"}}
+		if i%5 == 3 {
+			h.Lifecycle = "rejected"
+		} else {
+			want = append(want, id)
+		}
+		hits = append(hits, h)
+	}
+	demoteRejected(hits)
+	var got []string
+	for _, h := range hits {
+		if h.Lifecycle != "rejected" {
+			got = append(got, h.Session.ID)
+		}
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("ranking order lost:\n got %v\nwant %v", got, want)
+	}
+	for i, h := range hits {
+		if h.Lifecycle == "rejected" && i < len(want) {
+			t.Errorf("a rejected hit stayed at position %d", i)
+		}
+	}
+}
+
+// The label carries a date, not an identity: a rejected session in another
+// project on the same day must not clear it.
+func TestDemoteRejectedMatchesTheRightRival(t *testing.T) {
+	newer := time.Date(2026, 7, 28, 10, 0, 0, 0, time.UTC)
+	hits := []search.Hit{
+		{Session: model.Session{ID: "other", Project: "elsewhere", Updated: newer}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "mine", Project: "p"}, Superseded: "2026-07-28"},
+	}
+	demoteRejected(hits)
+	if hits[0].Session.ID != "mine" {
+		t.Fatalf("order = %s", hits[0].Session.ID)
+	}
+	if hits[0].Superseded != "2026-07-28" {
+		t.Errorf("cleared the label using another project's rejection")
+	}
 }

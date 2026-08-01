@@ -464,6 +464,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	// there is no way to know how the filters would have treated the hidden
 	// ones, so the pre-cap figure stands and `capped` says to distrust it.
 	attachLifecycles(hits)
+	demoteRejected(hits)
 	attachMoved(hits)
 	if !o.Capped {
 		o.Total = len(hits)

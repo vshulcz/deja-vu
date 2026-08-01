@@ -432,6 +432,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	}
 	attachAnswers(dir, hits)
 	attachLifecycles(hits)
+	demoteRejected(hits)
 	var b strings.Builder
 	served := 0
 	if stale {
