@@ -20,6 +20,11 @@ import (
 type wiringState struct {
 	Version string   `json:"version"`
 	Targets []string `json:"targets"`
+	// Exe is the binary path the configs were written with. A move without a
+	// version change is ordinary — a relink, a reinstall of the same release,
+	// a `go install` over a manual download — and left every config pointing
+	// at a path that no longer exists (#773).
+	Exe string `json:"exe,omitempty"`
 }
 
 func wiringStatePath() string {
@@ -61,6 +66,11 @@ func recordWiring(targets []string, uninstall bool) {
 		}
 	}
 	sort.Strings(kept)
+	exe, _ := os.Executable()
+	exe, _ = filepath.Abs(exe)
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
 	// Uninstalling everything on a machine that was never wired would otherwise
 	// create the record on the way out — a file left behind by the command that
 	// removes things (#676).
@@ -69,7 +79,7 @@ func recordWiring(targets []string, uninstall bool) {
 			return
 		}
 	}
-	st = wiringState{Version: version, Targets: kept}
+	st = wiringState{Version: version, Targets: kept, Exe: exe}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -87,7 +97,7 @@ func recordWiring(targets []string, uninstall bool) {
 // quiet, because a session start is not the place for maintenance chatter.
 func refreshWiringAfterUpgrade() []string {
 	st := readWiringState()
-	if len(st.Targets) == 0 || st.Version == version || version == "" {
+	if len(st.Targets) == 0 || version == "" {
 		return nil
 	}
 	exe, err := os.Executable()
@@ -95,6 +105,14 @@ func refreshWiringAfterUpgrade() []string {
 		return nil
 	}
 	exe, _ = filepath.Abs(exe)
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	// Either the version or the path: a binary that moved writes the same
+	// version into configs that now name a file which is not there (#773).
+	if st.Version == version && (st.Exe == "" || st.Exe == exe) {
+		return nil
+	}
 	var changed []string
 	for _, target := range st.Targets {
 		res, err := installTarget(target, exe, false)
