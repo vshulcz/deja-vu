@@ -722,7 +722,8 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 		// "malformed" covered only unparseable lines; valid JSON deja cannot
 		// use is skipped just as invisibly, and the reader needs the same
 		// warning either way (#814).
-		fmt.Fprintf(w, "  ingest   %s: %d unusable lines skipped, %d files failed — see `deja doctor --json`\n", h, e.MalformedLines, e.FailedFiles)
+		fmt.Fprintf(w, "  ingest   %s: %d unusable line%s skipped, %d path%s unreadable — see `deja doctor --json`\n",
+			h, e.MalformedLines, pluralS(e.MalformedLines), e.FailedFiles, pluralS(e.FailedFiles))
 	}
 }
 

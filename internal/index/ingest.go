@@ -1657,7 +1657,24 @@ func parseAppendedFile(harness, p string, old FileState) (ss []model.Session, er
 
 // harnessForPath reports the fine-grained source kind for a path (claude,
 // codex-history, cursor-db, ...) via the sources registry, or "" if none.
-func harnessForPath(p string) string { return sources.KindForPath(p) }
+// harnessForPath maps an ingest-diagnostic path to the harness it belongs to.
+// A directory has no transcript extension, so the matchers reject it outright;
+// asking what a transcript inside it would be is the same question the walk
+// was already answering (#818).
+func harnessForPath(p string) string {
+	if h := sources.KindForPath(p); h != "" {
+		return h
+	}
+	if filepath.Ext(p) != "" {
+		return ""
+	}
+	for _, name := range []string{"probe.jsonl", "probe.json", "probe.md"} {
+		if h := sources.KindForPath(filepath.Join(p, name)); h != "" {
+			return h
+		}
+	}
+	return ""
+}
 
 func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())

@@ -151,7 +151,17 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 func walkFiles(root string, pred func(string) bool) []string {
 	var out []string
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err == nil && d.Type()&os.ModeSymlink == 0 && !d.IsDir() && pred(p) {
+		if err != nil {
+			// A directory the process cannot read takes its sessions out of
+			// recall. Dropping the error here left the index run with nothing
+			// to say: the only sign was a file count nobody has memorised
+			// (#816, and the ingest half of it #818).
+			if os.IsPermission(err) {
+				diagFileError(p, err)
+			}
+			return nil
+		}
+		if d.Type()&os.ModeSymlink == 0 && !d.IsDir() && pred(p) {
 			out = append(out, p)
 		}
 		return nil

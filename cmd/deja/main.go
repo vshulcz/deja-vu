@@ -213,6 +213,17 @@ func cmdIndex(dir string, rest []string) error {
 	// holds them, so one project name covers both. Silence was the worst part
 	// of it: the indexer counted every session on disk while the manifest held
 	// fewer, and nothing connected the two numbers (#698).
+	// A store deja could not read loses its sessions from recall, and the index
+	// run is where someone is looking at the counts — doctor knowing about it
+	// is not the same as saying it here (#818).
+	for _, h := range sortedHarnesses(index.IngestHealth(dir)) {
+		e := index.IngestHealth(dir)[h]
+		if e.FailedFiles == 0 {
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "deja: %s: %d path%s could not be read — `deja doctor` names %s\n",
+			h, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
+	}
 	if n := index.ReportCollisions(); n > 0 {
 		fmt.Fprintf(os.Stderr, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
 	}
@@ -1579,6 +1590,25 @@ func forgetTitleFix(err error) string {
 		return "free some space on that filesystem"
 	}
 	return "clear the problem above"
+}
+
+// sortedHarnesses orders the ingest-health entries so a run reports them the
+// same way twice.
+func sortedHarnesses(m map[string]index.HarnessIngest) []string {
+	out := make([]string, 0, len(m))
+	for h := range m {
+		out = append(out, h)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// pluralWhich matches the pronoun to the count in the ingest warning.
+func pluralWhich(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
 }
 
 // ensureError turns an index-build failure into something a reader can act on.
