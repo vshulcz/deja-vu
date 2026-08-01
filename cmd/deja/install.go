@@ -487,15 +487,24 @@ func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
 // holds someone else's skill stays.
 func pruneGuidanceDirs(path string) {
 	dir := filepath.Dir(path)
-	if filepath.Base(dir) != "deja-history" {
+	if filepath.Base(dir) != "deja-history" || !isRealDir(dir) {
 		return
 	}
 	if err := os.Remove(dir); err != nil {
 		return
 	}
-	if dir = filepath.Dir(dir); filepath.Base(dir) == "skills" {
+	if dir = filepath.Dir(dir); filepath.Base(dir) == "skills" && isRealDir(dir) {
 		_ = os.Remove(dir)
 	}
+}
+
+// isRealDir reports whether p is a directory itself rather than a link to one.
+// os.Remove unlinks a symlink whatever stands behind it, so the "only if empty"
+// bound above does not hold for anyone who keeps skills/ in their dotfiles and
+// symlinks it into place: the link would go while the skills it points at stay.
+func isRealDir(p string) bool {
+	fi, err := os.Lstat(p)
+	return err == nil && fi.IsDir()
 }
 
 func backupOnce(path string) error {

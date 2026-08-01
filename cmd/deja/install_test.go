@@ -160,6 +160,41 @@ func TestUninstallKeepsASkillsDirectoryThatIsNotEmpty(t *testing.T) {
 	}
 }
 
+// The same when skills/ is a symlink into someone's dotfiles: os.Remove drops
+// a link whatever stands behind it, so "delete it only if it is empty" is no
+// protection there — the link went and the skills it pointed at stayed.
+func TestUninstallKeepsASymlinkedSkillsDirectory(t *testing.T) {
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	real := filepath.Join(home, "dotfiles", "skills")
+	theirs := filepath.Join(real, "their-skill", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(theirs), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(theirs, []byte("---\nname: theirs\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(home, ".claude", "skills")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if _, err := captureRun(t, "install", "claude", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "uninstall", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(link); err != nil {
+		t.Errorf("uninstall removed the user's skills symlink: %v", err)
+	}
+	if _, err := os.Stat(theirs); err != nil {
+		t.Errorf("uninstall removed a skill that is not deja's: %v", err)
+	}
+}
+
 func filesMentioning(t *testing.T, root, needle string) []string {
 	t.Helper()
 	var out []string
