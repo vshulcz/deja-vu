@@ -74,8 +74,11 @@ func TestPromoteCorrectionAppends(t *testing.T) {
 	if !strings.HasSuffix(ss[0].Title, "[superseded]") {
 		t.Fatalf("title must carry the latest state, got %q", ss[0].Title)
 	}
-	if len(ss[0].Messages) != 2 || !strings.Contains(ss[0].Messages[1].Text, "[superseded]") {
-		t.Fatalf("messages must keep the full history: %#v", ss[0].Messages)
+	// Full history, latest first: readers take the first messages, and after a
+	// run of corrections that used to serve the oldest answer (#812).
+	if len(ss[0].Messages) != 2 || !strings.Contains(ss[0].Messages[0].Text, "[superseded]") ||
+		!strings.Contains(ss[0].Messages[1].Text, "[accepted]") {
+		t.Fatalf("messages must keep the full history, newest first: %#v", ss[0].Messages)
 	}
 }
 

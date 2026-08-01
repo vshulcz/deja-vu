@@ -170,7 +170,15 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		return nil, err
 	}
 	out := make([]model.Session, 0, len(byDay))
-	for _, s := range byDay {
+	for key, s := range byDay {
+		// A promoted note's corrections append, so file order serves the
+		// oldest one first — and every reader takes the first messages. After
+		// a hundred careful corrections the hook handed the agent the first
+		// answer as fact (#812). Newest first: the latest correction is what
+		// holds, which is what the title already says.
+		if strings.HasPrefix(key, "promoted\x00") && len(s.Messages) > 1 {
+			reverseMessages(s.Messages)
+		}
 		out = append(out, *s)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -180,6 +188,12 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		return out[i].Project < out[j].Project
 	})
 	return out, nil
+}
+
+func reverseMessages(ms []model.Message) {
+	for i, j := 0, len(ms)-1; i < j; i, j = i+1, j-1 {
+		ms[i], ms[j] = ms[j], ms[i]
+	}
 }
 
 // NoteStates are the lifecycle states a promoted note may carry.
