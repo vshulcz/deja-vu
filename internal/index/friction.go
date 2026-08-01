@@ -95,6 +95,15 @@ func isFriction(l string) bool {
 			return false
 		}
 	}
+	// A comment about an error is source too, and the wider marker list in
+	// #729 made these reachable: `// panic: this is a comment about panics`
+	// became the top wall on a store of shell snippets.
+	for _, comment := range []string{"//", "#", "/*", "*", "--"} {
+		// normalizeFriction has already trimmed the line.
+		if strings.HasPrefix(l, comment) {
+			return false
+		}
+	}
 	// deja's own report is tool output in the next session, and every line of
 	// it contains an error by construction. Drop the report shape so running
 	// the command does not slowly teach it about itself.
@@ -103,12 +112,28 @@ func isFriction(l string) bool {
 			return false
 		}
 	}
+	// The list was nine phrases about things not being found or permitted, and
+	// it matched 3 of 12 ordinary errors on measurement — missing runtime
+	// panics, database timeouts, auth failures and build failures, which is
+	// most of what a machine actually trips over. One miss was capitalisation
+	// alone: curl writes "Connection refused" (#729).
+	low := strings.ToLower(l)
 	for _, p := range []string{
-		"command not found", "ModuleNotFoundError", "No module named",
+		// Not found, not permitted — the original list.
+		"command not found", "modulenotfounderror", "no module named",
 		"not found: ", "cannot find", "no such file or directory",
 		"undefined:", "connection refused", "permission denied",
+		// Crashed.
+		"panic:", "segmentation fault", "exception in thread",
+		"nullpointerexception", "index out of range", "stack overflow",
+		"typeerror:", "referenceerror:", "keyerror:", "attributeerror:",
+		// Refused by a server or a tool, with the tool named.
+		"fatal:", "npm err!", "rpc failed", "timeout expired",
+		"statement timeout", "connection reset", "connection timed out",
+		// Failed to build or run.
+		"] error ", "build failed", "compilation failed", "cannot be resolved",
 	} {
-		if strings.Contains(l, p) {
+		if strings.Contains(low, p) {
 			return true
 		}
 	}
