@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -1360,7 +1361,10 @@ func runForget(dir string, args []string) error {
 			// disk, which is the one thing the privacy command must not do
 			// (#804).
 			fmt.Fprintf(os.Stdout, "could not clear the title borrowed from the forgotten session%s: %v\n", pluralS(len(result.Keys)), err)
-			fmt.Fprintf(os.Stdout, "it is still in %s — fix that file's permissions and run this again\n", sources.NotesFile())
+			// Name the fix by the cause: on a full disk the first version of
+			// this line sent people to chmod a file that was already writable
+			// (#808).
+			fmt.Fprintf(os.Stdout, "it is still in %s — %s and run this again\n", sources.NotesFile(), forgetTitleFix(err))
 		case n > 0:
 			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s\n", n, pluralS(n))
 		}
@@ -1565,6 +1569,19 @@ func noAgentHistoryFound() bool {
 		}
 	}
 	return true
+}
+
+// forgetTitleFix names the fix by the cause. The first version of this line
+// said "permissions" whatever had happened, so a full disk sent the reader to
+// chmod a file that was already writable (#808).
+func forgetTitleFix(err error) string {
+	switch {
+	case errors.Is(err, fs.ErrPermission):
+		return "fix that file's permissions"
+	case errors.Is(err, syscall.ENOSPC):
+		return "free some space on that filesystem"
+	}
+	return "clear the problem above"
 }
 
 // ensureError turns an index-build failure into something a reader can act on.

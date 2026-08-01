@@ -394,6 +394,9 @@ func ForgetPromotedTitles(match func(session string) bool) (int, error) {
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		// A rewrite that ran out of room left its temp file behind, on the
+		// filesystem that just filled up (#808).
+		_ = os.Remove(tmp)
 		return 0, err
 	}
 	if err := os.Rename(tmp, path); err != nil {
