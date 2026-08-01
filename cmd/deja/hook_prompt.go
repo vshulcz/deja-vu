@@ -97,7 +97,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Version, not just presence: terms hash into buckets an index from
 	// another format never wrote, so a stale store answers every prompt with
 	// nothing and looks exactly like a user with no history (#777).
-	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) {
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
 		return nil
 	}
