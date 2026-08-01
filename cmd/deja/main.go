@@ -213,6 +213,13 @@ func cmdIndex(dir string, rest []string) error {
 		}
 		return fmt.Errorf("index: unknown flag %q", a)
 	}
+	// Silence reads as "it did not run". `update` on the newest release and
+	// `doctor` on a fresh index both say so; this one returned to the prompt
+	// with nothing (#824). Only here: on a search the same line would be noise.
+	if fresh, n := index.UpToDate(dir, ""); fresh && !force {
+		fmt.Fprintf(os.Stderr, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
+		return nil
+	}
 	prepareFirstIndexGreeting(dir)
 	// The detached warmup publishes its progress so hooks can tell the user
 	// memory is on its way; an interactive run draws the live display.

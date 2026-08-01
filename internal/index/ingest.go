@@ -101,6 +101,28 @@ func mergeIngestDiag(m *Manifest) {
 	}
 }
 
+// UpToDate reports whether Ensure would do nothing, and how many sessions the
+// index holds. Only `deja index` asks: silence reads as "it did not run", but
+// saying it on every search would be noise on a line nobody asked about (#824).
+func UpToDate(dir string, harness string) (bool, int) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	prior, err := readManifest(dir)
+	if err != nil {
+		return false, 0
+	}
+	want := currentFilesReusing(harness, priorFiles(prior, err))
+	scope := ""
+	if harness != "" {
+		scope = harness
+	}
+	if !manifestFresh(prior, want, scope) || !recordsIntact(dir, prior) {
+		return false, len(prior.Sessions)
+	}
+	return true, len(prior.Sessions)
+}
+
 func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
