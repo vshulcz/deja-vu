@@ -279,7 +279,13 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintf(w, "  Busiest day      %s · %d messages\n", valueOrDash(r.BusiestDay.Date), r.BusiestDay.Messages)
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
-	fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
+	// The log keeps the last 14 days once it passes 1MB, so the count is not a
+	// lifetime total — saying since when keeps it from reading like one (#763).
+	if since := r.Recall.Since; !since.IsZero() {
+		fmt.Fprintf(w, "  Recalls served   %d since %s\n", r.Recall.Recalls, since.Local().Format("Jan 2"))
+	} else {
+		fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
+	}
 	if r.Recall.RawBytes > 0 && r.Recall.Bytes > 0 {
 		ratio := r.Recall.RawBytes / int64(r.Recall.Bytes)
 		if ratio >= 2 {

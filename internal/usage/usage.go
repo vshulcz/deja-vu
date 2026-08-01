@@ -55,6 +55,11 @@ type Summary struct {
 	RawBytes         int64   `json:"raw_bytes,omitempty"`
 	DejaVuMoments    int     `json:"dejavu_moments,omitempty"`
 	EmptyResultRate  float64 `json:"empty_result_rate"`
+	// Since is the oldest event still in the log. The log is rewritten past
+	// 1MB keeping the last 14 days, so a count with no period attached reads
+	// as a lifetime total and then falls by orders of magnitude when that
+	// happens (#763).
+	Since time.Time `json:"since,omitempty"`
 }
 
 const (
@@ -171,6 +176,9 @@ func Totals(indexDir string) Summary {
 	var out Summary
 	empty := 0
 	for _, e := range read(Path(indexDir)) {
+		if out.Since.IsZero() || (!e.Time.IsZero() && e.Time.Before(out.Since)) {
+			out.Since = e.Time
+		}
 		switch e.Kind {
 		case KindRecall, KindContext, KindBlame:
 			out.Recalls++
