@@ -244,6 +244,13 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.json {
 		return printSessionJSON(os.Stdout, s, o.offset, o.limit, sourceInstance)
 	}
+	if o.sliced {
+		// Both flags are documented for `show` and only the JSON path honoured
+		// them; the text output printed the whole session (#709).
+		s.Messages = sliceMessages(s.Messages, o.offset, o.limit)
+	} else if n := len(s.Messages); n > showLargeSession {
+		fmt.Fprintf(os.Stderr, "deja: %d messages — `--offset n --limit n` reads a slice\n", n)
+	}
 	// The prefix picks the newest of its matches, which is the right default
 	// and, until now, a silent one: "2" resolved eleven sessions on a real
 	// store and the reader had no way to know they were shown a choice.
@@ -260,7 +267,15 @@ type showOptions struct {
 	id, harness   string
 	json          bool
 	offset, limit int
+	// sliced records that the reader asked for a slice, as opposed to the
+	// JSON default: applying 50 to the text output would silently truncate
+	// `deja show` for everyone who reads a session whole (#709).
+	sliced bool
 }
+
+// showLargeSession is where `deja show` mentions the flags that read a slice.
+// A 200k-message transcript prints 600 001 lines.
+const showLargeSession = 1000
 
 func parseShow(args []string) (showOptions, error) {
 	o := showOptions{limit: 50}
@@ -283,8 +298,10 @@ func parseShow(args []string) (showOptions, error) {
 			}
 			if a == "--offset" {
 				o.offset = n
+				o.sliced = true
 			} else {
 				o.limit = n
+				o.sliced = true
 			}
 		default:
 			if strings.HasPrefix(a, "-") {
