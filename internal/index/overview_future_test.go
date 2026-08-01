@@ -7,6 +7,17 @@ import (
 	"time"
 )
 
+// justAfterMidnight returns a moment that is today for every hour the suite
+// might run at: local midnight plus a minute, or now if the run is inside that
+// first minute.
+func justAfterMidnight(now time.Time) time.Time {
+	t := time.Date(now.Year(), now.Month(), now.Day(), 0, 1, 0, 0, now.Location())
+	if t.After(now) {
+		return now
+	}
+	return t
+}
+
 // The counters tested Updated.After(midnight) with no upper bound, so anything
 // ahead of the clock was today's work, this week's, and the newest thing in the
 // store — permanently. On a 10k-session store that read "today 2222" (#696).
@@ -16,8 +27,12 @@ func TestOverviewExcludesSessionsFromTheFuture(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
+	// Anchored inside today rather than measured backwards from now: two hours
+	// ago is yesterday when the suite runs shortly after midnight, and
+	// SessionsToday counts from local midnight (#837).
+	today := justAfterMidnight(now)
 	sessions := map[string]SessionMeta{
-		"claude:today":     {ID: "today", Harness: "claude", Updated: now.Add(-2 * time.Hour)},
+		"claude:today":     {ID: "today", Harness: "claude", Updated: today},
 		"claude:yesterday": {ID: "yesterday", Harness: "claude", Updated: now.AddDate(0, 0, -1)},
 		"claude:lastmonth": {ID: "lastmonth", Harness: "claude", Updated: now.AddDate(0, -1, 0)},
 		// Just inside the week, so narrowing the window shows up too.
@@ -58,7 +73,7 @@ func TestOverviewWithNoFutureSessionsSaysNothing(t *testing.T) {
 	}
 	now := time.Now()
 	sessions := map[string]SessionMeta{
-		"claude:a": {ID: "a", Harness: "claude", Updated: now.Add(-time.Hour)},
+		"claude:a": {ID: "a", Harness: "claude", Updated: justAfterMidnight(now)},
 		"claude:b": {ID: "b", Harness: "claude", Updated: now.AddDate(0, 0, -3)},
 	}
 	if err := writeManifest(dir, Manifest{Version: version, Files: map[string]FileState{}, Sessions: sessions}); err != nil {
