@@ -435,11 +435,21 @@ func tailSection(s model.Session, budget int) string {
 	return strings.TrimSpace(b.String())
 }
 
+// Short keeps an id readable in a line without destroying the thing it names.
+//
+// A flat cut printed "deja-2026-08" for a note whose id is
+// "deja-2026-08-01-ops/db" — an id no session has, in an error message telling
+// the reader which session was refused (#741). Ids are meaningful at both ends,
+// so the middle goes; #707 made the same change for search result lines.
 func Short(s string) string {
-	if len(s) > 12 {
-		return s[:12]
+	const width = 20
+	r := []rune(s)
+	if len(r) <= width {
+		return s
 	}
-	return s
+	head := width/2 - 1
+	tail := width - head - 1
+	return string(r[:head]) + "…" + string(r[len(r)-tail:])
 }
 
 // decisionMarkers spot conclusion-bearing assistant messages in tool-heavy

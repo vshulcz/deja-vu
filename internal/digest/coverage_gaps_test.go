@@ -39,7 +39,10 @@ func TestUTF8SafeCutLandsOnRuneBoundaries(t *testing.T) {
 }
 
 func TestShortTrimsIdentifiers(t *testing.T) {
-	if got := Short("2fc1d1ef-59f0-4044-b986-ba349e11c53c"); got != "2fc1d1ef-59f" {
+	// Both ends survive: a UUID cut to its head names no session, and the
+	// message that prints it is telling the reader which one was refused
+	// (#741).
+	if got := Short("2fc1d1ef-59f0-4044-b986-ba349e11c53c"); got != "2fc1d1ef-…349e11c53c" {
 		t.Fatalf("Short() = %q", got)
 	}
 	if got := Short("abc"); got != "abc" {

@@ -544,7 +544,9 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 	if !strings.Contains(b.String(), "deja stats") {
 		t.Fatalf("stats output = %q", b.String())
 	}
-	if got := digest.Short("123456789012345"); got != "123456789012" {
+	// The middle goes, not the tail: an error naming a session has to name one
+	// that exists (#741).
+	if got := digest.Short("123456789012345678901234567890"); !strings.HasPrefix(got, "123456789") || !strings.HasSuffix(got, "7890") {
 		t.Fatalf("digest.Short long = %q", got)
 	}
 	if got := claudeProjectDirFor(model.Session{Path: filepath.Join(t.TempDir(), "plain.jsonl")}); got != "" {
