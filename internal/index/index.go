@@ -25,7 +25,11 @@ import (
 // 21: Codex sessions are keyed on the ThreadId rather than the SessionId
 // (#635), so every existing Codex entry has the wrong identity, and the
 // harness preamble Codex injects as a user turn is stripped (#636).
-const version = 21
+// 22: titles are derived by the rules from #671, #693 and #770. Those three
+// shipped without a bump, so indexes built under the old rules kept the titles
+// they derived then — incremental ingest reuses SessionMeta for a file it has
+// already read, and no ordinary `deja index` re-derives it (#784).
+const version = 22
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
