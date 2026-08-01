@@ -100,6 +100,10 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 // returns that path. The walk is bounded: doctor is a diagnostic command, but
 // a harness root can hold tens of thousands of transcripts.
 func firstDeniedDir(paths []string) string {
+	// Directories, not entries: a store of 50k transcripts sits in a few
+	// hundred of them, and counting files spent the budget in the first
+	// project — a locked directory later in the walk was never reached, and
+	// doctor reported the store whole (#864).
 	const budget = 5000
 	visited := 0
 	home := sources.Home()
@@ -112,9 +116,6 @@ func firstDeniedDir(paths []string) string {
 		}
 		denied := ""
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-			if visited++; visited > budget {
-				return filepath.SkipAll
-			}
 			if err != nil {
 				if os.IsPermission(err) {
 					denied = p
@@ -124,6 +125,9 @@ func firstDeniedDir(paths []string) string {
 			}
 			if !d.IsDir() {
 				return nil
+			}
+			if visited++; visited > budget {
+				return filepath.SkipAll
 			}
 			return nil
 		})
