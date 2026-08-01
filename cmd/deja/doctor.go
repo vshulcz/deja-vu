@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -442,6 +443,15 @@ func doctorTools(w io.Writer) {
 		status = "found"
 	}
 	fmt.Fprintf(w, "  %-12s %s (needed for opencode and Cursor IDE stores)\n", "sqlite3", status)
+	// git is not optional decoration: without it a hit loses the line saying
+	// its files have changed since, project names lose worktree identity, and
+	// the session-start hook loses the task signal. All three degrade in
+	// silence, which is fine on a hit and not fine with nowhere to ask (#796).
+	gitStatus := "not found"
+	if _, err := exec.LookPath("git"); err == nil {
+		gitStatus = "found"
+	}
+	fmt.Fprintf(w, "  %-12s %s (needed for changed-file notes, worktree names and the task signal)\n", "git", gitStatus)
 }
 
 // doctorPolicy reports the one mechanism that separates local memory from
