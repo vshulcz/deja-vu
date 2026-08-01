@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -58,6 +59,11 @@ func readHookStdin() []byte {
 // readHookPayload reads at most 1MB from r and gives up after wait, keeping
 // whatever arrived by then. Waiting for EOF is waiting for the host: a payload
 // can be complete on the wire while the pipe stays open behind it (#846).
+//
+// It returns as soon as the bytes so far hold a whole JSON value. Waiting out
+// the deadline on a payload that already arrived would put those milliseconds
+// on every user message, which is the cost the decoder this replaced did not
+// have (#846).
 func readHookPayload(r io.Reader, wait time.Duration) []byte {
 	var mu sync.Mutex
 	var buf []byte
@@ -71,7 +77,11 @@ func readHookPayload(r io.Reader, wait time.Duration) []byte {
 			if n > 0 {
 				mu.Lock()
 				buf = append(buf, chunk[:n]...)
+				whole := endsAValue(buf) && json.Valid(buf)
 				mu.Unlock()
+				if whole {
+					return
+				}
 			}
 			if err != nil {
 				return
@@ -85,6 +95,17 @@ func readHookPayload(r io.Reader, wait time.Duration) []byte {
 	mu.Lock()
 	defer mu.Unlock()
 	return append([]byte(nil), buf...)
+}
+
+// endsAValue keeps the scan above off the hot path: json.Valid on every chunk
+// of a large payload is a full pass each time, and a hook payload is an object
+// or an array.
+func endsAValue(b []byte) bool {
+	b = bytes.TrimRight(b, " \t\r\n")
+	if len(b) == 0 {
+		return false
+	}
+	return b[len(b)-1] == '}' || b[len(b)-1] == ']'
 }
 
 // runHookPrecompact is deliberately best effort: Claude must be able to
