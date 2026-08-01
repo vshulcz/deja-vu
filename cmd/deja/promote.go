@@ -60,7 +60,10 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		return fmt.Errorf("promote needs a session id prefix (see `deja last`)")
 	}
 	if !sources.NoteStates[state] {
-		return fmt.Errorf("promote: state must be accepted, rejected, superseded or stale")
+		// Taking a mark back is the state nobody guesses: users reach for
+		// --state none, --state clear or --unpromote, get this line, and read
+		// four states none of which sounds like an undo (#845).
+		return fmt.Errorf("promote: state must be accepted, rejected, superseded or stale — `--state accepted` takes an earlier mark back")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	if err != nil {
@@ -77,6 +80,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		text = distillSession(s)
 	}
 	src := s.Harness + ":" + s.ID
+	prior := sources.PromotedLifecycles()[src]
 	title := strings.TrimSpace(s.Title)
 	if title == "" {
 		title = firstLine(text)
@@ -102,6 +106,9 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this file. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked, pluralS(masked))
 	}
 	fmt.Fprintf(stdout, "promoted %s as %s: %s\n", src, state, title)
+	if line := markTakenBack(src, state, prior); line != "" {
+		fmt.Fprintln(stdout, line)
+	}
 	if state == "accepted" {
 		all := sources.LoadPromotedNotes()
 		me := sources.PromotedNote{Project: s.Project, Session: src, State: state, Title: title, Text: text, Tags: sources.NormalizeTags(tags)}
@@ -115,6 +122,27 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintln(stdout, "the note now outranks the raw transcript in recall; corrections append with `deja promote", prefix, "--state <state>`")
 	return nil
+}
+
+// markTakenBack says that an accepted mark cleared the rejected/superseded/
+// stale one before it.
+//
+// The undo works and always did — the latest mark wins, so `--state accepted`
+// drops the label and the demotion — but nothing said so. The measured
+// alternatives all fail, two of them loudly: `--state none` and `--state
+// clear` are rejected, and `deja forget --session deja-note-…` prints
+// "sessions dropped: 1" while the label survives, because the state is read
+// from the notes file and not from the index (#845).
+func markTakenBack(src, state string, prior sources.Lifecycle) string {
+	if state != "accepted" || prior.State == "" || prior.State == "accepted" {
+		return ""
+	}
+	when := ""
+	if !prior.At.IsZero() {
+		when = " from " + prior.At.Format("2006-01-02")
+	}
+	return fmt.Sprintf("this takes back the %s mark%s: hits for %s are no longer labelled. Both marks stay in the note — `deja show deja-note-%s`",
+		prior.State, when, src, strings.ReplaceAll(src, ":", "-"))
 }
 
 // distillSession quotes the session instead of summarizing it: the first user
