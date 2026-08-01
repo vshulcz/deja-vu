@@ -122,8 +122,8 @@ func writeViewHTML(dir, out string) (string, error) {
 		Harnesses:     len(report.Harnesses),
 	}
 	if len(metas) > 0 {
-		page.DateEnd = metas[0].Updated.Format("2006-01-02")
-		page.DateStart = metas[len(metas)-1].Updated.Format("2006-01-02")
+		page.DateEnd = metas[0].Updated.Local().Format("2006-01-02")
+		page.DateStart = metas[len(metas)-1].Updated.Local().Format("2006-01-02")
 	}
 	sessions := make([]viewSession, 0, len(metas))
 	for i, s := range metas {

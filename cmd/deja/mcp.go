@@ -456,7 +456,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	for i, h := range hits {
 		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1, h.Session.Harness, h.Session.Project, h.Session.ID, h.Count)
 		if !h.Session.Updated.IsZero() {
-			fmt.Fprintf(&b, " · updated %s (%s)", h.Session.Updated.Format("2006-01-02"), search.RelativeDate(h.Session.Updated))
+			fmt.Fprintf(&b, " · updated %s (%s)", h.Session.Updated.Local().Format("2006-01-02"), search.RelativeDate(h.Session.Updated))
 		}
 		if h.Reused > 1 {
 			fmt.Fprintf(&b, " · reused %d×", h.Reused)

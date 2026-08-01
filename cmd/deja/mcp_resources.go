@@ -34,7 +34,10 @@ func mcpResourcesList(dir string) (any, int, string) {
 		}
 		desc := s.Project
 		if !s.Updated.IsZero() {
-			desc += " · " + s.Updated.Format("2006-01-02")
+			// The reader's zone, like every human surface since #849: an
+			// agent quoting this date to the user must not name a different
+			// day from the one on their screen (#856).
+			desc += " · " + s.Updated.Local().Format("2006-01-02")
 		}
 		resources = append(resources, map[string]any{
 			"uri":         "deja://session/" + s.Harness + ":" + s.ID,
