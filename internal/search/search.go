@@ -303,6 +303,9 @@ func setTier(o Options) string {
 	}
 }
 
+// notesHarness is the pseudo-harness deja files its own notes under.
+const notesHarness = "deja"
+
 // markEarlierAttempts flags hits that look like older passes over the same
 // problem: same project, heavy overlap in what matched, and a newer session
 // above some margin. The old session stays in the results — history is the
@@ -330,6 +333,16 @@ func markEarlierAttempts(hits []Hit) {
 				continue
 			}
 			a, b := hits[i], hits[j]
+			// Notes are not attempts. A day of what someone wrote down is
+			// grouped into one session, so two days of notes about the same
+			// decision overlap by construction — on a store with a thousand
+			// notes this labelled 17 of 20 note hits as work the project had
+			// moved past, including decisions nobody took back. deja already
+			// has a way to say a decision was replaced, and it is the person
+			// saying it: `promote --state superseded` (#863).
+			if a.Session.Harness == notesHarness || b.Session.Harness == notesHarness {
+				continue
+			}
 			if a.Session.Project == "" || a.Session.Project != b.Session.Project {
 				continue
 			}

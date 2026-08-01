@@ -73,3 +73,41 @@ func TestPrintShowsEarlierAttempt(t *testing.T) {
 		t.Fatalf("print output missing earlier-attempt note: %q", b.String())
 	}
 }
+
+// A day of notes is one session, so two days about the same decision overlap
+// by construction — and the reader was told most of their own decision log
+// was work the project had moved past (#863).
+func TestNotesAreNotEarlierAttempts(t *testing.T) {
+	now := time.Now()
+	oldNote := stalenessSession("deja-day1-api", "api", "decided to keep the connection pool at 50", now.AddDate(0, 0, -30))
+	oldNote.Harness = notesHarness
+	newNote := stalenessSession("deja-day2-api", "api", "decided to keep the connection pool at 50 after review", now.AddDate(0, 0, -1))
+	newNote.Harness = notesHarness
+	// A transcript in the same project still supersedes another transcript:
+	// the exclusion is about notes, not about the whole project.
+	oldSess := stalenessSession("s-old", "api", "decided to keep the connection pool at 50", now.AddDate(0, 0, -30))
+	// A transcript whose only newer rival is a note: writing a note about a
+	// decision is not the project moving past the session that made it.
+	lonely := stalenessSession("s-lonely", "web", "decided to keep the connection pool at 50", now.AddDate(0, 0, -30))
+	lonelyNote := stalenessSession("deja-day2-web", "web", "decided to keep the connection pool at 50 after review", now.AddDate(0, 0, -1))
+	lonelyNote.Harness = notesHarness
+	newSess := stalenessSession("s-new", "api", "decided to keep the connection pool at 50 after review", now.AddDate(0, 0, -1))
+
+	hits, err := Run([]model.Session{oldNote, newNote, oldSess, newSess, lonely, lonelyNote}, Options{Query: "connection pool", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]Hit{}
+	for _, h := range hits {
+		byID[h.Session.ID] = h
+	}
+	if got := byID["deja-day1-api"].Superseded; got != "" {
+		t.Errorf("note labelled an earlier attempt: %q", got)
+	}
+	if byID["s-old"].Superseded == "" {
+		t.Error("an older transcript stopped being marked")
+	}
+	if got := byID["s-lonely"].Superseded; got != "" {
+		t.Errorf("transcript marked as superseded by a note: %q", got)
+	}
+}
