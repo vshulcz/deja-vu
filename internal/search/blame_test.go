@@ -3,6 +3,7 @@ package search
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -109,6 +110,37 @@ func BenchmarkBlameVerification1000Candidates(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		if got := Blame(ss, target, BlameOptions{All: true}); len(got) != len(ss) {
 			b.Fatalf("hits=%d", len(got))
+		}
+	}
+}
+
+// The decay was read from the clock once per session, so candidates with
+// identical evidence and identical timestamps sorted differently on every run
+// — five runs, five different top hits (#688).
+func TestBlameRanksTheSameWayEveryRun(t *testing.T) {
+	day := time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC)
+	var ss []model.Session
+	for i := 0; i < 40; i++ {
+		id := fmt.Sprintf("s%02d", i)
+		ss = append(ss, model.Session{
+			Harness: "claude", ID: id, Project: "p", Updated: day,
+			Messages: []model.Message{{Role: "files", Text: "/repo/main.go", Time: day}},
+		})
+	}
+	target, err := ResolveBlamePath("/repo/main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := Blame(ss, target, BlameOptions{All: true})
+	if len(first) == 0 {
+		t.Fatal("no hits")
+	}
+	for run := 0; run < 20; run++ {
+		got := Blame(ss, target, BlameOptions{All: true})
+		for i := range got {
+			if got[i].Session.ID != first[i].Session.ID {
+				t.Fatalf("run %d position %d: %q, first run had %q", run, i, got[i].Session.ID, first[i].Session.ID)
+			}
 		}
 	}
 }

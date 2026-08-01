@@ -58,9 +58,15 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 }
 
 func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
+	// One clock reading for the whole ranking. Called per session, the decay
+	// differed by nanoseconds between candidates, so sessions with identical
+	// evidence and identical timestamps sorted differently on every run — five
+	// runs, five different top hits once blame started seeing the sessions that
+	// only touched the file (#688).
+	now := time.Now()
 	cut := time.Time{}
 	if o.Since > 0 {
-		cut = time.Now().Add(-o.Since)
+		cut = now.Add(-o.Since)
 	}
 	base := strings.ToLower(filepath.ToSlash(target.Base))
 	forms := blameForms(target.FullPath)
@@ -97,7 +103,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		if projectContainsFile(session.Project, target.FullPath) {
 			score *= 1.35
 		}
-		hit.Score = score * freshnessDecay(session.Updated, time.Now())
+		hit.Score = score * freshnessDecay(session.Updated, now)
 		hits = append(hits, hit)
 	}
 	sort.Slice(hits, func(i, j int) bool {
