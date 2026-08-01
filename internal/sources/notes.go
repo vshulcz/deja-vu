@@ -143,7 +143,7 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 			key := "promoted\x00" + src
 			s := byDay[key]
 			if s == nil {
-				s = &model.Session{ID: "deja-note-" + strings.ReplaceAll(src, ":", "-"), Harness: "deja", Project: project, Path: path}
+				s = &model.Session{ID: PromotedNoteID(src), Harness: "deja", Project: project, Path: path}
 				byDay[key] = s
 			}
 			if title == "" {
@@ -360,6 +360,31 @@ func noteWordSet(s string) map[string]bool {
 	return out
 }
 
+// ForgetPromotedNotes deletes whole promoted lines whose note session the
+// caller matched — what `deja forget` on a note itself has to mean. Dropping
+// the session from the index only writes a tombstone: search goes quiet while
+// the text stays in notes.jsonl, which deja wrote and rewrites elsewhere
+// (#841). Forgetting the SOURCE session is the other case and still keeps the
+// note, minus its borrowed title (#666).
+func ForgetPromotedNotes(match func(noteSession string) bool) (int, error) {
+	return rewriteNotes(func(m map[string]any) (map[string]any, bool) {
+		if kind, _ := m["kind"].(string); kind != "promoted" {
+			return m, false
+		}
+		src, _ := m["session"].(string)
+		if src == "" || !match(PromotedNoteID(src)) {
+			return m, false
+		}
+		return nil, true
+	})
+}
+
+// PromotedNoteID is the session id a promoted note is indexed under, so a
+// caller holding an id from the index can match the line that produced it.
+func PromotedNoteID(sourceSession string) string {
+	return "deja-note-" + strings.ReplaceAll(sourceSession, ":", "-")
+}
+
 // ForgetPromotedTitles strips the source session's opening line from every
 // promoted note whose provenance matches.
 //
@@ -372,6 +397,27 @@ func noteWordSet(s string) map[string]bool {
 // reason the raw session was safe to forget. Only the borrowed title goes; the
 // parser already falls back to "promoted from <src>" when it is absent.
 func ForgetPromotedTitles(match func(session string) bool) (int, error) {
+	return rewriteNotes(func(m map[string]any) (map[string]any, bool) {
+		if kind, _ := m["kind"].(string); kind != "promoted" {
+			return m, false
+		}
+		src, _ := m["session"].(string)
+		if src == "" || !match(src) {
+			return m, false
+		}
+		if title, _ := m["title"].(string); title == "" {
+			return m, false
+		}
+		delete(m, "title")
+		return m, true
+	})
+}
+
+// rewriteNotes applies edit to every note line: it returns the replacement and
+// whether anything changed, and a nil replacement deletes the line. The file is
+// written through temp+rename, and the temp file is removed when the write
+// fails so a full disk does not leave one behind (#808).
+func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error) {
 	path := NotesFile()
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -380,39 +426,43 @@ func ForgetPromotedTitles(match func(session string) bool) (int, error) {
 		}
 		return 0, err
 	}
-	lines := strings.Split(string(b), "\n")
+	var lines []string
 	changed := 0
-	for i, line := range lines {
+	for _, line := range strings.Split(string(b), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		var m map[string]any
 		if json.Unmarshal([]byte(line), &m) != nil {
+			lines = append(lines, line)
 			continue
 		}
-		if kind, _ := m["kind"].(string); kind != "promoted" {
+		next, edited := edit(m)
+		if !edited {
+			lines = append(lines, line)
 			continue
 		}
-		src, _ := m["session"].(string)
-		if src == "" || !match(src) {
-			continue
-		}
-		if title, _ := m["title"].(string); title == "" {
-			continue
-		}
-		delete(m, "title")
-		out, err := json.Marshal(m)
-		if err != nil {
-			continue
-		}
-		lines[i] = string(out)
 		changed++
+		if next == nil {
+			continue
+		}
+		out, err := json.Marshal(next)
+		if err != nil {
+			lines = append(lines, line)
+			changed--
+			continue
+		}
+		lines = append(lines, string(out))
 	}
 	if changed == 0 {
 		return 0, nil
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+	body := strings.Join(lines, "\n")
+	if body != "" {
+		body += "\n"
+	}
+	if err := os.WriteFile(tmp, []byte(body), 0o600); err != nil {
 		// A rewrite that ran out of room left its temp file behind, on the
 		// filesystem that just filled up (#808).
 		_ = os.Remove(tmp)
