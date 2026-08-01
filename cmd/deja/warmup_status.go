@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"os"
 	"path/filepath"
 	"sync"
@@ -179,9 +180,18 @@ func cmdWarmupStatus(dir string, _ []string) error {
 // reach deja only over MCP, so a tool result is the one place they can learn
 // that the first index is still being built. Without this the agent reads a
 // confident negative and tells the user they have no history.
-func emptyRecallAnswer(dir, q string) string {
+func emptyRecallAnswer(dir, q string) string { return emptyRecallAnswerPolicy(dir, q, 0) }
+
+// emptyRecallAnswerPolicy adds the reason when a rule, not the query, is why
+// the answer is empty. An agent told "no prior sessions matched" concludes the
+// work was never done and starts over (#680).
+func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	if st := readWarmupStatus(dir); st != nil {
 		return fmt.Sprintf("deja is still building its index (%s). Nothing can be recalled yet — it finishes within a few seconds, so ask again later in this session rather than concluding there is no history.", st.progress())
+	}
+	if hidden > 0 {
+		return fmt.Sprintf("%d prior session%s matched %q, but this machine's trust policy (%s) does not allow them on this path. There is prior work here; it is not being shown.",
+			hidden, pluralS(hidden), q, policy.Load().Describe(policy.ActivationMCP))
 	}
 	return fmt.Sprintf("No prior deja sessions matched %q.", q)
 }

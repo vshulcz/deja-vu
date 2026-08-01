@@ -3,6 +3,7 @@ package policy
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -107,5 +108,37 @@ func TestFilterDropsBlocked(t *testing.T) {
 	got := Filter(Load(), ActivationSearch, items, func(s string) string { return s })
 	if len(got) != 2 || got[0] != "deja-vu" || got[1] != "other" {
 		t.Fatalf("Filter = %v", got)
+	}
+}
+
+// Load falls back to the permissive default on any error, so a malformed file
+// changed nothing and said nothing (#661). Diagnose is what doctor reads.
+func TestDiagnose(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "policy.json")
+	t.Setenv("DEJA_POLICY_FILE", path)
+
+	if exists, err, unknown := Diagnose(); exists || err != nil || unknown != nil {
+		t.Fatalf("no file: exists=%v err=%v unknown=%v", exists, err, unknown)
+	}
+	if err := os.WriteFile(path, []byte("{ oops"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if exists, err, _ := Diagnose(); !exists || err == nil {
+		t.Fatalf("malformed: exists=%v err=%v", exists, err)
+	}
+	// Rules that name something deja never consults are silently doing nothing,
+	// which reads exactly like a rule that works.
+	body := `{"activations":{"auto":{"nosuchorigin":false},"nosuch":{"local":false},"mcp":{"imported:peer1":false,"local":true}}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	exists, err, unknown := Diagnose()
+	if !exists || err != nil {
+		t.Fatalf("valid: exists=%v err=%v", exists, err)
+	}
+	want := []string{"activation nosuch", "auto.nosuchorigin"}
+	if strings.Join(unknown, "|") != strings.Join(want, "|") {
+		t.Errorf("unknown = %v, want %v", unknown, want)
 	}
 }

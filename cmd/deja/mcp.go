@@ -398,7 +398,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
 	}
-	hits = policyFilterHits(policy.ActivationMCP, hits)
+	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
 	if os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
@@ -406,7 +406,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	o.Semantic = semantic
 	if len(hits) == 0 {
-		return emptyRecallAnswer(dir, q), 0, 0, nil, nil
+		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
 	}
 	total := len(hits)
 	if offset > 0 {
@@ -529,14 +529,14 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
 	}
-	hits = policyFilterHits(policy.ActivationMCP, hits)
+	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	if semantic {
 		o.Tier = search.TierSemantic
 	}
 	if len(hits) == 0 {
-		return emptyRecallAnswer(dir, q), 0, 0, nil, nil
+		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, hits[0].Session, q)

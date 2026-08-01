@@ -451,7 +451,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		}
 		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
 	}
-	hits = policyFilterHits(policy.ActivationSearch, hits)
+	hits, policyHidden := policyFilterHitsCounted(policy.ActivationSearch, hits)
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
@@ -469,7 +469,13 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		o.Total = len(hits)
 	}
 	if len(hits) == 0 {
-		printNoMatches(os.Stderr, dir, o.Query)
+		// The policy is named before the generic advice: "try fewer words" is
+		// wrong counsel for someone whose words were fine (#680).
+		if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
+			fmt.Fprint(os.Stderr, note)
+		} else {
+			printNoMatches(os.Stderr, dir, o.Query)
+		}
 	}
 	search.Print(os.Stdout, hits, o)
 	return nil

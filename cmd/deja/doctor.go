@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -93,6 +94,8 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	}
 	fmt.Fprintln(w)
 	doctorTools(w)
+	fmt.Fprintln(w)
+	doctorPolicy(w)
 	fmt.Fprintln(w)
 	doctorMCP(w)
 	fmt.Fprintln(w)
@@ -389,6 +392,33 @@ func doctorTools(w io.Writer) {
 		status = "found"
 	}
 	fmt.Fprintf(w, "  %-12s %s (needed for opencode and Cursor IDE stores)\n", "sqlite3", status)
+}
+
+// doctorPolicy reports the one mechanism that separates local memory from
+// imported. Load falls back to the permissive default on any error, so a
+// malformed file changed nothing and said nothing, and a working one was
+// invisible — leaving no place at all to find out what the rules are (#661).
+func doctorPolicy(w io.Writer) {
+	fmt.Fprintln(w, "Trust policy:")
+	exists, err, unknown := policy.Diagnose()
+	if !exists {
+		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", policy.Path())
+		return
+	}
+	if err != nil {
+		// The permissive default is what is actually in force, and that is the
+		// part worth saying out loud: the file reads like a restriction.
+		fmt.Fprintf(w, "  %-12s %s: %v\n", "unreadable", policy.Path(), err)
+		fmt.Fprintf(w, "  %-12s every origin activates everywhere until it parses\n", "in force")
+		return
+	}
+	pol := policy.Load()
+	for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
+		fmt.Fprintf(w, "  %-12s %s\n", activation, pol.Describe(activation))
+	}
+	for _, u := range unknown {
+		fmt.Fprintf(w, "  %-12s %q is not an activation or origin deja consults — this rule does nothing\n", "ignored", u)
+	}
 }
 
 func doctorMCP(w io.Writer) {

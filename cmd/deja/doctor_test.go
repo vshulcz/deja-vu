@@ -576,3 +576,42 @@ func TestHookContextDoesNotBlockOnSilentStdin(t *testing.T) {
 		t.Fatal("hook-context must not hang when the host never closes stdin (codex does this)")
 	}
 }
+
+// The one mechanism separating local memory from imported was invisible to the
+// command whose job is answering "is my setup right" (#661).
+func TestDoctorReportsThePolicy(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "policy.json")
+	t.Setenv("DEJA_POLICY_FILE", path)
+
+	var buf bytes.Buffer
+	doctorPolicy(&buf)
+	if !strings.Contains(buf.String(), "every origin activates everywhere") {
+		t.Errorf("no file: %q", buf.String())
+	}
+
+	buf.Reset()
+	if err := os.WriteFile(path, []byte("{ oops"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doctorPolicy(&buf)
+	// The permissive default is what is in force, and the file reads like a
+	// restriction — so saying only "unreadable" would leave the wrong belief.
+	for _, want := range []string{"unreadable", "every origin activates everywhere until it parses"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("malformed: %q lacks %q", buf.String(), want)
+		}
+	}
+
+	buf.Reset()
+	body := `{"activations":{"mcp":{"local":false},"nosuch":{"local":false}}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doctorPolicy(&buf)
+	for _, want := range []string{"mcp", "deny local", "ignored", "this rule does nothing"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("valid: %q lacks %q", buf.String(), want)
+		}
+	}
+}
