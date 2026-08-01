@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path"
@@ -246,6 +247,33 @@ func doctorEmbed(w io.Writer, r doctorEmbedReport) {
 	fmt.Fprintf(w, "  sidecar    coverage=%.1f%%\n", r.Coverage)
 }
 
+// unplacedFiles counts transcripts under root that the harness's own filter
+// did not pick up. A harness that changes its layout in a new version presents
+// exactly this way: quietly fewer sessions, no error, and a directory size that
+// still looks right (#701).
+func unplacedFiles(root string, seen []string) int {
+	have := make(map[string]bool, len(seen))
+	for _, p := range seen {
+		have[filepath.Clean(p)] = true
+	}
+	extra := 0
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(p)) {
+		case ".jsonl", ".json":
+		default:
+			return nil
+		}
+		if !have[filepath.Clean(p)] {
+			extra++
+		}
+		return nil
+	})
+	return extra
+}
+
 func doctorHarnesses(w io.Writer) {
 	fmt.Fprintln(w, "Harness stores:")
 	sqlite := sources.SQLite3Available()
@@ -262,11 +290,23 @@ func doctorHarnesses(w io.Writer) {
 		fmt.Fprintln(w, line)
 	}
 
+	// printFiles is printRow for the harnesses that answer with a file list.
+	// The count comes from the same filter the parser uses, so a store whose
+	// layout differs slightly loses those files from every number deja prints
+	// — the one thing `doctor` exists to rule out (#701).
+	printFiles := func(name, path string, present bool, seen []string) {
+		detail := doctorCount(len(seen), "file")
+		if extra := unplacedFiles(path, seen); extra > 0 {
+			detail += fmt.Sprintf(", %d not recognised here", extra)
+		}
+		printRow(name, path, present, detail)
+	}
+
 	claudeRoot := sources.ClaudeRoot()
-	printRow("claude", claudeRoot, doctorExists(claudeRoot), doctorCount(len(sources.ClaudeFiles()), "file"))
+	printFiles("claude", claudeRoot, doctorExists(claudeRoot), sources.ClaudeFiles())
 
 	codexRoot := sources.CodexRoot()
-	printRow("codex", codexRoot, doctorExists(codexRoot), doctorCount(len(sources.CodexFiles()), "file"))
+	printFiles("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles())
 
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))
@@ -274,20 +314,20 @@ func doctorHarnesses(w io.Writer) {
 	printRow("aider", doctorAiderLocation(), len(sources.AiderFiles()) > 0, doctorCount(len(sources.AiderFiles()), "file"))
 
 	geminiRoot := sources.GeminiRoot()
-	printRow("gemini", geminiRoot, doctorExists(geminiRoot), doctorCount(len(sources.GeminiChatFiles()), "file"))
+	printFiles("gemini", geminiRoot, doctorExists(geminiRoot), sources.GeminiChatFiles())
 
 	printRow("cursor", doctorCursorLocation(), doctorCursorPresent(), doctorCursorDetail(sqlite))
 
 	printRow("antigravity", doctorAntigravityLocation(), len(sources.AntigravityRoots()) > 0, doctorCount(len(sources.AntigravityTranscripts()), "file"))
 
 	grokRoot := sources.GrokRoot()
-	printRow("grok", grokRoot, doctorExists(grokRoot), doctorCount(len(sources.GrokSessionFiles()), "file"))
+	printFiles("grok", grokRoot, doctorExists(grokRoot), sources.GrokSessionFiles())
 
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
-	printRow("qwen", qwenRoot, doctorExists(qwenRoot), doctorCount(len(sources.QwenSessionFiles()), "file"))
+	printFiles("qwen", qwenRoot, doctorExists(qwenRoot), sources.QwenSessionFiles())
 
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
-	printRow("kimi", kimiRoot, doctorExists(kimiRoot), doctorCount(len(sources.KimiSessionFiles()), "file"))
+	printFiles("kimi", kimiRoot, doctorExists(kimiRoot), sources.KimiSessionFiles())
 
 	gooseRoot := filepath.Join(sources.GooseRoot(), "sessions")
 	printRow("goose", gooseRoot, doctorExists(gooseRoot) || doctorFilePresent(sources.GooseDB()), doctorGooseDetail(sqlite))
@@ -311,11 +351,11 @@ func doctorHarnesses(w io.Writer) {
 	printRow("roo", rooLoc, rooFiles > 0, doctorCount(rooFiles, "file"))
 
 	piRoot := sources.PiRoot()
-	printRow("pi", piRoot, doctorExists(piRoot), doctorCount(len(sources.PiSessionFiles()), "file"))
+	printFiles("pi", piRoot, doctorExists(piRoot), sources.PiSessionFiles())
 	openclawRoot := sources.OpenClawRoot()
 	printRow("openclaw", openclawRoot, doctorExists(openclawRoot), doctorCount(len(sources.OpenClawSessionFiles()), "file"))
 	copilotRoot := sources.CopilotRoot()
-	printRow("copilot", copilotRoot, doctorExists(copilotRoot), doctorCount(len(sources.CopilotSessionFiles()), "file"))
+	printFiles("copilot", copilotRoot, doctorExists(copilotRoot), sources.CopilotSessionFiles())
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
 }
 
