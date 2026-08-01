@@ -31,14 +31,21 @@ type restoreSpan struct {
 	session string
 	harness string
 	body    string
+	// file is the path the edit recorded, which is what the span was taken
+	// from — the -o guard compares against this rather than against whatever
+	// spelling the caller typed (#725).
+	file string
 }
 
 func runRestore(dir string, args []string, stdout io.Writer) error {
 	path := ""
 	want := 0
 	out := ""
+	force := false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--force":
+			force = true
 		case "--span":
 			if i+1 < len(args) {
 				i++
@@ -60,7 +67,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if path == "" {
-		return fmt.Errorf("usage: deja restore <path> [--span n] [-o file]")
+		return fmt.Errorf("usage: deja restore <path> [--span n] [-o file] [--force]")
 	}
 
 	spans, err := findRestoreSpans(dir, path)
@@ -92,10 +99,17 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		}
 		return nil
 	}
-	// Never the original path: this exists because something overwrote work,
-	// and writing back over it would repeat the mistake.
-	if sameFile(out, path) {
-		return fmt.Errorf("restore: refusing to write over %s — pick another -o", path)
+	// Never the original: this exists because something overwrote work, and
+	// writing back over it would repeat the mistake. Comparing against the
+	// argument alone was not enough — `deja restore pool.go -o repo/pool.go`
+	// named the same file two ways and went through (#725).
+	if sameFile(out, path) || (span.file != "" && sameFile(out, span.file)) {
+		return fmt.Errorf("restore: refusing to write over %s — that is the file this span came from; pick another -o", out)
+	}
+	// Any other existing file is someone's work too, and a recovery command is
+	// reached for in exactly the moments when a typo costs the most.
+	if _, err := os.Stat(out); err == nil && !force {
+		return fmt.Errorf("restore: %s already exists — pick another -o, or pass --force to overwrite it", out)
 	}
 	if err := os.WriteFile(out, []byte(span.body), 0o600); err != nil {
 		return fmt.Errorf("restore: %w", err)
@@ -137,7 +151,7 @@ func findRestoreSpans(dir string, path string) ([]restoreSpan, error) {
 			return
 		}
 		seen[meta.Harness+":"+meta.ID] = true
-		spans = append(spans, restoreSpan{when: r.Time, session: meta.ID, harness: meta.Harness, body: body})
+		spans = append(spans, restoreSpan{when: r.Time, session: meta.ID, harness: meta.Harness, body: body, file: recorded})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("restore: %w", err)

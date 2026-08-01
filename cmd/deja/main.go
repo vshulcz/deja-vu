@@ -1403,6 +1403,7 @@ Usage:
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja files <topic> [--project name] [--limit n]
+  deja restore <path> [--span n] [-o file] [--force]
   deja friction [--limit n]
   deja sync export <dir> [--full]
   deja sync import <dir>
