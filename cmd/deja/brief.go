@@ -69,6 +69,12 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintln(w, line)
 	}
 
+	// The week line earns its space only when the week holds something today
+	// does not. Equal session counts, equal recall counts and no déjà vu means
+	// it restates the line above with weaker numbers — on a one-session store
+	// that put the same number on three of the four lines (#842).
+	weekEchoesToday := ov.SessionsWeek == ov.SessionsToday && weekRecalls == recalls && dejaVu == 0
+
 	wr := weekRecalls
 	if quietWeek {
 		// Nothing this week. Two zero lines is the worst possible opening for
@@ -76,7 +82,7 @@ func runBrief(dir string, w io.Writer) error {
 		// fact is right there: how far back the memory goes.
 		fmt.Fprintf(w, "covering   %s%s → %s%s\n", bold,
 			ov.Oldest.Local().Format("Jan 2 2006"), ov.Newest.Local().Format("Jan 2 2006"), reset)
-	} else {
+	} else if !weekEchoesToday {
 		week := fmt.Sprintf("this week  %d session%s · %d recall%s", ov.SessionsWeek, pluralS(ov.SessionsWeek), wr, pluralS(wr))
 		if dejaVu > 0 {
 			week += fmt.Sprintf(" · %s%d déjà vu moment%s%s", bold, dejaVu, pluralS(dejaVu), reset)
@@ -114,15 +120,40 @@ func runBrief(dir string, w io.Writer) error {
 	// The one line on this screen that says something a person could not have
 	// noticed themselves: a question they asked in more than one session. A
 	// count of sessions is reporting; this is the thing the tool is for.
-	if a, ok := index.FindAskedTwice(dir); ok {
-		fmt.Fprintf(w, "asked      %s%s%s\n", bold, trimBriefTitle(a.Text), reset)
-		fmt.Fprintf(w, "before     %s%s%s\n", dim, askedWhen(a), reset)
+	asked, haveAsked := index.FindAskedTwice(dir)
+	askedText := ""
+	if haveAsked {
+		askedText = trimBriefTitle(asked.Text)
 	}
 
 	// What the counters above cannot say: which memory kept being worth
 	// recalling. "63 recalls" is a rate; a named piece of work is the thing a
 	// person repeats to a colleague (#579).
-	if r, ok := findReusedMemory(dir); ok {
+	r, haveReused := findReusedMemory(dir)
+
+	// What you keep asking is what keeps getting recalled, so these two land on
+	// the same work more often than not — and then the screen printed one title
+	// twice and made the reader diff two lines to notice (#843). The two facts
+	// differ, so both are kept; the second copy of the title is not.
+	sameWork := haveAsked && haveReused && sameBriefWork(r.Title, asked.Text)
+
+	if haveAsked {
+		fmt.Fprintf(w, "asked      %s%s%s\n", bold, askedText, reset)
+		when := askedWhen(asked)
+		if sameWork {
+			when += fmt.Sprintf(" · %d× re-used recently", r.Times)
+			// The span ends at the newest asking, and the memory being recalled
+			// is often an older one — the answer people keep coming back to,
+			// not the last time they asked. Then this date is a second fact and
+			// folding it away loses it (#843).
+			if last := search.RelativeDate(r.Age); last != search.RelativeDate(asked.Sessions[0].Updated) {
+				when += " · last worked " + last
+			}
+		}
+		fmt.Fprintf(w, "before     %s%s%s\n", dim, when, reset)
+	}
+
+	if haveReused && !sameWork {
 		fmt.Fprintf(w, "reused     %s%s%s\n", bold, trimBriefTitle(r.Title), reset)
 		// Not "by agents": the count includes the déjà vu events written when
 		// the user's own prompt returns to the same ground, which is a person
@@ -196,6 +227,29 @@ func trimBriefTitle(t string) string {
 		return string(r[:44]) + "…"
 	}
 	return t
+}
+
+// sameBriefWork reports whether the reused memory and the repeated question
+// name the same work.
+//
+// Judging that on the 44 columns the screen shows is judging the wrong text:
+// two questions about the same build that end "on the arm64 runner" and "on the
+// raspberry pi" are identical for the first 44 characters, and the reused one
+// then vanished from the screen instead of being printed (#843). The manifest
+// cuts a title at 60 characters while the question is stored whole, so neither
+// side is guaranteed complete — prefix agreement over everything both sides
+// kept is the strongest test available here.
+func sameBriefWork(title, asked string) bool {
+	t, a := briefWorkKey(title), briefWorkKey(asked)
+	if t == "" || a == "" {
+		return false
+	}
+	return strings.HasPrefix(a, t) || strings.HasPrefix(t, a)
+}
+
+func briefWorkKey(s string) string {
+	s = strings.Join(strings.Fields(strings.ToLower(s)), " ")
+	return strings.TrimSpace(strings.TrimSuffix(s, "…"))
 }
 
 // buildForFirstRun indexes with the same narration `deja warmup` uses, so the
