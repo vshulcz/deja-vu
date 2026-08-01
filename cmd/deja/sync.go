@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -23,6 +24,13 @@ func runSync(dir string, args []string) error {
 			if a == "--full" {
 				full = true
 				continue
+			}
+			// A dropped flag fell back to the incremental path, which on a
+			// second run has nothing left to send: `--ful` exported zero
+			// records into an empty directory while the reader believed they
+			// had carried their whole memory to another machine (#745).
+			if strings.HasPrefix(a, "-") {
+				return fmt.Errorf("sync export: unknown flag %q — only --full is accepted", a)
 			}
 			out = a
 		}
@@ -50,6 +58,9 @@ func runSync(dir string, args []string) error {
 		fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
 		return nil
 	case "import":
+		for _, a := range args[2:] {
+			return fmt.Errorf("sync import: unexpected argument %q — it takes one directory", a)
+		}
 		n, err := index.Import(dir, args[1])
 		if err != nil {
 			return err
