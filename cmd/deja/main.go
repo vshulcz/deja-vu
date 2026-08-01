@@ -525,6 +525,26 @@ func printNoMatches(w io.Writer, dir, q string) {
 	if hint := commandHint(q); hint != "" {
 		fmt.Fprint(w, hint)
 	}
+	if note := hiddenByOwnSettings(); note != "" {
+		fmt.Fprint(w, note)
+	}
+}
+
+// hiddenByOwnSettings names the states the reader created themselves and can
+// undo. "Forgotten", "excluded by my own pattern" and "never happened" were one
+// answer, and "try fewer words" is wrong counsel for the first two (#686).
+func hiddenByOwnSettings() string {
+	var parts []string
+	if n := len(index.Tombstones()); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d session%s forgotten (`deja forget --list`)", n, pluralS(n)))
+	}
+	if pats := sources.ExclusionPatterns(); len(pats) > 0 {
+		parts = append(parts, fmt.Sprintf("%d project pattern%s excluded from indexing (%s)", len(pats), pluralS(len(pats)), sources.ExcludePath()))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "deja: this machine also has " + strings.Join(parts, ", ") + "\n"
 }
 
 // commandHint reads an empty search as a possible mistyped subcommand. It

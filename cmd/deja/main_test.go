@@ -1357,3 +1357,42 @@ func TestCommandHint(t *testing.T) {
 		}
 	}
 }
+
+// "Forgotten", "excluded by my own pattern" and "never happened" were one
+// answer, and "try fewer words" is wrong counsel for the first two (#686).
+func TestHiddenByOwnSettings(t *testing.T) {
+	withTempStores(t)
+	// Nothing configured: nothing to say. A line on every empty result is
+	// noise that teaches people to skip the last line.
+	if got := hiddenByOwnSettings(); got != "" {
+		t.Errorf("clean machine said %q", got)
+	}
+
+	cfg := filepath.Join(os.Getenv("HOME"), ".config", "deja")
+	if err := os.MkdirAll(cfg, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg, "exclude"), []byte("secret\nclientwork\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := hiddenByOwnSettings()
+	if !strings.Contains(got, "2 project patterns excluded") || !strings.Contains(got, "exclude") {
+		t.Errorf("exclude only: %q", got)
+	}
+	if strings.Contains(got, "forgotten") {
+		t.Errorf("claimed forgotten sessions with no tombstones: %q", got)
+	}
+
+	// A real forget, so the tombstone is written the way the command writes it.
+	seedTouchedIndex(t, 2, "/w/t/shared.go")
+	if err := os.WriteFile(filepath.Join(cfg, "exclude"), []byte("secret\nclientwork\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "forget", "--session", "t00"); err != nil {
+		t.Fatal(err)
+	}
+	got = hiddenByOwnSettings()
+	if !strings.Contains(got, "forgotten") || !strings.Contains(got, "deja forget --list") {
+		t.Errorf("after forget: %q", got)
+	}
+}
