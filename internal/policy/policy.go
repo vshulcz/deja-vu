@@ -135,18 +135,18 @@ func Filter[T any](p Policy, activation string, items []T, projectOf func(T) str
 // Load deliberately falls back to the permissive default on any error, so a
 // malformed file changes nothing and says nothing — the wrong outcome for the
 // one mechanism separating local memory from imported (#661).
-func Diagnose() (exists bool, err error, unknown []string) {
+func Diagnose() (exists bool, unknown []string, err error) {
 	path := Path()
 	b, rerr := os.ReadFile(path)
 	if rerr != nil {
 		if os.IsNotExist(rerr) {
 			return false, nil, nil
 		}
-		return true, rerr, nil
+		return true, nil, rerr
 	}
 	var p Policy
 	if jerr := json.Unmarshal(b, &p); jerr != nil {
-		return true, jerr, nil
+		return true, nil, jerr
 	}
 	// A file that parses but names an activation or origin deja never consults
 	// is silently doing nothing, which reads exactly like a rule that works.
@@ -165,5 +165,5 @@ func Diagnose() (exists bool, err error, unknown []string) {
 		}
 	}
 	sort.Strings(unknown)
-	return true, nil, unknown
+	return true, unknown, nil
 }

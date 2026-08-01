@@ -118,13 +118,13 @@ func TestDiagnose(t *testing.T) {
 	path := filepath.Join(dir, "policy.json")
 	t.Setenv("DEJA_POLICY_FILE", path)
 
-	if exists, err, unknown := Diagnose(); exists || err != nil || unknown != nil {
+	if exists, unknown, err := Diagnose(); exists || err != nil || unknown != nil {
 		t.Fatalf("no file: exists=%v err=%v unknown=%v", exists, err, unknown)
 	}
 	if err := os.WriteFile(path, []byte("{ oops"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if exists, err, _ := Diagnose(); !exists || err == nil {
+	if exists, _, err := Diagnose(); !exists || err == nil {
 		t.Fatalf("malformed: exists=%v err=%v", exists, err)
 	}
 	// Rules that name something deja never consults are silently doing nothing,
@@ -133,12 +133,27 @@ func TestDiagnose(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	exists, err, unknown := Diagnose()
+	exists, unknown, err := Diagnose()
 	if !exists || err != nil {
 		t.Fatalf("valid: exists=%v err=%v", exists, err)
 	}
 	want := []string{"activation nosuch", "auto.nosuchorigin"}
 	if strings.Join(unknown, "|") != strings.Join(want, "|") {
 		t.Errorf("unknown = %v, want %v", unknown, want)
+	}
+}
+
+// A path that exists but cannot be read as a file — the config directory left
+// where the file should be — is neither "no policy" nor "malformed policy".
+func TestDiagnoseUnreadablePath(t *testing.T) {
+	dir := t.TempDir()
+	asDir := filepath.Join(dir, "policy.json")
+	if err := os.MkdirAll(asDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", asDir)
+	exists, _, err := Diagnose()
+	if !exists || err == nil {
+		t.Fatalf("exists=%v err=%v", exists, err)
 	}
 }

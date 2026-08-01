@@ -400,7 +400,7 @@ func doctorTools(w io.Writer) {
 // invisible — leaving no place at all to find out what the rules are (#661).
 func doctorPolicy(w io.Writer) {
 	fmt.Fprintln(w, "Trust policy:")
-	exists, err, unknown := policy.Diagnose()
+	exists, unknown, err := policy.Diagnose()
 	if !exists {
 		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", policy.Path())
 		return
