@@ -189,6 +189,14 @@ func (p *buildProgress) bar() string {
 // withBuildProgress runs fn with a live build display when stdout is a
 // terminal, and unchanged otherwise.
 func withBuildProgress(fn func() error) error {
+	// The detached warmup writes to /dev/null, which is a character device and
+	// so passes for a terminal. The live display then replaced the file sink
+	// withWarmupStatus had just installed and painted its animation into the
+	// device that discards it, leaving every "memory is on its way" line —
+	// hook, statusline, MCP, empty recall — with nothing to read (#862).
+	if os.Getenv("DEJA_WARMUP_SENTINEL") != "" {
+		return fn()
+	}
 	if !logoWanted(os.Stdout) {
 		return fn()
 	}
