@@ -132,6 +132,9 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			if gr.Path != "" && !banner {
 				fmt.Println(guidanceOutput(t, gr))
 			}
+			if gr.Path != "" && uninstall {
+				pruneGuidanceDirs(gr.Path)
+			}
 			if gr.Path != "" && !uninstall {
 				guidanceCount++
 			}
@@ -474,6 +477,27 @@ func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
 	return installOpencodePlugin(exe, uninstall)
 }
 
+// pruneGuidanceDirs drops the directories install had to create for a guidance
+// file, once that file is gone. A skill lives at <config>/skills/deja-history/
+// SKILL.md; both segments are deja's, and uninstall walked away from an empty
+// skills/deja-history/ nobody else put there (#840). Matching those two names
+// is the bound — every other guidance path (AGENTS.md, GEMINI.md) sits directly
+// in a harness directory that is not ours to delete. os.Remove on a directory
+// fails unless it is empty, which is the condition wanted: a skills/ that still
+// holds someone else's skill stays.
+func pruneGuidanceDirs(path string) {
+	dir := filepath.Dir(path)
+	if filepath.Base(dir) != "deja-history" {
+		return
+	}
+	if err := os.Remove(dir); err != nil {
+		return
+	}
+	if dir = filepath.Dir(dir); filepath.Base(dir) == "skills" {
+		_ = os.Remove(dir)
+	}
+}
+
 func backupOnce(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return nil
@@ -507,6 +531,19 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if removingWiring {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return "unchanged", nil
+		}
+		// Nothing is left once deja's block comes out, which means deja wrote
+		// the whole file: install created ~/.codex/AGENTS.md, uninstall
+		// truncated it to zero bytes and left it there, plus a .bak of deja's
+		// own guidance (#840). Deleting is what "remove what we added" means
+		// here. Before backupOnce, so the backup of a file that was entirely
+		// ours is not created either — the .bak of a config the user already
+		// had still is.
+		if len(next) == 0 {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return "", err
+			}
+			return "removed", nil
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

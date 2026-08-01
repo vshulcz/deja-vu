@@ -83,6 +83,83 @@ func TestUninstallStillRemovesWhatInstallWrote(t *testing.T) {
 	}
 }
 
+// What install created, uninstall takes back: an AGENTS.md that held nothing
+// but deja's block was truncated to zero bytes rather than deleted, and the
+// skills/deja-history/ deja made for the Claude skill was left standing empty
+// (#840). The .bak of a config the user already had is the documented safety
+// net and stays.
+func TestUninstallLeavesNoFileOrDirItCreated(t *testing.T) {
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	for _, d := range []string{".claude", ".codex"} {
+		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A codex config the user already had, and no AGENTS.md beside it.
+	if err := os.WriteFile(filepath.Join(home, ".codex", "config.toml"), []byte("model = \"gpt-5\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "--all", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	agents := filepath.Join(home, ".codex", "AGENTS.md")
+	skill := filepath.Join(home, ".claude", "skills", "deja-history", "SKILL.md")
+	for _, p := range []string{agents, skill} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("install did not write %s: %v", p, err)
+		}
+	}
+	if _, err := captureRun(t, "uninstall", "--all"); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{
+		agents,
+		agents + ".bak",
+		filepath.Dir(skill),
+		filepath.Join(home, ".claude", "skills"),
+	} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("uninstall left behind %s", p)
+		}
+	}
+	// The user's own config and its snapshot are not ours to delete.
+	for _, p := range []string{
+		filepath.Join(home, ".codex", "config.toml"),
+		filepath.Join(home, ".codex", "config.toml.bak"),
+	} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("uninstall removed %s: %v", p, err)
+		}
+	}
+}
+
+// A skills/ holding someone else's skill is not deja's to clean up, even once
+// deja's own is gone.
+func TestUninstallKeepsASkillsDirectoryThatIsNotEmpty(t *testing.T) {
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "claude", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	theirs := filepath.Join(home, ".claude", "skills", "their-skill", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(theirs), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(theirs, []byte("---\nname: theirs\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "uninstall", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(theirs); err != nil {
+		t.Errorf("uninstall removed a skill that is not deja's: %v", err)
+	}
+}
+
 func filesMentioning(t *testing.T, root, needle string) []string {
 	t.Helper()
 	var out []string
