@@ -660,6 +660,14 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 		updated = fi.ModTime().Format("2006-01-02 15:04")
 	}
 	fmt.Fprintf(w, "  status   built (size=%s, updated=%s)\n", humanBytes(pathSize(dir)), updated)
+	// A store whose postings vanished or whose record log was truncated cannot
+	// answer anything, and said "up to date" until #735. The next search
+	// rebuilds it, which is worth saying too — the reader has not lost memory,
+	// only this build of the index.
+	if index.Damaged(dir) {
+		fmt.Fprintln(w, "  integrity damaged — records or postings are missing; the next search rebuilds the index")
+		return
+	}
 	switch idx.State {
 	case "stale":
 		if idx.StaleStores == 1 {

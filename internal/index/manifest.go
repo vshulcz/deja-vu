@@ -166,6 +166,25 @@ func recordsIntact(dir string, m Manifest) bool {
 	return true
 }
 
+// Damaged reports whether the store on disk still holds what the manifest
+// committed — a truncated record log, or postings that went missing to a
+// partial copy or an over-eager delete.
+//
+// The next search rebuilds when this is true, so nothing is lost permanently.
+// What was wrong is the answer `doctor` gave: "built, up to date" about a store
+// that could not return a single result (#735).
+func Damaged(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		// No readable manifest is "not built", which doctor reports already.
+		return false
+	}
+	return !recordsIntact(dir, m)
+}
+
 // OverviewStats is what the brief needs about a whole store.
 type OverviewStats struct {
 	Sessions      int
