@@ -61,6 +61,14 @@ func recordWiring(targets []string, uninstall bool) {
 		}
 	}
 	sort.Strings(kept)
+	// Uninstalling everything on a machine that was never wired would otherwise
+	// create the record on the way out — a file left behind by the command that
+	// removes things (#676).
+	if len(kept) == 0 {
+		if _, err := os.Stat(wiringStatePath()); os.IsNotExist(err) {
+			return
+		}
+	}
 	st = wiringState{Version: version, Targets: kept}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {

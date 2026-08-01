@@ -18,6 +18,8 @@ import (
 type installResult struct{ Path, Action string }
 
 func runInstall(dir string, args []string, uninstall bool) error {
+	removingWiring = uninstall
+	defer func() { removingWiring = false }()
 	guidance := true
 	noIndex := false
 	var targetArgs []string
@@ -480,9 +482,23 @@ func backupOnce(path string) error {
 	return os.WriteFile(bak, b, 0o600)
 }
 
+// removingWiring is set for the length of an uninstall run. Thirty-seven call
+// sites write configs through writeIfChanged, and on the uninstall path each
+// one computes "the file without deja in it" — which, for a file that does not
+// exist, is an empty config it then creates (#676). The flag is process-wide
+// because the command is: one run, one direction.
+var removingWiring bool
+
 func writeIfChanged(path string, old, next []byte) (string, error) {
 	if bytes.Equal(old, next) {
 		return "unchanged", nil
+	}
+	// Removing something must not leave more behind than it found. A file that
+	// is not there has nothing in it to remove.
+	if removingWiring {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return "unchanged", nil
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
@@ -533,6 +549,11 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
+		// Adding the empty block on the way out rewrites a config that never
+		// mentioned deja, and leaves a .bak of it besides (#676).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		m = map[string]any{}
 		root["mcpServers"] = m
 	}
@@ -850,6 +871,11 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
+		// Adding the empty block on the way out rewrites a config that never
+		// mentioned deja, and leaves a .bak of it besides (#676).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		m = map[string]any{}
 		root["mcpServers"] = m
 	}
@@ -914,6 +940,11 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
+		// Adding the empty block on the way out rewrites a config that never
+		// mentioned deja, and leaves a .bak of it besides (#676).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		m = map[string]any{}
 		root["mcpServers"] = m
 	}
