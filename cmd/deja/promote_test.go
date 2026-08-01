@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"io"
 
@@ -244,5 +245,36 @@ func TestPromoteSurfacesConflicts(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "conflict:") {
 		t.Fatalf("superseded note must not conflict:\n%s", out.String())
+	}
+}
+
+// The line has to stay quiet when there is nothing to take back: a first mark,
+// a repeat of the same mark, or a session that never had one. Two mutants of
+// markTakenBack shipped the sentence with an empty state in it and no test
+// noticed (#845).
+func TestPromoteSaysNothingWhenNoMarkWasTakenBack(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		state string
+		prior sources.Lifecycle
+	}{
+		{"first mark of any kind", "accepted", sources.Lifecycle{}},
+		{"accepted twice", "accepted", sources.Lifecycle{State: "accepted", At: time.Now()}},
+		{"rejected after accepted", "rejected", sources.Lifecycle{State: "accepted", At: time.Now()}},
+		{"rejected after rejected", "rejected", sources.Lifecycle{State: "rejected", At: time.Now()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := markTakenBack("claude:s1", tc.state, tc.prior); got != "" {
+				t.Errorf("said %q with nothing to take back", got)
+			}
+		})
+	}
+
+	// And it does fire for every state an undo can reverse, naming that state.
+	for _, prior := range []string{"rejected", "superseded", "stale"} {
+		got := markTakenBack("claude:s1", "accepted", sources.Lifecycle{State: prior, At: time.Now()})
+		if !strings.Contains(got, "takes back the "+prior+" mark") {
+			t.Errorf("prior %s: %q", prior, got)
+		}
 	}
 }
