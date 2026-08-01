@@ -647,6 +647,13 @@ func termCountLine(dir, q string) string {
 // their query missed. It fired on every ordinary miss, so the signature could
 // not be used to recognise the failure it was written for (#637).
 func printNoMatches(w io.Writer, dir, q string) {
+	// An empty store is not a query problem: "fewer words" cannot help when
+	// nothing is indexed, and `last`, `blame` and the brief all say what to do
+	// instead. Search is the command a new machine reaches for first (#832).
+	if n, err := index.SessionCount(dir); err == nil && n == 0 {
+		fmt.Fprintln(w, emptyIndexHint(fmt.Sprintf("no matches for %q", q)))
+		return
+	}
 	// Nothing to look up: very short tokens are dropped and punctuation is
 	// trimmed, so this query never reached the index. "Try fewer words"
 	// cannot be followed with one word, or none (#828). The message does not
