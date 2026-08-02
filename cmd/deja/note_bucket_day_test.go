@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A day of notes is one session whose id *is* a date, minted in UTC. Reading
@@ -13,7 +14,12 @@ import (
 // nothing (#883).
 func TestANoteBucketShowsTheDayItsIdNames(t *testing.T) {
 	tmp := hermeticEnv(t)
-	t.Setenv("TZ", "Europe/Moscow")
+	// time.Local is resolved once at process start, so TZ= in the environment
+	// does not move it. The bug only shows outside UTC, and CI runs in UTC —
+	// so the zone is set on the package's clock and restored after.
+	savedLocal := time.Local
+	time.Local = time.FixedZone("test+03", 3*60*60)
+	t.Cleanup(func() { time.Local = savedLocal })
 	notes := filepath.Join(tmp, "notes.jsonl")
 	body := `{"ts":"2026-07-16T21:01:00Z","project":"edge","text":"note just after midnight in Moscow"}` + "\n"
 	if err := os.WriteFile(notes, []byte(body), 0o644); err != nil {
