@@ -116,6 +116,27 @@ func runHookPrecompact(dir string) {
 	requestWarmup(dir)
 }
 
+// joinNotes puts a maintenance line ahead of the memory line without letting
+// an empty one leave a stray separator.
+func joinNotes(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "":
+		return a
+	}
+	return a + "\n" + b
+}
+
+// rewireNote is the one line a session start spends on maintenance: which
+// targets were rewritten when the binary moved or upgraded.
+func rewireNote(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja: refreshed its wiring for %s after an upgrade — any hand-edited command there was replaced", strings.Join(targets, ", "))
+}
+
 // runHookContext prints session-start context. plain=false emits the Claude
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).
@@ -123,9 +144,13 @@ func runHookContext(dir string, plain bool) error {
 	// A session start is the one moment deja is guaranteed to run on every
 	// harness, which makes it the only reliable place to repair wiring left
 	// behind by an older binary. It costs one small file read when nothing
-	// changed, and it says nothing: the user asked for memory, not for
-	// maintenance notes.
-	refreshWiringAfterUpgrade()
+	// changed.
+	//
+	// When it does change something it says so, once: the rewrite replaces
+	// whatever those commands held, including a wrapper someone put there on
+	// purpose, and silently reverting a person's edit is not a maintenance
+	// note anybody can act on afterwards (#886).
+	rewired := refreshWiringAfterUpgrade()
 	// SessionStart fires for startup, resume, clear and compact; the payload
 	// says which. After a compaction the model just lost its working context,
 	// so the lead line changes to say the memory below survived it.
@@ -184,6 +209,7 @@ func runHookContext(dir string, plain bool) error {
 				// what the environment block above is for.
 				line = "deja: indexing your history — recall comes online in a few seconds"
 			}
+			line = joinNotes(rewireNote(rewired), line)
 			if line != "" {
 				var resp sessionStartHookResponse
 				resp.HookSpecificOutput.HookEventName = "SessionStart"
@@ -250,14 +276,14 @@ func runHookContext(dir string, plain bool) error {
 		if r, ok := findReusedMemory(dir); ok {
 			earned = fmt.Sprintf(" · most re-used recently: %q, %d×", trimBriefTitle(r.Title), r.Times)
 		}
-		resp.SystemMessage = fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote, earned)
+		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote, earned))
 	}
 	// Nothing to recall yet because the index is still being built: say so
 	// rather than starting in silence. The build runs detached, so the agent
 	// is already usable — this only explains why memory is not here yet.
 	if resp.SystemMessage == "" {
 		if st := readWarmupStatus(dir); st != nil {
-			resp.SystemMessage = st.line()
+			resp.SystemMessage = joinNotes(rewireNote(rewired), st.line())
 		}
 	}
 	b, err := json.Marshal(resp)
