@@ -92,6 +92,10 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	doctorMCP(w)
 	fmt.Fprintln(w)
 	doctorHooks(w)
+	// After doctorHooks, not inside it: that function returns early on a
+	// machine without claude settings, which is exactly a machine whose other
+	// harnesses may still be wired to a binary that moved.
+	doctorWiringExe(w)
 	fmt.Fprintln(w)
 	doctorIndex(w, report.Index, dir)
 	fmt.Fprintln(w)
@@ -166,6 +170,25 @@ func doctorHooks(w io.Writer) {
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, path)
 	doctorCodexHook(w)
 	doctorAutoRecall(w)
+}
+
+// doctorWiringExe reports configs that name a binary which is no longer there.
+//
+// Every hook and MCP entry deja writes holds an absolute path. Move the binary
+// and those configs keep naming the old one: the harness fails to start deja
+// on every session, and doctor happily printed "wired" for a hook that cannot
+// run. The repair from #773 exists but runs from the hook path — the one path
+// a dead binary cannot reach — so doctor is where a person finds out (#876).
+func doctorWiringExe(w io.Writer) {
+	st := readWiringState()
+	if st.Exe == "" || len(st.Targets) == 0 {
+		return
+	}
+	if _, err := os.Stat(st.Exe); err == nil {
+		return
+	}
+	fmt.Fprintf(w, "  %-12s %-11s configs name %s, which is not there — `deja install %s` rewrites them for this binary\n",
+		"wiring", "stale", st.Exe, strings.Join(st.Targets, " "))
 }
 
 // doctorCodexHook reports the codex session-start hook state. Codex gates
