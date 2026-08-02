@@ -256,7 +256,23 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	dead := readTombstones()
 	matched := map[string]bool{}
 	result := ForgetResult{}
+	// An id that names a session exactly means that session. Prefix matching
+	// is documented and useful, but it also made `forget --session s1` drop
+	// s1 and every s1x beside it — twelve sessions for a selector that named
+	// one, reported only afterwards (#870).
+	exact := ""
+	if o.Session != "" {
+		for _, meta := range m.Sessions {
+			if meta.ID == o.Session {
+				exact = o.Session
+				break
+			}
+		}
+	}
 	for key, meta := range m.Sessions {
+		if exact != "" && meta.ID != exact {
+			continue
+		}
 		if !sessionMatches(meta, o) {
 			continue
 		}

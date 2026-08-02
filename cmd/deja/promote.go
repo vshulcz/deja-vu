@@ -118,15 +118,6 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	return nil
 }
 
-// markTakenBack says that an accepted mark cleared the rejected/superseded/
-// stale one before it.
-//
-// The undo works and always did — the latest mark wins, so `--state accepted`
-// drops the label and the demotion — but nothing said so. The measured
-// alternatives all fail, two of them loudly: `--state none` and `--state
-// clear` are rejected, and `deja forget --session deja-note-…` prints
-// "sessions dropped: 1" while the label survives, because the state is read
-// from the notes file and not from the index (#845).
 // notesWriteError turns a refused write of the notes file into something the
 // reader can act on. A decision someone wants to keep is what these commands
 // exist for, and `open …: permission denied` names a syscall and nothing to do
@@ -140,6 +131,15 @@ func notesWriteError(err error) error {
 	return err
 }
 
+// markTakenBack says that an accepted mark cleared the rejected/superseded/
+// stale one before it.
+//
+// The undo works and always did — the latest mark wins, so `--state accepted`
+// drops the label and the demotion — but nothing said so. The measured
+// alternatives all fail, two of them loudly: `--state none` and `--state
+// clear` are rejected, and `deja forget --session deja-note-…` prints
+// "sessions dropped: 1" while the label survives, because the state is read
+// from the notes file and not from the index (#845).
 func markTakenBack(src, state string, prior sources.Lifecycle) string {
 	if state != "accepted" || prior.State == "" || prior.State == "accepted" {
 		return ""

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/vshulcz/deja-vu/internal/index"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,13 +57,26 @@ func TestAnAmbiguousElidedIdIsRefusedAndExplained(t *testing.T) {
 		t.Errorf("show still offers a prefix the reader cannot see:\n%s", out)
 	}
 
-	// forget refuses rather than dropping both.
-	err = runForget(indexDirForTest(), []string{"--session", elided, "--dry-run"})
+	// The dry run changes nothing, so it explains the ambiguity instead of
+	// erroring — that is the question someone runs it to answer.
+	dry, err := captureRun(t, "forget", "--session", elided, "--dry-run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(dry, "matches 2 sessions") {
+		t.Errorf("dry run did not say how many it matched:\n%s", dry)
+	}
+
+	// The real run refuses rather than dropping both.
+	err = runForget(indexDirForTest(), []string{"--session", elided})
 	if err == nil {
 		t.Fatal("forget accepted an ambiguous elided id")
 	}
 	if !strings.Contains(err.Error(), "matches 2 sessions") {
 		t.Errorf("forget did not say how many it matched: %v", err)
+	}
+	if got := index.Tombstones(); len(got) != 0 {
+		t.Fatalf("the refusal still forgot: %v", got)
 	}
 
 	// An elided id that stands for exactly one session is not ambiguous and

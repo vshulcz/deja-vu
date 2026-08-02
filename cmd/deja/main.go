@@ -1375,9 +1375,28 @@ func printSources(dir string) {
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
 
+// forgetScopeRefusal stops a destructive run whose selector reaches further
+// than the reader can have meant.
+//
+// `--session` takes a prefix, which is documented and useful for a day's ids —
+// but it also let one exact-looking id drop twelve sessions, and the count
+// arrived in the past tense afterwards (#870). An id copied off a result line
+// is worse still: the characters that tell the sessions apart are the ones the
+// line elided, so no longer prefix exists to reach for (#859).
+func forgetScopeRefusal(selector string, matches int, allMatches bool) error {
+	if matches <= 1 || allMatches {
+		return nil
+	}
+	if strings.Contains(selector, "…") {
+		return fmt.Errorf("%q matches %d sessions — the ids differ in the middle the line elides; `deja last` prints them whole", selector, matches)
+	}
+	return fmt.Errorf("%q is a prefix of %d sessions — `deja forget --session %s --dry-run` lists what would go; add --all-matches to drop them all", selector, matches, selector)
+}
+
 func runForget(dir string, args []string) error {
 	var o index.ForgetOptions
 	list := false
+	allMatches := false
 	unforget := ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -1385,6 +1404,8 @@ func runForget(dir string, args []string) error {
 			list = true
 		case "--dry-run":
 			o.DryRun = true
+		case "--all-matches":
+			allMatches = true
 		case "--session", "--project", "--before", "--unforget":
 			if i+1 >= len(args) {
 				return fmt.Errorf("forget: %s needs value", args[i])
@@ -1445,23 +1466,34 @@ func runForget(dir string, args []string) error {
 		fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index\n", lifted, pluralS(lifted))
 		return nil
 	}
+	// The scope check runs on a dry pass first: a refusal printed after
+	// index.Forget has already written the tombstones is not a refusal.
+	if o.Session != "" && !o.DryRun {
+		probe := o
+		probe.DryRun = true
+		pr, perr := index.Forget(dir, probe)
+		if perr != nil {
+			return perr
+		}
+		if err := forgetScopeRefusal(o.Session, pr.Sessions, allMatches); err != nil {
+			return err
+		}
+	}
 	result, err := index.Forget(dir, o)
 	if err != nil {
 		return err
 	}
-	// A dry run changes nothing, so reporting it in the past tense — the same
-	// three lines the real command prints — tells the reader their sessions are
-	// gone when they are not.
-	// An id copied off a result line can stand for more than one session — the
-	// characters that would tell them apart are the ones the line elided. A
-	// destructive command must not drop twice what the reader named once
-	// (#859).
-	if o.Session != "" && strings.Contains(o.Session, "…") && result.Sessions > 1 {
-		return fmt.Errorf("%q matches %d sessions — the ids differ in the middle the line elides; `deja last` prints them whole", o.Session, result.Sessions)
-	}
 	if o.DryRun {
 		fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
 			result.Sessions, result.Messages, result.Tombstones)
+		// The dry run is where someone checks the scope, so it says the same
+		// thing the real run would refuse with rather than erroring: nothing
+		// is being changed here, and the note is the answer they came for.
+		if o.Session != "" {
+			if scope := forgetScopeRefusal(o.Session, result.Sessions, allMatches); scope != nil {
+				fmt.Fprintln(os.Stdout, scope.Error())
+			}
+		}
 		if result.Notes > 0 {
 			fmt.Fprintf(os.Stdout, "%d of them %s promoted note%s — the decisions you kept, not raw sessions\n",
 				result.Notes, verbWere(result.Notes), pluralS(result.Notes))
@@ -1651,7 +1683,7 @@ Usage:
   deja last [n] [--json] [--project name] [--harness name] [--since duration] [--role user|assistant|tool]
   deja sources
   deja completion <bash|zsh|fish>
-  deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run]
+  deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
   deja forget --list | --unforget <id>
   deja doctor [--json] [--deep] [--offline]
   deja warmup
