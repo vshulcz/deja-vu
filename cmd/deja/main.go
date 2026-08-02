@@ -1825,11 +1825,18 @@ func pluralWhich(n int) string {
 // — the path of an internal lock file and a syscall error, which says nothing
 // about what to change.
 func ensureError(dir string, err error) error {
+	if dir == "" {
+		dir = index.DefaultDir()
+	}
 	if errors.Is(err, fs.ErrPermission) {
-		if dir == "" {
-			dir = index.DefaultDir()
-		}
 		return fmt.Errorf("cannot write the index at %s — check the directory's permissions, or point DEJA_INDEX_DIR somewhere writable", dir)
+	}
+	// A full disk arrived as `ensure: write /…/index.db.tmp/records.bin: no
+	// space left on device`: an internal path nobody can act on, and the same
+	// shape #798 replaced for permissions. The build needs room beside the
+	// index, so the directory to free is the one named here (#888).
+	if errors.Is(err, syscall.ENOSPC) {
+		return fmt.Errorf("no space left where the index is built (%s) — free some room there, or point DEJA_INDEX_DIR at a disk that has it", filepath.Dir(dir))
 	}
 	return fmt.Errorf("ensure: %w", err)
 }
