@@ -120,7 +120,10 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if exportPath != "" {
 		fmt.Fprintf(stdout, "exported to %s\n", exportPath)
 	}
-	fmt.Fprintln(stdout, "the note now outranks the raw transcript in recall; corrections append with `deja promote", prefix, "--state <state>`")
+	// The id deja resolved, not the one the reader typed: a prefix that stood
+	// for several sessions would send the correction to whichever is newest —
+	// measured, that was a different session from the one just marked (#884).
+	fmt.Fprintln(stdout, "the note now outranks the raw transcript in recall; corrections append with `deja promote", s.ID, "--state <state>`")
 	return nil
 }
 
