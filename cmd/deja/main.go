@@ -258,6 +258,13 @@ func cmdIndex(dir string, rest []string) error {
 		fmt.Fprintf(os.Stderr, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
 	}
 	maybeFirstIndexGreeting(dir)
+	// The live display erases itself on the way out, so a rebuild on a
+	// terminal ended with an empty screen — three seconds of animation and no
+	// record of what was built. Piped output has said it all along; this is
+	// the same two numbers for the reader who watched it happen (#867).
+	if b := index.LastBuild; !b.Initial && b.Messages > 0 && logoWanted(os.Stdout) && os.Getenv("DEJA_WARMUP_SENTINEL") == "" {
+		fmt.Fprintf(os.Stderr, "deja: indexed %d session%s, %d message%s\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
+	}
 	return nil
 }
 
