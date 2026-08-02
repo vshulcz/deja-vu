@@ -128,6 +128,23 @@ func joinNotes(a, b string) string {
 	return a + "\n" + b
 }
 
+// indexDirWritable reports whether a rebuild could write where the index
+// lives. Ensure builds into a sibling directory and renames it over the old
+// one, so the parent is what has to be writable — not the index directory
+// itself, which is why a store can rebuild fine while its own directory is
+// read-only.
+func indexDirWritable(dir string) bool {
+	parent := filepath.Dir(dir)
+	f, err := os.CreateTemp(parent, ".deja-probe-")
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	_ = f.Close()
+	_ = os.Remove(name)
+	return true
+}
+
 // rewireNote is the one line a session start spends on maintenance: which
 // targets were rewritten when the binary moved or upgraded.
 func rewireNote(targets []string) string {
@@ -208,6 +225,12 @@ func runHookContext(dir string, plain bool) error {
 				// recall would be a promise about nothing: that machine is
 				// what the environment block above is for.
 				line = "deja: indexing your history — recall comes online in a few seconds"
+				// …unless it cannot: a read-only cache directory lets the
+				// request be made and the build fail, so this promised recall
+				// "in a few seconds" on every session forever (#887).
+				if !indexDirWritable(dir) {
+					line = fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
+				}
 			}
 			line = joinNotes(rewireNote(rewired), line)
 			if line != "" {
