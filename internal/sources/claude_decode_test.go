@@ -82,6 +82,12 @@ func TestTypedClaudeParserMatchesTheGenericOne(t *testing.T) {
 		"unicode.jsonl": {
 			`{"type":"user","sessionId":"s10","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"кириллица 中文 emoji 🙂 \"quoted\" \\ backslash"}}`,
 		},
+		// MCP tool results carry content as an array of blocks rather than a
+		// string; the text lives one level down.
+		"tool-result-blocks.jsonl": {
+			`{"type":"user","sessionId":"s11","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"3 tests failed"}]}]}}`,
+			`{"type":"user","sessionId":"s11","timestamp":"2026-01-02T03:04:06Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"image","source":{"type":"base64","data":"AAAA"}}]}]}}`,
+		},
 	}
 	for name, lines := range cases {
 		path := filepath.Join(dir, name)
@@ -98,6 +104,33 @@ func TestTypedClaudeParserMatchesTheGenericOne(t *testing.T) {
 			t.Fatalf("%s: errors differ: %v vs %v", name, wantErr, gotErr)
 		}
 		sameSessions(t, want, got, name)
+	}
+}
+
+// End to end: a user line whose only content is a block-array tool result must
+// produce a tool-output record, not vanish from the session.
+func TestBlockToolResultBecomesARecord(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.jsonl")
+	line := `{"type":"user","sessionId":"s1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"chapter marked"}]}]}}`
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parsers := map[string]func(string, int64) ([]model.Session, error){
+		"typed":   parseClaudeTypedFromOffset,
+		"generic": parseClaudeGenericFromOffset,
+	}
+	for name, parse := range parsers {
+		ss, err := parse(path, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(ss) != 1 || len(ss[0].Messages) != 1 {
+			t.Fatalf("%s: sessions = %+v", name, ss)
+		}
+		if m := ss[0].Messages[0]; m.Role != RoleToolOutput || m.Text != "chapter marked" {
+			t.Fatalf("%s: message = %+v", name, m)
+		}
 	}
 }
 

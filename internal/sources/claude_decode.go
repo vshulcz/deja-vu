@@ -180,16 +180,16 @@ func claudeTextKind(raw json.RawMessage) (string, bool) {
 			continue
 		}
 		var part struct {
-			Type    string `json:"type"`
-			Text    string `json:"text"`
-			Content string `json:"content"`
+			Type    string          `json:"type"`
+			Text    string          `json:"text"`
+			Content json.RawMessage `json:"content"`
 		}
 		if json.Unmarshal(item, &part) != nil {
 			continue
 		}
 		chunk := part.Text
 		if chunk == "" {
-			chunk = part.Content
+			chunk = claudeContentText(part.Content)
 		}
 		if part.Type == "tool_result" {
 			sawToolResult = true
@@ -205,6 +205,50 @@ func claudeTextKind(raw json.RawMessage) (string, bool) {
 		b.WriteString(chunk)
 	}
 	return b.String(), sawToolResult && !sawSpeech
+}
+
+// claudeContentText reads an item's content field. Most tool results carry it
+// as a plain string, but an MCP tool's result is an array of blocks with the
+// text one level down — decoding it as a string failed the whole item, so
+// every MCP tool output vanished from the index (76 records on one real
+// store). Blocks without text, images among them, contribute nothing.
+func claudeContentText(raw json.RawMessage) string {
+	raw = trimJSONSpace(raw)
+	if len(raw) == 0 {
+		return ""
+	}
+	if raw[0] == '"' {
+		var s string
+		if json.Unmarshal(raw, &s) != nil {
+			return ""
+		}
+		return s
+	}
+	if raw[0] != '[' {
+		return ""
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, item := range items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		var block struct {
+			Text string `json:"text"`
+		}
+		if json.Unmarshal(item, &block) != nil || block.Text == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(block.Text)
+	}
+	return b.String()
 }
 
 func trimJSONSpace(b []byte) []byte {

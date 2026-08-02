@@ -55,12 +55,19 @@ func unixGuess(n int64) time.Time {
 // textFromContentKind is textFromContent plus the attribution question: did
 // everything it joined come from tool results? Claude files those inside `user`
 // messages, and labelling them as speech was wrong for 89% of that role (#559).
+//
+// It joins items itself rather than delegating to textFromContent because a
+// Claude item's content is not always a string: an MCP tool's result is an
+// array of blocks with the text one level down, and the string-only read
+// dropped those. Only the Claude path reads that shape; the other harnesses
+// keep textFromContent as it was.
 func textFromContentKind(v any) (string, bool) {
 	c, ok := v.([]any)
 	if !ok {
 		return textFromContent(v), false
 	}
 	var sawTool, sawSpeech bool
+	var b strings.Builder
 	for _, it := range c {
 		m, ok := it.(map[string]any)
 		if !ok {
@@ -68,14 +75,50 @@ func textFromContentKind(v any) (string, bool) {
 		}
 		typ, _ := m["type"].(string)
 		txt, _ := m["text"].(string)
-		str, _ := m["content"].(string)
+		if txt == "" {
+			txt = contentText(m["content"])
+		}
 		if typ == "tool_result" {
 			sawTool = true
-		} else if txt != "" || str != "" {
+		} else if txt != "" {
 			sawSpeech = true
 		}
+		if txt == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(txt)
 	}
-	return textFromContent(v), sawTool && !sawSpeech
+	return b.String(), sawTool && !sawSpeech
+}
+
+// contentText is claudeContentText for the reference parser: a content field
+// holds a plain string, or an array of blocks whose text sits one level down.
+func contentText(v any) string {
+	switch c := v.(type) {
+	case string:
+		return c
+	case []any:
+		var b strings.Builder
+		for _, it := range c {
+			m, ok := it.(map[string]any)
+			if !ok {
+				continue
+			}
+			txt, _ := m["text"].(string)
+			if txt == "" {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(txt)
+		}
+		return b.String()
+	}
+	return ""
 }
 
 func textFromContent(v any) string {
