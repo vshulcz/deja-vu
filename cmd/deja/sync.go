@@ -62,10 +62,18 @@ func runSync(dir string, args []string) error {
 			return fmt.Errorf("sync import: unexpected argument %q — it takes one directory", a)
 		}
 		n, err := index.Import(dir, args[1])
+		// What arrived is printed first even when a file was refused: the
+		// records that made it are in, and the reader needs both halves
+		// (#891).
+		if n > 0 {
+			fmt.Fprintf(os.Stdout, "deja: imported %d records\n", n)
+		}
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stdout, "deja: imported %d records\n", n)
+		if n == 0 {
+			fmt.Fprintln(os.Stdout, "deja: imported 0 records")
+		}
 		return nil
 	default:
 		return fmt.Errorf("unknown sync command %q", args[0])

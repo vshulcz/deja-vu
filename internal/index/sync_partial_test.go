@@ -1,0 +1,74 @@
+package index
+
+import (
+	"encoding/json"
+	"github.com/vshulcz/deja-vu/internal/query"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// One unreadable file used to stop the whole directory, so a valid export
+// sitting beside a truncated one never arrived — and the reader was told only
+// about a stray character, with no line and no word about what did import
+// (#891).
+func TestImportKeepsGoingPastAFileItCannotRead(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	in := filepath.Join(home, "export")
+	if err := os.MkdirAll(in, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := func(id, text string) string {
+		b, err := json.Marshal(SyncRecord{Harness: "claude", SessionID: id, Project: "p", Role: "user", Text: text})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	if err := os.WriteFile(filepath.Join(in, "a-broken.jsonl"),
+		[]byte(rec("s1", "before the break")+"\nnot json at all\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(in, "b-good.jsonl"),
+		[]byte(rec("s2", "the good file")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(home, "idx")
+	n, err := Import(dir, in)
+	if err == nil {
+		t.Fatal("a file that could not be read was not reported")
+	}
+	if n == 0 {
+		t.Error("the good file was held hostage to the broken one")
+	}
+	got := err.Error()
+	if !strings.Contains(got, "a-broken.jsonl line 2") {
+		t.Errorf("error does not say where: %q", got)
+	}
+	if !strings.Contains(got, "nothing was imported from 1 file") {
+		t.Errorf("error does not say what was skipped: %q", got)
+	}
+
+	ss, err := Search(dir, query.Options{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var texts []string
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			texts = append(texts, m.Text)
+		}
+	}
+	joined := strings.Join(texts, "|")
+	if !strings.Contains(joined, "the good file") {
+		t.Errorf("the good file did not arrive: %q", joined)
+	}
+	// All or nothing per file: the half before the bad line stays out.
+	if strings.Contains(joined, "before the break") {
+		t.Errorf("half of a refused file was imported: %q", joined)
+	}
+}

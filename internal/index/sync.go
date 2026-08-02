@@ -281,7 +281,31 @@ func Import(dir, inDir string) (int, error) {
 	titleAt := map[string]time.Time{} // key -> time of the turn the title came from
 	titleRankOf := map[string]int{}   // key -> how good that turn was as a title
 	added := 0
+	var skipped []string
 	for _, p := range paths {
+		// A file is imported whole or not at all, so what it contributed is
+		// remembered before it is read and rolled back if it turns out to be
+		// truncated: half a transfer is the one outcome nobody can reason
+		// about afterwards (#891).
+		before := importSnapshot{
+			counts: make(map[string]int, len(recsByKey)),
+			metas:  make(map[string]SessionMeta, len(metas)),
+			at:     make(map[string]time.Time, len(titleAt)),
+			rank:   make(map[string]int, len(titleRankOf)),
+			added:  added,
+		}
+		for k, v := range recsByKey {
+			before.counts[k] = len(v)
+		}
+		for k, v := range metas {
+			before.metas[k] = v
+		}
+		for k, v := range titleAt {
+			before.at[k] = v
+		}
+		for k, v := range titleRankOf {
+			before.rank[k] = v
+		}
 		if err := readSyncFile(p, func(sr SyncRecord) error {
 			origID := sr.SessionID
 			if sr.Harness == "" || origID == "" {
@@ -344,16 +368,70 @@ func Import(dir, inDir string) (int, error) {
 			added++
 			return nil
 		}); err != nil {
-			return added, err
+			// One unreadable file used to stop the whole directory, so a valid
+			// export sitting beside a truncated one never arrived and the
+			// reader was told only about a stray character (#891). The file is
+			// still refused whole; the others are not held hostage to it.
+			skipped = append(skipped, err.Error())
+			for k := range recsByKey {
+				n := before.counts[k]
+				if n == 0 {
+					delete(recsByKey, k)
+					continue
+				}
+				recsByKey[k] = recsByKey[k][:n]
+			}
+			restoreMap(metas, before.metas)
+			restoreMap(titleAt, before.at)
+			restoreMap(titleRankOf, before.rank)
+			added = before.added
+			continue
 		}
 	}
 	if added == 0 {
-		return 0, writeManifest(dir, m)
+		if err := writeManifest(dir, m); err != nil {
+			return 0, err
+		}
+		return 0, skippedError(skipped)
 	}
 	if err := appendImportedRecords(dir, &m, recsByKey, metas); err != nil {
 		return added, err
 	}
-	return added, nil
+	return added, skippedError(skipped)
+}
+
+// importSnapshot is what one file had contributed before it was read, so a
+// file that turns out to be unreadable can be taken back out.
+type importSnapshot struct {
+	counts map[string]int
+	metas  map[string]SessionMeta
+	at     map[string]time.Time
+	rank   map[string]int
+	added  int
+}
+
+func restoreMap[V any](live, saved map[string]V) {
+	for k := range live {
+		if _, ok := saved[k]; !ok {
+			delete(live, k)
+		}
+	}
+	for k, v := range saved {
+		live[k] = v
+	}
+}
+
+// skippedError reports the files an import could not read, after the ones it
+// could are already in. Callers print the count they imported and this
+// alongside it.
+func skippedError(skipped []string) error {
+	if len(skipped) == 0 {
+		return nil
+	}
+	if len(skipped) == 1 {
+		return fmt.Errorf("nothing was imported from 1 file: %s", skipped[0])
+	}
+	return fmt.Errorf("nothing was imported from %d files: %s", len(skipped), strings.Join(skipped, "; "))
 }
 
 func initEmptyIndex(dir string) error {
@@ -391,10 +469,16 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 	defer func() { _ = f.Close() }()
 	s := bufio.NewScanner(f)
 	s.Buffer(make([]byte, 64*1024), 8*1024*1024)
+	line := 0
 	for s.Scan() {
+		line++
 		var rec SyncRecord
 		if err := json.Unmarshal(s.Bytes(), &rec); err != nil {
-			return fmt.Errorf("%s: %w", filepath.Base(path), err)
+			// The line number, because "invalid character 'o' in literal null"
+			// on a file of thousands is not something anyone can act on. The
+			// file is still refused whole: a half-imported transfer is worse
+			// than one the reader can retry (#891).
+			return fmt.Errorf("%s line %d is not a record deja wrote: %w", filepath.Base(path), line, err)
 		}
 		if err := fn(rec); err != nil {
 			return err
