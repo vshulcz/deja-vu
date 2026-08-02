@@ -41,6 +41,17 @@ func TestDoctorRowCountsIndexedSessions(t *testing.T) {
 		t.Errorf("row does not show both counts: %q", row)
 	}
 
+	// A harness whose store is not on this machine but whose sessions are in
+	// the index — everything arrived by `sync import` — is named too, and said
+	// to have come from elsewhere (#892).
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "gone"))
+	buf.Reset()
+	doctorHarnesses(&buf, dir)
+	if row := harnessRow(t, buf.String(), "qwen"); !strings.Contains(row, "1 indexed session from elsewhere") {
+		t.Errorf("a store that is only in the index says nothing: %q", row)
+	}
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
+
 	// A harness with nothing in the index says nothing rather than "0": the
 	// row is about what deja found, and a zero there reads as a failure.
 	buf.Reset()

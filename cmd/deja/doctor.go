@@ -334,12 +334,17 @@ func doctorHarnesses(w io.Writer, dir string) {
 		if present {
 			status = "found"
 		}
-		if present {
-			if n, ok := indexed[name]; ok {
-				if detail != "" {
-					detail += ", "
-				}
-				detail += doctorCount(n, "indexed session")
+		// Also when the store is missing: a machine whose history arrived by
+		// `sync import` has no files at all, and doctor said nothing about the
+		// sessions it does hold — the only surface that names them was stats
+		// (#892).
+		if n, ok := indexed[name]; ok {
+			if detail != "" {
+				detail += ", "
+			}
+			detail += doctorCount(n, "indexed session")
+			if !present {
+				detail += " from elsewhere"
 			}
 		}
 		line := fmt.Sprintf("  %-12s %-8s %s", name, status, path)
