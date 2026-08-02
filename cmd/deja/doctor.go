@@ -697,6 +697,14 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	// boundary in the tool itself, not only in the security docs.
 	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
 	if idx.State == "missing" {
+		// A build already running is not a missing index, and "run `deja
+		// warmup`" tells the reader to start what is under way — doctor is
+		// the command people run when memory looks absent, so this is the
+		// worst place to describe it as absent (#873).
+		if st := readWarmupStatus(dir); st != nil {
+			fmt.Fprintf(w, "  status   building now (%s) — recall comes online in a few seconds\n", st.progress())
+			return
+		}
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return
 	}
