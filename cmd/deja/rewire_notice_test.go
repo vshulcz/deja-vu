@@ -16,7 +16,7 @@ func TestRewireNoteNamesWhatWasRewritten(t *testing.T) {
 		t.Errorf("a session that repaired nothing still said something: %q", got)
 	}
 	got := rewireNote([]string{"claude-auto", "codex"})
-	for _, want := range []string{"claude-auto, codex", "hand-edited command there was replaced"} {
+	for _, want := range []string{"claude-auto, codex", "`deja install` is what writes those commands"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("note does not mention %q: %q", want, got)
 		}
@@ -52,7 +52,7 @@ func TestTheHookReportsAWiringRepairWithNothingElseToSay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "refreshed its wiring for claude-auto") {
+	if !strings.Contains(out, "rewrote its wiring for claude-auto") {
 		t.Errorf("the session that rewrote the wiring said nothing:\n%s", out)
 	}
 }

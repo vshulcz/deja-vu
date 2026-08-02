@@ -151,7 +151,11 @@ func rewireNote(targets []string) string {
 	if len(targets) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("deja: refreshed its wiring for %s after an upgrade — any hand-edited command there was replaced", strings.Join(targets, ", "))
+	// States what happened rather than guessing why: on a routine upgrade
+	// nothing was hand-edited, and claiming an edit was destroyed reads as an
+	// accusation. Someone who did edit those commands still learns that they
+	// were rewritten, and where to put the change instead.
+	return fmt.Sprintf("deja: rewrote its wiring for %s after an upgrade — `deja install` is what writes those commands", strings.Join(targets, ", "))
 }
 
 // runHookContext prints session-start context. plain=false emits the Claude
