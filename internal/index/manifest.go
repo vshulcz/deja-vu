@@ -20,6 +20,18 @@ func IsCurrentVersion(dir string) bool {
 	return err == nil && m.Version == version
 }
 
+// OlderFormat reports that the index on disk reads, and was written by a
+// format this build no longer understands. Distinct from IsCurrentVersion,
+// which cannot tell an old index from an unreadable one — and doctor must not
+// call a corrupt manifest "an older deja" (#877).
+func OlderFormat(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	return err == nil && m.Version != version
+}
+
 func HasManifest(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()

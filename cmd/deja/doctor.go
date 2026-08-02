@@ -708,6 +708,10 @@ func doctorTOMLWired(path string) bool {
 	return false
 }
 
+// indexOlderFormat is a variable so a test can put doctor in front of an index
+// this build cannot read without shipping a manifest writer.
+var indexOlderFormat = index.OlderFormat
+
 func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	fmt.Fprintln(w, "Index:")
 	loc := idx.Path
@@ -736,6 +740,13 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 		updated = fi.ModTime().Format("2006-01-02 15:04")
 	}
 	fmt.Fprintf(w, "  status   built (size=%s, updated=%s)\n", humanBytes(pathSize(dir)), updated)
+	// An index written by an older format is unreadable to this binary: the
+	// hook paths refuse it and ask for a rebuild, which is why memory goes
+	// quiet after an upgrade. doctor called that "up to date" — the one
+	// command someone runs to find out why nothing is recalled (#877).
+	if indexOlderFormat(dir) {
+		fmt.Fprintln(w, "  format   written by an older deja — this build cannot read it; the next session rebuilds it, or run `deja index` now")
+	}
 	// A store whose postings vanished or whose record log was truncated cannot
 	// answer anything, and said "up to date" until #735. The next search
 	// rebuilds it, which is worth saying too — the reader has not lost memory,

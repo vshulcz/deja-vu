@@ -55,3 +55,28 @@ func TestSessionsWithNothingToIndexAreNotCounted(t *testing.T) {
 		t.Errorf("after rebuild manifest holds %d claude sessions, want 1", counts["claude"])
 	}
 }
+
+// OlderFormat must separate an index this build cannot read from one it cannot
+// read at all: doctor says "written by an older deja" on the first, and a
+// corrupt manifest is not that (#877).
+func TestOlderFormatOnlyReportsAReadableOldIndex(t *testing.T) {
+	dir := t.TempDir()
+	if err := writeManifest(dir, Manifest{Version: version, Sessions: map[string]SessionMeta{}}); err != nil {
+		t.Fatal(err)
+	}
+	if OlderFormat(dir) {
+		t.Error("a current index was called old")
+	}
+	if err := writeManifest(dir, Manifest{Version: version - 1, Sessions: map[string]SessionMeta{}}); err != nil {
+		t.Fatal(err)
+	}
+	if !OlderFormat(dir) {
+		t.Error("an index from an older format was not reported")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.gob"), []byte("not a gob"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if OlderFormat(dir) {
+		t.Error("an unreadable manifest was called an older format")
+	}
+}
