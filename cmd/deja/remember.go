@@ -50,7 +50,7 @@ func runRemember(dir string, args []string) error {
 		project = sources.ClaudeProjectName(cwd)
 	}
 	if err := sources.AppendNoteTagged(project, text, tags, time.Now()); err != nil {
-		return err
+		return notesWriteError(err)
 	}
 	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		return err

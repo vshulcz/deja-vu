@@ -250,7 +250,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Project) == "" {
 			a.Project = "notes"
 		}
-		if err := sources.AppendNote(a.Project, a.Text, time.Now()); err != nil {
+		if err := notesWriteError(sources.AppendNote(a.Project, a.Text, time.Now())); err != nil {
 			return "", err
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, mcpProgress()); err != nil {

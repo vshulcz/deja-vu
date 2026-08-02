@@ -86,13 +86,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		title = firstLine(text)
 	}
 	if err := sources.AppendPromotedTagged(s.Project, title, text, src, state, tags, time.Now()); err != nil {
-		// A decision the user wants to keep is what this command exists for,
-		// and `open …: permission denied` names a syscall and nothing to do
-		// about it — while index and forget both say what to change (#806).
-		if errors.Is(err, fs.ErrPermission) {
-			return fmt.Errorf("cannot write %s — check that file and its directory's permissions, or set DEJA_NOTES_FILE somewhere writable", sources.NotesFile())
-		}
-		return err
+		return notesWriteError(err)
 	}
 	if exportPath != "" {
 		masked, err := exportPromoted(exportPath, title, text, src, state, s.Updated)
@@ -133,6 +127,19 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 // clear` are rejected, and `deja forget --session deja-note-…` prints
 // "sessions dropped: 1" while the label survives, because the state is read
 // from the notes file and not from the index (#845).
+// notesWriteError turns a refused write of the notes file into something the
+// reader can act on. A decision someone wants to keep is what these commands
+// exist for, and `open …: permission denied` names a syscall and nothing to do
+// about it — while index and forget both say what to change (#806). The same
+// file is written by promote, `deja remember` and the MCP remember tool, and
+// only promote said it (#869).
+func notesWriteError(err error) error {
+	if errors.Is(err, fs.ErrPermission) {
+		return fmt.Errorf("cannot write %s — check that file and its directory's permissions, or set DEJA_NOTES_FILE somewhere writable", sources.NotesFile())
+	}
+	return err
+}
+
 func markTakenBack(src, state string, prior sources.Lifecycle) string {
 	if state != "accepted" || prior.State == "" || prior.State == "accepted" {
 		return ""
