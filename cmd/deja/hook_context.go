@@ -330,7 +330,12 @@ func cachedHookDigest(dir string) (string, int, int64, []string) {
 	// in hookDigestResult, so an index left behind by an upgrade was served
 	// stale and never rebuilt (#777). The cached digest is still the user's
 	// own history, so serve it — just ask for the rebuild too.
-	if index.HasManifest(dir) && (!index.IsCurrentVersion(dir) || index.Damaged(dir)) {
+	// A deleted index is the same situation with the manifest gone: the cache
+	// answered from a store that no longer exists and asked for nothing, so it
+	// kept serving that snapshot forever — every session recorded after the
+	// deletion invisible to the hook (#874). Caches do get wiped: ~/.cache is
+	// fair game for cleanup tools and CI images.
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
 	}
 	gate := hookGate()
