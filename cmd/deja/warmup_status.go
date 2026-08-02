@@ -112,7 +112,11 @@ func readWarmupStatus(dir string) *warmupStatus {
 	if json.Unmarshal(b, &st) != nil || st.Updated == 0 {
 		return nil
 	}
-	if time.Since(time.Unix(0, st.Updated)) > warmupStatusStale {
+	// Ahead of the clock counts as stale, not as fresh forever: time.Since is
+	// negative there, so a status stamped in the future — a skewed clock, a
+	// file copied from another machine — kept every surface saying "indexing
+	// your history" with no build running (#889).
+	if age := time.Since(time.Unix(0, st.Updated)); age > warmupStatusStale || age < -warmupStatusStale {
 		return nil
 	}
 	return &st
