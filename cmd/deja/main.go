@@ -254,6 +254,12 @@ func cmdIndex(dir string, rest []string) error {
 		fmt.Fprintf(os.Stderr, "deja: %s: %d path%s could not be read — `deja doctor` names %s\n",
 			h, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
 	}
+	// The parse count and the indexed count differ by exactly these, and this
+	// is where both are on screen (#868).
+	if n := index.ReportEmptySessions(); n > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d transcript%s held no message deja could index — not counted as %s\n",
+			n, pluralS(n), pluralSessionWord(n))
+	}
 	if n := index.ReportCollisions(); n > 0 {
 		fmt.Fprintf(os.Stderr, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
 	}
@@ -1746,6 +1752,14 @@ func sortedHarnesses(m map[string]index.HarnessIngest) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// pluralSessionWord words the tail of the empty-transcript line.
+func pluralSessionWord(n int) string {
+	if n == 1 {
+		return "a session"
+	}
+	return "sessions"
 }
 
 // pluralWhich matches the pronoun to the count in the ingest warning.

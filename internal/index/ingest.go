@@ -282,6 +282,8 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
 	reportPhase("indexing messages", len(ss))
+	wrote := map[string]bool{}
+	var wroteMu sync.Mutex
 	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			reportAdvance(1)
@@ -328,6 +330,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				if err != nil {
 					return err
 				}
+				wroteMu.Lock()
+				wrote[key] = true
+				wroteMu.Unlock()
 				writtenMessages++
 				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
@@ -341,6 +346,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	if err := rw.Close(); err != nil {
 		return err
 	}
+	dropEmptySessions(&m, wrote)
 	buildCooccur(tmp, ss)
 	reportPhase("writing index", len(buckets))
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
@@ -507,6 +513,30 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, imported)
 }
 
+// dropEmptySessions removes manifest rows that ended up with no records.
+//
+// A session whose every message strips to empty — harness plumbing, a prompt
+// the user never sent — still got a row, so `deja last` printed a blank line
+// for it, `show` printed a header with nothing under it, and the counters
+// disagreed: brief and doctor read the manifest and stats reads the records
+// (1159 against 1157 on my store) (#868).
+func dropEmptySessions(m *Manifest, wrote map[string]bool) {
+	for key := range m.Sessions {
+		if !wrote[key] {
+			delete(m.Sessions, key)
+			emptied.Add(1)
+		}
+	}
+}
+
+// ReportEmptySessions returns how many transcripts held nothing to index since
+// the last build, and clears the counter. The parse count and the indexed
+// count differ by exactly this, and the run is where someone is looking at
+// both numbers.
+func ReportEmptySessions() int {
+	return int(emptied.Swap(0))
+}
+
 func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileState, scope string) error {
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{})
 }
@@ -530,6 +560,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	}
 	seenMsgs := msgSeen{}
 	reportPhase("indexing messages", len(ss))
+	wrote := map[string]bool{}
+	var wroteMu sync.Mutex
 	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			reportAdvance(1)
@@ -575,6 +607,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				if err != nil {
 					return err
 				}
+				wroteMu.Lock()
+				wrote[key] = true
+				wroteMu.Unlock()
 				writtenMessages++
 				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
@@ -588,6 +623,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if err := rw.Close(); err != nil {
 		return err
 	}
+	dropEmptySessions(&m, wrote)
 	buildCooccur(tmp, ss)
 	reportPhase("writing index", len(buckets))
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
@@ -1067,6 +1103,7 @@ func sortedKeys[V any](m map[string]V) []string {
 // current build. The two full-build paths index sessions in parallel, so the
 // counter is atomic.
 var collisions atomic.Int64
+var emptied atomic.Int64
 
 // attributeSession decides which of two transcripts sharing an id owns the
 // manifest row, and whether they collided at all. Lexicographically smallest
