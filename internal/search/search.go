@@ -384,6 +384,35 @@ func snippetOverlap(a, b map[string]bool) float64 {
 // RelativeDate is the human "3w ago" form used in listings and digests.
 func RelativeDate(t time.Time) string { return relativeDate(t) }
 
+// noteBucketNoon anchors a bucket day at midday in the reader's zone, so the
+// relative wording ("today", "3d ago") is computed from the day the id names
+// and no hour of the clock can push it onto a neighbouring date.
+func noteBucketNoon(day string) time.Time {
+	t, err := time.ParseInLocation("2006-01-02", day, time.Local)
+	if err != nil {
+		return time.Time{}
+	}
+	return t.Add(12 * time.Hour)
+}
+
+// NoteBucketDay returns the day a note bucket's id encodes, when the session is
+// one. The id is deja-YYYY-MM-DD-<project>: the bucket itself rather than a
+// moment inside it, so it reads the same for every reader (#883).
+func NoteBucketDay(s model.Session) (string, bool) {
+	if s.Harness != notesHarness || !strings.HasPrefix(s.ID, "deja-") {
+		return "", false
+	}
+	rest := strings.TrimPrefix(s.ID, "deja-")
+	if len(rest) < 10 {
+		return "", false
+	}
+	day := rest[:10]
+	if _, err := time.Parse("2006-01-02", day); err != nil {
+		return "", false
+	}
+	return day, true
+}
+
 func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLength float64, queryTokenCount int, worn map[string]int) []Hit {
 	emptyQuery := queryTokenCount == 0
 	now := time.Now()
@@ -728,6 +757,12 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		d := "-"
 		if !h.Session.Updated.IsZero() {
 			d = relativeDate(h.Session.Updated)
+		}
+		// A day of notes is one session whose id *is* a date, minted in UTC.
+		// The reader's zone put a different day on the line than the id beside
+		// it, and only for deja's own buckets (#883).
+		if day, ok := NoteBucketDay(h.Session); ok {
+			d = relativeDate(noteBucketNoon(day))
 		}
 		if color {
 			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), h.Session.Project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, short(h.Session.ID), cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))

@@ -484,6 +484,14 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 			// on the day before the other two screens did (#849).
 			when = s.Updated.Local().Format("2006-01-02")
 		}
+		// A day of notes is one session whose id *is* a date, minted in UTC.
+		// Converting its timestamp to the reader's zone put a different day on
+		// the line than the id it sits next to — and the id a reader rebuilt
+		// from what they saw matched nothing (#883).
+		if day, ok := search.NoteBucketDay(s); ok {
+			when = day
+		}
+
 		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
 		title := s.Title
 		if title == "" {
