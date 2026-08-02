@@ -35,6 +35,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		return fmt.Errorf("resume needs id-prefix")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
+	noteAmbiguousPrefix(dir, prefix, "resuming")
 	if err != nil {
 		return err
 	}

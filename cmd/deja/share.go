@@ -15,6 +15,7 @@ func runShare(dir string, args []string, w io.Writer) error {
 		return fmt.Errorf("share needs id-prefix")
 	}
 	s, ok, err := findByPrefix(dir, args[0])
+	noteAmbiguousPrefix(dir, args[0], "sharing")
 	if err != nil {
 		return err
 	}

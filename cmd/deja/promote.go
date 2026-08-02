@@ -66,6 +66,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		return fmt.Errorf("promote: state must be accepted, rejected, superseded or stale — `--state accepted` takes an earlier mark back")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
+	noteAmbiguousPrefix(dir, prefix, "promoting")
 	if err != nil {
 		return err
 	}

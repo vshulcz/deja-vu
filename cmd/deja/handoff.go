@@ -136,6 +136,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	}
 	if prefix != "" {
 		s, ok, err := findByPrefix(dir, prefix)
+		noteAmbiguousPrefix(dir, prefix, "handing off")
 		if err != nil {
 			return model.Session{}, err
 		}

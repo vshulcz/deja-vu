@@ -322,28 +322,8 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	} else if n := len(s.Messages); n > showLargeSession {
 		fmt.Fprintf(os.Stderr, "deja: %d messages — `--offset n --limit n` reads a slice\n", n)
 	}
-	// The prefix picks the newest of its matches, which is the right default
-	// and, until now, a silent one: "2" resolved eleven sessions on a real
-	// store and the reader had no way to know they were shown a choice.
 	if o.harness == "" {
-		if n := index.PrefixMatches(dir, o.id); n > 1 {
-			// When the matches are the same id in different harnesses there is
-			// no longer prefix to reach for, and --harness is the only thing
-			// that separates them (#719).
-			if hs := index.PrefixHarnesses(dir, o.id); len(hs) > 1 {
-				fmt.Fprintf(os.Stderr, "deja: %d sessions share the id %q — showing the most recent; use --harness %s\n",
-					len(hs), o.id, strings.Join(hs, "|"))
-			} else {
-				// "A longer prefix" is not available when the reader copied an
-				// elided id off a result line: the characters that would
-				// disambiguate are the ones the elision replaced (#859).
-				advice := "use a longer prefix for another"
-				if strings.Contains(o.id, "…") {
-					advice = "the ids differ in the middle the line elides — `deja last` prints them whole"
-				}
-				fmt.Fprintf(os.Stderr, "deja: %d sessions match %q — showing the most recent; %s\n", n, o.id, advice)
-			}
-		}
+		noteAmbiguousPrefix(dir, o.id, "showing")
 	}
 	search.PrintSession(os.Stdout, s)
 	return nil
@@ -869,6 +849,36 @@ func isSubcommand(word string) bool {
 		return true
 	}
 	return false
+}
+
+// noteAmbiguousPrefix says when a selector reached more than one session.
+//
+// The prefix picks the newest of its matches, which is the right default and
+// was a silent one: "2" resolved eleven sessions on a real store. `show`
+// learned to say so in #719 and #859; promote, handoff, resume and share
+// resolve the same way and still picked in silence — promote records a state
+// against whichever session it chose (#872).
+func noteAmbiguousPrefix(dir, id, action string) {
+	n := index.PrefixMatches(dir, id)
+	if n <= 1 {
+		return
+	}
+	// When the matches are the same id in different harnesses there is no
+	// longer prefix to reach for, and --harness is the only thing that
+	// separates them (#719).
+	if hs := index.PrefixHarnesses(dir, id); len(hs) > 1 {
+		fmt.Fprintf(os.Stderr, "deja: %d sessions share the id %q — %s the most recent; use --harness %s\n",
+			len(hs), id, action, strings.Join(hs, "|"))
+		return
+	}
+	// "A longer prefix" is not available when the reader copied an elided id
+	// off a result line: the characters that would disambiguate are the ones
+	// the elision replaced (#859).
+	advice := "use a longer prefix for another"
+	if strings.Contains(id, "…") {
+		advice = "the ids differ in the middle the line elides — `deja last` prints them whole"
+	}
+	fmt.Fprintf(os.Stderr, "deja: %d sessions match %q — %s the most recent; %s\n", n, id, action, advice)
 }
 
 func findByPrefix(dir, p string) (model.Session, bool, error) {
