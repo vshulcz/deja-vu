@@ -37,9 +37,9 @@ func TestDoctorNamesAnIndexFromAnOlderFormat(t *testing.T) {
 	}
 
 	// An index this build cannot read.
-	saved := indexOlderFormat
-	indexOlderFormat = func(string) bool { return true }
-	t.Cleanup(func() { indexOlderFormat = saved })
+	saved := indexFormatDirection
+	indexFormatDirection = func(string) int { return -1 }
+	t.Cleanup(func() { indexFormatDirection = saved })
 	out.Reset()
 	doctorIndex(&out, doctorComponent{State: "ok", Path: dir}, dir)
 	got := out.String()
@@ -48,5 +48,40 @@ func TestDoctorNamesAnIndexFromAnOlderFormat(t *testing.T) {
 	}
 	if !strings.Contains(got, "deja index") {
 		t.Errorf("doctor does not say what to do:\n%s", got)
+	}
+}
+
+// The direction matters: an index from a newer deja means the binary was
+// rolled back, and calling it old sends that reader the wrong way (#890).
+func TestDoctorTellsAnOldIndexFromANewOne(t *testing.T) {
+	hermeticEnv(t)
+	dir := t.TempDir()
+	saved := indexFormatDirection
+	t.Cleanup(func() { indexFormatDirection = saved })
+
+	line := func(direction int) string {
+		indexFormatDirection = func(string) int { return direction }
+		var out bytes.Buffer
+		doctorIndex(&out, doctorComponent{State: "ok", Path: dir}, dir)
+		for _, l := range strings.Split(out.String(), "\n") {
+			if strings.Contains(l, "format ") {
+				return l
+			}
+		}
+		return ""
+	}
+
+	if got := line(-1); !strings.Contains(got, "written by an older deja") {
+		t.Errorf("older index: %q", got)
+	}
+	got := line(1)
+	if !strings.Contains(got, "written by a newer deja") {
+		t.Errorf("newer index: %q", got)
+	}
+	if strings.Contains(got, "older") {
+		t.Errorf("a rolled-back binary was told its index is old: %q", got)
+	}
+	if got := line(0); got != "" {
+		t.Errorf("a matching format still printed: %q", got)
 	}
 }

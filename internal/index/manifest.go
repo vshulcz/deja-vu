@@ -24,12 +24,31 @@ func IsCurrentVersion(dir string) bool {
 // format this build no longer understands. Distinct from IsCurrentVersion,
 // which cannot tell an old index from an unreadable one — and doctor must not
 // call a corrupt manifest "an older deja" (#877).
-func OlderFormat(dir string) bool {
+func OlderFormat(dir string) bool { return FormatDirection(dir) != 0 }
+
+// FormatDirection reports how the index on disk relates to this build's
+// format: -1 when it was written by an older deja, +1 by a newer one, 0 when
+// it matches or cannot be read.
+//
+// The direction matters because the fix differs. An older index is rebuilt and
+// forgotten; a newer one means the binary was rolled back — a bad release
+// reverted, `brew switch`, a pinned version in CI — and telling that reader
+// their index is old sends them looking in the wrong place (#890).
+func FormatDirection(dir string) int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	m, err := readManifest(dir)
-	return err == nil && m.Version != version
+	if err != nil {
+		return 0
+	}
+	switch {
+	case m.Version < version:
+		return -1
+	case m.Version > version:
+		return 1
+	}
+	return 0
 }
 
 func HasManifest(dir string) bool {

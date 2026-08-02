@@ -708,9 +708,9 @@ func doctorTOMLWired(path string) bool {
 	return false
 }
 
-// indexOlderFormat is a variable so a test can put doctor in front of an index
-// this build cannot read without shipping a manifest writer.
-var indexOlderFormat = index.OlderFormat
+// indexFormatDirection is a variable so a test can put doctor in front of an
+// index this build cannot read without shipping a manifest writer.
+var indexFormatDirection = index.FormatDirection
 
 func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	fmt.Fprintln(w, "Index:")
@@ -744,8 +744,13 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	// hook paths refuse it and ask for a rebuild, which is why memory goes
 	// quiet after an upgrade. doctor called that "up to date" — the one
 	// command someone runs to find out why nothing is recalled (#877).
-	if indexOlderFormat(dir) {
+	switch indexFormatDirection(dir) {
+	case -1:
 		fmt.Fprintln(w, "  format   written by an older deja — this build cannot read it; the next session rebuilds it, or run `deja index` now")
+	case 1:
+		// The binary was rolled back, not the index. Saying "older" here sent
+		// that reader looking in the wrong direction (#890).
+		fmt.Fprintln(w, "  format   written by a newer deja than this one — this build rebuilds it in its own format; upgrading again rebuilds it back")
 	}
 	// A store whose postings vanished or whose record log was truncated cannot
 	// answer anything, and said "up to date" until #735. The next search

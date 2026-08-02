@@ -80,3 +80,26 @@ func TestOlderFormatOnlyReportsAReadableOldIndex(t *testing.T) {
 		t.Error("an unreadable manifest was called an older format")
 	}
 }
+
+// FormatDirection has to name which side is behind, not merely that the two
+// differ (#890).
+func TestFormatDirection(t *testing.T) {
+	dir := t.TempDir()
+	if got := FormatDirection(dir); got != 0 {
+		t.Errorf("no manifest = %d, want 0", got)
+	}
+	for _, tc := range []struct {
+		v    int
+		want int
+	}{{version, 0}, {version - 1, -1}, {version + 1, 1}} {
+		if err := writeManifest(dir, Manifest{Version: tc.v, Sessions: map[string]SessionMeta{}}); err != nil {
+			t.Fatal(err)
+		}
+		if got := FormatDirection(dir); got != tc.want {
+			t.Errorf("version %d = %d, want %d", tc.v, got, tc.want)
+		}
+		if got, want := OlderFormat(dir), tc.want != 0; got != want {
+			t.Errorf("OlderFormat at version %d = %v", tc.v, got)
+		}
+	}
+}
