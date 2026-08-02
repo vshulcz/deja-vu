@@ -255,7 +255,15 @@ func relativeDay(updated, now time.Time) string {
 		return "yesterday"
 	default:
 		if days < 0 {
-			return "today"
+			// A day ahead is clock skew — a container, a zone, a machine that
+			// woke up wrong — and calling it today is the kind reading. A year
+			// ahead is not skew: it sat at the top of injected memory wearing
+			// today's date, and the model has no way to doubt it (#880).
+			// `search` prints the real date for both.
+			if days >= -1 {
+				return "today"
+			}
+			return "dated " + updatedDate.Format("2006-01-02")
 		}
 		return fmt.Sprintf("%d days ago", days)
 	}

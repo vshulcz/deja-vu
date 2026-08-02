@@ -350,6 +350,12 @@ func markEarlierAttempts(hits []Hit) {
 			if !b.Session.Updated.After(a.Session.Updated.Add(24 * time.Hour)) {
 				continue
 			}
+			// …and it must have happened. A transcript stamped ahead of the
+			// clock is newer than everything, so one bad timestamp labelled
+			// every real session in the project as an earlier attempt (#880).
+			if b.Session.Updated.After(time.Now()) {
+				continue
+			}
 			if snippetOverlap(sets[i], sets[j]) < 0.6 {
 				continue
 			}
