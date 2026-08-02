@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -48,6 +50,14 @@ func runSync(dir string, args []string) error {
 			n, err = index.Export(dir, out)
 		}
 		if err != nil {
+			// `open …/deja-sync-b9849e838232-1785639771368128000.jsonl:
+			// permission denied` names a file deja was about to create, with a
+			// name nobody chose. The directory is what has to change, the same
+			// as for the index (#798) and the notes file (#869) — this was the
+			// last write path still handing back the syscall (#893).
+			if errors.Is(err, fs.ErrPermission) {
+				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", out)
+			}
 			return err
 		}
 		fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
