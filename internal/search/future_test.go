@@ -14,7 +14,9 @@ import (
 func TestASessionDatedAheadIsNotTodayAndSupersedesNothing(t *testing.T) {
 	now := time.Now()
 	future := stalenessSession("fut1", "api", "connection pool exhausted under load", now.AddDate(1, 0, 0))
-	today := stalenessSession("today1", "api", "connection pool exhausted under load", now.Add(-2*time.Hour))
+	// now itself, not "a couple of hours ago": at 00:30 UTC that is yesterday,
+	// and this assertion is about the calendar day, not the offset.
+	today := stalenessSession("today1", "api", "connection pool exhausted under load", now)
 	old := stalenessSession("old1", "api", "connection pool exhausted under load", now.AddDate(0, 0, -30))
 
 	hits, err := Run([]model.Session{future, today, old}, Options{Query: "connection pool exhausted", All: true})
