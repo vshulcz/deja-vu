@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/index"
 	"io"
 	"os"
 	"strings"
@@ -22,6 +23,13 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	// instead of leaving them to wonder why recall is quiet.
 	if st := readWarmupStatus(dir); st != nil {
 		fmt.Fprintf(stdout, "deja %s %s", warmupBar(st), st.progress())
+		return nil
+	}
+	// A build asked for moments ago has not published progress yet, and until
+	// it does this said "no recalls yet today" — a normal day, while the index
+	// on disk is one this build cannot read (#879).
+	if warmupJustRequested(dir) && index.HasManifest(dir) {
+		fmt.Fprint(stdout, "deja · rebuilding the index · recall is quiet until it finishes")
 		return nil
 	}
 	recalls, bytes, injected := usage.TodayWithInjections(dir)

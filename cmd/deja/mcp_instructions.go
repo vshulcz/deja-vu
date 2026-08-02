@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/index"
+)
 
 // mcpInstructions is returned from the MCP initialize handshake. Hosts that
 // support the field put it in the system prompt, which gives us an auto-recall
@@ -14,6 +18,11 @@ func mcpInstructions(dir string) string {
 		b.WriteString(" The index is still building (")
 		b.WriteString(s.progress())
 		b.WriteString("); recall works now but covers more history as it finishes.")
+	} else if warmupJustRequested(dir) && index.HasManifest(dir) {
+		// Thirteen of the sixteen harnesses have no hook and read this and
+		// nothing else. A rebuild that has not reported yet left them with the
+		// ordinary instructions and an index this build cannot read (#879).
+		b.WriteString(" The index is being rebuilt right now; recall covers more history once it finishes.")
 	}
 	return b.String()
 }
