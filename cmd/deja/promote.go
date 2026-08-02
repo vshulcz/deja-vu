@@ -91,7 +91,12 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if exportPath != "" {
 		masked, err := exportPromoted(exportPath, title, text, src, state, s.Updated)
 		if err != nil {
-			return err
+			// The note is already written by this point, so failing with a bare
+			// syscall told the reader their decision was lost when it was not
+			// — and named a path with nothing to do about it (#871).
+			fmt.Fprintf(stdout, "promoted %s as %s: %s\n", src, state, title)
+			return fmt.Errorf("the note is kept, but %s could not be written (%s) — export it somewhere you can, or read the note back with `deja show %s`",
+				exportPath, exportFailureReason(err), "deja-note-"+strings.ReplaceAll(src, ":", "-"))
 		}
 		// The one outbound path that said nothing: `--to` exists to hand a
 		// decision to someone, and `share` and `sync export` both end with this
@@ -214,10 +219,52 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) (in
 		return 0, err
 	}
 	defer func() { _ = f.Close() }()
+	// The separating blank line is the leading "\n" below, which assumes the
+	// file already ends with one. A markdown file whose last line has no
+	// newline — a hand-written list, most often — got the heading glued to it
+	// (#871).
+	lead := ""
+	if fi, statErr := f.Stat(); statErr == nil && fi.Size() > 0 && !endsWithNewline(path) {
+		lead = "\n"
+	}
 	day := updated.UTC().Format("2006-01-02")
 	if updated.IsZero() {
 		day = time.Now().UTC().Format("2006-01-02")
 	}
-	_, err = fmt.Fprintf(f, "\n## %s\n\n- state: %s\n- source: %s (%s)\n\n%s\n", title, state, src, day, text)
+	_, err = fmt.Fprintf(f, "%s\n## %s\n\n- state: %s\n- source: %s (%s)\n\n%s\n", lead, title, state, src, day, text)
 	return masked, err
+}
+
+// exportFailureReason names why the export path could not be written, without
+// repeating the path the caller already prints.
+func exportFailureReason(err error) string {
+	switch {
+	case errors.Is(err, fs.ErrPermission):
+		return "permission denied"
+	case errors.Is(err, fs.ErrNotExist):
+		return "its directory does not exist"
+	case strings.Contains(err.Error(), "is a directory"):
+		return "that path is a directory"
+	}
+	return err.Error()
+}
+
+// endsWithNewline reports whether the file's last byte is a newline. Reading
+// one byte is cheaper than reading the file, and the answer decides whether
+// the appended section needs its own separator.
+func endsWithNewline(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return true
+	}
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil || fi.Size() == 0 {
+		return true
+	}
+	buf := make([]byte, 1)
+	if _, err := f.ReadAt(buf, fi.Size()-1); err != nil {
+		return true
+	}
+	return buf[0] == '\n'
 }
