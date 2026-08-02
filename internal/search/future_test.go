@@ -48,3 +48,42 @@ func TestASessionDatedAheadIsNotTodayAndSupersedesNothing(t *testing.T) {
 		t.Errorf("a day ahead reads as %q, want today", got)
 	}
 }
+
+// NoteBucketDay decides which lines get the bucket's own date, so its refusals
+// matter as much as its hits: a transcript, a short id, a shape that only looks
+// like a date (#883).
+func TestNoteBucketDayRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		harness string
+		id      string
+		want    string
+	}{
+		{"note", notesHarness, "deja-2026-07-16-edge", "2026-07-16"},
+		{"transcript with a bucket-shaped id", "claude", "deja-2026-07-16-edge", ""},
+		{"note with a short id", notesHarness, "deja-2026", ""},
+		{"note with an unparsable day", notesHarness, "deja-2026-13-99-edge", ""},
+		{"note with another prefix", notesHarness, "note-2026-07-16-edge", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := NoteBucketDay(model.Session{Harness: tc.harness, ID: tc.id})
+			if tc.want == "" {
+				if ok {
+					t.Fatalf("accepted %q as a bucket day: %q", tc.id, got)
+				}
+				return
+			}
+			if !ok || got != tc.want {
+				t.Fatalf("day = %q, %v; want %q", got, ok, tc.want)
+			}
+		})
+	}
+	// A day that cannot be parsed anchors nowhere rather than at the epoch's
+	// midday.
+	if got := noteBucketNoon("not-a-day"); !got.IsZero() {
+		t.Errorf("unparsable day anchored at %v", got)
+	}
+	if got := noteBucketNoon("2026-07-16"); got.Hour() != 12 {
+		t.Errorf("bucket anchored at %v, want midday", got)
+	}
+}
