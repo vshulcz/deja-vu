@@ -20,6 +20,13 @@ import (
 type wiringState struct {
 	Version string   `json:"version"`
 	Targets []string `json:"targets"`
+	// Home is the home directory the targets were written under. The repair
+	// derives every path from the environment it runs in, so a process whose
+	// HOME points elsewhere while the record is still visible — sudo with a
+	// preserved XDG_CONFIG_HOME, a container, an su session — wrote a fresh
+	// set of configs into a home nobody installed into, left the real ones
+	// pointing at the old binary, and marked the record repaired (#885).
+	Home string `json:"home,omitempty"`
 	// Exe is the binary path the configs were written with. A move without a
 	// version change is ordinary — a relink, a reinstall of the same release,
 	// a `go install` over a manual download — and left every config pointing
@@ -79,7 +86,7 @@ func recordWiring(targets []string, uninstall bool) {
 			return
 		}
 	}
-	st = wiringState{Version: version, Targets: kept, Exe: exe}
+	st = wiringState{Version: version, Targets: kept, Exe: exe, Home: homeDir()}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -111,6 +118,11 @@ func refreshWiringAfterUpgrade() []string {
 	// Either the version or the path: a binary that moved writes the same
 	// version into configs that now name a file which is not there (#773).
 	if st.Version == version && (st.Exe == "" || st.Exe == exe) {
+		return nil
+	}
+	// Only the home the targets were written under: this repairs, it does not
+	// spread (#885).
+	if st.Home != "" && st.Home != homeDir() {
 		return nil
 	}
 	var changed []string
