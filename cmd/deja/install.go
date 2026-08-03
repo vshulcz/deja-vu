@@ -288,7 +288,11 @@ func printMemoryProof(dir, heading string) {
 			title = digest.UTF8SafeCut(title, 76) + "…"
 		}
 		seenProject[s.Project] = true
-		date := ""
+		// A sync batch carries no timestamps, so an imported session has no
+		// date at all — and an empty slot left `[claude · imported:solo · ]`
+		// on the one screen that exists to show the memory arrived. `last`
+		// says the same thing with a dash (#964).
+		date := "-"
 		if !s.Updated.IsZero() {
 			date = s.Updated.Format("Jan 2")
 		}

@@ -116,3 +116,34 @@ func TestImportProofObeysTheTrustPolicy(t *testing.T) {
 	}
 	_ = out
 }
+
+// A sync batch carries no timestamps, so an imported session has no date, and
+// an empty slot left `[claude · imported:solo · ]` on the screen whose whole
+// job is to show the memory arrived (#964).
+func TestImportProofDoesNotLeaveTheDateSlotEmpty(t *testing.T) {
+	tmp := hermeticEnv(t)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "p1", Project: "api", Role: "user", Text: "peer one about the pool"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	proof, err := captureRunStderr(t, "sync", "import", exp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(proof, "peer one about the pool") {
+		t.Fatalf("the proof did not list the imported session:\n%s", proof)
+	}
+	if strings.Contains(proof, "· ]") {
+		t.Errorf("the date slot is empty:\n%s", proof)
+	}
+	if !strings.Contains(proof, "· -]") {
+		t.Errorf("a session with no date does not say so the way `last` does:\n%s", proof)
+	}
+}
