@@ -58,6 +58,12 @@ func runSync(dir string, args []string) error {
 			if errors.Is(err, fs.ErrPermission) {
 				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", out)
 			}
+			// A full or vanished disk in the same words as everywhere else
+			// (#906); anything deja does not recognise still comes through
+			// whole rather than being guessed at.
+			if reason := writeFailureReason(err); reason != err.Error() {
+				return fmt.Errorf("cannot write the export into %s — %s", out, reason)
+			}
 			return err
 		}
 		fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)

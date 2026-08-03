@@ -49,7 +49,7 @@ func writeStatsHTML(path string, report stats.Report, sessions []model.Session) 
 		return "", fmt.Errorf("render stats html: %w", err)
 	}
 	if err := os.WriteFile(abs, []byte(out.String()), 0o644); err != nil {
-		return "", fmt.Errorf("write stats html: %w", err)
+		return "", fmt.Errorf("cannot write %s — %s", path, writeFailureReason(err))
 	}
 	return abs, nil
 }

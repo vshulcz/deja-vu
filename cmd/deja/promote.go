@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -148,8 +149,16 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 // file is written by promote, `deja remember` and the MCP remember tool, and
 // only promote said it (#869).
 func notesWriteError(err error) error {
+	if err == nil {
+		return nil
+	}
 	if errors.Is(err, fs.ErrPermission) {
 		return fmt.Errorf("cannot write %s — check that file and its directory's permissions, or set DEJA_NOTES_FILE somewhere writable", sources.NotesFile())
+	}
+	// Everything else the disk can do to a write, in the same words the rest
+	// of deja uses (#906).
+	if reason := writeFailureReason(err); reason != err.Error() {
+		return fmt.Errorf("cannot write %s — %s", sources.NotesFile(), reason)
 	}
 	return err
 }
@@ -257,12 +266,27 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) (in
 // repeating the path the caller already prints.
 func exportFailureReason(err error) string {
 	switch {
-	case errors.Is(err, fs.ErrPermission):
-		return "permission denied"
 	case errors.Is(err, fs.ErrNotExist):
 		return "its directory does not exist"
 	case strings.Contains(err.Error(), "is a directory"):
 		return "that path is a directory"
+	}
+	return writeFailureReason(err)
+}
+
+// writeFailureReason words why a write did not happen, in the same vocabulary
+// everywhere. The index has said "no space left where the index is built"
+// since #888 while every other path handed back the syscall — the notes file,
+// the sync export and the stats page all reported ENOSPC as
+// `open /…: no space left on device` (#906).
+func writeFailureReason(err error) string {
+	switch {
+	case errors.Is(err, fs.ErrPermission):
+		return "permission denied"
+	case errors.Is(err, syscall.ENOSPC):
+		return "no space left on that disk"
+	case errors.Is(err, syscall.EIO), errors.Is(err, syscall.ENXIO), errors.Is(err, syscall.ENODEV):
+		return "that disk is not reachable"
 	}
 	return err.Error()
 }
