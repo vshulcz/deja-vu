@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -151,17 +153,30 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	}
 	var newest model.Session
 	distinct := map[string]bool{}
+	hidden := 0
 	for _, name := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.RecentProject(dir, name, 1)
+		ss, err := index.RecentProject(dir, name, 3)
 		if err != nil || len(ss) == 0 {
 			continue
 		}
-		distinct[ss[0].ID] = true
-		if ss[0].Updated.After(newest.Updated) {
-			newest = ss[0]
+		// Nobody named this session — deja is choosing it, which is what a
+		// listing does and what a listing filters (#937). Without this the
+		// pick landed on a session the rule keeps out of recall and packaged
+		// its content for another agent (#953).
+		kept, dropped := policyFilterSessionsCounted(policy.ActivationSearch, ss)
+		hidden += dropped
+		if len(kept) == 0 {
+			continue
+		}
+		distinct[kept[0].ID] = true
+		if kept[0].Updated.After(newest.Updated) {
+			newest = kept[0]
 		}
 	}
 	if newest.ID == "" {
+		if hidden > 0 {
+			return model.Session{}, errors.New(strings.TrimPrefix(policyHiddenNote(policy.ActivationSearch, hidden), "deja: "))
+		}
 		return model.Session{}, fmt.Errorf("no indexed sessions for this project — pass a session id-prefix (see `deja last`)")
 	}
 	if len(distinct) > 1 {
