@@ -339,6 +339,45 @@ func storeDiskGone(path string) bool {
 	return true
 }
 
+// noteBucketsRegrouped counts the day buckets in the index that this machine
+// would not build now. Notes are grouped by
+// the reader's day (#911), so a laptop that changed zones regroups them on the
+// next rebuild: nothing is lost, but an id that was shared or pasted somewhere
+// keeps resolving and starts naming a different note (#935).
+func noteBucketsRegrouped(dir string) int {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return 0
+	}
+	type span struct{ started, updated time.Time }
+	indexed := map[string]span{}
+	for _, m := range metas {
+		if m.Harness == "deja" {
+			indexed[m.ID] = span{m.Started, m.Updated}
+		}
+	}
+	if len(indexed) == 0 {
+		return 0
+	}
+	here := map[string]span{}
+	for _, s := range sources.LoadNotes() {
+		here[s.ID] = span{s.Started, s.Updated}
+	}
+	if len(here) == 0 {
+		return 0
+	}
+	// Notes written since the build only add buckets or extend them forward; a
+	// bucket that vanished, or that now starts at a different note, means the
+	// days were cut somewhere else — which is what a changed zone does.
+	moved := 0
+	for id, in := range indexed {
+		if h, ok := here[id]; !ok || !h.started.Equal(in.started) {
+			moved++
+		}
+	}
+	return moved
+}
+
 func doctorHarnesses(w io.Writer, dir string) {
 	fmt.Fprintln(w, "Harness stores:")
 	sqlite := sources.SQLite3Available()
@@ -457,6 +496,10 @@ func doctorHarnesses(w io.Writer, dir string) {
 	copilotRoot := sources.CopilotRoot()
 	printFiles("copilot", copilotRoot, doctorExists(copilotRoot), sources.CopilotSessionFiles())
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
+	if n := noteBucketsRegrouped(dir); n > 0 {
+		fmt.Fprintf(w, "  warning      %s of notes in the index %s not what this machine would build now — the zone changed, so the days regrouped; `deja index` renames them\n",
+			doctorCount(n, "day"), verbIs(n))
+	}
 }
 
 func doctorSQLiteDetail(db string, sqlite bool) string {
