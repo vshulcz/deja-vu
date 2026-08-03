@@ -479,6 +479,15 @@ func runHookRefresh(dir string) {
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
+	// The digest is recomputed from the index, so refreshing it off a stale
+	// index only re-serves the same snapshot: a project whose newest session
+	// reversed an earlier decision kept handing the agent the earlier one for
+	// as long as the user went without running the CLI (#913). This runs
+	// detached, off the startup path, so the incremental build costs the hook
+	// nothing; a directory that cannot be written stays stale, as before.
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		return
+	}
 	digest, sessions, raw, taskMatched := hookDigestResult(dir)
 	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched)
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
