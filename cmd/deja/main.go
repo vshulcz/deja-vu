@@ -422,6 +422,11 @@ func cmdCtx(dir string, rest []string) error {
 			return err
 		}
 		if ok {
+			// The one command an agent is told to call — the hook's lead line
+			// names recall_context — answered from one of several sessions
+			// behind an elided id without saying it was a choice, while show,
+			// share, resume, promote, forget and handoff all said so (#923).
+			noteAmbiguousPrefix(dir, q, "answering from")
 			search.PrintContext(os.Stdout, s, "")
 			return nil
 		}
