@@ -171,7 +171,12 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 			s.Messages = append(s.Messages, model.Message{Role: "user", Text: body, Time: t})
 			return
 		}
-		day := t.UTC().Format("2006-01-02")
+		// The bucket day is the reader's day, not UTC's. The line is labelled
+		// by the day the id names (#883) while every other line is rendered in
+		// the reader's zone (#849), so east of UTC a note written a quarter of
+		// an hour after a session was dated the day before it and `deja last`
+		// printed its dates out of order (#911).
+		day := t.Local().Format("2006-01-02")
 		key := project + "\x00" + day
 		s := byDay[key]
 		if s == nil {

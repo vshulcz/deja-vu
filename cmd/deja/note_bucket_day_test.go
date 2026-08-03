@@ -8,10 +8,11 @@ import (
 	"time"
 )
 
-// A day of notes is one session whose id *is* a date, minted in UTC. Reading
-// its timestamp in the reader's zone put a different day on the line than the
-// id sitting beside it, and an id rebuilt from what the reader saw matched
-// nothing (#883).
+// A day of notes is one session whose id *is* a date. Reading its timestamp in
+// the reader's zone put a different day on the line than the id sitting beside
+// it, and an id rebuilt from what the reader saw matched nothing (#883). The
+// day both carry is the reader's, so the note sits in the same calendar as the
+// sessions listed around it (#911).
 func TestANoteBucketShowsTheDayItsIdNames(t *testing.T) {
 	tmp := hermeticEnv(t)
 	// time.Local is resolved once at process start, so TZ= in the environment
@@ -34,12 +35,12 @@ func TestANoteBucketShowsTheDayItsIdNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "deja-2026-07-16-edge") {
+	if !strings.Contains(out, "deja-2026-07-17-edge") {
 		t.Fatalf("bucket id changed: %q", out)
 	}
 	// The date on the line is the date in the id, not the reader's rendering
 	// of a moment inside it.
-	if !strings.Contains(out, "2026-07-16 · deja-2026-07-16-edge") {
+	if !strings.Contains(out, "2026-07-17 · deja-2026-07-17-edge") {
 		t.Errorf("line and id disagree:\n%s", out)
 	}
 
