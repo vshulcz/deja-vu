@@ -881,6 +881,9 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	if err != nil {
 		return nil, err
 	}
+	for i := range out {
+		orderPromotedNote(&out[i])
+	}
 	return out, nil
 }
 
@@ -1124,7 +1127,22 @@ func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, b
 	for _, r := range recs {
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}
+	orderPromotedNote(&s)
 	return s, true, nil
+}
+
+// orderPromotedNote keeps a promoted note's corrections newest-first. The
+// parser writes them that way (#812), but an incremental build appends the new
+// lines to what the log already holds, so the record order stopped saying which
+// answer holds: the snippet an agent reads led with the answer that had been
+// overturned (#944). Ordering on read fixes indexes already on disk too.
+func orderPromotedNote(s *model.Session) {
+	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") || len(s.Messages) < 2 {
+		return
+	}
+	sort.SliceStable(s.Messages, func(i, j int) bool {
+		return s.Messages[i].Time.After(s.Messages[j].Time)
+	})
 }
 
 func scanRecords(dir string, m Manifest, o query.Options, offsets []int64) ([]model.Session, error) {
@@ -1246,6 +1264,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 	}
 	out := make([]model.Session, 0, len(by))
 	for _, s := range by {
+		orderPromotedNote(s)
 		out = append(out, *s)
 	}
 	return out, nil
