@@ -158,9 +158,6 @@ func rewireNote(targets []string) string {
 	return fmt.Sprintf("deja: rewrote its wiring for %s after an upgrade — `deja install` is what writes those commands", strings.Join(targets, ", "))
 }
 
-// runHookContext prints session-start context. plain=false emits the Claude
-// Code / Codex hook JSON envelope; plain=true prints the bare digest for
-// hosts that inject raw text (the opencode plugin).
 // buildNotice is what a session start says while a build runs: the published
 // progress if there is any, the bare promise if the build was only just asked
 // for, and the reason instead when the index cannot be written at all. It is
@@ -181,6 +178,9 @@ func buildNotice(dir string) string {
 	return "deja: indexing your history — recall comes online in a few seconds"
 }
 
+// runHookContext prints session-start context. plain=false emits the Claude
+// Code / Codex hook JSON envelope; plain=true prints the bare digest for
+// hosts that inject raw text (the opencode plugin).
 func runHookContext(dir string, plain bool) error {
 	// A session start is the one moment deja is guaranteed to run on every
 	// harness, which makes it the only reliable place to repair wiring left
