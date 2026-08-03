@@ -16,14 +16,14 @@ func TestDoctorPolicySeesTheEnvironmentOverride(t *testing.T) {
 	t.Setenv("DEJA_POLICY_FILE", filepath.Join(tmp, "no-such-policy.json"))
 
 	var out bytes.Buffer
-	doctorPolicy(&out)
+	doctorPolicy(&out, filepath.Join(tmp, "index.db"))
 	if !strings.Contains(out.String(), "every origin activates everywhere") {
 		t.Errorf("an unrestricted machine stopped saying so:\n%s", out.String())
 	}
 
 	t.Setenv("DEJA_AUTORECALL_LOCAL_ONLY", "1")
 	out.Reset()
-	doctorPolicy(&out)
+	doctorPolicy(&out, filepath.Join(tmp, "index.db"))
 	got := out.String()
 	if strings.Contains(got, "every origin activates everywhere") {
 		t.Errorf("doctor called a restricted machine unrestricted:\n%s", got)

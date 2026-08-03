@@ -87,7 +87,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	fmt.Fprintln(w)
 	doctorTools(w)
 	fmt.Fprintln(w)
-	doctorPolicy(w)
+	doctorPolicy(w, dir)
 	fmt.Fprintln(w)
 	doctorMCP(w)
 	fmt.Fprintln(w)
@@ -586,11 +586,40 @@ func doctorTools(w io.Writer) {
 	fmt.Fprintf(w, "  %-12s %s (needed for changed-file notes, worktree names and the task signal)\n", "git", gitStatus)
 }
 
+// unmatchedImportGroups lists imported:<group> rules that no session in the
+// index answers to.
+func unmatchedImportGroups(dir string) []string {
+	pol := policy.Load()
+	present := map[string]bool{}
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return nil
+	}
+	for _, m := range metas {
+		if o := policy.Origin(m.Project); strings.HasPrefix(o, "imported:") {
+			present[o] = true
+		}
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, rules := range pol.Activations {
+		for origin, allowed := range rules {
+			if allowed || !strings.HasPrefix(origin, "imported:") || present[origin] || seen[origin] {
+				continue
+			}
+			seen[origin] = true
+			out = append(out, origin)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // doctorPolicy reports the one mechanism that separates local memory from
 // imported. Load falls back to the permissive default on any error, so a
 // malformed file changed nothing and said nothing, and a working one was
 // invisible — leaving no place at all to find out what the rules are (#661).
-func doctorPolicy(w io.Writer) {
+func doctorPolicy(w io.Writer, dir string) {
 	fmt.Fprintln(w, "Trust policy:")
 	exists, unknown, err := policy.Diagnose()
 	if !exists {
@@ -622,6 +651,13 @@ func doctorPolicy(w io.Writer) {
 	}
 	for _, u := range unknown {
 		fmt.Fprintf(w, "  %-12s %q is not an activation or origin deja consults — this rule does nothing\n", "ignored", u)
+	}
+	// An `imported:x` rule has the right shape and still matches nothing when
+	// no session came from a project starting with x — the group is a project
+	// prefix from the exporting machine, not a machine name, and a rule
+	// written for a machine reads as in force forever (#955).
+	for _, g := range unmatchedImportGroups(dir) {
+		fmt.Fprintf(w, "  %-12s %q matches nothing in this index — the part after `imported:` is the first path component of the project on the machine it came from, not that machine's name\n", "inert", g)
 	}
 }
 
