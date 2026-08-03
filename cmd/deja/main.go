@@ -425,7 +425,10 @@ func cmdCtx(dir string, rest []string) error {
 	}
 	o := search.Options{Query: q, All: true}
 	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
-		return err
+		if !staleReadOnlyIndex(dir, err) {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
 	}
 	ss, err := index.SearchWithRecovery(dir, o, os.Stderr)
 	if err != nil {
@@ -540,7 +543,12 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
 	if err := withBuildProgress(func() error { return index.EnsureForSearch(dir, o, force, os.Stderr) }); err != nil {
-		return ensureError(dir, err)
+		// A store that cannot be written still has an index that can be read:
+		// answering from it beats answering nothing (#904).
+		if !staleReadOnlyIndex(dir, err) {
+			return ensureError(dir, err)
+		}
+		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
 	}
 	maybeFirstIndexGreeting(dir)
 	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
@@ -1826,10 +1834,18 @@ func pluralWhich(n int) string {
 	return "them"
 }
 
-// ensureError turns an index-build failure into something a reader can act on.
-// A denied write surfaced as `ensure: open /…/index.db.lock: permission denied`
-// — the path of an internal lock file and a syscall error, which says nothing
-// about what to change.
+// staleReadOnlyIndex reports that a build could not run because the store is
+// not writable, while an index that can still answer is right there. Refusing
+// the whole search then is deja withholding what it has: the reader gets
+// nothing instead of slightly old memory and a line saying why (#904).
+func staleReadOnlyIndex(dir string, err error) bool {
+	return errors.Is(err, fs.ErrPermission) && index.HasManifest(dir)
+}
+
+// ensureError turns a failed build into something the reader can act on.
+// A denied write surfaced as `ensure: open /…/index.db.lock: permission
+// denied` — the path of an internal lock file and a syscall error, which says
+// nothing about what to change.
 func ensureError(dir string, err error) error {
 	if dir == "" {
 		dir = index.DefaultDir()
