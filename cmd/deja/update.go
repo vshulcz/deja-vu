@@ -265,13 +265,17 @@ func packageManagerOwning(exe string) (manager, command string) {
 	case strings.Contains(p, "/Cellar/"), strings.Contains(lower, "/homebrew/"), strings.Contains(lower, "/linuxbrew/"):
 		return "Homebrew", "brew upgrade deja-vu"
 	case strings.Contains(lower, "/scoop/apps/"):
-		return "scoop", "scoop update deja"
+		return "scoop", "scoop update deja-vu"
 	case strings.HasPrefix(p, "/nix/store/"):
 		return "Nix", "nix profile upgrade deja"
 	case strings.Contains(lower, "/winget/packages/"):
-		return "winget", "winget upgrade deja"
+		return "winget", "winget upgrade vshulcz.deja-vu"
 	case strings.Contains(p, "/node_modules/"):
-		return "npm", "npm update -g deja-vu"
+		// The name each manager knows the package by, not the name of the
+		// binary: `npm update -g deja-vu` is a 404 against the registry, and
+		// the whole point of the line is that it is run instead of --force
+		// (#915).
+		return "npm", "npm update -g @vshulcz/deja-vu"
 	}
 	return "", ""
 }

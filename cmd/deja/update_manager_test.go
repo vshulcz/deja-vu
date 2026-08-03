@@ -21,12 +21,15 @@ func TestUpdateDefersToThePackageManagerThatOwnsTheBinary(t *testing.T) {
 	}{
 		{"/opt/homebrew/Cellar/deja-vu/0.16.5/bin/deja", "Homebrew", "brew upgrade deja-vu"},
 		{"/home/linuxbrew/.linuxbrew/bin/deja", "Homebrew", "brew upgrade deja-vu"},
-		{`C:\Users\v\scoop\apps\deja\current\deja.exe`, "scoop", "scoop update deja"},
+		{`C:\Users\v\scoop\apps\deja\current\deja.exe`, "scoop", "scoop update deja-vu"},
 		{"/nix/store/abc123-deja-0.16.5/bin/deja", "Nix", "nix profile upgrade deja"},
 		// README has promised this since the npm package shipped: "deja update
 		// is for standalone installs. Homebrew and npm installs update through
 		// the package manager." Nothing enforced it.
-		{"/usr/lib/node_modules/deja-vu/bin/deja", "npm", "npm update -g deja-vu"},
+		// The name the registry knows, not the name of the binary: `npm update
+		// -g deja-vu` answers 404, and the published package is scoped (#915).
+		{"/usr/lib/node_modules/deja-vu/bin/deja", "npm", "npm update -g @vshulcz/deja-vu"},
+		{`C:\Users\v\AppData\Local\winget\packages\vshulcz.deja-vu\deja.exe`, "winget", "winget upgrade vshulcz.deja-vu"},
 	}
 	for _, tc := range cases {
 		var out bytes.Buffer
