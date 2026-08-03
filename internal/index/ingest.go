@@ -1308,6 +1308,17 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			removed[p] = true
 		}
 	}
+	// A store on a disk that is not mounted looks exactly like a store whose
+	// files were deleted, and the sessions it held leave the index — after
+	// which every surface reads "no agent history was found on this machine".
+	// The files are still there, on a disk that is not, and reconnecting it
+	// restores them; that is what this says (#900).
+	if progress != nil {
+		for _, gone := range missingTrees(removed) {
+			fmt.Fprintf(progress, "deja: %s is gone, and %d indexed file%s with it — if that disk is simply not mounted, reconnect it and run `deja index`\n",
+				gone.dir, gone.files, pluralFiles(gone.files))
+		}
+	}
 	if len(changed) == 0 && len(removed) == 0 {
 		lastIngestFiles = 0
 		return nil
@@ -1778,6 +1789,49 @@ func priorFiles(m Manifest, err error) map[string]FileState {
 		return nil
 	}
 	return m.Files
+}
+
+// missingTree is a directory that vanished along with everything under it.
+type missingTree struct {
+	dir   string
+	files int
+}
+
+// missingTrees groups files that disappeared by the outermost directory that
+// is no longer there. One deleted file has an existing parent and is reported
+// as nothing; a whole store that went away with its disk is one line.
+func missingTrees(removed map[string]bool) []missingTree {
+	byDir := map[string]int{}
+	for p := range removed {
+		dir := filepath.Dir(p)
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			continue
+		}
+		for {
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			if _, err := os.Stat(parent); !os.IsNotExist(err) {
+				break
+			}
+			dir = parent
+		}
+		byDir[dir]++
+	}
+	out := make([]missingTree, 0, len(byDir))
+	for dir, n := range byDir {
+		out = append(out, missingTree{dir: dir, files: n})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].dir < out[j].dir })
+	return out
+}
+
+func pluralFiles(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func currentFiles(h string) map[string]FileState {
