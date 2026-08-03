@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"io/fs"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -61,12 +62,15 @@ func TestEnsureErrorSaysWhatToChange(t *testing.T) {
 	// A denied write surfaced as `ensure: open /…/index.db.lock: permission
 	// denied` — an internal lock path and a syscall error, neither of which
 	// tells the reader what to do.
-	err := ensureError("/some/index.db", fs.ErrPermission)
+	// The directory has to be one that exists: a path whose parent is gone is
+	// a disk that was unmounted, which says something else entirely (#931).
+	dir := filepath.Join(t.TempDir(), "index.db")
+	err := ensureError(dir, fs.ErrPermission)
 	if err == nil {
 		t.Fatal("want an error")
 	}
 	got := err.Error()
-	for _, want := range []string{"/some/index.db", "permissions", "DEJA_INDEX_DIR"} {
+	for _, want := range []string{dir, "permissions", "DEJA_INDEX_DIR"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("message should mention %q: %s", want, got)
 		}

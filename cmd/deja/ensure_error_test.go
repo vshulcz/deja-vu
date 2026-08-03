@@ -14,7 +14,9 @@ import (
 // left on device` — an internal path nobody can act on, and the same shape
 // #798 replaced for permissions (#888).
 func TestEnsureErrorNamesWhatToFix(t *testing.T) {
-	dir := filepath.Join("/tmp", "store", "index.db")
+	// A directory that is there: one whose parent is gone means the disk was
+	// unmounted, which is its own message (#931).
+	dir := filepath.Join(t.TempDir(), "index.db")
 
 	full := ensureError(dir, fmt.Errorf("write %s: %w", filepath.Join(dir+".tmp", "records.bin"), syscall.ENOSPC))
 	got := full.Error()
