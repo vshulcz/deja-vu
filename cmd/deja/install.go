@@ -119,15 +119,26 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	guidanceCount := 0
 	mcpCount := 0
 	hookCount := 0
+	// One target that refuses to be written used to end the run, so an
+	// uninstall stopped halfway: the hooks were gone, one guidance file was
+	// left behind, and the reader was handed a syscall for a path they did not
+	// choose. Everything else is still done, and what could not be is named at
+	// the end (#902).
+	var refused []string
+	note := func(t string, err error) {
+		refused = append(refused, fmt.Sprintf("%s: %v", t, err))
+	}
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
 		if err != nil {
-			return err
+			note(t, err)
+			continue
 		}
 		if guidance {
 			gr, err := guidanceResult(t, uninstall)
 			if err != nil {
-				return err
+				note(t, err)
+				continue
 			}
 			if gr.Path != "" && !banner {
 				fmt.Println(guidanceOutput(t, gr))
@@ -154,6 +165,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		if !uninstall && strings.HasSuffix(t, "-auto") {
 			hookCount++
 		}
+	}
+	if len(refused) > 0 {
+		verb := "install"
+		if uninstall {
+			verb = "uninstall"
+		}
+		return fmt.Errorf("%s finished what it could; %d target%s refused: %s — check those paths' permissions and run it again",
+			verb, len(refused), pluralS(len(refused)), strings.Join(refused, "; "))
 	}
 	// Every install builds, not only --auto and --all. Installing is the one
 	// moment a person has already accepted a wait — they just ran an installer
