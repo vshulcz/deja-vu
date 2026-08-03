@@ -251,8 +251,14 @@ func cmdIndex(dir string, rest []string) error {
 		if e.FailedFiles == 0 {
 			continue
 		}
+		// "deja: deja: 1 path could not be read" is the notes file, and reads
+		// like a stutter. It is the user's own writing, so it says so (#901).
+		name := h
+		if h == "deja" {
+			name = "your notes"
+		}
 		fmt.Fprintf(os.Stderr, "deja: %s: %d path%s could not be read — `deja doctor` names %s\n",
-			h, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
+			name, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
 	}
 	// The parse count and the indexed count differ by exactly these, and this
 	// is where both are on screen (#868).

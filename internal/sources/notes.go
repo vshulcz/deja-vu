@@ -95,7 +95,13 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 }
 
 func LoadNotes() []model.Session {
-	ss, _ := ParseNotesFile(NotesFile())
+	// The error is recorded, not swallowed: notes are read straight here
+	// rather than through parseFiles, so a notes file the process cannot read
+	// looked exactly like one with nothing in it — 43 sessions of the user's
+	// own decisions left the index and no line said so (#901).
+	path := NotesFile()
+	ss, err := ParseNotesFile(path)
+	diagFileError(path, err)
 	return ss
 }
 
