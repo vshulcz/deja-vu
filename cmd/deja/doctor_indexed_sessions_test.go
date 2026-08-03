@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,10 +48,41 @@ func TestDoctorRowCountsIndexedSessions(t *testing.T) {
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "gone"))
 	buf.Reset()
 	doctorHarnesses(&buf, dir)
-	if row := harnessRow(t, buf.String(), "qwen"); !strings.Contains(row, "1 indexed session from elsewhere") {
+	// The store is not where deja looks any more, but the session in the index
+	// is still this machine's own: the count is named without claiming it came
+	// from another machine (#892, narrowed by #894).
+	if row := harnessRow(t, buf.String(), "qwen"); !strings.Contains(row, "1 indexed session") {
 		t.Errorf("a store that is only in the index says nothing: %q", row)
+	} else if strings.Contains(row, "from elsewhere") {
+		t.Errorf("a local session was called imported: %q", row)
 	}
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
+
+	// A store that has both: the two are counted apart, because "2 files, 4
+	// indexed sessions" reads as a miscount (#894).
+	exp := filepath.Join(tmp, "export")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var batch strings.Builder
+	for _, id := range []string{"r1", "r2"} {
+		b, err := json.Marshal(index.SyncRecord{Harness: "qwen", SessionID: id, Project: "remote", Role: "user", Text: "a remote session about the seal"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch.WriteString(string(b) + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), []byte(batch.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.Import(dir, exp); err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	doctorHarnesses(&buf, dir)
+	if row := harnessRow(t, buf.String(), "qwen"); !strings.Contains(row, "1 indexed session, 2 more from elsewhere") {
+		t.Errorf("mixed store does not separate the two: %q", row)
+	}
 
 	// A harness with nothing in the index says nothing rather than "0": the
 	// row is about what deja found, and a zero there reads as a failure.

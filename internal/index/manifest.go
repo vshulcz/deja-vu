@@ -51,6 +51,27 @@ func FormatDirection(dir string) int {
 	return 0
 }
 
+// ImportedSessionCounts reports how many of each harness's indexed sessions
+// arrived from another machine. doctor prints files beside sessions, and on a
+// store that has both, more sessions than files reads as a miscount unless the
+// difference is named (#894).
+func ImportedSessionCounts(dir string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]int{}
+	for _, meta := range m.Sessions {
+		if strings.HasPrefix(meta.ID, "imported-") {
+			out[meta.Harness]++
+		}
+	}
+	return out
+}
+
 func HasManifest(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()

@@ -328,6 +328,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// reuses a thread id — and the difference is invisible in a row that only
 	// counts files (#861).
 	indexed := index.HarnessSessionCounts(dir)
+	fromElsewhere := index.ImportedSessionCounts(dir)
 
 	printRow := func(name, path string, present bool, detail string) {
 		status := "missing"
@@ -342,9 +343,18 @@ func doctorHarnesses(w io.Writer, dir string) {
 			if detail != "" {
 				detail += ", "
 			}
-			detail += doctorCount(n, "indexed session")
-			if !present {
-				detail += " from elsewhere"
+			// Local and imported counted apart: on a store with both, "3
+			// files, 8 indexed sessions" reads as a miscount, and the reader
+			// who learned from #861 that files-against-sessions shows
+			// collapsing has no way to read the other direction (#894).
+			imported := fromElsewhere[name]
+			switch imported {
+			case 0:
+				detail += doctorCount(n, "indexed session")
+			case n:
+				detail += doctorCount(n, "indexed session") + " from elsewhere"
+			default:
+				detail += doctorCount(n-imported, "indexed session") + fmt.Sprintf(", %d more from elsewhere", imported)
 			}
 		}
 		line := fmt.Sprintf("  %-12s %-8s %s", name, status, path)
