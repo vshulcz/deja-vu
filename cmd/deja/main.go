@@ -1520,6 +1520,12 @@ func runForget(dir string, args []string) error {
 		return nil
 	}
 	if unforget != "" {
+		// The destructive direction refuses a prefix that reaches more than one
+		// session; the undo restored them all and said so afterwards, while the
+		// hint printed beside the list promises one (#961).
+		if n := index.TombstoneMatches(unforget); n > 1 && !allMatches {
+			return fmt.Errorf("%q brings back %d forgotten sessions — `deja forget --list` names them; add --all-matches to restore them all", unforget, n)
+		}
 		var lifted int
 		if err := withBuildProgress(func() error {
 			var err error

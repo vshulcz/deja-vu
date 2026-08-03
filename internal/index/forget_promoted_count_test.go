@@ -49,3 +49,53 @@ func TestForgetCountsPromotedNotesApartFromDayBuckets(t *testing.T) {
 		t.Errorf("counted %d promoted notes, want 1 — the day bucket is not one", got.Promoted)
 	}
 }
+
+// The undo has to be able to refuse the way forget does, so the count and the
+// action share one selector (#961).
+func TestTombstoneMatchesCountsWhatUnforgetWouldLift(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+
+	store := filepath.Join(tmp, "claude", "proj-p")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i, id := range []string{"ab-one", "ab-two", "zz-other"} {
+		rec := `{"type":"user","sessionId":"` + id + `","timestamp":"2026-07-1` + string(rune('1'+i)) + `T10:00:00Z","cwd":"/p","message":{"role":"user","content":"session ` + id + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(rec), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Forget(dir, ForgetOptions{Session: "ab"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := TombstoneMatches("ab"); n != 2 {
+		t.Errorf("TombstoneMatches(\"ab\") = %d, want 2", n)
+	}
+	if n := TombstoneMatches("claude:"); n != 2 {
+		t.Errorf("a harness-scoped prefix counted %d, want 2", n)
+	}
+	if n := TombstoneMatches("claude:ab-one"); n != 1 {
+		t.Errorf("one exact key counted %d, want 1", n)
+	}
+	if n := TombstoneMatches("nothing-like-this"); n != 0 {
+		t.Errorf("a selector matching nothing counted %d", n)
+	}
+	// And what it counted is what Unforget lifts.
+	lifted, err := Unforget(dir, "ab", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lifted != 2 {
+		t.Errorf("Unforget lifted %d where the count said 2", lifted)
+	}
+}
