@@ -58,8 +58,9 @@ func TestTheSessionThatAsksForTheBuildIsTold(t *testing.T) {
 		t.Errorf("the session that asked for the build was told nothing: %q", out)
 	}
 
-	// A machine with no index at all is not promised recall: a build there
-	// finds nothing, and the environment block is what speaks for it.
+	// The very first build speaks too: requiring a manifest left a machine
+	// with ten thousand transcripts and no index yet in silence (#909). The
+	// line appears once and is true; the next session has a manifest.
 	if err := os.RemoveAll(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +75,7 @@ func TestTheSessionThatAsksForTheBuildIsTold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "indexing your history") {
-		t.Errorf("a machine with no history was promised recall: %q", out)
+	if !strings.Contains(out, "indexing your history") {
+		t.Errorf("the first build said nothing: %q", out)
 	}
 }

@@ -217,17 +217,21 @@ func runHookContext(dir string, plain bool) error {
 			line := ""
 			if st := readWarmupStatus(dir); st != nil {
 				line = st.line()
-			} else if warmupJustRequested(dir) && index.HasManifest(dir) {
+			} else if warmupJustRequested(dir) {
 				// The session that asks for the build is the one that hears
 				// nothing about it: the child has not written its first
 				// progress line yet. That session is the first one after an
 				// upgrade or a damaged store — the moment deja most looks
 				// broken (#878).
 				//
-				// Only with an index already on disk. A machine with no
-				// history at all also asks for a build, and promising it
-				// recall would be a promise about nothing: that machine is
-				// what the environment block above is for.
+				// Including the very first build. Requiring a manifest here
+				// left the one moment deja most looks broken in silence: a
+				// machine with ten thousand transcripts and no index yet said
+				// nothing at all, twice over, while the build ran (#909).
+				//
+				// A machine with no history also asks for a build; it sees
+				// this line once, truthfully, and never again — the next
+				// session has a manifest and takes the branch above.
 				line = "deja: indexing your history — recall comes online in a few seconds"
 				// …unless it cannot: a read-only cache directory lets the
 				// request be made and the build fail, so this promised recall
