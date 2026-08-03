@@ -28,11 +28,13 @@ type ForgetResult struct {
 	// clean up what lives outside the index — the titles promoted notes
 	// borrowed from these sessions (#666, #690).
 	Keys []string
-	// Notes is how many of Sessions were promoted notes rather than raw
-	// transcripts. They are the decisions the user deliberately kept, so one
-	// combined number reads as "four conversations" when half of it is their
-	// own writing.
-	Notes int
+	// Notes is how many of Sessions were the user's own writing rather than raw
+	// transcripts, so one combined number does not read as "four
+	// conversations" when half of it is theirs. Promoted counts the part of it
+	// that came from `deja promote`: calling a day of `remember` notes a
+	// promoted note names something the reader never did (#957).
+	Notes    int
+	Promoted int
 	// Peers names the hosts a forgotten session was already pushed to, and
 	// Exported reports the same for unnamed directory exports. Forgetting
 	// removes the local copy and keeps the session out of later pushes, but it
@@ -363,6 +365,9 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		result.Keys = append(result.Keys, key)
 		if meta.Harness == "deja" {
 			result.Notes++
+			if strings.HasPrefix(meta.ID, "deja-note-") {
+				result.Promoted++
+			}
 		}
 		if !dead[key] {
 			result.Tombstones++
