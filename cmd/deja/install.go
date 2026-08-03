@@ -12,6 +12,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -255,6 +256,18 @@ func printMemoryProof(dir, heading string) {
 	}
 	recent, err := index.Recent(dir, 12)
 	if err != nil || len(recent) == 0 {
+		return
+	}
+	// The proof is a listing, and a listing obeys the trust policy (#937). On a
+	// machine whose rule keeps imported sessions out of recall this block was
+	// printing their project and first line, and closing with "ask your agent
+	// about any of these — it will remember", which is exactly what the rule
+	// prevents (#951).
+	recent, hidden := policyFilterSessionsCounted(policy.ActivationSearch, recent)
+	if len(recent) == 0 {
+		if hidden > 0 {
+			fmt.Fprintf(os.Stderr, "\n%s\n", policyHiddenNote(policy.ActivationSearch, hidden))
+		}
 		return
 	}
 	seenProject := map[string]bool{}
