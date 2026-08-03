@@ -244,7 +244,12 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 // printInstallProof shows the "starts full" moment right in the install: a
 // few real sessions deja already indexed from this machine's history, so the
 // value is visible before the first agent session ever runs.
-func printInstallProof(dir string) {
+func printInstallProof(dir string) { printMemoryProof(dir, "deja already knows this machine:") }
+
+// printMemoryProof is that same proof under a caller's heading. `sync import`
+// ends the move to a new machine and said only "imported 59000 records" —
+// deja's own unit, and nothing a person can check (#929).
+func printMemoryProof(dir, heading string) {
 	if !index.HasManifest(dir) {
 		return
 	}
@@ -283,7 +288,7 @@ func printInstallProof(dir string) {
 	if len(lines) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, "\ndeja already knows this machine:")
+	fmt.Fprintln(os.Stderr, "\n"+heading)
 	for _, l := range lines {
 		fmt.Fprintln(os.Stderr, l)
 	}

@@ -12,6 +12,16 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
+// importedSessionTotal counts the sessions this index holds that came from
+// another machine.
+func importedSessionTotal(dir string) int {
+	total := 0
+	for _, n := range index.ImportedSessionCounts(dir) {
+		total += n
+	}
+	return total
+}
+
 func runSync(dir string, args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("sync needs export <dir>, import <dir>, or ssh <host>")
@@ -81,19 +91,30 @@ func runSync(dir string, args []string) error {
 		for _, a := range args[2:] {
 			return fmt.Errorf("sync import: unexpected argument %q — it takes one directory", a)
 		}
+		sessionsBefore := importedSessionTotal(dir)
 		n, err := index.Import(dir, args[1])
 		// What arrived is printed first even when a file was refused: the
 		// records that made it are in, and the reader needs both halves
 		// (#891).
 		if n > 0 {
-			fmt.Fprintf(os.Stdout, "deja: imported %d records\n", n)
+			// Sessions, not only records: "records" is deja's unit, and what
+			// arrived is what doctor and every other surface counts (#929).
+			line := fmt.Sprintf("deja: imported %d records", n)
+			if before, after := sessionsBefore, importedSessionTotal(dir); after > before {
+				line += fmt.Sprintf(" — %d sessions from another machine", after-before)
+			}
+			fmt.Fprintln(os.Stdout, line)
 		}
 		if err != nil {
 			return err
 		}
 		if n == 0 {
 			fmt.Fprintln(os.Stdout, "deja: imported 0 records")
+			return nil
 		}
+		// The end of a move to a new machine is the same moment as an install,
+		// and install proves it with real lines rather than a count (#929).
+		printMemoryProof(dir, "deja now knows, from the machine you came from:")
 		return nil
 	default:
 		return fmt.Errorf("unknown sync command %q", args[0])
