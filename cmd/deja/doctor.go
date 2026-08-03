@@ -319,6 +319,26 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 	}
 }
 
+// storeDiskGone distinguishes a store whose disk went away from a harness that
+// was never installed. Both leave the path missing; what differs is how much of
+// the way there is missing. `~/.kimi-code/sessions` on a machine without kimi
+// loses one level and its home is right there; a store on an ejected volume
+// loses the whole chain (#933).
+func storeDiskGone(path string) bool {
+	dir := filepath.Dir(path)
+	for i := 0; i < 2; i++ {
+		if dirExists(dir) {
+			return false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return true
+}
+
 func doctorHarnesses(w io.Writer, dir string) {
 	fmt.Fprintln(w, "Harness stores:")
 	sqlite := sources.SQLite3Available()
@@ -334,6 +354,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 		status := "missing"
 		if present {
 			status = "found"
+		} else if storeDiskGone(path) {
+			// A store whose whole disk is gone is not a store that was
+			// deleted, and "missing" on a row of transcripts reads as the
+			// second thing — the failure #906 fixed on every write path, and
+			// #931 on the index row one screen below this one (#933).
+			status = "unplugged"
 		}
 		// Also when the store is missing: a machine whose history arrived by
 		// `sync import` has no files at all, and doctor said nothing about the
@@ -357,7 +383,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 				detail += doctorCount(n-imported, "indexed session") + fmt.Sprintf(", %d more from elsewhere", imported)
 			}
 		}
-		line := fmt.Sprintf("  %-12s %-8s %s", name, status, path)
+		line := fmt.Sprintf("  %-12s %-9s %s", name, status, path)
 		if detail != "" {
 			line += "  (" + detail + ")"
 		}
