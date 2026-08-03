@@ -1872,6 +1872,14 @@ func ensureError(dir string, err error) error {
 	if dir == "" {
 		dir = index.DefaultDir()
 	}
+	// Before permissions: a volume that was ejected takes its mount point with
+	// it, and creating that point back fails with EPERM on macOS — so the
+	// errno says permissions while the disk is simply gone. The same trap the
+	// notes and export paths hit (#893, #906), and the reader is sent to check
+	// the permissions of a directory that no longer exists (#931).
+	if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
+		return fmt.Errorf("the index directory is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
+	}
 	if errors.Is(err, fs.ErrPermission) {
 		return fmt.Errorf("cannot write the index at %s — check the directory's permissions, or point DEJA_INDEX_DIR somewhere writable", dir)
 	}

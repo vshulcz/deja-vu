@@ -755,6 +755,13 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online in a few seconds")
 			return
 		}
+		// An index whose disk was unplugged is not a missing index, and
+		// "run `deja warmup`" points at a path that is not there. doctor is
+		// what someone runs when memory looks broken (#931).
+		if parent := filepath.Dir(dir); !dirExists(parent) {
+			fmt.Fprintf(w, "  status   not reachable — %s is not there; the disk it lives on may have been unmounted\n", parent)
+			return
+		}
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return
 	}
