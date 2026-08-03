@@ -467,9 +467,17 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
+	// The listing is titles and project names, which is exactly what the trust
+	// policy exists to keep off the screen — and it was the one path that never
+	// consulted it, while `search` under the same rule refused and said so
+	// (#937). Listing counts as browsing: the search activation governs it.
+	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, ss)
 	// Printing nothing at all and exiting 0 leaves no way to tell whether the
 	// command worked, found nothing, or failed silently — which is what a
 	// fresh install sees. blame already answers this shape of question.
+	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
+		fmt.Fprintln(os.Stderr, note)
+	}
 	if len(ss) == 0 {
 		if o.JSON {
 			return printRecentJSON(os.Stdout, nil, sourceInstance)

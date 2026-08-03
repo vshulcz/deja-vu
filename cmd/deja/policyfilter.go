@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/model"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -43,4 +44,14 @@ func policyFilterBlame(activation string, hits []search.BlameHit) []search.Blame
 	return policy.Filter(policy.Load(), activation, hits, func(h search.BlameHit) string {
 		return h.Session.Project
 	})
+}
+
+// policyFilterSessionsCounted is the same gate for paths that carry sessions
+// rather than hits — the listing, whose whole output is titles (#937).
+func policyFilterSessionsCounted(activation string, ss []model.Session) ([]model.Session, int) {
+	before := len(ss)
+	kept := policy.Filter(policy.Load(), activation, ss, func(s model.Session) string {
+		return s.Project
+	})
+	return kept, before - len(kept)
 }
