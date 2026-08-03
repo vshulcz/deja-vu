@@ -86,3 +86,44 @@ func TestLastHonoursTheTrustPolicy(t *testing.T) {
 		t.Errorf("--json leaked what the text form hides:\n%s", raw)
 	}
 }
+
+// The rule that emptied the listing is named a line above, so "no sessions
+// indexed yet — run `deja index`" is advice for a state deja is not in: the
+// backside of teaching the listing to filter at all (#949).
+func TestLastEmptiedByPolicyDoesNotAdviseAnIndexRun(t *testing.T) {
+	tmp := hermeticEnv(t)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer", Project: "api", Role: "user", Text: "peer text"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	policyFile := filepath.Join(tmp, "policy.json")
+	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", policyFile)
+
+	out, err := captureRunStderr(t, "last")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "trust policy hides") {
+		t.Errorf("the listing did not name the rule that emptied it: %q", out)
+	}
+	if strings.Contains(out, "no sessions indexed yet") {
+		t.Errorf("a store full of filtered sessions was called unindexed: %q", out)
+	}
+}

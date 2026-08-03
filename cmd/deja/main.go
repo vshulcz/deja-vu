@@ -482,6 +482,13 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		if o.JSON {
 			return printRecentJSON(os.Stdout, nil, sourceInstance)
 		}
+		// The rule that emptied the list was named a line above; "no sessions
+		// indexed yet — run `deja index`" is advice for a state deja is not in,
+		// and the backside of teaching the listing to filter at all (#937,
+		// #949).
+		if policyHidden > 0 {
+			return nil
+		}
 		// "Run deja index" is advice for an empty store. With a filter set it
 		// is advice for a state the tool is not in: indexing changes nothing
 		// and doctor reports the stores as found. Name what emptied the result
