@@ -792,6 +792,12 @@ func commandHint(q string) string {
 	if near == "" {
 		return ""
 	}
+	// "unforget" is the one wrong guess with a real answer behind it, and
+	// `deja forget` alone sends the reader back to a list that used to name
+	// nothing (#919).
+	if strings.EqualFold(first, "unforget") {
+		return "deja: \"unforget\" is not a command — `deja forget --unforget <id>` is, and `deja forget --list` names the ids\n"
+	}
 	return fmt.Sprintf("deja: %q is not a command — did you mean `deja %s`?\n", first, near)
 }
 
@@ -1477,8 +1483,16 @@ func runForget(dir string, args []string) error {
 		return fmt.Errorf("forget: selector required")
 	}
 	if list {
-		for _, key := range index.Tombstones() {
+		keys := index.Tombstones()
+		for _, key := range keys {
 			fmt.Fprintln(os.Stdout, key)
+		}
+		// The list is where someone who dropped more than they meant to lands,
+		// and it named no way back: `--unforget` lived in `deja help` only, and
+		// the hint for a guessed `deja unforget` pointed at this same list
+		// (#919).
+		if len(keys) > 0 {
+			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index\n", keys[0])
 		}
 		return nil
 	}
