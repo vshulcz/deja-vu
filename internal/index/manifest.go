@@ -205,6 +205,18 @@ func writeManifest(dir string, m Manifest) error {
 	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
 }
 
+// hasBucketFile reports whether the postings directory holds anything at all.
+// It stops at the first entry: the question is emptiness, not the count.
+func hasBucketFile(dir string) bool {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	names, err := f.Readdirnames(1)
+	return err == nil && len(names) > 0
+}
+
 // recordsIntact reports whether records.bin still holds everything the manifest
 // committed. A shorter file means a crash truncated the record log; the index
 // must rebuild rather than silently return fewer messages.
@@ -234,6 +246,14 @@ func recordsIntact(dir string, m Manifest) bool {
 	if len(m.Sessions) > 0 {
 		bi, err := os.Stat(filepath.Join(dir, "buckets"))
 		if err != nil || !bi.IsDir() {
+			return false
+		}
+		// An empty directory is the same loss as a missing one, and it is what
+		// `rm buckets/*.bin` and a copy that skipped the contents both leave
+		// behind: every check passed, `doctor` said "built, up to date", and
+		// search answered "no matches in 3 indexed sessions" about text that
+		// was still in the record log (#946).
+		if !hasBucketFile(filepath.Join(dir, "buckets")) {
 			return false
 		}
 	}
