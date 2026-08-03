@@ -313,7 +313,7 @@ func printStats(w io.Writer, r stats.Report) {
 }
 
 func statColorOK(w io.Writer) bool {
-	if os.Getenv("NO_COLOR") != "" {
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
 	}
 	f, ok := w.(*os.File)

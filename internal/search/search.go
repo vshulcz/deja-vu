@@ -1070,7 +1070,7 @@ func highlight(s, q string, isRe bool, color bool) string {
 }
 
 func colorOK(w io.Writer) bool {
-	if os.Getenv("NO_COLOR") != "" {
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
 	}
 	f, ok := w.(*os.File)

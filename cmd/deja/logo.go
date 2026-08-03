@@ -52,7 +52,10 @@ func visibleLen(s string) int { return len([]rune(ansiRE.ReplaceAllString(s, "")
 var logoWanted = defaultLogoWanted
 
 func defaultLogoWanted(f *os.File) bool {
-	if os.Getenv("NO_COLOR") != "" {
+	// TERM=dumb is a terminal that cannot do any of this: emacs shell-mode, a
+	// CI shell, an editor's built-in console. NO_COLOR was honoured and this
+	// was not, so those readers got escape sequences as literal text (#903).
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
 	}
 	fi, err := f.Stat()
