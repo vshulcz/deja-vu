@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.7] - 2026-08-03
+
+Two weeks spent on the trust policy and on the states a machine gets into when
+a disk goes away. The policy turned out to be honoured by search and by nothing
+else: the listing, the handoff picker and the block printed after an import all
+read straight from the index. Separately, an index whose postings were gone
+answered "no matches" about text it still held, and every surface called it
+healthy.
+
+The index format is unchanged, so upgrading does not rebuild.
+
+### Fixed
+- The trust policy now covers every path that chooses for you: `deja last`, `handoff` with no id, and the proof block printed after `sync import`. Search was the only one applying it. (#937, #951, #953)
+- `doctor` reports the policy in force rather than the file on disk — with no policy file and `DEJA_AUTORECALL_LOCAL_ONLY=1` set, it said every origin activates everywhere. (#939)
+- A rule deja never consults is no longer summarised as if it were in force, and an `imported:<group>` rule that matches nothing in the index is named. The part after the colon is the source project's first path component, not a machine name; the vocabulary said peer. (#941, #955)
+- The session-start receipt says when the policy withheld memory from that session instead of only naming the policy. (#948)
+- An index whose `buckets/` directory is empty counts as damaged: search rebuilds instead of answering "no matches" about text still in the record log, and `doctor` stops calling it built. (#946)
+- An unplugged disk is not a permissions problem: `search` and `doctor` name the vanished mount point, and a store on an ejected volume is called unplugged rather than missing. (#931, #933)
+- Promoted notes keep their corrections newest-first after an incremental build; the note led with the answer that had been overturned. (#944)
+- Note buckets are dated in the reader's zone, and `doctor` says when a zone change regrouped the days. (#911, #935)
+- `forget` names what it is dropping: a day of `remember` notes is no longer reported as a promoted note, and `forget --list` names the way back. (#919, #957)
+- The hook reports a running build on machines that have environment facts, names a store it could not read, and its background refresh reindexes before recomputing the digest. (#913, #917, #927)
+- The first seconds after install are not described as a quiet day or a missing index. (#925)
+- A session id is accepted the way it is pasted — quotes, backticks, stray spaces, and the `harness:id` form deja prints itself. (#921)
+- `ctx` says when an elided id reached more than one session. (#923)
+- `sync import` reports how many sessions arrived and names a few, instead of a record count. (#929)
+- `deja update` names the package each manager actually ships; `npm update -g deja-vu` was a 404. (#915)
+- Dumb terminals get no colour, and a read-only cache directory no longer stops `search` answering from the index that is there. (#903, #904)
+
 ## [0.16.6] - 2026-08-02
 
 Two weeks of reading deja's own output on states it had never been run in: no
@@ -509,7 +538,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.16.7...HEAD
+[0.16.7]: https://github.com/vshulcz/deja-vu/compare/v0.16.6...v0.16.7
 [0.16.1]: https://github.com/vshulcz/deja-vu/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vshulcz/deja-vu/compare/v0.15.7...v0.16.0
 [0.5.0]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...v0.5.0
