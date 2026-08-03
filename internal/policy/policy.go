@@ -94,6 +94,12 @@ func (p Policy) Allows(activation, project string) bool {
 	return true
 }
 
+// consultedOrigin reports whether a rule key is one Origin can produce. Rules
+// are keyed by origin; a project name looks like a rule and is not one.
+func consultedOrigin(origin string) bool {
+	return origin == "local" || origin == "imported" || strings.HasPrefix(origin, "imported:")
+}
+
 // Describe names the active rule set for receipts and `deja log`, so the
 // audit trail explains itself. The default policy reads "local+imported".
 func (p Policy) Describe(activation string) string {
@@ -106,7 +112,10 @@ func (p Policy) Describe(activation string) string {
 	}
 	denied := make([]string, 0, len(rules))
 	for origin, allowed := range rules {
-		if !allowed {
+		// A key deja never consults restricts nothing, and naming it here put
+		// two claims on one screen: "deny tmp/other" from this line and "this
+		// rule does nothing" from Diagnose's, three lines down (#941).
+		if !allowed && consultedOrigin(origin) {
 			denied = append(denied, origin)
 		}
 	}

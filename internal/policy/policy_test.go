@@ -157,3 +157,24 @@ func TestDiagnoseUnreadablePath(t *testing.T) {
 		t.Fatalf("exists=%v err=%v", exists, err)
 	}
 }
+
+// A key deja never consults restricts nothing, and naming it in the summary put
+// two claims on one screen: "deny tmp/other" here and "this rule does nothing"
+// from Diagnose three lines down (#941).
+func TestDescribeSkipsKeysDejaNeverConsults(t *testing.T) {
+	p := Policy{Activations: map[string]map[string]bool{
+		ActivationSearch: {"local": true, "tmp/other": false},
+	}}
+	if got := p.Describe(ActivationSearch); got != "local+imported" {
+		t.Errorf("Describe with a project-shaped key = %q, want the unrestricted summary", got)
+	}
+	// Real rules still show, including a single machine.
+	p.Activations[ActivationSearch]["imported:laptop"] = false
+	if got := p.Describe(ActivationSearch); got != "deny imported:laptop" {
+		t.Errorf("Describe dropped a rule it does consult: %q", got)
+	}
+	p.Activations[ActivationSearch]["imported"] = false
+	if got := p.Describe(ActivationSearch); got != "local-only" {
+		t.Errorf("Describe stopped naming local-only: %q", got)
+	}
+}
