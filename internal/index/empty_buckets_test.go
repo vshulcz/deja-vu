@@ -14,18 +14,24 @@ import (
 // matches in N indexed sessions" about text still in the record log (#946).
 func TestAnEmptyBucketDirectoryCountsAsDamage(t *testing.T) {
 	tmp := t.TempDir()
-	store := filepath.Join(tmp, "claude", "-proj")
+	store := filepath.Join(tmp, "claude", "proj-p")
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Every root the build consults, or another package's store leaks in and
+	// this index is not the one the test wrote.
+	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	rec := `{"type":"user","message":{"role":"user","content":"the ticker window is 30s"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"s1","cwd":"/proj"}` + "\n"
 	if err := os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(rec), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(tmp, "index.db")
-	if err := Ensure(dir, "", false, nil); err != nil {
+	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	if Damaged(dir) {
