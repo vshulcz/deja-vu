@@ -1835,6 +1835,13 @@ func ensureError(dir string, err error) error {
 	// space left on device`: an internal path nobody can act on, and the same
 	// shape #798 replaced for permissions. The build needs room beside the
 	// index, so the directory to free is the one named here (#888).
+	// A volume that went away mid-write — an unmounted disk, a network share
+	// that dropped — arrives as `write /…/index.db.tmp/records.bin:
+	// input/output error`: the same internal path as #888, and a reader who
+	// cannot tell that the disk is simply gone (#899).
+	if errors.Is(err, syscall.EIO) || errors.Is(err, syscall.ENXIO) || errors.Is(err, syscall.ENODEV) {
+		return fmt.Errorf("the index directory is not reachable (%s) — the disk it lives on may have been unmounted or dropped; reconnect it, or point DEJA_INDEX_DIR somewhere local", filepath.Dir(dir))
+	}
 	if errors.Is(err, syscall.ENOSPC) {
 		return fmt.Errorf("no space left where the index is built (%s) — free some room there, or point DEJA_INDEX_DIR at a disk that has it", filepath.Dir(dir))
 	}
