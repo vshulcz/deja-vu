@@ -294,6 +294,7 @@ func Import(dir, inDir string) (int, error) {
 			rank:   make(map[string]int, len(titleRankOf)),
 			added:  added,
 		}
+		fileDedupe := &before.dedupe
 		for k, v := range recsByKey {
 			before.counts[k] = len(v)
 		}
@@ -374,6 +375,7 @@ func Import(dir, inDir string) (int, error) {
 			}
 			metas[key] = meta
 			m.ImportedRecords[dedupe] = true
+			*fileDedupe = append(*fileDedupe, dedupe)
 			added++
 			return nil
 		}); err != nil {
@@ -389,6 +391,9 @@ func Import(dir, inDir string) (int, error) {
 					continue
 				}
 				recsByKey[k] = recsByKey[k][:n]
+			}
+			for _, k := range before.dedupe {
+				delete(m.ImportedRecords, k)
 			}
 			restoreMap(metas, before.metas)
 			restoreMap(titleAt, before.at)
@@ -416,6 +421,11 @@ type importSnapshot struct {
 	metas  map[string]SessionMeta
 	at     map[string]time.Time
 	rank   map[string]int
+	// dedupe keys added while reading this file. Without taking these back a
+	// refused file left its records out of the index and marked as already
+	// imported, so the retry after fixing the file brought nothing and the
+	// records were lost for good (#897).
+	dedupe []string
 	added  int
 }
 
