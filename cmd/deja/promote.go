@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -152,6 +153,13 @@ func notesWriteError(err error) error {
 	if err == nil {
 		return nil
 	}
+	// The directory before the errno: a volume that was unmounted fails with
+	// EACCES on macOS, because deja is then trying to create a directory under
+	// /Volumes — and "check that file's permissions" sends the reader after a
+	// permission problem they do not have (#907).
+	if dir := filepath.Dir(sources.NotesFile()); !dirExists(dir) {
+		return fmt.Errorf("cannot write %s — %s is not there; the disk it lives on may have been unmounted", sources.NotesFile(), dir)
+	}
 	if errors.Is(err, fs.ErrPermission) {
 		return fmt.Errorf("cannot write %s — check that file and its directory's permissions, or set DEJA_NOTES_FILE somewhere writable", sources.NotesFile())
 	}
@@ -274,6 +282,13 @@ func exportFailureReason(err error) string {
 	return writeFailureReason(err)
 }
 
+// dirExists reports whether p is there as a directory. A path whose directory
+// is gone is not a permission problem, whatever errno the platform picks.
+func dirExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
+}
+
 // writeFailureReason words why a write did not happen, in the same vocabulary
 // everywhere. The index has said "no space left where the index is built"
 // since #888 while every other path handed back the syscall — the notes file,
@@ -281,6 +296,8 @@ func exportFailureReason(err error) string {
 // `open /…: no space left on device` (#906).
 func writeFailureReason(err error) string {
 	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return "its directory does not exist"
 	case errors.Is(err, fs.ErrPermission):
 		return "permission denied"
 	case errors.Is(err, syscall.ENOSPC):
