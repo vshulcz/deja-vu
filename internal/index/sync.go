@@ -311,6 +311,15 @@ func Import(dir, inDir string) (int, error) {
 			if sr.Harness == "" || origID == "" {
 				return nil
 			}
+			// The same rule the local ingest applies: a message that strips to
+			// empty is not a message, and a session with nothing but those is
+			// not a session. deja's own exports never carry them, but a
+			// hand-made batch or one from a build older than #868 does — and
+			// they came back in as blank lines in `last` and rows in every
+			// counter (#896).
+			if strings.TrimSpace(sr.Text) == "" {
+				return nil
+			}
 			// Key includes role and a text hash: two messages can legally share
 			// a timestamp (aider stamps a whole session with its start time).
 			// The legacy time-only key is still honored so batches imported by

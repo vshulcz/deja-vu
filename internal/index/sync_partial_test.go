@@ -72,3 +72,59 @@ func TestImportKeepsGoingPastAFileItCannotRead(t *testing.T) {
 		t.Errorf("half of a refused file was imported: %q", joined)
 	}
 }
+
+// deja's own exports never carry a record whose text strips to empty — the
+// local ingest drops them (#868) — but a hand-made batch or one from an older
+// build does, and they arrived as sessions: blank lines in `last`, rows in
+// every counter (#896).
+func TestImportDropsRecordsWithNothingInThem(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	in := filepath.Join(home, "export")
+	if err := os.MkdirAll(in, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var batch strings.Builder
+	for _, tc := range []struct{ id, text string }{
+		{"r1", "a real remote record"},
+		{"r2", "   "},
+		{"r3", ""},
+		{"r4", "\n\t "},
+	} {
+		b, err := json.Marshal(SyncRecord{Harness: "claude", SessionID: tc.id, Project: "p", Role: "user", Text: tc.text})
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch.WriteString(string(b) + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(in, "deja-sync-y.jsonl"), []byte(batch.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(home, "idx")
+	n, err := Import(dir, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("imported %d records, want only the one with something in it", n)
+	}
+	counts := HarnessSessionCounts(dir)
+	if counts["claude"] != 1 {
+		t.Errorf("manifest holds %d claude sessions, want 1", counts["claude"])
+	}
+	ss, err := Search(dir, query.Options{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var texts []string
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			texts = append(texts, m.Text)
+		}
+	}
+	if len(texts) != 1 || texts[0] != "a real remote record" {
+		t.Errorf("messages in the index = %q, want only the real one", texts)
+	}
+}
