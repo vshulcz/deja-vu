@@ -747,6 +747,14 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 			fmt.Fprintf(w, "  status   building now (%s) — recall comes online in a few seconds\n", st.progress())
 			return
 		}
+		// A build requested moments ago has published no progress yet, and
+		// "run `deja warmup`" tells the reader to start what is already
+		// running — the first build after install is exactly that state
+		// (#925).
+		if warmupJustRequested(dir) {
+			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online in a few seconds")
+			return
+		}
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return
 	}

@@ -28,8 +28,15 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	// A build asked for moments ago has not published progress yet, and until
 	// it does this said "no recalls yet today" — a normal day, while the index
 	// on disk is one this build cannot read (#879).
-	if warmupJustRequested(dir) && index.HasManifest(dir) {
-		fmt.Fprint(stdout, "deja · rebuilding the index · recall is quiet until it finishes")
+	if warmupJustRequested(dir) {
+		// Requiring a manifest here left the very minute after install — the
+		// first build, no index yet — reading "no recalls yet today", a normal
+		// quiet day (#925). The same guard #909 took off the hook.
+		if index.HasManifest(dir) {
+			fmt.Fprint(stdout, "deja · rebuilding the index · recall is quiet until it finishes")
+		} else {
+			fmt.Fprint(stdout, "deja · indexing your history · recall comes online in a few seconds")
+		}
 		return nil
 	}
 	recalls, bytes, injected := usage.TodayWithInjections(dir)
