@@ -594,6 +594,18 @@ func doctorPolicy(w io.Writer) {
 	fmt.Fprintln(w, "Trust policy:")
 	exists, unknown, err := policy.Diagnose()
 	if !exists {
+		// …unless the environment restricts it anyway. Deciding on the file's
+		// absence said "every origin activates everywhere" while the auto path
+		// was local-only, on the one screen someone opens to find out what is
+		// allowed (#939).
+		if pol := policy.Load(); pol.Describe(policy.ActivationAuto) != "local+imported" {
+			fmt.Fprintf(w, "  %-12s no file at %s\n", "default", policy.Path())
+			for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
+				fmt.Fprintf(w, "  %-12s %s\n", activation, pol.Describe(activation))
+			}
+			fmt.Fprintf(w, "  %-12s DEJA_AUTORECALL_LOCAL_ONLY is set in this environment\n", "from env")
+			return
+		}
 		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", policy.Path())
 		return
 	}
