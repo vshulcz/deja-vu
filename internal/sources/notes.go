@@ -2,7 +2,9 @@ package sources
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -101,7 +103,12 @@ func LoadNotes() []model.Session {
 	// own decisions left the index and no line said so (#901).
 	path := NotesFile()
 	ss, err := ParseNotesFile(path)
-	diagFileError(path, err)
+	// A notes file that was never written is not a failure: every machine
+	// starts without one, and reporting it made `deja index` warn about the
+	// user's notes on a store that has none (#908).
+	if !errors.Is(err, fs.ErrNotExist) {
+		diagFileError(path, err)
+	}
 	return ss
 }
 

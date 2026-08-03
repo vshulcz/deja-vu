@@ -30,6 +30,17 @@ func TestLoadNotesRecordsAFileItCannotRead(t *testing.T) {
 		t.Errorf("a readable file was reported as failed: %v", failed)
 	}
 
+	// A machine that never wrote a note is not a machine with a problem: this
+	// warned about the user's notes on every store that has none (#908).
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(dir, "never-written.jsonl"))
+	if ss := LoadNotes(); len(ss) != 0 {
+		t.Fatalf("a missing file yielded %d sessions", len(ss))
+	}
+	if _, failed := DiagSnapshot(); len(failed) != 0 {
+		t.Errorf("a notes file that was never written was reported: %v", failed)
+	}
+	t.Setenv("DEJA_NOTES_FILE", notes)
+
 	if err := os.Chmod(notes, 0o000); err != nil {
 		t.Fatal(err)
 	}
