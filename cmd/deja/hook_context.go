@@ -240,6 +240,9 @@ func runHookContext(dir string, plain bool) error {
 					line = fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
 				}
 			}
+			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
+				line = joinNotes(note, line)
+			}
 			line = joinNotes(rewireNote(rewired), line)
 			if line != "" {
 				var resp sessionStartHookResponse
@@ -317,12 +320,66 @@ func runHookContext(dir string, plain bool) error {
 			resp.SystemMessage = joinNotes(rewireNote(rewired), st.line())
 		}
 	}
+	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
+		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
+	}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil
 	}
 	fmt.Fprintln(os.Stdout, string(b))
 	return nil
+}
+
+// unreadableStoreNote names a store deja could not read in full. A newcomer's
+// first contact is the agent, not the CLI: `deja index` and `deja doctor` both
+// explain a locked directory, and neither is what someone who installed deja
+// and went back to their agent ever runs, so the project simply had no memory
+// and nothing said why (#917). The count is already in the manifest, so this
+// costs one read of what the hook path has read anyway.
+func unreadableStoreNote(dir string) string {
+	var names []string
+	total := 0
+	health := index.IngestHealth(dir)
+	for _, h := range sortedHarnesses(health) {
+		e := health[h]
+		if e.FailedFiles == 0 {
+			continue
+		}
+		total += e.FailedFiles
+		name := h
+		if h == "deja" {
+			name = "your notes"
+		}
+		names = append(names, name)
+	}
+	if total == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja: %d path%s in %s could not be read — sessions are missing from recall; `deja doctor` names %s",
+		total, pluralS(total), strings.Join(names, ", "), pluralWhich(total))
+}
+
+// storeNoteIsNews keeps the line above from becoming wallpaper: it is repeated
+// only when the count changes, or once a day while it stands.
+func storeNoteIsNews(dir, note string) bool {
+	if note == "" {
+		return false
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(note))
+	sum := fmt.Sprintf("%x", h.Sum64())
+	p := dir + ".storenote"
+	if b, err := os.ReadFile(p); err == nil {
+		parts := strings.Fields(string(b))
+		if len(parts) == 2 && parts[0] == sum {
+			if ts, err := strconv.ParseInt(parts[1], 10, 64); err == nil && time.Since(time.Unix(ts, 0)) < 24*time.Hour {
+				return false
+			}
+		}
+	}
+	_ = os.WriteFile(p, []byte(sum+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	return true
 }
 
 // receiptIsNews reports whether this digest differs from the one last
