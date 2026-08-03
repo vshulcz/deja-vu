@@ -32,6 +32,11 @@ func TestRebuildOnATerminalSaysWhatItIndexed(t *testing.T) {
 	// hermeticEnv points the warmup sentinel at a guard path for every test in
 	// this package; this case is the ordinary interactive run.
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	// Never the real thing: on Windows a detached child holds deja.test.exe
+	// open and `go test` fails to remove it after the run.
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { return nil }
+	t.Cleanup(func() { spawnWarmup = oldSpawn })
 
 	saved := logoWanted
 	logoWanted = func(*os.File) bool { return true }

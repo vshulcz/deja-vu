@@ -36,6 +36,11 @@ func TestRewireNoteNamesWhatWasRewritten(t *testing.T) {
 func TestTheHookReportsAWiringRepairWithNothingElseToSay(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	// Never the real thing: on Windows a detached child holds deja.test.exe
+	// open and `go test` fails to remove it after the run.
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { return nil }
+	t.Cleanup(func() { spawnWarmup = oldSpawn })
 	cfg := filepath.Join(tmp, "config")
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	if err := os.MkdirAll(filepath.Join(cfg, "deja"), 0o700); err != nil {

@@ -19,6 +19,11 @@ func TestTheHookDoesNotPromiseARebuildItCannotDo(t *testing.T) {
 	}
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	// Never the real thing: on Windows a detached child holds deja.test.exe
+	// open and `go test` fails to remove it after the run.
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { return nil }
+	t.Cleanup(func() { spawnWarmup = oldSpawn })
 	cache := filepath.Join(tmp, "cache")
 	dir := filepath.Join(cache, "index.db")
 	if err := os.MkdirAll(dir, 0o700); err != nil {

@@ -17,6 +17,11 @@ import (
 func TestTheSessionThatAsksForTheBuildIsTold(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_WARMUP_SENTINEL", "")
+	// Never the real thing: on Windows a detached child holds deja.test.exe
+	// open and `go test` fails to remove it after the run.
+	oldSpawn := spawnWarmup
+	spawnWarmup = func(_, _ string) error { return nil }
+	t.Cleanup(func() { spawnWarmup = oldSpawn })
 	dir := os.Getenv("DEJA_INDEX_DIR")
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
 	if err := os.MkdirAll(store, 0o755); err != nil {
