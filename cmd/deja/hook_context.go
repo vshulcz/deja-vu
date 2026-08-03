@@ -206,7 +206,7 @@ func runHookContext(dir string, plain bool) error {
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
 	adoptHookCWD(input.CWD)
-	digest, sessions, raw, taskMatched := cachedHookDigest(dir)
+	digest, sessions, raw, taskMatched, withheld := cachedHookDigest(dir)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -325,6 +325,13 @@ func runHookContext(dir string, plain bool) error {
 		polNote := ""
 		if polName != "local+imported" {
 			polNote = " · policy: " + polName
+			// The line was identical whether the rule hid a session here or
+			// merely existed, so the reader could not tell that memory had
+			// been withheld from this very session — search has said it since
+			// the counter existed (#L-new19).
+			if withheld > 0 {
+				polNote += fmt.Sprintf(" (%s withheld here)", doctorCount(withheld, "session"))
+			}
 		}
 		// A count says deja did something; a name says what. The receipt is
 		// the one place a person reliably sees, so when a piece of work has
@@ -441,9 +448,13 @@ type hookCacheEntry struct {
 	// under. A cache hit returns before either is consulted, so serving an
 	// entry built under different rules would let a cached digest outlive
 	// DEJA_RECALL=off or a policy that now forbids it.
-	Gate        string   `json:"gate,omitempty"`
-	Digest      string   `json:"digest"`
-	Sessions    int      `json:"sessions"`
+	Gate     string `json:"gate,omitempty"`
+	Digest   string `json:"digest"`
+	Sessions int    `json:"sessions"`
+	// Withheld counts the candidates the trust policy dropped for this
+	// digest. Old entries decode as zero, which reads as "nothing withheld"
+	// and is what they meant.
+	Withheld    int      `json:"withheld,omitempty"`
 	Raw         int64    `json:"raw"`
 	TaskMatched []string `json:"task_matched,omitempty"`
 }
@@ -472,13 +483,13 @@ func adoptHookCWD(cwd string) {
 	_ = os.Setenv("CLAUDE_PROJECT_DIR", cwd)
 }
 
-func cachedHookDigest(dir string) (string, int, int64, []string) {
+func cachedHookDigest(dir string) (string, int, int64, []string, int) {
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
-		return "", 0, 0, nil
+		return "", 0, 0, nil, 0
 	}
 	// Before the cache read: a hit returns without reaching the version guard
 	// in hookDigestResult, so an index left behind by an upgrade was served
@@ -502,19 +513,19 @@ func cachedHookDigest(dir string) (string, int, int64, []string) {
 				// the cache off the startup path.
 				requestHookRefresh(dir, cwd)
 			}
-			return e.Digest, e.Sessions, e.Raw, e.TaskMatched
+			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld
 		}
 	}
-	digest, sessions, raw, taskMatched := hookDigestResult(dir)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched)
-	return digest, sessions, raw, taskMatched
+	digest, sessions, raw, taskMatched, withheld := hookDigestResult(dir)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld)
+	return digest, sessions, raw, taskMatched, withheld
 }
 
-func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string) {
+func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string, withheld int) {
 	if digest == "" {
 		return
 	}
-	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched}); err == nil {
+	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld}); err == nil {
 		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
 	}
 }
@@ -569,17 +580,18 @@ func runHookRefresh(dir string) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		return
 	}
-	digest, sessions, raw, taskMatched := hookDigestResult(dir)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched)
+	digest, sessions, raw, taskMatched, withheld := hookDigestResult(dir)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld)
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }
 
 func hookDigest(dir string) string {
-	digest, _, _, _ := hookDigestResult(dir)
+	digest, _, _, _, _ := hookDigestResult(dir)
 	return digest
 }
 
-func hookDigestResult(dir string) (string, int, int64, []string) {
+func hookDigestResult(dir string) (string, int, int64, []string, int) {
+	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
 	t0 := time.Now()
@@ -592,7 +604,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	_ = mark
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
-		return "", 0, 0, nil
+		return "", 0, 0, nil, 0
 	}
 	// A store from an older index version must be rebuilt before it is read:
 	// this path never calls Ensure, so otherwise the first prompts after an
@@ -601,14 +613,14 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	// manifest still describes, and this path answers from them (#800).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return "", 0, 0, nil
+		return "", 0, 0, nil, 0
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return "", 0, 0, nil
+			return "", 0, 0, nil, 0
 		}
 	}
 	// The two git probes (worktree list for identity, status/log for the
@@ -643,6 +655,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	if got, err := index.RecentProjects(dir, lookupNames, perName); err == nil {
 		for _, s := range got {
 			if !pol.Allows(policy.ActivationAuto, s.Project) {
+				withheld++
 				continue
 			}
 			k := s.Harness + ":" + s.ID
@@ -655,7 +668,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 	}
 	mark("load-sessions")
 	if len(ss) == 0 {
-		return "", 0, 0, nil
+		return "", 0, 0, nil, 0
 	}
 	scores, matched := taskScores(ss, taskFiles)
 	sort.Slice(ss, func(i, j int) bool {
@@ -697,7 +710,7 @@ func hookDigestResult(dir string) (string, int, int64, []string) {
 		}
 	}
 	mark("environment")
-	return text, result.Sessions, rawSize(ss), matched
+	return text, result.Sessions, rawSize(ss), matched, withheld
 }
 
 // warmupDeadAfter is how long a warmup may go without publishing progress

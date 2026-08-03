@@ -35,7 +35,7 @@ func TestHookAntigravityBoundsStdinWithoutInjectingOnEveryTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", "/proj")
-	if d, _, _, _ := cachedHookDigest(dir); d == "" {
+	if d, _, _, _, _ := cachedHookDigest(dir); d == "" {
 		t.Fatal("fixture has no digest to inject")
 	}
 

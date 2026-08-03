@@ -187,7 +187,7 @@ func gooseRecallPath() string {
 }
 
 func refreshGooseHints() error {
-	digest, sessions, _, _ := cachedHookDigest(index.DefaultDir())
+	digest, sessions, _, _, _ := cachedHookDigest(index.DefaultDir())
 	body := digest
 	if sessions > 0 {
 		body = frameRecall(gooseLead + digest)

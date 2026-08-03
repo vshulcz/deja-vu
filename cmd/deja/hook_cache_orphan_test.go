@@ -45,7 +45,7 @@ func TestHookAsksForARebuildWhenTheIndexIsGone(t *testing.T) {
 	spawnWarmup = func(exe, sentinel string) error { spawned++; return nil }
 	t.Cleanup(func() { spawnWarmup = saved })
 
-	digest, sessions, _, _ := cachedHookDigest(dir)
+	digest, sessions, _, _, _ := cachedHookDigest(dir)
 	if !strings.Contains(digest, "pool exhausted") || sessions != 1 {
 		t.Errorf("the cached digest was dropped rather than served: %q (%d sessions)", digest, sessions)
 	}
