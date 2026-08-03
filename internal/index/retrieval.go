@@ -958,6 +958,17 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 			}
 		}
 	}
+	// Last: the `harness:id` shape deja prints in `forget --list` and in
+	// promote's receipts, which every reading command refused (#921).
+	if len(matches) == 0 {
+		if harness, id := splitSelector(p); harness != "" {
+			for _, meta := range m.Sessions {
+				if strings.EqualFold(meta.Harness, harness) && (strings.HasPrefix(meta.ID, id) || idLooselyMatches(meta.ID, id)) {
+					matches = append(matches, meta)
+				}
+			}
+		}
+	}
 	if len(matches) == 0 {
 		return model.Session{}, false, nil
 	}

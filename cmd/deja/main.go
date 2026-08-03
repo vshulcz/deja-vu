@@ -291,6 +291,9 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
+	// An id arrives from a chat wrapped in quotes or backticks and with the
+	// harness deja itself printed in front of it (#921).
+	o.id = index.PastedSelector(o.id)
 	if o.id == "" {
 		return fmt.Errorf("show needs id-prefix")
 	}
@@ -1451,11 +1454,11 @@ func runForget(dir string, args []string) error {
 			i++
 			switch args[i-1] {
 			case "--session":
-				o.Session = args[i]
+				o.Session = index.PastedSelector(args[i])
 			case "--project":
 				o.Project = args[i]
 			case "--unforget":
-				unforget = args[i]
+				unforget = index.PastedSelector(args[i])
 			case "--before":
 				if d, err := parseDur(args[i]); err == nil {
 					// "older than 0 days" is the whole store, and the typo that

@@ -247,7 +247,7 @@ func sessionMatches(meta SessionMeta, o ForgetOptions) bool {
 	// middle of a long one, and forget was the last command that would not take
 	// what the reader copied off the screen — answering "nothing was changed"
 	// on a session that is there (#855).
-	if o.Session != "" && !strings.HasPrefix(meta.ID, o.Session) && !idMatchesElided(meta.ID, o.Session) {
+	if o.Session != "" && !selectorMatches(meta, o.Session) {
 		return false
 	}
 	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
@@ -257,6 +257,69 @@ func sessionMatches(meta SessionMeta, o ForgetOptions) bool {
 		return false
 	}
 	return o.Session != "" || o.Project != "" || !o.Before.IsZero()
+}
+
+// selectorMatches reports whether a session answers to what someone typed or
+// pasted. Beyond the id prefix and the elided form (#855), that includes the
+// `harness:id` shape deja prints itself — in `forget --list`, in the undo line
+// beside it, and in promote's receipts — which `show` refused and
+// `forget --session` accepted while matching nothing (#921).
+func selectorMatches(meta SessionMeta, sel string) bool {
+	if strings.HasPrefix(meta.ID, sel) || idMatchesElided(meta.ID, sel) {
+		return true
+	}
+	harness, id := splitSelector(sel)
+	if harness == "" || !strings.EqualFold(meta.Harness, harness) {
+		return false
+	}
+	return strings.HasPrefix(meta.ID, id) || idMatchesElided(meta.ID, id)
+}
+
+// splitSelector takes the `harness:` off a pasted selector. The whole string is
+// always tried first, so an id that happens to carry a colon keeps working;
+// this only widens what matches.
+func splitSelector(sel string) (harness, id string) {
+	i := strings.IndexByte(sel, ':')
+	if i <= 0 || i == len(sel)-1 {
+		return "", sel
+	}
+	for _, r := range sel[:i] {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return "", sel
+		}
+	}
+	return sel[:i], sel[i+1:]
+}
+
+// PastedSelector strips what a paste carries around an id: surrounding
+// whitespace and one wrapping pair of quotes or backticks. An id copied out of
+// a chat arrives dressed like that, and every reading command refused it
+// (#921).
+func PastedSelector(raw string) string {
+	s := strings.TrimSpace(raw)
+	for len(s) >= 2 {
+		first, last := s[0], s[len(s)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') || (first == '`' && last == '`') {
+			s = strings.TrimSpace(s[1 : len(s)-1])
+			continue
+		}
+		if q, ok := strings.CutPrefix(s, "\u201c"); ok {
+			if q, ok := strings.CutSuffix(q, "\u201d"); ok {
+				s = strings.TrimSpace(q)
+				continue
+			}
+		}
+		if q, ok := strings.CutPrefix(s, "\u2018"); ok {
+			if q, ok := strings.CutSuffix(q, "\u2019"); ok {
+				s = strings.TrimSpace(q)
+				continue
+			}
+		}
+		break
+	}
+	return s
 }
 
 func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
