@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -108,6 +109,19 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "promoted %s as %s: %s\n", src, state, title)
 	if line := markTakenBack(src, state, prior); line != "" {
 		fmt.Fprintln(stdout, line)
+	}
+	// Taking a decision back is the same moment forget is: the machines that
+	// already have this session keep the note as it was, and deja knows which
+	// ones (#898). Only for the states that withdraw something — an ordinary
+	// `accepted` is not a retraction.
+	if state != "accepted" {
+		if peers, exported := index.PushedTo(dir, s.Harness, s.ID); len(peers) > 0 || exported {
+			where := "another machine"
+			if len(peers) > 0 {
+				where = strings.Join(peers, ", ")
+			}
+			fmt.Fprintf(stdout, "already sent to %s — this mark stays here; a copy over there still reads as it did\n", where)
+		}
 	}
 	if state == "accepted" {
 		all := sources.LoadPromotedNotes()

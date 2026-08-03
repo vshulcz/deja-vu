@@ -87,6 +87,25 @@ func pushedTo(m Manifest, matched map[string]bool) ([]string, bool) {
 	return out, unnamed
 }
 
+// PushedTo reports where one session's records have already gone: named peers
+// and whether an unnamed directory export carried it. forget says this when it
+// drops a session (#788); taking a decision back is the same moment for the
+// same reason, and promote said nothing (#898).
+func PushedTo(dir, harness, id string) ([]string, bool) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil, false
+	}
+	key := harness + ":" + id
+	if _, ok := m.Sessions[key]; !ok {
+		return nil, false
+	}
+	return pushedTo(m, map[string]bool{key: true})
+}
+
 func privacyDir() string {
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {
