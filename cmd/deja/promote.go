@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -91,6 +92,13 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	}
 	if err := sources.AppendPromotedTagged(s.Project, title, text, src, state, tags, time.Now()); err != nil {
 		return notesWriteError(err)
+	}
+	// The note has to reach the index before the line below claims it outranks
+	// the transcript. `remember` has done this since it was written; promote
+	// did not, so a decision recorded here was invisible to the hook — which
+	// never builds — until some other command happened to run (#910).
+	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
+		fmt.Fprintf(os.Stderr, "deja: the note is written; the index could not be updated yet — %v\n", err)
 	}
 	if exportPath != "" {
 		masked, err := exportPromoted(exportPath, title, text, src, state, s.Updated)
