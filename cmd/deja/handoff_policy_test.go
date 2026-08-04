@@ -29,7 +29,10 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Newer than the local one, so it wins any recency contest.
-	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer", Project: "proj", Role: "user", Text: "PEER SECRET: the vault rotation runs at 03:00"})
+	// Project "work/proj" under a directory of the same shape: it answers to
+	// two of the name candidates the directory yields, which is what the
+	// count has to survive (#981).
+	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer", Project: "work/proj", Role: "user", Text: "PEER SECRET: the vault rotation runs at 03:00"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +48,7 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 	}
 	// handoff takes the project from the working directory, so the test has to
 	// stand in one whose name matches.
-	work := filepath.Join(tmp, "proj")
+	work := filepath.Join(tmp, "work", "proj")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +83,15 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := handoffSource(dir, ""); err == nil || !strings.Contains(err.Error(), "trust policy") {
+	_, err = handoffSource(dir, "")
+	if err == nil || !strings.Contains(err.Error(), "trust policy") {
 		t.Errorf("with everything hidden, handoff said: %v", err)
+	}
+	// One session is hidden here, and a directory answers to several project
+	// names — the count is the only thing telling the reader how much the rule
+	// holds back, and per-pass addition named more than the project holds
+	// (#981).
+	if err != nil && !strings.Contains(err.Error(), "hides 1 matching session ") {
+		t.Errorf("the count is not what the project holds: %v", err)
 	}
 }

@@ -153,7 +153,11 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	}
 	var newest model.Session
 	distinct := map[string]bool{}
-	hidden := 0
+	// By session, not by pass: a directory yields several project-name
+	// candidates and the same session answers to more than one of them, so
+	// counting per pass told the reader the rule hides more than the project
+	// holds (#981).
+	hidden := map[string]bool{}
 	for _, name := range digest.ProjectNameCandidates(cwd) {
 		ss, err := index.RecentProject(dir, name, 3)
 		if err != nil || len(ss) == 0 {
@@ -163,8 +167,16 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		// listing does and what a listing filters (#937). Without this the
 		// pick landed on a session the rule keeps out of recall and packaged
 		// its content for another agent (#953).
-		kept, dropped := policyFilterSessionsCounted(policy.ActivationSearch, ss)
-		hidden += dropped
+		kept, _ := policyFilterSessionsCounted(policy.ActivationSearch, ss)
+		keptIDs := map[string]bool{}
+		for _, k := range kept {
+			keptIDs[k.ID] = true
+		}
+		for _, s := range ss {
+			if !keptIDs[s.ID] {
+				hidden[s.ID] = true
+			}
+		}
 		if len(kept) == 0 {
 			continue
 		}
@@ -174,8 +186,8 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		}
 	}
 	if newest.ID == "" {
-		if hidden > 0 {
-			return model.Session{}, errors.New(strings.TrimPrefix(policyHiddenNote(policy.ActivationSearch, hidden), "deja: "))
+		if len(hidden) > 0 {
+			return model.Session{}, errors.New(strings.TrimPrefix(policyHiddenNote(policy.ActivationSearch, len(hidden)), "deja: "))
 		}
 		return model.Session{}, fmt.Errorf("no indexed sessions for this project — pass a session id-prefix (see `deja last`)")
 	}
