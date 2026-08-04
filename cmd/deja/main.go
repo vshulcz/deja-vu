@@ -1543,6 +1543,7 @@ func runForget(dir string, args []string) error {
 		// forget took the last copy — and the undo reported a restore that did
 		// not happen (#967).
 		back, gone := restoredSessions(dir, unforget, lifted)
+		restorePromotedTitles(dir, unforget)
 		if back > 0 {
 			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index\n", back, pluralS(back))
 		}
@@ -2004,4 +2005,32 @@ func restoredSessions(dir, selector string, lifted int) (back, gone int) {
 		back = lifted
 	}
 	return back, lifted - back
+}
+
+// restorePromotedTitles gives a promoted note back the title it borrowed from a
+// session that has just been restored. forget clears it so the text of a
+// forgotten session does not live on in the note (#666); unforget is the moment
+// that reason stops applying (#969).
+func restorePromotedTitles(dir, selector string) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return
+	}
+	titles := map[string]string{}
+	for _, m := range metas {
+		if !index.SelectorMatches(m, selector) {
+			continue
+		}
+		s, ok, err := index.FindByPrefix(dir, m.ID)
+		if err != nil || !ok {
+			continue
+		}
+		if t := firstUserTitle(s); t != "" {
+			titles[m.Harness+":"+m.ID] = t
+		}
+	}
+	if len(titles) == 0 {
+		return
+	}
+	_, _ = sources.RestorePromotedTitles(func(src string) string { return titles[src] })
 }

@@ -431,6 +431,33 @@ func ForgetPromotedTitles(match func(session string) bool) (int, error) {
 	})
 }
 
+// RestorePromotedTitles fills the title back in for promoted notes whose source
+// session is available again. `forget` clears it so the forgotten session's
+// first line does not survive in the note (#666); when the session comes back
+// the reason is gone, and without this the note stayed "promoted from <src>"
+// forever — a round trip through forget/unforget left the store worse than it
+// found it (#969).
+func RestorePromotedTitles(titleFor func(session string) string) (int, error) {
+	return rewriteNotes(func(m map[string]any) (map[string]any, bool) {
+		if kind, _ := m["kind"].(string); kind != "promoted" {
+			return m, false
+		}
+		if title, _ := m["title"].(string); title != "" {
+			return m, false
+		}
+		src, _ := m["session"].(string)
+		if src == "" {
+			return m, false
+		}
+		title := titleFor(src)
+		if title == "" {
+			return m, false
+		}
+		m["title"] = title
+		return m, true
+	})
+}
+
 // rewriteNotes applies edit to every note line: it returns the replacement and
 // whether anything changed, and a nil replacement deletes the line. The file is
 // written through temp+rename, and the temp file is removed when the write
