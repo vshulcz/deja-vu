@@ -14,6 +14,15 @@ func runShare(dir string, args []string, w io.Writer) error {
 	if len(args) < 1 {
 		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix")
 	}
+	// Everything after the id used to be ignored, so `deja share <id> --to
+	// out.md` printed the share to the terminal and wrote no file — and said
+	// nothing about either (#1002). promote refuses unknown flags; this is the
+	// same command shape one letter away.
+	for _, a := range args[1:] {
+		if strings.HasPrefix(a, "-") {
+			return fmt.Errorf("share: unknown flag %q — share writes to stdout (redirect it), and `deja promote <id> --to <path>` is the one that writes a file", a)
+		}
+	}
 	s, ok, err := findByPrefix(dir, args[0])
 	noteAmbiguousPrefix(dir, args[0], "sharing")
 	if err != nil {
