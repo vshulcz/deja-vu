@@ -140,6 +140,7 @@ func runStats(dir string, args []string) error {
 	// The rule that emptied the report is named a line above, so "nothing
 	// indexed yet — run `deja index`" is advice for a state deja is not in:
 	// the same backside `last` grew when it learned to filter (#949, #983).
+	report.PolicyWithheld = policyHidden
 	report.EmptiedByPolicy = report.TotalSessions == 0 && policyHidden > 0
 	if report.TotalSessions == 0 {
 		report.HiddenBySettings = hiddenByOwnSettings()

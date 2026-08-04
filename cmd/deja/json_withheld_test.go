@@ -83,3 +83,68 @@ func TestJSONSaysWhenTheTrustPolicyWithheldRows(t *testing.T) {
 		t.Errorf("the listing returned the wrong rows: %v", got["sessions"])
 	}
 }
+
+// #990 gave search and last the field; stats printed the reason on stderr only,
+// so the third machine form still could not tell a rule from a small store
+// (#1010).
+func TestStatsJSONCarriesTheWithheldCount(t *testing.T) {
+	tmp := hermeticEnv(t)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer", Project: "work/api", Role: "user", Text: "peer two about the pool cap"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"local work on the ticker window"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"loc","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "loc.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := captureRun(t, "stats", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("stats --json is not JSON: %v", err)
+	}
+	if _, ok := m["policy_withheld"]; ok {
+		t.Errorf("an unrestricted report claims withheld rows: %v", m["policy_withheld"])
+	}
+
+	policyFile := filepath.Join(tmp, "policy.json")
+	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", policyFile)
+
+	out, err = captureRun(t, "stats", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["policy_withheld"] != float64(1) {
+		t.Errorf("stats --json does not say what the rule kept out: %v", m)
+	}
+	if m["total_sessions"] != float64(1) {
+		t.Errorf("the report counted the hidden session anyway: %v", m["total_sessions"])
+	}
+}

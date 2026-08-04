@@ -15,14 +15,18 @@ import (
 )
 
 type Report struct {
-	SchemaVersion   int            `json:"schema_version"`
-	TotalSessions   int            `json:"total_sessions"`
-	TotalMessages   int            `json:"total_messages"`
-	RepeatQuestions int            `json:"repeat_questions,omitempty"`
-	Harnesses       []HarnessStats `json:"harnesses"`
-	TopProjects     []ProjectStats `json:"top_projects"`
-	Monthly         []MonthStats   `json:"monthly"`
-	Heatmap         HeatmapStats   `json:"-"` // card-only presentation data; kept out of the stable --json schema
+	SchemaVersion   int `json:"schema_version"`
+	TotalSessions   int `json:"total_sessions"`
+	TotalMessages   int `json:"total_messages"`
+	RepeatQuestions int `json:"repeat_questions,omitempty"`
+	// PolicyWithheld is how many indexed sessions the trust policy kept out of
+	// this report — the same field `search --json` and `last --json` carry, so
+	// a caller can tell a rule from an empty store (#1010).
+	PolicyWithheld int            `json:"policy_withheld,omitempty"`
+	Harnesses      []HarnessStats `json:"harnesses"`
+	TopProjects    []ProjectStats `json:"top_projects"`
+	Monthly        []MonthStats   `json:"monthly"`
+	Heatmap        HeatmapStats   `json:"-"` // card-only presentation data; kept out of the stable --json schema
 	// EmptiedByPolicy marks a report whose rows were all withheld by the
 	// trust policy, so the empty-index advice is not the right thing to print.
 	EmptiedByPolicy bool `json:"-"`
