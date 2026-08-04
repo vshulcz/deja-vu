@@ -33,6 +33,10 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 	t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
 	t.Setenv("XDG_CONFIG_HOME", "")
+	// The hook adopts the payload's cwd by exporting CLAUDE_PROJECT_DIR into
+	// the process, so a test that runs it hands every later test a project
+	// directory that no longer exists. Pinned here so it is restored per test.
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// Goose resolves through %APPDATA% on Windows; pin it so the doctor
 	// golden stays OS-neutral.

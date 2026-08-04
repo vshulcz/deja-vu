@@ -341,7 +341,7 @@ func runHookContext(dir string, plain bool) error {
 		if r, ok := findReusedMemory(dir); ok {
 			earned = fmt.Sprintf(" · most re-used recently: %q, %d×", trimBriefTitle(r.Title), r.Times)
 		}
-		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja: recalled %d prior session%s %s (~%dKB) — the agent starts already knowing them%s%s%s", sessions, plural, why, (len(digest)+1023)/1024, serviceReceipt(dir), polNote, earned))
+		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja: recalled %d prior session%s %s (%s) — the agent starts already knowing them%s%s%s", sessions, plural, why, humanBytes(int64(len(digest))), serviceReceipt(dir), polNote, earned))
 	}
 	// Nothing to recall yet because the index is still being built: say so
 	// rather than starting in silence. The build runs detached, so the agent
