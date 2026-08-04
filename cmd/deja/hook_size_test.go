@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -45,6 +46,11 @@ func runHookCapturing(t *testing.T, dir, event string) string {
 // read as "~1KB" while statusline and stats counted the real figure — the one
 // number a reader sees first was the one no command could reproduce (#991).
 func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The helper swaps the process's stdin and stdout for pipes; on
+		// windows that stalls the hook's own reader instead of returning.
+		t.Skip("stdin/stdout swapping is not reliable on windows")
+	}
 	tmp := hermeticEnv(t)
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
 	if err := os.MkdirAll(store, 0o755); err != nil {
