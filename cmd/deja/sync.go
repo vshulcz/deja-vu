@@ -81,6 +81,12 @@ func runSync(dir string, args []string) error {
 			return err
 		}
 		fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
+		// A watermark is per machine, not per destination: the second peer you
+		// hand memory to gets an empty folder and the same "exported 0
+		// records" that means "you are up to date" at the first one (#982).
+		if n == 0 && !full && !hasSyncBatches(out) {
+			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", out)
+		}
 		masked := 0
 		if rs, rerr := index.Redactions(dir); rerr == nil {
 			masked = rs.Total
@@ -125,4 +131,18 @@ func runSync(dir string, args []string) error {
 	default:
 		return fmt.Errorf("unknown sync command %q", args[0])
 	}
+}
+
+// hasSyncBatches reports whether a directory already holds exported batches.
+func hasSyncBatches(out string) bool {
+	entries, err := os.ReadDir(out)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasPrefix(e.Name(), "deja-sync-") && strings.HasSuffix(e.Name(), ".jsonl") {
+			return true
+		}
+	}
+	return false
 }
