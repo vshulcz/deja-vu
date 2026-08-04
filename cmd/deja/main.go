@@ -484,7 +484,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	}
 	if len(ss) == 0 {
 		if o.JSON {
-			return printRecentJSON(os.Stdout, nil, sourceInstance)
+			return printRecentJSONWithheld(os.Stdout, nil, sourceInstance, policyHidden)
 		}
 		// The rule that emptied the list was named a line above; "no sessions
 		// indexed yet — run `deja index`" is advice for a state deja is not in,
@@ -505,7 +505,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		return nil
 	}
 	if o.JSON {
-		return printRecentJSON(os.Stdout, ss, sourceInstance)
+		return printRecentJSONWithheld(os.Stdout, ss, sourceInstance, policyHidden)
 	}
 	for _, s := range ss {
 		// A session whose timestamp was missing or unparseable carries the Go
@@ -623,6 +623,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationSearch, hits)
+	o.PolicyWithheld = policyHidden
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}

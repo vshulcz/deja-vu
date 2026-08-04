@@ -29,6 +29,9 @@ from a list of hits:
   sessions deja could find. Counting those as hits overstates recall, and this
   used to be readable only as a sentence on stderr.
 - `total` and `capped` — how many sessions matched, and whether a cap hid some.
+- `policy_withheld` — how many matching sessions this machine's trust policy
+  kept out of the answer. Omitted when none were. Present on `search --json`
+  and `last --json`, so an empty result can be told apart from a rule.
   Counting the returned hits measures the cap: that figure moves when the
   window's membership changes, whether or not retrieval improved.
   **`capped: false` means the response holds everything that matched, on every

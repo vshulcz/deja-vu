@@ -61,6 +61,7 @@ type searchJSONEnvelope struct {
 	// the cap hid any. Counting the returned hits alone measures the cap.
 	Total    int                 `json:"total"`
 	Capped   bool                `json:"capped,omitempty"`
+	Withheld int                 `json:"policy_withheld,omitempty"`
 	Hits     []Hit               `json:"hits"`
 	Fuzzy    bool                `json:"fuzzy,omitempty"`
 	Stemmed  bool                `json:"stemmed,omitempty"`
@@ -744,6 +745,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			Tier:          setTier(o),
 			Total:         o.Total,
 			Capped:        o.Capped,
+			Withheld:      o.PolicyWithheld,
 			Hits:          hits,
 			Fuzzy:         o.Fuzzy,
 			Stemmed:       o.Stemmed,

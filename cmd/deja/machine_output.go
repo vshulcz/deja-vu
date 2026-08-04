@@ -11,6 +11,9 @@ import (
 type recentJSON struct {
 	SchemaVersion int             `json:"schema_version"`
 	Sessions      []model.Session `json:"sessions"`
+	// Withheld is how many rows the trust policy kept out of this listing —
+	// the same fact the text form prints on stderr (#990).
+	Withheld int `json:"policy_withheld,omitempty"`
 }
 
 type sessionWindow struct {
@@ -27,6 +30,10 @@ type sessionJSON struct {
 }
 
 func printRecentJSON(w io.Writer, sessions []model.Session, sourceInstance string) error {
+	return printRecentJSONWithheld(w, sessions, sourceInstance, 0)
+}
+
+func printRecentJSONWithheld(w io.Writer, sessions []model.Session, sourceInstance string, withheld int) error {
 	for i := range sessions {
 		sessions[i].Messages = nil
 		sessions[i].SetSource(sourceInstance)
@@ -34,7 +41,7 @@ func printRecentJSON(w io.Writer, sessions []model.Session, sourceInstance strin
 	if sessions == nil {
 		sessions = []model.Session{}
 	}
-	return json.NewEncoder(w).Encode(recentJSON{SchemaVersion: jsonout.Version, Sessions: sessions})
+	return json.NewEncoder(w).Encode(recentJSON{SchemaVersion: jsonout.Version, Sessions: sessions, Withheld: withheld})
 }
 
 // sliceMessages applies --offset and --limit. Both are documented for `deja

@@ -50,6 +50,10 @@ type Options struct {
 	// survived it. Counting the survivors measures the cap.
 	Total  int
 	Capped bool
+	// PolicyWithheld is how many matching sessions the trust policy kept out
+	// of this answer. The reason travelled on stderr only, so a caller reading
+	// --json could not tell a rule from an empty history (#990).
+	PolicyWithheld int
 	// WithAnswer carries the assistant reply next to a matched user turn.
 	// Agent-facing recall sets it; human CLI output does not, because a person
 	// reading results can open the session.
