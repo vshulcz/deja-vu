@@ -354,6 +354,12 @@ func runHookContext(dir string, plain bool) error {
 	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
 		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
 	}
+	// An index that is behind and cannot be written stays behind. "the agent
+	// starts already knowing them" was printed over a picture missing today's
+	// work, and this path said nothing — search names the same state (#1005).
+	if note := staleReadOnlyNote(dir); note != "" {
+		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
+	}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil
@@ -863,4 +869,33 @@ func serviceReceipt(dir string) string {
 		return fmt.Sprintf(" · today: %d recall%s", recalls, pluralS(recalls))
 	}
 	return fmt.Sprintf(" · today: %d recall%s, %s distilled from %s", recalls, pluralS(recalls), humanBytes(int64(bytes)), humanBytes(raw))
+}
+
+// staleReadOnlyNote is the one line for an index that is behind and cannot
+// catch up: the store has newer sessions and the directory the rebuild would
+// write is not writable. Costs one manifest stat plus one temp-file probe, and
+// only when the index is already known to be behind.
+func staleReadOnlyNote(dir string) string {
+	if indexCanCatchUp(dir) {
+		return ""
+	}
+	return fmt.Sprintf("deja: this is the index as it was — it cannot be updated because %s is not writable", filepath.Dir(dir))
+}
+
+// indexCanCatchUp reports whether the index is either current or able to
+// become current. False only for the one state search already names: newer
+// sessions on disk and nowhere to write the result.
+func indexCanCatchUp(dir string) bool {
+	// Writability first: it is one temp file, while UpToDate walks every
+	// store. Measured on 6000 sessions, asking the expensive question first
+	// cost 25ms on every session start; this way the ordinary machine pays
+	// nothing (#1005).
+	if indexDirWritable(dir) {
+		return true
+	}
+	if !index.HasManifest(dir) {
+		return true
+	}
+	fresh, _ := index.UpToDate(dir, "")
+	return fresh
 }

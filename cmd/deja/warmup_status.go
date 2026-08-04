@@ -197,5 +197,12 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 		return fmt.Sprintf("%d prior session%s matched %q, but this machine's trust policy (%s) does not allow them on this path. There is prior work here; it is not being shown.",
 			hidden, pluralS(hidden), q, policy.Load().Describe(policy.ActivationMCP))
 	}
+	// A confident negative over an index that is behind and cannot catch up:
+	// the session is on disk, deja simply could not add it. The hook says this
+	// at session start; over MCP it is the only place to say it (#1005).
+	if !indexCanCatchUp(dir) {
+		return fmt.Sprintf("No indexed session matched %q — the index is behind and cannot be updated (%s is not writable), so recent work may be missing from this answer.",
+			q, filepath.Dir(dir))
+	}
 	return fmt.Sprintf("No prior deja sessions matched %q.", q)
 }
