@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -132,7 +133,9 @@ func runSync(dir string, args []string) error {
 		}
 		// The end of a move to a new machine is the same moment as an install,
 		// and install proves it with real lines rather than a count (#929).
-		printMemoryProof(dir, "deja now knows, from the machine you came from:")
+		printMemoryProofOf(dir, "deja now knows, from the machine you came from:", func(s model.Session) bool {
+			return strings.HasPrefix(s.Project, "imported:")
+		})
 		return nil
 	default:
 		return fmt.Errorf("unknown sync command %q", args[0])

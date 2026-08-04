@@ -12,6 +12,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -250,13 +251,35 @@ func printInstallProof(dir string) { printMemoryProof(dir, "deja already knows t
 // printMemoryProof is that same proof under a caller's heading. `sync import`
 // ends the move to a new machine and said only "imported 59000 records" —
 // deja's own unit, and nothing a person can check (#929).
-func printMemoryProof(dir, heading string) {
+func printMemoryProof(dir, heading string) { printMemoryProofOf(dir, heading, nil) }
+
+// printMemoryProofOf is the proof narrowed to the rows a caller can honestly
+// claim. `sync import` says "from the machine you came from" and was handed
+// the recent list, so on a batch that added nothing visible it offered this
+// machine's own sessions as the evidence a transfer had landed (#988).
+func printMemoryProofOf(dir, heading string, keep func(model.Session) bool) {
 	if !index.HasManifest(dir) {
 		return
 	}
-	recent, err := index.Recent(dir, 12)
+	want := 12
+	if keep != nil {
+		want = 60
+	}
+	recent, err := index.Recent(dir, want)
 	if err != nil || len(recent) == 0 {
 		return
+	}
+	if keep != nil {
+		var only []model.Session
+		for _, s := range recent {
+			if keep(s) {
+				only = append(only, s)
+			}
+		}
+		recent = only
+		if len(recent) == 0 {
+			return
+		}
 	}
 	// The proof is a listing, and a listing obeys the trust policy (#937). On a
 	// machine whose rule keeps imported sessions out of recall this block was

@@ -147,3 +147,70 @@ func TestImportProofDoesNotLeaveTheDateSlotEmpty(t *testing.T) {
 		t.Errorf("a session with no date does not say so the way `last` does:\n%s", proof)
 	}
 }
+
+// The block is headed "from the machine you came from" and was built from the
+// recent list, so this machine's own sessions stood in as evidence a transfer
+// had landed — and under a rule that hides imported rows they were all that
+// was left (#988).
+func TestImportProofShowsOnlyWhatArrived(t *testing.T) {
+	tmp := hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"local work on the ticker window"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"loc","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "loc.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer", Project: "work/api", Role: "user", Text: "peer three about the ticker"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	proof, err := captureRunStderr(t, "sync", "import", exp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(proof, "peer three about the ticker") {
+		t.Errorf("the proof does not show what arrived:\n%s", proof)
+	}
+	if strings.Contains(proof, "local work on the ticker window") {
+		t.Errorf("a session that was here before the transfer is offered as proof of it:\n%s", proof)
+	}
+
+	// With every arrived row hidden by a rule, the reader gets the rule — not
+	// this machine's own sessions under someone else's heading.
+	policyFile := filepath.Join(tmp, "policy.json")
+	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", policyFile)
+	b2, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "peer2", Project: "work/api", Role: "user", Text: "another peer line"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-y.jsonl"), append(b2, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	proof, err = captureRunStderr(t, "sync", "import", exp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(proof, "local work on the ticker window") {
+		t.Errorf("the proof fell back to local sessions under the import heading:\n%s", proof)
+	}
+	if !strings.Contains(proof, "trust policy") {
+		t.Errorf("nothing named the rule that emptied the proof:\n%s", proof)
+	}
+}
