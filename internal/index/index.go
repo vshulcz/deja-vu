@@ -112,6 +112,12 @@ type SessionMeta struct {
 	// The field is additive: a manifest written before it existed decodes with
 	// it empty and the caller degrades to saying nothing.
 	Touched []string `json:",omitempty"`
+	// Shared marks a row that covers more than one conversation: two
+	// transcripts wrote the same harness:id, so one row holds both. The build
+	// says so once (#698); forget had no way to know, and dropping "1 session"
+	// took two conversations from two projects (#970). Additive: a manifest
+	// written before this decodes with it false.
+	Shared bool `json:",omitempty"`
 	// Hit holds hashes of the specific errors this session tripped over, so
 	// the first screen can name a wall the machine keeps running into without
 	// reading a single session. Same trade as Asked: the text is recovered

@@ -1554,16 +1554,24 @@ func runForget(dir string, args []string) error {
 	}
 	// The scope check runs on a dry pass first: a refusal printed after
 	// index.Forget has already written the tombstones is not a refusal.
-	if o.Session != "" && !o.DryRun {
+	//
+	// The same pass answers what is about to go: after the real Forget the rows
+	// are out of the manifest, so a row that covered two conversations can no
+	// longer be recognised (#970).
+	shared := 0
+	if !o.DryRun {
 		probe := o
 		probe.DryRun = true
 		pr, perr := index.Forget(dir, probe)
 		if perr != nil {
 			return perr
 		}
-		if err := forgetScopeRefusal(o.Session, pr.Sessions, allMatches); err != nil {
-			return err
+		if o.Session != "" {
+			if err := forgetScopeRefusal(o.Session, pr.Sessions, allMatches); err != nil {
+				return err
+			}
 		}
+		shared = sharedRowsAmong(dir, pr.Keys)
 	}
 	result, err := index.Forget(dir, o)
 	if err != nil {
@@ -1582,6 +1590,16 @@ func runForget(dir string, args []string) error {
 		}
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
+		}
+		// Two transcripts can write the same harness:id, and then one manifest
+		// row holds both conversations. The build says so once (#698); forget
+		// said "1 session" and took two, from two projects (#970).
+		if o.DryRun {
+			shared = sharedRowsAmong(dir, result.Keys)
+		}
+		if n := shared; n > 0 {
+			fmt.Fprintf(os.Stdout, "%s covered more than one conversation — transcripts that share an id are filed under one row, and both go\n",
+				doctorCount(n, "of them"))
 		}
 		return nil
 	}
@@ -1646,6 +1664,12 @@ func runForget(dir string, args []string) error {
 		return nil
 	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
+	// "1 session" can be two conversations: transcripts that share an id are
+	// filed under one row, and the message count is the only tell (#970).
+	if shared > 0 {
+		fmt.Fprintf(os.Stdout, "%s covered more than one conversation — transcripts that share an id are filed under one row, and both went\n",
+			doctorCount(shared, "of them"))
+	}
 	// Forgetting keeps the session out of later pushes but cannot reach a
 	// machine that already has it. Three lines about what was dropped read as
 	// "it is gone everywhere" to someone forgetting a customer name (#788).
@@ -2033,4 +2057,27 @@ func restorePromotedTitles(dir, selector string) {
 		return
 	}
 	_, _ = sources.RestorePromotedTitles(func(src string) string { return titles[src] })
+}
+
+// sharedRowsAmong counts the manifest rows in keys that hold more than one
+// conversation, so forget can say what it is about to take (#970).
+func sharedRowsAmong(dir string, keys []string) int {
+	if len(keys) == 0 {
+		return 0
+	}
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return 0
+	}
+	want := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		want[k] = true
+	}
+	n := 0
+	for _, m := range metas {
+		if m.Shared && want[m.Harness+":"+m.ID] {
+			n++
+		}
+	}
+	return n
 }

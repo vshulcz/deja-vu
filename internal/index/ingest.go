@@ -314,6 +314,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			if owns {
 				m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
 			}
+			if collided {
+				markShared(m.Sessions, key)
+			}
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
@@ -490,6 +493,15 @@ func ReportCollisions() int {
 	return int(collisions.Swap(0))
 }
 
+// markShared records that a manifest row covers more than one conversation, so
+// a later forget can say what it is about to take (#970).
+func markShared(sessions map[string]SessionMeta, key string) {
+	if meta, ok := sessions[key]; ok {
+		meta.Shared = true
+		sessions[key] = meta
+	}
+}
+
 func rebuildForSearch(dir string, o query.Options, scope string, files map[string]FileState, progress io.Writer) error {
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
@@ -591,6 +603,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			}
 			if owns {
 				m.Sessions[key] = metaWithOrd(metaForSession(s), ord)
+			}
+			if collided {
+				markShared(m.Sessions, key)
 			}
 			for _, msg := range s.Messages {
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
@@ -1497,6 +1512,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		} else if _, present := m.Sessions[key]; !present {
 			m.Sessions[key] = held
 		}
+		if collided {
+			markShared(m.Sessions, key)
+		}
 		for _, msg := range s.Messages {
 			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 				continue
@@ -1629,6 +1647,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			owns, collided := attributeSession(meta, s)
 			if collided {
 				collisions.Add(1)
+				meta.Shared = true
 			}
 			if s.Project != "" && s.Project != "-" && owns {
 				meta.Project = s.Project
