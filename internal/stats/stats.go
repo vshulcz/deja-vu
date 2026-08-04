@@ -23,6 +23,9 @@ type Report struct {
 	TopProjects     []ProjectStats `json:"top_projects"`
 	Monthly         []MonthStats   `json:"monthly"`
 	Heatmap         HeatmapStats   `json:"-"` // card-only presentation data; kept out of the stable --json schema
+	// EmptiedByPolicy marks a report whose rows were all withheld by the
+	// trust policy, so the empty-index advice is not the right thing to print.
+	EmptiedByPolicy bool           `json:"-"`
 	Sparkline       string         `json:"sparkline"`
 	DateRange       DateRangeStats `json:"date_range"`
 	Longest         SessionStat    `json:"longest_session"`

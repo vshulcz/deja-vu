@@ -131,6 +131,10 @@ func runStats(dir string, args []string) error {
 		fmt.Fprintln(os.Stderr, note)
 	}
 	report := stats.Build(stats.Filter(ss, options), time.Now())
+	// The rule that emptied the report is named a line above, so "nothing
+	// indexed yet — run `deja index`" is advice for a state deja is not in:
+	// the same backside `last` grew when it learned to filter (#949, #983).
+	report.EmptiedByPolicy = report.TotalSessions == 0 && policyHidden > 0
 	// Replaced spans are kept out of ordinary retrieval, so they are not in
 	// the sessions above and take a pass of their own.
 	if spans, files, err := index.SpanInventory(dir); err == nil {
@@ -223,6 +227,12 @@ func printStats(w io.Writer, r stats.Report) {
 	// Section headings over an empty index read as a broken report rather
 	// than an empty one. Say what is missing and stop.
 	if r.TotalSessions == 0 {
+		if r.EmptiedByPolicy {
+			// The rule is named on stderr a line above; repeating "run `deja
+			// index`" here sends the reader after a build that changes nothing.
+			fmt.Fprintln(w, "deja: nothing to report — the trust policy withholds every indexed session from this path")
+			return
+		}
 		fmt.Fprintln(w, emptyIndexHint("nothing indexed yet"))
 		return
 	}
