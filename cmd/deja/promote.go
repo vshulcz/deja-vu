@@ -77,14 +77,27 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if !ok {
 		return fmt.Errorf("no session matches %q", prefix)
 	}
+	src := s.Harness + ":" + s.ID
 	if s.Harness == "deja" {
-		return fmt.Errorf("%q is already a note — promote the source session instead", prefix)
+		// A correction on a promoted note is what `promote` tells you to write,
+		// and the id in that hint stops resolving to the transcript once the
+		// source is forgotten: both routes then refused, and "promote the
+		// source session instead" named something that is gone for good — the
+		// note froze at whatever state it held (#979).
+		origin, noteTitle, isPromoted := promotedNoteSource(s.ID)
+		if !isPromoted {
+			return fmt.Errorf("%q is a note you wrote, not a session — `deja remember` adds to it", prefix)
+		}
+		src = origin
+		// The session's title here is the note's own display line, and once
+		// forget clears the borrowed one that line is "promoted from <src>" —
+		// which would be echoed back as the title of the correction.
+		s.Title = noteTitle
 	}
 	text := strings.TrimSpace(noteText)
 	if text == "" {
 		text = distillSession(s)
 	}
-	src := s.Harness + ":" + s.ID
 	prior := sources.PromotedLifecycles()[src]
 	title := strings.TrimSpace(s.Title)
 	if title == "" {
@@ -334,4 +347,22 @@ func endsWithNewline(path string) bool {
 		return true
 	}
 	return buf[0] == '\n'
+}
+
+// promotedNoteSource maps a promoted note's id back to the session it was
+// promoted from. The id is built by replacing the colon in `harness:id`, which
+// does not invert on its own — harness names carry dashes — so the note log is
+// the authority.
+func promotedNoteSource(noteID string) (string, string, bool) {
+	src, title, found := "", "", false
+	for _, n := range sources.LoadPromotedNotes() {
+		if n.Session == "" || "deja-note-"+strings.ReplaceAll(n.Session, ":", "-") != noteID {
+			continue
+		}
+		src, found = n.Session, true
+		if t := strings.TrimSpace(n.Title); t != "" {
+			title = t
+		}
+	}
+	return src, title, found
 }
