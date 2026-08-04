@@ -243,6 +243,26 @@ var lastImportSkippedForgotten int
 // leave alone (#968).
 func ImportSkippedForgotten() int { return lastImportSkippedForgotten }
 
+// noteStateFromText reads the state a promoted note's line carries. deja writes
+// them as "[accepted] …" or "[rejected] did not hold", and that prefix is the
+// only copy of the state that crosses a machine boundary (#975).
+func noteStateFromText(text string) (state, note string, ok bool) {
+	if !strings.HasPrefix(text, "[") {
+		return "", "", false
+	}
+	end := strings.IndexByte(text, ']')
+	if end <= 1 {
+		return "", "", false
+	}
+	state = text[1:end]
+	switch state {
+	case "accepted", "rejected", "superseded", "stale":
+	default:
+		return "", "", false
+	}
+	return state, strings.TrimSpace(text[end+1:]), true
+}
+
 func Import(dir, inDir string) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -366,7 +386,7 @@ func Import(dir, inDir string) (int, error) {
 			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
 			meta := metas[key]
 			if meta.ID == "" {
-				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath}
+				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath, OrigID: origID}
 			}
 			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
 				meta.Started = sr.Time
@@ -388,6 +408,18 @@ func Import(dir, inDir string) (int, error) {
 					meta.Title = truncateTitle(strings.TrimSpace(text), 60)
 					titleAt[key] = sr.Time
 					titleRankOf[key] = rank
+				}
+			}
+			// A promoted note carries its state in the text: "[rejected] …".
+			// The states themselves live in the other machine's notes.jsonl,
+			// which never travels, so without reading them here a decision
+			// retracted there reads as accepted on this machine (#975).
+			if strings.HasPrefix(origID, "deja-note-") {
+				if st, note, ok := noteStateFromText(sr.Text); ok {
+					meta.Lifecycle, meta.LifecycleNote = st, note
+					if !sr.Time.IsZero() {
+						meta.LifecycleAt = sr.Time.Format("2006-01-02")
+					}
 				}
 			}
 			metas[key] = meta

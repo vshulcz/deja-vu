@@ -5,11 +5,28 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 const lifecycleRejected = "rejected"
+
+// promotedNoteID returns the id a promoted note has on the machine that made
+// it: after a sync the local id is imported-<hash>, and every rule written for
+// notes keys on the deja-note- shape (#975).
+func promotedNoteID(s model.Session) string {
+	if s.Harness != "deja" {
+		return ""
+	}
+	if strings.HasPrefix(s.ID, "deja-note-") {
+		return s.ID
+	}
+	if strings.HasPrefix(s.OrigID, "deja-note-") {
+		return s.OrigID
+	}
+	return ""
+}
 
 // attachLifecycles marks hits whose decision was later rejected, superseded or
 // left to go stale.
@@ -24,10 +41,10 @@ func attachLifecycles(hits []search.Hit) {
 	if len(hits) == 0 {
 		return
 	}
+	// An empty local table is not "nothing to attach": a note that arrived by
+	// sync carries its state in the index, because the states themselves live
+	// in the other machine's notes.jsonl and never travel (#975).
 	states := sources.PromotedLifecycles()
-	if len(states) == 0 {
-		return
-	}
 	for i := range hits {
 		h := &hits[i]
 		key := h.Session.Harness + ":" + h.Session.ID
@@ -36,11 +53,22 @@ func attachLifecycles(hits []search.Hit) {
 		// Recall shows the lines that matched, and a rejection whose words are
 		// not in the query simply did not appear: the agent was handed the
 		// accepted line of a decision that had been taken back (#974).
-		if src, ok := strings.CutPrefix(h.Session.ID, "deja-note-"); ok && h.Session.Harness == "deja" {
-			key = strings.Replace(src, "-", ":", 1)
+		if noteID := promotedNoteID(h.Session); noteID != "" {
+			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
+				key = strings.Replace(src, "-", ":", 1)
+			}
 		}
 		lc, ok := states[key]
-		if !ok || lc.State == "" || lc.State == "accepted" {
+		if !ok || lc.State == "" {
+			// An imported note brought its state with it: the machine that
+			// made the decision keeps the states, and notes.jsonl does not
+			// travel (#975).
+			if h.Session.Lifecycle != "" && h.Session.Lifecycle != "accepted" {
+				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
+			}
+			continue
+		}
+		if lc.State == "accepted" {
 			continue
 		}
 		h.Lifecycle = lc.State
@@ -144,11 +172,21 @@ func demotedNote(hits []search.Hit, moved int) string {
 	if moved == 0 {
 		return ""
 	}
-	n := 0
+	n, elsewhere := 0, 0
 	for _, h := range hits {
-		if h.Lifecycle == lifecycleRejected {
-			n++
+		if h.Lifecycle != lifecycleRejected {
+			continue
 		}
+		n++
+		// "you marked" is wrong for a decision another machine took back: the
+		// state travelled with the note, the judgement was not this reader's
+		// (#975).
+		if strings.HasPrefix(h.Session.Project, "imported:") {
+			elsewhere++
+		}
+	}
+	if elsewhere == n {
+		return fmt.Sprintf("%d session%s marked rejected on the machine %s came from %s below the rest", n, pluralS(n), theyOrIt(n), verbWere2(n))
 	}
 	return fmt.Sprintf("%d session%s you marked rejected %s below the rest", n, pluralS(n), verbWere2(n))
 }
@@ -158,4 +196,12 @@ func verbWere2(n int) string {
 		return "is"
 	}
 	return "are"
+}
+
+// theyOrIt keeps the sentence about other machines readable for one and many.
+func theyOrIt(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "they"
 }

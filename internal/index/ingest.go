@@ -1087,6 +1087,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 	return model.Session{
 		ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path,
 		Title: meta.Title, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
+		OrigID: meta.OrigID, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }
 

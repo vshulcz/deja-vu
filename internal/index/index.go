@@ -118,6 +118,19 @@ type SessionMeta struct {
 	// took two conversations from two projects (#970). Additive: a manifest
 	// written before this decodes with it false.
 	Shared bool `json:",omitempty"`
+	// OrigID is the id a session had on the machine it came from. Import
+	// renames every session to imported-<hash>, so a promoted note stopped
+	// looking like one the moment it crossed a machine boundary and every rule
+	// written for notes — newest correction first, the decision's state —
+	// silently stopped applying (#975). Additive: older manifests decode with
+	// it empty.
+	OrigID string `json:",omitempty"`
+	// Lifecycle is the state of a promoted note that arrived by sync. The
+	// local states live in notes.jsonl, which the other machine does not have,
+	// so a decision retracted there read as accepted here (#975).
+	Lifecycle     string `json:",omitempty"`
+	LifecycleNote string `json:",omitempty"`
+	LifecycleAt   string `json:",omitempty"`
 	// Hit holds hashes of the specific errors this session tripped over, so
 	// the first screen can name a wall the machine keeps running into without
 	// reading a single session. Same trade as Asked: the text is recovered

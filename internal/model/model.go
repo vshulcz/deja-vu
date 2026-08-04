@@ -26,6 +26,17 @@ type Session struct {
 	// search result can ask a cheap question about those files without reading
 	// the session back.
 	Touched []string `json:"touched,omitempty"`
+	// OrigID is the id this session had on the machine it came from, when it
+	// arrived by sync. Import renames sessions to imported-<hash>, so a
+	// promoted note stopped looking like one across a machine boundary and the
+	// rules written for notes stopped applying to it (#975).
+	OrigID string `json:"orig_id,omitempty"`
+	// Lifecycle carries the state of a promoted note that arrived by sync: the
+	// states live in the other machine's notes.jsonl, which never travels
+	// (#975).
+	Lifecycle     string `json:"lifecycle,omitempty"`
+	LifecycleNote string `json:"lifecycle_note,omitempty"`
+	LifecycleAt   string `json:"lifecycle_at,omitempty"`
 }
 
 // Source identifies where a session entered this deja index. Instance is an

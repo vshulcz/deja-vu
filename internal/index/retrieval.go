@@ -1131,17 +1131,34 @@ func loadSessionMeta(dir string, m Manifest, meta SessionMeta) (model.Session, b
 	return s, true, nil
 }
 
+// IsPromotedNote reports whether a session is a promoted note, on this machine
+// or on the one it came from. Import renames sessions to imported-<hash>, so
+// the id alone stops answering the question after a sync (#975).
+func IsPromotedNote(harness, id, origID string) bool {
+	if harness != "deja" {
+		return false
+	}
+	return strings.HasPrefix(id, "deja-note-") || strings.HasPrefix(origID, "deja-note-")
+}
+
 // orderPromotedNote keeps a promoted note's corrections newest-first. The
 // parser writes them that way (#812), but an incremental build appends the new
 // lines to what the log already holds, so the record order stopped saying which
 // answer holds: the snippet an agent reads led with the answer that had been
 // overturned (#944). Ordering on read fixes indexes already on disk too.
 func orderPromotedNote(s *model.Session) {
-	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") || len(s.Messages) < 2 {
+	if !IsPromotedNote(s.Harness, s.ID, s.OrigID) || len(s.Messages) < 2 {
 		return
 	}
+	// Newest first by time; when a batch carries no timestamps — a hand-made
+	// one, or an older export — the file order is the record: the parser
+	// reverses it for the same reason (#812, #975).
 	sort.SliceStable(s.Messages, func(i, j int) bool {
-		return s.Messages[i].Time.After(s.Messages[j].Time)
+		a, b := s.Messages[i], s.Messages[j]
+		if a.Time.Equal(b.Time) {
+			return i > j
+		}
+		return a.Time.After(b.Time)
 	})
 }
 
