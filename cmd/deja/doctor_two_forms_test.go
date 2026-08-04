@@ -58,7 +58,12 @@ func TestDoctorsTwoFormsAgreeAboutEveryStore(t *testing.T) {
 	for _, s := range report.Stores {
 		states[s.Name] = s.State
 	}
-	if states["opencode"] != "unreadable" {
+	// Without the sqlite3 CLI — which CI on windows does not have — the same
+	// store is `needs-sqlite3`; either way it is not a healthy one, and the
+	// point is that both forms say the same word.
+	switch states["opencode"] {
+	case "unreadable", "needs-sqlite3":
+	default:
 		t.Errorf("the machine form calls it %q", states["opencode"])
 	}
 	if !strings.Contains(row, states["opencode"]) {
