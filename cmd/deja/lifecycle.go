@@ -31,6 +31,14 @@ func attachLifecycles(hits []search.Hit) {
 	for i := range hits {
 		h := &hits[i]
 		key := h.Session.Harness + ":" + h.Session.ID
+		// A promoted note is filed under its own id, so the state — which is a
+		// property of the decision, not of the transcript — never reached it.
+		// Recall shows the lines that matched, and a rejection whose words are
+		// not in the query simply did not appear: the agent was handed the
+		// accepted line of a decision that had been taken back (#974).
+		if src, ok := strings.CutPrefix(h.Session.ID, "deja-note-"); ok && h.Session.Harness == "deja" {
+			key = strings.Replace(src, "-", ":", 1)
+		}
 		lc, ok := states[key]
 		if !ok || lc.State == "" || lc.State == "accepted" {
 			continue
