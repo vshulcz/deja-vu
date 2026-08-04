@@ -234,13 +234,13 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	return total, commit, nil
 }
 
-// ImportSkippedForgotten reports how many records the last Import dropped
-// because this machine had forgotten the session they belong to. The count is
-// worth saying: a peer's copy of a forgotten session is exactly what someone
-// expects deja to leave alone (#968).
+// lastImportSkippedForgotten holds how many records the last Import dropped
+// because this machine had forgotten the session they belong to.
 var lastImportSkippedForgotten int
 
-// ImportSkippedForgotten returns that count.
+// ImportSkippedForgotten reports that count. It is worth saying out loud: a
+// peer's copy of a forgotten session is exactly what someone expects deja to
+// leave alone (#968).
 func ImportSkippedForgotten() int { return lastImportSkippedForgotten }
 
 func Import(dir, inDir string) (int, error) {
