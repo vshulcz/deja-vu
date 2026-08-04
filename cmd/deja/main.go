@@ -339,8 +339,37 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.harness == "" {
 		noteAmbiguousPrefix(dir, o.id, "showing")
 	}
+	// A day bucket's date is the day the index was built in, not the moment a
+	// line was written: read in another zone, `show` lists a record dated the
+	// day before the id says, and nothing connected the two (#1006).
+	if note := bucketDayNote(s); note != "" {
+		fmt.Fprintln(os.Stderr, note)
+	}
 	search.PrintSession(os.Stdout, s)
 	return nil
+}
+
+// bucketDayNote explains a note bucket's date when the records inside it fall
+// on a different local day than the id claims — and stays silent otherwise, so
+// the ordinary case gains no line.
+func bucketDayNote(s model.Session) string {
+	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-20") {
+		return ""
+	}
+	parts := strings.Split(strings.TrimPrefix(s.ID, "deja-"), "-")
+	if len(parts) < 3 {
+		return ""
+	}
+	day := strings.Join(parts[:3], "-")
+	for _, m := range s.Messages {
+		if m.Time.IsZero() {
+			continue
+		}
+		if m.Time.Local().Format("2006-01-02") != day {
+			return fmt.Sprintf("deja: %s in this id is the day the index was built in; the times below are this machine's — `deja index` regroups them", day)
+		}
+	}
+	return ""
 }
 
 type showOptions struct {
