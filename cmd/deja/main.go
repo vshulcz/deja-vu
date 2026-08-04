@@ -738,7 +738,18 @@ func printNoMatches(w io.Writer, dir, q string) {
 		fmt.Fprintf(w, "deja: nothing to search for in %q — every word in it is too short to look up\n", q)
 		return
 	}
-	if n, err := index.SessionCount(dir); err == nil {
+	// The size worth naming is the part of the store this path may read. Under
+	// a trust rule the two differ, and "no matches in 1 indexed session — try
+	// fewer words" sent the reader after a wording problem in a session the
+	// rule never let search open (#986).
+	if reach, total, ok := reachableSessionCount(dir); ok && reach == 0 && total > 0 {
+		fmt.Fprintf(w, "deja: no matches for %q\n", q)
+		fmt.Fprintf(w, "deja: the trust policy withholds every indexed session from this path (%s: %s) — see %s\n",
+			policy.ActivationSearch, policy.Load().Describe(policy.ActivationSearch), policy.Path())
+		return
+	} else if ok {
+		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", reach, pluralS(reach), q)
+	} else if n, err := index.SessionCount(dir); err == nil {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
 	} else {
 		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
@@ -2140,4 +2151,21 @@ func forgetKeyOf(dir string, o index.ForgetOptions) string {
 		}
 	}
 	return ""
+}
+
+// reachableSessionCount reports how many indexed sessions the search
+// activation may read, and how many are indexed in all.
+func reachableSessionCount(dir string) (int, int, bool) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return 0, 0, false
+	}
+	pol := policy.Load()
+	reach := 0
+	for _, m := range metas {
+		if pol.Allows(policy.ActivationSearch, m.Project) {
+			reach++
+		}
+	}
+	return reach, len(metas), true
 }
