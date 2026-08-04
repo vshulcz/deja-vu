@@ -94,7 +94,7 @@
     },
     {
       "name": "goose",
-      "state": "missing",
+      "state": "unplugged",
       "paths": [
         "<tmp>/home/.local/share/goose/sessions"
       ],
@@ -102,7 +102,7 @@
     },
     {
       "name": "pi",
-      "state": "missing",
+      "state": "unplugged",
       "paths": [
         "<tmp>/home/.pi/agent/sessions"
       ],
@@ -122,6 +122,20 @@
       "paths": [
         "<tmp>/copilot"
       ],
+      "files": 0
+    },
+    {
+      "name": "cline",
+      "state": "unplugged",
+      "paths": [
+        "<tmp>/home/.cline/data/sessions"
+      ],
+      "files": 0
+    },
+    {
+      "name": "roo",
+      "state": "missing",
+      "paths": null,
       "files": 0
     },
     {

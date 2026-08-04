@@ -357,7 +357,10 @@ func installIndexHint(dir string) string {
 		if store.Files > 0 {
 			detected++
 		}
-		if store.State != "missing" && store.State != "empty" {
+		// A store whose disk is not attached is not history found here either;
+		// the text rows have separated the two since #933 and the JSON form
+		// learned to in #999.
+		if store.State != "missing" && store.State != "empty" && store.State != "unplugged" {
 			onlyMissingOrEmpty = false
 		}
 		for _, path := range store.Paths {

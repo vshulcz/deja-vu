@@ -187,12 +187,21 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"pi", []string{sources.PiRoot()}, sources.PiSessionFiles(), sources.ParsePiFile},
 		{"openclaw", []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles(), sources.ParseOpenClawFile},
 		{"copilot", []string{sources.CopilotRoot()}, sources.CopilotSessionFiles(), sources.ParseCopilotFile},
+		// Both were listed by the text rows and by nothing else: absent here,
+		// `doctor --json` never named them and "no agent history was found on
+		// this machine" was printed on a machine whose history is theirs
+		// (#999).
+		{"cline", []string{sources.ClineSessionsDir()}, sources.ClineSessionFiles(), sources.ParseClineFile},
+		{"roo", sources.RooRoots(), sources.RooTaskFiles(), sources.ParseRooTask},
 		{"deja", []string{sources.NotesFile()}, presentDoctorFile(sources.NotesFile()), sources.ParseNotesFile},
 	}
 }
 
 func presentDoctorFile(path string) []string {
-	if doctorExists(path) {
+	// By content: an empty notes file is not a store with something in it, and
+	// counting it made the two forms of this command disagree about the same
+	// row — `missing` in the text, `ok` in JSON (#999).
+	if fi, err := os.Stat(path); err == nil && !fi.IsDir() && fi.Size() > 0 {
 		return []string{path}
 	}
 	return nil
@@ -264,6 +273,14 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 		return store, time.Time{}
 	}
 	if len(check.files) == 0 {
+		// The text rows have separated a store whose disk went away from one
+		// that was deleted since #933; a script reading this could not (#999).
+		for _, p := range check.paths {
+			if p != "" && storeDiskGone(p) {
+				store.State = "unplugged"
+				break
+			}
+		}
 		return store, time.Time{}
 	}
 	newest, mod := newestDoctorFile(check.files)

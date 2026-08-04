@@ -389,6 +389,14 @@ func doctorHarnesses(w io.Writer, dir string) {
 	indexed := index.HarnessSessionCounts(dir)
 	fromElsewhere := index.ImportedSessionCounts(dir)
 
+	// The same inspection the JSON form reports, so one command does not give
+	// two answers about one store: `found` here and `unreadable` there (#999).
+	inspected := map[string]string{}
+	for _, check := range doctorStoreChecks() {
+		store, _ := inspectDoctorStore(check)
+		inspected[check.name] = store.State
+	}
+
 	printRow := func(name, path string, present bool, detail string) {
 		status := "missing"
 		if present {
@@ -397,13 +405,16 @@ func doctorHarnesses(w io.Writer, dir string) {
 			// without a word — the failure #802/#816 closed, but only in
 			// `doctor --json`, which has said `denied` all along while this
 			// row, the one people read, said `found` (#993).
-			if denied := firstDeniedDir(strings.Split(path, ", ")); denied != "" {
-				status = "denied"
-				if detail != "" {
-					detail += ", "
+			switch inspected[name] {
+			case "denied", "unreadable", "parsed-zero", "needs-sqlite3":
+				status = inspected[name]
+				if status == "denied" {
+					if detail != "" {
+						detail += ", "
+					}
+					// The warning block below names the path and what to do.
+					detail += "cannot be read"
 				}
-				_ = denied // the warning line below names the path
-				detail += "cannot be read"
 			}
 		} else if storeDiskGone(path) {
 			// A store whose whole disk is gone is not a store that was
