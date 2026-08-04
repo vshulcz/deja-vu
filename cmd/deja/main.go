@@ -492,7 +492,15 @@ func cmdCtx(dir string, rest []string) error {
 	// session's note arrives as an ordinary hit — and the answer still has to
 	// say the session is gone (#971).
 	noteForgottenSource(hits[0].Session, q)
-	search.PrintContext(os.Stdout, hits[0].Session, q)
+	// The hit carries the matching snippets, not the session: for a promoted
+	// note that meant the correction — which rarely repeats the words of the
+	// decision — was missing, and the command whose whole job is packaging
+	// context handed an agent a decision that had been withdrawn (#1011).
+	whole := hits[0].Session
+	if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
+		whole = full
+	}
+	search.PrintContext(os.Stdout, whole, q)
 	return nil
 }
 
