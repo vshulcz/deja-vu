@@ -234,6 +234,15 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	return total, commit, nil
 }
 
+// ImportSkippedForgotten reports how many records the last Import dropped
+// because this machine had forgotten the session they belong to. The count is
+// worth saying: a peer's copy of a forgotten session is exactly what someone
+// expects deja to leave alone (#968).
+var lastImportSkippedForgotten int
+
+// ImportSkippedForgotten returns that count.
+func ImportSkippedForgotten() int { return lastImportSkippedForgotten }
+
 func Import(dir, inDir string) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -282,6 +291,8 @@ func Import(dir, inDir string) (int, error) {
 	titleRankOf := map[string]int{}   // key -> how good that turn was as a title
 	added := 0
 	var skipped []string
+	forgottenSkipped := 0
+	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
 	for _, p := range paths {
 		// A file is imported whole or not at all, so what it contributed is
 		// remembered before it is read and rolled back if it turns out to be
@@ -336,7 +347,13 @@ func Import(dir, inDir string) (int, error) {
 			// Forgetting is primary data, not cache: a tombstoned session
 			// must stay dead even when the peer still holds the batch and
 			// this index was wiped and rebuilt.
-			if dead[sr.Harness+":"+importID] {
+			//
+			// Both keys, because a session forgotten here was forgotten under
+			// its own id: checking only the imported one let a peer's copy walk
+			// the same text back into local search under a new id, while
+			// `forget --list` still called it forgotten (#968).
+			if dead[sr.Harness+":"+importID] || dead[sr.Harness+":"+origID] {
+				forgottenSkipped++
 				return nil
 			}
 			// The exclude list keeps a project out of this machine's memory;

@@ -105,6 +105,12 @@ func runSync(dir string, args []string) error {
 			}
 			fmt.Fprintln(os.Stdout, line)
 		}
+		// Whether or not anything arrived: a batch that is entirely someone
+		// else's copy of what this machine forgot imports zero records, and
+		// "imported 0 records" alone reads as an empty batch (#968).
+		if skipped := index.ImportSkippedForgotten(); skipped > 0 {
+			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — they belong to sessions you forgot here (`deja forget --list`)\n", skipped, pluralS(skipped))
+		}
 		if err != nil {
 			return err
 		}
