@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // The one state an agent cannot ask a human about: the index is not there yet
@@ -30,8 +32,17 @@ func TestMCPSaysTheIndexIsBeingBuiltInsteadOfFailing(t *testing.T) {
 		t.Errorf("an agent calling recall mid-build is told: %q", got)
 	}
 
-	// With an index in place the answer comes from the index, not from this.
-	if err := os.WriteFile(filepath.Join(dir, "manifest.gob"), []byte("x"), 0o600); err != nil {
+	// With a real index in place the answer comes from the index, not from
+	// this: a hand-made manifest is not one, which is what HasManifest checks.
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"a session"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"s1","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := buildingNowForAgent(dir); got != "" {
