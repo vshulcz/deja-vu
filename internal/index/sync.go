@@ -263,6 +263,15 @@ func noteStateFromText(text string) (state, note string, ok bool) {
 	return state, strings.TrimSpace(text[end+1:]), true
 }
 
+// dayBucketKey identifies a note in a day bucket without the bucket id. Empty
+// for anything else, so ordinary sessions keep the key they have always had.
+func dayBucketKey(sr SyncRecord, textHash uint64) string {
+	if sr.Harness != "deja" || !strings.HasPrefix(sr.SessionID, "deja-20") {
+		return ""
+	}
+	return "deja-note-day:" + sr.Project + ":" + sr.Time.UTC().Format(time.RFC3339Nano) + ":" + sr.Role + ":" + strconv.FormatUint(textHash, 16)
+}
+
 func Import(dir, inDir string) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -360,6 +369,16 @@ func Import(dir, inDir string) (int, error) {
 			th := fnv.New64a()
 			_, _ = th.Write([]byte(sr.Text))
 			dedupe := legacy + ":" + sr.Role + ":" + strconv.FormatUint(th.Sum64(), 16)
+			// A day bucket's id is the sending machine's rendering of a date,
+			// not the identity of what it holds: after that machine changes
+			// zone the same note arrives under a new bucket and every peer
+			// grew a second copy (#977). Key those on what does not move.
+			if bucket := dayBucketKey(sr, th.Sum64()); bucket != "" {
+				if m.ImportedRecords[bucket] {
+					return nil
+				}
+				dedupe = bucket
+			}
 			if m.ImportedRecords[dedupe] || m.ImportedRecords[legacy] {
 				return nil
 			}
