@@ -114,6 +114,12 @@ func runSync(dir string, args []string) error {
 		// Whether or not anything arrived: a batch that is entirely someone
 		// else's copy of what this machine forgot imports zero records, and
 		// "imported 0 records" alone reads as an empty batch (#968).
+		// A shared folder is an outbox as well as an inbox, so a batch this
+		// machine wrote comes back to it. Saying nothing made "imported 0
+		// records" read as a failed transfer (#987).
+		if own := index.ImportSkippedOwn(); own > 0 {
+			fmt.Fprintf(os.Stdout, "deja: %d record%s in this folder were written by this machine — already here\n", own, pluralS(own))
+		}
 		if skipped := index.ImportSkippedForgotten(); skipped > 0 {
 			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — they belong to sessions you forgot here (`deja forget --list`)\n", skipped, pluralS(skipped))
 		}

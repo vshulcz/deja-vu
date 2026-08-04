@@ -326,10 +326,40 @@ func Import(dir, inDir string) (int, error) {
 	metas := map[string]SessionMeta{}
 	titleAt := map[string]time.Time{} // key -> time of the turn the title came from
 	titleRankOf := map[string]int{}   // key -> how good that turn was as a title
+	// A shared folder is both an outbox and an inbox: the machine that wrote a
+	// batch also runs `sync import` on that directory, and its own records came
+	// back as a second, "imported" copy of every session and note it had
+	// (#987). Recognised by content, so a peer's genuinely new lines in a
+	// session this machine also holds still land.
+	localContent := map[string]bool{}
+	localSessions := map[string]bool{}
+	for _, meta := range m.Sessions {
+		if meta.OrigID == "" {
+			localSessions[meta.Harness+":"+meta.ID] = true
+		}
+	}
+	localContentLoaded := false
+	loadLocalContent := func() {
+		if localContentLoaded {
+			return
+		}
+		localContentLoaded = true
+		for _, r := range readRecordsForForget(dir) {
+			meta, ok := m.Sessions[r.Record.Key]
+			if !ok || meta.OrigID != "" {
+				continue
+			}
+			th := fnv.New64a()
+			_, _ = th.Write([]byte(r.Record.Text))
+			localContent[recordContentKey(meta.Harness, meta.ID, r.Record.Role, r.Record.Time, th.Sum64())] = true
+		}
+	}
 	added := 0
 	var skipped []string
+	ownSkipped := 0
 	forgottenSkipped := 0
 	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
+	defer func() { lastImportSkippedOwn = ownSkipped }()
 	for _, p := range paths {
 		// A file is imported whole or not at all, so what it contributed is
 		// remembered before it is read and rolled back if it turns out to be
@@ -399,6 +429,13 @@ func Import(dir, inDir string) (int, error) {
 			// not the identity of what it holds: after that machine changes
 			// zone the same note arrives under a new bucket and every peer
 			// grew a second copy (#977). Key those on what does not move.
+			if localSessions[sr.Harness+":"+sr.SessionID] {
+				loadLocalContent()
+				if localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, th.Sum64())] {
+					ownSkipped++
+					return nil
+				}
+			}
 			if bucket := dayBucketKey(sr, th.Sum64()); bucket != "" {
 				if m.ImportedRecords[bucket] {
 					return nil
@@ -676,6 +713,19 @@ func shortHash(s string) string {
 	h := sha1.Sum([]byte(s))
 	return strings.TrimLeft(hex.EncodeToString(h[:])[:12], "-")
 }
+
+// recordContentKey identifies one line of one session by what it says rather
+// than by which copy of it this is.
+func recordContentKey(harness, sessionID, role string, at time.Time, textHash uint64) string {
+	return harness + ":" + sessionID + ":" + at.UTC().Format(time.RFC3339Nano) + ":" + role + ":" + strconv.FormatUint(textHash, 16)
+}
+
+// lastImportSkippedOwn holds how many records the last Import recognised as
+// this machine's own copies coming home from a shared folder.
+var lastImportSkippedOwn int
+
+// ImportSkippedOwn reports that count.
+func ImportSkippedOwn() int { return lastImportSkippedOwn }
 
 func ImportedSessionID(harness, sessionID string) string {
 	return "imported-" + shortHash(harness+":"+sessionID)
