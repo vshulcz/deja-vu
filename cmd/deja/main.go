@@ -1571,7 +1571,10 @@ func runForget(dir string, args []string) error {
 		probe.DryRun = true
 		pr, perr := index.Forget(dir, probe)
 		if perr != nil {
-			return perr
+			// The probe fails the same ways the real pass does — a vanished
+			// volume, a read-only cache — and handing its syscall back was the
+			// shape #798 replaced everywhere else.
+			return ensureError(dir, perr)
 		}
 		if o.Session != "" {
 			if err := forgetScopeRefusal(o.Session, pr.Sessions, allMatches); err != nil {
