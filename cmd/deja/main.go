@@ -1407,6 +1407,12 @@ func printSources(dir string) {
 			msg += len(s.Messages)
 		}
 		note := ""
+		// `deja sources` is where the empty-machine advice sends people, and a
+		// store deja is not allowed to read looked exactly like one nobody has
+		// used: `sessions=0 messages=0 size=0 B` (#1000).
+		if denied := firstDeniedDir(it.roots); denied != "" {
+			note = "\t(cannot be read — permission denied on " + denied + ")"
+		}
 		if it.name == "cursor" && len(sources.CursorDBs()) > 0 && !sources.SQLite3Available() {
 			note = "\t(sqlite3 CLI not found — Cursor IDE sessions unavailable)"
 		}
