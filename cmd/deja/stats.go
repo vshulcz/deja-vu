@@ -12,6 +12,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -119,6 +120,15 @@ func runStats(dir string, args []string) error {
 	ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, progress)
 	if err != nil {
 		return err
+	}
+	// stats is the one screen deja calls "wrapped for sharing", and it was
+	// naming projects the trust policy keeps off every other surface — the
+	// other machine's project, in an artifact meant to be shown to someone
+	// (#966). Browsing your own store is the search activation, as in `last`
+	// (#937).
+	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, ss)
+	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
+		fmt.Fprintln(os.Stderr, note)
 	}
 	report := stats.Build(stats.Filter(ss, options), time.Now())
 	// Replaced spans are kept out of ordinary retrieval, so they are not in

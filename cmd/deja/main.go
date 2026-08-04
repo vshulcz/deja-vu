@@ -1538,7 +1538,17 @@ func runForget(dir string, args []string) error {
 			fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
 			return nil
 		}
-		fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index\n", lifted, pluralS(lifted))
+		// Lifting a tombstone brings a session back only if the transcript is
+		// still on this machine. An imported one lives only in the index, so
+		// forget took the last copy — and the undo reported a restore that did
+		// not happen (#967).
+		back, gone := restoredSessions(dir, unforget, lifted)
+		if back > 0 {
+			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index\n", back, pluralS(back))
+		}
+		if gone > 0 {
+			fmt.Fprintf(os.Stdout, "%d of them came from another machine and deja held the only copy — the tombstone is lifted, but the records are gone; `deja sync import` brings them back\n", gone)
+		}
 		return nil
 	}
 	// The scope check runs on a dry pass first: a refusal printed after
@@ -1975,4 +1985,23 @@ func dayWord(n int) string {
 		return "a day"
 	}
 	return fmt.Sprintf("%d days", n)
+}
+
+// restoredSessions splits what a lifted tombstone actually returned from what
+// it could not: a session whose transcript is on this machine is re-read by the
+// rebuild, while an imported one existed only in the index that forget rewrote.
+func restoredSessions(dir, selector string, lifted int) (back, gone int) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return lifted, 0
+	}
+	for _, m := range metas {
+		if index.SelectorMatches(m, selector) {
+			back++
+		}
+	}
+	if back > lifted {
+		back = lifted
+	}
+	return back, lifted - back
 }

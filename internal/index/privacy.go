@@ -261,6 +261,11 @@ func sessionMatches(meta SessionMeta, o ForgetOptions) bool {
 	return o.Session != "" || o.Project != "" || !o.Before.IsZero()
 }
 
+// SelectorMatches is selectorMatches for callers outside the package: the CLI
+// has to tell what a lifted tombstone actually brought back from what it could
+// not (#967).
+func SelectorMatches(meta SessionMeta, sel string) bool { return selectorMatches(meta, sel) }
+
 // selectorMatches reports whether a session answers to what someone typed or
 // pasted. Beyond the id prefix and the elided form (#855), that includes the
 // `harness:id` shape deja prints itself — in `forget --list`, in the undo line
