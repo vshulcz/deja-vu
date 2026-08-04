@@ -18,7 +18,10 @@ jobs:
   test:
     name: test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # windows runs the suite about four times slower than the others and had
+    # grown into the 20-minute cap: the run was cancelled a second after the
+    # last package passed.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
