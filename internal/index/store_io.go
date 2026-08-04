@@ -463,6 +463,13 @@ func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
 	_ = os.RemoveAll(old)
 	if err := os.Rename(dir, old); err != nil && !os.IsNotExist(err) {
+		// The parking spot survived the removal above — a leftover from an
+		// interrupted swap whose permissions stop deja from clearing it. The
+		// bare `rename …: file exists` names two paths nobody chose and gives
+		// nothing to do about either (#1009).
+		if _, statErr := os.Stat(old); statErr == nil {
+			return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
+		}
 		return err
 	}
 	if err := os.Rename(tmp, dir); err != nil {

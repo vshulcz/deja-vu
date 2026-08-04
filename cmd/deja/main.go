@@ -2049,6 +2049,12 @@ func ensureError(dir string, err error) error {
 	if errors.Is(err, syscall.ENOSPC) {
 		return fmt.Errorf("no space left where the index is built (%s) — free some room there, or point DEJA_INDEX_DIR at a disk that has it", filepath.Dir(dir))
 	}
+	// Already worded where it was raised — the leftover-swap case names the
+	// directory to remove and the command to rerun, and "ensure:" in front of
+	// it is internal noise (#1009).
+	if strings.HasPrefix(err.Error(), "an earlier index swap left ") {
+		return err
+	}
 	return fmt.Errorf("ensure: %w", err)
 }
 
