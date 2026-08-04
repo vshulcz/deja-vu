@@ -586,6 +586,25 @@ func doctorTools(w io.Writer) {
 	fmt.Fprintf(w, "  %-12s %s (needed for changed-file notes, worktree names and the task signal)\n", "git", gitStatus)
 }
 
+// policyWithheldCounts reports, per activation, how many indexed sessions the
+// policy in force keeps off that path, and how many are indexed in all.
+func policyWithheldCounts(dir string) (map[string]int, int) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return nil, 0
+	}
+	pol := policy.Load()
+	out := map[string]int{}
+	for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
+		for _, m := range metas {
+			if !pol.Allows(activation, m.Project) {
+				out[activation]++
+			}
+		}
+	}
+	return out, len(metas)
+}
+
 // unmatchedImportGroups lists imported:<group> rules that no session in the
 // index answers to.
 func unmatchedImportGroups(dir string) []string {
@@ -629,8 +648,13 @@ func doctorPolicy(w io.Writer, dir string) {
 		// allowed (#939).
 		if pol := policy.Load(); pol.Describe(policy.ActivationAuto) != "local+imported" {
 			fmt.Fprintf(w, "  %-12s no file at %s\n", "default", policy.Path())
+			withheld, total := policyWithheldCounts(dir)
 			for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
-				fmt.Fprintf(w, "  %-12s %s\n", activation, pol.Describe(activation))
+				line := pol.Describe(activation)
+				if n := withheld[activation]; n > 0 {
+					line += fmt.Sprintf(" — withholds %d of %d indexed session%s", n, total, pluralS(total))
+				}
+				fmt.Fprintf(w, "  %-12s %s\n", activation, line)
 			}
 			fmt.Fprintf(w, "  %-12s DEJA_AUTORECALL_LOCAL_ONLY is set in this environment\n", "from env")
 			return
@@ -646,8 +670,16 @@ func doctorPolicy(w io.Writer, dir string) {
 		return
 	}
 	pol := policy.Load()
+	withheld, total := policyWithheldCounts(dir)
 	for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
-		fmt.Fprintf(w, "  %-12s %s\n", activation, pol.Describe(activation))
+		line := pol.Describe(activation)
+		// The rule's text is not its effect. `search local-only` reads the
+		// same whether it withholds nothing or the whole index, and doctor is
+		// where someone checks that the rule does what they meant (#978).
+		if n := withheld[activation]; n > 0 {
+			line += fmt.Sprintf(" — withholds %d of %d indexed session%s", n, total, pluralS(total))
+		}
+		fmt.Fprintf(w, "  %-12s %s\n", activation, line)
 	}
 	for _, u := range unknown {
 		fmt.Fprintf(w, "  %-12s %q is not an activation or origin deja consults — this rule does nothing\n", "ignored", u)
