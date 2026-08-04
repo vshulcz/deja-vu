@@ -158,6 +158,9 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	// counting per pass told the reader the rule hides more than the project
 	// holds (#981).
 	hidden := map[string]bool{}
+	// Newest of the withheld ones, so the pick can say it is not the latest
+	// work in this project rather than handing over older work in silence.
+	var hiddenNewest time.Time
 	for _, name := range digest.ProjectNameCandidates(cwd) {
 		ss, err := index.RecentProject(dir, name, 3)
 		if err != nil || len(ss) == 0 {
@@ -175,6 +178,9 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		for _, s := range ss {
 			if !keptIDs[s.ID] {
 				hidden[s.ID] = true
+				if s.Updated.After(hiddenNewest) {
+					hiddenNewest = s.Updated
+				}
 			}
 		}
 		if len(kept) == 0 {
@@ -190,6 +196,14 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 			return model.Session{}, errors.New(strings.TrimPrefix(policyHiddenNote(policy.ActivationSearch, len(hidden)), "deja: "))
 		}
 		return model.Session{}, idPrefixNeeded(dir, "handoff needs a session to package", "no indexed sessions for this project — pass a session id-prefix (see `deja last`)")
+	}
+	// The pick is deja's, and a rule that removed newer work from the choice
+	// changes what the pick means: handing over a month-old session while
+	// today's is withheld looked exactly like a project nobody has touched
+	// since (#1013).
+	if hiddenNewest.After(newest.Updated) {
+		fmt.Fprintf(os.Stderr, "deja: newer work in this project is withheld by the trust policy (%s: %s) — this is the newest session it allows\n",
+			policy.ActivationSearch, policy.Load().Describe(policy.ActivationSearch))
 	}
 	if len(distinct) > 1 {
 		fmt.Fprintf(os.Stderr, "deja: %d different sessions match this directory's project names — picked the newest; pass an id-prefix to choose (see `deja last`)\n", len(distinct))

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -93,5 +94,76 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 	// (#981).
 	if err != nil && !strings.Contains(err.Error(), "hides 1 matching session ") {
 		t.Errorf("the count is not what the project holds: %v", err)
+	}
+}
+
+// deja's own pick changes meaning when a rule removed newer work from the
+// choice: handing over a month-old session while today's is withheld reads
+// exactly like a project nobody has touched since (#1013).
+func TestHandoffSaysWhenNewerWorkIsWithheld(t *testing.T) {
+	tmp := hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"the older local session about the pool cap"},"timestamp":"2026-07-01T10:00:00Z","sessionId":"old","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "old.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(index.SyncRecord{Harness: "claude", SessionID: "newpeer", Project: "proj", Role: "user",
+		Text: "the newest work on this project, from another machine", Time: time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-x.jsonl"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	work := filepath.Join(tmp, "proj")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	back, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(work); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(back) })
+
+	policyFile := filepath.Join(tmp, "policy.json")
+	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":true,"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", policyFile)
+
+	note, err := captureRunStderr(t, "handoff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(note, "newer work in this project is withheld") {
+		t.Errorf("handoff packaged older work without saying newer was withheld:\n%s", note)
+	}
+
+	// Without the rule the newest session is the pick, and there is nothing to
+	// warn about.
+	t.Setenv("DEJA_POLICY_FILE", filepath.Join(tmp, "no-policy.json"))
+	note, err = captureRunStderr(t, "handoff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(note, "withheld") {
+		t.Errorf("an unrestricted handoff warned about withheld work:\n%s", note)
 	}
 }

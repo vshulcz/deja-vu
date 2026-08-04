@@ -151,8 +151,11 @@ func (p Policy) Describe(activation string) string {
 
 // Filter drops the items whose project the policy blocks on this path.
 // projectOf maps an element to its session project name.
+// The result is a new slice: filtering in place rewrote the caller's own
+// input — handoff read the pre-filter list to learn what had been withheld and
+// saw the kept sessions duplicated over it (#1013).
 func Filter[T any](p Policy, activation string, items []T, projectOf func(T) string) []T {
-	out := items[:0]
+	out := make([]T, 0, len(items))
 	for _, it := range items {
 		if p.Allows(activation, projectOf(it)) {
 			out = append(out, it)
