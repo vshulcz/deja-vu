@@ -297,3 +297,21 @@ type bucketEntry struct {
 	off uint64
 	n   uint32
 }
+
+// LockWaitNotice is called once when a write path finds the index locked by
+// another deja and is about to wait for it. Readers never reach it — they take
+// a lock-free snapshot instead — so this is only the case where a command is
+// about to sit still for the length of someone else's build.
+var LockWaitNotice func()
+
+// noteLockWait reports the wait at most once per process, so a command that
+// takes several locks does not repeat itself.
+func noteLockWait() {
+	if LockWaitNotice == nil || lockWaitNoted {
+		return
+	}
+	lockWaitNoted = true
+	LockWaitNotice()
+}
+
+var lockWaitNoted bool

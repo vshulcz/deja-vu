@@ -22,9 +22,15 @@ func lockDir(dir string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		f.Close()
-		return nil, fmt.Errorf("lock index: %w", err)
+	// Try without blocking first, only to learn whether there is a wait to
+	// report: a reader that lands mid-rebuild sits here for the length of it
+	// and printed nothing, so the command looked hung (#994).
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		noteLockWait()
+		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+			f.Close()
+			return nil, fmt.Errorf("lock index: %w", err)
+		}
 	}
 	// Under the lock: finish any swap interrupted mid-rename. Running this
 	// before the flock raced a concurrent swap's missing-dir window (#181).

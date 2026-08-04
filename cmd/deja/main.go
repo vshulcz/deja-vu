@@ -25,6 +25,11 @@ import (
 var version = "dev"
 
 func main() {
+	// A command that lands mid-rebuild waits for the whole of it, and silence
+	// there reads as a hang rather than as a queue (#994).
+	index.LockWaitNotice = func() {
+		fmt.Fprintln(os.Stderr, "deja: another deja is building the index — waiting for it to finish")
+	}
 	stopProfiling := startProfiling()
 	if err := run(os.Args[1:]); err != nil {
 		stopProfiling()

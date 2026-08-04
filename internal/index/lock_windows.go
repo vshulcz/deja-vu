@@ -36,9 +36,14 @@ func lockDir(dir string) (func(), error) {
 	}
 	h := syscall.Handle(f.Fd())
 	var ol syscall.Overlapped
-	if err := lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol); err != nil {
-		f.Close()
-		return nil, fmt.Errorf("lock index: %w", err)
+	// Without blocking first, only to learn whether there is a wait worth
+	// reporting — see the note in lock_unix.go (#994).
+	if err := lockFileEx(h, lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &ol); err != nil {
+		noteLockWait()
+		if err := lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol); err != nil {
+			f.Close()
+			return nil, fmt.Errorf("lock index: %w", err)
+		}
 	}
 	// Under the lock: finish any swap interrupted mid-rename. Running this
 	// before the lock raced a concurrent swap's missing-dir window (#181).
