@@ -14,6 +14,9 @@ import (
 // wiped-and-rebuilt index said it (#980).
 func TestReimportOfAForgottenSessionStillSaysItWasLeftOut(t *testing.T) {
 	tmp := t.TempDir()
+	// Tombstones live under XDG_CONFIG_HOME, which the package shares: one
+	// left behind here reads as forgotten in every test that runs after.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	dir := filepath.Join(tmp, "index.db")
 	exp := filepath.Join(tmp, "transfer")
 	if err := os.MkdirAll(exp, 0o755); err != nil {
