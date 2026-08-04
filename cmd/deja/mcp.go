@@ -178,6 +178,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
+		if line := buildingNowForAgent(dir); line != "" {
+			return frameRecall(line), nil
+		}
 		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), 4096-recallFrameOverhead)
 		if err == nil {
 			text = frameRecall(text) + environmentOnce(dir)
@@ -195,6 +198,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
+		}
+		if line := buildingNowForAgent(dir); line != "" {
+			return frameRecall(line), nil
 		}
 		text, sessions, raw, ids, err := recallContextResult(dir, a.Query, a.Harness)
 		if err == nil {
@@ -610,4 +616,22 @@ func (n *mcpNumber) UnmarshalJSON(b []byte) error {
 	}
 	*n = mcpNumber(f)
 	return nil
+}
+
+// buildingNowForAgent explains the one state an agent cannot ask a human about:
+// the index is not there yet because it is being built. Without this the tool
+// call failed with `manifest: open /…/manifest.gob: no such file or directory`
+// — an internal path and an errno, handed to a model as a broken tool (#972).
+// Every other surface says the same thing in words.
+func buildingNowForAgent(dir string) string {
+	if index.HasManifest(dir) {
+		return ""
+	}
+	if st := readWarmupStatus(dir); st != nil {
+		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
+	}
+	if index.RebuildInProgress(dir) || warmupJustRequested(dir) {
+		return "deja is indexing this machine's history. Recall comes online in a few seconds; ask again then."
+	}
+	return ""
 }
