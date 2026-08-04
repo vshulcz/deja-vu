@@ -28,11 +28,13 @@ type ForgetResult struct {
 	// clean up what lives outside the index — the titles promoted notes
 	// borrowed from these sessions (#666, #690).
 	Keys []string
-	// Notes is how many of Sessions were promoted notes rather than raw
-	// transcripts. They are the decisions the user deliberately kept, so one
-	// combined number reads as "four conversations" when half of it is their
-	// own writing.
-	Notes int
+	// Notes is how many of Sessions were the user's own writing rather than raw
+	// transcripts, so one combined number does not read as "four
+	// conversations" when half of it is theirs. Promoted counts the part of it
+	// that came from `deja promote`: calling a day of `remember` notes a
+	// promoted note names something the reader never did (#957).
+	Notes    int
+	Promoted int
 	// Peers names the hosts a forgotten session was already pushed to, and
 	// Exported reports the same for unnamed directory exports. Forgetting
 	// removes the local copy and keeps the session out of later pushes, but it
@@ -363,6 +365,9 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		result.Keys = append(result.Keys, key)
 		if meta.Harness == "deja" {
 			result.Notes++
+			if strings.HasPrefix(meta.ID, "deja-note-") {
+				result.Promoted++
+			}
 		}
 		if !dead[key] {
 			result.Tombstones++
@@ -425,9 +430,41 @@ func Tombstones() []string {
 	return out
 }
 
+// TombstoneMatches counts the forgotten sessions a selector would bring back,
+// without touching anything. The undo has to be able to refuse the way forget
+// does: one word restored three sessions and said so afterwards (#961).
+func TombstoneMatches(prefix string) int {
+	n := 0
+	for key := range readTombstones() {
+		if tombstoneMatches(key, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+// tombstoneMatches is the selector Unforget applies, factored out so the count
+// and the action cannot drift apart.
+func tombstoneMatches(key, prefix string) bool {
+	// A prefix containing ':' is a key/harness-scoped prefix (claude:abc, z:);
+	// a bare prefix is an id-prefix symmetric with forget --session, so "c"
+	// cannot resurrect every claude/codex/cursor session at once.
+	if strings.ContainsRune(prefix, ':') {
+		return strings.HasPrefix(key, prefix)
+	}
+	id := key
+	if i := strings.IndexByte(key, ':'); i >= 0 {
+		id = key[i+1:]
+	}
+	// Same widening as the forget selector: the id a reader copies off a
+	// result line carries the elision (#855).
+	return key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix)
+}
+
 // Unforget lifts tombstones and reports how many it lifted. The count is not
 // bookkeeping: the command printed nothing at all, so "restored one session"
 // and "that prefix matched nothing" looked identical (#672).
+//
 // Unforget lifts the tombstones matching prefix and rebuilds so the sessions
 // come back. The rebuild runs first and the reduced tombstone set is persisted
 // only once it succeeds: interrupted the other way round, the tombstone that
@@ -437,25 +474,9 @@ func Tombstones() []string {
 // by `forget --list`, which is visible and fixed by running unforget again.
 func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 	set := readTombstones()
-	// A prefix containing ':' is a key/harness-scoped prefix (claude:abc,
-	// z:); a bare prefix is an id-prefix symmetric with forget --session, so
-	// "c" cannot resurrect every claude/codex/cursor session at once.
-	scoped := strings.ContainsRune(prefix, ':')
 	lifted := 0
 	for key := range set {
-		var match bool
-		if scoped {
-			match = strings.HasPrefix(key, prefix)
-		} else {
-			id := key
-			if i := strings.IndexByte(key, ':'); i >= 0 {
-				id = key[i+1:]
-			}
-			// Same widening as the forget selector: the id a reader copies off
-			// a result line carries the elision (#855).
-			match = key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix)
-		}
-		if match {
+		if tombstoneMatches(key, prefix) {
 			delete(set, key)
 			lifted++
 		}

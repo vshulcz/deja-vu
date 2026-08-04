@@ -1,7 +1,7 @@
 // Package policy decides what memory activates where. Recall crossing a
 // machine boundary was the launch thread's top concern; instead of one env
 // var, a small explicit table: per activation (search, mcp, auto), which
-// origins (local, imported, imported:<peer>) may inject. Defaults allow
+// origins (local, imported, imported:<group>) may inject. Defaults allow
 // everything, matching prior behavior; DEJA_AUTORECALL_LOCAL_ONLY=1 stays as
 // an alias for denying imported memory on the auto path.
 package policy
@@ -23,8 +23,12 @@ const (
 )
 
 // Policy maps activation → origin rules. A missing activation allows every
-// origin. Origin keys: "local", "imported" (any peer), "imported:<peer>"
-// (most specific wins).
+// origin. Origin keys: "local", "imported" (anything that arrived by sync) and
+// "imported:<group>", where group is the first path component of the project
+// the session had on the machine it came from — a sync batch carries no machine
+// identity, so this is a project grouping and not a peer name, which is how it
+// was described until a rule written for a machine turned out to be accepted,
+// displayed and never matched (#955). Most specific wins.
 type Policy struct {
 	Activations map[string]map[string]bool `json:"activations,omitempty"`
 }
@@ -60,7 +64,10 @@ func Load() Policy {
 	return p
 }
 
-// Origin classifies a session's project name.
+// Origin classifies a session's project name. Everything local is "local";
+// anything that arrived by sync is "imported", and additionally
+// "imported:<group>" when its source project had a path, so a group of another
+// machine's projects can be addressed on its own (#955).
 func Origin(project string) string {
 	if peer, ok := strings.CutPrefix(project, "imported:"); ok {
 		if i := strings.IndexByte(peer, '/'); i > 0 {
@@ -72,7 +79,7 @@ func Origin(project string) string {
 }
 
 // Allows reports whether memory from the session's origin may activate on
-// this path. Most specific rule wins: imported:<peer> over imported over the
+// this path. Most specific rule wins: imported:<group> over imported over the
 // activation default (allow).
 func (p Policy) Allows(activation, project string) bool {
 	rules := p.Activations[activation]

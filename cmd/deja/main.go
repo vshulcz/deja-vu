@@ -1520,6 +1520,12 @@ func runForget(dir string, args []string) error {
 		return nil
 	}
 	if unforget != "" {
+		// The destructive direction refuses a prefix that reaches more than one
+		// session; the undo restored them all and said so afterwards, while the
+		// hint printed beside the list promises one (#961).
+		if n := index.TombstoneMatches(unforget); n > 1 && !allMatches {
+			return fmt.Errorf("%q brings back %d forgotten sessions — `deja forget --list` names them; add --all-matches to restore them all", unforget, n)
+		}
 		var lifted int
 		if err := withBuildProgress(func() error {
 			var err error
@@ -1563,9 +1569,8 @@ func runForget(dir string, args []string) error {
 				fmt.Fprintln(os.Stdout, scope.Error())
 			}
 		}
-		if result.Notes > 0 {
-			fmt.Fprintf(os.Stdout, "%d of them %s promoted note%s — the decisions you kept, not raw sessions\n",
-				result.Notes, verbWere(result.Notes), pluralS(result.Notes))
+		if line := forgetNotesLine(result); line != "" {
+			fmt.Fprintln(os.Stdout, line)
 		}
 		return nil
 	}
@@ -1939,4 +1944,35 @@ func splitEqualsForms(args []string) []string {
 		out = append(out, a)
 	}
 	return out
+}
+
+// forgetNotesLine says how much of what is going is the user's own writing.
+// Everything deja files under its own harness counted as a "promoted note",
+// so forgetting a day of `remember` notes named something the reader had never
+// done (#957).
+func forgetNotesLine(result index.ForgetResult) string {
+	switch {
+	case result.Notes == 0:
+		return ""
+	case result.Promoted == result.Notes:
+		return fmt.Sprintf("%d of them %s promoted note%s — the decisions you kept, not raw sessions",
+			result.Notes, verbWere(result.Notes), pluralS(result.Notes))
+	case result.Promoted == 0:
+		if result.Notes == 1 {
+			return "1 of them is a day of your own notes, not raw sessions"
+		}
+		return fmt.Sprintf("%d of them are %s of your own notes, not raw sessions",
+			result.Notes, dayWord(result.Notes))
+	default:
+		return fmt.Sprintf("%d of them %s your own writing — %d promoted, %s of notes — not raw sessions",
+			result.Notes, verbWere(result.Notes), result.Promoted, dayWord(result.Notes-result.Promoted))
+	}
+}
+
+// dayWord names day buckets the way the reader wrote them: by the day.
+func dayWord(n int) string {
+	if n == 1 {
+		return "a day"
+	}
+	return fmt.Sprintf("%d days", n)
 }

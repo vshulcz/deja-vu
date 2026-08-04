@@ -591,7 +591,7 @@ func TestDoctorReportsThePolicy(t *testing.T) {
 	t.Setenv("DEJA_POLICY_FILE", path)
 
 	var buf bytes.Buffer
-	doctorPolicy(&buf)
+	doctorPolicy(&buf, t.TempDir())
 	if !strings.Contains(buf.String(), "every origin activates everywhere") {
 		t.Errorf("no file: %q", buf.String())
 	}
@@ -600,7 +600,7 @@ func TestDoctorReportsThePolicy(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{ oops"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	doctorPolicy(&buf)
+	doctorPolicy(&buf, t.TempDir())
 	// The permissive default is what is in force, and the file reads like a
 	// restriction — so saying only "unreadable" would leave the wrong belief.
 	for _, want := range []string{"unreadable", "every origin activates everywhere until it parses"} {
@@ -614,7 +614,7 @@ func TestDoctorReportsThePolicy(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	doctorPolicy(&buf)
+	doctorPolicy(&buf, t.TempDir())
 	for _, want := range []string{"mcp", "deny local", "ignored", "this rule does nothing"} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("valid: %q lacks %q", buf.String(), want)
