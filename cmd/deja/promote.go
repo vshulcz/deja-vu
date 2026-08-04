@@ -349,6 +349,19 @@ func endsWithNewline(path string) bool {
 	return buf[0] == '\n'
 }
 
+// promotedNoteSources maps every promoted note's id to the session it came
+// from, in one pass over the note log.
+func promotedNoteSources() map[string]string {
+	out := map[string]string{}
+	for _, n := range sources.LoadPromotedNotes() {
+		if n.Session == "" {
+			continue
+		}
+		out["deja-note-"+strings.ReplaceAll(n.Session, ":", "-")] = n.Session
+	}
+	return out
+}
+
 // promotedNoteSource maps a promoted note's id back to the session it was
 // promoted from. The id is built by replacing the colon in `harness:id`, which
 // does not invert on its own — harness names carry dashes — so the note log is

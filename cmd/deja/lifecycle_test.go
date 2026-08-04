@@ -244,3 +244,39 @@ func TestDemotedNote(t *testing.T) {
 		t.Errorf("plural note = %q", got)
 	}
 }
+
+// The line attributes a reordering to the person who caused it, so its number
+// is the count of their decisions. A rejected note and the transcript it was
+// promoted from are one decision stored twice, and counting rows grew the
+// number with deja's storage rather than with what the reader did (#997).
+func TestDemotedNoteCountsDecisionsNotRows(t *testing.T) {
+	tmp := t.TempDir()
+	notes := filepath.Join(tmp, "notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", notes)
+	body := `{"ts":"2026-08-04T10:00:00Z","project":"p","text":"rolled back","kind":"promoted","session":"claude:bad","state":"rejected","title":"pool cap"}` + "\n"
+	if err := os.WriteFile(notes, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hits := []search.Hit{
+		{Session: model.Session{ID: "bad", Harness: "claude", Project: "p"}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "deja-note-claude-bad", Harness: "deja", Project: "p"}, Lifecycle: "rejected"},
+		{Session: model.Session{ID: "good", Harness: "claude", Project: "p"}},
+	}
+	got := demotedNote(hits, demoteRejected(hits))
+	if !strings.Contains(got, "1 session you marked rejected is below") {
+		t.Errorf("one decision stored twice was counted as %q", got)
+	}
+
+	// Two decisions are still two.
+	body += `{"ts":"2026-08-04T11:00:00Z","project":"p","text":"also wrong","kind":"promoted","session":"claude:worse","state":"rejected","title":"ticker"}` + "\n"
+	if err := os.WriteFile(notes, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hits = append(hits[:2:2],
+		search.Hit{Session: model.Session{ID: "worse", Harness: "claude", Project: "p"}, Lifecycle: "rejected"},
+		search.Hit{Session: model.Session{ID: "deja-note-claude-worse", Harness: "deja", Project: "p"}, Lifecycle: "rejected"},
+		search.Hit{Session: model.Session{ID: "good", Harness: "claude", Project: "p"}})
+	if got := demotedNote(hits, demoteRejected(hits)); !strings.Contains(got, "2 sessions you marked rejected are below") {
+		t.Errorf("two decisions were counted as %q", got)
+	}
+}

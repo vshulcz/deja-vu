@@ -172,11 +172,24 @@ func demotedNote(hits []search.Hit, moved int) string {
 	if moved == 0 {
 		return ""
 	}
+	// One decision, not one row: a rejected note and the transcript it was
+	// promoted from are both demoted, and counting rows told the reader they
+	// had marked two sessions when they marked one (#997).
+	notes := promotedNoteSources()
+	seen := map[string]bool{}
 	n, elsewhere := 0, 0
 	for _, h := range hits {
 		if h.Lifecycle != lifecycleRejected {
 			continue
 		}
+		key := h.Session.Harness + ":" + h.Session.ID
+		if src, ok := notes[h.Session.ID]; ok {
+			key = src
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		n++
 		// "you marked" is wrong for a decision another machine took back: the
 		// state travelled with the note, the judgement was not this reader's
