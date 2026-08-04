@@ -296,6 +296,14 @@ func Import(dir, inDir string) (int, error) {
 	}
 	defer unlock()
 	dead := readTombstones()
+	// Content tombstones are recorded against the session they came from, so
+	// they are read back once here rather than scanned per record.
+	deadContent := map[string]bool{}
+	for k := range dead {
+		if _, content, ok := strings.Cut(k, "\x00"); ok {
+			deadContent[content] = true
+		}
+	}
 	ex := sources.NewExcluder()
 	if !HasManifest(dir) {
 		if err := initEmptyIndex(dir); err != nil {
@@ -393,6 +401,13 @@ func Import(dir, inDir string) (int, error) {
 			// grew a second copy (#977). Key those on what does not move.
 			if bucket := dayBucketKey(sr, th.Sum64()); bucket != "" {
 				if m.ImportedRecords[bucket] {
+					return nil
+				}
+				// Forgotten as text: the sending machine renders the day its
+				// own way, so a note this machine dropped arrives under a
+				// bucket id no tombstone here has ever named (#985).
+				if deadContent[bucket] {
+					forgottenSkipped++
 					return nil
 				}
 				dedupe = bucket

@@ -3,6 +3,7 @@ package index
 import (
 	"bufio"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"path/filepath"
@@ -389,13 +390,33 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// Count the messages on the dry run too. It is the same single pass over
 	// records, and without it `--dry-run` answers "0 messages" to the only
 	// question it exists to answer: how much am I about to lose.
+	// A note forgotten here is forgotten as text, not as a day: the peer who
+	// still holds it sends it under their own bucket id, which was a key this
+	// index had never seen — and deja announced the line the reader had just
+	// deleted (#985). The content key is the one #977 already dedupes on.
+	var contentKeys []string
 	for _, r := range readRecordsForForget(dir) {
-		if matched[r.Record.Key] {
-			result.Messages++
+		if !matched[r.Record.Key] {
+			continue
+		}
+		result.Messages++
+		meta, ok := m.Sessions[r.Record.Key]
+		if !ok || meta.Harness != "deja" || !strings.HasPrefix(meta.ID, "deja-20") {
+			continue
+		}
+		th := fnv.New64a()
+		_, _ = th.Write([]byte(r.Record.Text))
+		key := dayBucketKey(SyncRecord{Harness: "deja", SessionID: meta.ID, Project: meta.Project,
+			Role: r.Record.Role, Time: r.Record.Time}, th.Sum64())
+		if key != "" {
+			contentKeys = append(contentKeys, r.Record.Key+"\x00"+key)
 		}
 	}
 	if o.DryRun {
 		return result, nil
+	}
+	for _, k := range contentKeys {
+		dead[k] = true
 	}
 	// Persist tombstones before the rebuild: a crash between the two must
 	// leave sessions forgotten, not resurrect them on the next index pass.
@@ -429,6 +450,11 @@ func Tombstones() []string {
 	set := readTombstones()
 	out := make([]string, 0, len(set))
 	for key := range set {
+		// Content keys hang off the session they were recorded with; the list
+		// is what someone reads and unforgets by name.
+		if strings.Contains(key, "\x00") {
+			continue
+		}
 		out = append(out, key)
 	}
 	sort.Strings(out)
@@ -444,6 +470,11 @@ func Tombstoned(key string) bool { return readTombstones()[key] }
 func TombstoneMatches(prefix string) int {
 	n := 0
 	for key := range readTombstones() {
+		// Content keys ride along with their session and are lifted with it;
+		// counting them told the reader one note was two sessions.
+		if strings.Contains(key, "\x00") {
+			continue
+		}
 		if tombstoneMatches(key, prefix) {
 			n++
 		}
@@ -484,6 +515,15 @@ func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 	set := readTombstones()
 	lifted := 0
 	for key := range set {
+		session, _, hasContent := strings.Cut(key, "\x00")
+		if hasContent {
+			// Bringing a note back has to bring back the copies a peer may
+			// still send, or the next import would drop them silently.
+			if tombstoneMatches(session, prefix) {
+				delete(set, key)
+			}
+			continue
+		}
 		if tombstoneMatches(key, prefix) {
 			delete(set, key)
 			lifted++
