@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -123,6 +125,11 @@ func runSync(dir string, args []string) error {
 		if own := index.ImportSkippedOwn(); own > 0 {
 			fmt.Fprintf(os.Stdout, "deja: %d record%s were already here word for word — this folder holds a copy of what this machine has\n", own, pluralS(own))
 		}
+		// The count is a fact about this machine's memory, not about one
+		// terminal moment: a peer who keeps sending sessions you forgot drops
+		// records on every sync, and only the line below said so — gone the
+		// moment the terminal scrolls (#1016).
+		recordLastImport(dir, n, index.ImportSkippedForgotten(), index.ImportSkippedOwn())
 		if skipped := index.ImportSkippedForgotten(); skipped > 0 {
 			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — they belong to sessions you forgot here (`deja forget --list`)\n", skipped, pluralS(skipped))
 		}
@@ -156,4 +163,34 @@ func hasSyncBatches(out string) bool {
 		}
 	}
 	return false
+}
+
+// lastImport is the one-line summary doctor reads back.
+type lastImport struct {
+	At      time.Time `json:"at"`
+	Records int       `json:"records"`
+	Forgot  int       `json:"forgotten_left_out,omitempty"`
+	Own     int       `json:"already_here,omitempty"`
+}
+
+func lastImportPath(dir string) string { return dir + ".lastimport" }
+
+func recordLastImport(dir string, records, forgot, own int) {
+	b, err := json.Marshal(lastImport{At: time.Now(), Records: records, Forgot: forgot, Own: own})
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(lastImportPath(dir), b, 0o600)
+}
+
+func readLastImport(dir string) (lastImport, bool) {
+	b, err := os.ReadFile(lastImportPath(dir))
+	if err != nil {
+		return lastImport{}, false
+	}
+	var li lastImport
+	if json.Unmarshal(b, &li) != nil || li.At.IsZero() {
+		return lastImport{}, false
+	}
+	return li, true
 }

@@ -975,6 +975,20 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	default:
 		fmt.Fprintln(w, "  freshness up to date")
 	}
+	// What the last sync did with this machine's own rules: records that were
+	// dropped because they belong to sessions forgotten here are invisible
+	// afterwards, and a peer who keeps sending them drops them every time
+	// (#1016).
+	if li, ok := readLastImport(dir); ok && (li.Forgot > 0 || li.Own > 0) {
+		parts := []string{fmt.Sprintf("%d record%s in", li.Records, pluralS(li.Records))}
+		if li.Forgot > 0 {
+			parts = append(parts, fmt.Sprintf("%d left out as forgotten here", li.Forgot))
+		}
+		if li.Own > 0 {
+			parts = append(parts, fmt.Sprintf("%d already here word for word", li.Own))
+		}
+		fmt.Fprintf(w, "  last sync %s (%s)\n", strings.Join(parts, ", "), li.At.Local().Format("2006-01-02 15:04"))
+	}
 	health := index.IngestHealth(dir)
 	names := make([]string, 0, len(health))
 	for h, e := range health {
