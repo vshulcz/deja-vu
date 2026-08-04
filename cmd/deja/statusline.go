@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/index"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -37,6 +38,14 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		} else {
 			fmt.Fprint(stdout, "deja · indexing your history · recall comes online in a few seconds")
 		}
+		return nil
+	}
+	// A rule that activates nothing turns memory off everywhere, and the line
+	// people always have on screen read the same as an ordinary quiet day:
+	// "no recalls yet today" is true and says nothing about why it will stay
+	// true (#1012).
+	if policy.Load().Describe(policy.ActivationAuto) == "nothing activates" {
+		fmt.Fprint(stdout, withFileMemory(dir, in, "deja · off here · the trust policy activates nothing (`deja doctor`)"))
 		return nil
 	}
 	recalls, bytes, injected := usage.TodayWithInjections(dir)
