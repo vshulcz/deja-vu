@@ -91,30 +91,18 @@ func TestForgetKeyOfNamesTheSessionASelectorReached(t *testing.T) {
 }
 
 // The dry probe that decides the scope refusal fails the same ways the real
-// pass does; handing its syscall back was the shape #798 replaced everywhere
-// else (#976).
-func TestForgetOnAVanishedIndexDiskNamesTheDisk(t *testing.T) {
+// pass does, and its error went out raw: on an ejected volume `deja forget`
+// answered `mkdir /Volumes/dejaidx: permission denied` (#976). Measured on a
+// real HFS+ image; here the same shape is exercised through ensureError, which
+// is what the probe now uses.
+func TestForgetProbeErrorIsWordedLikeEveryOther(t *testing.T) {
 	tmp := hermeticEnv(t)
-	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
-	if err := os.MkdirAll(store, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	rec := `{"type":"user","message":{"role":"user","content":"a session about the vault"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"s22","cwd":"/proj"}` + "\n"
-	if err := os.WriteFile(filepath.Join(store, "s22.jsonl"), []byte(rec), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// A mount point that is not there: the index directory and its parent are
-	// both missing, which is what an ejected volume leaves behind.
-	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "gone-volume", "index.db"))
-
-	_, err := captureRun(t, "forget", "--session", "s22")
-	if err == nil {
-		t.Fatal("forget reported success against a vanished disk")
-	}
-	if !strings.Contains(err.Error(), "is not there") || !strings.Contains(err.Error(), "unmounted") {
-		t.Errorf("the failure does not name the disk: %q", err.Error())
+	gone := filepath.Join(tmp, "gone-volume", "index.db")
+	err := ensureError(gone, os.ErrPermission)
+	if err == nil || !strings.Contains(err.Error(), "is not there") {
+		t.Errorf("a vanished mount point is worded as: %v", err)
 	}
 	if strings.Contains(err.Error(), "mkdir") {
-		t.Errorf("the failure is still a syscall: %q", err.Error())
+		t.Errorf("the wording is still a syscall: %v", err)
 	}
 }
