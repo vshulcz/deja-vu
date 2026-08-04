@@ -393,6 +393,18 @@ func doctorHarnesses(w io.Writer, dir string) {
 		status := "missing"
 		if present {
 			status = "found"
+			// A directory deja cannot open loses its sessions from recall
+			// without a word — the failure #802/#816 closed, but only in
+			// `doctor --json`, which has said `denied` all along while this
+			// row, the one people read, said `found` (#993).
+			if denied := firstDeniedDir(strings.Split(path, ", ")); denied != "" {
+				status = "denied"
+				if detail != "" {
+					detail += ", "
+				}
+				_ = denied // the warning line below names the path
+				detail += "cannot be read"
+			}
 		} else if storeDiskGone(path) {
 			// A store whose whole disk is gone is not a store that was
 			// deleted, and "missing" on a row of transcripts reads as the
