@@ -435,6 +435,9 @@ func Tombstones() []string {
 	return out
 }
 
+// Tombstoned reports whether one exact harness:id has been forgotten here.
+func Tombstoned(key string) bool { return readTombstones()[key] }
+
 // TombstoneMatches counts the forgotten sessions a selector would bring back,
 // without touching anything. The undo has to be able to refuse the way forget
 // does: one word restored three sessions and said so afterwards (#961).

@@ -454,6 +454,10 @@ func cmdCtx(dir string, rest []string) error {
 		}
 		return fmt.Errorf("no session matches %q", q)
 	}
+	// A short selector never reaches the id branch above, so a forgotten
+	// session's note arrives as an ordinary hit — and the answer still has to
+	// say the session is gone (#971).
+	noteForgottenSource(hits[0].Session, q)
 	search.PrintContext(os.Stdout, hits[0].Session, q)
 	return nil
 }
@@ -935,6 +939,9 @@ func noteAmbiguousPrefix(dir, id, action string) {
 func findByPrefix(dir, p string) (model.Session, bool, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if s, ok, err := index.FindByPrefix(dir, p); err == nil {
+			if ok {
+				noteForgottenSource(s, p)
+			}
 			return s, ok, nil
 		}
 	}
@@ -2080,4 +2087,34 @@ func sharedRowsAmong(dir string, keys []string) int {
 		}
 	}
 	return n
+}
+
+// noteForgottenSource says when an id lookup landed on the note promoted from a
+// session that has been forgotten. Asking for the session by the id you
+// remember answered with the note and said nothing, so the reply looked like
+// the session itself until you noticed the id had changed (#971).
+func noteForgottenSource(s model.Session, selector string) {
+	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") {
+		return
+	}
+	src, ok := strings.CutPrefix(s.ID, "deja-note-")
+	if !ok || src == "" {
+		return
+	}
+	// The selector named the source, not the note: a reader who typed the note
+	// id knows what they asked for.
+	if strings.HasPrefix(s.ID, selector) {
+		return
+	}
+	key := strings.Replace(src, "-", ":", 1)
+	// Only when the reader named that session: an ordinary topical query that
+	// happens to land on the note is not asking about the forgotten source, and
+	// the line would be noise on every such search.
+	if selector == "" || !strings.Contains(key, selector) {
+		return
+	}
+	if !index.Tombstoned(key) {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "deja: %s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone\n", key)
 }
