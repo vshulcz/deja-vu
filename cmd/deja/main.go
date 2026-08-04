@@ -1582,7 +1582,14 @@ func runForget(dir string, args []string) error {
 	}
 	result, err := index.Forget(dir, o)
 	if err != nil {
-		return err
+		// The tombstone is already written; what failed is the rebuild that
+		// takes the records out. Handing back `mkdir /…/idx.tmp: permission
+		// denied` names an internal path and leaves the reader believing the
+		// session is gone while search still returns it (#976).
+		if !o.DryRun && index.Tombstoned(forgetKeyOf(dir, o)) {
+			return fmt.Errorf("%v\nthe session is marked forgotten and is still in the index until it can be rebuilt — search keeps returning it until then", ensureError(dir, err))
+		}
+		return ensureError(dir, err)
 	}
 	if o.DryRun {
 		fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
@@ -2117,4 +2124,22 @@ func noteForgottenSource(s model.Session, selector string) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "deja: %s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone\n", key)
+}
+
+// forgetKeyOf names the exact session a selector reached, so a failed forget
+// can tell whether the tombstone landed (#976).
+func forgetKeyOf(dir string, o index.ForgetOptions) string {
+	if o.Session == "" {
+		return ""
+	}
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return ""
+	}
+	for _, m := range metas {
+		if index.SelectorMatches(m, o.Session) {
+			return m.Harness + ":" + m.ID
+		}
+	}
+	return ""
 }
