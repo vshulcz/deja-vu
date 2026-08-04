@@ -25,19 +25,22 @@ type Report struct {
 	Heatmap         HeatmapStats   `json:"-"` // card-only presentation data; kept out of the stable --json schema
 	// EmptiedByPolicy marks a report whose rows were all withheld by the
 	// trust policy, so the empty-index advice is not the right thing to print.
-	EmptiedByPolicy bool           `json:"-"`
-	Sparkline       string         `json:"sparkline"`
-	DateRange       DateRangeStats `json:"date_range"`
-	Longest         SessionStat    `json:"longest_session"`
-	BusiestDay      DayStat        `json:"busiest_day"`
-	Recall          usage.Summary  `json:"recall"`
-	WeekRecalls     int            `json:"week_recalls"`
-	WeekBytes       int            `json:"week_bytes"`
-	WeekInjected    int            `json:"week_injected"`
-	HandoffsIn      int            `json:"handoffs_received"`
-	AgentCredits    int            `json:"agent_credits"`
-	WeekCredits     int            `json:"week_agent_credits"`
-	SidecarSize     int64          `json:"sidecar_size,omitempty"`
+	EmptiedByPolicy bool `json:"-"`
+	// HiddenBySettings is the reader's own tombstones and exclusions, when
+	// those are why the report is empty.
+	HiddenBySettings string         `json:"-"`
+	Sparkline        string         `json:"sparkline"`
+	DateRange        DateRangeStats `json:"date_range"`
+	Longest          SessionStat    `json:"longest_session"`
+	BusiestDay       DayStat        `json:"busiest_day"`
+	Recall           usage.Summary  `json:"recall"`
+	WeekRecalls      int            `json:"week_recalls"`
+	WeekBytes        int            `json:"week_bytes"`
+	WeekInjected     int            `json:"week_injected"`
+	HandoffsIn       int            `json:"handoffs_received"`
+	AgentCredits     int            `json:"agent_credits"`
+	WeekCredits      int            `json:"week_agent_credits"`
+	SidecarSize      int64          `json:"sidecar_size,omitempty"`
 	// Spans and SpanFiles are what `deja restore` can hand back: the exact
 	// bytes an agent replaced, which no other tool keeps. Filled by the
 	// caller, not by Build — replaced spans are deliberately kept out of

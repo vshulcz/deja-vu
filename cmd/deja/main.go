@@ -535,6 +535,13 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 			fmt.Fprintf(os.Stderr, "deja: no sessions match %s\n", where)
 			return nil
 		}
+		// "run `deja index`" cannot bring back what the reader forgot, and on a
+		// store emptied by their own settings it is the wrong instruction —
+		// search has said so since #844; the listing did not (#1007).
+		if note := hiddenByOwnSettings(); note != "" {
+			fmt.Fprint(os.Stderr, "deja: no sessions indexed yet\n"+note)
+			return nil
+		}
 		fmt.Fprintln(os.Stderr, emptyIndexHint("no sessions indexed yet"))
 		return nil
 	}
