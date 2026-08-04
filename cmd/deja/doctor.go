@@ -969,6 +969,9 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 		} else {
 			fmt.Fprintf(w, "  freshness %d stores changed since last build — run `deja index`\n", idx.StaleStores)
 		}
+	case "stale-readonly":
+		fmt.Fprintf(w, "  freshness %s changed since last build, and the index cannot be written — check the permissions on %s, or point DEJA_INDEX_DIR somewhere writable\n",
+			doctorCount(idx.StaleStores, "store"), filepath.Dir(idx.Path))
 	default:
 		fmt.Fprintln(w, "  freshness up to date")
 	}

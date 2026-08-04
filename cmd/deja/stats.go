@@ -112,14 +112,20 @@ func runStats(dir string, args []string) error {
 		progress = io.Discard
 	}
 	if err := index.Ensure(dir, "", false, progress); err != nil {
-		return err
+		// `mkdir …/idx.tmp: permission denied` names a path nobody chose and a
+		// syscall nobody can act on. index and search have worded this since
+		// #798; stats was the one screen still handing it back raw (#1004).
+		return ensureError(dir, err)
 	}
 	if redaction {
 		return printRedactionReport(dir, jsonOut)
 	}
 	ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, progress)
 	if err != nil {
-		return err
+		// `mkdir …/idx.tmp: permission denied` names a path nobody chose and a
+		// syscall nobody can act on. index and search have worded this since
+		// #798; stats was the one screen still handing it back raw (#1004).
+		return ensureError(dir, err)
 	}
 	// stats is the one screen deja calls "wrapped for sharing", and it was
 	// naming projects the trust policy keeps off every other surface — the

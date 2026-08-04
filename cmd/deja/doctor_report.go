@@ -351,6 +351,13 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorComponent {
 	}
 	if result.StaleStores > 0 {
 		result.State = "stale"
+		// "run `deja index`" is the advice attached to `stale`, and it cannot
+		// be followed when the index cannot be written: the build fails with
+		// the same permission error every time. search says so on this exact
+		// state; doctor called it ordinary staleness (#1004).
+		if !indexDirWritable(dir) {
+			result.State = "stale-readonly"
+		}
 	}
 	return result
 }
