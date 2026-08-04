@@ -1901,8 +1901,18 @@ func emptyIndexHint(what string) string {
 // opposed to an index that merely has not been built yet.
 func noAgentHistoryFound() bool {
 	for _, check := range doctorStoreChecks() {
-		if store, _ := inspectDoctorStore(check); store.Files > 0 {
-			return false
+		store, _ := inspectDoctorStore(check)
+		if store.Files == 0 {
+			continue
+		}
+		// By content, not by existence: an empty notes file — one `deja
+		// remember` later forgotten, or a file someone touched — counted as
+		// history and turned the answer into "run `deja index`", which is the
+		// one piece of advice this branch exists to avoid (#996).
+		for _, f := range check.files {
+			if fi, err := os.Stat(f); err == nil && fi.Size() > 0 {
+				return false
+			}
 		}
 	}
 	return true

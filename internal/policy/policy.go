@@ -114,9 +114,25 @@ func (p Policy) Describe(activation string) string {
 	if rules == nil {
 		return "local+imported"
 	}
+	localOff := false
+	if v, ok := rules["local"]; ok && !v {
+		localOff = true
+	}
+	importedOff := false
 	if v, ok := rules["imported"]; ok && !v {
+		importedOff = true
+	}
+	// A rule that denies both origins was described as "local-only", which is
+	// the name of a different rule — and doctor printed it beside a count that
+	// contradicted it: "local-only — withholds 1 of 1 indexed session" (#995).
+	switch {
+	case localOff && importedOff:
+		return "nothing activates"
+	case importedOff:
 		return "local-only"
 	}
+	// A rule that denies only `local` keeps the generic "deny <origin>" form:
+	// it is one denial among the others below, and two tests pin it (#941).
 	denied := make([]string, 0, len(rules))
 	for origin, allowed := range rules {
 		// A key deja never consults restricts nothing, and naming it here put
