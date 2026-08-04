@@ -24,8 +24,11 @@ func TestMain(m *testing.M) {
 		"XDG_CONFIG_HOME":         "",
 		"XDG_DATA_HOME":           "",
 		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
-		"DEJA_NOTES_FILE":         "",
-		"DEJA_SOURCE_INSTANCE":    "",
+		// A developer with DEJA_INDEX_DIR exported reads their own index
+		// here, and the suite went red on their machine only.
+		"DEJA_INDEX_DIR":       "",
+		"DEJA_NOTES_FILE":      "",
+		"DEJA_SOURCE_INSTANCE": "",
 		// Guard: hook tests must never spawn a real detached warmup —
 		// os.Executable() inside tests is the test binary itself.
 		"DEJA_WARMUP_SENTINEL":  filepath.Join(root, "warmup-guard"),

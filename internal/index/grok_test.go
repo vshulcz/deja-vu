@@ -21,7 +21,10 @@ func TestMain(m *testing.M) {
 		// Tombstones and the exclude list live under XDG_CONFIG_HOME. A
 		// developer who has it set would otherwise have the suite write into
 		// their real ~/.config/deja.
-		"XDG_CONFIG_HOME":       filepath.Join(root, "config"),
+		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		// A developer with DEJA_INDEX_DIR exported reads their own index
+		// here, and the suite went red on their machine only.
+		"DEJA_INDEX_DIR":        "",
 		"DEJA_EXCLUDE_PROJECTS": "",
 		"DEJA_CLAUDE_ROOT":      filepath.Join(root, "claude"),
 		"DEJA_CODEX_ROOT":       filepath.Join(root, "codex"),

@@ -361,6 +361,24 @@ func Import(dir, inDir string) (int, error) {
 			if strings.TrimSpace(sr.Text) == "" {
 				return nil
 			}
+			importID := ImportedSessionID(sr.Harness, origID)
+			// Forgetting is primary data, not cache: a tombstoned session
+			// must stay dead even when the peer still holds the batch and
+			// this index was wiped and rebuilt.
+			//
+			// Both keys, because a session forgotten here was forgotten under
+			// its own id: checking only the imported one let a peer's copy walk
+			// the same text back into local search under a new id, while
+			// `forget --list` still called it forgotten (#968).
+			//
+			// Ahead of the dedupe ledger, which answers first for the ordinary
+			// case — the same batch handed over twice. Both drop the record;
+			// only this one knows why, and behind the ledger the import went
+			// silent exactly when the peer re-sent what you forgot (#980).
+			if dead[sr.Harness+":"+importID] || dead[sr.Harness+":"+origID] {
+				forgottenSkipped++
+				return nil
+			}
 			// Key includes role and a text hash: two messages can legally share
 			// a timestamp (aider stamps a whole session with its start time).
 			// The legacy time-only key is still honored so batches imported by
@@ -380,19 +398,6 @@ func Import(dir, inDir string) (int, error) {
 				dedupe = bucket
 			}
 			if m.ImportedRecords[dedupe] || m.ImportedRecords[legacy] {
-				return nil
-			}
-			importID := ImportedSessionID(sr.Harness, origID)
-			// Forgetting is primary data, not cache: a tombstoned session
-			// must stay dead even when the peer still holds the batch and
-			// this index was wiped and rebuilt.
-			//
-			// Both keys, because a session forgotten here was forgotten under
-			// its own id: checking only the imported one let a peer's copy walk
-			// the same text back into local search under a new id, while
-			// `forget --list` still called it forgotten (#968).
-			if dead[sr.Harness+":"+importID] || dead[sr.Harness+":"+origID] {
-				forgottenSkipped++
 				return nil
 			}
 			// The exclude list keeps a project out of this machine's memory;
