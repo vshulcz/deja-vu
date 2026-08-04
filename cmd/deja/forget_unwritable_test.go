@@ -62,3 +62,30 @@ func TestForgetSaysWhatIsStillVisibleWhenTheIndexCannotBeWritten(t *testing.T) {
 		t.Errorf("the failure does not say the session is still visible: %q", msg)
 	}
 }
+
+// forgetKeyOf answers "which session did this selector reach", which is what
+// lets the failure above say whether the tombstone landed (#976).
+func TestForgetKeyOfNamesTheSessionASelectorReached(t *testing.T) {
+	tmp := hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"a session"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"abc123","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "abc123.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := forgetKeyOf(dir, index.ForgetOptions{Session: "abc"}); got != "claude:abc123" {
+		t.Errorf("forgetKeyOf(prefix) = %q, want claude:abc123", got)
+	}
+	if got := forgetKeyOf(dir, index.ForgetOptions{Session: "nothing-like-it"}); got != "" {
+		t.Errorf("a selector matching nothing named %q", got)
+	}
+	if got := forgetKeyOf(dir, index.ForgetOptions{Project: "proj"}); got != "" {
+		t.Errorf("a project selector named a single session: %q", got)
+	}
+}
