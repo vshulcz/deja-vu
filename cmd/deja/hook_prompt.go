@@ -479,7 +479,14 @@ func dejaVuLine(s model.Session, terms ...string) string {
 		}
 		why = " · via: " + strings.Join(terms, ", ")
 	}
-	return fmt.Sprintf("deja-vu: you have been here — %q (%s%s)", topic, search.RelativeDate(s.Updated), why)
+	// "you have been here" for a session that arrived from another machine
+	// claims the reader did work they have never seen — the context block
+	// below labels it `imported:` and this line contradicted it (#1001).
+	who := "you have been here"
+	if strings.HasPrefix(s.Project, "imported:") {
+		who = "this was done on another machine"
+	}
+	return fmt.Sprintf("deja-vu: %s — %q (%s%s)", who, topic, search.RelativeDate(s.Updated), why)
 }
 
 // dejaVuTopic picks something a human actually typed. Session titles are the

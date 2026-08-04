@@ -506,3 +506,27 @@ func TestHookPromptSurvivesBytesAfterThePayload(t *testing.T) {
 		}
 	}
 }
+
+// The one line a person reads claimed they had done work that arrived from
+// another machine, while the context block below it labelled the same session
+// `imported:` (#1001).
+func TestDejaVuLineDoesNotClaimAPeersWorkAsYours(t *testing.T) {
+	local := model.Session{ID: "loc", Project: "tmp/w16", Updated: time.Now(),
+		Messages: []model.Message{{Role: "user", Text: "the ticker window stays at 30s"}}}
+	if got := dejaVuLine(local, "ticker"); !strings.Contains(got, "you have been here") {
+		t.Errorf("a local session lost the wording it has always had: %q", got)
+	}
+	peer := local
+	peer.Project = "imported:tmp/w16"
+	got := dejaVuLine(peer, "ticker")
+	if strings.Contains(got, "you have been here") {
+		t.Errorf("a session from another machine is claimed as the reader's own: %q", got)
+	}
+	if !strings.Contains(got, "another machine") {
+		t.Errorf("the line does not say where the session came from: %q", got)
+	}
+	// The rest of the line — the topic and why it fired — is unchanged.
+	if !strings.Contains(got, "ticker window") || !strings.Contains(got, "via: ticker") {
+		t.Errorf("the line lost what it is for: %q", got)
+	}
+}
