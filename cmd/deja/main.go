@@ -1866,6 +1866,17 @@ Examples:
 See README.md for the full CLI reference.`)
 }
 
+// idPrefixNeeded is the refusal for a command that needs a session named on the
+// command line. "see `deja last`" is a step the reader can take and learn
+// nothing from when the store is empty: the listing answers with the same
+// emptiness deja already knows about here (#992).
+func idPrefixNeeded(dir, subject, refusal string) error {
+	if n, err := index.SessionCount(dir); err == nil && n == 0 {
+		return errors.New(strings.TrimPrefix(emptyIndexHint(subject+", and nothing is indexed yet"), "deja: "))
+	}
+	return errors.New(refusal)
+}
+
 // emptyIndexHint phrases the nothing-here answer the same way everywhere, and
 // points at the next command rather than leaving the user to guess.
 //

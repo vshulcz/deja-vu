@@ -12,7 +12,7 @@ import (
 
 func runShare(dir string, args []string, w io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("share needs id-prefix")
+		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix")
 	}
 	s, ok, err := findByPrefix(dir, args[0])
 	noteAmbiguousPrefix(dir, args[0], "sharing")

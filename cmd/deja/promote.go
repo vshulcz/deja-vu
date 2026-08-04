@@ -61,7 +61,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if prefix == "" {
-		return fmt.Errorf("promote needs a session id prefix (see `deja last`)")
+		return idPrefixNeeded(dir, "promote needs a session id prefix", "promote needs a session id prefix (see `deja last`)")
 	}
 	if !sources.NoteStates[state] {
 		// Taking a mark back is the state nobody guesses: users reach for

@@ -189,7 +189,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		if len(hidden) > 0 {
 			return model.Session{}, errors.New(strings.TrimPrefix(policyHiddenNote(policy.ActivationSearch, len(hidden)), "deja: "))
 		}
-		return model.Session{}, fmt.Errorf("no indexed sessions for this project — pass a session id-prefix (see `deja last`)")
+		return model.Session{}, idPrefixNeeded(dir, "handoff needs a session to package", "no indexed sessions for this project — pass a session id-prefix (see `deja last`)")
 	}
 	if len(distinct) > 1 {
 		fmt.Fprintf(os.Stderr, "deja: %d different sessions match this directory's project names — picked the newest; pass an id-prefix to choose (see `deja last`)\n", len(distinct))
