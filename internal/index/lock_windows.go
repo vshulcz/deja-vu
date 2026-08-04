@@ -36,14 +36,22 @@ func lockDir(dir string) (func(), error) {
 	}
 	h := syscall.Handle(f.Fd())
 	var ol syscall.Overlapped
-	// Without blocking first, only to learn whether there is a wait worth
-	// reporting — see the note in lock_unix.go (#994).
-	if err := lockFileEx(h, lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &ol); err != nil {
-		noteLockWait()
-		if err := lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol); err != nil {
-			f.Close()
-			return nil, fmt.Errorf("lock index: %w", err)
+	// The probe takes its own handle: a failed LOCKFILE_FAIL_IMMEDIATELY on
+	// the handle we are about to block with leaves the lock state on it
+	// ambiguous, and the blocking call that follows never returned. Only to
+	// learn whether there is a wait worth reporting — see lock_unix.go (#994).
+	if probe, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600); err == nil {
+		var pol syscall.Overlapped
+		if lockFileEx(syscall.Handle(probe.Fd()), lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &pol) != nil {
+			noteLockWait()
+		} else {
+			_ = unlockFileEx(syscall.Handle(probe.Fd()), 0, 1, 0, &pol)
 		}
+		_ = probe.Close()
+	}
+	if err := lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("lock index: %w", err)
 	}
 	// Under the lock: finish any swap interrupted mid-rename. Running this
 	// before the lock raced a concurrent swap's missing-dir window (#181).
