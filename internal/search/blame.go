@@ -34,6 +34,12 @@ type BlameHit struct {
 	Snippets []string      `json:"snippets"`
 	Score    float64       `json:"score"`
 	Tier     string        `json:"tier"`
+	// Lifecycle carries a decision that did not hold. blame answers "who
+	// decided this", and it was answering with the accepted line of a decision
+	// that had been taken back (#1017).
+	Lifecycle     string `json:"lifecycle,omitempty"`
+	LifecycleNote string `json:"lifecycle_note,omitempty"`
+	LifecycleAt   string `json:"lifecycle_at,omitempty"`
 }
 
 func ResolveBlamePath(name string) (BlameTarget, error) {
@@ -247,6 +253,13 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 			}
 		}
 		fmt.Fprintln(w)
+		if line := BlameLifecycleLine(hit); line != "" {
+			if color {
+				fmt.Fprintf(w, "  %s%s%s\n", cDim, line, cReset)
+			} else {
+				fmt.Fprintf(w, "  %s\n", line)
+			}
+		}
 		for _, text := range hit.Snippets {
 			if color {
 				fmt.Fprintf(w, "  %s%s%s\n", cDim, text, cReset)
@@ -255,4 +268,30 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 			}
 		}
 	}
+}
+
+// BlameLifecycleLine words a withdrawn decision for blame the way search words
+// it: what happened, not the name of the state.
+func BlameLifecycleLine(h BlameHit) string {
+	if h.Lifecycle == "" {
+		return ""
+	}
+	var head string
+	switch h.Lifecycle {
+	case "rejected":
+		head = "this was tried and rejected"
+	case "superseded":
+		head = "a later decision replaced this"
+	case "stale":
+		head = "marked stale — may no longer hold"
+	default:
+		head = h.Lifecycle
+	}
+	if h.LifecycleAt != "" {
+		head += " (" + h.LifecycleAt + ")"
+	}
+	if h.LifecycleNote != "" {
+		head += ": " + h.LifecycleNote
+	}
+	return head
 }

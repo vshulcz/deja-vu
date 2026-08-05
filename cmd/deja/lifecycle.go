@@ -218,3 +218,36 @@ func theyOrIt(n int) string {
 	}
 	return "they"
 }
+
+// attachBlameLifecycles is attachLifecycles for blame, which carries its own
+// hit type: blame answers "who decided this", and it answered with the
+// accepted line of a decision that had been taken back (#1017).
+func attachBlameLifecycles(hits []search.BlameHit) {
+	if len(hits) == 0 {
+		return
+	}
+	states := sources.PromotedLifecycles()
+	for i := range hits {
+		h := &hits[i]
+		key := h.Session.Harness + ":" + h.Session.ID
+		if noteID := promotedNoteID(h.Session); noteID != "" {
+			if src, ok := strings.CutPrefix(noteID, "deja-note-"); ok {
+				key = strings.Replace(src, "-", ":", 1)
+			}
+		}
+		lc, ok := states[key]
+		if !ok || lc.State == "" {
+			if h.Session.Lifecycle != "" && h.Session.Lifecycle != "accepted" {
+				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
+			}
+			continue
+		}
+		if lc.State == "accepted" {
+			continue
+		}
+		h.Lifecycle, h.LifecycleNote = lc.State, lc.Note
+		if !lc.At.IsZero() {
+			h.LifecycleAt = lc.At.Format("2006-01-02")
+		}
+	}
+}

@@ -1318,7 +1318,9 @@ func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions,
 	if err != nil {
 		return nil, err
 	}
-	return policyFilterBlame(activation, search.Blame(withFileTouchers(dir, result.Sessions, target), target, o)), nil
+	hits := policyFilterBlame(activation, search.Blame(withFileTouchers(dir, result.Sessions, target), target, o))
+	attachBlameLifecycles(hits)
+	return hits, nil
 }
 
 // blameToucherCap bounds how many extra sessions a blame reads from the
