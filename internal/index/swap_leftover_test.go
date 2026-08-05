@@ -65,3 +65,40 @@ func TestALeftoverSwapDirectoryIsNamedInsteadOfTheRename(t *testing.T) {
 		t.Errorf("the previous index did not survive the failed swap: %v", statErr)
 	}
 }
+
+// The selector the refusal uses to name what it would restore: content keys
+// ride along with their session and must not be listed as sessions of their
+// own (#1014).
+func TestTombstonesMatchingNamesSessionsOnly(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	set := map[string]bool{
+		"claude:sess0":                        true,
+		"claude:sess1":                        true,
+		"claude:alpha":                        true,
+		"claude:sess0\x00deja-note-day:x:1:2": true,
+	}
+	if err := writeTombstones(set); err != nil {
+		t.Fatal(err)
+	}
+	got := TombstonesMatching("claude:sess")
+	want := []string{"claude:sess0", "claude:sess1"}
+	if len(got) != len(want) {
+		t.Fatalf("matching keys = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("matching keys = %v, want %v", got, want)
+			break
+		}
+	}
+	if n := TombstoneMatches("claude:sess"); n != len(want) {
+		t.Errorf("count %d disagrees with the names %v", n, got)
+	}
+	if got := TombstonesMatching("claude:nothing"); len(got) != 0 {
+		t.Errorf("a selector that matches nothing named %v", got)
+	}
+	if !Tombstoned("claude:alpha") || Tombstoned("claude:absent") {
+		t.Error("Tombstoned disagrees with what was written")
+	}
+}
