@@ -667,6 +667,10 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	// One scan for the whole batch, not one per new session: nextSessionOrd
+	// walks every manifest entry, so importing n sessions cost O(n²) and a
+	// 100k batch took 306s against 1.9s for forgetting the same 100k (#1024).
+	nextOrd := nextSessionOrd(m.Sessions)
 	for _, key := range keys {
 		meta := metas[key]
 		old := m.Sessions[key]
@@ -679,7 +683,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 				meta.Updated = old.Updated
 			}
 		} else {
-			meta.Ord = nextSessionOrd(m.Sessions)
+			meta.Ord = nextOrd
+			nextOrd++
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {
