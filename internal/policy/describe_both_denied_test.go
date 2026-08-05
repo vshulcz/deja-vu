@@ -1,6 +1,10 @@
 package policy
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 // "local-only" is the name of the rule that keeps local sessions and drops
 // imported ones. A policy that denies both was described with it, next to a
@@ -32,5 +36,33 @@ func TestDescribeNamesTheRuleThatIsActuallyInForce(t *testing.T) {
 	}
 	if !importedOnly.Allows(ActivationSearch, "imported:proj") || importedOnly.Allows(ActivationSearch, "proj") {
 		t.Error("the description and the filter disagree")
+	}
+}
+
+// Twenty group rules made one 1000-character line on the screen people read to
+// find out what is allowed. The file itself is named beside it and holds the
+// full set (#1023).
+func TestDescribeCapsALongDenyList(t *testing.T) {
+	rules := map[string]bool{"local": true}
+	for i := 0; i < 20; i++ {
+		rules[fmt.Sprintf("imported:grp%02d", i)] = false
+	}
+	got := Policy{Activations: map[string]map[string]bool{ActivationSearch: rules}}.Describe(ActivationSearch)
+	if len(got) > 120 {
+		t.Errorf("the description is %d characters long: %q", len(got), got)
+	}
+	if !strings.Contains(got, "+16 more") {
+		t.Errorf("the description does not say how many it left out: %q", got)
+	}
+	if !strings.Contains(got, "imported:grp00") {
+		t.Errorf("the description names none of the rules: %q", got)
+	}
+
+	// A short list is printed whole.
+	short := Policy{Activations: map[string]map[string]bool{
+		ActivationSearch: {"local": true, "imported:a": false, "imported:b": false},
+	}}
+	if got := short.Describe(ActivationSearch); got != "deny imported:a,imported:b" {
+		t.Errorf("a short list was truncated: %q", got)
 	}
 }

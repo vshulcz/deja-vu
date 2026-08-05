@@ -8,6 +8,7 @@ package policy
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -146,6 +147,13 @@ func (p Policy) Describe(activation string) string {
 		return "local+imported"
 	}
 	sort.Strings(denied)
+	// Twenty group rules made one 1000-character line on the screen people
+	// read to find out what is allowed; the file itself is named beside it
+	// and holds the full set (#1023).
+	const shown = 4
+	if len(denied) > shown {
+		return fmt.Sprintf("deny %s +%d more", strings.Join(denied[:shown], ","), len(denied)-shown)
+	}
 	return "deny " + strings.Join(denied, ",")
 }
 
