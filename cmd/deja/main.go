@@ -1948,9 +1948,27 @@ func idPrefixNeeded(dir, subject, refusal string) error {
 // found at all, the useful next step is finding out where deja looked.
 func emptyIndexHint(what string) string {
 	if noAgentHistoryFound() {
+		// "no agent history was found" is a claim about the machine, and it
+		// was made over a store deja is not allowed to open: the sessions are
+		// there, behind a permission wall doctor and sources both name (#1020).
+		if denied := deniedStoreCount(); denied > 0 {
+			return fmt.Sprintf("deja: %s — %d store%s could not be read (permission denied); `deja doctor` names %s",
+				what, denied, pluralS(denied), pluralWhich(denied))
+		}
 		return "deja: " + what + " — no agent history was found on this machine; `deja sources` shows where deja looked"
 	}
 	return "deja: " + what + " — run `deja index`, or `deja doctor` to see which agent stores were found"
+}
+
+// deniedStoreCount reports how many harness stores exist but cannot be opened.
+func deniedStoreCount() int {
+	n := 0
+	for _, check := range doctorStoreChecks() {
+		if store, _ := inspectDoctorStore(check); store.State == "denied" {
+			n++
+		}
+	}
+	return n
 }
 
 // noAgentHistoryFound reports whether the stores themselves are empty, as
