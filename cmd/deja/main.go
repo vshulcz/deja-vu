@@ -1587,7 +1587,11 @@ func runForget(dir string, args []string) error {
 		}
 	}
 	if !list && unforget == "" && o.Session == "" && o.Project == "" && o.Before.IsZero() {
-		return fmt.Errorf("forget: selector required")
+		// Naming the selectors here is what separates one call from hundreds:
+		// forgetting 100 sessions one id at a time took 10.5s against 0.2s for
+		// `--project`, and nothing on this path said the second form exists
+		// (#1022).
+		return fmt.Errorf("forget: selector required — `--session <id>`, `--project <name>` or `--before <date>`; `--dry-run` shows what would go, `--list` what already went")
 	}
 	if list {
 		keys := index.Tombstones()
