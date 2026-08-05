@@ -17,8 +17,11 @@ import (
 // We merge one SessionStart entry into ~/.codex/hooks.json and leave
 // everything else in the file alone.
 func installCodexHooks(exe string, uninstall bool) (installResult, error) {
-	h, _ := os.UserHomeDir()
-	path := filepath.Join(h, ".codex", "hooks.json")
+	// Use CodexHome() (honours CODEX_HOME / DEJA_CODEX_ROOT) rather than a raw
+	// ~/.codex join, so a sandboxed install stays sandboxed and a non-default
+	// codex home gets its hooks written where codex actually reads them. Every
+	// other codex path already goes through it (e.g. doctor.go). See #850.
+	path := filepath.Join(sources.CodexHome(), "hooks.json")
 	old, _ := os.ReadFile(path)
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {

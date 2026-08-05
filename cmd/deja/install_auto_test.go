@@ -182,3 +182,32 @@ func TestPrintInstallProofListsDistinctProjects(t *testing.T) {
 		t.Fatalf("projects not deduped: %q", out)
 	}
 }
+
+// TestInstallCodexHooksHonoursCodexHome pins #850: install must write to
+// CODEX_HOME (via sources.CodexHome()), not a raw ~/.codex, so a sandboxed
+// install cannot edit the operator's real config. HOME and CODEX_HOME point at
+// distinct dirs; the hooks file must land under CODEX_HOME and not under HOME.
+func TestInstallCodexHooksHonoursCodexHome(t *testing.T) {
+	home := t.TempDir()
+	codexHome := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CODEX_HOME", codexHome)
+
+	r, err := installCodexHooks("/usr/local/bin/deja", false)
+	if err != nil {
+		t.Fatalf("install: %v", err)
+	}
+
+	want := filepath.Join(codexHome, "hooks.json")
+	if r.Path != want {
+		t.Errorf("install wrote to %q, want %q (CODEX_HOME must be honoured)", r.Path, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Errorf("no hooks.json under CODEX_HOME: %v", err)
+	}
+	// The real (HOME-based) ~/.codex must be left untouched.
+	if _, err := os.Stat(filepath.Join(home, ".codex", "hooks.json")); !os.IsNotExist(err) {
+		t.Errorf("install wrote to HOME/.codex despite CODEX_HOME being set (err=%v)", err)
+	}
+}

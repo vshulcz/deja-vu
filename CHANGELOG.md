@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `install`/`uninstall` write the codex SessionStart hook to `CODEX_HOME` (via `sources.CodexHome()`) instead of a raw `~/.codex`, so a sandboxed install stays sandboxed and a non-default codex home gets its hooks where codex reads them. Every other codex path already honoured it. (#850)
+
 ## [0.16.7] - 2026-08-03
 
 Two weeks spent on the trust policy and on the states a machine gets into when
