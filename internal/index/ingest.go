@@ -1863,6 +1863,11 @@ func currentFilesStat(h string) map[string]FileState {
 }
 
 func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
+	// Walking the stores is the first thing a build does and, on a network
+	// volume, the slowest: it published nothing, so every "memory is on its
+	// way" surface reported an ordinary quiet day until the walk finished
+	// (#1021).
+	reportPhase("finding transcripts", 0)
 	paths := map[string]bool{}
 	for _, hr := range sources.Registry() {
 		if h != "" && h != hr.Name {

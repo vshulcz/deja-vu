@@ -202,6 +202,8 @@ func cmdVersion(_ string, _ []string) error {
 }
 
 func cmdWarmup(dir string, _ []string) error {
+	stop := publishBuildProgress(dir)
+	defer stop()
 	prepareFirstIndexGreeting(dir)
 	if err := withBuildProgress(func() error { return index.Ensure(dir, "", false, os.Stderr) }); err != nil {
 		return err
@@ -222,7 +224,12 @@ func cmdIndex(dir string, rest []string) error {
 	// Silence reads as "it did not run". `update` on the newest release and
 	// `doctor` on a fresh index both say so; this one returned to the prompt
 	// with nothing (#824). Only here: on a search the same line would be noise.
+	// The freshness check walks every store, which on a slow volume is the
+	// longest part of the whole command, and it ran before the progress sink
+	// existed (#1021).
+	stopProgress := publishBuildProgress(dir)
 	if fresh, n := index.UpToDate(dir, ""); fresh && !force {
+		stopProgress()
 		// The warmup child runs this command, so returning before the sentinel
 		// is cleared leaves a build that is not running: the next request is
 		// suppressed until the retry window, and readWarmupStatus tells the
@@ -231,6 +238,7 @@ func cmdIndex(dir string, rest []string) error {
 		fmt.Fprintf(os.Stderr, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
 		return nil
 	}
+	stopProgress()
 	prepareFirstIndexGreeting(dir)
 	// The detached warmup publishes its progress so hooks can tell the user
 	// memory is on its way; an interactive run draws the live display.
