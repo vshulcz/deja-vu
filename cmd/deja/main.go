@@ -1638,6 +1638,13 @@ func runForget(dir string, args []string) error {
 		// and it named no way back: `--unforget` lived in `deja help` only, and
 		// the hint for a guessed `deja unforget` pointed at this same list
 		// (#919).
+		if len(keys) == 0 {
+			// Silence here is the one answer a reader cannot act on: it looks
+			// the same as a command that did not run, and every other empty
+			// result says so out loud (#1040). On stderr, so a pipe still
+			// counts only ids.
+			fmt.Fprintln(os.Stderr, "deja: nothing is forgotten on this machine")
+		}
 		if len(keys) > 0 {
 			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index\n", keys[0])
 		}
