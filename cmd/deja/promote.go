@@ -67,7 +67,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		// Taking a mark back is the state nobody guesses: users reach for
 		// --state none, --state clear or --unpromote, get this line, and read
 		// four states none of which sounds like an undo (#845).
-		return fmt.Errorf("promote: state must be accepted, rejected, superseded or stale — `--state accepted` takes an earlier mark back")
+		return fmt.Errorf("promote: state must be accepted, rejected, superseded or stale — `--state accepted` takes an earlier mark back, and `deja forget --session deja-note-<harness>-<id>` removes the note itself")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	noteAmbiguousPrefix(dir, prefix, "promoting")

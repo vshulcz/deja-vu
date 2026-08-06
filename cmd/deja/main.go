@@ -937,6 +937,12 @@ func commandHint(q string) string {
 	// The switch in run() handles these before the map is consulted, so the
 	// map alone would miss the commonest words of all — "serch" landed on
 	// "bench" while `search` was one letter away.
+	// The same shape for the other undo nobody can guess: removing a note is
+	// `forget` on the note's own id, and the reader who typed this has no way
+	// to know a note has an id at all (#1085).
+	if strings.EqualFold(first, "unpromote") || strings.EqualFold(first, "demote") {
+		return "deja: \"" + first + "\" is not a command — `deja promote <id> --state rejected` takes a decision back, and `deja forget --session deja-note-<harness>-<id>` removes the note itself\n"
+	}
 	names := []string{"search", "show", "last", "aider", "goose"}
 	for name := range commands {
 		// Hidden plumbing is not something anyone means to type.
