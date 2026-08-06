@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -300,4 +301,10 @@ func shortenUsage(usage string) string {
 		parts = parts[:2]
 	}
 	return strings.Join(parts, " · ")
+}
+
+// safeLine is safeForStatusline without the bound, for the listings that print
+// harness text on a line of their own (#1090).
+func safeLine(s string) string {
+	return safeForStatusline(s, math.MaxInt32)
 }

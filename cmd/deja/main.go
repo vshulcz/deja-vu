@@ -649,7 +649,10 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// while borrowing the id's day made the column run 06, 07, 04 down
 		// the screen for a reader far enough east of the writer (#1038).
 
-		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
+		// Project, id and title are text a harness wrote, and this is one
+		// line: an escape byte in any of them recolours the rest of the
+		// listing and a carriage return rewinds it (#1090).
+		fmt.Printf("[%s · %s · %s · %s]", s.Harness, redact.SafeForDisplay(s.Project), when, redact.SafeForDisplay(s.ID))
 		title := s.Title
 		if title == "" {
 			title = firstUserTitle(s)

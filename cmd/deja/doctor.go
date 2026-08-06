@@ -1011,7 +1011,7 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	health := index.IngestHealth(dir)
 	names := make([]string, 0, len(health))
 	for h, e := range health {
-		if e.MalformedLines > 0 || e.FailedFiles > 0 {
+		if e.MalformedLines > 0 || e.FailedFiles > 0 || e.ClippedMessages > 0 {
 			names = append(names, h)
 		}
 	}
@@ -1021,8 +1021,16 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 		// "malformed" covered only unparseable lines; valid JSON deja cannot
 		// use is skipped just as invisibly, and the reader needs the same
 		// warning either way (#814).
-		fmt.Fprintf(w, "  ingest   %s: %d unusable line%s skipped, %d path%s unreadable — see `deja doctor --json`\n",
-			h, e.MalformedLines, pluralS(e.MalformedLines), e.FailedFiles, pluralS(e.FailedFiles))
+		clipped := ""
+		if e.ClippedMessages > 0 {
+			// Named separately from the skipped lines: the session is here and
+			// searchable, it is the tail of one message that is not, and a
+			// search over that tail answers "no matches" (#1093).
+			clipped = fmt.Sprintf(", %d message%s stored short of the transcript (over 64 KB)",
+				e.ClippedMessages, pluralS(e.ClippedMessages))
+		}
+		fmt.Fprintf(w, "  ingest   %s: %d unusable line%s skipped, %d path%s unreadable%s — see `deja doctor --json`\n",
+			h, e.MalformedLines, pluralS(e.MalformedLines), e.FailedFiles, pluralS(e.FailedFiles), clipped)
 	}
 }
 

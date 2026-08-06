@@ -194,9 +194,14 @@ type Manifest struct {
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
 type HarnessIngest struct {
-	MalformedLines int    `json:"malformed_lines,omitempty"`
-	FailedFiles    int    `json:"failed_files,omitempty"`
-	LastError      string `json:"last_error,omitempty"`
+	MalformedLines int `json:"malformed_lines,omitempty"`
+	// ClippedMessages counts messages stored short of what the transcript
+	// holds, because a single message ran past maxIndexedText. The text is
+	// there and the tail is not, so a search over the tail answers "no
+	// matches" — the same silent loss as an unparseable line (#1093).
+	ClippedMessages int    `json:"clipped_messages,omitempty"`
+	FailedFiles     int    `json:"failed_files,omitempty"`
+	LastError       string `json:"last_error,omitempty"`
 }
 
 type manifestCore struct {
