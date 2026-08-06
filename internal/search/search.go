@@ -803,7 +803,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintln(w, note)
 		}
 		for _, sn := range h.Snippets {
-			fmt.Fprintf(w, "  %s\n", highlight(sn, o.Query, o.Regex, color))
+			fmt.Fprintf(w, "  %s\n", highlight(SafeText(sn), o.Query, o.Regex, color))
 		}
 	}
 }
@@ -855,7 +855,7 @@ func PrintSession(w io.Writer, s model.Session) {
 		if !m.Time.IsZero() {
 			t = m.Time.Format("2006-01-02 15:04") + " "
 		}
-		fmt.Fprintf(w, "\n%s%s:\n%s\n", t, m.Role, txt)
+		fmt.Fprintf(w, "\n%s%s:\n%s\n", t, m.Role, SafeText(txt))
 	}
 }
 
@@ -923,7 +923,7 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if !ok {
 			continue
 		}
-		text := contextText(m.Text, matched)
+		text := SafeText(contextText(m.Text, matched))
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
@@ -1217,4 +1217,32 @@ func RelevanceHits(ss []model.Session, terms []string) []Hit {
 		hits = append(hits, hit)
 	}
 	return hits
+}
+
+// SafeText neutralises what a terminal acts on rather than prints. Transcript
+// text arrives verbatim from a harness, and after `deja sync import` from
+// another machine — the boundary the trust policy exists for. An escape byte
+// recolours the rest of the screen, erases the line above or sets the window
+// title; a bell rings on every redraw. The status bar (#634) and the brief
+// titles have stripped these since they were written; the reading surfaces
+// printed them raw (#1090).
+//
+// Newlines and tabs stay: unlike a one-line bar, these renderers are the
+// session's own layout. Format characters (Cf) are left alone here too — a
+// zero-width joiner holds an emoji sequence together, and the line-layout
+// attacks it also enables belong to the surfaces that own a single line.
+func SafeText(s string) string {
+	if !strings.ContainsFunc(s, unsafeForTerminal) {
+		return s
+	}
+	return strings.Map(func(r rune) rune {
+		if unsafeForTerminal(r) {
+			return ' '
+		}
+		return r
+	}, s)
+}
+
+func unsafeForTerminal(r rune) bool {
+	return r != '\n' && r != '\t' && unicode.IsControl(r)
 }

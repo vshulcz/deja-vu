@@ -622,12 +622,15 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 			when = day
 		}
 
-		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
+		// Project, id and title are text a harness wrote, and this is one
+		// line: an escape byte in any of them recolours the rest of the
+		// listing and a carriage return rewinds it (#1090).
+		fmt.Printf("[%s · %s · %s · %s]", s.Harness, safeLine(s.Project), when, safeLine(s.ID))
 		title := s.Title
 		if title == "" {
 			title = firstUserTitle(s)
 		}
-		if title != "" {
+		if title := safeLine(title); title != "" {
 			fmt.Printf(" %s", title)
 		}
 		fmt.Println()

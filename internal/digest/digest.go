@@ -224,6 +224,13 @@ func stripANSI(s string) string {
 			inEsc = true
 			continue
 		}
+		// The rest of C0, and DEL. An OSC ends with a bell rather than a
+		// letter, so dropping the escape alone left the bell to ring on every
+		// redraw (#1090). Newline and tab are the text's own layout. C0 bytes
+		// never appear inside a UTF-8 sequence, so this is safe byte-wise.
+		if (c < 0x20 && c != '\n' && c != '\t') || c == 0x7f {
+			continue
+		}
 		b.WriteByte(c)
 	}
 	return b.String()
