@@ -281,7 +281,7 @@ func runHookContext(dir string, plain bool) error {
 	}
 	// One actionable line so injected memory leads somewhere: models that see
 	// bare data tend to ignore it.
-	lead := "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, tell the user in one digest.Short line what deja-vu recalled and how you reused it; otherwise do not mention it.\n"
+	lead := sessionStartLead
 	if input.Source == "compact" {
 		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
 		// The generic digest is about the project. What a compacted session
@@ -899,3 +899,5 @@ func indexCanCatchUp(dir string) bool {
 	fresh, _ := index.UpToDate(dir, "")
 	return fresh
 }
+
+const sessionStartLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, tell the user in one short line what deja-vu recalled and how you reused it; otherwise do not mention it.\n"
