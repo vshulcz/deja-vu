@@ -2111,6 +2111,16 @@ func staleReadOnlyIndex(dir string, err error) bool {
 	return errors.Is(err, fs.ErrPermission) && index.HasManifest(dir)
 }
 
+// deniedPath names the file a permission error was actually about, so the fix
+// deja suggests points at it rather than at the index directory (#1031).
+func deniedPath(err error) string {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Path
+	}
+	return ""
+}
+
 // ensureError turns a failed build into something the reader can act on.
 // A denied write surfaced as `ensure: open /…/index.db.lock: permission
 // denied` — the path of an internal lock file and a syscall error, which says
@@ -2127,6 +2137,13 @@ func ensureError(dir string, err error) error {
 		// permissions of a directory that no longer exists (#931).
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
 			return fmt.Errorf("the index directory is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
+		}
+		// The denial is not always about the index: forget writes the
+		// tombstone file first, and a read-only ~/.config/deja arrived here
+		// as "check the index directory", which was writable — the reader was
+		// sent to change a permission that was already right (#1031, #808).
+		if p := deniedPath(err); p != "" && !strings.HasPrefix(p, dir) {
+			return fmt.Errorf("cannot write %s — check that file's permissions", p)
 		}
 		return fmt.Errorf("cannot write the index at %s — check the directory's permissions, or point DEJA_INDEX_DIR somewhere writable", dir)
 	}

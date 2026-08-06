@@ -106,3 +106,57 @@ func TestForgetProbeErrorIsWordedLikeEveryOther(t *testing.T) {
 		t.Errorf("the wording is still a syscall: %v", err)
 	}
 }
+
+// forget writes the tombstone file before anything else, and a read-only
+// ~/.config/deja arrived as "check the index directory's permissions" — a
+// directory that was writable, so the suggested fix changed nothing (#1031).
+func TestForgetNamesTheTombstoneFileItCannotWrite(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("file permissions do not deny writes here")
+	}
+	tmp := hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"the decision about the retry counter"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"s21","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "s21.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	privacy := filepath.Join(os.Getenv("HOME"), ".config", "deja")
+	if err := os.MkdirAll(privacy, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tombstones := filepath.Join(privacy, "tombstones")
+	if err := os.WriteFile(tombstones, nil, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(privacy, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(privacy, 0o700) })
+
+	_, err := captureRun(t, "forget", "--session", "claude:s21")
+	if err == nil {
+		t.Fatal("forget did not refuse with an unwritable tombstone file")
+	}
+	if !strings.Contains(err.Error(), tombstones) {
+		t.Errorf("the refusal does not name the file it could not write: %v", err)
+	}
+	if strings.Contains(err.Error(), "DEJA_INDEX_DIR") {
+		t.Errorf("the refusal sends the reader at the index instead: %v", err)
+	}
+	// The refusal is only worth anything if nothing was dropped.
+	out, err := captureRun(t, "last")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "s21") {
+		t.Errorf("the session went away under a refused forget: %q", out)
+	}
+}
