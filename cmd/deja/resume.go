@@ -20,7 +20,7 @@ import (
 // terminal attached.
 func runResume(dir string, args []string, stdout io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("resume needs id-prefix")
+		return idPrefixNeeded(dir, "resume needs an id-prefix", "resume needs id-prefix (see `deja last`)")
 	}
 	doExec := false
 	prefix := ""
@@ -32,7 +32,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		prefix = a
 	}
 	if prefix == "" {
-		return fmt.Errorf("resume needs id-prefix")
+		return idPrefixNeeded(dir, "resume needs an id-prefix", "resume needs id-prefix (see `deja last`)")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	noteAmbiguousPrefix(dir, prefix, "resuming")
