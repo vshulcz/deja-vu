@@ -1089,6 +1089,50 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	return loadSessionMeta(dir, m, meta)
 }
 
+// Identity names one session the way machine output does.
+type Identity struct {
+	Harness string
+	ID      string
+}
+
+// FindManyByIdentity is FindByIdentity for a list. Records live in one
+// append-only log with no per-session offsets, so resolving a single identity
+// streams the whole of records.bin; calling it in a loop streams it once per
+// session. `deja files` did that 250 times over a 59 MB log and spent 1.6 s of
+// its 1.9 s there (#1069). One pass, all keys.
+//
+// Sessions come back in the order asked for, with identities the manifest does
+// not know dropped.
+func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	metas := make([]SessionMeta, 0, len(ids))
+	for _, want := range ids {
+		if meta, found := m.Sessions[want.Harness+":"+want.ID]; found {
+			metas = append(metas, meta)
+		}
+	}
+	if len(metas) == 0 {
+		return nil, nil
+	}
+	return sessionsForMetas(dir, metas)
+}
+
 // FindByID looks a session up when only its id is known. Hook payloads carry
 // one without naming the harness, and the id is unique in practice: the
 // harnesses that generate them use uuids or their own prefixed ids.

@@ -1401,31 +1401,36 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 	// Identity breaks ties, or which sessions survive the cap depends on Go's
 	// map order and two runs disagree — the same failure as #668.
 	sort.Slice(metas, func(i, j int) bool { return newestFirst(metas[i], metas[j]) })
-	added := 0
+	// Pick the identities first and read them in one pass: per-identity reads
+	// stream the whole record log each time, so the cap alone did not bound
+	// the cost — 50 sessions meant 50 scans (#1069).
+	var want []index.Identity
 	for _, meta := range metas {
 		// A file like main.go is touched by everything, and each addition is a
 		// record read. Ten hits are printed; this is far more than enough to
 		// rank them.
-		if added >= blameToucherCap {
+		if len(want) >= blameToucherCap {
 			break
 		}
-		key := meta.Harness + ":" + meta.ID
 		for _, p := range meta.Touched {
 			if strings.ToLower(filepath.Base(filepath.FromSlash(p))) != base {
 				continue
 			}
-			full, ok, err := index.FindByIdentity(dir, meta.Harness, meta.ID)
-			if err == nil && ok {
-				// The manifest is keyed by identity, so each session reaches
-				// this once — there is no second visit to record a position for.
-				if i, present := at[key]; present {
-					ss[i] = full
-				} else {
-					ss = append(ss, full)
-				}
-				added++
-			}
+			want = append(want, index.Identity{Harness: meta.Harness, ID: meta.ID})
 			break
+		}
+	}
+	full, err := index.FindManyByIdentity(dir, want)
+	if err != nil {
+		return ss
+	}
+	for _, s := range full {
+		// The manifest is keyed by identity, so each session reaches this once
+		// — there is no second visit to record a position for.
+		if i, present := at[s.Harness+":"+s.ID]; present {
+			ss[i] = s
+		} else {
+			ss = append(ss, s)
 		}
 	}
 	return ss

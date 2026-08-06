@@ -15,8 +15,19 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// recordLogScans counts walks of the record log. There are no per-session
+// offsets, so every walk reads the whole of records.bin — which is why a
+// caller asking for sessions one at a time is a cost bug and not a style
+// point (#1069). Exported through RecordLogScans for tests that assert a
+// batch path stayed one pass.
+var recordLogScans int64
+
+// RecordLogScans reports how many times this process walked the record log.
+func RecordLogScans() int64 { return atomic.LoadInt64(&recordLogScans) }
 
 func ReadRecords(dir string) ([]OffsetRecord, error) {
 	t, err := loadRecordTables(dir)
@@ -207,6 +218,7 @@ func readRecord(r io.Reader, t *recordTables) (Record, error) {
 // want; other bodies are skipped after peeking the key field. On a large log
 // this trades a full decode of every record for a few length reads.
 func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn func(Record)) error {
+	atomic.AddInt64(&recordLogScans, 1)
 	f, err := os.Open(path)
 	if err != nil {
 		return err
