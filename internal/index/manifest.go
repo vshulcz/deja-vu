@@ -169,7 +169,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, IngestHealth: core.IngestHealth, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -184,6 +184,7 @@ func writeManifestOnly(dir string, m Manifest) error {
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
+	core.BucketFiles = countBucketFiles(filepath.Join(dir, "buckets"))
 	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
 }
 
@@ -199,6 +200,7 @@ func writeManifest(dir string, m Manifest) error {
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
+	core.BucketFiles = countBucketFiles(filepath.Join(dir, "buckets"))
 	if err := writeGobAtomic(filepath.Join(dir, "sessions.gob"), m.Sessions); err != nil {
 		return err
 	}
@@ -256,8 +258,33 @@ func recordsIntact(dir string, m Manifest) bool {
 		if !hasBucketFile(filepath.Join(dir, "buckets")) {
 			return false
 		}
+		// Losing part of the directory is the same loss spread thinner, and it
+		// is the shape a partial copy or an interrupted sync actually leaves.
+		// Every token in a missing file answered "no matches in N indexed
+		// sessions" while its text sat in the record log, and `doctor --deep`
+		// called that index healthy (#1088). Fewer than committed only: a
+		// larger count belongs to a build this manifest does not describe, and
+		// the freshness check already covers that.
+		if m.BucketFiles > 0 && countBucketFiles(filepath.Join(dir, "buckets")) < m.BucketFiles {
+			return false
+		}
 	}
 	return true
+}
+
+// countBucketFiles counts the postings files a buckets directory holds.
+func countBucketFiles(dir string) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".bin") {
+			n++
+		}
+	}
+	return n
 }
 
 // Damaged reports whether the store on disk still holds what the manifest

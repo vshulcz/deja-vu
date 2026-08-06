@@ -178,6 +178,14 @@ type Manifest struct {
 	// A live index whose records.bin is shorter than this lost its tail to a
 	// torn write and must be treated as corrupt.
 	RecordsSize int64 `json:"records_size,omitempty"`
+	// BucketFiles is how many postings files buckets/ held when the manifest
+	// was committed. Losing the whole directory was already caught (#946), but
+	// a partial copy or an interrupted sync leaves some files behind rather
+	// than none, and each one that goes missing takes every result for the
+	// tokens it held — silently, with `doctor --deep` still reporting the
+	// index healthy (#1088). Additive: a manifest written before this decodes
+	// with it zero, and the check is skipped.
+	BucketFiles int `json:"bucket_files,omitempty"`
 	// IngestHealth records, per harness, what ingestion skipped on the pass
 	// that last touched it: malformed JSONL lines and files that failed to
 	// parse. Silent loss must be diagnosable (`deja doctor --json`).
@@ -204,6 +212,7 @@ type manifestCore struct {
 	ImportedRecords  map[string]bool
 	RecordStrings    []string
 	RecordsSize      int64
+	BucketFiles      int
 	IngestHealth     map[string]HarnessIngest
 }
 
