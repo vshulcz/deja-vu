@@ -95,6 +95,19 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "no sessions mention %q\n", q)
 		return nil
 	}
+	// Retrieval hands candidates back in map order, so taking the first 250 of
+	// 2119 matches counted a different quarter of them on every run and the top
+	// file changed each time (#1072). Newest first, the rule blame already
+	// uses, with identity to break ties.
+	sort.Slice(hits, func(i, j int) bool {
+		if !hits[i].Updated.Equal(hits[j].Updated) {
+			return hits[i].Updated.After(hits[j].Updated)
+		}
+		if hits[i].Harness != hits[j].Harness {
+			return hits[i].Harness < hits[j].Harness
+		}
+		return hits[i].ID < hits[j].ID
+	})
 	if len(hits) > filesMaxSessions {
 		hits = hits[:filesMaxSessions]
 	}
