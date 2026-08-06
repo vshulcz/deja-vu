@@ -676,7 +676,11 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
-	ss := result.Sessions
+	// Before ranking, not after: the cap is applied while ranking, so a rule
+	// that runs later still lets denied sessions occupy the result slots and
+	// the allowed ones never reach the page (#1060).
+	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, result.Sessions)
+	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
 	if result.Stemmed {
 		printStemmed(os.Stderr, result.Variants)
@@ -716,8 +720,6 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		}
 		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
 	}
-	hits, policyHidden := policyFilterHitsCounted(policy.ActivationSearch, hits)
-	o.PolicyWithheld = policyHidden
 	if !o.NoEmbed && os.Getenv("DEJA_EMBED") != "off" {
 		hits = maybeRerank(dir, hits, o, os.Stderr)
 	}
