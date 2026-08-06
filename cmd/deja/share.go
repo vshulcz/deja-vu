@@ -12,7 +12,7 @@ import (
 
 func runShare(dir string, args []string, w io.Writer) error {
 	if len(args) < 1 {
-		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix")
+		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix (see `deja last`)")
 	}
 	// Everything after the id used to be ignored, so `deja share <id> --to
 	// out.md` printed the share to the terminal and wrote no file — and said

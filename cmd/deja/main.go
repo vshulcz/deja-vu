@@ -312,13 +312,20 @@ func cmdHookContext(dir string, rest []string) error {
 func cmdShow(dir string, rest []string, sourceInstance string) error {
 	o, err := parseShow(rest)
 	if err != nil {
+		// The missing id is the one refusal that depends on the store: on a
+		// machine with nothing indexed the honest answer is that there is
+		// nothing to show, not that an argument is missing. parseShow has no
+		// dir to ask, so the store-aware phrasing is applied here (#1063).
+		if err.Error() == showNeedsID {
+			return idPrefixNeeded(dir, "show needs an id-prefix", showNeedsID)
+		}
 		return err
 	}
 	// An id arrives from a chat wrapped in quotes or backticks and with the
 	// harness deja itself printed in front of it (#921).
 	o.id = index.PastedSelector(o.id)
 	if o.id == "" {
-		return fmt.Errorf("show needs id-prefix")
+		return idPrefixNeeded(dir, "show needs an id-prefix", showNeedsID)
 	}
 	var s model.Session
 	var ok bool
@@ -443,7 +450,7 @@ func parseShow(args []string) (showOptions, error) {
 	// The id first: it is what the command is for, and checking the flag ahead
 	// of it cost two runs to learn two missing things (#820).
 	if o.id == "" {
-		return o, fmt.Errorf("show needs id-prefix")
+		return o, errors.New(showNeedsID)
 	}
 	if o.json && o.harness == "" {
 		return o, fmt.Errorf("show --json requires --harness for exact identity")
@@ -456,7 +463,8 @@ func parseShow(args []string) (showOptions, error) {
 
 func cmdCtx(dir string, rest []string) error {
 	if len(rest) < 1 {
-		return fmt.Errorf("ctx needs query or id-prefix")
+		return idPrefixNeeded(dir, "ctx needs a query or an id-prefix",
+			"ctx needs query or id-prefix (see `deja last`)")
 	}
 	// ctx takes no flags, and --json/--harness/--project/--since all exist on
 	// neighbouring commands — so reaching for one here is the obvious mistake.
@@ -2103,6 +2111,12 @@ func movedBucketHint(dir, id string) string {
 	}
 	return ""
 }
+
+// showNeedsID is the refusal show gives with no argument. "id-prefix" names a
+// thing the reader has no way to produce on their own; promote has pointed at
+// `deja last` all along, and show, share and resume are the three commands
+// reached for right after a search result (#1063).
+const showNeedsID = "show needs id-prefix (see `deja last`)"
 
 // idPrefixNeeded is the refusal for a command that needs a session named on the
 // command line. "see `deja last`" is a step the reader can take and learn
