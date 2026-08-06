@@ -23,7 +23,7 @@ func TestImpactLineMatchesTheRatio(t *testing.T) {
 	for _, c := range cases {
 		var b strings.Builder
 		r := usage.ImpactReport{Recalls: 1, ServedBytes: c.served, RawBytes: c.raw}
-		if err := printImpact(&b, r, false); err != nil {
+		if err := printImpact(&b, r, 0, false); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(b.String(), c.want) {

@@ -337,7 +337,7 @@ func printStats(w io.Writer, r stats.Report) {
 		fmt.Fprintf(w, "  Déjà vu          %d prompt%s your own history already answered\n", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))
 	}
 	if r.AgentCredits > 0 {
-		fmt.Fprintf(w, "  Credited aloud   agents said \"deja-vu recalled\" %d times (%d this week)\n", r.AgentCredits, r.WeekCredits)
+		fmt.Fprintf(w, "  Credited aloud   agents said \"deja-vu recalled\" %d time%s (%d this week)\n", r.AgentCredits, pluralS(r.AgentCredits), r.WeekCredits)
 	}
 	if r.HandoffsIn > 0 {
 		fmt.Fprintf(w, "  Handoffs         %d session%s started from a handoff\n", r.HandoffsIn, pluralS(r.HandoffsIn))

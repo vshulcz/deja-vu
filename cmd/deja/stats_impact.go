@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -12,14 +16,28 @@ import (
 // Every line is counted from this machine's usage log; the closing note says
 // exactly what was counted so nobody has to take the numbers on faith.
 func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
-	return printImpact(w, usage.Impact(dir), jsonOut)
+	r := usage.Impact(dir)
+	credits := 0
+	// Served is not used. The one signal that tells four helpful injections
+	// from four ignored ones is the agent naming deja out loud in a later
+	// transcript, and that lives in the index, not in the usage log (#1062).
+	// Only pay for the session scan when there is activity to explain.
+	if r.Recalls > 0 || r.Injections > 0 {
+		if ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard); err == nil {
+			credits, _ = stats.AgentCredits(ss, time.Now())
+		}
+	}
+	return printImpact(w, r, credits, jsonOut)
 }
 
-func printImpact(w io.Writer, r usage.ImpactReport, jsonOut bool) error {
+func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) error {
 	if jsonOut {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(r)
+		return enc.Encode(struct {
+			usage.ImpactReport
+			CreditedAloud int `json:"credited_aloud"`
+		}{r, credits})
 	}
 	if r.Recalls == 0 && r.Injections == 0 {
 		fmt.Fprintln(w, "deja: no recall activity recorded yet — impact numbers appear once agents start recalling")
@@ -52,6 +70,13 @@ func printImpact(w io.Writer, r usage.ImpactReport, jsonOut bool) error {
 	}
 	if r.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  déjà vu moments    %d prompts matched work you had already done\n", r.DejaVuMoments)
+	}
+	served := r.Recalls + r.Injections
+	switch {
+	case credits > 0:
+		fmt.Fprintf(w, "  credited aloud     %d of %d said \"deja-vu recalled\" — memory that was used, not just served\n", credits, served)
+	case served > 0:
+		fmt.Fprintf(w, "  credited aloud     none of %d yet — served, but no agent has said \"deja-vu recalled\"\n", served)
 	}
 	fmt.Fprintln(w, "\ncounted: served bytes = digests actually returned to agents; raw bytes =")
 	fmt.Fprintln(w, "the source transcripts those digests distilled. `deja log` shows every entry.")
