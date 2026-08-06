@@ -614,13 +614,10 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 			// on the day before the other two screens did (#849).
 			when = s.Updated.Local().Format("2006-01-02")
 		}
-		// A day of notes is one session whose id *is* a date, minted in UTC.
-		// Converting its timestamp to the reader's zone put a different day on
-		// the line than the id it sits next to — and the id a reader rebuilt
-		// from what they saw matched nothing (#883).
-		if day, ok := search.NoteBucketDay(s); ok {
-			when = day
-		}
+		// The id's own day is not used here, unlike search: this line prints
+		// the id whole, so nothing has to be rebuilt from the date (#883),
+		// while borrowing the id's day made the column run 06, 07, 04 down
+		// the screen for a reader far enough east of the writer (#1038).
 
 		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
 		title := s.Title
