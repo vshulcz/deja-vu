@@ -14,6 +14,34 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
+// briefWithholdingReach says what the rule actually keeps memory out of. The
+// auto rule stops injection, the search rule empties the reader's own queries,
+// and the mcp rule stops the agent asking — one sentence for all three read
+// wrong for two of them (#1103).
+func briefWithholdingReach(activation string) string {
+	switch activation {
+	case policy.ActivationSearch:
+		return "search rule keeps them out of your own searches"
+	case policy.ActivationMCP:
+		return "mcp rule keeps them out of every agent that asks"
+	default:
+		return "auto rule keeps them out of every agent"
+	}
+}
+
+// briefWithholdingRule names the activation whose rule withholds the whole
+// store, preferring auto because that is the path the reader never sees fail.
+// Returns auto when nothing withholds everything, so the caller's comparison
+// simply fails and the line stays off.
+func briefWithholdingRule(withheld map[string]int, total int) string {
+	for _, a := range []string{policy.ActivationAuto, policy.ActivationSearch, policy.ActivationMCP} {
+		if withheld[a] == total {
+			return a
+		}
+	}
+	return policy.ActivationAuto
+}
+
 // runBrief is what a bare `deja` on a terminal shows: the memory, alive.
 // Manifest metadata and the usage sidecar only — it must feel instant.
 // Pipes and scripts still get the usage text; `deja help` always works.
@@ -108,8 +136,11 @@ func runBrief(dir string, w io.Writer) error {
 	// number (#978); it is the fifth screen someone reaches for, not the first
 	// (#1067). Partial withholding stays quiet: the counters are still broadly
 	// true, and a caveat on every line is wallpaper.
-	if withheld, total := policyWithheldCounts(dir); total > 0 && withheld[policy.ActivationAuto] == total {
-		fmt.Fprintf(w, "withheld   %sall %d session%s%s — your trust policy's auto rule keeps them out of every agent (`deja doctor`)\n",
+	// Every activation, not just auto: a rule on `search` withholds the
+	// reader's own queries, search says so on its own screen, and this one
+	// stayed silent (#1103, the shape #1102 fixed on the status line).
+	if withheld, total := policyWithheldCounts(dir); total > 0 && withheld[briefWithholdingRule(withheld, total)] == total {
+		fmt.Fprintf(w, "withheld   %sall %d session%s%s — your trust policy's "+briefWithholdingReach(briefWithholdingRule(withheld, total))+" (`deja doctor`)\n",
 			bold, total, pluralS(total), reset)
 	}
 
