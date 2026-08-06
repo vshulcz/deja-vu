@@ -68,7 +68,11 @@ func runStats(dir string, args []string) error {
 			card = true
 			cardPath = "deja-stats.svg"
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				cardPath = cardFileName(args[i+1])
+				var note string
+				cardPath, note = cardFileName(args[i+1])
+				if note != "" {
+					fmt.Fprint(os.Stderr, note)
+				}
 				i++
 			}
 		case "--harness", "--project", "--since", "--role":
@@ -398,9 +402,18 @@ func statHarnessTag(h string, color bool) string {
 // writing it into card.png produced a file GitHub serves as a PNG and every
 // browser refuses — while the command cheerfully printed the markdown to embed
 // it. A name that already says svg is left alone.
-func cardFileName(path string) string {
-	if strings.EqualFold(filepath.Ext(path), ".svg") {
-		return path
+func cardFileName(path string) (string, string) {
+	ext := filepath.Ext(path)
+	if strings.EqualFold(ext, ".svg") {
+		return path, ""
 	}
-	return path + ".svg"
+	// Appending kept the wrong extension in the name: card.png became
+	// card.png.svg, an SVG named after a format it is not, and a script that
+	// went on to upload card.png found nothing there (#1056). Replace it, and
+	// say so once — silence is what made the first version confusing.
+	if ext != "" {
+		out := strings.TrimSuffix(path, ext) + ".svg"
+		return out, fmt.Sprintf("deja: the card is an SVG, so it goes to %s rather than %s\n", filepath.Base(out), filepath.Base(path))
+	}
+	return path + ".svg", ""
 }

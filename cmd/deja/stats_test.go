@@ -12,16 +12,24 @@ import (
 // markdown to embed it — a broken image for anyone who followed the hint.
 
 func TestCardFileNameKeepsTheFormatHonest(t *testing.T) {
+	// An extension deja cannot honour is replaced, not appended: card.png used
+	// to become card.png.svg, an SVG named after a format it is not (#1056).
 	for in, want := range map[string]string{
 		"deja-stats.svg": "deja-stats.svg",
 		"CARD.SVG":       "CARD.SVG",
-		"card.png":       "card.png.svg",
-		"card.txt":       "card.txt.svg",
+		"card.png":       "card.svg",
+		"card.txt":       "card.svg",
 		"card":           "card.svg",
 		"dir/card":       "dir/card.svg",
+		"dir/card.jpeg":  "dir/card.svg",
 	} {
-		if got := cardFileName(in); got != want {
+		got, note := cardFileName(in)
+		if got != want {
 			t.Fatalf("cardFileName(%q) = %q, want %q", in, got, want)
+		}
+		// The replacement is stated once; a name deja could keep says nothing.
+		if wantNote := filepath.Ext(in) != "" && !strings.EqualFold(filepath.Ext(in), ".svg"); wantNote != (note != "") {
+			t.Errorf("cardFileName(%q) note = %q, want a note: %v", in, note, wantNote)
 		}
 	}
 }
