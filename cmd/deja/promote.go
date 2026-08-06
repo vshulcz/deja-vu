@@ -84,7 +84,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		// source is forgotten: both routes then refused, and "promote the
 		// source session instead" named something that is gone for good — the
 		// note froze at whatever state it held (#979).
-		origin, noteTitle, isPromoted := promotedNoteSource(s.ID)
+		origin, noteTitle, noteBody, isPromoted := promotedNoteSource(s.ID)
 		if !isPromoted {
 			return fmt.Errorf("%q is a note you wrote, not a session — `deja remember` adds to it", prefix)
 		}
@@ -93,6 +93,13 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		// forget clears the borrowed one that line is "promoted from <src>" —
 		// which would be echoed back as the title of the correction.
 		s.Title = noteTitle
+		// And its body is the note as it was written. Distilling the note's
+		// own rows instead re-rendered "[accepted] asked: … · outcome: …" and
+		// wrote that back as the correction's text, one wrapper deeper each
+		// time — visible once forget had cleared the borrowed title (#1033).
+		if noteBody != "" && strings.TrimSpace(noteText) == "" {
+			noteText = noteBody
+		}
 	}
 	text := strings.TrimSpace(noteText)
 	if text == "" {
@@ -366,8 +373,8 @@ func promotedNoteSources() map[string]string {
 // promoted from. The id is built by replacing the colon in `harness:id`, which
 // does not invert on its own — harness names carry dashes — so the note log is
 // the authority.
-func promotedNoteSource(noteID string) (string, string, bool) {
-	src, title, found := "", "", false
+func promotedNoteSource(noteID string) (string, string, string, bool) {
+	src, title, body, found := "", "", "", false
 	for _, n := range sources.LoadPromotedNotes() {
 		if n.Session == "" || "deja-note-"+strings.ReplaceAll(n.Session, ":", "-") != noteID {
 			continue
@@ -376,6 +383,9 @@ func promotedNoteSource(noteID string) (string, string, bool) {
 		if t := strings.TrimSpace(n.Title); t != "" {
 			title = t
 		}
+		if b := strings.TrimSpace(n.Text); b != "" {
+			body = b
+		}
 	}
-	return src, title, found
+	return src, title, body, found
 }

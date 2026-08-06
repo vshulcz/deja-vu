@@ -84,3 +84,43 @@ func TestCorrectionReachesANoteWhoseSourceIsForgotten(t *testing.T) {
 		t.Errorf("the refusal does not say what the id is: %v", err)
 	}
 }
+
+// #979 made the correction reach the note; without --note it then distilled
+// the note's own rows, so `[accepted] asked: … · outcome: …` came back as the
+// text of the correction, one wrapper deeper each time (#1033).
+func TestCorrectionWithoutANoteCarriesTheNoteText(t *testing.T) {
+	tmp := hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"how should we shard the write queue"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"shard1","cwd":"/proj"}` + "\n" +
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"decided to shard by tenant id"}]},"timestamp":"2026-07-11T10:05:00Z","sessionId":"shard1","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "s.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "promote", "shard1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "forget", "--session", "claude:shard1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := captureRun(t, "promote", "deja-note-claude-shard1", "--state", "superseded")
+	if err != nil {
+		t.Fatalf("the correction was refused: %v", err)
+	}
+	if strings.Contains(out, "[accepted]") {
+		t.Errorf("the correction wrapped the note's own rendered line:\n%s", out)
+	}
+	if strings.Count(out, "asked:") > 1 {
+		t.Errorf("the correction repeats the note inside itself:\n%s", out)
+	}
+	if !strings.Contains(out, "shard by tenant") {
+		t.Errorf("the correction lost the decision it carries:\n%s", out)
+	}
+}
