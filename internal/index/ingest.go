@@ -78,7 +78,9 @@ func mergeIngestDiag(m *Manifest) {
 		if h == "" {
 			continue
 		}
-		m.IngestHealth[h] = HarnessIngest{}
+		// The clip count for this pass is recorded during redaction, which
+		// runs before this fold; resetting the whole entry threw it away.
+		m.IngestHealth[h] = HarnessIngest{ClippedMessages: m.IngestHealth[h].ClippedMessages}
 	}
 	for p, n := range malformed {
 		h := harnessForPath(p)
@@ -1226,6 +1228,7 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 			cut--
 		}
 		redacted = redacted[:cut]
+		countClipped(m, sourcePath, 1)
 	}
 	n := counts.Total()
 	if n == 0 || m == nil {
@@ -1975,6 +1978,9 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 							cut--
 						}
 						redacted = redacted[:cut]
+						mu.Lock()
+						countClipped(m, s.Path, 1)
+						mu.Unlock()
 					}
 					s.Messages[mi].Text = redacted
 					if n := counts.Total(); n > 0 && m != nil {
@@ -2028,4 +2034,28 @@ func filePrefixHash(path string, n int64) uint64 {
 		return 0
 	}
 	return h.Sum64()
+}
+
+
+// countClipped records messages stored short of the transcript. The caller
+// holds the lock where one is needed; redactForIngest runs single-threaded.
+func countClipped(m *Manifest, sourcePath string, n int) {
+	if m == nil || n == 0 {
+		return
+	}
+	h := harnessForPath(sourcePath)
+	if h == "" {
+		if _, ok := m.Files[sources.OpencodeDB()]; ok {
+			h = "opencode"
+		}
+	}
+	if h == "" {
+		return
+	}
+	if m.IngestHealth == nil {
+		m.IngestHealth = map[string]HarnessIngest{}
+	}
+	e := m.IngestHealth[h]
+	e.ClippedMessages += n
+	m.IngestHealth[h] = e
 }
