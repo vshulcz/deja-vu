@@ -1980,6 +1980,15 @@ func oneSuffixStep(word string) []string {
 		base := strings.TrimSuffix(word, "ing")
 		add(base)
 		add(base + "e")
+	case strings.HasSuffix(word, "ies"):
+		// retries -> retry. Ahead of the "es" and "s" cases, which reduce it
+		// to "retri" and stop there: neither a consonant+y word nor its
+		// plural could reach the other, so "retry" found nothing in a store
+		// full of "retries" (#1079).
+		add(strings.TrimSuffix(word, "ies") + "y")
+		add(strings.TrimSuffix(word, "es"))
+	case strings.HasSuffix(word, "ied"):
+		add(strings.TrimSuffix(word, "ied") + "y")
 	case strings.HasSuffix(word, "ed"):
 		base := strings.TrimSuffix(word, "ed")
 		add(base)
@@ -2001,6 +2010,12 @@ func oneSuffixStep(word string) []string {
 	}
 	// expansions: fail->fails, fail->failing/failed. The catalog filter keeps
 	// nonsense forms from ever reaching a lookup.
+	if base, ok := consonantY(word); ok {
+		// retry -> retries, retried. The plain +s below gives "retrys", which
+		// no transcript contains (#1079).
+		add(base + "ies")
+		add(base + "ied")
+	}
 	if !strings.HasSuffix(word, "s") {
 		add(word + "s")
 	}
@@ -2507,4 +2522,17 @@ func askedTextFor(dir string, m Manifest, metas []SessionMeta, want uint64) stri
 		}
 	}
 	return ""
+}
+
+// consonantY splits a word ending in consonant+y, the form whose plural is
+// -ies rather than -s. "key" and "day" end in vowel+y and keep their -s.
+func consonantY(word string) (string, bool) {
+	if !strings.HasSuffix(word, "y") || len(word) < 3 {
+		return "", false
+	}
+	switch word[len(word)-2] {
+	case 'a', 'e', 'i', 'o', 'u':
+		return "", false
+	}
+	return strings.TrimSuffix(word, "y"), true
 }
