@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -28,6 +30,32 @@ func promotedNoteID(s model.Session) string {
 	return ""
 }
 
+// importedLifecycles maps a source session key ("claude:src1") to the state of
+// a promoted note about it that arrived by sync. The note travels and keeps
+// its original id; the notes.jsonl holding the states does not travel at all,
+// so on the receiving machine the index is the only place the link survives.
+func importedLifecycles(dir string) map[string]sources.Lifecycle {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]sources.Lifecycle{}
+	for _, m := range metas {
+		if m.Harness != "deja" || m.Lifecycle == "" {
+			continue
+		}
+		src, ok := strings.CutPrefix(m.OrigID, "deja-note-")
+		if !ok {
+			continue
+		}
+		at, _ := time.Parse("2006-01-02", m.LifecycleAt)
+		out[strings.Replace(src, "-", ":", 1)] = sources.Lifecycle{
+			State: m.Lifecycle, Note: m.LifecycleNote, At: at,
+		}
+	}
+	return out
+}
+
 // attachLifecycles marks hits whose decision was later rejected, superseded or
 // left to go stale.
 //
@@ -37,7 +65,7 @@ func promotedNoteID(s model.Session) string {
 // when its own wording matched the query, so asking about a reverted decision
 // returned the transcript that made it, reading like current truth. The state
 // belongs to the session; ranking was never going to carry it.
-func attachLifecycles(hits []search.Hit) {
+func attachLifecycles(dir string, hits []search.Hit) {
 	if len(hits) == 0 {
 		return
 	}
@@ -45,6 +73,8 @@ func attachLifecycles(hits []search.Hit) {
 	// sync carries its state in the index, because the states themselves live
 	// in the other machine's notes.jsonl and never travel (#975).
 	states := sources.PromotedLifecycles()
+	var imported map[string]sources.Lifecycle
+	importedReady := false
 	for i := range hits {
 		h := &hits[i]
 		key := h.Session.Harness + ":" + h.Session.ID
@@ -65,10 +95,24 @@ func attachLifecycles(hits []search.Hit) {
 			// travel (#975).
 			if h.Session.Lifecycle != "" && h.Session.Lifecycle != "accepted" {
 				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
+				continue
 			}
-			continue
-		}
-		if lc.State == "accepted" {
+			// The rejection and the transcript it rejects can both arrive by
+			// sync. Each keeps its original id, so the note still names the
+			// session it is about — but only the index remembers, and the
+			// transcript came back with no mark on it: the query a person
+			// actually types returned a reverted decision as current (#1051).
+			if !importedReady {
+				imported, importedReady = importedLifecycles(dir), true
+			}
+			lc, ok = imported[key]
+			if !ok && h.Session.OrigID != "" {
+				lc, ok = imported[h.Session.Harness+":"+h.Session.OrigID]
+			}
+			if !ok || lc.State == "" || lc.State == "accepted" {
+				continue
+			}
+		} else if lc.State == "accepted" {
 			continue
 		}
 		h.Lifecycle = lc.State

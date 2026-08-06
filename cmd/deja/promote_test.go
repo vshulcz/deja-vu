@@ -142,7 +142,7 @@ func TestPromoteAcceptedTakesTheRejectedMarkBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	hits := searchHits(t, dir, "signing key")
-	attachLifecycles(hits)
+	attachLifecycles(dir, hits)
 	if len(hits) == 0 || hits[0].Lifecycle != "rejected" {
 		t.Fatalf("rejected mark must land on the transcript hit: %#v", hits)
 	}
@@ -162,7 +162,7 @@ func TestPromoteAcceptedTakesTheRejectedMarkBack(t *testing.T) {
 	}
 
 	hits = searchHits(t, dir, "signing key")
-	attachLifecycles(hits)
+	attachLifecycles(dir, hits)
 	for _, h := range hits {
 		if h.Lifecycle != "" {
 			t.Fatalf("accepted must clear the mark, %s:%s still %q", h.Session.Harness, h.Session.ID, h.Lifecycle)

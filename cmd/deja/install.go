@@ -318,7 +318,7 @@ func printMemoryProofOf(dir, heading string, keep func(model.Session) bool) {
 		// In the reader's calendar, the way every other date deja prints is:
 		// an imported record keeps the sender's offset, so a batch from +14
 		// was dated a day ahead of what `last` said on the same machine
-		// seconds later (#1050).
+		// seconds later (#1047, #1050 — found twice, from both ends).
 		date := "-"
 		if !s.Updated.IsZero() {
 			date = s.Updated.Local().Format("Jan 2")

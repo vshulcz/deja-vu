@@ -41,7 +41,7 @@ func TestAPromotedNoteCarriesItsOwnState(t *testing.T) {
 		{Session: model.Session{Harness: "deja", ID: "deja-note-claude-s1"}},
 		{Session: model.Session{Harness: "claude", ID: "s1"}},
 	}
-	attachLifecycles(hits)
+	attachLifecycles(dir, hits)
 	if hits[0].Lifecycle != "rejected" {
 		t.Errorf("the note carries lifecycle %q, want rejected", hits[0].Lifecycle)
 	}
@@ -53,7 +53,7 @@ func TestAPromotedNoteCarriesItsOwnState(t *testing.T) {
 	}
 	// An ordinary session with no decision on it stays unmarked.
 	other := []search.Hit{{Session: model.Session{Harness: "claude", ID: "unrelated"}}}
-	attachLifecycles(other)
+	attachLifecycles(dir, other)
 	if other[0].Lifecycle != "" {
 		t.Errorf("an unrelated session was marked %q", other[0].Lifecycle)
 	}
