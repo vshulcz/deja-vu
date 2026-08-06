@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -54,8 +55,50 @@ type doctorReport struct {
 	SQLite3       doctorComponent                `json:"sqlite3"`
 	Version       doctorVersionReport            `json:"version"`
 	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
+	Policy        doctorPolicyReport             `json:"policy"`
 	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 	Deep          *index.DeepReport              `json:"deep,omitempty"`
+}
+
+// doctorPolicyReport is the trust policy in the machine form. The text report
+// has had a block for it since #661 while `--json` had no key at all, so a
+// script could not see that recall is switched off on a machine (#1027).
+type doctorPolicyReport struct {
+	// State is one of default, active, unreadable — what is in force, not what
+	// the file says, which is the distinction the text block draws too.
+	State       string                      `json:"state"`
+	Path        string                      `json:"path"`
+	Error       string                      `json:"error,omitempty"`
+	Total       int                         `json:"indexed_sessions"`
+	Activations map[string]doctorPolicyRule `json:"activations"`
+	Ignored     []string                    `json:"ignored,omitempty"`
+	Inert       []string                    `json:"inert,omitempty"`
+}
+
+type doctorPolicyRule struct {
+	Rule     string `json:"rule"`
+	Withheld int    `json:"withheld"`
+}
+
+func collectDoctorPolicy(dir string) doctorPolicyReport {
+	r := doctorPolicyReport{State: "active", Path: policy.Path(), Activations: map[string]doctorPolicyRule{}}
+	exists, unknown, err := policy.Diagnose()
+	switch {
+	case !exists:
+		r.State = "default"
+	case err != nil:
+		r.State = "unreadable"
+		r.Error = err.Error()
+	}
+	pol := policy.Load()
+	withheld, total := policyWithheldCounts(dir)
+	r.Total = total
+	for _, a := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
+		r.Activations[a] = doctorPolicyRule{Rule: pol.Describe(a), Withheld: withheld[a]}
+	}
+	r.Ignored = unknown
+	r.Inert = unmatchedImportGroups(dir)
+	return r
 }
 
 type doctorEmbedReport struct {
@@ -94,6 +137,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	if sources.SQLite3Available() {
 		report.SQLite3.State = "ok"
 	}
+	report.Policy = collectDoctorPolicy(dir)
 	report.Version = collectDoctorVersion(lookup)
 	report.Embed = collectDoctorEmbed(dir)
 	return report

@@ -464,6 +464,13 @@ func cmdCtx(dir string, rest []string) error {
 			return err
 		}
 		if ok {
+			// Every other reading surface stops here when a rule denies the
+			// session's origin; ctx handed the whole session over, and it is
+			// the command the hook tells an agent to call (#1026).
+			if kept, hidden := policyFilterSessionsCounted(policy.ActivationSearch, []model.Session{s}); len(kept) == 0 {
+				fmt.Fprint(os.Stderr, policyHiddenNote(policy.ActivationSearch, hidden))
+				return fmt.Errorf("no session matches %q", q)
+			}
 			// The one command an agent is told to call — the hook's lead line
 			// names recall_context — answered from one of several sessions
 			// behind an elided id without saying it was a choice, while show,
@@ -487,6 +494,11 @@ func cmdCtx(dir string, rest []string) error {
 	hits, err := search.Run(ss, o)
 	if err != nil {
 		return err
+	}
+	hits, policyHidden := policyFilterHitsCounted(policy.ActivationSearch, hits)
+	if len(hits) == 0 && policyHidden > 0 {
+		fmt.Fprint(os.Stderr, policyHiddenNote(policy.ActivationSearch, policyHidden))
+		return fmt.Errorf("no session matches %q", q)
 	}
 	if len(hits) == 0 {
 		// Same as #834 in files and restore: an empty store is not a miss on

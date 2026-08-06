@@ -235,5 +235,24 @@
     "state": "update-available",
     "current": "1.0.0",
     "latest": "2.0.0"
+  },
+  "policy": {
+    "state": "default",
+    "path": "<tmp>/home/.config/deja/policy.json",
+    "indexed_sessions": 0,
+    "activations": {
+      "auto": {
+        "rule": "local+imported",
+        "withheld": 0
+      },
+      "mcp": {
+        "rule": "local+imported",
+        "withheld": 0
+      },
+      "search": {
+        "rule": "local+imported",
+        "withheld": 0
+      }
+    }
   }
 }

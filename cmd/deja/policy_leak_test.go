@@ -109,3 +109,44 @@ func TestBlameHonorsPolicy(t *testing.T) {
 		t.Fatalf("blame served policy-denied memory:\n%s", got)
 	}
 }
+
+// ctx is the command the hook tells an agent to call, and it answered from
+// sessions every other reading surface withheld (#1026).
+func TestCtxHonorsPolicy(t *testing.T) {
+	dir := policyLeakIndex(t)
+	pol := filepath.Join(t.TempDir(), "policy.json")
+	if err := os.WriteFile(pol, []byte(`{"activations":{"search":{"imported":false},"mcp":{"imported":false},"auto":{"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", pol)
+	out := captureStdout(t, func() {
+		if err := cmdCtx(dir, []string{"authentication", "middleware", "panicked"}); err == nil {
+			t.Error("ctx answered from a session the policy denies")
+		}
+	})
+	if strings.Contains(out, "ZQSECRETMARKER") {
+		t.Fatalf("ctx served policy-denied memory:\n%s", out)
+	}
+	// The id-prefix branch takes its own path to the same session.
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := ""
+	for _, m := range metas {
+		if strings.HasPrefix(m.Project, "imported:") && len(m.ID) >= 6 {
+			id = m.ID
+		}
+	}
+	if id == "" {
+		t.Fatal("no imported session with an id long enough for the prefix branch")
+	}
+	out = captureStdout(t, func() {
+		if err := cmdCtx(dir, []string{id}); err == nil {
+			t.Error("ctx by id answered from a session the policy denies")
+		}
+	})
+	if strings.Contains(out, "ZQSECRETMARKER") {
+		t.Fatalf("ctx by id served policy-denied memory:\n%s", out)
+	}
+}

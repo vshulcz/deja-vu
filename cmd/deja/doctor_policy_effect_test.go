@@ -73,3 +73,42 @@ func TestDoctorPolicySaysHowMuchTheRuleWithholds(t *testing.T) {
 		t.Errorf("a rule that hides nothing was counted as withholding:\n%s", out.String())
 	}
 }
+
+// The text report has had a trust-policy block since #661; `--json` had no key
+// for it at all, so a script could not see that recall is off on a machine
+// (#1027).
+func TestDoctorJSONReportsThePolicy(t *testing.T) {
+	tmp := hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"local work on the ticker window"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"loc","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "loc.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	policyFile := filepath.Join(tmp, "policy.json")
+	if err := os.WriteFile(policyFile, []byte(`{"activations":{"search":{"local":false,"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", policyFile)
+
+	got := collectDoctorPolicy(dir)
+	if got.State != "active" || got.Path != policyFile {
+		t.Errorf("policy state = %q at %q, want active at %q", got.State, got.Path, policyFile)
+	}
+	if got.Total != 1 {
+		t.Errorf("indexed sessions = %d, want 1", got.Total)
+	}
+	search := got.Activations["search"]
+	if search.Rule != "nothing activates" || search.Withheld != 1 {
+		t.Errorf("search rule = %+v, want {nothing activates 1}", search)
+	}
+	if auto := got.Activations["auto"]; auto.Withheld != 0 {
+		t.Errorf("a path the rule does not touch withheld %d", auto.Withheld)
+	}
+}
