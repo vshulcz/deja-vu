@@ -315,9 +315,13 @@ func printMemoryProofOf(dir, heading string, keep func(model.Session) bool) {
 		// date at all — and an empty slot left `[claude · imported:solo · ]`
 		// on the one screen that exists to show the memory arrived. `last`
 		// says the same thing with a dash (#964).
+		// In the reader's calendar, the way every other date deja prints is:
+		// an imported record keeps the sender's offset, so a batch from +14
+		// was dated a day ahead of what `last` said on the same machine
+		// seconds later (#1050).
 		date := "-"
 		if !s.Updated.IsZero() {
-			date = s.Updated.Format("Jan 2")
+			date = s.Updated.Local().Format("Jan 2")
 		}
 		lines = append(lines, fmt.Sprintf("  [%s · %s · %s] %s", s.Harness, s.Project, date, title))
 		shown++
