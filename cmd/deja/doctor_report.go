@@ -24,6 +24,12 @@ type doctorStore struct {
 	State string   `json:"state"`
 	Paths []string `json:"paths"`
 	Files int      `json:"files"`
+	// IndexedSessions is the other half of the pair the human line has printed
+	// since #861: files against sessions is how collapsing shows, and a reader
+	// of --json could see only the files (#1088). Imported is counted apart for
+	// the same reason the printed line separates it (#894).
+	IndexedSessions int `json:"indexed_sessions"`
+	Imported        int `json:"indexed_from_elsewhere,omitempty"`
 	// Denied names the path that refused to be read, so the warning can point
 	// at the directory to fix rather than at the harness (#802). Partial says
 	// the rest of the store was readable: sessions are missing from recall
@@ -125,8 +131,12 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	stores := doctorStoreChecks()
 	report := doctorReport{SchemaVersion: jsonout.Version, Stores: make([]doctorStore, 0, len(stores))}
 	storeMods := make([]time.Time, 0, len(stores))
+	indexed := index.HarnessSessionCounts(dir)
+	fromElsewhere := index.ImportedSessionCounts(dir)
 	for _, check := range stores {
 		store, mod := inspectDoctorStore(check)
+		store.IndexedSessions = indexed[check.name]
+		store.Imported = fromElsewhere[check.name]
 		report.Stores = append(report.Stores, store)
 		storeMods = append(storeMods, mod)
 	}
