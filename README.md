@@ -169,7 +169,7 @@ $ deja "jwt refresh token"
 
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, substrings match (`code` finds `opencode`), and double-quoted phrases require contiguous text; zero-result queries try word forms before close spellings. `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--limit`, `--json`. |
+| `deja <query>` | Search all histories. Multi-word = AND, common English filler words are ignored, and double-quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). `--re`, `--harness`, `--project`, `--since 30d`, `--role`, `--limit`, `--json`. |
 | `deja ctx <query>` | Compact markdown digest of the best match — pipe it into a prompt. |
 | `deja blame <path>` | Find sessions that discussed a file, newest and most specific first. `--json`, `--all`, and the usual filters are supported. |
 | `deja restore <path>` | List the spans an agent replaced in that file, newest first, and print or write one back with `--span n [-o file]`. Refuses to write over an existing file — `--force` if you mean it — and never over the file the span came from. Output is what the agent recorded, not the file, and a span that passed through redaction says so. |
