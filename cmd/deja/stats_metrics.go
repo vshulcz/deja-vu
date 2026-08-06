@@ -10,7 +10,7 @@ import (
 func statsHeadline(r stats.Report) string {
 	parts := make([]string, 0, 3)
 	if r.TotalSessions > 0 {
-		parts = append(parts, fmt.Sprintf("%s sessions indexed", formatStatNumber(r.TotalSessions)))
+		parts = append(parts, fmt.Sprintf("%s session%s indexed", formatStatNumber(r.TotalSessions), pluralS(r.TotalSessions)))
 	}
 	if r.Recall.Recalls > 0 {
 		served := "times"
