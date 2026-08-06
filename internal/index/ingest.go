@@ -1335,12 +1335,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// stopped too. Records that came off a mount point stay in the index while
 	// the volume is away, and the line repeats until it is back.
 	gone := missingTrees(removed)
-	for _, g := range gone {
-		if !g.mount {
+	for i := range gone {
+		gone[i].renamed = renamedMount(gone[i].dir)
+		if !gone[i].mount && gone[i].renamed == "" {
 			continue
 		}
 		for p := range removed {
-			if !strings.HasPrefix(p, g.dir+string(filepath.Separator)) {
+			if !strings.HasPrefix(p, gone[i].dir+string(filepath.Separator)) {
 				continue
 			}
 			if of, ok := old.Files[p]; ok {
@@ -1351,17 +1352,21 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	if progress != nil {
 		for _, g := range gone {
-			if g.mount {
-				verb := "is"
-				if g.files != 1 {
-					verb = "are"
-				}
+			verb := "is"
+			if g.files != 1 {
+				verb = "are"
+			}
+			switch {
+			case g.renamed != "":
+				fmt.Fprintf(progress, "deja: %s is mounted as %s now — its %d indexed file%s %s still searchable; point deja at the new path\n",
+					g.dir, g.renamed, g.files, pluralFiles(g.files), verb)
+			case g.mount:
 				fmt.Fprintf(progress, "deja: %s is not mounted — its %d indexed file%s %s still searchable; reconnect the disk to pick up anything new\n",
 					g.dir, g.files, pluralFiles(g.files), verb)
-				continue
+			default:
+				fmt.Fprintf(progress, "deja: %s is gone, and %d indexed file%s with it — if that disk is simply not mounted, reconnect it and run `deja index`\n",
+					g.dir, g.files, pluralFiles(g.files))
 			}
-			fmt.Fprintf(progress, "deja: %s is gone, and %d indexed file%s with it — if that disk is simply not mounted, reconnect it and run `deja index`\n",
-				g.dir, g.files, pluralFiles(g.files))
 		}
 	}
 	if len(changed) == 0 && len(removed) == 0 {
@@ -1847,6 +1852,34 @@ type missingTree struct {
 	// mount is set when dir is a mount point rather than an ordinary
 	// directory: an unplugged disk, not a deletion.
 	mount bool
+	// renamed is where the same volume turned up under a numbered name.
+	renamed string
+}
+
+// renamedMount finds the path a missing one moved to when its volume came
+// back under a different name: macOS mounts a disk as "/Volumes/Disk 1"
+// when something already sits on "/Volumes/Disk", and every path naming the
+// old mount point starts failing while the files are right there. Telling
+// the user to reconnect a disk that is already connected helps nobody.
+func renamedMount(path string) string {
+	sep := string(filepath.Separator)
+	for _, m := range mountParents {
+		if !strings.HasPrefix(path, m+sep) {
+			continue
+		}
+		rest := strings.TrimPrefix(path, m+sep)
+		name, sub, _ := strings.Cut(rest, sep)
+		if name == "" {
+			continue
+		}
+		for n := 1; n <= 9; n++ {
+			cand := filepath.Join(m, fmt.Sprintf("%s %d", name, n), sub)
+			if _, err := os.Stat(cand); err == nil {
+				return cand
+			}
+		}
+	}
+	return ""
 }
 
 // mountParents are the directories whose direct children are mount points.
