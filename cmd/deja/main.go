@@ -1711,15 +1711,23 @@ func runForget(dir string, args []string) error {
 		return ensureError(dir, err)
 	}
 	if o.DryRun {
-		fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
-			result.Sessions, result.Messages, result.Tombstones)
 		// The dry run is where someone checks the scope, so it says the same
 		// thing the real run would refuse with rather than erroring: nothing
 		// is being changed here, and the note is the answer they came for.
+		// It goes above the counts, and the counts say whose run they are:
+		// under an ambiguous selector the numbers were those of
+		// `--all-matches`, while the command as typed drops nothing (#1032).
+		scope := error(nil)
 		if o.Session != "" {
-			if scope := forgetScopeRefusal(o.Session, result.Sessions, allMatches); scope != nil {
-				fmt.Fprintln(os.Stdout, scope.Error())
-			}
+			scope = forgetScopeRefusal(o.Session, result.Sessions, allMatches)
+		}
+		if scope != nil {
+			fmt.Fprintln(os.Stdout, scope.Error())
+			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nas it stands this run drops nothing; with --all-matches it would drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
+				result.Sessions, result.Messages, result.Tombstones)
+		} else {
+			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
+				result.Sessions, result.Messages, result.Tombstones)
 		}
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
