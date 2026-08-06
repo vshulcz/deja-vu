@@ -115,7 +115,12 @@ var statsHTMLTemplate = template.Must(template.New("stats-html").Funcs(template.
 <footer>{{.SessionCount}} metadata-only sessions embedded. No message text is included in this file.{{if .Truncated}} The embedded list is capped at the 5,000 most recent sessions.{{end}}</footer></main><script>
 // Only metadata is embedded below: dates, harnesses, projects, counts, and redacted first-user titles. No message text.
 const sessions={{.SessionsJSON}};const tbody=document.getElementById('sessions'),empty=document.getElementById('empty'),input=document.getElementById('filter');
-function esc(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML}function render(){const q=input.value.toLowerCase().trim();tbody.innerHTML='';let n=0;sessions.forEach((s,i)=>{const hay=[s.date,s.harness,s.project,s.title].join(' ').toLowerCase();if(q&&!hay.includes(q))return;n++;const row=document.createElement('tr');row.innerHTML='<td>'+esc(s.date)+'</td><td><span class="badge clickable" data-value="'+esc(s.harness)+'">'+esc(s.harness)+'</span></td><td><span class="clickable" data-value="'+esc(s.project)+'">'+esc(s.project)+'</span></td><td class="title">'+esc(s.title||'-')+'</td><td>'+s.messages+'</td>';row.querySelectorAll('.clickable').forEach(e=>e.onclick=()=>{input.value=e.dataset.value;render()});tbody.appendChild(row)});empty.hidden=n!==0}input.oninput=render;render();
+// textContent leaves quotes alone, and two of the values below land inside a
+// double-quoted attribute — a project name carrying a quote closed it and the
+// rest of the name parsed as attributes, event handlers included. Project
+// names arrive from "deja remember --project", from a directory name, and
+// across "sync import" from another machine.
+function esc(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}function render(){const q=input.value.toLowerCase().trim();tbody.innerHTML='';let n=0;sessions.forEach((s,i)=>{const hay=[s.date,s.harness,s.project,s.title].join(' ').toLowerCase();if(q&&!hay.includes(q))return;n++;const row=document.createElement('tr');row.innerHTML='<td>'+esc(s.date)+'</td><td><span class="badge clickable" data-value="'+esc(s.harness)+'">'+esc(s.harness)+'</span></td><td><span class="clickable" data-value="'+esc(s.project)+'">'+esc(s.project)+'</span></td><td class="title">'+esc(s.title||'-')+'</td><td>'+s.messages+'</td>';row.querySelectorAll('.clickable').forEach(e=>e.onclick=()=>{input.value=e.dataset.value;render()});tbody.appendChild(row)});empty.hidden=n!==0}input.oninput=render;render();
 </script></body></html>`))
 
 func barHeight(n int, months []stats.MonthStats) int {
