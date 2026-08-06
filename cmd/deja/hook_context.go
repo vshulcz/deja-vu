@@ -169,13 +169,27 @@ func buildNotice(dir string) string {
 	if st := readWarmupStatus(dir); st != nil {
 		return st.line()
 	}
+	// A rebuild is pending either because one was asked for or because the
+	// index on disk cannot answer as it stands. The second half matters
+	// because the sentinel requestWarmup writes lives inside the index
+	// directory: on a read-only one it is never created, warmupJustRequested
+	// stays false, and this line — written for exactly that state — was
+	// reachable only when the directory was writable. Every session went out
+	// silent, in the one state that never repairs itself (#1048).
+	if (warmupJustRequested(dir) || indexNeedsRebuild(dir)) && !indexDirWritable(dir) {
+		return fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
+	}
 	if !warmupJustRequested(dir) {
 		return ""
 	}
-	if !indexDirWritable(dir) {
-		return fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
-	}
 	return "deja: indexing your history — recall comes online in a few seconds"
+}
+
+// indexNeedsRebuild reports that the index on disk cannot answer as it stands:
+// absent, written by another format, or damaged. It is the condition every
+// caller of requestWarmup already tested separately.
+func indexNeedsRebuild(dir string) bool {
+	return !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir)
 }
 
 // runHookContext prints session-start context. plain=false emits the Claude
@@ -238,32 +252,20 @@ func runHookContext(dir string, plain bool) error {
 		// whereas the plain path is injected into the model's context, where
 		// a progress line is noise.
 		if !plain {
-			line := ""
-			if st := readWarmupStatus(dir); st != nil {
-				line = st.line()
-			} else if warmupJustRequested(dir) {
-				// The session that asks for the build is the one that hears
-				// nothing about it: the child has not written its first
-				// progress line yet. That session is the first one after an
-				// upgrade or a damaged store — the moment deja most looks
-				// broken (#878).
-				//
-				// Including the very first build. Requiring a manifest here
-				// left the one moment deja most looks broken in silence: a
-				// machine with ten thousand transcripts and no index yet said
-				// nothing at all, twice over, while the build ran (#909).
-				//
-				// A machine with no history also asks for a build; it sees
-				// this line once, truthfully, and never again — the next
-				// session has a manifest and takes the branch above.
-				line = "deja: indexing your history — recall comes online in a few seconds"
-				// …unless it cannot: a read-only cache directory lets the
-				// request be made and the build fail, so this promised recall
-				// "in a few seconds" on every session forever (#887).
-				if !indexDirWritable(dir) {
-					line = fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
-				}
-			}
+			// The session that asks for the build is the one that hears
+			// nothing about it: the child has not written its first progress
+			// line yet. That session is the first one after an upgrade or a
+			// damaged store — the moment deja most looks broken (#878).
+			//
+			// Including the very first build. Requiring a manifest left the
+			// one moment deja most looks broken in silence: a machine with
+			// ten thousand transcripts and no index yet said nothing at all,
+			// twice over, while the build ran (#909).
+			//
+			// A machine with no history also asks for a build; it sees this
+			// line once, truthfully, and never again — the next session has a
+			// manifest and reads the published progress instead.
+			line := buildNotice(dir)
 			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
 				line = joinNotes(note, line)
 			}
