@@ -524,6 +524,23 @@ func cmdCtx(dir string, rest []string) error {
 	return nil
 }
 
+// clearedNoteIDs names the notes whose borrowed title was just cleared. The
+// line used to offer `--session deja-note-…`, an id that matches nothing —
+// deja knows them here, and the ellipsis sent the reader to `deja last` to
+// look up what this command was already holding (#1030).
+func clearedNoteIDs(keys []string) string {
+	ids := make([]string, 0, len(keys))
+	for _, k := range keys {
+		ids = append(ids, "deja-note-"+strings.ReplaceAll(k, ":", "-"))
+	}
+	sort.Strings(ids)
+	const shown = 3
+	if len(ids) > shown {
+		return strings.Join(ids[:shown], "`, `") + fmt.Sprintf("` and %d more", len(ids)-shown)
+	}
+	return strings.Join(ids, "`, `")
+}
+
 func cmdLast(dir string, rest []string, sourceInstance string) error {
 	n, o, sinceRaw, err := parseLast(rest)
 	if err != nil {
@@ -1767,8 +1784,16 @@ func runForget(dir string, args []string) error {
 			// reason the raw session was safe to forget (#666) — so say that
 			// its content is still there rather than let the line read as
 			// "the note was handled" (#841).
-			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s; %s still holds what you wrote there — `deja forget --session deja-note-…` removes it\n",
-				n, pluralS(n), sources.NotesFile())
+			// The ids, not an ellipsis: this line knows which notes it just
+			// cleared, and `deja forget --session deja-note-…` matched
+			// nothing — it sent the reader to `deja last` to look up
+			// something the command was already holding (#1030).
+			what := "it"
+			if n > 1 {
+				what = "them"
+			}
+			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s; %s still holds what you wrote there — `deja forget --session %s` removes %s\n",
+				n, pluralS(n), sources.NotesFile(), clearedNoteIDs(result.Keys), what)
 		}
 	}
 	// Nothing matched is a different answer from nothing was dropped: the
@@ -1776,6 +1801,18 @@ func runForget(dir string, args []string) error {
 	// successful removal of zero leaves the reader believing they deleted
 	// something that is in fact still there under a different id.
 	if result.Sessions == 0 && result.Messages == 0 {
+		// A note whose own project was forgotten keeps its line in
+		// notes.jsonl while its index row is gone, and the id the forget
+		// line offers then matched nothing at all — the file, not the
+		// index, is what holds a note (#1030).
+		if o.Session != "" {
+			if gone, err := sources.ForgetPromotedNotes(func(noteID string) bool {
+				return noteID == strings.TrimPrefix(o.Session, "deja:")
+			}); err == nil && gone > 0 {
+				fmt.Fprintf(os.Stdout, "removed %d promoted note%s from %s\n", gone, pluralS(gone), sources.NotesFile())
+				return nil
+			}
+		}
 		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped\n", forgetSelector(o))
 		return nil
 	}

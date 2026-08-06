@@ -64,6 +64,16 @@ func TestForgetByProjectClearsBorrowedTitlesAndNamesTheNotes(t *testing.T) {
 	if !strings.Contains(out, "cleared the borrowed title") {
 		t.Errorf("forget --project said %q", out)
 	}
+	// The line offered `--session deja-note-…`, an id that matches nothing,
+	// while the command was holding the real one (#1030). Whatever it names
+	// has to be a selector the reader can paste back.
+	if strings.Contains(out, "deja-note-…") {
+		t.Errorf("the advice still elides the id: %q", out)
+	}
+	noteID := "deja-note-claude-a1"
+	if !strings.Contains(out, "`deja forget --session "+noteID+"`") {
+		t.Errorf("the advice does not name the note it just cleared: %q", out)
+	}
 	// The count folds notes and transcripts together, so it has to say which
 	// is which: the notes are what the reader deliberately kept.
 	// Two raw sessions and one note: the exact split, not just the words
@@ -83,6 +93,22 @@ func TestForgetByProjectClearsBorrowedTitlesAndNamesTheNotes(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "batch the export nightly") {
 		t.Errorf("the decision was destroyed:\n%s", b)
+	}
+	// Last, because it removes the note: the id the line offers has to be a
+	// selector that works, and the note's own row is already out of the index.
+	gone, err := captureRun(t, "forget", "--session", noteID)
+	if err != nil {
+		t.Fatalf("the id the line offered does not run: %v", err)
+	}
+	if !strings.Contains(gone, "removed 1 promoted note") {
+		t.Errorf("running the advised command removed nothing: %q", gone)
+	}
+	b, err = os.ReadFile(filepath.Join(tmp, "notes.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "batch the export nightly") {
+		t.Errorf("the advised command left the note on disk:\n%s", b)
 	}
 }
 
