@@ -1244,5 +1244,21 @@ func SafeText(s string) string {
 }
 
 func unsafeForTerminal(r rune) bool {
-	return r != '\n' && r != '\t' && unicode.IsControl(r)
+	if r == '\n' || r == '\t' {
+		return false
+	}
+	if unicode.IsControl(r) {
+		return true
+	}
+	// The bidi overrides and isolates are the same attack without an escape
+	// byte: U+202E reverses the rendering of everything after it, so a line
+	// can read as the opposite of the bytes stored. Nothing recalled from a
+	// transcript needs to reorder the reader's screen. The other format
+	// characters stay — a zero-width joiner holds an emoji sequence together.
+	switch r {
+	case '\u200e', '\u200f', '\u202a', '\u202b', '\u202c', '\u202d', '\u202e',
+		'\u2066', '\u2067', '\u2068', '\u2069':
+		return true
+	}
+	return false
 }
