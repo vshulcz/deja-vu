@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/stats"
@@ -114,6 +115,16 @@ func writeViewHTML(dir, out string) (string, error) {
 	metas, err := index.Recent(dir, 0)
 	if err != nil {
 		return "", err
+	}
+	// The page is titles, project names and message previews — the whole of
+	// what the trust policy exists to keep off the screen, and it is written to
+	// a file meant to be looked at and passed around. Every other surface
+	// consulted the policy and this one did not: it embedded imported sessions
+	// a local-only rule had already withheld from search, the listing, stats
+	// and the agent. Browsing, so the search activation governs it (#937).
+	metas, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, metas)
+	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
+		fmt.Fprint(os.Stderr, note)
 	}
 	report := stats.Build(metas, time.Now())
 	page := viewPage{
