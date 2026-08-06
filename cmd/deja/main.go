@@ -228,7 +228,17 @@ func cmdIndex(dir string, rest []string) error {
 	// longest part of the whole command, and it ran before the progress sink
 	// existed (#1021).
 	stopProgress := publishBuildProgress(dir)
-	if fresh, n := index.UpToDate(dir, ""); fresh && !force {
+	fresh, n := index.UpToDate(dir, "")
+	// A note bucket's id names the local day of whichever process indexed the
+	// line, so a `remember` under TZ=UTC and one under the machine's own zone
+	// split the same moment into two buckets. `show` tells the reader this
+	// command regroups them, and it answered that the index was up to date
+	// (#1058).
+	if fresh && !force && index.NotesZoneDrift(dir) {
+		fmt.Fprintln(os.Stderr, "deja: some notes were grouped in another time zone — regrouping them")
+		fresh, force = false, true
+	}
+	if fresh && !force {
 		stopProgress()
 		// The warmup child runs this command, so returning before the sentinel
 		// is cleared leaves a build that is not running: the next request is
