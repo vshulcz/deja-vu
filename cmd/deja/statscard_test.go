@@ -161,3 +161,20 @@ func TestHandoffsReceivedCountedFromIndex(t *testing.T) {
 		t.Fatalf("HandoffsIn = %d, want 1", r.HandoffsIn)
 	}
 }
+
+// A path on a disk that is not there came back as `write stats card: open
+// /Volumes/…/card.png.svg: no such file or directory` — an internal path and a
+// syscall, the shape #893/#907 replaced on the other writing paths (#1036).
+func TestWriteStatsCardSaysWhatIsWrongWithThePath(t *testing.T) {
+	gone := filepath.Join(t.TempDir(), "no-such-dir", "card.png")
+	_, err := writeStatsCard(gone, stats.Report{})
+	if err == nil {
+		t.Fatal("writing into a directory that does not exist did not fail")
+	}
+	if !strings.Contains(err.Error(), "its directory does not exist") {
+		t.Errorf("the error does not say what is wrong: %v", err)
+	}
+	if strings.Contains(err.Error(), "no such file or directory") {
+		t.Errorf("the syscall is still handed back: %v", err)
+	}
+}

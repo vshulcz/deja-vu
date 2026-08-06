@@ -67,3 +67,23 @@ func TestViewPreviewCap(t *testing.T) {
 		t.Fatalf("preview exceeds cap: %d", len(got))
 	}
 }
+
+// Same as the stats card: the view handed back the bare syscall when its
+// target sat on a disk that is gone (#1036).
+func TestViewSaysWhatIsWrongWithThePath(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, err := writeViewHTML(dir, filepath.Join(tmp, "no-such-dir", "m.html"))
+	if err == nil {
+		t.Fatal("writing into a directory that does not exist did not fail")
+	}
+	if !strings.Contains(err.Error(), "its directory does not exist") {
+		t.Errorf("the error does not say what is wrong: %v", err)
+	}
+	if strings.Contains(err.Error(), "no such file or directory") {
+		t.Errorf("the syscall is still handed back: %v", err)
+	}
+}

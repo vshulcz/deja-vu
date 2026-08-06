@@ -175,7 +175,9 @@ func writeViewHTML(dir, out string) (string, error) {
 		return "", fmt.Errorf("render view: %w", err)
 	}
 	if err := os.WriteFile(abs, []byte(b.String()), 0o644); err != nil {
-		return "", err
+		// A path on a disk that is gone came back as the bare syscall, which
+		// says nothing about what to change (#1036).
+		return "", fmt.Errorf("cannot write the view to %s — %s", abs, writeFailureReason(err))
 	}
 	return abs, nil
 }

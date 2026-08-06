@@ -19,7 +19,10 @@ func writeStatsCard(path string, report stats.Report) (string, error) {
 		return "", fmt.Errorf("stats card path: %w", err)
 	}
 	if err := os.WriteFile(abs, []byte(renderStatsCard(report)), 0o644); err != nil {
-		return "", fmt.Errorf("write stats card: %w", err)
+		// An unplugged disk arrived as `open /Volumes/…/card.png.svg: no such
+		// file or directory` — an internal path and a syscall, the shape
+		// #893/#907 replaced on the other writing paths (#1036).
+		return "", fmt.Errorf("cannot write the stats card to %s — %s", abs, writeFailureReason(err))
 	}
 	return abs, nil
 }
