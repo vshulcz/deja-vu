@@ -2289,6 +2289,16 @@ func ensureError(dir string, err error) error {
 	if errors.Is(err, syscall.ENOSPC) {
 		return fmt.Errorf("no space left where the index is built (%s) — free some room there, or point DEJA_INDEX_DIR at a disk that has it", filepath.Dir(dir))
 	}
+	// A volume ejected cleanly mid-build leaves its mount point behind as an
+	// empty directory, so the write fails with ENOENT rather than the EIO of a
+	// disk yanked out (#899) — an internal `idx.tmp/buckets/…` path and a
+	// syscall for what is simply a disconnected disk. The index that was
+	// already there is untouched, since the build writes beside it and
+	// renames, and saying so is the part that decides whether the reader goes
+	// looking for damage (#1068).
+	if errors.Is(err, fs.ErrNotExist) && !dirExists(dir) {
+		return fmt.Errorf("the index directory went away mid-build (%s) — the disk it lives on may have been unmounted; the index already there is unharmed, so reconnect it and run `deja index` again, or point DEJA_INDEX_DIR somewhere local", dir)
+	}
 	// Already worded where it was raised — the leftover-swap case names the
 	// directory to remove and the command to rerun, and "ensure:" in front of
 	// it is internal noise (#1009).
