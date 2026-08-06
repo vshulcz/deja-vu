@@ -123,6 +123,12 @@ type SessionMeta struct {
 	// took two conversations from two projects (#970). Additive: a manifest
 	// written before this decodes with it false.
 	Shared bool `json:",omitempty"`
+	// AgentTitle marks a title that came from the assistant's opening line
+	// because the session holds no user turn (#692). The listing printed it in
+	// the place of the reader's own question, so an assertion nobody made read
+	// like something they said (#1100). Additive: an older manifest decodes
+	// with it false, and the line then reads as it did before.
+	AgentTitle bool `json:",omitempty"`
 	// OrigID is the id a session had on the machine it came from. Import
 	// renames every session to imported-<hash>, so a promoted note stopped
 	// looking like one the moment it crossed a machine boundary and every rule

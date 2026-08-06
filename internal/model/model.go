@@ -26,6 +26,10 @@ type Session struct {
 	// search result can ask a cheap question about those files without reading
 	// the session back.
 	Touched []string `json:"touched,omitempty"`
+	// AgentTitle marks a Title taken from the assistant's opening line because
+	// the session holds no user turn (#692). Surfaces that print titles in the
+	// place of the reader's own question need to say so (#1100).
+	AgentTitle bool `json:"agent_title,omitempty"`
 	// OrigID is the id this session had on the machine it came from, when it
 	// arrived by sync. Import renames sessions to imported-<hash>, so a
 	// promoted note stopped looking like one across a machine boundary and the

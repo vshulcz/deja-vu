@@ -665,7 +665,14 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// The title is transcript text going straight to a terminal: an escape
 		// in it repaints the screen and a carriage return rewinds the line.
 		if title = redact.SafeForDisplay(title); title != "" {
-			fmt.Printf(" %s", title)
+			// A session with no user turn borrows the assistant's opening line
+			// (#692), and unmarked it read like the reader's own question
+			// (#1100).
+			if s.AgentTitle {
+				fmt.Printf(" agent: %s", title)
+			} else {
+				fmt.Printf(" %s", title)
+			}
 		}
 		fmt.Println()
 	}

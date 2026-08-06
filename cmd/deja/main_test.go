@@ -222,8 +222,9 @@ func TestLastFiltersProjectAndHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	// No user turn: the assistant's first sentence is the title, because the
-	// alternative is a row that says nothing at all (#692).
-	if !strings.Contains(out, "[claude · gamma · 2026-01-05 · claude-gamma] assistant-only memory") {
+	// alternative is a row that says nothing at all (#692) — marked as the
+	// agent's words since #1100, so it does not read as the reader's question.
+	if !strings.Contains(out, "[claude · gamma · 2026-01-05 · claude-gamma] agent: assistant-only memory") {
 		t.Fatalf("title-less last output = %q", out)
 	}
 

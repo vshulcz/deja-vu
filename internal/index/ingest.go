@@ -922,8 +922,13 @@ func (m msgSeen) dup(key, role string, ts time.Time, text string) bool {
 
 func metaForSession(s model.Session) SessionMeta {
 	title := s.Title
+	agentTitle := s.AgentTitle
 	if title == "" {
 		title = sessionTitle(s)
+		// A session with no user turn borrows the assistant's opening line
+		// (#692); the listing needs to say so rather than print it where the
+		// reader's own question goes (#1100).
+		agentTitle = title != "" && earliestTitle(s.Messages, "user") == ""
 	}
 	// Titles come from unredacted places — an agent-generated summary, a
 	// composer name, the first user message — and are persisted in
@@ -933,7 +938,7 @@ func metaForSession(s model.Session) SessionMeta {
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
 	// and the id it had on the machine it came from (#1049).
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages),
 		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
@@ -1117,7 +1122,7 @@ func nextSessionOrd(sessions map[string]SessionMeta) uint32 {
 func sessionFromMeta(meta SessionMeta) model.Session {
 	return model.Session{
 		ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path,
-		Title: meta.Title, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
+		Title: meta.Title, AgentTitle: meta.AgentTitle, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
 		OrigID: meta.OrigID, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }
@@ -1733,6 +1738,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			}
 			if meta.Title == "" {
 				meta.Title = sessionTitle(s)
+				meta.AgentTitle = meta.Title != "" && earliestTitle(s.Messages, "user") == ""
 			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
@@ -2176,7 +2182,6 @@ func filePrefixHash(path string, n int64) uint64 {
 	}
 	return h.Sum64()
 }
-
 
 // countClipped records messages stored short of the transcript. The caller
 // holds the lock where one is needed; redactForIngest runs single-threaded.
