@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -96,6 +97,19 @@ func runBrief(dir string, w io.Writer) error {
 	// explanation (#696).
 	if ov.Future > 0 {
 		fmt.Fprintf(w, "ahead      %d session%s stamped later than this machine's clock\n", ov.Future, pluralS(ov.Future))
+	}
+
+	// The top line counts what is indexed; the auto rule decides what an agent
+	// actually gets. When it withholds every session the two disagree
+	// completely — the screen says the memory is there and no agent will ever
+	// see any of it — and the reader who set the rule has no reason to suspect
+	// it, because search and the listing below still answer. doctor has the
+	// number (#978); it is the fifth screen someone reaches for, not the first
+	// (#1067). Partial withholding stays quiet: the counters are still broadly
+	// true, and a caveat on every line is wallpaper.
+	if withheld, total := policyWithheldCounts(dir); total > 0 && withheld[policy.ActivationAuto] == total {
+		fmt.Fprintf(w, "withheld   %sall %d session%s%s — your trust policy's auto rule keeps them out of every agent (`deja doctor`)\n",
+			bold, total, pluralS(total), reset)
 	}
 
 	// Read the index as-is: the brief must never trigger a rebuild or let
