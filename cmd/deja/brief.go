@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -121,7 +122,15 @@ func runBrief(dir string, w io.Writer) error {
 			if title == "" {
 				title = firstUserTitle(s)
 			}
-			title = trimBriefTitle(title)
+			// Budgeted against what is already on the line, not against a
+			// constant. Every other line on this screen has a fixed 11-column
+			// prefix; this one carries the harness, the project and a date,
+			// and a fixed 44-rune title on top of that overflowed 80 columns
+			// in every store state — worst on an old store, where "Jun 27
+			// 2025" is six columns longer than "today" and the three lines
+			// came out three different lengths (#1073).
+			head := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, s.Project, search.RelativeDate(s.Updated))
+			title = trimBriefTitleTo(title, briefTitleBudget(visibleLen(head)))
 			fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, s.Project, dim, search.RelativeDate(s.Updated), reset)
 			if title != "" {
 				fmt.Fprintf(w, " · %s", title)
@@ -228,7 +237,14 @@ func pluralS(n int) string {
 // screen, a bell rings on every refresh. The `recent` lines have printed them
 // raw since they existed; this is one place for all of them (#634 set the same
 // rule for the status bar).
-func trimBriefTitle(t string) string {
+func trimBriefTitle(t string) string { return trimBriefTitleTo(t, briefTitleMax) }
+
+// briefTitleMax is the width the fixed-prefix lines (`asked`, `reused`, `hit`)
+// are laid out to: an 11-column label plus 44 plus the ellipsis is 56, which
+// fits the narrowest terminal anyone opens.
+const briefTitleMax = 44
+
+func trimBriefTitleTo(t string, max int) string {
 	t = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -237,10 +253,36 @@ func trimBriefTitle(t string) string {
 	}, t)
 	t = strings.Join(strings.Fields(t), " ")
 	r := []rune(t)
-	if len(r) > 44 {
-		return string(r[:44]) + "…"
+	if len(r) > max {
+		return string(r[:max]) + "…"
 	}
 	return t
+}
+
+// briefTitleBudget is how much title fits after a prefix of prefixLen columns.
+//
+// briefWidth is the target, not a measurement: reading the real terminal size
+// means a per-OS TIOCGWINSZ, and this module has no dependencies and builds for
+// Windows. 80 is the width that is wrong least often, COLUMNS is honoured for
+// the readers who export it, and the 44 cap keeps a wide terminal looking as it
+// always has. The floor stops a deep project path from cutting titles to
+// nothing — a line that overflows by a little beats one that says nothing.
+func briefTitleBudget(prefixLen int) int {
+	room := briefWidth() - prefixLen - 1 // the ellipsis
+	if room > briefTitleMax {
+		return briefTitleMax
+	}
+	if room < 12 {
+		return 12
+	}
+	return room
+}
+
+func briefWidth() int {
+	if n, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && n >= 20 && n <= 400 {
+		return n
+	}
+	return 80
 }
 
 // sameBriefWork reports whether the reused memory and the repeated question
