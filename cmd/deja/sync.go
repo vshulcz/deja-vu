@@ -54,7 +54,11 @@ func runSync(dir string, args []string) error {
 			return fmt.Errorf("sync export needs a target dir")
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
-			return err
+			// An index that cannot be written stops the export before a record
+			// is read, and handed back `update: mkdir /…/index.db.tmp:
+			// permission denied` — an internal path, on the same store where
+			// search names the directory to fix (#1046).
+			return ensureError(dir, err)
 		}
 		var n int
 		var err error
@@ -69,6 +73,17 @@ func runSync(dir string, args []string) error {
 			// name nobody chose. The directory is what has to change, the same
 			// as for the index (#798) and the notes file (#869) — this was the
 			// last write path still handing back the syscall (#893).
+			// The watermark for what just left is saved into the index, so an
+			// unwritable index fails here too — and arrived as "check that
+			// directory's permissions" for a destination that was writable and
+			// already held the batch (#1046, the shape of #1031).
+			if p := deniedPath(err); p != "" && !strings.HasPrefix(p, out) &&
+				(errors.Is(err, fs.ErrPermission) || writeFailureReason(err) != err.Error()) {
+				if n > 0 {
+					return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, out, ensureError(dir, err))
+				}
+				return ensureError(dir, err)
+			}
 			if parent := filepath.Dir(out); !dirExists(out) && !dirExists(parent) {
 				return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", out, parent)
 			}
