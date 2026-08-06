@@ -1578,7 +1578,7 @@ func runForget(dir string, args []string) error {
 	var o index.ForgetOptions
 	list := false
 	allMatches := false
-	unforget := ""
+	unforget, unforgetGiven := "", false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--list":
@@ -1589,7 +1589,7 @@ func runForget(dir string, args []string) error {
 			allMatches = true
 		case "--session", "--project", "--before", "--unforget":
 			if i+1 >= len(args) {
-				return fmt.Errorf("forget: %s needs value", args[i])
+				return fmt.Errorf("forget: %s needs a value", args[i])
 			}
 			i++
 			switch args[i-1] {
@@ -1598,7 +1598,7 @@ func runForget(dir string, args []string) error {
 			case "--project":
 				o.Project = args[i]
 			case "--unforget":
-				unforget = index.PastedSelector(args[i])
+				unforget, unforgetGiven = index.PastedSelector(args[i]), true
 			case "--before":
 				if d, err := parseDur(args[i]); err == nil {
 					// "older than 0 days" is the whole store, and the typo that
@@ -1621,6 +1621,12 @@ func runForget(dir string, args []string) error {
 		default:
 			return fmt.Errorf("forget: unknown flag %q", args[i])
 		}
+	}
+	// An empty `--unforget` was answered with the selectors for forgetting:
+	// the reader asked to bring something back and was told how to drop more
+	// (#1041).
+	if unforgetGiven && unforget == "" {
+		return fmt.Errorf("forget: --unforget needs an id — `deja forget --list` names the ids")
 	}
 	if !list && unforget == "" && o.Session == "" && o.Project == "" && o.Before.IsZero() {
 		// Naming the selectors here is what separates one call from hundreds:
