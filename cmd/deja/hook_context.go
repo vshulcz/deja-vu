@@ -65,6 +65,14 @@ func readHookStdin() []byte {
 // on every user message, which is the cost the decoder this replaced did not
 // have (#846).
 func readHookPayload(r io.Reader, wait time.Duration) []byte {
+	return readBounded(r, wait, true)
+}
+
+// readBounded is readHookPayload with a say in when to stop. stopAtValue=false
+// keeps reading to EOF or the deadline: the status line drains what the host
+// wrote rather than leaving the rest of it in the pipe, and only the waiting
+// needed a bound (#1074).
+func readBounded(r io.Reader, wait time.Duration, stopAtValue bool) []byte {
 	var mu sync.Mutex
 	var buf []byte
 	done := make(chan struct{})
@@ -77,7 +85,7 @@ func readHookPayload(r io.Reader, wait time.Duration) []byte {
 			if n > 0 {
 				mu.Lock()
 				buf = append(buf, chunk[:n]...)
-				whole := endsAValue(buf) && json.Valid(buf)
+				whole := stopAtValue && endsAValue(buf) && json.Valid(buf)
 				mu.Unlock()
 				if whole {
 					return
