@@ -41,7 +41,7 @@ func TestASyncedRejectionMarksTheTranscriptItRejects(t *testing.T) {
 	}
 	// The transcript is the hit this query returns; the note's own words
 	// ("pgbouncer") are not in it, which is the whole point of the bug.
-	var transcript int = -1
+	transcript := -1
 	for i, h := range hits {
 		if h.Session.Harness == "claude" {
 			transcript = i
