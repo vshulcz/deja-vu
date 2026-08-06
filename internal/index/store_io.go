@@ -22,7 +22,7 @@ import (
 // recordLogScans counts walks of the record log. There are no per-session
 // offsets, so every walk reads the whole of records.bin — which is why a
 // caller asking for sessions one at a time is a cost bug and not a style
-// point (#1061). Exported through RecordLogScans for tests that assert a
+// point (#1069). Exported through RecordLogScans for tests that assert a
 // batch path stayed one pass.
 var recordLogScans int64
 

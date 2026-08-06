@@ -13,7 +13,7 @@ import (
 // `deja files` read its matching sessions one identity at a time, and a
 // per-identity read walks the whole record log because records carry no
 // per-session offset. On a 5000-session store that was 250 walks of a 59 MB
-// log — 1.6 s of a 1.9 s command (#1061).
+// log — 1.6 s of a 1.9 s command (#1069).
 func TestFilesReadsTheRecordLogOnce(t *testing.T) {
 	tmp := hermeticEnv(t)
 	repo := filepath.Join(tmp, "repo")
@@ -54,7 +54,7 @@ func TestFilesReadsTheRecordLogOnce(t *testing.T) {
 }
 
 // blame had the same loop, bounded at 50 sessions — a bound on how many walks
-// of the whole log, not on the work (#1061).
+// of the whole log, not on the work (#1069).
 func TestBlameReadsTheRecordLogOnce(t *testing.T) {
 	tmp := hermeticEnv(t)
 	repo := filepath.Join(tmp, "repo")

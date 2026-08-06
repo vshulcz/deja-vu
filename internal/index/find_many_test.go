@@ -8,7 +8,7 @@ import (
 )
 
 // FindManyByIdentity is FindByIdentity's batch form; callers that looped over
-// the single one walked the whole record log per session (#1061).
+// the single one walked the whole record log per session (#1069).
 func TestFindManyByIdentity(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)

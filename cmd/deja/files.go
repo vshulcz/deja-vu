@@ -124,7 +124,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	scanned := 0
 
 	// One pass for all 250, not one pass each: the per-identity lookup streams
-	// the whole record log every time it is called (#1061).
+	// the whole record log every time it is called (#1069).
 	ids := make([]index.Identity, 0, len(hits))
 	for _, h := range hits {
 		ids = append(ids, index.Identity{Harness: h.Harness, ID: h.ID})
