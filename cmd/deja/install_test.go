@@ -216,3 +216,31 @@ func filesMentioning(t *testing.T, root, needle string) []string {
 	})
 	return out
 }
+
+// A stray flag fell into the target list, and the refusal then said the target
+// was missing while printing the very target it had been given (#1078).
+func TestInstallNamesAStrayFlagInsteadOfBlamingTheTarget(t *testing.T) {
+	hermeticEnv(t)
+	err := runInstall(os.Getenv("DEJA_INDEX_DIR"), []string{"claude-code", "--nonsense"}, false)
+	if err == nil {
+		t.Fatal("a stray flag was accepted")
+	}
+	if !strings.Contains(err.Error(), `unknown flag "--nonsense"`) {
+		t.Errorf("the refusal does not name the flag: %v", err)
+	}
+	if strings.Contains(err.Error(), "needs a target") {
+		t.Errorf("the refusal still blames the target it was given: %v", err)
+	}
+	// uninstall shares the path.
+	if err := runInstall(os.Getenv("DEJA_INDEX_DIR"), []string{"claude-code", "--dry-run"}, true); err == nil ||
+		!strings.Contains(err.Error(), `uninstall: unknown flag "--dry-run"`) {
+		t.Errorf("uninstall: %v", err)
+	}
+	// The flags it does take stay accepted, and a missing target still says so.
+	if err := runInstall(os.Getenv("DEJA_INDEX_DIR"), []string{"claude-code", "--no-index"}, false); err != nil {
+		t.Errorf("--no-index refused: %v", err)
+	}
+	if err := runInstall(os.Getenv("DEJA_INDEX_DIR"), nil, false); err == nil || !strings.Contains(err.Error(), "needs a target") {
+		t.Errorf("a missing target lost its message: %v", err)
+	}
+}

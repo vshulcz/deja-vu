@@ -37,15 +37,25 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 		targetArgs = append(targetArgs, arg)
 	}
+	verb := "install"
+	if uninstall {
+		verb = "uninstall"
+	}
+	// A flag deja does not know is named plainly by every other command; here
+	// it fell into the target list, and the refusal then said the target was
+	// missing while printing the target it had been given (#1078).
+	if len(targetArgs) > 1 {
+		for _, a := range targetArgs {
+			if strings.HasPrefix(a, "--") && a != "--all" && a != "--auto" {
+				return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance or --no-index", verb, a)
+			}
+		}
+	}
 	if len(targetArgs) != 1 {
 		// The first command a new machine runs, so a bare word they have to go
 		// look up is the worst possible answer. Every other command in this
 		// position prints the shape it wants (#830), and this one can do
 		// better still: name the agents actually present here.
-		verb := "install"
-		if uninstall {
-			verb = "uninstall"
-		}
 		if found := existingTargets(); len(found) > 0 {
 			sort.Strings(found)
 			return fmt.Errorf("%s needs a target — found here: %s (or --all, --auto)", verb, strings.Join(found, ", "))
