@@ -506,7 +506,9 @@ func cmdCtx(dir string, rest []string) error {
 		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
 			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", q)), "deja: "))
 		}
-		return fmt.Errorf("no session matches %q", q)
+		// The agent asking by a bucket id that moved got the dead end while
+		// the human on `show` got the way forward (#1043).
+		return fmt.Errorf("no session matches %q%s", q, movedBucketHint(dir, q))
 	}
 	// A short selector never reaches the id branch above, so a forgotten
 	// session's note arrives as an ordinary hit — and the answer still has to
@@ -2033,12 +2035,20 @@ func movedBucketHint(dir, id string) string {
 	if err != nil {
 		return ""
 	}
+	pol := policy.Load()
 	for _, shift := range []int{-1, 1} {
 		want := "deja-" + when.AddDate(0, 0, shift).Format("2006-01-02") + rest
 		for _, m := range metas {
-			if m.ID == want {
-				return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is `%s` now", want)
+			if m.ID != want {
+				continue
 			}
+			// Naming it is recalling it: a rule that hides the session hides
+			// the fact that it moved too, or the hint becomes the way around
+			// the rule (#1043).
+			if !pol.Allows(policy.ActivationSearch, m.Project) {
+				return ""
+			}
+			return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is `%s` now", want)
 		}
 	}
 	return ""

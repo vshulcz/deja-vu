@@ -59,3 +59,50 @@ func TestAStaleBucketIdSaysTheDaysRegrouped(t *testing.T) {
 		t.Errorf("an id with no neighbour was explained anyway: %v", err)
 	}
 }
+
+// The hint names a session, and naming it is recalling it: under a rule that
+// hides the session, the hint must go quiet too — otherwise it is the way
+// around the rule. And ctx, the one command that honours the rule on an
+// explicit id, was the one command that never offered the hint (#1043).
+func TestTheMovedBucketHintFollowsThePolicy(t *testing.T) {
+	tmp := hermeticEnv(t)
+	saved := time.Local
+	time.Local = time.FixedZone("test+02", 2*60*60)
+	t.Cleanup(func() { time.Local = saved })
+	notes := filepath.Join(tmp, "notes.jsonl")
+	body := `{"ts":"2026-07-16T13:40:25Z","project":"edge","text":"the vault rotation stays weekly"}` + "\n"
+	if err := os.WriteFile(notes, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_NOTES_FILE", notes)
+	if _, err := captureRunStderr(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	time.Local = time.FixedZone("test+14", 14*60*60)
+	if _, err := captureRunStderr(t, "index", "--rebuild"); err != nil {
+		t.Fatal(err)
+	}
+	stale, moved := "deja-2026-07-16-edge", "deja-2026-07-17-edge"
+
+	// ctx gets the same way forward the human gets on show.
+	if _, err := captureRun(t, "ctx", stale); err == nil {
+		t.Fatal("the stale id resolved")
+	} else if !strings.Contains(err.Error(), moved) {
+		t.Errorf("ctx does not explain the moved id: %v", err)
+	}
+
+	pol := filepath.Join(tmp, "policy.json")
+	if err := os.WriteFile(pol, []byte(`{"activations":{"search":{"local":false,"imported":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", pol)
+	for _, cmd := range [][]string{{"ctx", stale}, {"show", stale}} {
+		_, err := captureRun(t, cmd...)
+		if err == nil {
+			t.Fatalf("%v resolved a hidden session", cmd)
+		}
+		if strings.Contains(err.Error(), moved) {
+			t.Errorf("%v named a session the rule hides: %v", cmd, err)
+		}
+	}
+}
