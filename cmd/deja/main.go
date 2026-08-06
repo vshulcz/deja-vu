@@ -529,9 +529,17 @@ func cmdCtx(dir string, rest []string) error {
 // deja knows them here, and the ellipsis sent the reader to `deja last` to
 // look up what this command was already holding (#1030).
 func clearedNoteIDs(keys []string) string {
+	// Only keys a note was actually promoted from: the dropped set also holds
+	// the notes' own rows, and turning one of those into an id produced
+	// `deja-note-deja-deja-note-claude-s1`, which matches nothing.
+	known := promotedNoteSources()
 	ids := make([]string, 0, len(keys))
 	for _, k := range keys {
-		ids = append(ids, "deja-note-"+strings.ReplaceAll(k, ":", "-"))
+		id := "deja-note-" + strings.ReplaceAll(k, ":", "-")
+		if _, ok := known[id]; !ok {
+			continue
+		}
+		ids = append(ids, id)
 	}
 	sort.Strings(ids)
 	const shown = 3

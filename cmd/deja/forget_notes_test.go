@@ -94,6 +94,11 @@ func TestForgetByProjectClearsBorrowedTitlesAndNamesTheNotes(t *testing.T) {
 	if !strings.Contains(string(b), "batch the export nightly") {
 		t.Errorf("the decision was destroyed:\n%s", b)
 	}
+	// The dropped set holds the notes' own rows too, and turning one of those
+	// into an id produced `deja-note-deja-deja-note-…`, which matches nothing.
+	if strings.Contains(out, "deja-note-deja-") {
+		t.Errorf("the advice offers an id built from a note's own row: %q", out)
+	}
 	// Last, because it removes the note: the id the line offers has to be a
 	// selector that works, and the note's own row is already out of the index.
 	gone, err := captureRun(t, "forget", "--session", noteID)
