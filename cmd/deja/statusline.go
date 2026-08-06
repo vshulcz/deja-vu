@@ -11,6 +11,28 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
+// policyStatusLine names which paths a trust rule switches off, for the one
+// line that is always on screen. Silence is wrong when the reader's own
+// searches are withheld, and "activates nothing" is wrong when only the
+// automatic path is (#1012, #1102).
+func policyStatusLine() string {
+	pol := policy.Load()
+	off := make([]string, 0, 3)
+	for _, a := range []string{policy.ActivationAuto, policy.ActivationSearch, policy.ActivationMCP} {
+		if pol.Describe(a) == "nothing activates" {
+			off = append(off, a)
+		}
+	}
+	switch len(off) {
+	case 0:
+		return ""
+	case 3:
+		return "deja · off here · the trust policy activates nothing (`deja doctor`)"
+	default:
+		return "deja · " + strings.Join(off, "+") + " off · the trust policy (`deja doctor`)"
+	}
+}
+
 // runStatusline prints one line for a status bar: how much memory deja served
 // to agents today, and what earlier sessions decided about the file this one
 // is working on. It must stay fast and quiet — no lock, no fork, no record
@@ -44,8 +66,11 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	// people always have on screen read the same as an ordinary quiet day:
 	// "no recalls yet today" is true and says nothing about why it will stay
 	// true (#1012).
-	if policy.Load().Describe(policy.ActivationAuto) == "nothing activates" {
-		fmt.Fprint(stdout, withFileMemory(dir, in, "deja · off here · the trust policy activates nothing (`deja doctor`)"))
+	// Name the path that is off rather than generalising one rule to all of
+	// them: an `auto` rule said "activates nothing" while search and MCP still
+	// answered, and a `search` rule said nothing at all (#1102).
+	if line := policyStatusLine(); line != "" {
+		fmt.Fprint(stdout, withFileMemory(dir, in, line))
 		return nil
 	}
 	recalls, bytes, injected := usage.TodayWithInjections(dir)
