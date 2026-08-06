@@ -29,7 +29,12 @@ import (
 // shipped without a bump, so indexes built under the old rules kept the titles
 // they derived then — incremental ingest reuses SessionMeta for a file it has
 // already read, and no ordinary `deja index` re-derives it (#784).
-const version = 22
+// 23: the same shape again — #984 began recording an imported note's state on
+// its manifest row without a bump, so a store that imported a batch before it
+// kept a row with no state, and re-importing the batch adds nothing because it
+// is deduped. The bump is what makes the one rebuild that re-derives it happen
+// (#1049).
+const version = 23
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

@@ -397,9 +397,33 @@ func importedSessions(dir string) importedState {
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	})
 	for _, sess := range by {
+		deriveImportedNoteState(sess)
 		out.sessions = append(out.sessions, *sess)
 	}
 	return out
+}
+
+// deriveImportedNoteState recovers the state of an imported promoted note from
+// the note text. #984 started recording that state on the manifest row without
+// bumping the index format, so a store that imported a batch before it holds a
+// row with no state at all and nothing re-derives it — the batch is deduped,
+// so re-importing adds 0 records and the decision the other machine retracted
+// reads as accepted here (#1049).
+func deriveImportedNoteState(s *model.Session) {
+	if s.Harness != "deja" || s.Lifecycle != "" {
+		return
+	}
+	for _, msg := range s.Messages {
+		st, note, ok := noteStateFromText(msg.Text)
+		if !ok {
+			continue
+		}
+		s.Lifecycle, s.LifecycleNote = st, note
+		if !msg.Time.IsZero() {
+			s.LifecycleAt = msg.Time.Format("2006-01-02")
+		}
+		return
+	}
 }
 
 func load(h string) []model.Session { return loadProgress(h, nil) }
@@ -903,7 +927,12 @@ func metaForSession(s model.Session) SessionMeta {
 	// composer name, the first user message — and are persisted in
 	// sessions.gob, so they need the same scrubbing as record text.
 	title, _ = redact.Text(title)
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages)}
+	// The import fields travel with the session, not with the transcript: a
+	// rebuild reloads imported sessions out of the index itself, and rebuilding
+	// the row from scratch dropped what only the import knew — the note's state
+	// and the id it had on the machine it came from (#1049).
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages),
+		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
 // agentOwnedFile drops the agent's own working files. They are touched
