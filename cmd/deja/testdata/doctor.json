@@ -7,7 +7,8 @@
       "paths": [
         "<tmp>/claude"
       ],
-      "files": 1
+      "files": 1,
+      "indexed_sessions": 0
     },
     {
       "name": "codex",
@@ -15,7 +16,8 @@
       "paths": [
         "<tmp>/codex"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "opencode",
@@ -23,7 +25,8 @@
       "paths": [
         "<tmp>/opencode.db"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "aider",
@@ -32,7 +35,8 @@
         "<tmp>/home",
         "<tmp>/aider"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "gemini",
@@ -40,7 +44,8 @@
       "paths": [
         "<tmp>/gemini"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "cursor",
@@ -49,7 +54,8 @@
         "<tmp>/cursor",
         "<tmp>/cursor-cli"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "antigravity",
@@ -57,7 +63,8 @@
       "paths": [
         "<tmp>/antigravity"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "grok",
@@ -65,7 +72,8 @@
       "paths": [
         "<tmp>/grok"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "hermes",
@@ -74,7 +82,8 @@
         "<tmp>/home/.hermes",
         "<tmp>/home/.hermes/profiles"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "qwen",
@@ -82,7 +91,8 @@
       "paths": [
         "<tmp>/qwen/projects"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "kimi",
@@ -90,7 +100,8 @@
       "paths": [
         "<tmp>/home/.kimi-code/sessions"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "goose",
@@ -98,7 +109,8 @@
       "paths": [
         "<tmp>/home/.local/share/goose/sessions"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "pi",
@@ -106,7 +118,8 @@
       "paths": [
         "<tmp>/home/.pi/agent/sessions"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "openclaw",
@@ -114,7 +127,8 @@
       "paths": [
         "<tmp>/home/.openclaw/agents"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "copilot",
@@ -122,7 +136,8 @@
       "paths": [
         "<tmp>/copilot"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "cline",
@@ -130,13 +145,15 @@
       "paths": [
         "<tmp>/home/.cline/data/sessions"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "roo",
       "state": "missing",
       "paths": null,
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     },
     {
       "name": "deja",
@@ -144,7 +161,8 @@
       "paths": [
         "<tmp>/notes.jsonl"
       ],
-      "files": 0
+      "files": 0,
+      "indexed_sessions": 0
     }
   ],
   "index": {
