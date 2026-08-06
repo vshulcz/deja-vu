@@ -83,7 +83,7 @@ func runSync(dir string, args []string) error {
 			}
 			return err
 		}
-		fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
+		fmt.Fprintf(os.Stdout, "deja: exported %d record%s\n", n, pluralS(n))
 		// A watermark is per machine, not per destination: the second peer you
 		// hand memory to gets an empty folder and the same "exported 0
 		// records" that means "you are up to date" at the first one (#982).
@@ -113,9 +113,9 @@ func runSync(dir string, args []string) error {
 		if n > 0 {
 			// Sessions, not only records: "records" is deja's unit, and what
 			// arrived is what doctor and every other surface counts (#929).
-			line := fmt.Sprintf("deja: imported %d records", n)
+			line := fmt.Sprintf("deja: imported %d record%s", n, pluralS(n))
 			if before, after := sessionsBefore, importedSessionTotal(dir); after > before {
-				line += fmt.Sprintf(" — %d sessions from another machine", after-before)
+				line += fmt.Sprintf(" — %d session%s from another machine", after-before, pluralS(after-before))
 			}
 			fmt.Fprintln(os.Stdout, line)
 		}

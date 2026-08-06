@@ -35,7 +35,7 @@ func TestExportToASecondDestinationSaysWhyItIsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "exported 1 records") {
+	if !strings.Contains(out, "exported 1 record\n") {
 		t.Fatalf("the first export did not carry the session:\n%s", out)
 	}
 	// Same destination again is the up-to-date case and must stay quiet about
