@@ -183,7 +183,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if strings.TrimSpace(digest) == "" {
 		return nil
 	}
-	lead := "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one digest.Short line what deja-vu recalled; otherwise ignore silently.\n" + rejectedWarning
+	lead := promptHookLead + rejectedWarning
 	out := frameRecall(lead + digest + citationLine(ss[0]))
 	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms, sessionIDs(ss)...)
 	if plain {
@@ -215,7 +215,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 }
 
 // promptSearchTerms extracts the informative tokens from a natural-language
-// prompt: stop words and digest.Short fragments dropped, capped so the query stays
+// prompt: stop words and short fragments dropped, capped so the query stays
 // specific.
 func promptSearchTerms(prompt string) []string {
 	fields := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool {
@@ -613,3 +613,5 @@ func sessionIDs(ss []model.Session) []string {
 	}
 	return out
 }
+
+const promptHookLead = "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one short line what deja-vu recalled; otherwise ignore silently.\n"

@@ -10,4 +10,4 @@ Before re-deriving past work, search deja when the user refers to past work, pre
 
 Example: for "what did we decide about token refresh?", call recall with query "token refresh decision", then call recall_context if the result needs more detail.
 
-When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — say so to the user in one digest.Short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.
+When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.
