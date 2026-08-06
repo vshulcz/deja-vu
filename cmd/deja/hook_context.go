@@ -177,6 +177,13 @@ func buildNotice(dir string) string {
 	// reachable only when the directory was writable. Every session went out
 	// silent, in the one state that never repairs itself (#1048).
 	if (warmupJustRequested(dir) || indexNeedsRebuild(dir)) && !indexDirWritable(dir) {
+		// A disk that went away is not a permission problem, and telling
+		// someone to check the permissions of a directory that is not there
+		// sends them nowhere. `deja index` and doctor already separate the
+		// two; session start is where the state is first noticed (#1054).
+		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
+			return fmt.Sprintf("deja: the index is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
+		}
 		return fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
 	}
 	if !warmupJustRequested(dir) {
