@@ -585,6 +585,10 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	if len(hits) == 0 {
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
 	}
+	// The same order the search screen shows: this handed the agent a session
+	// the reader had rejected, while search demoted it and said why (#1099).
+	attachLifecycles(dir, hits)
+	demoteRejected(hits)
 	var b bytes.Buffer
 	search.PrintContext(&b, hits[0].Session, q)
 	text := b.String()

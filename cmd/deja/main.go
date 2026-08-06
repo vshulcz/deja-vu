@@ -527,6 +527,11 @@ func cmdCtx(dir string, rest []string) error {
 		fmt.Fprint(os.Stderr, policyHiddenNote(policy.ActivationSearch, policyHidden))
 		return fmt.Errorf("no session matches %q", q)
 	}
+	// The same order the search screen shows: ctx took the top hit off its own
+	// ranking, so a session the reader had rejected was handed to the agent as
+	// the answer while search demoted it and said why (#1099, #974).
+	attachLifecycles(dir, hits)
+	demoteRejected(hits)
 	if len(hits) == 0 {
 		// Same as #834 in files and restore: an empty store is not a miss on
 		// the query.
