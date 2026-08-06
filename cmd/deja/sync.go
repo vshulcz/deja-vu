@@ -54,7 +54,11 @@ func runSync(dir string, args []string) error {
 			return fmt.Errorf("sync export needs a target dir")
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
-			return err
+			// An index that cannot be written stops the export before a record
+			// is read, and handed back `update: mkdir /…/index.db.tmp:
+			// permission denied` — an internal path, on the same store where
+			// search names the directory to fix (#1046).
+			return ensureError(dir, err)
 		}
 		var n int
 		var err error
