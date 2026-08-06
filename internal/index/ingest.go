@@ -1329,10 +1329,39 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// which every surface reads "no agent history was found on this machine".
 	// The files are still there, on a disk that is not, and reconnecting it
 	// restores them; that is what this says (#900).
+	//
+	// Saying it once was not enough: the eviction still happened, so from the
+	// next run on there was nothing left to compare against and the warning
+	// stopped too. Records that came off a mount point stay in the index while
+	// the volume is away, and the line repeats until it is back.
+	gone := missingTrees(removed)
+	for _, g := range gone {
+		if !g.mount {
+			continue
+		}
+		for p := range removed {
+			if !strings.HasPrefix(p, g.dir+string(filepath.Separator)) {
+				continue
+			}
+			if of, ok := old.Files[p]; ok {
+				files[p] = of
+				delete(removed, p)
+			}
+		}
+	}
 	if progress != nil {
-		for _, gone := range missingTrees(removed) {
+		for _, g := range gone {
+			if g.mount {
+				verb := "is"
+				if g.files != 1 {
+					verb = "are"
+				}
+				fmt.Fprintf(progress, "deja: %s is not mounted — its %d indexed file%s %s still searchable; reconnect the disk to pick up anything new\n",
+					g.dir, g.files, pluralFiles(g.files), verb)
+				continue
+			}
 			fmt.Fprintf(progress, "deja: %s is gone, and %d indexed file%s with it — if that disk is simply not mounted, reconnect it and run `deja index`\n",
-				gone.dir, gone.files, pluralFiles(gone.files))
+				g.dir, g.files, pluralFiles(g.files))
 		}
 	}
 	if len(changed) == 0 && len(removed) == 0 {
@@ -1815,6 +1844,47 @@ func priorFiles(m Manifest, err error) map[string]FileState {
 type missingTree struct {
 	dir   string
 	files int
+	// mount is set when dir is a mount point rather than an ordinary
+	// directory: an unplugged disk, not a deletion.
+	mount bool
+}
+
+// mountParents are the directories whose direct children are mount points.
+// A test cannot create one for real — /Volumes is not writable — so it
+// points this at a temporary directory instead.
+var mountParents = defaultMountParents()
+
+func defaultMountParents() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{"/Volumes"}
+	case "windows":
+		return nil
+	default:
+		return []string{"/mnt", "/media"}
+	}
+}
+
+// mountRoot reports whether dir is where a removable volume gets mounted.
+// A directory the user deleted is a deletion and its sessions leave the
+// index; a mount point that is empty means the disk is elsewhere, and the
+// sessions it holds are not gone.
+func mountRoot(dir string) bool {
+	dir = filepath.Clean(dir)
+	parent := filepath.Dir(dir)
+	if parent == dir {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return filepath.VolumeName(dir) == dir || parent == filepath.VolumeName(dir)+`\`
+	}
+	for _, m := range mountParents {
+		if parent == m {
+			return true
+		}
+	}
+	// /run/media/<user>/<volume> is what udisks2 uses.
+	return runtime.GOOS == "linux" && filepath.Dir(parent) == "/run/media"
 }
 
 // missingTrees groups files that disappeared by the outermost directory that
@@ -1841,7 +1911,7 @@ func missingTrees(removed map[string]bool) []missingTree {
 	}
 	out := make([]missingTree, 0, len(byDir))
 	for dir, n := range byDir {
-		out = append(out, missingTree{dir: dir, files: n})
+		out = append(out, missingTree{dir: dir, files: n, mount: mountRoot(dir)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].dir < out[j].dir })
 	return out
