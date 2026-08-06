@@ -41,13 +41,18 @@ const (
 // readStatuslineInput consumes the payload without ever blocking. An
 // interactive terminal has nothing piped, and a host that pipes something
 // deja does not understand must cost nothing to ignore.
+//
+// "Without blocking" used to mean ReadAll on a pipe, which is only true while
+// the host closes it: one that opened stdin and held it hung the status bar
+// for as long as the host allowed, on every assistant message (#1074). Same
+// bound the hooks have had since #846.
 func readStatuslineInput(r io.Reader) transcriptSource {
 	var in transcriptSource
 	if !pipedStdin(r) {
 		return in
 	}
-	b, err := io.ReadAll(io.LimitReader(r, 1<<20))
-	if err != nil || len(b) == 0 {
+	b := readBounded(r, hookStdinWait, false)
+	if len(b) == 0 {
 		return in
 	}
 	_ = json.Unmarshal(b, &in)
