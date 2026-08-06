@@ -469,7 +469,48 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		hits = append(hits, doc.hit)
 	}
 	sortHits(hits)
+	liftNotesAboveTheirSource(hits)
 	return hits
+}
+
+// liftNotesAboveTheirSource keeps a promoted note in front of the transcript it
+// was distilled from. The two say the same thing, so nothing is buried by the
+// swap — but the note says it in one line with a state attached, and that is
+// what `promote` promises. Score alone cannot deliver it: the transcript
+// carries the query words in its title and the note does not, and once a note
+// is dated by its evidence rather than by the day it was filed (V4) the two are
+// equally fresh, so the transcript won its own distillation.
+func liftNotesAboveTheirSource(hits []Hit) {
+	notes := make(map[string]int, len(hits))
+	for i, h := range hits {
+		if h.Session.Harness == notesHarness && strings.HasPrefix(h.Session.ID, "deja-note-") {
+			notes[h.Session.ID] = i
+		}
+	}
+	if len(notes) == 0 {
+		return
+	}
+	for i := 0; i < len(hits); i++ {
+		h := hits[i]
+		if h.Session.Harness == notesHarness {
+			continue
+		}
+		// Mirrors sources.PromotedNoteID: building the id rather than parsing
+		// one keeps a harness name with a dash in it from splitting wrong.
+		id := "deja-note-" + h.Session.Harness + "-" + h.Session.ID
+		j, ok := notes[id]
+		if !ok || j < i {
+			continue
+		}
+		note := hits[j]
+		copy(hits[i+1:j+1], hits[i:j])
+		hits[i] = note
+		for k := i; k <= j; k++ {
+			if hits[k].Session.Harness == notesHarness && strings.HasPrefix(hits[k].Session.ID, "deja-note-") {
+				notes[hits[k].Session.ID] = k
+			}
+		}
+	}
 }
 
 // sortHits orders a ranked result set.

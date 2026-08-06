@@ -110,7 +110,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if title == "" {
 		title = firstLine(text)
 	}
-	if err := sources.AppendPromotedTagged(s.Project, title, text, src, state, tags, time.Now()); err != nil {
+	if err := sources.AppendPromotedSourced(s.Project, title, text, src, state, tags, s.Updated, time.Now()); err != nil {
 		return notesWriteError(err)
 	}
 	// The note has to reach the index before the line below claims it outranks

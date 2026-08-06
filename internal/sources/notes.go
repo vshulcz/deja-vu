@@ -27,6 +27,12 @@ type note struct {
 	State   string   `json:"state,omitempty"`
 	Title   string   `json:"title,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
+	// SrcTS is when the source transcript was last updated. A note is a
+	// distillation, so its evidence is as old as the session it came from.
+	// Stamping the note with the moment someone typed `promote` made a
+	// January conclusion the freshest thing in the store and sank the August
+	// session that corrected it. Absent on notes written before this.
+	SrcTS string `json:"src_ts,omitempty"`
 }
 
 func NotesFile() string {
@@ -163,12 +169,17 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 				title = "promoted from " + src
 			}
 			s.Title = title + " [" + state + "]"
-			s.Touch(t)
-			body := "[" + state + "] " + text + " (from " + src + ", " + t.UTC().Format("2006-01-02") + ")"
+			// A promoted note is dated by the evidence it distils, not by the
+			// moment it was filed: ranking decays with age, so promoting an
+			// old session minted the newest thing in the store and buried the
+			// newer session that contradicted it (V4).
+			stamp := noteEvidenceTime(m, t)
+			s.Touch(stamp)
+			body := "[" + state + "] " + text + " (from " + src + ", " + stamp.UTC().Format("2006-01-02") + ")"
 			if tagLine := renderNoteTags(m); tagLine != "" {
 				body += " " + tagLine
 			}
-			s.Messages = append(s.Messages, model.Message{Role: "user", Text: body, Time: t})
+			s.Messages = append(s.Messages, model.Message{Role: "user", Text: body, Time: stamp})
 			return
 		}
 		// The bucket day is the reader's day, not UTC's. The line is labelled
@@ -213,6 +224,22 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 	return out, nil
 }
 
+// noteEvidenceTime returns the source transcript's time for a promoted note,
+// falling back to the note's own timestamp when the line predates src_ts or
+// carries one that has not happened yet — a stamp ahead of the clock would
+// outrank everything, which is the failure this exists to prevent.
+func noteEvidenceTime(m map[string]any, filed time.Time) time.Time {
+	raw, _ := m["src_ts"].(string)
+	if raw == "" {
+		return filed
+	}
+	src, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil || src.IsZero() || src.After(filed) {
+		return filed
+	}
+	return src
+}
+
 func reverseMessages(ms []model.Message) {
 	for i, j := 0, len(ms)-1; i < j; i, j = i+1, j-1 {
 		ms[i], ms[j] = ms[j], ms[i]
@@ -229,6 +256,13 @@ func AppendPromoted(project, title, text, session, state string, now time.Time) 
 }
 
 func AppendPromotedTagged(project, title, text, session, state string, tags []string, now time.Time) error {
+	return AppendPromotedSourced(project, title, text, session, state, tags, time.Time{}, now)
+}
+
+// AppendPromotedSourced also records when the source transcript was last
+// updated, so the note ranks by the age of the evidence rather than by when
+// someone got around to promoting it.
+func AppendPromotedSourced(project, title, text, session, state string, tags []string, srcTS, now time.Time) error {
 	if strings.TrimSpace(session) == "" {
 		return fmt.Errorf("session required")
 	}
@@ -257,10 +291,14 @@ func AppendPromotedTagged(project, title, text, session, state string, tags []st
 	if now.IsZero() {
 		now = time.Now()
 	}
+	stamp := ""
+	if !srcTS.IsZero() {
+		stamp = srcTS.UTC().Format(time.RFC3339Nano)
+	}
 	return json.NewEncoder(f).Encode(note{
 		TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text,
 		Kind: "promoted", Session: session, State: state, Title: title,
-		Tags: NormalizeTags(tags),
+		Tags: NormalizeTags(tags), SrcTS: stamp,
 	})
 }
 
