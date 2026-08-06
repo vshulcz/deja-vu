@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"strings"
 	"testing"
 	"time"
@@ -107,7 +108,7 @@ func TestIsAgentArtifactSpotsPlumbing(t *testing.T) {
 // are indexed as tokens and shown back to the user as garbage.
 func TestStripANSIRemovesEscapesOnly(t *testing.T) {
 	in := "\x1b[31mred\x1b[0m and \x1b[1;32mgreen\x1b[0m"
-	got := stripANSI(in)
+	got := redact.SafeForDisplay(in)
 	if strings.Contains(got, "\x1b") {
 		t.Fatalf("escape survived: %q", got)
 	}
@@ -116,7 +117,7 @@ func TestStripANSIRemovesEscapesOnly(t *testing.T) {
 	}
 	// Text with no escapes must come back untouched, byte for byte.
 	plain := "plain text with [brackets] and 0m digits"
-	if stripANSI(plain) != plain {
-		t.Fatalf("plain text was altered: %q", stripANSI(plain))
+	if redact.SafeForDisplay(plain) != plain {
+		t.Fatalf("plain text was altered: %q", redact.SafeForDisplay(plain))
 	}
 }

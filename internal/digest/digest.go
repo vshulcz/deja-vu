@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -69,7 +70,7 @@ func Share(s model.Session, budget int) string {
 }
 
 func MessageText(s string) string {
-	s = strings.TrimSpace(stripANSI(s))
+	s = strings.TrimSpace(redact.SafeForDisplay(s))
 	if s == "" {
 		return ""
 	}
@@ -201,33 +202,6 @@ func looksLikeDataDump(t string) bool {
 	return longestRun > 200
 }
 
-func stripANSI(s string) string {
-	var b strings.Builder
-	inEsc := false
-	inCSI := false
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if inCSI {
-			if c >= '@' && c <= '~' {
-				inCSI = false
-			}
-			continue
-		}
-		if inEsc {
-			inEsc = false
-			if c == '[' {
-				inCSI = true
-			}
-			continue
-		}
-		if c == 0x1b {
-			inEsc = true
-			continue
-		}
-		b.WriteByte(c)
-	}
-	return b.String()
-}
 
 func UTF8SafeCut(s string, n int) string {
 	if n <= 0 {

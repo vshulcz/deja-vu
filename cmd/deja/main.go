@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -645,7 +646,9 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		if title == "" {
 			title = firstUserTitle(s)
 		}
-		if title != "" {
+		// The title is transcript text going straight to a terminal: an escape
+		// in it repaints the screen and a carriage return rewinds the line.
+		if title = redact.SafeForDisplay(title); title != "" {
 			fmt.Printf(" %s", title)
 		}
 		fmt.Println()
