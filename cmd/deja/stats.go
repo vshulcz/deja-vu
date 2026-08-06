@@ -92,7 +92,7 @@ func runStats(dir string, args []string) error {
 				options.Since = d
 			}
 		default:
-			return fmt.Errorf("stats: unknown flag %s", args[i])
+			return fmt.Errorf("stats: unknown flag %q", args[i])
 		}
 	}
 	if (jsonOut && card) || (jsonOut && html) || (card && html) {

@@ -38,7 +38,7 @@ func runSyncSSH(dir string, args []string) error {
 			full = true
 		default:
 			if strings.HasPrefix(a, "-") {
-				return fmt.Errorf("sync ssh: unknown flag %s", a)
+				return fmt.Errorf("sync ssh: unknown flag %q", a)
 			}
 			if host != "" {
 				return fmt.Errorf("sync ssh takes one host")

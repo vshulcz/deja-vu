@@ -43,7 +43,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			doExec = true
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return fmt.Errorf("handoff: unknown flag %s", args[i])
+				return fmt.Errorf("handoff: unknown flag %q", args[i])
 			}
 			prefix = args[i]
 		}
