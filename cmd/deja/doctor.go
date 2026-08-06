@@ -393,10 +393,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// two answers about one store: `found` here and `unreadable` there (#999).
 	inspected := map[string]string{}
 	unchecked := map[string]bool{}
+	partly := map[string]bool{}
 	for _, check := range doctorStoreChecks() {
 		store, _ := inspectDoctorStore(check)
 		inspected[check.name] = store.State
 		unchecked[check.name] = store.Unchecked
+		partly[check.name] = store.Partial
 	}
 
 	printRow := func(name, path string, present bool, detail string) {
@@ -415,7 +417,14 @@ func doctorHarnesses(w io.Writer, dir string) {
 						detail += ", "
 					}
 					// The warning block below names the path and what to do.
-					detail += "cannot be read"
+					// Whole or in part: the row folded both into "cannot be
+					// read" while the warning under it and the search above
+					// said the store still answers (#1034, #816).
+					if partly[name] {
+						detail += "partly unreadable"
+					} else {
+						detail += "cannot be read"
+					}
 				}
 			}
 			// A walk that stopped at its budget looked at part of the store,
