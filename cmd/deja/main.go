@@ -1742,6 +1742,10 @@ func runForget(dir string, args []string) error {
 				unforget, n, joinCapped(index.TombstonesMatching(unforget), 5))
 		}
 		var lifted int
+		// The ids to name afterwards are the tombstones this call lifts, read
+		// before it lifts them — after the rebuild the manifest holds every
+		// session the selector matches, restored or never forgotten (#1095).
+		lifting := index.TombstonesMatching(unforget)
 		if err := withBuildProgress(func() error {
 			var err error
 			lifted, err = index.Unforget(dir, unforget, os.Stderr)
@@ -1757,10 +1761,13 @@ func runForget(dir string, args []string) error {
 		// still on this machine. An imported one lives only in the index, so
 		// forget took the last copy — and the undo reported a restore that did
 		// not happen (#967).
-		back, gone := restoredSessions(dir, unforget, lifted)
+		back, gone, names := restoredSessions(dir, unforget, lifted, lifting)
 		restorePromotedTitles(dir, unforget)
 		if back > 0 {
-			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index\n", back, pluralS(back))
+			// The ids, not just the count: this is the moment someone checks
+			// that they got back exactly what they lost, and both the list and
+			// the ambiguity refusal name them a step earlier (#1095, #1014).
+			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index — %s\n", back, pluralS(back), joinCapped(names, 5))
 		}
 		if gone > 0 {
 			fmt.Fprintf(os.Stdout, "%d of them came from another machine and deja held the only copy — the tombstone is lifted, but the records are gone; `deja sync import` brings them back\n", gone)
@@ -2377,20 +2384,39 @@ func dayWord(n int) string {
 // restoredSessions splits what a lifted tombstone actually returned from what
 // it could not: a session whose transcript is on this machine is re-read by the
 // rebuild, while an imported one existed only in the index that forget rewrote.
-func restoredSessions(dir, selector string, lifted int) (back, gone int) {
+func restoredSessions(dir, selector string, lifted int, lifting []string) (back, gone int, names []string) {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
-		return lifted, 0
+		return lifted, 0, lifting
 	}
+	// A session counts as back only if its row is in the manifest again: an
+	// imported one lives only in the index, so forget took the last copy and
+	// lifting its tombstone restores nothing (#967).
+	here := map[string]bool{}
 	for _, m := range metas {
-		if index.SelectorMatches(m, selector) {
+		here[m.Harness+":"+m.ID] = true
+	}
+	for _, key := range lifting {
+		if here[key] {
 			back++
+			names = append(names, key)
 		}
 	}
-	if back > lifted {
-		back = lifted
+	if back == 0 && lifted > 0 {
+		// Selectors that are not whole keys (a bare id, a prefix) still count
+		// through the manifest, as before.
+		for _, m := range metas {
+			if index.SelectorMatches(m, selector) {
+				back++
+				names = append(names, m.Harness+":"+m.ID)
+			}
+		}
+		if back > lifted {
+			back, names = lifted, names[:lifted]
+		}
 	}
-	return back, lifted - back
+	sort.Strings(names)
+	return back, lifted - back, names
 }
 
 // restorePromotedTitles gives a promoted note back the title it borrowed from a
