@@ -106,7 +106,10 @@ func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
 	if err := json.Unmarshal([]byte(stats), &s); err != nil {
 		t.Fatal(err)
 	}
-	if want := humanBytes(s.Recall.Bytes); !strings.Contains(resp.SystemMessage, "("+want+")") {
+	// The number, not its punctuation: the receipt names what the figure
+	// measures ("… of context") since #1082, and the invariant this test
+	// exists for is that the two surfaces quote the same number.
+	if want := humanBytes(s.Recall.Bytes); !strings.Contains(resp.SystemMessage, want) {
 		t.Errorf("the first screen says something else than stats counts (%s):\n%s", want, resp.SystemMessage)
 	}
 }
