@@ -233,8 +233,19 @@ func TestRequestWarmupBranches(t *testing.T) {
 	if spawned != 2 {
 		t.Fatalf("stale sentinel not replaced: spawned=%d", spawned)
 	}
-	// A corrupt sentinel is also replaced.
-	if err := os.WriteFile(filepath.Join(dir, "warmup.sentinel"), []byte("garbage"), 0o600); err != nil {
+	// A corrupt sentinel is also replaced, once it is old enough to be nobody's
+	// claim in flight: no readable stamp is exactly what a claim looks like
+	// between its O_EXCL create and the write that follows (#1065).
+	corrupt := filepath.Join(dir, "warmup.sentinel")
+	if err := os.WriteFile(corrupt, []byte("garbage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	requestWarmup(dir)
+	if spawned != 2 {
+		t.Fatalf("a sentinel with no stamp yet was taken for a dead one: spawned=%d", spawned)
+	}
+	when := time.Now().Add(-2 * warmupDeadAfter)
+	if err := os.Chtimes(corrupt, when, when); err != nil {
 		t.Fatal(err)
 	}
 	requestWarmup(dir)

@@ -769,6 +769,17 @@ func requestWarmup(dir string) {
 		}
 		b, readErr := os.ReadFile(sentinel)
 		stamp, parseErr := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
+		// The claim is the O_EXCL create; the stamp lands a moment later. A
+		// sentinel read inside that window is empty, and treating empty as
+		// unreadable made the second hook delete another hook's claim and
+		// spawn a build of its own — two rebuilds over one directory whenever
+		// two projects started together (#1065). The file's own mtime says
+		// when the claim was made.
+		if readErr == nil && parseErr != nil {
+			if fi, statErr := os.Stat(sentinel); statErr == nil {
+				stamp, parseErr = fi.ModTime().UnixNano(), nil
+			}
+		}
 		if readErr == nil && parseErr == nil && now.Sub(time.Unix(0, stamp)) < warmupRetryAfter && !warmupLooksDead(dir, now, stamp) {
 			return
 		}
