@@ -2,6 +2,7 @@ package index
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -198,6 +199,37 @@ func writeTombstones(set map[string]bool) error {
 	return nil
 }
 
+// appendTombstones adds keys to the set on disk without reading or rewriting
+// what is already there. Forget only ever grows the set, and the full rewrite
+// was the whole cost of the command on a machine with a large history (#1029).
+func appendTombstones(keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if err := os.MkdirAll(privacyDir(), 0o700); err != nil {
+		return err
+	}
+	sort.Strings(keys)
+	var buf bytes.Buffer
+	for _, key := range keys {
+		buf.WriteString(key)
+		buf.WriteByte('\n')
+	}
+	f, err := os.OpenFile(tombstonePath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(buf.Bytes()); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
 func writeTombstoneMirror(keys []string) error {
 	return writeTombstoneMirrorAt("", keys)
 }
@@ -344,6 +376,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		return ForgetResult{}, err
 	}
 	dead := readTombstones()
+	var added []string
 	matched := map[string]bool{}
 	result := ForgetResult{}
 	// An id that names a session exactly means that session. Prefix matching
@@ -377,6 +410,9 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		}
 		if !dead[key] {
 			result.Tombstones++
+			if !o.DryRun {
+				added = append(added, key)
+			}
 		}
 		if !o.DryRun {
 			dead[key] = true
@@ -416,11 +452,19 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 		return result, nil
 	}
 	for _, k := range contentKeys {
+		if !dead[k] {
+			added = append(added, k)
+		}
 		dead[k] = true
 	}
 	// Persist tombstones before the rebuild: a crash between the two must
 	// leave sessions forgotten, not resurrect them on the next index pass.
-	if err := writeTombstones(dead); err != nil {
+	// Appending the new keys rather than rewriting the whole set: the set only
+	// grows here, and rewriting it cost 4.9 s of a 6.6 s forget once a machine
+	// had forgotten a million note lines (#1029). A torn append loses the keys
+	// it was in the middle of writing, which is the same outcome as crashing a
+	// moment earlier; unforget, which removes keys, still rewrites in full.
+	if err := appendTombstones(added); err != nil {
 		return result, err
 	}
 	if err := rebuildWithTombstones(dir, "", "", currentFiles(""), nil, dead); err != nil {
