@@ -25,6 +25,17 @@ func importedSessionTotal(dir string) int {
 	return total
 }
 
+// ownCopyLine says how much of a folder is this machine's own export coming
+// back. It counted one record with a plural verb — "1 record were already
+// here" — the slip #1052 fixed on the neighbouring lines.
+func ownCopyLine(own int) string {
+	was := "were"
+	if own == 1 {
+		was = "was"
+	}
+	return fmt.Sprintf("deja: %d record%s %s already here word for word — this folder holds a copy of what this machine has\n", own, pluralS(own), was)
+}
+
 func runSync(dir string, args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("sync needs export <dir>, import <dir>, or ssh <host>")
@@ -143,7 +154,7 @@ func runSync(dir string, args []string) error {
 		// checked — the same session, instant and text — not who wrote it: a
 		// batch carries no machine id (#955).
 		if own := index.ImportSkippedOwn(); own > 0 {
-			fmt.Fprintf(os.Stdout, "deja: %d record%s were already here word for word — this folder holds a copy of what this machine has\n", own, pluralS(own))
+			fmt.Fprint(os.Stdout, ownCopyLine(own))
 		}
 		// The count is a fact about this machine's memory, not about one
 		// terminal moment: a peer who keeps sending sessions you forgot drops

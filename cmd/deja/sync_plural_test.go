@@ -42,3 +42,14 @@ func TestSyncAndStatsCountOneSessionInTheSingular(t *testing.T) {
 		t.Errorf("the plural case broke: %q", got)
 	}
 }
+
+// The own-copy line counted one record with a plural verb: "1 record were
+// already here", the same slip #1052 fixed on the import and stats lines.
+func TestTheOwnCopyLineAgreesWithItsCount(t *testing.T) {
+	if got := ownCopyLine(1); !strings.Contains(got, "1 record was already here") {
+		t.Errorf("one record: %q", got)
+	}
+	if got := ownCopyLine(2); !strings.Contains(got, "2 records were already here") {
+		t.Errorf("two records: %q", got)
+	}
+}
