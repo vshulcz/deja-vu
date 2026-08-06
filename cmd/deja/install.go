@@ -317,7 +317,11 @@ func printMemoryProofOf(dir, heading string, keep func(model.Session) bool) {
 		// says the same thing with a dash (#964).
 		date := "-"
 		if !s.Updated.IsZero() {
-			date = s.Updated.Format("Jan 2")
+			// The reader's zone, like `last` and search. An imported record
+			// keeps the exporting machine's offset, so formatting it as it
+			// arrived dated a UTC+14 session "Aug 7" on a UTC−11 machine that
+			// listed the same session under Aug 6 everywhere else (#1047).
+			date = s.Updated.Local().Format("Jan 2")
 		}
 		lines = append(lines, fmt.Sprintf("  [%s · %s · %s] %s", s.Harness, s.Project, date, title))
 		shown++
