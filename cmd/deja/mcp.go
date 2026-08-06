@@ -281,6 +281,7 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	if limit <= 0 {
 		limit = 10
 	}
+	found := len(hits)
 	if !o.All && len(hits) > limit {
 		hits = hits[:limit]
 	}
@@ -289,8 +290,29 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	// against the ~4 KB the other tools answer in. The snippets that sit beside
 	// it are the part an agent reads; the full session is one recall_context
 	// away when it genuinely needs it.
-	return string(mustMarshalBlame(hits)), len(hits), nil
+	//
+	// The byte budget below is the same cap for every path into here. `all`
+	// used to skip the truncation above and hand back 162 KB from a store where
+	// 300 sessions touched one file (#1071); a cap that an argument can turn
+	// off is not a cap.
+	body := mustMarshalBlame(hits, 0)
+	for len(body) > blameMCPBudget && len(hits) > 1 {
+		hits = hits[:max(len(hits)*3/4, 1)]
+		body = mustMarshalBlame(hits, 0)
+	}
+	if omitted := found - len(hits); omitted > 0 {
+		// Silently returning the top slice let an agent conclude it had seen
+		// every session that touched the file. Say what was left out and what
+		// to do about it.
+		body = mustMarshalBlame(hits, omitted)
+	}
+	return string(body), len(hits), nil
 }
+
+// blameMCPBudget bounds one blame answer. Higher than recall's ~4 KB because a
+// hit is a whole session rather than a snippet, and well under what an agent
+// can absorb from one tool call.
+const blameMCPBudget = 8192
 
 // blameHitJSON is what the MCP blame tool returns: the same shape as the CLI's
 // --json minus the session's message list.
@@ -314,8 +336,8 @@ type blameSessionJSON struct {
 	Touched []string  `json:"touched,omitempty"`
 }
 
-func mustMarshalBlame(hits []search.BlameHit) []byte {
-	out := make([]blameHitJSON, 0, len(hits))
+func mustMarshalBlame(hits []search.BlameHit, omitted int) []byte {
+	out := make([]any, 0, len(hits)+1)
 	for _, h := range hits {
 		out = append(out, blameHitJSON{
 			Session: blameSessionJSON{
@@ -326,6 +348,11 @@ func mustMarshalBlame(hits []search.BlameHit) []byte {
 			Title: h.Session.Title, Count: h.Count, Score: h.Score,
 			Tier: h.Tier, Snippets: h.Snippets,
 		})
+	}
+	if omitted > 0 {
+		out = append(out, map[string]any{"note": fmt.Sprintf(
+			"%d more session%s touch this path and were left out to stay within one answer — narrow with project, harness or since, or call recall_context on one of the above.",
+			omitted, pluralS(omitted))})
 	}
 	b, err := json.Marshal(out)
 	if err != nil {
@@ -427,7 +454,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	total := len(hits)
 	if offset > 0 {
 		if offset >= total {
-			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", q, total, offset), 0, 0, nil, nil
+			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", clampEcho(q), total, offset), 0, 0, nil, nil
 		}
 		hits = hits[offset:]
 	}

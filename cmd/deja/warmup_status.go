@@ -213,6 +213,7 @@ func emptyRecallAnswer(dir, q string) string { return emptyRecallAnswerPolicy(di
 // the answer is empty. An agent told "no prior sessions matched" concludes the
 // work was never done and starts over (#680).
 func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
+	q = clampEcho(q)
 	if st := readWarmupStatus(dir); st != nil {
 		return fmt.Sprintf("deja is still building its index (%s). Nothing can be recalled yet — it finishes within a few seconds, so ask again later in this session rather than concluding there is no history.", st.progress())
 	}
@@ -228,4 +229,20 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 			q, filepath.Dir(dir))
 	}
 	return fmt.Sprintf("No prior deja sessions matched %q.", q)
+}
+
+// clampEcho bounds a query before it is quoted back to the agent. Echoing the
+// whole thing made the answer as large as the caller's input — a 64 KB query
+// came back as a 64 KB tool result, against the ~4 KB the tool promises — and
+// the description tells agents to query with whole error strings (#1070). The
+// tail is kept as well as the head: the distinguishing part of a pasted stack
+// trace is rarely at the front.
+func clampEcho(q string) string {
+	const width = 120
+	r := []rune(q)
+	if len(r) <= width {
+		return q
+	}
+	head := width * 2 / 3
+	return string(r[:head]) + "…" + string(r[len(r)-(width-head-1):])
 }

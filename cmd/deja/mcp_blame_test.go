@@ -26,7 +26,7 @@ func TestMCPBlameLeavesTheTranscriptBehind(t *testing.T) {
 		Title: "pool exhaustion", Count: 3, Score: 1.5, Tier: "exact",
 		Snippets: []string{"we chose transaction pooling"},
 	}}
-	out := mustMarshalBlame(hits)
+	out := mustMarshalBlame(hits, 0)
 	if len(out) > 4096 {
 		t.Fatalf("blame answered %d bytes for one hit; the transcript is still in there", len(out))
 	}
