@@ -62,7 +62,17 @@ func defaultLogoWanted(f *os.File) bool {
 	if err != nil {
 		return false
 	}
-	return fi.Mode()&os.ModeCharDevice != 0
+	if fi.Mode()&os.ModeCharDevice == 0 {
+		return false
+	}
+	// The null device is a character device too, so it passed this test and
+	// `deja index >/dev/null` took the interactive branch: the live display
+	// painted into the sink that discards it, and the plain progress lines —
+	// which go to stderr and were the point of redirecting stdout away — were
+	// never printed at all. #862 hit this from the detached warmup and patched
+	// that one caller by sentinel; the redirect a person types in a script or
+	// a cron entry reaches the same place.
+	return !isNullDevice(fi)
 }
 
 // logoLines lays the info column beside the mark, vertically centred, and
