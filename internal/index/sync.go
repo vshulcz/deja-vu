@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -635,6 +636,14 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 			// than one the reader can retry (#891).
 			return fmt.Errorf("%s line %d is not a record deja wrote: %w", filepath.Base(path), line, err)
 		}
+		// Metadata from a batch is another machine's text: it lands in the
+		// project label and the harness tag, which are rendered into result
+		// lines a human and a model both read. A newline there forged a whole
+		// extra entry — one with no "imported:" prefix, so it read as local
+		// work (#1080). Message text is redacted further down; these fields
+		// were never touched.
+		rec.Project = sanitizeSyncField(rec.Project, syncFieldMax)
+		rec.Harness = sanitizeSyncField(rec.Harness, syncFieldMax)
 		if err := fn(rec); err != nil {
 			return err
 		}
@@ -745,4 +754,30 @@ func ImportSkippedOwn() int { return lastImportSkippedOwn }
 
 func ImportedSessionID(harness, sessionID string) string {
 	return "imported-" + shortHash(harness+":"+sessionID)
+}
+
+// syncFieldMax bounds one metadata field from a batch. Project names are short
+// by construction; anything longer is not a name.
+const syncFieldMax = 120
+
+// sanitizeSyncField flattens a metadata field to a single printable line.
+//
+// Control characters (Cc) cover the newline that forged the extra result entry
+// and the escape byte that recolours a terminal; format characters (Cf) cover
+// U+202E, which reverses everything rendered after it, and the zero-width
+// spaces that pad a label invisibly. Both become spaces rather than vanishing,
+// so words on either side do not run together.
+func sanitizeSyncField(s string, max int) string {
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, s)
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) > max {
+		return strings.TrimSpace(string(r[:max])) + "…"
+	}
+	return s
 }

@@ -39,6 +39,7 @@ func printSanitized(w io.Writer, text string) {
 	// Redact the whole document at once: multiline secrets (PEM private key
 	// blocks) never match when scanned line-by-line.
 	redacted, counts := redact.Text(text)
+	redacted = stripBidiAndInvisible(redacted)
 	fmt.Fprint(w, redacted)
 	if !strings.HasSuffix(redacted, "\n") {
 		fmt.Fprintln(w)
@@ -55,4 +56,29 @@ func printSanitized(w io.Writer, text string) {
 		masked += n
 	}
 	fmt.Fprintf(os.Stderr, "deja: %d secrets masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked)
+}
+
+// stripBidiAndInvisible removes the characters that make a share render as
+// something other than what it says.
+//
+// The command ends with "review before sending", and a U+202E reverses the
+// rendering of everything after it, so the reviewer reads one thing and sends
+// another; a zero-width space hides a word boundary in the same way. ANSI
+// escapes were already dropped upstream by digest.stripANSI for this reason —
+// these are the other half (#1081).
+//
+// Joiners (U+200C, U+200D) are deliberately left alone: they are load-bearing
+// in Persian, Hindi and emoji sequences, and a share that mangles someone's
+// language to defend against an invisible character has made the wrong trade.
+func stripBidiAndInvisible(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 0x202A && r <= 0x202E, // bidi embeddings and overrides
+			r >= 0x2066 && r <= 0x2069, // bidi isolates
+			r == 0x200E, r == 0x200F,   // left/right marks
+			r == 0x200B, r == 0xFEFF: // zero-width space, BOM
+			return -1
+		}
+		return r
+	}, s)
 }
