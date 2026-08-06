@@ -95,6 +95,19 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "no sessions mention %q\n", q)
 		return nil
 	}
+	// Retrieval hands candidates back in map order, so taking the first 250 of
+	// 2119 matches counted a different quarter of them on every run and the top
+	// file changed each time (#1072). Newest first, the rule blame already
+	// uses, with identity to break ties.
+	sort.Slice(hits, func(i, j int) bool {
+		if !hits[i].Updated.Equal(hits[j].Updated) {
+			return hits[i].Updated.After(hits[j].Updated)
+		}
+		if hits[i].Harness != hits[j].Harness {
+			return hits[i].Harness < hits[j].Harness
+		}
+		return hits[i].ID < hits[j].ID
+	})
 	if len(hits) > filesMaxSessions {
 		hits = hits[:filesMaxSessions]
 	}
@@ -110,11 +123,18 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	sessions := map[string]int{}     // path -> how many sessions touched it
 	scanned := 0
 
+	// One pass for all 250, not one pass each: the per-identity lookup streams
+	// the whole record log every time it is called (#1061).
+	ids := make([]index.Identity, 0, len(hits))
 	for _, h := range hits {
-		full, ok, err := index.FindByIdentity(dir, h.Harness, h.ID)
-		if err != nil || !ok {
-			continue
-		}
+		ids = append(ids, index.Identity{Harness: h.Harness, ID: h.ID})
+	}
+	full250, err := index.FindManyByIdentity(dir, ids)
+	if err != nil {
+		return fmt.Errorf("read sessions: %w", err)
+	}
+
+	for _, full := range full250 {
 		// The window is counted over speech and file events only. Tool output is
 		// two thirds of the records in a session, so a raw message count would be
 		// a few seconds of one command — far too narrow to connect a subject to
