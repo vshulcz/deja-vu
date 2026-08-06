@@ -392,9 +392,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// The same inspection the JSON form reports, so one command does not give
 	// two answers about one store: `found` here and `unreadable` there (#999).
 	inspected := map[string]string{}
+	unchecked := map[string]bool{}
 	for _, check := range doctorStoreChecks() {
 		store, _ := inspectDoctorStore(check)
 		inspected[check.name] = store.State
+		unchecked[check.name] = store.Unchecked
 	}
 
 	printRow := func(name, path string, present bool, detail string) {
@@ -415,6 +417,14 @@ func doctorHarnesses(w io.Writer, dir string) {
 					// The warning block below names the path and what to do.
 					detail += "cannot be read"
 				}
+			}
+			// A walk that stopped at its budget looked at part of the store,
+			// and `found` on its own claims the whole of it (#1025).
+			if unchecked[name] {
+				if detail != "" {
+					detail += ", "
+				}
+				detail += "permissions not fully checked"
 			}
 		} else if storeDiskGone(path) {
 			// A store whose whole disk is gone is not a store that was

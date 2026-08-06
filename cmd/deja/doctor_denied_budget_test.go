@@ -34,7 +34,34 @@ func TestDeniedDirIsFoundPastTheFileBudget(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 
-	if got := firstDeniedDir([]string{root}); got != locked {
-		t.Errorf("denied dir = %q, want %q", got, locked)
+	if got, whole := firstDeniedDir([]string{root}); got != locked || !whole {
+		t.Errorf("denied dir = %q whole = %v, want %q true", got, whole, locked)
+	}
+}
+
+// The budget then counted directories, and a machine with a few thousand
+// projects spent it before reaching a locked one — doctor called the store
+// whole (#1025).
+func TestDeniedDirIsFoundPastTheDirectoryBudget(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not deny reads here")
+	}
+	root := t.TempDir()
+	for i := 0; i < 6000; i++ {
+		if err := os.MkdirAll(filepath.Join(root, fmt.Sprintf("proj%05d", i)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	locked := filepath.Join(root, "zzz-locked")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	if got, whole := firstDeniedDir([]string{root}); got != locked || !whole {
+		t.Errorf("denied dir = %q whole = %v, want %q true", got, whole, locked)
 	}
 }

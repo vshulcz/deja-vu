@@ -27,8 +27,11 @@ type doctorStore struct {
 	// at the directory to fix rather than at the harness (#802). Partial says
 	// the rest of the store was readable: sessions are missing from recall
 	// rather than the whole harness (#816).
-	Denied  string `json:"denied,omitempty"`
-	Partial bool   `json:"partial,omitempty"`
+	// Unchecked says the permission walk stopped at its budget, so no
+	// permission problem past that point was looked for (#1025).
+	Denied    string `json:"denied,omitempty"`
+	Partial   bool   `json:"partial,omitempty"`
+	Unchecked bool   `json:"unchecked,omitempty"`
 }
 
 type doctorComponent struct {
@@ -98,14 +101,19 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 
 // firstDeniedDir walks the store roots until something refuses to be read and
 // returns that path. The walk is bounded: doctor is a diagnostic command, but
-// a harness root can hold tens of thousands of transcripts.
-func firstDeniedDir(paths []string) string {
+// a harness root can hold tens of thousands of transcripts. The second result
+// is false when the budget cut the walk short, so the caller can avoid calling
+// a half-checked store whole (#1025).
+func firstDeniedDir(paths []string) (string, bool) {
 	// Directories, not entries: a store of 50k transcripts sits in a few
 	// hundred of them, and counting files spent the budget in the first
 	// project — a locked directory later in the walk was never reached, and
-	// doctor reported the store whole (#864).
-	const budget = 5000
+	// doctor reported the store whole (#864). A machine with a few thousand
+	// projects hit the same wall at the directory bound, so it is high enough
+	// that only a pathological tree reaches it (#1025).
+	const budget = 200_000
 	visited := 0
+	whole := true
 	home := sources.Home()
 	for _, root := range paths {
 		// aider's root is the home directory itself: any locked directory
@@ -127,15 +135,16 @@ func firstDeniedDir(paths []string) string {
 				return nil
 			}
 			if visited++; visited > budget {
+				whole = false
 				return filepath.SkipAll
 			}
 			return nil
 		})
 		if denied != "" {
-			return denied
+			return denied, true
 		}
 	}
-	return ""
+	return "", whole
 }
 
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
@@ -266,12 +275,17 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	// its sessions out of recall. With no files at all that read as a harness
 	// nobody has used (#802); with some files it read as a complete store
 	// missing a few, which is quieter still (#816).
-	if denied := firstDeniedDir(check.paths); denied != "" {
+	denied, whole := firstDeniedDir(check.paths)
+	if denied != "" {
 		store.State = "denied"
 		store.Denied = denied
 		store.Partial = len(check.files) > 0
 		return store, time.Time{}
 	}
+	// Nothing refused to be read *of what was walked*. Saying "found" for a
+	// store whose walk stopped early is the same silence #864 closed, one
+	// order of magnitude up (#1025).
+	store.Unchecked = !whole
 	if len(check.files) == 0 {
 		// The text rows have separated a store whose disk went away from one
 		// that was deleted since #933; a script reading this could not (#999).
