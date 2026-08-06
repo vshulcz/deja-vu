@@ -598,6 +598,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// instead (#637).
 		if where := activeFilters(o, sinceRaw); where != "" {
 			fmt.Fprintf(os.Stderr, "deja: no sessions match %s\n", where)
+			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 			return nil
 		}
 		// "run `deja index`" cannot bring back what the reader forgot, and on a
@@ -669,6 +670,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
+	sinceRaw := sinceRawArg(filtered)
 	o.SourceInstance = sourceInstance
 	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
@@ -757,8 +759,9 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		switch note := policyHiddenNote(policy.ActivationSearch, policyHidden); {
 		case note != "":
 			fmt.Fprint(os.Stderr, note)
-		case activeFilters(o, "") != "":
-			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, ""))
+		case activeFilters(o, sinceRaw) != "":
+			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw))
+			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 		default:
 			printNoMatches(os.Stderr, dir, o.Query)
 		}
@@ -943,6 +946,41 @@ func commandHint(q string) string {
 		return "deja: \"unforget\" is not a command — `deja forget --unforget <id>` is, and `deja forget --list` names the ids\n"
 	}
 	return fmt.Sprintf("deja: %q is not a command — did you mean `deja %s`?\n", first, near)
+}
+
+// sinceRawArg recovers the text the reader typed after --since. parseSearch
+// keeps only the parsed duration, and the search path had nothing else to hand
+// activeFilters, so it reported "since 720h0m0s" for `--since 30d` (#1059).
+// Last wins, as in parseSearch.
+func sinceRawArg(args []string) string {
+	args = splitEqualsForms(args)
+	raw := ""
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--since" {
+			raw = args[i+1]
+		}
+	}
+	return raw
+}
+
+// olderThanWindow names the store's own range when --since cut off everything
+// in it. Without it someone returning to a year-old store is told their query
+// matched nothing — advice about the query, when it was the window that
+// emptied the result and no query under it could have returned anything.
+// `deja stats` has said this since #854; search and `last` had not (#1059).
+func olderThanWindow(dir string, since time.Duration) string {
+	if since <= 0 {
+		return ""
+	}
+	ov, err := index.Overview(dir)
+	if err != nil || ov.Sessions == 0 || ov.Newest.IsZero() {
+		return ""
+	}
+	if !ov.Newest.Before(time.Now().Add(-since)) {
+		return ""
+	}
+	return fmt.Sprintf("deja: every one of the %d indexed sessions is older than that window — the newest is %s\n",
+		ov.Sessions, ov.Newest.Local().Format("2006-01-02"))
 }
 
 // activeFilters names the filters a caller set, so an empty result can say
