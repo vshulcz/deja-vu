@@ -90,11 +90,16 @@ func runSync(dir string, args []string) error {
 		if n == 0 && !full && !hasSyncBatches(out) {
 			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", out)
 		}
-		masked := 0
-		if rs, rerr := index.Redactions(dir); rerr == nil {
-			masked = rs.Total
+		// Only when something was written: on a watermarked sync most runs
+		// send nothing, and the line asked the reader to review a file that
+		// does not exist (#1035).
+		if n > 0 {
+			masked := 0
+			if rs, rerr := index.Redactions(dir); rerr == nil {
+				masked = rs.Total
+			}
+			fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
 		}
-		fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
 		return nil
 	case "import":
 		for _, a := range args[2:] {
