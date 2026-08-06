@@ -33,6 +33,9 @@ type transcriptSource struct {
 // off a narrow terminal (#604 is the same concern, one screen over).
 const (
 	statuslineMaxTitle = 38
+	// statuslineMinTitle is the shortest title fragment worth printing. Below
+	// it the count form says more than three words and an ellipsis.
+	statuslineMinTitle = 12
 	// statuslineMaxName bounds the filename for the same reason: a 200-char
 	// path put a 226-rune line on a bar that has no horizontal scroll.
 	statuslineMaxName = 28
@@ -175,6 +178,13 @@ func sessionsTouching(metas []index.SessionMeta, path string, self index.Session
 // statuslineMemoryLine renders it. A count is a statistic; what the earlier
 // session was about is a memory, so the title wins when there is one.
 func statuslineMemoryLine(m fileMemory) string {
+	return statuslineMemoryLineTo(m, statuslineMaxTitle)
+}
+
+// statuslineMemoryLineTo bounds the title to maxTitle runes. maxTitle <= 0
+// drops the title and falls through to the count form, which is what a bar too
+// narrow to hold any of it gets.
+func statuslineMemoryLineTo(m fileMemory, maxTitle int) string {
 	// The path comes from a tool call and is recorded verbatim, exactly like
 	// the title: a filename can carry a carriage return or an escape just as
 	// easily, and it reaches the same bar.
@@ -184,7 +194,7 @@ func statuslineMemoryLine(m fileMemory) string {
 		// A meta with no timestamp would otherwise put "Jan 1 0001" on the bar.
 		when = " " + search.RelativeDate(m.Last)
 	}
-	if title := trimStatuslineTitle(m.Title); title != "" {
+	if title := safeForStatusline(m.Title, maxTitle); maxTitle > 0 && title != "" {
 		return fmt.Sprintf("%s · %d earlier: \u201c%s\u201d%s", name, m.Sessions, title, when)
 	}
 	noun := "sessions"
@@ -238,8 +248,49 @@ func withFileMemory(dir string, in transcriptSource, usage string) string {
 	if !ok {
 		return usage
 	}
-	return "deja · " + statuslineMemoryLine(m) + " · " + shortenUsage(usage)
+	width := statuslineWidth()
+	// The per-component caps never added up to a line anyone measured: 28 for
+	// the name and 38 for the title made a memory segment of up to 95 columns
+	// on its own, so the half this function deliberately puts first was itself
+	// cut mid-word by the terminal — losing the closing quote and the date on
+	// top of the numbers (#1076).
+	//
+	// The memory segment is fitted first, because the comment above is the
+	// rule: it is the half that has to survive. The title is its elastic part,
+	// with a floor so a long filename cannot cut it to a stub.
+	mem := "deja · " + statuslineMemoryLineTo(m, statuslineMaxTitle)
+	if over := visibleLen(mem) - width; over > 0 {
+		budget := statuslineMaxTitle - over
+		if budget < statuslineMinTitle {
+			budget = statuslineMinTitle
+		}
+		mem = "deja · " + statuslineMemoryLineTo(m, budget)
+	}
+	// Then as much of the usage as still fits. Appending it whole is what put
+	// it past the edge; dropping it is the trade this function already
+	// documents, and half of it beats a line that runs off.
+	for _, tail := range []string{shortenUsage(usage), firstUsageFact(usage)} {
+		if tail != "" && visibleLen(mem)+3+visibleLen(tail) <= width {
+			return mem + " · " + tail
+		}
+	}
+	return mem
 }
+
+// firstUsageFact is the usage segment cut to its leading fact — the recall
+// count — for a bar with room for that and no more.
+func firstUsageFact(usage string) string {
+	parts := strings.Split(strings.TrimPrefix(usage, "deja · "), " · ")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+// statuslineWidth is the bar deja lays out for. Same reasoning as briefWidth:
+// no dependency may be added to read the real size, 80 is wrong least often,
+// and COLUMNS is honoured for the readers who export it.
+func statuslineWidth() int { return briefWidth() }
 
 // shortenUsage keeps the first two facts — how many recalls and how much
 // context — and drops the derived ones.
