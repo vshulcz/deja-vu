@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
 const (
@@ -847,7 +848,7 @@ func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {
 func PrintSession(w io.Writer, s model.Session) {
 	fmt.Fprintf(w, "# %s · %s · %s\n", s.Harness, s.Project, s.ID)
 	for _, m := range s.Messages {
-		txt := collapseTool(m.Text)
+		txt := redact.SafeForDisplay(collapseTool(m.Text))
 		if strings.TrimSpace(txt) == "" {
 			continue
 		}
@@ -1137,13 +1138,12 @@ func collapseTool(s string) string {
 }
 
 var (
-	ansiRE       = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
 	lineNumberRE = regexp.MustCompile(`^\s*\d{1,5}[:|]\s+`)
 	toolDumpRE   = regexp.MustCompile(`(?i)(tool_use|tool_result|<local-command|netcat|npm ERR!|panic:|goroutine \d+)`)
 )
 
 func proseForSnippet(s string) string {
-	s = ansiRE.ReplaceAllString(s, "")
+	s = redact.SafeForDisplay(s)
 	var keep []string
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
@@ -1155,13 +1155,13 @@ func proseForSnippet(s string) string {
 	out := strings.Join(keep, " ")
 	out = strings.Join(strings.Fields(out), " ")
 	if out == "" {
-		out = strings.Join(strings.Fields(ansiRE.ReplaceAllString(s, "")), " ")
+		out = strings.Join(strings.Fields(redact.SafeForDisplay(s)), " ")
 	}
 	return out
 }
 
 func contextText(s string, matched bool) string {
-	s = ansiRE.ReplaceAllString(s, "")
+	s = redact.SafeForDisplay(s)
 	if strings.Contains(s, "```") {
 		return strings.TrimSpace(s)
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -288,13 +289,16 @@ func buildHeatmap(byDay map[string]int, now time.Time) HeatmapStats {
 	return hm
 }
 
+// Title is the one-line name of a session. It reaches a terminal, a shared
+// HTML page and a stats card, and it is transcript text, so it is stripped of
+// what a terminal acts on rather than prints.
 func Title(s model.Session) string {
 	if s.Title != "" && !Noise(s.Title) {
-		return s.Title
+		return redact.SafeForDisplay(s.Title)
 	}
 	for _, m := range s.Messages {
 		if m.Role == "user" && !Noise(m.Text) {
-			return TrimRunes(strings.Join(strings.Fields(m.Text), " "), 60)
+			return TrimRunes(strings.Join(strings.Fields(redact.SafeForDisplay(m.Text)), " "), 60)
 		}
 	}
 	return ""
