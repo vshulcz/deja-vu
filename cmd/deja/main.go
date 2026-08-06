@@ -1958,7 +1958,7 @@ Usage:
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]
-  deja last [n] [--json] [--project name] [--harness name] [--since duration] [--role user|assistant|tool]
+  deja last [n] [--json] [--project name] [--harness name] [--since duration] [--role user|assistant|tool|files|command|edit]
   deja sources
   deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
@@ -1971,7 +1971,7 @@ Usage:
   deja log [n] [--last] [--json]
   deja statusline
   deja stats [--json] [--impact] [--redaction] [--card [path]] [--html [path]]
-	deja remember "text" [--project name] [--tag name]
+  deja remember "text" [--project name] [--tag name]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja mcp
   deja version
@@ -1983,7 +1983,8 @@ Search flags (the bare "deja [flags] <query>" form above):
   --harness <name>              only sessions from one harness (claude, codex, ...)
   --project <name>              only sessions from one project
   --since <duration>            only sessions newer than e.g. 30d, 12h
-  --role <user|assistant|tool>  only match turns from one role
+  --role <name>                 only match turns from one role: user, assistant,
+                                tool (tool output), files, command, edit
   --limit <1-100>               max sessions to return (default 15)
   --all                         return every match, no cap
   --re                          treat the query as a regular expression
