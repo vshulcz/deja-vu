@@ -202,7 +202,6 @@ func looksLikeDataDump(t string) bool {
 	return longestRun > 200
 }
 
-
 func UTF8SafeCut(s string, n int) string {
 	if n <= 0 {
 		return ""

@@ -47,7 +47,7 @@ func substringStore(t *testing.T, withLiteral bool) string {
 // together.
 func TestSubstringReachesItsWordOnlyWithoutAnExactMatch(t *testing.T) {
 	// With a literal `code` in the store, `code` is not a zero-result query.
-	dir := substringStore(t, true)
+	_ = substringStore(t, true)
 	out, err := captureRun(t, "search", "code")
 	if err != nil {
 		t.Fatal(err)
@@ -65,8 +65,7 @@ func TestSubstringReachesItsWordOnlyWithoutAnExactMatch(t *testing.T) {
 
 	// Without the literal, the same query falls through to the close tier and
 	// the README's example works — which is the only state in which it does.
-	dir = substringStore(t, false)
-	_ = dir
+	_ = substringStore(t, false)
 	out, err = captureRun(t, "search", "code")
 	if err != nil {
 		t.Fatal(err)

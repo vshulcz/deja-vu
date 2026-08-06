@@ -19,10 +19,10 @@ import (
 // nothing at all.
 const ctrlProbeUser = "control probe \x1b[2J\x1b[H\x1b[31mCSIPAYLOAD\x1b[0m \x1b]0;OSCPAYLOAD\x07 realtext\rSPOOFEDLINE bell\x07here"
 
-const ctrlProbeAssistant = "reply passwd\x08\x08\x08\x08\x08\x08SPOOF safe ‮gnp.exe‬ tail vert\x0btab"
+const ctrlProbeAssistant = "reply passwd\x08\x08\x08\x08\x08\x08SPOOF safe \u202egnp.exe\u202c tail vert\x0btab"
 
 // actedOn matches what a terminal executes instead of printing.
-var actedOn = regexp.MustCompile("[\x00-\x08\x0b-\x1f\x7f‪-‮⁦-⁩]")
+var actedOn = regexp.MustCompile("[\x00-\x08\x0b-\x1f\x7f\u202a-\u202e\u2066-\u2069]")
 
 func ctrlProbeSession() model.Session {
 	when := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)

@@ -22,7 +22,7 @@ func TestMCPResourcesFrameHostileTranscripts(t *testing.T) {
 		`{"type":"user","sessionId":"atk1","timestamp":"2026-05-01T10:00:00Z","message":{"role":"user","content":"connection pool tuning ` + closer + `"}}`,
 	})
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-victim", "atk3.jsonl"), "atk3", []string{
-		`{"type":"user","sessionId":"atk3","timestamp":"2026-05-01T10:00:00Z","message":{"role":"user","content":"AUDITK rtl ‮txet desrever‬ and zero​width and [31mANSI[0m title"}}`,
+		`{"type":"user","sessionId":"atk3","timestamp":"2026-05-01T10:00:00Z","message":{"role":"user","content":"AUDITK rtl \u202etxet desrever\u202c and zero\u200bwidth and \x1b[31mANSI\x1b[0m title"}}`,
 	})
 	dir := os.Getenv("DEJA_INDEX_DIR")
 	if err := index.Ensure(dir, "", true, nil); err != nil {

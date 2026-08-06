@@ -28,7 +28,7 @@ func TestImportFlattensForgedMetadataFields(t *testing.T) {
 	batch := []map[string]any{
 		{"harness": "claude", "session_id": "forge1", "project": forged,
 			"role": "user", "text": "AUDITK forged project label", "time": "2026-05-02T10:00:00Z"},
-		{"harness": "claude", "session_id": "forge2", "project": "tmp/work\x1b[31m‮DLOF",
+		{"harness": "claude", "session_id": "forge2", "project": "tmp/work\x1b[31m\u202eDLOF",
 			"role": "user", "text": "AUDITK control chars in project", "time": "2026-05-02T10:00:00Z"},
 	}
 	shared := filepath.Join(tmp, "shared")

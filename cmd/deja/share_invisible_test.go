@@ -15,7 +15,7 @@ import (
 // rendering of everything after it, so the reviewer reads one thing and sends
 // another (#1081).
 func TestShareOutputCarriesNoInvisibleReordering(t *testing.T) {
-	const payload = "AUDITK terminal test RED‮reversed​zerowidth"
+	const payload = "AUDITK terminal test RED\u202ereversed\u200bzerowidth"
 	var out bytes.Buffer
 	printSanitized(&out, payload)
 	got := out.String()
@@ -67,10 +67,10 @@ func TestShareCommandDropsEscapesAndInvisibles(t *testing.T) {
 // that mangles them to defend against an invisible character has made the
 // wrong trade.
 func TestShareKeepsJoiners(t *testing.T) {
-	const text = "AUDITK family \U0001F468‍\U0001F469‍\U0001F467 and zero‌width-non-joiner"
+	const text = "AUDITK family \U0001F468\u200d\U0001F469\u200d\U0001F467 and zero\u200cwidth-non-joiner"
 	var out bytes.Buffer
 	printSanitized(&out, text)
-	if got := out.String(); !strings.Contains(got, "‍") || !strings.Contains(got, "‌") {
+	if got := out.String(); !strings.Contains(got, "\u200d") || !strings.Contains(got, "\u200c") {
 		t.Errorf("share stripped a joiner: %q", got)
 	}
 }

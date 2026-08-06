@@ -23,10 +23,10 @@ func TestSafeForDisplayRemovesWhatATerminalActsOn(t *testing.T) {
 		{"backspace rubs out the word before it", "passwd\x08\x08\x08\x08\x08\x08SPOOF", "passwd      SPOOF"},
 		{"bell", "bell\x07here", "bell here"},
 		{"vertical tab and form feed", "a\x0bb\x0cc", "a b c"},
-		{"bidi override reverses what is shown", "safe ‮gnp.exe‬ tail", "safe  gnp.exe  tail"},
-		{"C1 control", "ab", "a b"},
+		{"bidi override reverses what is shown", "safe \u202egnp.exe\u202c tail", "safe  gnp.exe  tail"},
+		{"C1 control", "a\u0090b", "a b"},
 		{"newline and tab are layout", "keep\ttab\nand line", "keep\ttab\nand line"},
-		{"a zero-width joiner is ordinary text", "family ‍ emoji", "family ‍ emoji"},
+		{"a zero-width joiner is ordinary text", "family \u200d emoji", "family \u200d emoji"},
 		{"plain text is returned byte for byte", "plain [brackets] and 0m digits", "plain [brackets] and 0m digits"},
 	}
 	for _, c := range cases {

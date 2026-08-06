@@ -20,7 +20,7 @@ func TestClippedMessageIsCounted(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	big := strings.Repeat("lorem ipsum dolor sit amet ", 4000) // ~108 KB, past the 64 KB cap
 	lines := []string{
-		fmt.Sprintf(`{"type":"user","sessionId":"s-huge","cwd":"/tmp/big","timestamp":"2026-06-01T09:00:00Z","message":{"role":"user","content":"gudgeonpin opening line"}}`),
+		`{"type":"user","sessionId":"s-huge","cwd":"/tmp/big","timestamp":"2026-06-01T09:00:00Z","message":{"role":"user","content":"gudgeonpin opening line"}}`,
 		fmt.Sprintf(`{"type":"user","sessionId":"s-huge","cwd":"/tmp/big","timestamp":"2026-06-01T09:01:00Z","message":{"role":"user","content":"%s tailneedle"}}`, big),
 	}
 	writeClaudeFixture(t, filepath.Join(root, "projects", "-tmp-big", "s-huge.jsonl"), "s-huge", lines)
