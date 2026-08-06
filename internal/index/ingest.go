@@ -1567,6 +1567,15 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			// The row may exist only in the manifest being replaced.
 			held = old.Sessions[key]
 		}
+		// A renamed transcript arrives as one removed path and one added path
+		// in the same pass, so the path deja holds is the one that went away.
+		// Comparing them called it a collision with a file that no longer
+		// exists: the row kept the dead path until a full rebuild, `--json`
+		// handed callers that path, and `forget` warned that dropping the
+		// session would take a second conversation with it (#1086).
+		if removed[held.Path] {
+			held.Path = ""
+		}
 		owns, collided := attributeSession(held, s)
 		if collided {
 			collisions.Add(1)
