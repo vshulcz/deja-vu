@@ -332,7 +332,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
 			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", o.id)), "deja: "))
 		}
-		return fmt.Errorf("no session matches %q", o.id)
+		return fmt.Errorf("no session matches %q%s", o.id, movedBucketHint(dir, o.id))
 	}
 	if o.json {
 		return printSessionJSON(os.Stdout, s, o.offset, o.limit, sourceInstance)
@@ -1826,7 +1826,7 @@ func runForget(dir string, args []string) error {
 				return nil
 			}
 		}
-		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped\n", forgetSelector(o))
+		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped%s\n", forgetSelector(o), movedBucketHint(dir, o.Session))
 		return nil
 	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
@@ -2001,6 +2001,34 @@ Examples:
   deja install --all
 
 See README.md for the full CLI reference.`)
+}
+
+// movedBucketHint explains a note-bucket id that stopped resolving. The id
+// carries the day it was minted in, so a machine that changed zone renames its
+// buckets on the next build — and every id refusal then read as "that note is
+// gone" while the note sat under the neighbouring day (#1039).
+func movedBucketHint(dir, id string) string {
+	if !strings.HasPrefix(id, "deja-") || len(id) < 15 {
+		return ""
+	}
+	day, rest := id[5:15], id[15:]
+	when, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return ""
+	}
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return ""
+	}
+	for _, shift := range []int{-1, 1} {
+		want := "deja-" + when.AddDate(0, 0, shift).Format("2006-01-02") + rest
+		for _, m := range metas {
+			if m.ID == want {
+				return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is `%s` now", want)
+			}
+		}
+	}
+	return ""
 }
 
 // idPrefixNeeded is the refusal for a command that needs a session named on the

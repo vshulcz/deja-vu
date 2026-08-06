@@ -75,7 +75,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no session matches %q", prefix)
+		return fmt.Errorf("no session matches %q%s", prefix, movedBucketHint(dir, prefix))
 	}
 	src := s.Harness + ":" + s.ID
 	if s.Harness == "deja" {
