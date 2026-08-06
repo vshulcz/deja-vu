@@ -42,6 +42,11 @@ func TestSafeTextNeutralisesControls(t *testing.T) {
 	if got := SafeText("one\ntwo\tthree"); got != "one\ntwo\tthree" {
 		t.Errorf("newline or tab was rewritten: %q", got)
 	}
+	// A bidi override reverses the rendering of what follows: the same
+	// display attack without an escape byte.
+	if got := SafeText("safe \u202ereversed\u202c tail"); strings.ContainsAny(got, "\u202e\u202c") {
+		t.Errorf("a bidi override survived: %q", got)
+	}
 	// Ordinary text is returned untouched, including emoji held together by a
 	// zero-width joiner.
 	for _, s := range []string{"plain text", "family 👨‍👩‍👧", "日本語", "لغة عربية"} {
