@@ -63,3 +63,24 @@ func TestForgetListNamesTheWayBack(t *testing.T) {
 		t.Errorf("the guess hint does not name the command: %q", got)
 	}
 }
+
+// An empty list printed nothing on either stream, which reads the same as a
+// command that did not run — and this is the command the other refusals point
+// at (#1040). The line goes to stderr so a pipe still counts only ids.
+func TestAnEmptyForgetListSaysSo(t *testing.T) {
+	hermeticEnv(t)
+	out, err := captureRun(t, "forget", "--list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("stdout is not empty, a pipe would count it: %q", out)
+	}
+	errOut, err := captureRunStderr(t, "forget", "--list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(errOut, "nothing is forgotten on this machine") {
+		t.Errorf("an empty list says nothing at all: %q", errOut)
+	}
+}

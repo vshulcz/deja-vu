@@ -61,3 +61,26 @@ func TestUnforgetRefusesAPrefixThatReachesSeveral(t *testing.T) {
 		t.Errorf("restoring a single session was refused: %v", err)
 	}
 }
+
+// An empty `--unforget` fell through to the selector refusal, which names
+// three ways to forget more and none to bring anything back (#1041).
+func TestAnEmptyUnforgetAsksForAnId(t *testing.T) {
+	hermeticEnv(t)
+	err := runForget(os.Getenv("DEJA_INDEX_DIR"), []string{"--unforget", ""})
+	if err == nil {
+		t.Fatal("an empty --unforget was accepted")
+	}
+	if !strings.Contains(err.Error(), "--unforget needs an id") {
+		t.Errorf("the refusal does not ask for an id: %v", err)
+	}
+	for _, wrong := range []string{"--project", "--before", "--dry-run"} {
+		if strings.Contains(err.Error(), wrong) {
+			t.Errorf("the refusal offers %s, which forgets rather than restores: %v", wrong, err)
+		}
+	}
+	// A missing value is still its own message, and reads as a sentence.
+	err = runForget(os.Getenv("DEJA_INDEX_DIR"), []string{"--unforget"})
+	if err == nil || !strings.Contains(err.Error(), "--unforget needs a value") {
+		t.Errorf("a missing value is not named: %v", err)
+	}
+}

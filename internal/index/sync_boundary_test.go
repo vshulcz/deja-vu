@@ -3,6 +3,8 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	search "github.com/vshulcz/deja-vu/internal/query"
@@ -127,5 +129,38 @@ func TestExcludeAppliesToAlreadyImportedSessions(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Fatalf("excluded project survived the rebuild: %d sessions", len(got))
+	}
+}
+
+// Glob swallows a directory it cannot open, so a locked source imported
+// "0 records" — the words an already-imported batch prints, while the records
+// were there the whole time (#1042).
+func TestImportSaysWhenTheSourceCannotBeRead(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not deny reads here")
+	}
+	dir := filepath.Join(t.TempDir(), "index.db")
+	src := t.TempDir()
+	line := `{"harness":"claude","session_id":"peer3","project":"work/api","role":"user","text":"a third peer decision","time":"2026-08-04T10:00:00Z"}` + "\n"
+	if err := os.WriteFile(filepath.Join(src, "deja-sync-x.jsonl"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(src, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(src, 0o755) })
+
+	n, err := Import(dir, src)
+	if err == nil {
+		t.Fatalf("a locked source imported %d records without a word", n)
+	}
+	if !strings.Contains(err.Error(), "permission denied") {
+		t.Errorf("the refusal does not name the reason: %v", err)
+	}
+
+	// A readable directory with nothing in it is a different answer and stays
+	// a quiet zero.
+	if n, err := Import(dir, t.TempDir()); err != nil || n != 0 {
+		t.Errorf("an empty source returned %d, %v; want 0 and no error", n, err)
 	}
 }

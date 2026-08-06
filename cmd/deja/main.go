@@ -332,7 +332,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
 			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", o.id)), "deja: "))
 		}
-		return fmt.Errorf("no session matches %q", o.id)
+		return fmt.Errorf("no session matches %q%s", o.id, movedBucketHint(dir, o.id))
 	}
 	if o.json {
 		return printSessionJSON(os.Stdout, s, o.offset, o.limit, sourceInstance)
@@ -506,7 +506,9 @@ func cmdCtx(dir string, rest []string) error {
 		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
 			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", q)), "deja: "))
 		}
-		return fmt.Errorf("no session matches %q", q)
+		// The agent asking by a bucket id that moved got the dead end while
+		// the human on `show` got the way forward (#1043).
+		return fmt.Errorf("no session matches %q%s", q, movedBucketHint(dir, q))
 	}
 	// A short selector never reaches the id branch above, so a forgotten
 	// session's note arrives as an ordinary hit — and the answer still has to
@@ -614,13 +616,10 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 			// on the day before the other two screens did (#849).
 			when = s.Updated.Local().Format("2006-01-02")
 		}
-		// A day of notes is one session whose id *is* a date, minted in UTC.
-		// Converting its timestamp to the reader's zone put a different day on
-		// the line than the id it sits next to — and the id a reader rebuilt
-		// from what they saw matched nothing (#883).
-		if day, ok := search.NoteBucketDay(s); ok {
-			when = day
-		}
+		// The id's own day is not used here, unlike search: this line prints
+		// the id whole, so nothing has to be rebuilt from the date (#883),
+		// while borrowing the id's day made the column run 06, 07, 04 down
+		// the screen for a reader far enough east of the writer (#1038).
 
 		fmt.Printf("[%s · %s · %s · %s]", s.Harness, s.Project, when, s.ID)
 		title := s.Title
@@ -1581,7 +1580,7 @@ func runForget(dir string, args []string) error {
 	var o index.ForgetOptions
 	list := false
 	allMatches := false
-	unforget := ""
+	unforget, unforgetGiven := "", false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--list":
@@ -1592,7 +1591,7 @@ func runForget(dir string, args []string) error {
 			allMatches = true
 		case "--session", "--project", "--before", "--unforget":
 			if i+1 >= len(args) {
-				return fmt.Errorf("forget: %s needs value", args[i])
+				return fmt.Errorf("forget: %s needs a value", args[i])
 			}
 			i++
 			switch args[i-1] {
@@ -1601,7 +1600,7 @@ func runForget(dir string, args []string) error {
 			case "--project":
 				o.Project = args[i]
 			case "--unforget":
-				unforget = index.PastedSelector(args[i])
+				unforget, unforgetGiven = index.PastedSelector(args[i]), true
 			case "--before":
 				if d, err := parseDur(args[i]); err == nil {
 					// "older than 0 days" is the whole store, and the typo that
@@ -1625,6 +1624,12 @@ func runForget(dir string, args []string) error {
 			return fmt.Errorf("forget: unknown flag %q", args[i])
 		}
 	}
+	// An empty `--unforget` was answered with the selectors for forgetting:
+	// the reader asked to bring something back and was told how to drop more
+	// (#1041).
+	if unforgetGiven && unforget == "" {
+		return fmt.Errorf("forget: --unforget needs an id — `deja forget --list` names the ids")
+	}
 	if !list && unforget == "" && o.Session == "" && o.Project == "" && o.Before.IsZero() {
 		// Naming the selectors here is what separates one call from hundreds:
 		// forgetting 100 sessions one id at a time took 10.5s against 0.2s for
@@ -1641,6 +1646,13 @@ func runForget(dir string, args []string) error {
 		// and it named no way back: `--unforget` lived in `deja help` only, and
 		// the hint for a guessed `deja unforget` pointed at this same list
 		// (#919).
+		if len(keys) == 0 {
+			// Silence here is the one answer a reader cannot act on: it looks
+			// the same as a command that did not run, and every other empty
+			// result says so out loud (#1040). On stderr, so a pipe still
+			// counts only ids.
+			fmt.Fprintln(os.Stderr, "deja: nothing is forgotten on this machine")
+		}
 		if len(keys) > 0 {
 			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index\n", keys[0])
 		}
@@ -1829,7 +1841,7 @@ func runForget(dir string, args []string) error {
 				return nil
 			}
 		}
-		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped\n", forgetSelector(o))
+		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped%s\n", forgetSelector(o), movedBucketHint(dir, o.Session))
 		return nil
 	}
 	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
@@ -2004,6 +2016,42 @@ Examples:
   deja install --all
 
 See README.md for the full CLI reference.`)
+}
+
+// movedBucketHint explains a note-bucket id that stopped resolving. The id
+// carries the day it was minted in, so a machine that changed zone renames its
+// buckets on the next build — and every id refusal then read as "that note is
+// gone" while the note sat under the neighbouring day (#1039).
+func movedBucketHint(dir, id string) string {
+	if !strings.HasPrefix(id, "deja-") || len(id) < 15 {
+		return ""
+	}
+	day, rest := id[5:15], id[15:]
+	when, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return ""
+	}
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return ""
+	}
+	pol := policy.Load()
+	for _, shift := range []int{-1, 1} {
+		want := "deja-" + when.AddDate(0, 0, shift).Format("2006-01-02") + rest
+		for _, m := range metas {
+			if m.ID != want {
+				continue
+			}
+			// Naming it is recalling it: a rule that hides the session hides
+			// the fact that it moved too, or the hint becomes the way around
+			// the rule (#1043).
+			if !pol.Allows(policy.ActivationSearch, m.Project) {
+				return ""
+			}
+			return fmt.Sprintf(" — the days regrouped when this machine's zone changed; it is `%s` now", want)
+		}
+	}
+	return ""
 }
 
 // idPrefixNeeded is the refusal for a command that needs a session named on the

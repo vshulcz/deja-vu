@@ -104,7 +104,12 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		total, err := index.SessionCount(dir)
 		switch {
 		case err != nil || total == 0:
-			fmt.Fprintln(stdout, "nothing recurring — no sessions are indexed yet")
+			// "no sessions are indexed yet" is a claim about the machine, and
+			// a store deja is not allowed to open produces the same zero —
+			// the failure #1020 closed on last and search. friction is where
+			// someone lands when recall feels thin, so it is the worst place
+			// to say the history is not there (#1044).
+			fmt.Fprintln(stdout, strings.TrimPrefix(emptyIndexHint("nothing recurring"), "deja: "))
 		case len(sessions) == 0:
 			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
 				total, pluralS(total))
