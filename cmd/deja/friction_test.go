@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -150,7 +151,10 @@ func TestFrictionEmptyAnswerDistinguishesThreeStores(t *testing.T) {
 	t.Run("no sessions at all", func(t *testing.T) {
 		seedFrictionStore(t, nil)
 		out := runFrictionFor(t)
-		if !strings.Contains(out, "no sessions are indexed yet") {
+		// Since #1044 the empty case shares the wording every other surface
+		// uses, which also separates "no history here" from "a store deja
+		// cannot read".
+		if !strings.Contains(out, "no agent history was found on this machine") {
 			t.Errorf("empty store: %q", out)
 		}
 	})
@@ -205,4 +209,37 @@ func runFrictionFor(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return buf.String()
+}
+
+// A store deja is not allowed to open produces the same zero as an empty
+// machine, and friction reported the machine empty — the failure #1020 closed
+// on last and search, one surface further along (#1044).
+func TestFrictionDoesNotCallALockedStoreEmpty(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not deny reads here")
+	}
+	hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"a decision about queues"},"timestamp":"2026-07-11T10:00:00Z","sessionId":"s1","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "s.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(store, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(store, 0o755) })
+
+	out, err := captureRun(t, "friction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "could not be read (permission denied)") {
+		t.Errorf("friction does not name the locked store:\n%s", out)
+	}
+	if strings.Contains(out, "no sessions are indexed yet") {
+		t.Errorf("friction still calls the machine empty:\n%s", out)
+	}
 }
