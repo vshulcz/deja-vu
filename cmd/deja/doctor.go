@@ -388,6 +388,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// counts files (#861).
 	indexed := index.HarnessSessionCounts(dir)
 	fromElsewhere := index.ImportedSessionCounts(dir)
+	sharedRows := index.HarnessSharedCounts(dir)
 
 	// The same inspection the JSON form reports, so one command does not give
 	// two answers about one store: `found` here and `unreadable` there (#999).
@@ -458,6 +459,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 			switch imported {
 			case 0:
 				detail += doctorCount(n, "indexed session")
+				// The gap between files and sessions has two causes, and they
+				// read the same: a file that failed to parse, or two files
+				// sharing an id. The manifest knows which (#1101).
+				if sh := sharedRows[name]; sh > 0 {
+					detail += fmt.Sprintf(", %d of them shared by two transcripts", sh)
+				}
 			case n:
 				detail += doctorCount(n, "indexed session") + " from elsewhere"
 			default:

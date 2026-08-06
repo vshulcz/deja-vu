@@ -122,6 +122,27 @@ func HarnessSessionCounts(dir string) map[string]int {
 	return out
 }
 
+// HarnessSharedCounts reports, per harness, how many manifest rows cover more
+// than one transcript. doctor's row shows the files-to-sessions gap; without
+// this it cannot say whether the gap is a parse failure or an id collision
+// (#1101, the two causes #861 and #970 left indistinguishable).
+func HarnessSharedCounts(dir string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]int{}
+	for _, meta := range m.Sessions {
+		if meta.Shared {
+			out[meta.Harness]++
+		}
+	}
+	return out
+}
+
 func Redactions(dir string) (RedactionStats, error) {
 	if dir == "" {
 		dir = DefaultDir()
