@@ -1316,7 +1316,12 @@ func recent(dir string, n int) ([]model.Session, error) {
 func recentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if o.Role != "" {
-			ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard)
+			// The role has to travel into the index query, not just the filter
+			// below: a scan with no role set drops file, command and edit
+			// records on the way out — they are indexed but served only when
+			// asked for — so `last --role files` saw sessions with the very
+			// records it was selecting on already removed.
+			ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: o.Role}, io.Discard)
 			if err == nil {
 				ss = filterRecentSources(ss, o)
 				return search.Recent(ss, n), nil
@@ -1759,7 +1764,7 @@ func printSources(dir string) {
 		if excluded > 0 {
 			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 		}
-		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, len(ss), msg, humanBytes(size), redacted, note)
+		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
 	aiderFiles := sources.AiderFiles()
 	var aiderSize int64
@@ -1787,7 +1792,7 @@ func printSources(dir string) {
 	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
 		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 	}
-	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, len(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()

@@ -73,6 +73,20 @@ func (e Excluder) Match(project string) bool {
 
 func ExcludedProject(project string) bool { return NewExcluder().Match(project) }
 
+// CountSessions reports how many conversations a slice of parsed transcripts
+// amounts to. The index keys a session on harness+id, so two transcripts that
+// carry one id are one session there — a harness mid-migration writes the same
+// conversation to both its old jsonl store and its new sqlite one, and a
+// resumed run continues an id in a second file. Counting records instead makes
+// a store read as bigger than what deja holds.
+func CountSessions(ss []model.Session) int {
+	seen := make(map[string]struct{}, len(ss))
+	for _, s := range ss {
+		seen[s.Harness+":"+s.ID] = struct{}{}
+	}
+	return len(seen)
+}
+
 func FilterSessions(ss []model.Session) []model.Session {
 	ex := NewExcluder()
 	if ex.Empty() {
