@@ -135,9 +135,19 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 
 func projectMatches(project string, names []string) bool {
 	project = strings.ToLower(filepathClean(project))
+	// A session imported from a peer carries its project under an "imported:"
+	// prefix but is still this project's history. Match the base name too, or the
+	// session-start digest silently drops imported sessions the trust policy
+	// (default local+imported) already allowed — while hook-prompt keeps them, so
+	// the two auto-injections disagreed on the same store (#E-new33).
+	bare := strings.TrimPrefix(project, "imported:")
 	for _, name := range names {
 		name = strings.ToLower(filepathClean(name))
-		if name != "" && (project == name || strings.HasSuffix(project, "/"+name)) {
+		if name == "" {
+			continue
+		}
+		if project == name || strings.HasSuffix(project, "/"+name) ||
+			bare == name || strings.HasSuffix(bare, "/"+name) {
 			return true
 		}
 	}

@@ -700,3 +700,27 @@ func TestPrintContextAnchorsBudgetOnTheMatch(t *testing.T) {
 		t.Errorf("ctx exceeded the digest budget: %d", b.Len())
 	}
 }
+
+// An imported session's project is "imported:<name>"; it is still the same
+// project's history, so the session-start digest must scope it in — otherwise it
+// silently dropped imported sessions the default local+imported policy allowed,
+// while hook-prompt kept them (#E-new33).
+func TestProjectMatchesHandlesImportedPrefix(t *testing.T) {
+	names := []string{"myproj", "/home/me/myproj"}
+	cases := []struct {
+		project string
+		want    bool
+	}{
+		{"myproj", true},
+		{"imported:myproj", true},     // peer's copy of the same project
+		{"/home/me/myproj", true},     // path suffix
+		{"imported:otherproj", false}, // different imported project — no over-match
+		{"myproject2", false},         // substring must not match
+		{"imported:notmyproj", false}, // base name differs
+	}
+	for _, c := range cases {
+		if got := projectMatches(c.project, names); got != c.want {
+			t.Errorf("projectMatches(%q, %v) = %v, want %v", c.project, names, got, c.want)
+		}
+	}
+}
