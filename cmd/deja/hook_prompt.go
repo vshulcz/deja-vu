@@ -98,7 +98,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
 	adoptHookCWD(input.CWD)
 	terms := promptSearchTerms(string(input.Prompt))
-	if len(terms) < 2 {
+	if !promptTermsWorthAsking(terms) {
 		return nil
 	}
 	// Version, not just presence: terms hash into buckets an index from
@@ -310,6 +310,20 @@ func hasCJKRune(s string) bool {
 		}
 	}
 	return false
+}
+
+// promptTermsWorthAsking is the gate before the index is touched. Two terms
+// were required, which silenced the sharpest prompt there is: "do we need
+// pgbouncer here" reduces to one term and never reached the store, while "add
+// pgbouncer to the stack" — the same question with a filler noun — did. The
+// rule below already decides the single-term case (one informative match is
+// served when the question named a term of art, without the déjà vu line);
+// the floor returned first, so that rule could never see it.
+func promptTermsWorthAsking(terms []string) bool {
+	if len(terms) == 0 {
+		return false
+	}
+	return len(terms) >= 2 || hasIdentifierTerm(terms)
 }
 
 // hasIdentifierTerm reports whether the question contains a word specific
