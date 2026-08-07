@@ -35,6 +35,22 @@ func isBidiControl(r rune) bool {
 	return false
 }
 
+// isInvisible reports the runes that render as nothing at all. They are the
+// quiet half of the same problem: text a reader never sees and a model still
+// reads. The tag block is a whole invisible ASCII alphabet, so "SYSTEM: ignore
+// prior instructions" fits inside it and arrives in an agent's context looking
+// like an empty string. Only subdivision-flag emoji use tags for anything, and
+// a plain black flag is cheaper than an invisible instruction. Variation
+// selectors (U+FE00.., U+E0100..) are not in the block and do change what is
+// drawn, so they stay.
+func isInvisible(r rune) bool {
+	switch r {
+	case '\u00ad', '\u061c', '\u200b', '\u2060', '\ufeff':
+		return true
+	}
+	return r >= '\U000e0000' && r <= '\U000e007f'
+}
+
 // SafeForDisplay removes escape sequences and replaces every other control
 // character with a space, so what a reader sees is what the transcript holds.
 // Newline and tab survive unchanged.
@@ -59,7 +75,7 @@ func SafeForDisplay(s string) string {
 		if r == '\r' && i+1 < len(runes) && runes[i+1] == '\n' {
 			continue
 		}
-		if isBidiControl(r) || unicode.IsControl(r) {
+		if isBidiControl(r) || isInvisible(r) || unicode.IsControl(r) {
 			b.WriteRune(' ')
 			continue
 		}
@@ -104,7 +120,7 @@ func needsDisplaySafety(s string) bool {
 		if r == '\n' || r == '\t' {
 			continue
 		}
-		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || isBidiControl(r) {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || isBidiControl(r) || isInvisible(r) {
 			return true
 		}
 	}
