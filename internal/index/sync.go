@@ -482,8 +482,19 @@ func Import(dir, inDir string) (int, error) {
 				}
 				dedupe = bucket
 			}
+			// The ledger is an optimisation over the manifest, not authority
+			// over it: it says a record already arrived, so re-importing the
+			// same batch is a no-op. But forgetting an imported session drops
+			// it from the manifest while leaving its rows in the ledger, and a
+			// tombstone (checked above) only holds until unforget lifts it —
+			// after which the stale ledger silently ate the very re-import
+			// unforget tells the user to run, and the "only copy" was
+			// unrecoverable. Skip only while the session it belongs to still
+			// lives; a ledger row whose session is gone is stale, not a dupe.
 			if m.ImportedRecords[dedupe] || m.ImportedRecords[legacy] {
-				return nil
+				if _, live := m.Sessions[sr.Harness+":"+importID]; live {
+					return nil
+				}
 			}
 			// The exclude list keeps a project out of this machine's memory;
 			// a sync from another machine must not put it back.

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -79,5 +80,84 @@ func TestUnforgetSaysWhenAnImportedSessionCannotComeBack(t *testing.T) {
 	}
 	if !strings.Contains(out, "restored 1 session") {
 		t.Errorf("a local session no longer reports its restore: %q", out)
+	}
+}
+
+// The undo names `sync import` as the way back; this checks the way back
+// actually works. Forgetting an imported session dropped it from the manifest
+// but left its rows in the import dedupe ledger, so the re-import the message
+// told the user to run was silently deduped away and the "only copy" was
+// unrecoverable. Import now skips a ledger row only while its session still
+// lives, so an unforgotten session comes back.
+func TestUnforgetImportedComesBackOnReimport(t *testing.T) {
+	tmp := hermeticEnv(t)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Three imported sessions so a forget is unambiguous and the count moves.
+	var batch []byte
+	for i := 1; i <= 3; i++ {
+		b, err := json.Marshal(index.SyncRecord{
+			Harness: "claude", SessionID: "pe" + string(rune('0'+i)), Project: "svc",
+			Role: "user", Text: "rotate the signing key, take " + string(rune('0'+i)),
+			Time: time.Date(2026, time.Month(i), 1, 10, 0, 5, 0, time.UTC),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch = append(batch, append(b, '\n')...)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), batch, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	sessions := func() int {
+		ov, err := index.Overview(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ov.Sessions
+	}
+	if sessions() != 3 {
+		t.Fatalf("import: want 3 sessions, got %d", sessions())
+	}
+
+	var id string
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range metas {
+		if strings.HasPrefix(m.ID, "imported-") {
+			id = m.ID
+			break
+		}
+	}
+	if _, err := captureRunStderr(t, "forget", "--session", id); err != nil {
+		t.Fatal(err)
+	}
+	if sessions() != 2 {
+		t.Fatalf("forget: want 2 sessions, got %d", sessions())
+	}
+	// While forgotten the tombstone must hold: re-import does not resurrect it.
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	if sessions() != 2 {
+		t.Fatalf("re-import while forgotten resurrected it: want 2, got %d", sessions())
+	}
+	// Undo the tombstone, then re-import: now it comes back.
+	if _, err := captureRun(t, "forget", "--unforget", "claude:"+id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	if got := sessions(); got != 3 {
+		t.Fatalf("re-import after unforget did not bring the session back: want 3, got %d", got)
 	}
 }
