@@ -101,6 +101,11 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		return 0, nil, err
 	}
 	if err := os.MkdirAll(outDir, 0o700); err != nil {
+		// The import side of the same mistake is worded; this one handed back
+		// `mkdir /…/file: not a directory` (#1112).
+		if fi, statErr := os.Stat(outDir); statErr == nil && !fi.IsDir() {
+			return 0, nil, fmt.Errorf("%s is a file; sync export wants a directory to write the batch into", outDir)
+		}
 		return 0, nil, err
 	}
 	if m.ExportWatermarks == nil {
