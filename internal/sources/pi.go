@@ -68,14 +68,25 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 				return
 			}
 			role, _ := msg["role"].(string)
-			if role != "user" && role != "assistant" {
+			outRole := role
+			switch role {
+			case "user", "assistant":
+				// speech, kept under its own role
+			case "toolResult":
+				// Command output and errors carry the same recall value every
+				// other harness with structured tool output indexes: roleToolOutput
+				// powers friction and `--role tool`. pi kept it in the transcript
+				// but the parser dropped everything but speech, so pi users alone
+				// had no friction and could not search a command's output.
+				outRole = RoleToolOutput
+			default:
 				return
 			}
 			t := parseTimeAny(m["timestamp"])
 			s.Touch(t)
 			txt := textFromContent(msg["content"])
 			if txt != "" {
-				s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
+				s.Messages = append(s.Messages, model.Message{Role: outRole, Text: txt, Time: t})
 			}
 		}
 	})

@@ -44,8 +44,8 @@ func TestParsePiFile(t *testing.T) {
 	if s.Project != filepath.Join("deja", "vu") {
 		t.Fatalf("project = %q, want deja/vu", s.Project)
 	}
-	if len(s.Messages) != 3 {
-		t.Fatalf("want 3 messages (user + 2 assistant), got %d: %#v", len(s.Messages), s.Messages)
+	if len(s.Messages) != 4 {
+		t.Fatalf("want 4 messages (user + 2 assistant + tool output), got %d: %#v", len(s.Messages), s.Messages)
 	}
 	if s.Messages[0].Role != "user" || s.Messages[0].Text != "what is pi?" {
 		t.Fatalf("message[0] = %#v", s.Messages[0])
@@ -53,8 +53,13 @@ func TestParsePiFile(t *testing.T) {
 	if s.Messages[1].Role != "assistant" || s.Messages[1].Text != "pi is a coding agent" {
 		t.Fatalf("message[1] = %#v", s.Messages[1])
 	}
-	if s.Messages[2].Role != "assistant" || s.Messages[2].Text != "here is the result" {
-		t.Fatalf("message[2] = %#v", s.Messages[2])
+	// Tool output is kept as roleToolOutput so pi feeds friction and `--role tool`
+	// like the other harnesses that carry it.
+	if s.Messages[2].Role != RoleToolOutput || s.Messages[2].Text != "some output" {
+		t.Fatalf("message[2] = %#v, want tool output", s.Messages[2])
+	}
+	if s.Messages[3].Role != "assistant" || s.Messages[3].Text != "here is the result" {
+		t.Fatalf("message[3] = %#v", s.Messages[3])
 	}
 }
 
