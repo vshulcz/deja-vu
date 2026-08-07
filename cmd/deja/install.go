@@ -244,6 +244,13 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 		fmt.Fprintf(os.Stderr, "index: built (%d session%s, %d message%s)\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 	} else if !index.HasManifest(dir) && detected > 0 {
 		fmt.Fprintln(os.Stderr, "next: run `deja index` to finish building memory")
+	} else if n := deniedStoreCount(); !index.HasManifest(dir) && n > 0 {
+		// "no agent history detected" is a claim about the machine, and the
+		// install said it over a store deja is not allowed to open — the very
+		// first step told the newcomer they had nothing, and only doctor, three
+		// commands later, named the permission wall. Same reading as #1020.
+		fmt.Fprintf(os.Stderr, "index: %d agent store%s could not be read (permission denied) — `deja doctor` names %s\n",
+			n, pluralS(n), pluralWhich(n))
 	} else if !index.HasManifest(dir) {
 		fmt.Fprintln(os.Stderr, "index: no agent history detected")
 	} else {
@@ -386,6 +393,13 @@ func installIndexHint(dir string) string {
 	}
 	if onlyMissingOrEmpty {
 		return "no agent history found on this machine; checked " + strings.Join(paths, ", ")
+	}
+	if detected == 0 {
+		// Every store deja found is one it cannot open: "index 0 agent stores"
+		// is a zero with an instruction that would change nothing.
+		if n := deniedStoreCount(); n > 0 {
+			return fmt.Sprintf("%d agent store%s could not be read (permission denied) — `deja doctor` names %s", n, pluralS(n), pluralWhich(n))
+		}
 	}
 	return fmt.Sprintf("next: run `deja index` to index %d agent stores", detected)
 }
