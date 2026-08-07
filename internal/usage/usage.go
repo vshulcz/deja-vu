@@ -24,8 +24,13 @@ const (
 	// and it is the largest thing the server hands over — whole sessions
 	// rather than budgeted snippets — so leaving it out understated what the
 	// agent was given (#682).
-	KindBlame   = "blame"
-	KindHandoff = "handoff"
+	KindBlame = "blame"
+	// KindResource is a read of deja://session/… over the MCP resources
+	// surface. It hands the agent a whole session in the same frame
+	// recall_context uses, so leaving it out understated what was served the
+	// same way blame did before #682.
+	KindResource = "resource"
+	KindHandoff  = "handoff"
 	// KindDejaVu marks a per-prompt recall: the user asked something their
 	// own history already answers — the product's namesake moment.
 	KindDejaVu = "dejavu"
