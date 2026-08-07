@@ -280,6 +280,29 @@ func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn fu
 // always stored it, so it stays the on-disk marker for "never stamped".
 var zeroTimeUnixNano = time.Time{}.UnixNano()
 
+// UnixNano is only defined for 1678-2262: outside that window the nanosecond
+// count wraps, and what comes back is a plausible date rather than an obvious
+// one. A transcript stamped 2999 read back out of records.bin as 1829, so
+// `deja stats` reported a store that began 200 years before its oldest
+// session. Clamping keeps a nonsense stamp at the edge of the range instead of
+// moving it to the other end of history.
+var (
+	minRecordTime = time.Unix(0, math.MinInt64)
+	maxRecordTime = time.Unix(0, math.MaxInt64)
+)
+
+func recordNanos(t time.Time) int64 {
+	switch {
+	case t.IsZero():
+		return zeroTimeUnixNano
+	case t.Before(minRecordTime):
+		return math.MinInt64
+	case t.After(maxRecordTime):
+		return math.MaxInt64
+	}
+	return t.UnixNano()
+}
+
 // recordTables interns the two fields every record used to repeat verbatim.
 // A corpus of 57k messages held only 90 distinct source paths and 1073
 // distinct keys, so writing them per record cost 7.3 MB — 15% of the record
@@ -370,7 +393,7 @@ var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
 func encodeRecord(r Record, t *recordTables) []byte {
 	body := make([]byte, 0, len(r.Role)+len(r.Text)+24)
 	body = appendField(body, r.Role)
-	body = binary.LittleEndian.AppendUint64(body, uint64(r.Time.UnixNano()))
+	body = binary.LittleEndian.AppendUint64(body, uint64(recordNanos(r.Time)))
 	body = appendField(body, r.Text)
 
 	b := make([]byte, 0, len(body)+16)
