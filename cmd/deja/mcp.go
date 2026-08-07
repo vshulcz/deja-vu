@@ -628,13 +628,21 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	// the reader had rejected, while search demoted it and said why (#1099).
 	attachLifecycles(dir, hits)
 	demoteRejected(hits)
+	// The hit carries only the matching messages; recall_context is the "full
+	// story" tool, so upgrade to the whole session before printing — otherwise
+	// an answer worded nothing like the question (the decision itself) never
+	// reached the agent, the same gap CLI ctx closed (#1011).
+	whole := hits[0].Session
+	if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
+		whole = full
+	}
 	var b bytes.Buffer
-	search.PrintContext(&b, hits[0].Session, q)
+	search.PrintContext(&b, whole, q)
 	text := b.String()
 	if hits[0].Tier != search.TierExact {
 		text = "[" + hits[0].Tier + "]\n" + text
 	}
-	return text, 1, rawSize([]model.Session{hits[0].Session}), []string{hits[0].Session.ID}, nil
+	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, nil
 }
 
 func mcpProgress() io.Writer {
