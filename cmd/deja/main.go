@@ -807,6 +807,9 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
 	}
+	if note := otherWordFormsNote(dir, o, hits); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
 	if len(hits) == 0 {
 		// The policy is named before the generic advice: "try fewer words" is
 		// wrong counsel for someone whose words were fine (#680). A filter the
@@ -843,6 +846,87 @@ func printStemmed(w io.Writer, variants map[string][]string) {
 			}
 		}
 	}
+}
+
+// otherWordFormsNote says that a word form the query did not use has sessions
+// of its own that this answer does not contain.
+//
+// The exact tier wins and stops, so `retry` returns what wrote "retry" and
+// never reaches "retries" — the stem tier below it only runs when exact comes
+// up empty. deja narrates every other time the ladder shapes an answer (close
+// spellings, dropped terms, the trust policy); this rung was the silent one,
+// and silence here reads as "that is all there is". Only the forms that bring
+// sessions the answer does not already hold are worth a line.
+func otherWordFormsNote(dir string, o query.Options, hits []search.Hit) string {
+	if o.Regex || o.Tier != search.TierExact || len(hits) == 0 {
+		return ""
+	}
+	terms := query.Tokens(o.Query)
+	if len(terms) == 0 || len(terms) > 4 {
+		return ""
+	}
+	forms := index.OtherWordForms(dir, terms)
+	if len(forms) == 0 {
+		return ""
+	}
+	var flat []string
+	for _, list := range forms {
+		flat = append(flat, list...)
+	}
+	counts := index.TermSessionCounts(dir, flat)
+	var parts []string
+	for _, term := range terms {
+		for _, form := range forms[term] {
+			extra := counts[form] - sessionsHolding(hits, form)
+			if extra <= 0 {
+				continue
+			}
+			parts = append(parts, fmt.Sprintf("%q in %d more", form, extra))
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja: word forms this answer leaves out: %s — search the form to see them\n", strings.Join(parts, ", "))
+}
+
+// sessionsHolding counts the returned sessions that already contain a word
+// form, so the note reports what is missing rather than what is on the page.
+func sessionsHolding(hits []search.Hit, form string) int {
+	n := 0
+	for _, h := range hits {
+		for _, m := range h.Session.Messages {
+			if containsWord(strings.ToLower(m.Text), form) {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
+
+// containsWord matches a whole word, not a substring: "retry" inside
+// "retrying" is a different form and counting it would hide the one the note
+// exists to name.
+func containsWord(low, word string) bool {
+	for i := 0; ; {
+		j := strings.Index(low[i:], word)
+		if j < 0 {
+			return false
+		}
+		start := i + j
+		end := start + len(word)
+		beforeOK := start == 0 || !isWordByte(low[start-1])
+		afterOK := end == len(low) || !isWordByte(low[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		i = start + 1
+	}
+}
+
+func isWordByte(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b >= 0x80
 }
 
 // termCountLine names the terms that do match on their own, so "try fewer

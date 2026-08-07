@@ -12,7 +12,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-const lifecycleRejected = "rejected"
+const (
+	lifecycleRejected   = "rejected"
+	lifecycleSuperseded = "superseded"
+	lifecycleStale      = "stale"
+)
 
 // promotedNoteID returns the id a promoted note has on the machine that made
 // it: after a sync the local id is imported-<hash>, and every rule written for
