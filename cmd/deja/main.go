@@ -179,6 +179,12 @@ func run(args []string) error {
 		return nil
 	}
 	sourceInstance := os.Getenv("DEJA_SOURCE_INSTANCE")
+	if wantsHelp(args[1:]) {
+		if h := helpForCommand(args[0]); h != "" {
+			fmt.Print(h)
+			return nil
+		}
+	}
 	switch args[0] {
 	case "show":
 		return cmdShow(dir, args[1:], sourceInstance)
@@ -2077,7 +2083,13 @@ func wrapTargets(names []string, indent string, width int) string {
 }
 
 func printUsage() {
-	fmt.Printf(`deja - persistent memory for coding agents
+	fmt.Print(usageText())
+}
+
+// usageText renders the usage block so `--help` on a single command can quote
+// the lines that belong to it instead of the whole page.
+func usageText() string {
+	return fmt.Sprintf(`deja - persistent memory for coding agents
 
 Usage:
   deja [flags] <query>
@@ -2114,6 +2126,7 @@ Usage:
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja mcp
   deja version
+  deja <command> --help
   deja update [--force]
   deja install <target> | --all | --auto
   deja uninstall <target> | --all | --auto
@@ -2147,6 +2160,60 @@ Examples:
 
 See README.md for the full CLI reference.
 `, wrapTargets(installTargetNames(), "      ", 76))
+}
+
+// helpForCommand answers `deja <cmd> --help`. Every command rejected it as an
+// unknown flag, and a couple did worse: `deja statusline --help` printed a
+// statusline and `deja mcp --help` started the server and hung the terminal
+// (#1111).
+func helpForCommand(name string) string {
+	var out []string
+	usage := usageText()
+	if i := strings.Index(usage, "\nUsage:\n"); i >= 0 {
+		usage = usage[i+len("\nUsage:\n"):]
+	}
+	if i := strings.Index(usage, "\nExamples:\n"); i >= 0 {
+		usage = usage[:i]
+	}
+	// A usage line can carry indented continuations under it — the install
+	// target list sits under the install/uninstall pair — so a match keeps
+	// collecting until the next "deja …" line that does not match.
+	matched := false
+	for _, line := range strings.Split(usage, "\n") {
+		t := strings.TrimSpace(line)
+		switch {
+		case t == "deja "+name || strings.HasPrefix(t, "deja "+name+" "):
+			out = append(out, line)
+			matched = true
+		case matched && t != "" && strings.HasPrefix(line, "    ") && !strings.HasPrefix(t, "deja "):
+			out = append(out, line)
+		case matched && strings.HasPrefix(t, "deja "):
+			// install and uninstall share one target list, printed under the
+			// second of the pair; every other command's help ends at the next
+			// command line.
+			pair := name == "install" || name == "uninstall"
+			matched = pair && (strings.HasPrefix(t, "deja install ") || strings.HasPrefix(t, "deja uninstall "))
+		default:
+			matched = false
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return strings.Join(out, "\n") + "\nSee `deja help` for every command and flag.\n"
+}
+
+// wantsHelp reports whether a command line asks for help rather than work.
+func wantsHelp(rest []string) bool {
+	for _, a := range rest {
+		if a == "--help" || a == "-h" {
+			return true
+		}
+		if a == "--" {
+			return false
+		}
+	}
+	return false
 }
 
 // movedBucketHint explains a note-bucket id that stopped resolving. The id
