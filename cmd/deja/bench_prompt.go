@@ -66,13 +66,11 @@ type promptReport struct {
 }
 
 func runBenchPrompt(args []string) error {
-	jsonOut := false
-	for _, a := range args {
-		if a == "--json" {
-			jsonOut = true
-		}
+	jsonOut, seed, err := parseBenchArgs("prompt", args)
+	if err != nil {
+		return err
 	}
-	report, err := measurePrompt(bench.Seed)
+	report, err := measurePrompt(seed)
 	if err != nil {
 		return err
 	}

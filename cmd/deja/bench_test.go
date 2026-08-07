@@ -133,7 +133,7 @@ func TestBenchmarkTempDirRejectsSquattedParent(t *testing.T) {
 	if _, err := benchmarkTempDir(); err == nil {
 		t.Fatal("benchmark accepted a squatted scratch path")
 	}
-	if err := runBenchRecall(false); err == nil {
+	if err := runBenchRecall(false, bench.Seed); err == nil {
 		t.Fatal("benchmark ignored a squatted scratch path")
 	}
 }
