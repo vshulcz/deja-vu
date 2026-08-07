@@ -162,7 +162,9 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if exportPath != "" {
-		fmt.Fprintf(stdout, "exported to %s\n", exportPath)
+		// The path is whatever the caller passed. A newline in it ends this
+		// line and starts one of the caller's that reads as deja's own output.
+		fmt.Fprintf(stdout, "exported to %s\n", search.SafeLine(exportPath))
 	}
 	// The id deja resolved, not the one the reader typed: a prefix that stood
 	// for several sessions would send the correction to whichever is newest —

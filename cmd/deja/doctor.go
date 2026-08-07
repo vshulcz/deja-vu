@@ -16,6 +16,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -509,7 +510,10 @@ func doctorHarnesses(w io.Writer, dir string) {
 				detail += doctorCount(n-imported, "indexed session") + fmt.Sprintf(", %d more from elsewhere", imported)
 			}
 		}
-		line := fmt.Sprintf("  %-12s %-9s %s", name, status, path)
+		// A store path can come from the environment (DEJA_NOTES_FILE) or from
+		// disk. On a fixed-width row a newline in it prints a line of its own
+		// that reads as one of doctor's.
+		line := fmt.Sprintf("  %-12s %-9s %s", name, status, search.SafeLine(path))
 		if detail != "" {
 			line += "  (" + detail + ")"
 		}

@@ -65,9 +65,12 @@ func orderForInjection(ss []model.Session) ([]model.Session, string) {
 		if !ok {
 			continue
 		}
-		line := fmt.Sprintf("session %s %s", s.ID, phrase)
+		// The id and the note are free text that travelled with the session.
+		// This warning is one line of an injected digest, so a note spanning
+		// several lines writes rows the store never held.
+		line := fmt.Sprintf("session %s %s", recallListingLine(s.ID), phrase)
 		if lc.Note != "" {
-			line += ": " + lc.Note
+			line += ": " + recallListingLine(lc.Note)
 		}
 		warn = append(warn, line)
 	}

@@ -144,14 +144,19 @@ func lifecycleLine(h search.Hit) string {
 	case "stale":
 		b.WriteString("[marked stale — may no longer hold")
 	default:
-		b.WriteString("[" + h.Lifecycle)
+		b.WriteString("[" + recallListingLine(h.Lifecycle))
 	}
 	if h.LifecycleAt != "" {
 		fmt.Fprintf(&b, ", %s", h.LifecycleAt)
 	}
 	b.WriteString("]")
 	if h.LifecycleNote != "" {
-		b.WriteString(" " + h.LifecycleNote)
+		// The note is free text the writer chose, and it travels between
+		// machines with the session. On its own line above the snippets, a
+		// note spanning several lines prints a "2. [claude] …" header and a
+		// "- …" snippet that no session in the store produced — the forgery
+		// #1080 fixed for imported project names, here on the note channel.
+		b.WriteString(" " + recallListingLine(h.LifecycleNote))
 	}
 	return b.String()
 }
