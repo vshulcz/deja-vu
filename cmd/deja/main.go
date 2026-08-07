@@ -528,7 +528,7 @@ func cmdCtx(dir string, rest []string) error {
 	}
 	o := search.Options{Query: q, All: true}
 	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
-		if !staleReadOnlyIndex(dir, err) {
+		if !staleUnwritableIndex(dir, err) {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
@@ -742,7 +742,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if err := withBuildProgress(func() error { return index.EnsureForSearch(dir, o, force, os.Stderr) }); err != nil {
 		// A store that cannot be written still has an index that can be read:
 		// answering from it beats answering nothing (#904).
-		if !staleReadOnlyIndex(dir, err) {
+		if !staleUnwritableIndex(dir, err) {
 			return ensureError(dir, err)
 		}
 		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
@@ -2521,12 +2521,18 @@ func pluralWhich(n int) string {
 	return "them"
 }
 
-// staleReadOnlyIndex reports that a build could not run because the store is
-// not writable, while an index that can still answer is right there. Refusing
-// the whole search then is deja withholding what it has: the reader gets
-// nothing instead of slightly old memory and a line saying why (#904).
-func staleReadOnlyIndex(dir string, err error) bool {
-	return errors.Is(err, fs.ErrPermission) && index.HasManifest(dir)
+// staleUnwritableIndex reports that a build could not run because the store
+// cannot be written, while an index that can still answer is right there.
+// Refusing the whole search then is deja withholding what it has: the reader
+// gets nothing instead of slightly old memory and a line saying why (#904).
+// A full disk belongs here next to a denied one: it is the commoner of the
+// two, and it took every answer with it — empty stdout and exit 1 while a
+// complete index sat in the store.
+func staleUnwritableIndex(dir string, err error) bool {
+	if !errors.Is(err, fs.ErrPermission) && !errors.Is(err, syscall.ENOSPC) {
+		return false
+	}
+	return index.HasManifest(dir)
 }
 
 // deniedPath names the file a permission error was actually about, so the fix

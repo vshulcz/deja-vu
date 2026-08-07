@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -54,7 +56,7 @@ func TestSearchAnswersFromAnIndexItCannotUpdate(t *testing.T) {
 
 	// The seam itself: an index that is there and a store that is not
 	// writable is the case that carries on; nothing to read is not.
-	if !staleReadOnlyIndex(dir, fs.ErrPermission) {
+	if !staleUnwritableIndex(dir, fs.ErrPermission) {
 		t.Error("a readable index with an unwritable store was treated as fatal")
 	}
 	if err := os.Chmod(parent, 0o700); err != nil {
@@ -66,7 +68,41 @@ func TestSearchAnswersFromAnIndexItCannotUpdate(t *testing.T) {
 	if index.HasManifest(dir) {
 		t.Fatal("the index did not go away")
 	}
-	if staleReadOnlyIndex(dir, fs.ErrPermission) {
+	if staleUnwritableIndex(dir, fs.ErrPermission) {
+		t.Error("with no index at all deja still claimed it could answer")
+	}
+}
+
+// A full disk leaves the index as intact as a denied one does, but only the
+// denied case carried on: on ENOSPC the search exited 1 with empty stdout
+// while a complete index sat in the store.
+func TestAFullDiskStillAnswersFromTheIndex(t *testing.T) {
+	hermeticEnv(t)
+	dir := os.Getenv("DEJA_INDEX_DIR")
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := `{"type":"user","message":{"role":"user","content":"the winch brake pads squeal"},"timestamp":"2026-07-01T10:00:00Z","sessionId":"s1","cwd":"/proj"}`
+	if err := os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The shape the OS actually hands back from a write to a full volume.
+	full := &fs.PathError{Op: "write", Path: filepath.Join(dir+".tmp", "records.bin"), Err: syscall.ENOSPC}
+	if !staleUnwritableIndex(dir, full) {
+		t.Error("a full disk was treated as fatal while a readable index was right there")
+	}
+	if staleUnwritableIndex(dir, errors.New("something else entirely")) {
+		t.Error("an unrelated build failure was waved through as answerable")
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if staleUnwritableIndex(dir, full) {
 		t.Error("with no index at all deja still claimed it could answer")
 	}
 }
