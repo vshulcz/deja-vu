@@ -36,8 +36,11 @@ jobs:
       - run: go vet ./...
       # -timeout below the job's own patience: a hung test then dies with every
       # goroutine's stack in the log, instead of the runner sitting on it until
-      # the queue times out and the log says only "go test -race" (#838).
-      - run: go test -race -timeout 6m -coverprofile=coverage.out -covermode=atomic ./...
+      # the queue times out and the log says only "go test -race" (#838). Raised
+      # to 12m as the suite grew — cmd/deja under -race on the windows runner
+      # runs ~6m of real, non-hung work, and 12m keeps a wide margin below the
+      # job's 30m so a true hang still dies with a stack.
+      - run: go test -race -timeout 12m -coverprofile=coverage.out -covermode=atomic ./...
         shell: bash
       - run: go build ./cmd/deja
       - name: Benchmark lexical recall floor
