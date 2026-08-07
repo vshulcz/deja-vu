@@ -16,6 +16,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -2265,6 +2266,13 @@ func intersectPostingMaps(sets []map[int64]posting) []posting {
 }
 
 func tokens(s string) []string {
+	// Fold NFD to NFC so an accented word keys the same whether it was typed or
+	// stored decomposed. A combining mark is category Mn, not a letter, so the
+	// tokenizer below would otherwise split "café" (NFD) into "cafe" and drop
+	// the accent, keying it apart from the precomposed "café" (#1098). Both the
+	// stored text (indexKeys) and the query (queryKeys) pass through here, so
+	// the fold is symmetric and the two sides always meet on one key.
+	s = nfcfold.Compose(s)
 	seen := map[string]bool{}
 	var out []string
 	var b strings.Builder
@@ -2421,6 +2429,16 @@ func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][
 	}
 	if query.MatchesParts(r.Text, terms, phrases, variants) {
 		return true
+	}
+	// The postings that pointed here folded NFD to NFC (tokens); this surface
+	// check runs on the raw bytes, where the same accented word in the other
+	// normalization would not substring-match. Retry both composed, mirroring
+	// the CJK retry below (#1098).
+	if nfcfold.Compose(r.Text) != r.Text || nfcfold.Compose(o.Query) != o.Query {
+		nterms, nphrases := query.QueryParts(nfcfold.Compose(o.Query))
+		if query.MatchesParts(nfcfold.Compose(r.Text), nterms, nphrases, variants) {
+			return true
+		}
 	}
 	// Postings are keyed on Traditional-folded bigrams, so a Simplified query
 	// can legitimately reach a Traditional record (and the reverse). This

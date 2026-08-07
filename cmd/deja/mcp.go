@@ -15,6 +15,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -435,7 +436,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	if limit <= 0 {
 		limit = 5
 	}
-	o := search.Options{Query: q, Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, err
@@ -587,7 +588,7 @@ func recallContext(dir, q string) (string, error) {
 }
 
 func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) {
-	o := search.Options{Query: q, Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, err
 	} else if stale {
