@@ -640,17 +640,28 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
+	// A last line the writer never terminated is the signature of a transfer cut
+	// off mid-write, not a foreign record: deja wrote it, it just did not all
+	// arrive. The file is still refused whole (#891), but the reason is a
+	// truncation to re-fetch, not a batch deja mistrusts (#1117).
+	torn := !fileEndsWithNewline(f)
 	s := bufio.NewScanner(f)
 	s.Buffer(make([]byte, 64*1024), 8*1024*1024)
 	line := 0
-	for s.Scan() {
+	have := s.Scan()
+	for have {
 		line++
+		cur := append([]byte(nil), s.Bytes()...)
+		next := s.Scan()
 		var rec SyncRecord
-		if err := json.Unmarshal(s.Bytes(), &rec); err != nil {
+		if err := json.Unmarshal(cur, &rec); err != nil {
 			// The line number, because "invalid character 'o' in literal null"
 			// on a file of thousands is not something anyone can act on. The
 			// file is still refused whole: a half-imported transfer is worse
 			// than one the reader can retry (#891).
+			if !next && torn {
+				return fmt.Errorf("%s looks truncated at line %d — the transfer may have been cut off; fetch the batch again", filepath.Base(path), line)
+			}
 			return fmt.Errorf("%s line %d is not a record deja wrote: %w", filepath.Base(path), line, err)
 		}
 		// Metadata from a batch is another machine's text: it lands in the
@@ -664,11 +675,28 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 		if err := fn(rec); err != nil {
 			return err
 		}
+		have = next
 	}
 	if err := s.Err(); err != nil && err != io.EOF {
 		return err
 	}
 	return nil
+}
+
+// fileEndsWithNewline reports whether the file's last byte is a newline. A batch
+// deja wrote always ends in one; a missing final newline means the last line was
+// never finished — a transfer cut off mid-write. An empty file counts as
+// terminated: it has no torn tail.
+func fileEndsWithNewline(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil || fi.Size() == 0 {
+		return true
+	}
+	buf := make([]byte, 1)
+	if _, err := f.ReadAt(buf, fi.Size()-1); err != nil {
+		return true
+	}
+	return buf[0] == '\n'
 }
 
 func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Record, metas map[string]SessionMeta) error {
