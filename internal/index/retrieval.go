@@ -2547,7 +2547,12 @@ type AskedTwice struct {
 //
 // The search runs entirely over the manifest. Only the matching sessions are
 // read back, and only to recover the text the hashes stand for.
-func FindAskedTwice(dir string) (AskedTwice, bool) {
+// allow is the trust gate: it reports whether a session's project may reach the
+// caller's activation. Imported sessions now carry asked hashes, so an
+// asked-twice repeat can be all imported — without this gate the brief would
+// print it on a machine whose auto rule withholds imported memory. A nil allow
+// counts every session (the manifest-level view the tests read).
+func FindAskedTwice(dir string, allow func(project string) bool) (AskedTwice, bool) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -2557,6 +2562,9 @@ func FindAskedTwice(dir string) (AskedTwice, bool) {
 	}
 	byHash := map[uint64][]SessionMeta{}
 	for _, meta := range m.Sessions {
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
 		for _, h := range meta.Asked {
 			byHash[h] = append(byHash[h], meta)
 		}

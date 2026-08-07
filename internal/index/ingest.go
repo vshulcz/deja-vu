@@ -1016,6 +1016,22 @@ func agentOwnedFile(p string) bool {
 	return strings.HasSuffix(p, ".log") || strings.HasSuffix(p, ".output")
 }
 
+// askedHashOf returns the stem hash for one user turn, or false when the text
+// is not a question worth tracking. Shared by the message and record paths so
+// they agree on what counts as an asking.
+func askedHashOf(text string) (uint64, bool) {
+	if notAsked(text) || !looksLikeQuestion(text) {
+		return 0, false
+	}
+	stem := questionStem(text)
+	if stem == "" {
+		return 0, false
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(stem))
+	return h.Sum64(), true
+}
+
 // askedHashes fingerprints the substantial things a person asked in a session.
 // Short turns are excluded the way stats excludes them: "ok" and "continue"
 // repeat in every session and mean nothing.
@@ -1026,17 +1042,33 @@ func askedHashes(ms []model.Message) []uint64 {
 		if m.Role != "user" {
 			continue
 		}
-		if notAsked(m.Text) || !looksLikeQuestion(m.Text) {
+		v, ok := askedHashOf(m.Text)
+		if !ok || seen[v] {
 			continue
 		}
-		stem := questionStem(m.Text)
-		if stem == "" {
+		seen[v] = true
+		out = append(out, v)
+		if len(out) >= askedQuestionCap {
+			break
+		}
+	}
+	return out
+}
+
+// askedFromRecords is askedHashes for the import path, which holds a session as
+// records rather than messages. Imported sessions used to carry no Asked, so
+// the brief's asked-twice line — which reads meta.Asked — never saw a repeat
+// that crossed a sync boundary, while stats' RepeatQuestions (from records)
+// counted it. The two disagreed on the same store.
+func askedFromRecords(recs []Record) []uint64 {
+	var out []uint64
+	seen := map[uint64]bool{}
+	for _, r := range recs {
+		if r.Role != "user" {
 			continue
 		}
-		h := fnv.New64a()
-		_, _ = h.Write([]byte(stem))
-		v := h.Sum64()
-		if seen[v] {
+		v, ok := askedHashOf(r.Text)
+		if !ok || seen[v] {
 			continue
 		}
 		seen[v] = true

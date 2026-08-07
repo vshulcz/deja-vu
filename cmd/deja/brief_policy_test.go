@@ -135,3 +135,71 @@ func TestBriefStaysQuietWhenThePolicyWithholdsNothing(t *testing.T) {
 		t.Errorf("search-path rule reported as withholding from agents:\n%s", buf.String())
 	}
 }
+
+// askedLine returns the "asked" row of the brief, or "" if there is none.
+func askedLine(out string) string {
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.HasPrefix(ln, "asked ") {
+			return ln
+		}
+	}
+	return ""
+}
+
+// A question asked locally and again by a peer whose session arrived by sync is
+// still the same question asked twice — the one line the brief exists to show.
+// Imported sessions used to carry no asked hashes, so the repeat crossed a sync
+// boundary unseen; stats' RepeatQuestions (from records) counted it and the two
+// screens disagreed. It stays gated on the auto rule: a machine that withholds
+// imported memory must not surface an all-imported repeat.
+func TestBriefAskedTwiceCountsImportedAndHonoursPolicy(t *testing.T) {
+	q := "how do I configure the retry queue for delivery?"
+
+	// A local session asks it in March.
+	tmp := hermeticEnv(t)
+	local := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(local, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","sessionId":"locz","cwd":"/proj","timestamp":"2026-03-01T10:00:00Z","message":{"role":"user","content":"` + q + `"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(local, "l.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A peer asks the same thing in July; it arrives by sync.
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	peer := `{"harness":"claude","session_id":"peerz","project":"proj","role":"user","text":"` + q + `","time":"2026-07-01T10:00:00Z"}` + "\n"
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-p.jsonl"), []byte(peer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	// Default policy (local+imported): the repeat surfaces.
+	var buf bytes.Buffer
+	if err := runBrief(dir, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if ln := askedLine(buf.String()); !strings.Contains(ln, "retry queue") {
+		t.Fatalf("asked-twice did not count the imported repeat; asked line = %q\n%s", ln, buf.String())
+	}
+
+	// A rule that withholds imported memory from agents must drop the line: the
+	// only thing keeping the count at two is a session the reader chose to hide.
+	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
+	buf.Reset()
+	if err := runBrief(dir, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if ln := askedLine(buf.String()); ln != "" {
+		t.Errorf("asked-twice surfaced an all-imported repeat under auto:local-only:\n%s", ln)
+	}
+}

@@ -761,6 +761,12 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		if t := touchedFromRecords(recsByKey[key]); len(t) > 0 {
 			meta.Touched = t
 		}
+		// Same reason for the asked-twice signal: without meta.Asked an imported
+		// session can never contribute a repeat to the brief, so a question a
+		// peer asked and you asked again crossed a sync boundary unseen.
+		if a := askedFromRecords(recsByKey[key]); len(a) > 0 {
+			meta.Asked = a
+		}
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord

@@ -174,7 +174,10 @@ func runBrief(dir string, w io.Writer) error {
 	// The one line on this screen that says something a person could not have
 	// noticed themselves: a question they asked in more than one session. A
 	// count of sessions is reporting; this is the thing the tool is for.
-	asked, haveAsked := index.FindAskedTwice(dir)
+	briefPol := policy.Load()
+	asked, haveAsked := index.FindAskedTwice(dir, func(project string) bool {
+		return briefPol.Allows(policy.ActivationAuto, project)
+	})
 	askedText := ""
 	if haveAsked {
 		askedText = trimBriefTitle(asked.Text)

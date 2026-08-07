@@ -139,7 +139,7 @@ func TestFindAskedTwicePicksTheWidestSpan(t *testing.T) {
 			"c": "2026-05-02T10:00:00Z",
 			"d": "2026-05-02T14:00:00Z",
 		})
-	got, ok := FindAskedTwice(dir)
+	got, ok := FindAskedTwice(dir, nil)
 	if !ok {
 		t.Fatal("a question asked two months apart should be found")
 	}
@@ -155,10 +155,10 @@ func TestFindAskedTwiceStaysQuietWithoutARepeat(t *testing.T) {
 	dir := askedFixture(t,
 		map[string][]string{"a": {"why does the pool exhaust under load?"}},
 		map[string]string{"a": "2026-03-01T10:00:00Z"})
-	if _, ok := FindAskedTwice(dir); ok {
+	if _, ok := FindAskedTwice(dir, nil); ok {
 		t.Fatal("one asking is not a repeat")
 	}
-	if _, ok := FindAskedTwice(t.TempDir()); ok {
+	if _, ok := FindAskedTwice(t.TempDir(), nil); ok {
 		t.Fatal("an empty store has nothing to say")
 	}
 }
