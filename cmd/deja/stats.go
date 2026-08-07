@@ -101,6 +101,9 @@ func runStats(dir string, args []string) error {
 	if err := checkHarness(options.Harness); err != nil {
 		return fmt.Errorf("stats: %w", err)
 	}
+	if err := checkRole(options.Role); err != nil {
+		return fmt.Errorf("stats: %w", err)
+	}
 	if impact {
 		return runStatsImpact(os.Stdout, dir, jsonOut)
 	}

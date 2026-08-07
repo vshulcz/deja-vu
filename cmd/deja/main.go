@@ -601,6 +601,9 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if err := checkHarness(o.Harness); err != nil {
 		return err
 	}
+	if err := checkRole(o.Role); err != nil {
+		return err
+	}
 	ss, err := recentMatching(dir, n, o)
 	if err != nil {
 		return err
@@ -718,6 +721,9 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		return err
 	}
 	if err := checkHarness(o.Harness); err != nil {
+		return err
+	}
+	if err := checkRole(o.Role); err != nil {
 		return err
 	}
 	sinceRaw := sinceRawArg(filtered)
@@ -1049,6 +1055,30 @@ func checkHarness(name string) error {
 		return nil
 	}
 	return fmt.Errorf("%q is not a harness deja knows — one of: %s", name, strings.Join(sources.HarnessNames(), ", "))
+}
+
+// knownRoles is the set `--role` accepts. It lists the documented spellings the
+// help text prints plus "tool-output", the stored form "tool" is an alias for —
+// both reach tool records, so both must be accepted.
+var knownRoles = []string{
+	"user", "assistant", "tool", sources.RoleToolOutput,
+	sources.RoleFiles, sources.RoleCommand, sources.RoleEdit,
+}
+
+// checkRole rejects a --role value that is not a known role. Like an unknown
+// --harness, a typo used to be indistinguishable from a real role with no
+// matches: `--role toool` said "matched nothing under role toool" instead of
+// naming the mistake (#1113).
+func checkRole(role string) error {
+	if role == "" {
+		return nil
+	}
+	for _, r := range knownRoles {
+		if r == role {
+			return nil
+		}
+	}
+	return fmt.Errorf("%q is not a role deja knows — one of: %s", role, strings.Join(knownRoles, ", "))
 }
 
 // activeFilters names the filters a caller set, so an empty result can say
