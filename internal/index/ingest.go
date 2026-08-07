@@ -147,6 +147,9 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 		scope = harness
 	}
 	m, err := prior, priorErr
+	if !force && err == nil && notesZoneDrifted(m) {
+		force = true
+	}
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
@@ -173,6 +176,9 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 	want := currentFilesReusing("", priorFiles(prior, priorErr))
 	scope := ""
 	m, err := prior, priorErr
+	if !force && err == nil && notesZoneDrifted(m) {
+		force = true
+	}
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
@@ -226,6 +232,11 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
 		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+	}
+	if notesZoneDrifted(m) {
+		// Regrouping the day buckets is a full rebuild; hand it to the
+		// detached warmup and say the current answer is stale.
+		return true, nil
 	}
 	if manifestFresh(m, want, "") {
 		return false, nil

@@ -24,6 +24,14 @@ func NotesZoneDrift(dir string) bool {
 	if err != nil {
 		return false
 	}
+	return notesZoneDrifted(m)
+}
+
+// notesZoneDrifted is NotesZoneDrift over a manifest the caller already holds.
+// The ingest paths read the manifest anyway, and only `deja index` used to make
+// the check — so a search, `deja last` or the hook left the split buckets in
+// place forever and showed one local day as two rows (#1058).
+func notesZoneDrifted(m Manifest) bool {
 	notes := sources.NotesFile()
 	for _, s := range m.Sessions {
 		if s.Path != notes {
