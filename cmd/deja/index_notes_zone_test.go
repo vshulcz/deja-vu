@@ -45,13 +45,10 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 		f()
 	}
 
+	// Two days apart in UTC, one day in UTC+14: the index built here splits
+	// them, and carrying the laptop east regroups them.
 	append(`{"ts":"2026-07-20T23:45:00Z","project":"tz","text":"the anemometer drifted"}`)
-	inZone(east, func() {
-		if err := index.Ensure(dir, "", false, nil); err != nil {
-			t.Fatal(err)
-		}
-	})
-	append(`{"ts":"2026-07-20T23:50:00Z","project":"tz","text":"the barometer drifted too"}`)
+	append(`{"ts":"2026-07-21T09:00:00Z","project":"tz","text":"the barometer drifted too"}`)
 	inZone(time.UTC, func() {
 		if err := index.Ensure(dir, "", false, nil); err != nil {
 			t.Fatal(err)
@@ -61,7 +58,7 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 	// The split is the premise, not the finding: without two buckets here the
 	// rest of the case proves nothing.
 	if _, n := index.UpToDate(dir, ""); n != 2 {
-		t.Fatalf("two notes a moment apart, indexed in two zones, gave %d sessions, want the 2 this case is about", n)
+		t.Fatalf("two notes on two UTC days gave %d sessions, want the 2 this case is about", n)
 	}
 
 	oldSpawn := spawnWarmup
@@ -74,7 +71,7 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 	}
 	stderr := os.Stderr
 	os.Stderr = w
-	inZone(time.UTC, func() { err = cmdIndex(dir, nil) })
+	inZone(east, func() { err = cmdIndex(dir, nil) })
 	os.Stderr = stderr
 	_ = w.Close()
 	out, _ := io.ReadAll(r)
@@ -83,7 +80,7 @@ func TestIndexRegroupsNotesGroupedInAnotherZone(t *testing.T) {
 	}
 
 	var n int
-	inZone(time.UTC, func() { _, n = index.UpToDate(dir, "") })
+	inZone(east, func() { _, n = index.UpToDate(dir, "") })
 	if n != 1 {
 		t.Errorf("deja index left %d note buckets for one day, want 1 — it said:\n%s", n, out)
 	}
