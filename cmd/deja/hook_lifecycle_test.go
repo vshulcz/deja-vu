@@ -42,13 +42,24 @@ func TestOrderForInjection(t *testing.T) {
 	}
 
 	// Other states are not rejections: superseded says "this was true once",
-	// which is still the record of how the answer was reached.
+	// which is still the record of how the answer was reached, so it keeps its
+	// place. It still has to be said — promoting a correction changed what
+	// `deja search` prints and left the injection reading as if the replaced
+	// answer stood.
 	t.Setenv("DEJA_NOTES_FILE", notes)
-	if err := os.WriteFile(notes, []byte(strings.Replace(body, `"rejected"`, `"superseded"`, 1)), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	got, warn = orderForInjection(ss)
-	if got[0].ID != "bad" || warn != "" {
-		t.Errorf("superseded: order %s, warn %q", got[0].ID, warn)
+	for _, tc := range []struct{ state, want string }{
+		{"superseded", "session bad was replaced by a later decision"},
+		{"stale", "session bad was marked stale and may no longer hold"},
+	} {
+		if err := os.WriteFile(notes, []byte(strings.Replace(body, `"rejected"`, `"`+tc.state+`"`, 1)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, warn = orderForInjection(ss)
+		if got[0].ID != "bad" {
+			t.Errorf("%s: order = %s, want the marked session left in place", tc.state, got[0].ID)
+		}
+		if !strings.Contains(warn, tc.want) || !strings.Contains(warn, "nitrile swelled") {
+			t.Errorf("%s: warning = %q, want %q with the note", tc.state, warn, tc.want)
+		}
 	}
 }
