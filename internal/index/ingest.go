@@ -933,11 +933,10 @@ func metaForSession(s model.Session) SessionMeta {
 	title := s.Title
 	agentTitle := s.AgentTitle
 	if title == "" {
-		title = sessionTitle(s)
 		// A session with no user turn borrows the assistant's opening line
 		// (#692); the listing needs to say so rather than print it where the
 		// reader's own question goes (#1100).
-		agentTitle = title != "" && earliestTitle(s.Messages, "user") == ""
+		title, agentTitle = sessionTitleFrom(s)
 	}
 	// Titles come from unredacted places — an agent-generated summary, a
 	// composer name, the first user message — and are persisted in
@@ -1185,14 +1184,40 @@ func pluralS(n int) string {
 }
 
 func sessionTitle(s model.Session) string {
-	// A user turn always wins; the assistant's opening line fills in when
-	// there is none — a session the agent opened itself, or one whose prompts
-	// are all harness plumbing. The alternative was the blank line these
-	// printed in `deja last` and on the first screen (#692).
+	t, _ := sessionTitleFrom(s)
+	return t
+}
+
+// sessionTitleFrom derives a session's title and reports whether it is the
+// agent's own words rather than the reader's.
+//
+// A user turn always wins; the assistant's opening line fills in when there is
+// none — a session the agent opened itself, or one whose prompts are all
+// harness plumbing. The alternative was the blank line these printed in `deja
+// last` and on the first screen (#692). A session of nothing but tool output
+// has neither, and printed an empty bracket in `last` against a dash in
+// `stats`; it is named after its first output instead.
+func sessionTitleFrom(s model.Session) (title string, fromAgent bool) {
 	if t := earliestTitle(s.Messages, "user"); t != "" {
-		return t
+		return t, false
 	}
-	return earliestTitle(s.Messages, "assistant")
+	if t := earliestTitle(s.Messages, "assistant"); t != "" {
+		return t, true
+	}
+	if t := earliestTitle(s.Messages, roleToolOutput); t != "" {
+		return toolOutputTitle(t), false
+	}
+	return "", false
+}
+
+// toolOutputTitlePrefix marks a title borrowed from tool output. It rides in
+// the title text rather than in a flag beside it so that every surface —
+// `last`, `stats`, the MCP listing, a synced peer — says the same thing
+// without a second field having to travel with it.
+const toolOutputTitlePrefix = "tool output: "
+
+func toolOutputTitle(t string) string {
+	return toolOutputTitlePrefix + truncateTitle(t, 60-len([]rune(toolOutputTitlePrefix)))
 }
 
 // earliestTitle picks the first turn of a role by the clock, falling back to
@@ -1746,8 +1771,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				meta.Path = s.Path
 			}
 			if meta.Title == "" {
-				meta.Title = sessionTitle(s)
-				meta.AgentTitle = meta.Title != "" && earliestTitle(s.Messages, "user") == ""
+				meta.Title, meta.AgentTitle = sessionTitleFrom(s)
 			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {

@@ -498,11 +498,15 @@ func Import(dir, inDir string) (int, error) {
 				better := rank > titleRankOf[key]
 				sameRank := rank == titleRankOf[key] && !sr.Time.IsZero() && sr.Time.Before(titleAt[key])
 				if _, seen := titleAt[key]; !seen || better || sameRank {
-					meta.Title = truncateTitle(strings.TrimSpace(text), 60)
+					if rank == titleRank(roleToolOutput) {
+						meta.Title = toolOutputTitle(strings.TrimSpace(text))
+					} else {
+						meta.Title = truncateTitle(strings.TrimSpace(text), 60)
+					}
 					// The listing marks a title that is the agent's own words
 					// rather than the reader's question (#1100); the import
 					// path derived the title the same way and lost the mark.
-					meta.AgentTitle = titleRank("user") != rank
+					meta.AgentTitle = rank == titleRank("assistant")
 					titleAt[key] = sr.Time
 					titleRankOf[key] = rank
 				}
@@ -619,8 +623,12 @@ func initEmptyIndex(dir string) error {
 func titleRank(role string) int {
 	switch role {
 	case "user":
-		return 2
+		return 3
 	case "assistant":
+		return 2
+	case roleToolOutput:
+		// A session of nothing but tool output would otherwise arrive titleless
+		// and list as a bare id on the receiving machine.
 		return 1
 	}
 	return 0

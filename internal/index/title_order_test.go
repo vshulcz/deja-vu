@@ -52,9 +52,9 @@ func TestSessionTitleTakesTheEarliestTurn(t *testing.T) {
 			msg("user", "<local-command-stdout>ok</local-command-stdout>", 0),
 			msg("user", "the real question", 5),
 		}, "the real question"},
-		{"nothing worth naming", []model.Message{
+		{"only tool output", []model.Message{
 			msg("tool-output", "panic: boom", 0),
-		}, ""},
+		}, "tool output: panic: boom"},
 	}
 	for _, c := range cases {
 		if got := sessionTitle(model.Session{Messages: c.msgs}); got != c.want {
