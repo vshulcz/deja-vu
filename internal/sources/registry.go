@@ -335,6 +335,28 @@ func Registry() []Harness {
 	}
 }
 
+// HarnessNames lists every coarse harness name deja knows, in registry order.
+// It is the set `--harness` accepts — independent of what is installed, so a
+// known-but-empty harness stays valid and only a typo is rejected.
+func HarnessNames() []string {
+	reg := Registry()
+	out := make([]string, 0, len(reg))
+	for _, h := range reg {
+		out = append(out, h.Name)
+	}
+	return out
+}
+
+// IsKnownHarness reports whether name is a harness deja can read.
+func IsKnownHarness(name string) bool {
+	for _, h := range Registry() {
+		if h.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // KindForPath returns the fine-grained kind whose Match accepts p, or "".
 func KindForPath(p string) string {
 	for _, h := range Registry() {

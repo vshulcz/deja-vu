@@ -594,6 +594,9 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
+	if err := checkHarness(o.Harness); err != nil {
+		return err
+	}
 	ss, err := recentMatching(dir, n, o)
 	if err != nil {
 		return err
@@ -708,6 +711,9 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	}
 	o, err := parseSearch(filtered)
 	if err != nil {
+		return err
+	}
+	if err := checkHarness(o.Harness); err != nil {
 		return err
 	}
 	sinceRaw := sinceRawArg(filtered)
@@ -1027,6 +1033,18 @@ func olderThanWindow(dir string, since time.Duration) string {
 	}
 	return fmt.Sprintf("deja: every one of the %d indexed sessions is older than that window — the newest is %s\n",
 		ov.Sessions, ov.Newest.Local().Format("2006-01-02"))
+}
+
+// checkHarness rejects a --harness value deja does not know. A typo used to be
+// indistinguishable from a real harness with no sessions — both said "matched
+// nothing under harness X" — so `--harness cluade` read as "you have no claude
+// history" instead of "that is not a harness". A known-but-empty harness is
+// still valid; only an unknown name is refused (#1113).
+func checkHarness(name string) error {
+	if name == "" || sources.IsKnownHarness(name) {
+		return nil
+	}
+	return fmt.Errorf("%q is not a harness deja knows — one of: %s", name, strings.Join(sources.HarnessNames(), ", "))
 }
 
 // activeFilters names the filters a caller set, so an empty result can say

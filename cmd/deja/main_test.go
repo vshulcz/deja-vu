@@ -1181,14 +1181,17 @@ func TestSearchFlagsAcceptTheEqualsForm(t *testing.T) {
 func TestLastWithFiltersNamesTheFilter(t *testing.T) {
 	dir := seedBriefIndex(t)
 	_ = dir
-	out, err := captureRunStderr(t, "last", "3", "--harness", "nosuchharness")
+	// A real harness with no sessions here (the fixture is claude-only): the
+	// filter emptied the result, and the message must name it. An unknown name
+	// is refused earlier now, so this path needs a valid-but-empty one.
+	out, err := captureRunStderr(t, "last", "3", "--harness", "codex")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out, "no sessions indexed yet") {
 		t.Fatalf("blamed the index for a filter: %q", out)
 	}
-	if !strings.Contains(out, `harness "nosuchharness"`) {
+	if !strings.Contains(out, `harness "codex"`) {
 		t.Fatalf("did not name the filter: %q", out)
 	}
 	// Unfiltered on an empty store keeps the original advice, which is right
