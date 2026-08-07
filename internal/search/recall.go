@@ -30,6 +30,11 @@ type AutoRecallOptions struct {
 type AutoRecallResult struct {
 	Text     string
 	Sessions int
+	// RawBytes is the transcript volume of the sessions that made it into
+	// Text — the denominator of the distillation ratio deja prints as its
+	// own measurement. Candidates the digest skipped never reached an agent,
+	// so counting them inflates the ratio.
+	RawBytes int64
 }
 
 func AutoRecallDigest(ss []model.Session, budget int) string {
@@ -93,6 +98,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	}
 	var b strings.Builder
 	var fingerprints []map[string]bool
+	var raw int64
 	for _, s := range candidates {
 		if mode == RecallSafe && !projectMatches(s.Project, o.ProjectNames) {
 			continue
@@ -117,11 +123,14 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		}
 		b.WriteString(section)
 		fingerprints = append(fingerprints, fingerprint)
+		for _, m := range s.Messages {
+			raw += int64(len(m.Text))
+		}
 		if b.Len() >= budget || len(fingerprints) >= maxSessions {
 			break
 		}
 	}
-	return AutoRecallResult{Text: strings.TrimSpace(b.String()), Sessions: len(fingerprints)}
+	return AutoRecallResult{Text: strings.TrimSpace(b.String()), Sessions: len(fingerprints), RawBytes: raw}
 }
 
 func projectMatches(project string, names []string) bool {
