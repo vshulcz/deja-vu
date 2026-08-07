@@ -176,10 +176,19 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
+	damaged := !force && (priorErr != nil && !errors.Is(priorErr, fs.ErrNotExist) || priorErr == nil && !recordsIntact(dir, prior))
 	if force || err != nil || m.Version != version || m.Scope != scope || !recordsIntact(dir, m) {
 		if progress != nil {
 			if !hasProgressSink() {
-				fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
+				if damaged {
+					// A half-written index rebuilds itself, and the line for it
+					// used to be the routine one — so a disk that keeps
+					// corrupting the store looked like ordinary reindexing
+					// every single time (#1110).
+					fmt.Fprintf(progress, "deja: the index in %s could not be read and is being rebuilt ...\n", displayPath(dir))
+				} else {
+					fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
+				}
 			}
 		}
 		return rebuildForSearch(dir, o, scope, want, progress)
