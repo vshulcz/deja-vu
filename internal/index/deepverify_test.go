@@ -173,3 +173,44 @@ func TestDeepVerifyDeterministicSampling(t *testing.T) {
 		t.Fatalf("sampling must be deterministic: %d/%d vs %d/%d", a.SampledFiles, a.SampledPostings, b.SampledFiles, b.SampledPostings)
 	}
 }
+
+// A truncated bucket made tokenCatalog give up on the whole vocabulary, and
+// deep verification skipped its posting check without a word — a clean bill of
+// health over postings it could not read.
+func TestDeepVerifyFlagsUnreadableBucket(t *testing.T) {
+	dir, _ := deepFixture(t)
+	healthy, err := DeepVerify(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !healthy.Clean() || healthy.SampledPostings == 0 {
+		t.Fatalf("baseline: clean=%v postings=%d", healthy.Clean(), healthy.SampledPostings)
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, "buckets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var truncated bool
+	for _, de := range entries {
+		if strings.HasSuffix(de.Name(), ".bin") {
+			if err := os.Truncate(filepath.Join(dir, "buckets", de.Name()), 7); err != nil {
+				t.Fatal(err)
+			}
+			truncated = true
+			break
+		}
+	}
+	if !truncated {
+		t.Fatal("no bucket to truncate")
+	}
+	got, err := DeepVerify(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Clean() {
+		t.Fatalf("truncated bucket reported clean: %+v", got)
+	}
+	if !findingKinds(got)["unreadable-postings"] {
+		t.Fatalf("want unreadable-postings finding, got %+v", got.Findings)
+	}
+}
