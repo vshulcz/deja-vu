@@ -1269,9 +1269,9 @@ func RelevanceHits(ss []model.Session, terms []string) []Hit {
 // printed them raw (#1090).
 //
 // Newlines and tabs stay: unlike a one-line bar, these renderers are the
-// session's own layout. Format characters (Cf) are left alone here too — a
-// zero-width joiner holds an emoji sequence together, and the line-layout
-// attacks it also enables belong to the surfaces that own a single line.
+// session's own layout. Most format characters (Cf) are left alone here too:
+// a zero-width joiner holds an emoji sequence together. The ones that reorder
+// the line, and the ones that render as nothing at all, do not.
 func SafeText(s string) string {
 	if !strings.ContainsFunc(s, unsafeForTerminal) {
 		return s
@@ -1295,10 +1295,23 @@ func unsafeForTerminal(r rune) bool {
 	// byte: U+202E reverses the rendering of everything after it, so a line
 	// can read as the opposite of the bytes stored. Nothing recalled from a
 	// transcript needs to reorder the reader's screen. The other format
-	// characters stay — a zero-width joiner holds an emoji sequence together.
+	// characters stay: a zero-width joiner holds an emoji sequence together.
 	switch r {
-	case '\u200e', '\u200f', '\u202a', '\u202b', '\u202c', '\u202d', '\u202e',
+	case '\u200e', '\u200f', '\u061c', // left/right/arabic marks
+		'\u202a', '\u202b', '\u202c', '\u202d', '\u202e',
 		'\u2066', '\u2067', '\u2068', '\u2069':
+		return true
+	}
+	// Characters that render as nothing at all are the quiet version: text a
+	// reader never sees and a model still reads. The tag block is a whole
+	// invisible ASCII alphabet: "SYSTEM: ignore prior instructions" fits in
+	// it and arrives in the agent's context looking like an empty string
+	// (#1090). Only regional-flag sequences use tags for anything, and a plain
+	// black flag is cheaper than an invisible instruction.
+	switch {
+	case r == '\u00ad', r == '\u200b', r == '\u2060', r == '\ufeff':
+		return true
+	case r >= '\U000e0000' && r <= '\U000e007f':
 		return true
 	}
 	return false
