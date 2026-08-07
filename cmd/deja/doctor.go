@@ -998,6 +998,13 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 			fmt.Fprintf(w, "  status   not reachable — %s is not there; the disk it lives on may have been unmounted\n", parent)
 			return
 		}
+		// "run `deja warmup`" on a location that cannot be written sends the
+		// reader to a command that fails the same way. doctor is where someone
+		// looks to learn why memory is absent, so it has to name the reason.
+		if !indexDirWritable(dir) {
+			fmt.Fprintf(w, "  status   not built — %s is not writable, so no build can run there; point DEJA_INDEX_DIR somewhere writable\n", filepath.Dir(dir))
+			return
+		}
 		fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
 		return
 	}
