@@ -274,7 +274,23 @@ func buildHeatmap(byDay map[string]int, now time.Time) HeatmapStats {
 		}
 		hm.Weeks = append(hm.Weeks, week)
 	}
+	hm.Months = spaceMonthTicks(hm.Months)
 	return hm
+}
+
+// spaceMonthTicks drops a tick whose neighbour sits one column away. Columns
+// are 13px apart on the card and a three-letter label is wider than that, so
+// adjacent ticks overprint. The later one wins: the leading column is a partial
+// week and the month after it owns the rest of the strip.
+func spaceMonthTicks(in []HeatMonth) []HeatMonth {
+	out := make([]HeatMonth, 0, len(in))
+	for i, m := range in {
+		if i+1 < len(in) && in[i+1].Col-m.Col < 2 {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // Title is the one-line name of a session. It reaches a terminal, a shared
