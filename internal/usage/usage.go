@@ -261,29 +261,47 @@ func read(p string) []Event {
 // rotate rewrites the log keeping only the recent window once it grows past
 // rotateAt. Concurrent writers may lose an event during the swap; usage data
 // is advisory, so that trade keeps the hot path lock-free.
+//
+// Size is the trigger, but the window is what actually bounds the file, and
+// past 1MB the two disagree: a log that is large because it is busy — not
+// because it is old — is over the trigger with nothing to drop, and then every
+// recall rewrote the whole thing and left it exactly as long. Measured on a
+// 10k-session store, per-recall cost went 123ms at an empty log to 342ms at
+// 1.2MB and 870ms at 5.8MB, none of those rewrites dropping a single event.
+// Reading the log to find that out is nearly free; writing it back is not, so
+// the write is what gets skipped when every event survives the cutoff. Which
+// event is oldest cannot be assumed from the order — a clock that steps back
+// appends an older event behind a newer one, and dropping on that assumption
+// would leave stale recalls weighing on ranking forever.
 func rotate(p string) {
 	fi, err := os.Stat(p)
 	if err != nil || fi.Size() < rotateAt {
 		return
 	}
 	cutoff := time.Now().UTC().Add(-keepWindow)
+	all := read(p)
 	var keep []Event
-	for _, e := range read(p) {
+	for _, e := range all {
 		if e.Time.After(cutoff) {
 			keep = append(keep, e)
 		}
+	}
+	if len(keep) == len(all) {
+		return
 	}
 	tmp := p + ".tmp"
 	f, err := os.Create(tmp)
 	if err != nil {
 		return
 	}
+	w := bufio.NewWriter(f)
 	for _, e := range keep {
 		if b, err := json.Marshal(e); err == nil {
-			_, _ = f.Write(append(b, '\n'))
+			_, _ = w.Write(append(b, '\n'))
 		}
 	}
-	if f.Close() != nil {
+	flushed := w.Flush()
+	if f.Close() != nil || flushed != nil {
 		_ = os.Remove(tmp)
 		return
 	}
