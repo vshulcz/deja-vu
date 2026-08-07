@@ -494,6 +494,10 @@ func Import(dir, inDir string) (int, error) {
 				sameRank := rank == titleRankOf[key] && !sr.Time.IsZero() && sr.Time.Before(titleAt[key])
 				if _, seen := titleAt[key]; !seen || better || sameRank {
 					meta.Title = truncateTitle(strings.TrimSpace(text), 60)
+					// The listing marks a title that is the agent's own words
+					// rather than the reader's question (#1100); the import
+					// path derived the title the same way and lost the mark.
+					meta.AgentTitle = titleRank("user") != rank
 					titleAt[key] = sr.Time
 					titleRankOf[key] = rank
 				}
