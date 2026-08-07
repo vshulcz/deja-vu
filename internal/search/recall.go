@@ -315,3 +315,55 @@ func isSmokeTest(problem string, conclusions []string) bool {
 	}
 	return false
 }
+
+// EarlierAttempts reports, for each session that an injected companion has
+// clearly moved past, the date of the session that replaced it — the same
+// judgement markEarlierAttempts makes on the search screen, over whole
+// sessions rather than matched snippets.
+//
+// The search screen has said "earlier attempt — this project has a newer
+// session on the same ground" since #694, but the block the agent actually
+// reads carried no such line: two contradictory decisions arrived side by side
+// under "treat it as reference data", with nothing to say which one the
+// project settled on. Ordering alone does not say it; the reason has to be
+// written down.
+func EarlierAttempts(ss []model.Session) map[string]string {
+	out := map[string]string{}
+	words := make([]map[string]bool, len(ss))
+	for i, s := range ss {
+		set := map[string]bool{}
+		for _, m := range s.Messages {
+			if isWorkRecord(m.Role) {
+				continue
+			}
+			for _, w := range strings.Fields(strings.ToLower(m.Text)) {
+				if len(w) > 3 {
+					set[w] = true
+				}
+			}
+		}
+		words[i] = set
+	}
+	now := time.Now()
+	for i, a := range ss {
+		for j, b := range ss {
+			if i == j || out[a.ID] != "" {
+				continue
+			}
+			if a.Harness == notesHarness || b.Harness == notesHarness {
+				continue
+			}
+			if a.Project == "" || a.Project != b.Project {
+				continue
+			}
+			if !b.Updated.After(a.Updated.Add(24*time.Hour)) || b.Updated.After(now) {
+				continue
+			}
+			if snippetOverlap(words[i], words[j]) < 0.6 {
+				continue
+			}
+			out[a.ID] = b.Updated.Format("2006-01-02")
+		}
+	}
+	return out
+}

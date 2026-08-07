@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -40,7 +41,7 @@ func injectionLifecycle(state string) string {
 func orderForInjection(ss []model.Session) ([]model.Session, string) {
 	states := sources.PromotedLifecycles()
 	if len(states) == 0 {
-		return ss, ""
+		return ss, earlierAttemptWarning(ss)
 	}
 	marked := func(s model.Session) (sources.Lifecycle, string, bool) {
 		lc, ok := states[s.Harness+":"+s.ID]
@@ -71,7 +72,29 @@ func orderForInjection(ss []model.Session) ([]model.Session, string) {
 		warn = append(warn, line)
 	}
 	if len(warn) == 0 {
-		return out, ""
+		return out, earlierAttemptWarning(out)
 	}
-	return out, "Some of this no longer holds — " + strings.Join(warn, "; ") + ".\n"
+	return out, "Some of this no longer holds — " + strings.Join(warn, "; ") + ".\n" + earlierAttemptWarning(out)
+}
+
+// earlierAttemptWarning names the injected sessions the project has already
+// moved past. The search screen has carried this since #694; the block the
+// agent reads did not, so two contradictory decisions from the same project
+// arrived side by side with nothing but their order to tell them apart — and
+// order is not a claim the reader can act on.
+func earlierAttemptWarning(ss []model.Session) string {
+	older := search.EarlierAttempts(ss)
+	if len(older) == 0 {
+		return ""
+	}
+	var lines []string
+	for _, s := range ss {
+		if when := older[s.ID]; when != "" {
+			lines = append(lines, fmt.Sprintf("session %s is an earlier attempt — this project has a newer session on the same ground (%s)", s.ID, when))
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return strings.Join(lines, "; ") + ".\n"
 }
