@@ -369,6 +369,13 @@ func Impact(indexDir string) ImpactReport {
 				worn[id]++
 			}
 		case KindHook:
+			// A session start with no project session to show still injects
+			// the environment block, and that event is logged empty. Counting
+			// it made "N session starts began with project memory" claim
+			// memory that was not there.
+			if e.Empty {
+				continue
+			}
 			r.Injections++
 			r.ServedBytes += e.Bytes
 			r.RawBytes += e.RawBytes
