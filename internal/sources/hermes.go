@@ -61,13 +61,25 @@ func HermesDBs() []string {
 	return out
 }
 
-// HermesSessionFiles is the store list the indexer stats for changes.
-func HermesSessionFiles() []string { return HermesDBs() }
+// HermesSessionFiles is the store list the indexer stats for changes. The
+// Postgres store, when opted in, rides along as a token the index fingerprints
+// instead of stats.
+func HermesSessionFiles() []string {
+	files := HermesDBs()
+	if dsn := HermesPGDSN(); dsn != "" {
+		files = append(files, HermesPGStorePath(dsn))
+	}
+	return files
+}
 
 func LoadHermes() []model.Session {
 	var out []model.Session
 	for _, db := range HermesDBs() {
 		ss, _ := ParseHermesDB(db)
+		out = append(out, ss...)
+	}
+	if dsn := HermesPGDSN(); dsn != "" {
+		ss, _ := ParseHermesPG(dsn, 0)
 		out = append(out, ss...)
 	}
 	return out
@@ -125,13 +137,27 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		_ = cmd.Wait()
 		return nil, fmt.Errorf("bad sqlite json")
 	}
-	project := hermesProfile(db)
+	out, err := decodeHermesArray(dec, hermesProfile(db), db)
+	if err != nil {
+		_ = cmd.Wait()
+		return nil, err
+	}
+	if err := cmd.Wait(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// decodeHermesArray reads a json array of {session_id,role,content,timestamp}
+// rows — the same shape sqlite3 -json and Postgres json_agg produce — into
+// sessions. dec is positioned just past the opening '['; it is left just past
+// the closing ']'. project and path stamp every session.
+func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	var order []string
 	for dec.More() {
 		var r map[string]any
 		if err := dec.Decode(&r); err != nil {
-			_ = cmd.Wait()
 			return nil, err
 		}
 		id := str(r["session_id"])
@@ -140,7 +166,7 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		}
 		s := by[id]
 		if s == nil {
-			s = &model.Session{Harness: "hermes", ID: id, Project: project, Path: db}
+			s = &model.Session{Harness: "hermes", ID: id, Project: project, Path: path}
 			by[id] = s
 			order = append(order, id)
 		}
@@ -156,10 +182,6 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		s.Messages = append(s.Messages, model.Message{Role: str(r["role"]), Text: txt, Time: t})
 	}
 	if _, err := dec.Token(); err != nil {
-		_ = cmd.Wait()
-		return nil, err
-	}
-	if err := cmd.Wait(); err != nil {
 		return nil, err
 	}
 	out := make([]model.Session, 0, len(order))

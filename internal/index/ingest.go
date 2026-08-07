@@ -2065,7 +2065,35 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 			out[p] = fs
 		}
 	}
+	injectHermesPG(out, old)
 	return out
+}
+
+// injectHermesPG adds the Postgres-backed Hermes store, which has no inode to
+// stat. Its fingerprint is a query: count(*) as the size, max(timestamp) as the
+// mtime, so the ordinary size/mtime change check drives a re-read (#1018). A
+// store deja cannot reach this instant, or a DSN turned off for one run, keeps
+// its old state — an unset env is an unmounted disk, not a deletion, and its
+// sessions must not be dropped as if forgotten.
+func injectHermesPG(out, old map[string]FileState) {
+	dsn := sources.HermesPGDSN()
+	if dsn == "" {
+		for p, of := range old {
+			if sources.IsHermesPGStore(p) {
+				out[p] = of
+			}
+		}
+		return
+	}
+	token := sources.HermesPGStorePath(dsn)
+	rows, newest, err := sources.HermesPGFingerprint(dsn)
+	if err != nil {
+		if of, ok := old[token]; ok {
+			out[token] = of
+		}
+		return
+	}
+	out[token] = FileState{Path: token, Size: rows, MTime: newest, LastUpdated: newest}
 }
 
 // lastCompleteLineOffset finds the offset just past the final newline, so an

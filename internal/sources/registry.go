@@ -203,6 +203,14 @@ func Registry() []Harness {
 				},
 				Parse:     dbParse(ParseHermesDB, ParseHermesDBSince),
 				ParseFrom: dbParseFrom(ParseHermesDB, ParseHermesDBSince),
+			}, {
+				// The Postgres store is a DSN, not a file; the index matches its
+				// token and re-reads by timestamp watermark like the other
+				// db-backed kinds.
+				Name:      "hermes-pg",
+				Match:     func(p string) bool { return IsHermesPGStore(p) },
+				Parse:     func(_ string, nano int64) ([]model.Session, error) { return ParseHermesPG(HermesPGDSN(), nano) },
+				ParseFrom: func(_ string, _, nano int64) ([]model.Session, error) { return ParseHermesPG(HermesPGDSN(), nano) },
 			}},
 		},
 		{

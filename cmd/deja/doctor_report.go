@@ -243,7 +243,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"cursor", []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorFiles, parseDoctorCursor},
 		{"antigravity", sources.AntigravityRoots(), sources.AntigravityTranscripts(), sources.ParseAntigravityFile},
 		{"grok", []string{sources.GrokRoot()}, sources.GrokSessionFiles(), sources.ParseGrokFile},
-		{"hermes", []string{sources.HermesHome(), sources.HermesProfilesRoot()}, sources.HermesSessionFiles(), sources.ParseHermesDB},
+		{"hermes", []string{sources.HermesHome(), sources.HermesProfilesRoot()}, sources.HermesSessionFiles(), parseDoctorHermes},
 		{"qwen", []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles(), sources.ParseQwenFile},
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles(), sources.ParseKimiFile},
 		{"goose", []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles(), parseDoctorGoose},
@@ -289,6 +289,16 @@ func parseDoctorGoose(path string) ([]model.Session, error) {
 		return sources.ParseGooseDB(path)
 	}
 	return sources.ParseGooseFile(path)
+}
+
+// parseDoctorHermes probes the SQLite stores by file and the Postgres store by
+// DSN, so a PG-backed Hermes reports its real health instead of the frozen
+// pre-cutover state.db (#1018).
+func parseDoctorHermes(path string) ([]model.Session, error) {
+	if sources.IsHermesPGStore(path) {
+		return sources.ParseHermesPG(sources.HermesPGDSN(), 0)
+	}
+	return sources.ParseHermesDB(path)
 }
 
 func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
