@@ -16,6 +16,28 @@ func TestWorthIndexingKeepsWhatHappened(t *testing.T) {
 		"git commit -m 'fix: x'",
 		"make build && deja index --rebuild",
 		"docker compose up -d",
+		// Build/test toolchains beyond the Go/JS/Python core (#1098 sweep):
+		// dropping these lost the command history of whole ecosystems.
+		"bazel test //services:api_test",
+		"deno test spec.ts",
+		"jest --watch",
+		"vitest run",
+		"tox -e py311",
+		"sbt compile",
+		"ninja -C build",
+		"meson compile",
+		"cabal test",
+		"stack build",
+		"zig build test",
+		"nix build .#pkg",
+		"ctest --output-on-failure",
+		"tsc --noEmit",
+		"rake spec",
+		"phpunit tests/",
+		"composer install",
+		"clang -O2 main.c",
+		"gcc -o app app.c",
+		"rustc main.rs",
 	} {
 		if !worthIndexing(c) {
 			t.Errorf("dropped a command worth keeping: %q", c)
@@ -28,6 +50,11 @@ func TestWorthIndexingKeepsWhatHappened(t *testing.T) {
 		"cd /repo && pwd",
 		"sed -n 1,40p internal/index/index.go",
 		"echo hi",
+		// A meaningful tool name inside a navigation command stays dropped —
+		// the trivial prefix wins.
+		"cat stack.yaml",
+		"which gcc",
+		"cd /nix/store",
 	} {
 		if worthIndexing(c) {
 			t.Errorf("kept navigation: %q", c)
