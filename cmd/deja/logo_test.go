@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func TestPrintLogo(t *testing.T) {
@@ -67,5 +69,42 @@ func TestLogoLinesKeepsAColumnTallerThanTheMark(t *testing.T) {
 	}
 	if got, want := runeCol(below, "store21"), runeCol(beside, "store0"); got != want {
 		t.Errorf("overflow line starts at column %d, the ones beside the mark at %d", got, want)
+	}
+}
+
+// The greeting was laid out against a hard column 42 and nothing added it up,
+// so `try: deja "something you fixed weeks ago"` reached column 83 on the
+// 80-column terminal that is the common case.
+func TestLogoLinesFitTheWidth(t *testing.T) {
+	info := append(brandInfo(), "", `try: deja "something you fixed weeks ago"`)
+	for _, width := range []int{60, 80, 100, 120} {
+		t.Setenv("COLUMNS", strconv.Itoa(width))
+		for _, l := range logoLines(info) {
+			if n := visibleLen(l); n > width {
+				t.Errorf("COLUMNS=%d: line is %d columns: %q", width, n, ansiRE.ReplaceAllString(l, ""))
+			}
+		}
+	}
+}
+
+// A narrow terminal cannot hold the mark and the column side by side, so the
+// column goes underneath — but every line still has to be there.
+func TestLogoLinesStackWhenNarrow(t *testing.T) {
+	t.Setenv("COLUMNS", "60")
+	info := firstIndexInfo(index.BuildSummary{
+		Messages: 5, Harnesses: 2,
+		PerHarness: []index.HarnessCount{
+			{Name: "claude", Messages: 2, Sessions: 1},
+			{Name: "codex", Messages: 3, Sessions: 2},
+		},
+	}, `try: deja "something you fixed weeks ago"`)
+	plain := ansiRE.ReplaceAllString(strings.Join(logoLines(info), "\n"), "")
+	for _, want := range []string{"deja-vu", "memory for coding agents", "· 1 session", "· 2 sessions"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("stacked greeting dropped %q:\n%s", want, plain)
+		}
+	}
+	if strings.Contains(plain, "1 sessions") {
+		t.Error("a single session must not be counted in the plural")
 	}
 }
