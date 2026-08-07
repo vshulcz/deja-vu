@@ -7,8 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.8] - 2026-08-07
+
+A long audit pass. Most of it was one recurring shape: a surface that knew a
+fact and did not say it — the same state described three different ways across
+`last`, `search` and `stats`; a rule applied on one path and skipped on its
+neighbour; advice that named something you could not run. A handful were worse
+than untidy: a project name could carry terminal control sequences or an HTML
+event handler through to a screen, and a peer-supplied field could forge an
+entry that read as local.
+
+The index format changed, so the first run after upgrading rebuilds it once.
+
+### Added
+- A Postgres-backed Hermes store is indexed when `DEJA_HERMES_PG_DSN` is set. Hermes can keep its sessions in PostgreSQL instead of SQLite, and deja only globbed `state.db`, so the whole harness went dark after the cutover. It reads the same query over `psql` and re-reads incrementally by timestamp. (#1018)
+- `deja <command> --help` prints that command's own syntax. It was rejected as an unknown flag everywhere, and `mcp --help` went as far as starting the server. (#1111)
+
 ### Fixed
+- Six surfaces printed raw terminal control sequences from session text: `last` could blank the screen and `show` could overwrite what was already there. Display now goes through one shared safe-output rule. (#1083)
+- `stats --html` no longer lets a project name inject an HTML event handler, and a peer-controlled `project` can no longer forge a result entry without its `imported:` prefix — both travelled by sync. (#1075, #1080)
+- The trust policy is applied before the result cap, not after: a denied origin used to empty the results while the top hit still read at full confidence. (#1060)
+- A rebuild keeps imported note state, so a retracted decision no longer reads as accepted afterwards. (#1049)
+- `doctor` calls an unreadable index damaged instead of "built, up to date", says when a rebuild happened because the store could not be read, and stops calling an uninstalled harness "unplugged". (#1108, #1110)
+- `sync export` into a file explains what it wanted instead of handing back a raw `mkdir` error, matching the import side. (#1112)
 - `install`/`uninstall` write the codex SessionStart hook to `CODEX_HOME` (via `sources.CodexHome()`) instead of a raw `~/.codex`, so a sandboxed install stays sandboxed and a non-default codex home gets its hooks where codex reads them. Every other codex path already honoured it. (#850)
+- A round of smaller honesty fixes across `doctor`, `ctx`, `statusline`, `brief`, the MCP surfaces and the help text — each a surface stating one thing while another stated its opposite. (#1034, #1071, #1101, #1102, #1103, #1106, #1107)
 
 ## [0.16.7] - 2026-08-03
 
