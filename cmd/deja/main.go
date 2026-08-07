@@ -213,7 +213,11 @@ func cmdWarmup(dir string, _ []string) error {
 	defer stop()
 	prepareFirstIndexGreeting(dir)
 	if err := withBuildProgress(func() error { return index.Ensure(dir, "", false, os.Stderr) }); err != nil {
-		return err
+		// Every other build path runs through ensureError; this one returned
+		// the raw error, so a read-only index directory read as
+		// `open /…/index.lock: permission denied` — an internal lock file and
+		// a syscall, the shape #798 replaced everywhere else.
+		return ensureError(dir, err)
 	}
 	maybeFirstIndexGreeting(dir)
 	return nil
