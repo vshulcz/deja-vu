@@ -671,3 +671,32 @@ func TestSearchRoleFilterAcceptsTool(t *testing.T) {
 		t.Error("exact names keep working")
 	}
 }
+
+// A query whose answer sits deep in a long session must still reach the digest:
+// walking from the top let earlier scaffolding eat the budget and drop the very
+// turns the query matched (#R8-budget).
+func TestPrintContextAnchorsBudgetOnTheMatch(t *testing.T) {
+	var msgs []model.Message
+	for i := 0; i < 40; i++ {
+		msgs = append(msgs,
+			model.Message{Role: "user", Text: strings.Repeat("unrelated bulk chatter ", 20)},
+			model.Message{Role: "assistant", Text: strings.Repeat("unrelated reply prose ", 20)})
+	}
+	msgs = append(msgs,
+		model.Message{Role: "user", Text: "the LATEMATCHQ decision for the client"},
+		model.Message{Role: "assistant", Text: "cap it at 3 LATEANSWERZ"})
+	s := model.Session{ID: "s1", Harness: "claude", Project: "p", Messages: msgs}
+
+	var b bytes.Buffer
+	PrintContext(&b, s, "LATEMATCHQ")
+	out := b.String()
+	if !strings.Contains(out, "LATEMATCHQ") {
+		t.Errorf("ctx dropped the matched question under budget:\n%s", out[:min(len(out), 200)])
+	}
+	if !strings.Contains(out, "LATEANSWERZ") {
+		t.Errorf("ctx dropped the paired answer under budget")
+	}
+	if b.Len() > 8050 {
+		t.Errorf("ctx exceeded the digest budget: %d", b.Len())
+	}
+}
