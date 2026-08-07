@@ -417,7 +417,16 @@ func citationLine(s model.Session) string {
 	}
 	date := ""
 	if !s.Updated.IsZero() {
-		date = ", " + s.Updated.Format("Jan 2")
+		// With the year, when it is not this one. Every other date deja prints
+		// carries it; the sentence the agent is told to say aloud did not, so
+		// a decision from July 2025 was narrated to the user as "Jul 3" —
+		// reading as five weeks ago on the one recall where the age is the
+		// thing worth knowing (#R13).
+		layout := "Jan 2"
+		if s.Updated.Local().Year() != time.Now().Year() {
+			layout = "Jan 2 2006"
+		}
+		date = ", " + s.Updated.Local().Format(layout)
 	}
 	return fmt.Sprintf("\nIf it helped, say: \"deja-vu recalled: %s (%s%s) — reusing it.\"", title, s.Harness, date)
 }
