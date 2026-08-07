@@ -412,6 +412,22 @@ func attachAnswers(dir string, hits []search.Hit) {
 	}
 }
 
+// recallListingLine makes one line of the recall listing safe to hand a model.
+//
+// The listing is built here rather than by the search printer, so it never
+// went through SafeText: measured on a planted session, `recall` returned the
+// escape byte, U+202E and U+200B verbatim inside the frame, while
+// `recall_context` — which does print via search — returned the same session
+// clean. The worst of it is the `→ ` answer line, which attachAnswers copies
+// straight out of the transcript with no filter at all.
+//
+// Newlines are collapsed on top of SafeText because every line here is one
+// row of a numbered list: a project name or an answer spanning two lines
+// forges a second result, which is the shape #1080 fixed on the sync path.
+func recallListingLine(s string) string {
+	return strings.Join(strings.Fields(search.SafeText(s)), " ")
+}
+
 func recallText(dir, q, harness string, limit, budget int) (string, error) {
 	text, _, _, _, err := recallTextResult(dir, q, harness, limit, 0, budget)
 	return text, err
@@ -504,7 +520,8 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
 	}
 	for i, h := range hits {
-		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1, h.Session.Harness, h.Session.Project, h.Session.ID, h.Count)
+		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1,
+			recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project), recallListingLine(h.Session.ID), h.Count)
 		// A session with no user turn is the agent's own words, and the lines
 		// below carry no role — so an assertion a model made arrived as a fact
 		// from the store (#1107, the shape #1100 fixed for the listing).
@@ -528,7 +545,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 			fmt.Fprintf(&b, "[%s]\n", h.Tier)
 		}
 		for _, sn := range h.Snippets {
-			fmt.Fprintf(&b, "- %s\n", sn)
+			fmt.Fprintf(&b, "- %s\n", recallListingLine(sn))
 		}
 		served++
 		if b.Len() >= budget {
