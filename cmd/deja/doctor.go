@@ -998,6 +998,17 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 			fmt.Fprintf(w, "  status   not reachable — %s is not there; the disk it lives on may have been unmounted\n", parent)
 			return
 		}
+		// The index directory is there but cannot be read — a permissions
+		// problem or a restricted mount, not a missing build. "run `deja
+		// warmup`" would send the reader to a command that cannot read it
+		// either, and the index may well be built behind the closed door
+		// (#1116).
+		if dirExists(dir) {
+			if _, err := os.ReadDir(dir); os.IsPermission(err) {
+				fmt.Fprintf(w, "  status   unreadable — %s cannot be read (permission denied); fix its permissions or point DEJA_INDEX_DIR somewhere readable\n", dir)
+				return
+			}
+		}
 		// "run `deja warmup`" on a location that cannot be written sends the
 		// reader to a command that fails the same way. doctor is where someone
 		// looks to learn why memory is absent, so it has to name the reason.
