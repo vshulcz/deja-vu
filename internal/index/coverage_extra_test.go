@@ -754,7 +754,8 @@ func TestRequestedPureCheapIndexCoverageBranches(t *testing.T) {
 		// The caveat is not a title, and with no other user turn the assistant's
 		// first sentence fills in rather than leaving a blank line (#692).
 		{name: "caveat", s: model.Session{Messages: []model.Message{{Role: "user", Text: "Caveat: noisy"}, {Role: "assistant", Text: "skip"}}}, want: "skip"},
-		{name: "nothing worth naming", s: model.Session{Messages: []model.Message{{Role: "tool-output", Text: "panic: boom"}}}, want: ""},
+		{name: "only tool output", s: model.Session{Messages: []model.Message{{Role: "tool-output", Text: "panic: boom"}}}, want: "tool output: panic: boom"},
+		{name: "nothing worth naming", s: model.Session{Messages: []model.Message{{Role: "files", Text: "/repo/pool.go"}}}, want: ""},
 	} {
 		t.Run("title "+tc.name, func(t *testing.T) {
 			if got := sessionTitle(tc.s); got != tc.want {

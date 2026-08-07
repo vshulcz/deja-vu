@@ -35,12 +35,18 @@ func TestSessionTitleFallsBackToTheAssistant(t *testing.T) {
 			msg("assistant", "<command-name>/clear</command-name>", 0),
 			msg("assistant", "cleared it", 1),
 		}, "cleared it"},
-		// Tool output is not speech: naming a session after a stack trace is
-		// how the titles in #636 happened.
-		{"nothing worth naming", []model.Message{
+		// Tool output is not speech — naming a session after a stack trace is
+		// how the titles in #636 happened — so it never outranks a turn. With
+		// no turn at all it is the only thing left, and it is marked so the
+		// line does not read as something a person said.
+		{"tool output loses to speech", []model.Message{
+			msg("tool-output", "panic: runtime error", 0),
+			msg("assistant", "looking at the pool", 1),
+		}, "looking at the pool"},
+		{"only tool output", []model.Message{
 			msg("tool-output", "panic: runtime error", 0),
 			msg("files", "/repo/pool.go", 1),
-		}, ""},
+		}, "tool output: panic: runtime error"},
 	}
 	for _, c := range cases {
 		if got := sessionTitle(model.Session{Messages: c.msgs}); got != c.want {
