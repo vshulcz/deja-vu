@@ -933,16 +933,17 @@ func metaForSession(s model.Session) SessionMeta {
 	title := s.Title
 	agentTitle := s.AgentTitle
 	if title == "" {
-		title = sessionTitle(s)
+		title = derivedTitle(s)
 		// A session with no user turn borrows the assistant's opening line
 		// (#692); the listing needs to say so rather than print it where the
 		// reader's own question goes (#1100).
 		agentTitle = title != "" && earliestTitle(s.Messages, "user") == ""
+	} else {
+		// Titles come from unredacted places — an agent-generated summary, a
+		// composer name, the first user message — and are persisted in
+		// sessions.gob, so they need the same scrubbing as record text.
+		title, _ = redact.Text(title)
 	}
-	// Titles come from unredacted places — an agent-generated summary, a
-	// composer name, the first user message — and are persisted in
-	// sessions.gob, so they need the same scrubbing as record text.
-	title, _ = redact.Text(title)
 	// The import fields travel with the session, not with the transcript: a
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
@@ -1184,6 +1185,15 @@ func pluralS(n int) string {
 	return "s"
 }
 
+// derivedTitle is the title read out of the transcript, redacted and then cut.
+// The order matters: cutting first slices a secret in half, and half a pattern
+// matches nothing, so the plaintext prefix survives into sessions.gob and onto
+// every page that prints a title. The import path already redacts first.
+func derivedTitle(s model.Session) string {
+	t, _ := redact.Text(sessionTitle(s))
+	return truncateTitle(t, 60)
+}
+
 func sessionTitle(s model.Session) string {
 	// A user turn always wins; the assistant's opening line fills in when
 	// there is none — a session the agent opened itself, or one whose prompts
@@ -1220,7 +1230,7 @@ func earliestTitle(ms []model.Message, role string) string {
 		case !msg.Time.Before(bestAt):
 			continue
 		}
-		best, bestAt = truncateTitle(t, 60), msg.Time
+		best, bestAt = t, msg.Time
 	}
 	return best
 }
@@ -1746,7 +1756,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				meta.Path = s.Path
 			}
 			if meta.Title == "" {
-				meta.Title = sessionTitle(s)
+				meta.Title = derivedTitle(s)
 				meta.AgentTitle = meta.Title != "" && earliestTitle(s.Messages, "user") == ""
 			}
 			m.Sessions[key] = meta
