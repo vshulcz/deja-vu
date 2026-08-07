@@ -98,7 +98,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
 	adoptHookCWD(input.CWD)
 	terms := promptSearchTerms(string(input.Prompt))
-	if len(terms) < 2 {
+	if !promptTermsWorthAsking(terms) {
 		return nil
 	}
 	// Version, not just presence: terms hash into buckets an index from
@@ -312,6 +312,20 @@ func hasCJKRune(s string) bool {
 	return false
 }
 
+// promptTermsWorthAsking is the gate before the index is touched. Two terms
+// were required, which silenced the sharpest prompt there is: "do we need
+// pgbouncer here" reduces to one term and never reached the store, while "add
+// pgbouncer to the stack" — the same question with a filler noun — did. The
+// rule below already decides the single-term case (one informative match is
+// served when the question named a term of art, without the déjà vu line);
+// the floor returned first, so that rule could never see it.
+func promptTermsWorthAsking(terms []string) bool {
+	if len(terms) == 0 {
+		return false
+	}
+	return len(terms) >= 2 || hasIdentifierTerm(terms)
+}
+
 // hasIdentifierTerm reports whether the question contains a word specific
 // enough to carry a match on its own. In a small corpus even "file" clears the
 // informativeness bar, so a single hit is only trusted when the question named
@@ -403,7 +417,16 @@ func citationLine(s model.Session) string {
 	}
 	date := ""
 	if !s.Updated.IsZero() {
-		date = ", " + s.Updated.Format("Jan 2")
+		// With the year, when it is not this one. Every other date deja prints
+		// carries it; the sentence the agent is told to say aloud did not, so
+		// a decision from July 2025 was narrated to the user as "Jul 3" —
+		// reading as five weeks ago on the one recall where the age is the
+		// thing worth knowing (#R13).
+		layout := "Jan 2"
+		if s.Updated.Local().Year() != time.Now().Year() {
+			layout = "Jan 2 2006"
+		}
+		date = ", " + s.Updated.Local().Format(layout)
 	}
 	return fmt.Sprintf("\nIf it helped, say: \"deja-vu recalled: %s (%s%s) — reusing it.\"", title, s.Harness, date)
 }

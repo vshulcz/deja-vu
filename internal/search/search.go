@@ -931,9 +931,18 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	qlow := strings.ToLower(query)
 	terms, phrases := QueryParts(query)
 	budget := 8000
+	// The reply to an included turn comes with it. Every user turn was kept
+	// and every assistant turn had to match, but the decision lives in the
+	// answer and is worded nothing like the question: `ctx "http client"`
+	// handed an agent "the http client hammered the server on failure" and
+	// dropped "we decided to cap retries at 3" from the turn below it. That
+	// is the problem statement without its resolution (#R8).
+	prevKept := false
 	written := printContextChunks(w, s, budget, func(m model.Message) (bool, bool) {
 		matched := qlow != "" && (strings.Contains(strings.ToLower(m.Text), qlow) || MatchesParts(m.Text, terms, phrases, nil))
-		return matched || m.Role == "user", matched
+		keep := matched || m.Role == "user" || (m.Role == "assistant" && prevKept)
+		prevKept = keep
+		return keep, matched
 	})
 	if written > 0 {
 		return

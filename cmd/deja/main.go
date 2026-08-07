@@ -533,12 +533,39 @@ func cmdCtx(dir string, rest []string) error {
 		}
 		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
 	}
-	ss, err := index.SearchWithRecovery(dir, o, os.Stderr)
+	// Detailed, not the plain form: retrieval answers a sentence by dropping
+	// the terms nothing carries and returning the session under the close or
+	// relevance tier. Handing those sessions to Run without the tier and its
+	// variant map made scoring hunt for the whole literal query, score zero,
+	// and report "no session matches" — about a store `deja search` answered
+	// on the same words. ctx is the command the hook names to an agent, and
+	// agents ask in sentences (#R8).
+	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
 	if err != nil {
 		return err
 	}
-	hits, err := search.Run(ss, o)
-	if err != nil {
+	ss := result.Sessions
+	o.Tier = result.Tier
+	// Which rung answered, said out loud on stderr as the search screen says
+	// it — stdout stays the context block an agent parses. ctx served an
+	// answer to a word the caller never typed and said nothing about it.
+	if result.Stemmed {
+		printStemmed(os.Stderr, result.Variants)
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Fuzzy {
+		printSpellings(os.Stderr, result.Variants)
+		o.Fuzzy = true
+		o.FuzzyVariants = result.Variants
+	}
+	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
+		o.FuzzyVariants = result.Variants
+	}
+	var hits []search.Hit
+	if result.Tier == search.TierRelevance {
+		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
+		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
+	} else if hits, err = search.Run(ss, o); err != nil {
 		return err
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationSearch, hits)
@@ -1215,26 +1242,41 @@ func clearWarmupSentinel() {
 	}
 }
 
-func printFuzzy(w io.Writer, variants map[string][]string) {
+// printSpellings names the words the close tier substituted. ctx uses this
+// rather than printFuzzy: "did you mean the command" is advice for a person
+// at a shell, and ctx is called by an agent that typed nothing.
+func printSpellings(w io.Writer, variants map[string][]string) {
 	keys := make([]string, 0, len(variants))
 	for token := range variants {
 		keys = append(keys, token)
 	}
 	sort.Strings(keys)
-	hinted := false
 	for _, token := range keys {
 		for _, variant := range variants[token] {
 			if variant != token {
 				fmt.Fprintf(w, "deja: no exact match, trying close spellings: %s -> %s\n", token, variant)
-				// A misspelled subcommand is searched for as a word: `deja
-				// isntall` corrects to "install" and returns sessions that
-				// mention installing, which is not what the typist wanted.
-				// Spelled correctly it would have run the command, so the only
-				// case this fires on is the one where the hint is wanted.
-				if !hinted && isSubcommand(variant) {
-					fmt.Fprintf(w, "deja: `%s` is also a command — run `deja %s` if that is what you meant\n", variant, variant)
-					hinted = true
-				}
+			}
+		}
+	}
+}
+
+func printFuzzy(w io.Writer, variants map[string][]string) {
+	printSpellings(w, variants)
+	keys := make([]string, 0, len(variants))
+	for token := range variants {
+		keys = append(keys, token)
+	}
+	sort.Strings(keys)
+	for _, token := range keys {
+		for _, variant := range variants[token] {
+			// A misspelled subcommand is searched for as a word: `deja
+			// isntall` corrects to "install" and returns sessions that
+			// mention installing, which is not what the typist wanted.
+			// Spelled correctly it would have run the command, so the only
+			// case this fires on is the one where the hint is wanted.
+			if variant != token && isSubcommand(variant) {
+				fmt.Fprintf(w, "deja: `%s` is also a command — run `deja %s` if that is what you meant\n", variant, variant)
+				return
 			}
 		}
 	}
