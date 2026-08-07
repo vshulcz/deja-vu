@@ -27,7 +27,7 @@ func TestHermesPostgresIsIndexedAndIncremental(t *testing.T) {
 	}
 	fake := func(_, sql string) ([]byte, error) {
 		if strings.HasPrefix(sql, "select count(*)") {
-			return []byte(fmt.Sprintf("%d %d\n", len(rows), 1785000000+60*(len(rows)-1))), nil
+			return []byte(fmt.Sprintf("%d|%d\n", len(rows), 1785000000+60*(len(rows)-1))), nil
 		}
 		return []byte("[" + strings.Join(rows, ",") + "]"), nil
 	}
@@ -72,7 +72,7 @@ func TestHermesPostgresSurvivesADisabledDSN(t *testing.T) {
 
 	fake := func(_, sql string) ([]byte, error) {
 		if strings.HasPrefix(sql, "select count(*)") {
-			return []byte("1 1785000000\n"), nil
+			return []byte("1|1785000000\n"), nil
 		}
 		return []byte(`[{"session_id":"h1","role":"user","content":"a decision about queue backpressure","timestamp":1785000000}]`), nil
 	}

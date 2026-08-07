@@ -71,7 +71,7 @@ func TestParseHermesPGSinceFiltersByTimestamp(t *testing.T) {
 }
 
 func TestHermesPGFingerprintParsesCountAndNewest(t *testing.T) {
-	f := &fakePG{fingerprint: "42 1785000000"}
+	f := &fakePG{fingerprint: "42|1785000000"}
 	defer SetHermesPGRunner(f.run)()
 
 	rows, newest, err := HermesPGFingerprint("postgres://x")
@@ -83,6 +83,35 @@ func TestHermesPGFingerprintParsesCountAndNewest(t *testing.T) {
 	}
 	if newest != 1785000000*1_000_000_000 {
 		t.Errorf("newest nano = %d", newest)
+	}
+}
+
+// deja reads Hermes' epoch-seconds timestamp. A store whose column is some
+// other type (a timestamptz text like `2026-07-21 10:00:00+00`) must fail
+// loudly: indexing with a zero watermark would silently miss every later row.
+func TestHermesPGFingerprintRejectsAnUnreadableTimestamp(t *testing.T) {
+	f := &fakePG{fingerprint: "7|2026-07-21 10:00:00+00"}
+	defer SetHermesPGRunner(f.run)()
+
+	if _, _, err := HermesPGFingerprint("postgres://x"); err == nil {
+		t.Fatal("an unreadable max(timestamp) was accepted")
+	} else if !strings.Contains(err.Error(), "epoch seconds") {
+		t.Errorf("error does not explain the format: %v", err)
+	}
+}
+
+// A fractional epoch second is the shape Hermes actually writes, and it must
+// parse.
+func TestHermesPGFingerprintReadsFractionalEpoch(t *testing.T) {
+	f := &fakePG{fingerprint: "3|1785000000.5"}
+	defer SetHermesPGRunner(f.run)()
+
+	rows, newest, err := HermesPGFingerprint("postgres://x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows != 3 || newest <= 0 {
+		t.Errorf("rows=%d newest=%d", rows, newest)
 	}
 }
 

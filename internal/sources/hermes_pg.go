@@ -67,20 +67,29 @@ func IsHermesPGStore(p string) bool { return strings.HasPrefix(p, "hermes-pg:") 
 // store, the two numbers the index diffs to decide the store changed. A DSN has
 // no mtime; max(timestamp) is the mtime and count(*) is the size.
 func HermesPGFingerprint(dsn string) (rows int64, newestNano int64, err error) {
+	// Two columns split on psql's -A separator '|', not on whitespace: Hermes'
+	// timestamp is epoch seconds like its SQLite store, but casting to text
+	// would tear apart any value that carried a space.
 	out, err := HermesPGRunner(dsn,
-		`select count(*)||' '||coalesce(max(timestamp),0) from messages where `+hermesPGWhere)
+		`select count(*), coalesce(max(timestamp)::text, '0') from messages where `+hermesPGWhere)
 	if err != nil {
 		return 0, 0, err
 	}
-	fields := strings.Fields(strings.TrimSpace(string(out)))
+	fields := strings.SplitN(strings.TrimSpace(string(out)), "|", 2)
 	if len(fields) != 2 {
 		return 0, 0, fmt.Errorf("hermes pg: unexpected fingerprint %q", strings.TrimSpace(string(out)))
 	}
-	rows, err = strconv.ParseInt(fields[0], 10, 64)
+	rows, err = strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
 	if err != nil {
 		return 0, 0, fmt.Errorf("hermes pg: row count %q: %w", fields[0], err)
 	}
-	newest := hermesTime(pgNumber(fields[1]))
+	ts := strings.TrimSpace(fields[1])
+	newest := hermesTime(pgNumber(ts))
+	if ts != "0" && newest.IsZero() {
+		// An unreadable max(timestamp) would index with a broken watermark and
+		// then silently miss every later row. Fail so doctor names it instead.
+		return 0, 0, fmt.Errorf("hermes pg: cannot read max(timestamp) %q; deja expects epoch seconds like the sqlite store", ts)
+	}
 	return rows, newest.UnixNano(), nil
 }
 
