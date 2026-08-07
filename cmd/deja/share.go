@@ -31,6 +31,9 @@ func runShare(dir string, args []string, w io.Writer) error {
 	if !ok {
 		return fmt.Errorf("no session matches %q", args[0])
 	}
+	if err := denyPolicyHidden(args[0], s, os.Stderr); err != nil {
+		return err
+	}
 	printSanitized(w, digest.Share(s, digest.ShareBudget))
 	return nil
 }
