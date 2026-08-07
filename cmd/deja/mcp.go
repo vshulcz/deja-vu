@@ -451,7 +451,14 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	if len(hits) == 0 {
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
 	}
+	// Before the page is cut, not after: demoting inside the page is a no-op
+	// when every hit on it was rejected, and then the approaches the reader did
+	// not reject sit below the cut and never reach the agent at all. On 30
+	// matches with the 25 newest rejected, `limit 15` served 15 rejected
+	// attempts and none of the 5 clean ones.
 	total := len(hits)
+	attachLifecycles(dir, hits)
+	demoted := demoteRejected(hits)
 	if offset > 0 {
 		if offset >= total {
 			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", clampEcho(q), total, offset), 0, 0, nil, nil
@@ -464,8 +471,6 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		hits = hits[:limit]
 	}
 	attachAnswers(dir, hits)
-	attachLifecycles(dir, hits)
-	demoted := demoteRejected(hits)
 	var b strings.Builder
 	served := 0
 	if stale {

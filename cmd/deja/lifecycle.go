@@ -242,6 +242,12 @@ func demotedNote(hits []search.Hit, moved int) string {
 			elsewhere++
 		}
 	}
+	// Reordering the whole result set and then paging it can leave a page with
+	// no rejected hit on it; "0 sessions you marked rejected" is not a fact
+	// worth spending a line on.
+	if n == 0 {
+		return ""
+	}
 	if elsewhere == n {
 		return fmt.Sprintf("%d session%s marked rejected on the machine %s came from %s below the rest", n, pluralS(n), theyOrIt(n), verbWere2(n))
 	}
