@@ -214,20 +214,20 @@ func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 	}
 	var b strings.Builder
 	if provenance {
-		fmt.Fprintf(&b, "✓ recalled from %s session · %s\n", s.Harness, relativeDay(s.Updated, now))
-		fmt.Fprintf(&b, "  - Session: **%s** `%s`\n", s.Project, short(s.ID))
+		fmt.Fprintf(&b, "✓ recalled from %s session · %s\n", digestLine(s.Harness), relativeDay(s.Updated, now))
+		fmt.Fprintf(&b, "  - Session: **%s** `%s`\n", digestLine(s.Project), digestLine(short(s.ID)))
 	} else {
 		date := ""
 		if !s.Updated.IsZero() {
 			date = " · " + s.Updated.Format("2006-01-02")
 		}
-		fmt.Fprintf(&b, "- **%s** `%s`%s\n", s.Project, short(s.ID), date)
+		fmt.Fprintf(&b, "- **%s** `%s`%s\n", digestLine(s.Project), digestLine(short(s.ID)), date)
 	}
 	if problem != "" {
-		fmt.Fprintf(&b, "  - User: %s\n", problem)
+		fmt.Fprintf(&b, "  - User: %s\n", digestLine(problem))
 	}
 	for _, c := range conclusions {
-		fmt.Fprintf(&b, "  - Assistant: %s\n", c)
+		fmt.Fprintf(&b, "  - Assistant: %s\n", digestLine(c))
 	}
 	return b.String()
 }
@@ -277,6 +277,15 @@ func noiseMessage(s string) bool {
 		}
 	}
 	return false
+}
+
+// digestLine is one row of the digest this file injects into an agent's
+// context. The rows are built here rather than by the printer, so they never
+// went through SafeText: a zero-width space in a recalled reply reached the
+// hook context intact, and a project name is markdown a session never wrote.
+// Confining each field to one line stops it forging a row of its own.
+func digestLine(s string) string {
+	return strings.Join(strings.Fields(SafeText(s)), " ")
 }
 
 func firstLine(s string, n int) string {
