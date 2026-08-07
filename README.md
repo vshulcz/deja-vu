@@ -248,8 +248,8 @@ lexical search and MCP recall continue unchanged. `--no-embed` or
 Without an embedding endpoint, the semantic zero-result fallback does not exist.
 
 The vector sidecar is stored beside the index as `.vectors.bin`, not in
-`index.db`. Float32 vectors cost roughly 4 KB per 1k messages for a 1,024
-dimension model, plus a small record key. Embedding is local and can consume
+`index.db`. Float32 vectors cost roughly 4 MB per 1k messages for a 1,024
+dimension model (4 KB a message), plus a small record key. Embedding is local and can consume
 CPU, memory, and model-server time; it never sends raw source files, only the
 redacted indexed text truncated to about 2k characters.
 
