@@ -178,6 +178,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
 		}
+		if err := checkHarness(a.Harness); err != nil {
+			return "", err
+		}
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
 		}
@@ -198,6 +201,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("query required")
+		}
+		if err := checkHarness(a.Harness); err != nil {
+			return "", err
 		}
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
@@ -223,6 +229,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		if strings.TrimSpace(a.Path) == "" {
 			return "", fmt.Errorf("path required")
+		}
+		if err := checkHarness(a.Harness); err != nil {
+			return "", err
 		}
 		var since time.Duration
 		if a.Since != "" {
