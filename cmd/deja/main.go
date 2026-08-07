@@ -2051,8 +2051,33 @@ func humanBytes(n int64) string {
 	}
 	return fmt.Sprintf("%.1f %s", f, units[i])
 }
+
+// wrapTargets lays install target names out over as many indented lines as they
+// need. Naming them inline in the usage text is what let help drift: eleven of
+// the thirty-one were listed, so `deja install aider` and `deja install
+// openclaw-auto` — both of them in the README — read as invalid (#1106).
+func wrapTargets(names []string, indent string, width int) string {
+	var b strings.Builder
+	line := indent
+	for i, n := range names {
+		piece := n
+		if i < len(names)-1 {
+			piece += ","
+		}
+		if len(line) > len(indent) && len(line)+1+len(piece) > width {
+			b.WriteString(line + "\n")
+			line = indent
+		}
+		if len(line) > len(indent) {
+			line += " "
+		}
+		line += piece
+	}
+	return b.String() + line
+}
+
 func printUsage() {
-	fmt.Println(`deja - persistent memory for coding agents
+	fmt.Printf(`deja - persistent memory for coding agents
 
 Usage:
   deja [flags] <query>
@@ -2090,8 +2115,10 @@ Usage:
   deja mcp
   deja version
   deja update [--force]
-  deja install <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|cline|statusline|--all|--auto>
-  deja uninstall <claude-code|codex|opencode|cursor|gemini|antigravity|grok|qwen|kimi|statusline|--all|--auto>
+  deja install <target> | --all | --auto
+  deja uninstall <target> | --all | --auto
+    targets:
+%s
 
 Search flags (the bare "deja [flags] <query>" form above):
   --harness <name>              only sessions from one harness (claude, codex, ...)
@@ -2118,7 +2145,8 @@ Examples:
   deja ctx "schema migration rollback" > deja-context.md
   deja install --all
 
-See README.md for the full CLI reference.`)
+See README.md for the full CLI reference.
+`, wrapTargets(installTargetNames(), "      ", 76))
 }
 
 // movedBucketHint explains a note-bucket id that stopped resolving. The id
