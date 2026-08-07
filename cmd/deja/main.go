@@ -179,6 +179,7 @@ func run(args []string) error {
 		return nil
 	}
 	sourceInstance := os.Getenv("DEJA_SOURCE_INSTANCE")
+	warnBrokenPolicy(args[0], os.Stderr)
 	if wantsHelp(args[1:]) {
 		if h := helpForCommand(args[0]); h != "" {
 			fmt.Print(h)
