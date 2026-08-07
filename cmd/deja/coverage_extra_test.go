@@ -486,7 +486,10 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(badIndex, "child"))
-	if _, err := captureRun(t, "needle"); err == nil || !strings.Contains(err.Error(), "ensure:") {
+	// An index path inside a file is neither a raw syscall nor an unmounted
+	// disk: unix reports ENOTDIR, windows ENOENT, and the message has to be
+	// the same shape on both.
+	if _, err := captureRun(t, "needle"); err == nil || !strings.Contains(err.Error(), "which is a file") {
 		t.Fatalf("ensure error err=%v", err)
 	}
 	if got := firstUserTitle(model.Session{Messages: []model.Message{{Role: "user", Text: " digest.Short title "}}}); got != "digest.Short title" {

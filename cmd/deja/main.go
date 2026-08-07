@@ -2294,6 +2294,22 @@ func deniedPath(err error) string {
 	return ""
 }
 
+// existingNonDirAncestor names the first ancestor of p that exists and is not
+// a directory. Such a path can never hold an index, and the errno differs by
+// platform, so the shape is worth naming rather than the syscall.
+func existingNonDirAncestor(p string) string {
+	for cur := filepath.Clean(p); ; {
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return ""
+		}
+		if fi, err := os.Stat(parent); err == nil && !fi.IsDir() {
+			return parent
+		}
+		cur = parent
+	}
+}
+
 // ensureError turns a failed build into something the reader can act on.
 // A denied write surfaced as `ensure: open /…/index.db.lock: permission
 // denied` — the path of an internal lock file and a syscall error, which says
@@ -2341,6 +2357,13 @@ func ensureError(dir string, err error) error {
 	// already there is untouched, since the build writes beside it and
 	// renames, and saying so is the part that decides whether the reader goes
 	// looking for damage (#1068).
+	// An index path that points inside a file is not a disconnected disk: on
+	// unix the write fails with ENOTDIR and fell through to the raw syscall,
+	// on windows it fails with ENOENT and read as an unmounted volume (found
+	// by CI on windows after #1068).
+	if p := existingNonDirAncestor(dir); p != "" {
+		return fmt.Errorf("the index path runs through %s, which is a file — point DEJA_INDEX_DIR at a directory", p)
+	}
 	if errors.Is(err, fs.ErrNotExist) && !dirExists(dir) {
 		return fmt.Errorf("the index directory went away mid-build (%s) — the disk it lives on may have been unmounted; the index already there is unharmed, so reconnect it and run `deja index` again, or point DEJA_INDEX_DIR somewhere local", dir)
 	}
