@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // `deja friction` names what this machine keeps tripping over.
@@ -46,10 +47,20 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	}
 	found := map[string]*seen{}
 	sessions := map[string]bool{}
+	// friction reads across the whole store, so a peer's recurring errors — its
+	// hosts, its infra IPs — surfaced here even when the trust policy withheld
+	// imported content from every other browsing surface. Browsing is the search
+	// activation, as in `last` and `stats` (#937, and its friction gap #1120).
+	pol := policy.Load()
+	withheld := 0
 	// One pass over the record log rather than a load per session: loading by
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
+		if !pol.Allows(policy.ActivationSearch, meta.Project) {
+			withheld++
+			return
+		}
 		key := meta.Harness + ":" + meta.ID
 		sessions[key] = true
 		for _, line := range strings.Split(r.Text, "\n") {
@@ -70,6 +81,9 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		}
 	}); err != nil {
 		return fmt.Errorf("friction: %w", err)
+	}
+	if note := policyHiddenNote(policy.ActivationSearch, withheld); note != "" {
+		fmt.Fprintln(os.Stderr, note)
 	}
 
 	type row struct {
