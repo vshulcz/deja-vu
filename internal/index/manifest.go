@@ -321,7 +321,13 @@ func Damaged(dir string) bool {
 	}
 	m, err := readManifest(dir)
 	if err != nil {
-		// No readable manifest is "not built", which doctor reports already.
+		// A manifest that is not there is "not built", which doctor reports
+		// already. One that is there but will not decode is a different story:
+		// doctor stats the file, calls the index built and up to date, and the
+		// next search rebuilds it from scratch.
+		if _, statErr := os.Stat(filepath.Join(dir, "manifest.gob")); statErr == nil {
+			return true
+		}
 		return false
 	}
 	return !recordsIntact(dir, m)
