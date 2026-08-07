@@ -34,7 +34,10 @@ import (
 // kept a row with no state, and re-importing the batch adds nothing because it
 // is deduped. The bump is what makes the one rebuild that re-derives it happen
 // (#1049).
-const version = 23
+// 24: tokens() now folds NFD to NFC, so postings keys for accented words change
+// shape. A store built before the fold keyed "café" decomposed; the rebuild
+// re-derives every key on the composed form so an NFC query reaches it (#1098).
+const version = 24
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
