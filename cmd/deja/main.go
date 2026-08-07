@@ -532,12 +532,33 @@ func cmdCtx(dir string, rest []string) error {
 		}
 		fmt.Fprintf(os.Stderr, "deja: answering from the index as it was — %v\n", ensureError(dir, err))
 	}
-	ss, err := index.SearchWithRecovery(dir, o, os.Stderr)
+	// Detailed, not the plain form: retrieval answers a sentence by dropping
+	// the terms nothing carries and returning the session under the close or
+	// relevance tier. Handing those sessions to Run without the tier and its
+	// variant map made scoring hunt for the whole literal query, score zero,
+	// and report "no session matches" — about a store `deja search` answered
+	// on the same words. ctx is the command the hook names to an agent, and
+	// agents ask in sentences (#R8).
+	result, err := index.SearchWithRecoveryDetailed(dir, o, os.Stderr)
 	if err != nil {
 		return err
 	}
-	hits, err := search.Run(ss, o)
-	if err != nil {
+	ss := result.Sessions
+	o.Tier = result.Tier
+	if result.Stemmed {
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Fuzzy {
+		o.Fuzzy = true
+		o.FuzzyVariants = result.Variants
+	}
+	if result.Tier == search.TierClose && o.FuzzyVariants == nil {
+		o.FuzzyVariants = result.Variants
+	}
+	var hits []search.Hit
+	if result.Tier == search.TierRelevance {
+		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
+	} else if hits, err = search.Run(ss, o); err != nil {
 		return err
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationSearch, hits)
