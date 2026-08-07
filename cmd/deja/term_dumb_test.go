@@ -18,7 +18,10 @@ func drawableCharDevice(t *testing.T) *os.File {
 	t.Helper()
 	name := "/dev/zero"
 	if runtime.GOOS == "windows" {
-		name = os.DevNull // NUL stays drawable there; see logo_windows.go
+		// NUL is excluded there too since #1097's windows half, so the console
+		// input device is the only stand-in left; a runner without a console
+		// skips.
+		name = "CONIN$"
 	}
 	f, err := os.Open(name)
 	if err != nil {
