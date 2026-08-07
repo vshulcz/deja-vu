@@ -1479,6 +1479,37 @@ func postingsFor(dir, tok string) ([]posting, error) {
 	return readBucketToken(filepath.Join(dir, "buckets", bucket(tok)+".bin"), tok)
 }
 
+// OtherWordForms lists, per query term, the other forms of that word the
+// corpus actually holds — "retries" for "retry", "rotated" for "rotate".
+//
+// The stem tier already knows these, but it only ever runs after the exact
+// tier came up empty. When the exact tier does answer, `retry` returns the
+// sessions that wrote "retry" and stops: the sessions that wrote "retries"
+// are neither returned nor mentioned, and the ladder is invisible from the
+// outside. This is the lookup that lets the caller say so.
+func OtherWordForms(dir string, terms []string) map[string][]string {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	catalog, err := tokenCatalogCached(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string][]string{}
+	for _, term := range terms {
+		var others []string
+		for _, form := range stemMatches(term, catalog) {
+			if form != term {
+				others = append(others, form)
+			}
+		}
+		if len(others) > 0 {
+			out[term] = others
+		}
+	}
+	return out
+}
+
 // TermSessionCounts says how many sessions each term appears in on its own.
 // When an AND query finds no intersection, "try fewer words" is right in
 // direction and empty in content — the reader has to guess which of their words
