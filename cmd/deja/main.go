@@ -1316,7 +1316,12 @@ func recent(dir string, n int) ([]model.Session, error) {
 func recentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if o.Role != "" {
-			ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard)
+			// The role has to travel into the index query, not just the filter
+			// below: a scan with no role set drops file, command and edit
+			// records on the way out — they are indexed but served only when
+			// asked for — so `last --role files` saw sessions with the very
+			// records it was selecting on already removed.
+			ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: o.Role}, io.Discard)
 			if err == nil {
 				ss = filterRecentSources(ss, o)
 				return search.Recent(ss, n), nil
