@@ -45,7 +45,7 @@ func environmentBlock(dir, activation string) string {
 	// to be per wall rather than one check up front: a machine can hold both
 	// local and imported sessions hitting the same error.
 	pol := policy.Load()
-	walls := index.TopFriction(dir, environmentWalls)
+	walls := index.TopFriction(dir, environmentWalls, nil)
 	if len(walls) == 0 {
 		return ""
 	}

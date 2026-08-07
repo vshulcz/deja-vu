@@ -203,3 +203,55 @@ func TestBriefAskedTwiceCountsImportedAndHonoursPolicy(t *testing.T) {
 		t.Errorf("asked-twice surfaced an all-imported repeat under auto:local-only:\n%s", ln)
 	}
 }
+
+// hitLine returns the "hit" (friction) row of the brief, or "" if there is none.
+func hitLine(out string) string {
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.HasPrefix(ln, "hit ") {
+			return ln
+		}
+	}
+	return ""
+}
+
+// A wall a peer kept hitting, arriving by sync, is a wall — `deja friction` and
+// stats both count it, and the brief's one friction line used to be the lone
+// holdout because imported sessions carried no Hit hashes. Populate meta.Hit on
+// import and gate the brief's lookup on the auto rule, the same shape as the
+// asked-twice fix above.
+func TestBriefFrictionCountsImportedAndHonoursPolicy(t *testing.T) {
+	tmp := hermeticEnv(t)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var batch []byte
+	for i := 1; i <= index.FrictionMinSessions; i++ {
+		rec := `{"harness":"claude","session_id":"peer` + string(rune('0'+i)) + `","project":"svc","role":"tool-output","text":"npm ERR! code ELIFECYCLE","time":"2026-0` + string(rune('0'+i)) + `-01T10:00:00Z"}` + "\n"
+		batch = append(batch, rec...)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync-p.jsonl"), batch, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if err := runBrief(dir, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if ln := hitLine(buf.String()); !strings.Contains(ln, "ELIFECYCLE") {
+		t.Fatalf("friction line did not count the imported wall; hit line = %q\n%s", ln, buf.String())
+	}
+
+	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
+	buf.Reset()
+	if err := runBrief(dir, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if ln := hitLine(buf.String()); ln != "" {
+		t.Errorf("friction surfaced an all-imported wall under auto:local-only:\n%s", ln)
+	}
+}

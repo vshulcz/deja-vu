@@ -223,7 +223,9 @@ func runBrief(dir string, w io.Writer) error {
 	// counter: a wall this machine keeps running into. Manifest-only, like the
 	// asked line above it — the command that reports the full list reads the
 	// record log, which is a hundred times this screen's budget.
-	if f, ok := index.FindFriction(dir); ok {
+	if f, ok := index.FindFriction(dir, func(project string) bool {
+		return briefPol.Allows(policy.ActivationAuto, project)
+	}); ok {
 		fmt.Fprintf(w, "hit        %s%s%s\n", bold, trimBriefTitle(f.Text), reset)
 		fmt.Fprintf(w, "again      %s%d sessions · last %s · deja friction%s\n",
 			dim, len(f.Sessions), search.RelativeDate(f.Last), reset)

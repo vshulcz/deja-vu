@@ -767,6 +767,12 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		if a := askedFromRecords(recsByKey[key]); len(a) > 0 {
 			meta.Asked = a
 		}
+		// And the friction signal, for the same reason: without meta.Hit the
+		// brief's one wall line never counted an error a peer kept hitting,
+		// though `deja friction` and stats both did.
+		if hh := hitFromRecords(recsByKey[key]); len(hh) > 0 {
+			meta.Hit = hh
+		}
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord

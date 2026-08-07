@@ -140,7 +140,7 @@ func frictionStore(t *testing.T, sessions int) string {
 
 func TestFindFrictionOverTheManifest(t *testing.T) {
 	dir := frictionStore(t, FrictionMinSessions)
-	f, ok := FindFriction(dir)
+	f, ok := FindFriction(dir, nil)
 	if !ok {
 		t.Fatal("three sessions hitting one error should be reported")
 	}
@@ -163,13 +163,13 @@ func TestFindFrictionOverTheManifest(t *testing.T) {
 
 func TestFindFrictionQuietBelowThreshold(t *testing.T) {
 	dir := frictionStore(t, FrictionMinSessions-1)
-	if _, ok := FindFriction(dir); ok {
+	if _, ok := FindFriction(dir, nil); ok {
 		t.Fatal("two sessions is a coincidence, not friction")
 	}
 }
 
 func TestFindFrictionOnMissingStore(t *testing.T) {
-	if _, ok := FindFriction(filepath.Join(t.TempDir(), "nope")); ok {
+	if _, ok := FindFriction(filepath.Join(t.TempDir(), "nope"), nil); ok {
 		t.Fatal("no store, nothing to report")
 	}
 }
