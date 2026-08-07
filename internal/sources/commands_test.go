@@ -38,6 +38,13 @@ func TestWorthIndexingKeepsWhatHappened(t *testing.T) {
 		"clang -O2 main.c",
 		"gcc -o app app.c",
 		"rustc main.rs",
+		// Compound commands: a leading cd/export/source must not sink the real
+		// work chained after it — the `cd repo && build` shape is everywhere.
+		"cd services/api && go test ./...",
+		"cd frontend && npm run build",
+		"export CGO_ENABLED=0 && go build ./...",
+		"source .venv/bin/activate && pytest -q",
+		"cd a && cd b && bazel test //x:y",
 	} {
 		if !worthIndexing(c) {
 			t.Errorf("dropped a command worth keeping: %q", c)
@@ -55,6 +62,12 @@ func TestWorthIndexingKeepsWhatHappened(t *testing.T) {
 		"cat stack.yaml",
 		"which gcc",
 		"cd /nix/store",
+		// A meaningful command name inside a nav command's ARGUMENT is not a
+		// chained segment, so it stays dropped.
+		"grep 'go test' logs.txt",
+		"cat go.mod | grep module",
+		"echo 'run npm build'",
+		"ls && cd /tmp",
 	} {
 		if worthIndexing(c) {
 			t.Errorf("kept navigation: %q", c)

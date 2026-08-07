@@ -461,8 +461,22 @@ func worthIndexing(cmd string) bool {
 	if strings.Contains(cmd, "\n") {
 		return false
 	}
-	return meaningfulCommand.MatchString(cmd) && !trivialCommand.MatchString(cmd)
+	// Judge each chained segment, not the whole string. `cd repo && go test` is
+	// a test run, not navigation — the leading `cd` must not sink it. Splitting
+	// on the shell operators also keeps `grep "go test" log` correctly dropped:
+	// its `go test` is an argument, not a segment of its own.
+	for _, seg := range commandChain.Split(cmd, -1) {
+		if meaningfulCommand.MatchString(seg) && !trivialCommand.MatchString(seg) {
+			return true
+		}
+	}
+	return false
 }
+
+// commandChain splits a shell line on the operators that separate commands, so
+// each side is judged on its own. Quoted operators are rare in real command
+// logs and splitting on them at worst keeps one more command than it should.
+var commandChain = regexp.MustCompile(`&&|\|\||;|\|`)
 
 // claudeCommands pulls the shell commands worth keeping out of a message.
 func claudeCommands(raw json.RawMessage) []string {
