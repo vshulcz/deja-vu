@@ -197,3 +197,37 @@ func TestDejaVuMomentsCountTowardsWornSessions(t *testing.T) {
 		}
 	}
 }
+
+// A log is over the size trigger because it is busy, not because it is old.
+// Rewriting it then drops nothing and costs a full read-and-write on the
+// recall path: measured on a 10k-session store, per-recall time went from
+// 123ms at an empty log to 342ms at 1.2MB and 870ms at 5.8MB, with every one
+// of those rewrites keeping every event.
+func TestRecordSkipsRotationWhenNothingWouldBeDropped(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	p := Path(dir)
+	// An extra field no Event carries: a rewrite re-marshals and drops it, so
+	// its survival says the file was appended to rather than rebuilt.
+	var sb strings.Builder
+	for sb.Len() < rotateAt {
+		e, _ := json.Marshal(Event{Time: time.Now().UTC().Add(-time.Hour), Kind: KindRecall, Bytes: 1})
+		sb.Write(append(e[:len(e)-1], []byte(`,"probe":1}`)...))
+		sb.WriteByte('\n')
+	}
+	before := sb.String()
+	if err := os.WriteFile(p, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	Record(dir, KindHook, 3)
+	after, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(after), before) {
+		t.Fatalf("log was rewritten: %d bytes before, %d after, prefix intact = %v",
+			len(before), len(after), strings.HasPrefix(string(after), before))
+	}
+	if n := strings.Count(string(after), `"probe":1`); n != strings.Count(before, `"probe":1`) {
+		t.Fatalf("kept %d probe fields, want %d", n, strings.Count(before, `"probe":1`))
+	}
+}
