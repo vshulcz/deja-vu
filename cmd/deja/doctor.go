@@ -331,7 +331,38 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 // the way there is missing. `~/.kimi-code/sessions` on a machine without kimi
 // loses one level and its home is right there; a store on an ejected volume
 // loses the whole chain (#933).
-func storeDiskGone(path string) bool {
+// Cursor and aider hand doctor their roots joined for display, and a joined
+// string is no path to walk up from: it lost the whole chain by construction
+// and cursor's row said `unplugged` on every machine.
+func storeDiskGone(location string) bool {
+	roots := doctorLocationRoots(location)
+	for _, root := range roots {
+		if !oneStoreDiskGone(root) {
+			return false
+		}
+	}
+	return len(roots) > 0
+}
+
+func doctorLocationRoots(location string) []string {
+	var roots []string
+	for _, part := range strings.Split(location, string(os.PathListSeparator)) {
+		for _, root := range strings.Split(part, ", ") {
+			if root = strings.TrimSpace(root); root != "" {
+				roots = append(roots, root)
+			}
+		}
+	}
+	return roots
+}
+
+func oneStoreDiskGone(path string) bool {
+	// Two levels is not enough for every store: `~/.local/share/goose/sessions`
+	// and `~/.cline/data/sessions` lose three on a machine that never installed
+	// them. A home directory that is there means the disk is there.
+	if home := sources.Home(); home != "" && strings.HasPrefix(path, home+string(os.PathSeparator)) && dirExists(home) {
+		return false
+	}
 	dir := filepath.Dir(path)
 	for i := 0; i < 2; i++ {
 		if dirExists(dir) {
