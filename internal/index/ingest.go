@@ -1130,12 +1130,39 @@ func topTouchedFiles(ms []model.Message) []string {
 		if m.Role != roleFiles {
 			continue
 		}
-		for _, p := range strings.Split(m.Text, "\n") {
-			if p = strings.TrimSpace(p); p != "" && !agentOwnedFile(p) {
-				count[p]++
-			}
+		countTouchedPaths(count, m.Text)
+	}
+	return rankTouched(count)
+}
+
+// touchedFromRecords is topTouchedFiles for the import path, which holds a
+// session as records rather than messages. Imported sessions used to carry no
+// Touched, so `deja blame` — which reads it — could not attribute a peer's
+// edits even though `search --role files` surfaced the same records.
+func touchedFromRecords(recs []Record) []string {
+	count := map[string]int{}
+	for _, r := range recs {
+		if r.Role != roleFiles {
+			continue
+		}
+		countTouchedPaths(count, r.Text)
+	}
+	return rankTouched(count)
+}
+
+// countTouchedPaths tallies the file paths in one `files` record's text, one
+// per line, skipping deja's own injected artifacts.
+func countTouchedPaths(count map[string]int, text string) {
+	for _, p := range strings.Split(text, "\n") {
+		if p = strings.TrimSpace(p); p != "" && !agentOwnedFile(p) {
+			count[p]++
 		}
 	}
+}
+
+// rankTouched orders touched paths by recurrence and caps the list, the shape
+// SessionMeta.Touched holds.
+func rankTouched(count map[string]int) []string {
 	if len(count) == 0 {
 		return nil
 	}

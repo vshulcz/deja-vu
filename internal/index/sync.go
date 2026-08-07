@@ -754,6 +754,13 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	nextOrd := nextSessionOrd(m.Sessions)
 	for _, key := range keys {
 		meta := metas[key]
+		// Derive the file-touch list the way local ingest does. Without it an
+		// imported session carried no Touched, so `deja blame` — which reads
+		// Touched to find who edited a file — could not attribute a peer's edits
+		// even though `search --role files` surfaced the same records.
+		if t := touchedFromRecords(recsByKey[key]); len(t) > 0 {
+			meta.Touched = t
+		}
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord
