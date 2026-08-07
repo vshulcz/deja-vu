@@ -380,6 +380,9 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		}
 		return fmt.Errorf("no session matches %q%s", o.id, movedBucketHint(dir, o.id))
 	}
+	if err := denyPolicyHidden(o.id, s, os.Stderr); err != nil {
+		return err
+	}
 	if o.json {
 		return printSessionJSON(os.Stdout, s, o.offset, o.limit, sourceInstance)
 	}

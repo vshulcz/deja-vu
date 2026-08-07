@@ -67,6 +67,9 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
+		return err
+	}
 	// Source receipt: the user must always see WHAT is being handed off —
 	// wrong-project or stale handoffs should be obvious before they land.
 	age := "unknown age"

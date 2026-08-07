@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/model"
+	"io"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -54,4 +55,18 @@ func policyFilterSessionsCounted(activation string, ss []model.Session) ([]model
 		return s.Project
 	})
 	return kept, before - len(kept)
+}
+
+// denyPolicyHidden stops a direct-access command (show, share, handoff) from
+// revealing a session a trust rule withholds. Naming an exact id is still
+// browsing under the search activation — ctx already refuses here (#1026), and
+// last and search never surface the session at all — so a peer's content a rule
+// hides must not leak through a command that happens to take an id. Returns a
+// non-nil error to return, or nil when the session is allowed.
+func denyPolicyHidden(id string, s model.Session, w io.Writer) error {
+	if kept, hidden := policyFilterSessionsCounted(policy.ActivationSearch, []model.Session{s}); len(kept) == 0 {
+		fmt.Fprint(w, policyHiddenNote(policy.ActivationSearch, hidden))
+		return fmt.Errorf("no session matches %q", id)
+	}
+	return nil
 }
