@@ -240,6 +240,7 @@ func cmdIndex(dir string, rest []string) error {
 	// longest part of the whole command, and it ran before the progress sink
 	// existed (#1021).
 	stopProgress := publishBuildProgress(dir)
+	index.SweepStaleTmp(dir)
 	fresh, n := index.UpToDate(dir, "")
 	// A note bucket's id names the local day of whichever process indexed the
 	// line, so a `remember` under TZ=UTC and one under the machine's own zone
