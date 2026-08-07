@@ -2098,7 +2098,7 @@ Usage:
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
   deja handoff [--to <agent>] [id-prefix] [--exec]
-  deja hook-prompt   (UserPromptSubmit hook: relevance recall per prompt)
+  deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
@@ -2128,7 +2128,7 @@ Usage:
   deja version
   deja <command> --help
   deja update [--force]
-  deja install <target> | --all | --auto
+  deja install <target> | --all | --auto  [--no-guidance] [--no-index]
   deja uninstall <target> | --all | --auto
     targets:
 %s
