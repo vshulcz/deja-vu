@@ -312,6 +312,13 @@ func cmdIndex(dir string, rest []string) error {
 				b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 		}
 	}
+	// A machine with no agent history built an empty index and said nothing:
+	// the step whose whole job is filling memory returned to the prompt after
+	// a bare "indexing ..." line, and the state (no history anywhere, or a
+	// store behind a permission wall) only surfaced on the next command.
+	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) {
+		fmt.Fprintln(os.Stderr, emptyIndexHint("nothing to index yet"))
+	}
 	maybeFirstIndexGreeting(dir)
 	// The live display erases itself on the way out, so a rebuild on a
 	// terminal ended with an empty screen — three seconds of animation and no
