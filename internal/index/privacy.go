@@ -572,6 +572,19 @@ func tombstoneMatches(key, prefix string) bool {
 // A crash in the remaining window leaves the session present but still listed
 // by `forget --list`, which is visible and fixed by running unforget again.
 func Unforget(dir, prefix string, progress io.Writer) (int, error) {
+	// The set is read under the lock, the way Forget reads it. Read before
+	// locking, two unforgets of different sessions each got the whole set,
+	// dropped their own key from their own copy, and wrote it back in turn:
+	// both said "restored 1 session" and only the last one's session came
+	// back, the other's tombstone reappeared out of the loser's stale copy.
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return 0, err
+	}
+	defer unlock()
 	set := readTombstones()
 	lifted := 0
 	for key := range set {
@@ -596,14 +609,6 @@ func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 	// incremental pass would skip it and the session would stay invisible
 	// (#672) — hence a full rebuild, with the lifted tombstones already gone
 	// from the set this pass applies.
-	if dir == "" {
-		dir = DefaultDir()
-	}
-	unlock, err := lockDir(dir)
-	if err != nil {
-		return 0, err
-	}
-	defer unlock()
 	if err := rebuildWithTombstones(dir, "", "", currentFiles(""), progress, set); err != nil {
 		return 0, err
 	}
