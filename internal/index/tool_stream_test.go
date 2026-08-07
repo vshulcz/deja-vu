@@ -229,6 +229,7 @@ func TestSpanInventorySkipsSpansWithNoPath(t *testing.T) {
 // empty slice on every session and no error — silence, which is how it cost a
 // wrong measurement before it was noticed (#633).
 func TestRecentCarriesTouched(t *testing.T) {
+	skipWindowsPortability(t)
 	tmp := t.TempDir()
 	proj := filepath.Join(tmp, "claude", "-tmp-touch")
 	if err := os.MkdirAll(proj, 0o755); err != nil {

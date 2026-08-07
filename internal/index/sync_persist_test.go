@@ -37,6 +37,7 @@ func writeSyncBatch(t *testing.T, dir string, recs []SyncRecord) {
 // deja-sync-import path that the next update classified as a removed source,
 // purging every imported record.
 func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
+	skipWindowsPortability(t)
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-tmp-local")

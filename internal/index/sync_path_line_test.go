@@ -9,6 +9,7 @@ import (
 // acting on a repo's instructions. Printed verbatim, a newline in it ended
 // deja's error line and started one that reads as deja's own output.
 func TestSyncImportErrorKeepsThePathOnOneLine(t *testing.T) {
+	skipWindowsPortability(t)
 	bad := "/tmp/no\u001bXsuch\ndeja: store is clean\u202edir"
 	_, err := Import(t.TempDir(), bad)
 	if err == nil {

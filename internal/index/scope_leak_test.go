@@ -50,6 +50,7 @@ func TestEnsureHonorsHarnessScope(t *testing.T) {
 }
 
 func TestDateTokensMakeSessionsFindableByMonth(t *testing.T) {
+	skipWindowsPortability(t)
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-tmp-app")
