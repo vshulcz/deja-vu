@@ -164,6 +164,16 @@ func runSync(dir string, args []string) error {
 		if skipped := index.ImportSkippedForgotten(); skipped > 0 {
 			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — they belong to sessions you forgot here (`deja forget --list`)\n", skipped, pluralS(skipped))
 		}
+		// A record with no session to attribute it to is dropped, and a silent
+		// drop made "imported 2 records" from a 3-record batch read as a
+		// complete transfer (#1118).
+		if inc := index.ImportSkippedIncomplete(); inc > 0 {
+			what := "it"
+			if inc > 1 {
+				what = "them"
+			}
+			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — no session id to attribute %s to; the batch may be from a different tool or damaged\n", inc, pluralS(inc), what)
+		}
 		if err != nil {
 			return err
 		}

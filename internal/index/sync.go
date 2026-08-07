@@ -249,6 +249,16 @@ var lastImportSkippedForgotten int
 // leave alone (#968).
 func ImportSkippedForgotten() int { return lastImportSkippedForgotten }
 
+// lastImportSkippedIncomplete holds how many records the last Import dropped
+// because they could not be attributed to a session — no harness or no
+// session_id. deja's own exports always carry both; a hand-made or foreign
+// batch may not, and dropping such a record silently made "imported 2 records"
+// from a 3-record batch read as a complete transfer (#1118).
+var lastImportSkippedIncomplete int
+
+// ImportSkippedIncomplete reports that count.
+func ImportSkippedIncomplete() int { return lastImportSkippedIncomplete }
+
 // noteStateFromText reads the state a promoted note's line carries. deja writes
 // them as "[accepted] …" or "[rejected] did not hold", and that prefix is the
 // only copy of the state that crosses a machine boundary (#975).
@@ -375,8 +385,10 @@ func Import(dir, inDir string) (int, error) {
 	var skipped []string
 	ownSkipped := 0
 	forgottenSkipped := 0
+	incompleteSkipped := 0
 	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
 	defer func() { lastImportSkippedOwn = ownSkipped }()
+	defer func() { lastImportSkippedIncomplete = incompleteSkipped }()
 	for _, p := range paths {
 		// A file is imported whole or not at all, so what it contributed is
 		// remembered before it is read and rolled back if it turns out to be
@@ -405,6 +417,9 @@ func Import(dir, inDir string) (int, error) {
 		if err := readSyncFile(p, func(sr SyncRecord) error {
 			origID := sr.SessionID
 			if sr.Harness == "" || origID == "" {
+				// No session to attribute it to. Count it so the summary does not
+				// call a partial transfer complete (#1118).
+				incompleteSkipped++
 				return nil
 			}
 			// The same rule the local ingest applies: a message that strips to
