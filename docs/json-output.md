@@ -125,6 +125,26 @@ window](#hits-is-not-a-fixed-window-across-tiers)). Every machine session has
 operator-chosen `source.instance`; imported sessions omit it because current
 sync batches do not carry trustworthy peer identity.
 
+### The session object
+
+`search`, `last` and `show` all carry the same session object. The examples
+above show the fields that are always there; these are the rest, each omitted
+when empty:
+
+| Field | Meaning |
+|---|---|
+| `path` | file the session was read from |
+| `title` | first user turn, elided to terminal width |
+| `agent_title` | `title` came from the assistant because the session has no user turn |
+| `touched` | the few files this session worked on most |
+| `orig_id` | id this session had on the machine it was imported from |
+| `lifecycle` | state of an imported promoted note: `accepted`, `rejected`, `superseded` or `stale` |
+| `lifecycle_note` | the note left with that state |
+| `lifecycle_at` | when that state was set |
+
+`messages` is likewise absent rather than empty on `last`, which never returns
+turns.
+
 ## `deja last --json`
 
 Recent session metadata uses a versioned envelope and never includes messages:
