@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -220,7 +221,11 @@ func sessionPreview(msgs []model.Message) string {
 	}
 	out := b.String()
 	if len(out) > viewPreviewBytes {
-		out = out[:viewPreviewBytes] + "…"
+		cut := viewPreviewBytes
+		for cut > 0 && !utf8.RuneStart(out[cut]) {
+			cut--
+		}
+		out = out[:cut] + "…"
 	}
 	return out
 }

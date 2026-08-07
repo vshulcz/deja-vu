@@ -107,13 +107,13 @@ func renderStatsCard(r stats.Report) string {
 func cardPunchline(r stats.Report) string {
 	switch {
 	case r.WeekRecalls > 0:
-		return fmt.Sprintf("deja handed your agents memory %s times this week.", formatStatNumber(r.WeekRecalls))
+		return fmt.Sprintf("deja handed your agents memory %s time%s this week.", formatStatNumber(r.WeekRecalls), pluralS(r.WeekRecalls))
 	case r.RepeatQuestions > 0:
-		return fmt.Sprintf("You asked the same thing %s times — deja remembered.", formatStatNumber(r.RepeatQuestions))
+		return fmt.Sprintf("You asked the same thing %s time%s — deja remembered.", formatStatNumber(r.RepeatQuestions), pluralS(r.RepeatQuestions))
 	case r.Recall.Recalls > 0:
-		return fmt.Sprintf("deja handed your agents memory %s times.", formatStatNumber(r.Recall.Recalls))
+		return fmt.Sprintf("deja handed your agents memory %s time%s.", formatStatNumber(r.Recall.Recalls), pluralS(r.Recall.Recalls))
 	case r.TotalSessions > 0:
-		return fmt.Sprintf("%s sessions of agent history, all searchable.", formatStatNumber(r.TotalSessions))
+		return fmt.Sprintf("%s session%s of agent history, all searchable.", formatStatNumber(r.TotalSessions), pluralS(r.TotalSessions))
 	default:
 		return "Your coding-agent memory, indexed and searchable."
 	}

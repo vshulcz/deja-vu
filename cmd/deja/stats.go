@@ -364,6 +364,9 @@ func statColorOK(w io.Writer) bool {
 	return st.Mode()&os.ModeCharDevice != 0
 }
 
+// statHarnessTag closes every attribute it opens. It used to re-arm bold after
+// the reset, which no stats caller wants: the "By harness" counts and the whole
+// "Busiest day" line below it rendered bold because that escape had no closer.
 func statHarnessTag(h string, color bool) string {
 	tag := "[" + h + "]"
 	if !color {
@@ -371,19 +374,19 @@ func statHarnessTag(h string, color bool) string {
 	}
 	switch h {
 	case "claude":
-		return statOrange + tag + statReset + statBold
+		return statOrange + tag + statReset
 	case "codex":
-		return statGreen + tag + statReset + statBold
+		return statGreen + tag + statReset
 	case "opencode":
-		return statBlue + tag + statReset + statBold
+		return statBlue + tag + statReset
 	case "cursor":
-		return "\x1b[36m" + tag + statReset + statBold
+		return "\x1b[36m" + tag + statReset
 	case "gemini":
-		return "\x1b[35m" + tag + statReset + statBold
+		return "\x1b[35m" + tag + statReset
 	case "aider":
-		return "\x1b[33m" + tag + statReset + statBold
+		return "\x1b[33m" + tag + statReset
 	case "antigravity":
-		return "\x1b[94m" + tag + statReset + statBold
+		return "\x1b[94m" + tag + statReset
 	}
 	return tag
 }
