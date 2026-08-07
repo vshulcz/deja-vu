@@ -12,12 +12,15 @@ func statsHeadline(r stats.Report) string {
 	if r.TotalSessions > 0 {
 		parts = append(parts, fmt.Sprintf("%s session%s indexed", formatStatNumber(r.TotalSessions), pluralS(r.TotalSessions)))
 	}
-	if r.Recall.Recalls > 0 {
+	// Recalls and injections both handed memory to an agent; the headline is
+	// about that total, so it sums them rather than reading a field that used
+	// to carry both.
+	if handed := r.Recall.Recalls + r.Recall.Injections; handed > 0 {
 		served := "times"
-		if r.Recall.Recalls == 1 {
+		if handed == 1 {
 			served = "time"
 		}
-		parts = append(parts, fmt.Sprintf("memory served %s %s", formatStatNumber(r.Recall.Recalls), served))
+		parts = append(parts, fmt.Sprintf("memory served %s %s", formatStatNumber(handed), served))
 	}
 	if r.RepeatQuestions > 0 {
 		parts = append(parts, fmt.Sprintf("%s questions asked more than once", formatStatNumber(r.RepeatQuestions)))

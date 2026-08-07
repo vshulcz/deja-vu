@@ -40,14 +40,18 @@ func runBench(args []string) error {
 	if len(args) > 0 && args[0] == "context" {
 		return runBenchContext(args[1:])
 	}
-	if len(args) < 1 || args[0] != "recall" || len(args) > 2 || (len(args) == 2 && args[1] != "--json") {
-		return fmt.Errorf("bench: usage: bench recall|context|prompt [--json]")
+	if len(args) < 1 || args[0] != "recall" {
+		return fmt.Errorf("bench: usage: bench recall|context|prompt [--json] [--seed N]")
 	}
-	return runBenchRecall(len(args) == 2)
+	jsonOutput, seed, err := parseBenchArgs("recall", args[1:])
+	if err != nil {
+		return err
+	}
+	return runBenchRecall(jsonOutput, seed)
 }
 
-func runBenchRecall(jsonOutput bool) error {
-	corpus := bench.Generate(bench.Seed)
+func runBenchRecall(jsonOutput bool, seed int64) error {
+	corpus := bench.Generate(seed)
 	root, err := benchmarkTempDir()
 	if err != nil {
 		return err

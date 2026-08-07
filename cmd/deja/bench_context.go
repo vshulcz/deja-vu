@@ -40,26 +40,37 @@ type contextMeasurement struct {
 	negative bool
 }
 
-func runBenchContext(args []string) error {
-	jsonOutput := false
-	seed := bench.Seed
+// parseBenchArgs reads the flags every bench subcommand documents. It is
+// shared because two of the three used to disagree with `deja help`: recall
+// rejected --seed outright and prompt accepted it and ran seed 1 anyway, so
+// the one knob that makes a benchmark reproducible worked on one subcommand.
+func parseBenchArgs(sub string, args []string) (jsonOutput bool, seed int64, err error) {
+	seed = bench.Seed
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			jsonOutput = true
 		case "--seed":
 			if i+1 >= len(args) {
-				return fmt.Errorf("bench context: --seed requires a number")
+				return false, 0, fmt.Errorf("bench %s: --seed requires a number", sub)
 			}
-			value, err := strconv.ParseInt(args[i+1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("bench context: invalid seed: %w", err)
+			value, parseErr := strconv.ParseInt(args[i+1], 10, 64)
+			if parseErr != nil {
+				return false, 0, fmt.Errorf("bench %s: invalid seed: %w", sub, parseErr)
 			}
 			seed = value
 			i++
 		default:
-			return fmt.Errorf("bench: usage: bench context [--json] [--seed N]")
+			return false, 0, fmt.Errorf("bench: usage: bench %s [--json] [--seed N]", sub)
 		}
+	}
+	return jsonOutput, seed, nil
+}
+
+func runBenchContext(args []string) error {
+	jsonOutput, seed, err := parseBenchArgs("context", args)
+	if err != nil {
+		return err
 	}
 	report, err := measureContext(seed)
 	if err != nil {

@@ -55,6 +55,10 @@ type Event struct {
 }
 
 type Summary struct {
+	// Recalls counts agent-initiated recalls only. Injections are counted
+	// separately and printed on their own line — folding them into Recalls
+	// made one surface say 5 and `deja stats --impact` say 2 about the same
+	// five events.
 	Recalls          int     `json:"recalls_served"`
 	Injections       int     `json:"injections"`
 	RecallSessions   int     `json:"recall_sessions"`
@@ -198,7 +202,6 @@ func Totals(indexDir string) Summary {
 				empty++
 			}
 		case KindHook, KindDejaVu:
-			out.Recalls++
 			out.Injections++
 			out.InjectedSessions += e.Sessions
 			out.InjectedBytes += e.Bytes
@@ -209,8 +212,8 @@ func Totals(indexDir string) Summary {
 			}
 		}
 	}
-	if served := out.Recalls - out.Injections; served > 0 {
-		out.EmptyResultRate = float64(empty) / float64(served)
+	if out.Recalls > 0 {
+		out.EmptyResultRate = float64(empty) / float64(out.Recalls)
 	}
 	return out
 }
@@ -366,6 +369,13 @@ func Impact(indexDir string) ImpactReport {
 				worn[id]++
 			}
 		case KindHook:
+			// A session start with no project session to show still injects
+			// the environment block, and that event is logged empty. Counting
+			// it made "N session starts began with project memory" claim
+			// memory that was not there.
+			if e.Empty {
+				continue
+			}
 			r.Injections++
 			r.ServedBytes += e.Bytes
 			r.RawBytes += e.RawBytes

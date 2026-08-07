@@ -757,7 +757,10 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 		}
 	}
 	mark("environment")
-	return text, result.Sessions, rawSize(ss), matched, withheld
+	// The candidates that never made it into the digest were never served:
+	// counting their transcripts here inflated the distillation ratio deja
+	// prints about itself (1 session distilled, 3 sessions' bytes claimed).
+	return text, result.Sessions, result.RawBytes, matched, withheld
 }
 
 // warmupDeadAfter is how long a warmup may go without publishing progress
