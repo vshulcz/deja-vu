@@ -63,9 +63,10 @@ func printSanitized(w io.Writer, text string) {
 //
 // The command ends with "review before sending", and a U+202E reverses the
 // rendering of everything after it, so the reviewer reads one thing and sends
-// another; a zero-width space hides a word boundary in the same way. ANSI
-// escapes were already dropped upstream by digest.stripANSI for this reason —
-// these are the other half (#1081).
+// another; a zero-width space hides a word boundary in the same way, and the
+// tag block spells whole sentences that render as nothing at all. ANSI escapes
+// were already dropped upstream by digest.stripANSI for this reason — these
+// are the other half (#1081).
 //
 // Joiners (U+200C, U+200D) are deliberately left alone: they are load-bearing
 // in Persian, Hindi and emoji sequences, and a share that mangles someone's
@@ -74,9 +75,10 @@ func stripBidiAndInvisible(s string) string {
 	return strings.Map(func(r rune) rune {
 		switch {
 		case r >= 0x202A && r <= 0x202E, // bidi embeddings and overrides
-			r >= 0x2066 && r <= 0x2069, // bidi isolates
-			r == 0x200E, r == 0x200F,   // left/right marks
-			r == 0x200B, r == 0xFEFF: // zero-width space, BOM
+			r >= 0x2066 && r <= 0x2069,            // bidi isolates
+			r == 0x200E, r == 0x200F, r == 0x061C, // left/right/arabic marks
+			r == 0x200B, r == 0x2060, r == 0xFEFF, r == 0x00AD, // zero-width
+			r >= 0xE0000 && r <= 0xE007F: // tag characters, an invisible alphabet
 			return -1
 		}
 		return r
