@@ -1048,9 +1048,38 @@ func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
 	}
 }
 
+// strandedUpdateStagings counts the staging files an interrupted update left
+// beside this binary. The name is deja's own (`.deja-update-*`), so this
+// recognises only its own litter (#1109).
+func strandedUpdateStagings() (int, string) {
+	exe, err := os.Executable()
+	if err != nil {
+		return 0, ""
+	}
+	dir := filepath.Dir(exe)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, ""
+	}
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasPrefix(e.Name(), ".deja-update-") {
+			n++
+		}
+	}
+	return n, dir
+}
+
 func doctorVersion(w io.Writer, lookup doctorVersionLookup) {
 	fmt.Fprintln(w, "Version:")
 	fmt.Fprintf(w, "  current  %s\n", version)
+	// An update killed between staging and rename strands a whole binary's
+	// worth of bytes beside the real one, under a prefix deja itself wrote —
+	// and every later run walked past it (#1109).
+	if n, dir := strandedUpdateStagings(); n > 0 {
+		fmt.Fprintf(w, "  %-8s %s left in %s by an interrupted update — safe to delete\n",
+			"leftover", doctorCount(n, "staged file"), dir)
+	}
 	latest, ok := lookup()
 	if !ok {
 		fmt.Fprintln(w, "  latest   unable to check")
