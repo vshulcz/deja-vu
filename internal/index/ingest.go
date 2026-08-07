@@ -1805,6 +1805,17 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				meta.Title, meta.AgentTitle = sessionTitleFrom(s)
 				meta.Title, _ = redact.Text(meta.Title)
 				meta.Title = truncateTitle(meta.Title, 60)
+			} else if s.Title != "" {
+				// A title the source authored is a live value, not a one-time
+				// naming: a promoted note's carries its state, and the loader
+				// rewrites it on every correction. Only the full rebuild took
+				// the new one, so `promote --state rejected` left every
+				// one-line surface — `deja last`, the digest, the citation the
+				// hook hands the agent to say aloud — reading "[accepted]"
+				// until an unrelated rebuild happened to run (#R11).
+				if t, _ := redact.Text(s.Title); t != meta.Title {
+					meta.Title, meta.AgentTitle = t, s.AgentTitle
+				}
 			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
