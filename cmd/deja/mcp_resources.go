@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 const mcpResourceLimit = 20
@@ -87,9 +89,14 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// Same transcript, same frame as recall_context. Reading a session through
 	// the resources surface used to skip the untrusted-data wrapper and the
 	// marker neutralisation entirely (#1077).
+	text := frameRecall(b.String())
+	// It also left no trace: a whole session reached the agent and `deja log`
+	// stayed empty — the gap #682 closed for blame.
+	usage.RecordServedSessions(dir, usage.KindResource, len(text), 1, false, rawSize([]model.Session{s}), []string{s.ID})
+	usage.SnapshotPolicy(dir, usage.KindResource, text, 1, policy.Load().Describe(policy.ActivationMCP))
 	return map[string]any{"contents": []map[string]any{{
 		"uri":      uri,
 		"mimeType": "text/markdown",
-		"text":     frameRecall(b.String()),
+		"text":     text,
 	}}}, 0, ""
 }
