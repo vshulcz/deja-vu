@@ -84,6 +84,13 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	}
 	doctorHarnesses(w, dir)
 	printDoctorStoreWarnings(w, report.Stores)
+	// The third cause of a files-to-sessions gap, after a parse failure (#861)
+	// and an id collision (#1101): the reader forgot them. `last` and `stats`
+	// have said so all along; the screen someone opens to check that a forget
+	// took did not (#1108).
+	if n := len(index.Tombstones()); n > 0 {
+		fmt.Fprintf(w, "  %-12s %s forgotten here and kept out of the index (`deja forget --list`)\n", "forgotten", doctorCount(n, "session"))
+	}
 	fmt.Fprintln(w)
 	doctorTools(w)
 	fmt.Fprintln(w)
