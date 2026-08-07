@@ -25,8 +25,9 @@ func TestHelpDocumentsEveryAcceptedFlag(t *testing.T) {
 	accepted := map[string][]string{}
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`case "(--[a-z][a-z-]*)"`),
-		regexp.MustCompile(`a == "(--[a-z][a-z-]*)"`),
-		regexp.MustCompile(`args\[i\] == "(--[a-z][a-z-]*)"`),
+		// Any variable name, not just a/args[i]: install compares `arg`, and
+		// its --no-guidance/--no-index slipped past the narrow patterns (#1106).
+		regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*(?:\[[^]]*\])? == "(--[a-z][a-z-]*)"`),
 	}
 	for _, path := range sources {
 		if strings.HasSuffix(path, "_test.go") {
