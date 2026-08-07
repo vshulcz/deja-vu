@@ -102,3 +102,42 @@ func TestTombstonesMatchingNamesSessionsOnly(t *testing.T) {
 		t.Error("Tombstoned disagrees with what was written")
 	}
 }
+
+// A build killed mid-flight leaves <dir>.tmp behind. Only `index --rebuild`
+// cleared it, so an ordinary run over a fresh index walked past a full index
+// worth of bytes and doctor reported only the live index's size.
+func TestAStaleBuildScratchDirIsSweptOnAFreshIndex(t *testing.T) {
+	dir, _ := deepFixture(t)
+	before, err := DeepVerify(dir)
+	if err != nil || !before.Clean() {
+		t.Fatalf("baseline: %v %+v", err, before.Findings)
+	}
+	scratch := dir + ".tmp"
+	if err := os.MkdirAll(filepath.Join(scratch, "buckets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(scratch, "records.bin"), []byte("half a build"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure decides the index is fresh and returns without building.
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
+		t.Fatalf("Ensure left the scratch dir behind: %v", err)
+	}
+
+	// And the same via the standalone sweep `deja index` calls before it
+	// decides not to build at all.
+	if err := os.MkdirAll(scratch, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	SweepStaleTmp(dir)
+	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
+		t.Fatalf("SweepStaleTmp left the scratch dir behind: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "records.bin")); err != nil {
+		t.Fatalf("the live index did not survive the sweep: %v", err)
+	}
+}

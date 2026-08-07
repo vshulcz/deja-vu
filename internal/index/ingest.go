@@ -125,6 +125,36 @@ func UpToDate(dir string, harness string) (bool, int) {
 	return true, len(prior.Sessions)
 }
 
+// sweepStaleTmp deletes a build scratch dir left by a process that died
+// mid-rebuild. Holding the dir lock means no live builder owns it. Without
+// this only `index --rebuild` cleared it, so a crashed build left a full
+// index worth of bytes on disk indefinitely, and `doctor` reported only the
+// live index's size.
+func sweepStaleTmp(dir string) {
+	tmp := dir + ".tmp"
+	if _, err := os.Stat(tmp); err == nil {
+		_ = os.RemoveAll(tmp)
+	}
+}
+
+// SweepStaleTmp is sweepStaleTmp for callers that do not already hold the dir
+// lock — `deja index` decides the index is fresh and returns before Ensure
+// ever runs, which is exactly the run that used to walk past the leftover.
+func SweepStaleTmp(dir string) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if _, err := os.Stat(dir + ".tmp"); err != nil {
+		return
+	}
+	unlock, err := lockDir(dir)
+	if err != nil {
+		return
+	}
+	defer unlock()
+	sweepStaleTmp(dir)
+}
+
 func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
@@ -134,6 +164,7 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 		return err
 	}
 	defer unlock()
+	sweepStaleTmp(dir)
 	// The manifest is read before the walk so unchanged files can carry
 	// their derived state forward instead of being re-read.
 	prior, priorErr := readManifest(dir)
@@ -172,6 +203,7 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 		return err
 	}
 	defer unlock()
+	sweepStaleTmp(dir)
 	prior, priorErr := readManifest(dir)
 	want := currentFilesReusing("", priorFiles(prior, priorErr))
 	scope := ""

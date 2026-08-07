@@ -135,21 +135,36 @@ func DeepVerify(dir string) (DeepReport, error) {
 	}
 
 	// 3. Dead postings: a sample of tokens must resolve to readable records.
+	// Every way this section can fail to run is itself a finding: a truncated
+	// bucket makes tokenCatalog give up on the whole vocabulary, and skipping
+	// quietly meant the check reported "no memory lost" over postings it could
+	// not read at all.
 	catalog, err := tokenCatalog(dir)
 	dvTables, dvErr := loadRecordTables(dir)
-	if err == nil && dvErr == nil {
+	switch {
+	case err != nil:
+		report.Findings = append(report.Findings, DeepFinding{Kind: "unreadable-postings", Detail: fmt.Sprintf("token catalog unreadable: %v", err)})
+	case dvErr != nil:
+		report.Findings = append(report.Findings, DeepFinding{Kind: "unreadable-postings", Detail: fmt.Sprintf("record tables unreadable: %v", dvErr)})
+	default:
 		f, ferr := os.Open(recordsPath(dir))
-		if ferr == nil {
-			defer func() { _ = f.Close() }()
-			for _, tok := range sampleTokens(catalog, deepPostingSample) {
-				posts, perr := postingsFor(dir, "t"+tok)
-				if perr != nil || len(posts) == 0 {
-					continue
-				}
-				report.SampledPostings++
-				if _, rerr := readRecordAt(f, posts[0].Off, dvTables); rerr != nil {
-					report.Findings = append(report.Findings, DeepFinding{Kind: "dead-posting", Detail: fmt.Sprintf("token %q points at unreadable record offset %d", tok, posts[0].Off)})
-				}
+		if ferr != nil {
+			report.Findings = append(report.Findings, DeepFinding{Kind: "unreadable-postings", Detail: fmt.Sprintf("records unreadable: %v", ferr)})
+			break
+		}
+		defer func() { _ = f.Close() }()
+		for _, tok := range sampleTokens(catalog, deepPostingSample) {
+			posts, perr := postingsFor(dir, "t"+tok)
+			if perr != nil {
+				report.Findings = append(report.Findings, DeepFinding{Kind: "unreadable-postings", Detail: fmt.Sprintf("token %q: postings unreadable: %v", tok, perr)})
+				continue
+			}
+			if len(posts) == 0 {
+				continue
+			}
+			report.SampledPostings++
+			if _, rerr := readRecordAt(f, posts[0].Off, dvTables); rerr != nil {
+				report.Findings = append(report.Findings, DeepFinding{Kind: "dead-posting", Detail: fmt.Sprintf("token %q points at unreadable record offset %d", tok, posts[0].Off)})
 			}
 		}
 	}
