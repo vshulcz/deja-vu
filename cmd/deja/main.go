@@ -1759,7 +1759,7 @@ func printSources(dir string) {
 		if excluded > 0 {
 			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 		}
-		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, len(ss), msg, humanBytes(size), redacted, note)
+		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
 	aiderFiles := sources.AiderFiles()
 	var aiderSize int64
@@ -1787,7 +1787,7 @@ func printSources(dir string) {
 	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
 		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 	}
-	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, len(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
