@@ -934,14 +934,22 @@ func metaForSession(s model.Session) SessionMeta {
 	agentTitle := s.AgentTitle
 	if title == "" {
 		// A session with no user turn borrows the assistant's opening line
-		// (#692); the listing needs to say so rather than print it where the
-		// reader's own question goes (#1100).
+		// (#692), and one that is only tool output is named after its first
+		// output; the listing needs to say so rather than print it where the
+		// reader's own question goes (#1100). sessionTitleFrom carries the
+		// right fromAgent bit — a computed one calls tool-only sessions
+		// agent-titled.
 		title, agentTitle = sessionTitleFrom(s)
+		// Redact before the cut: slicing a secret in half leaves a prefix no
+		// pattern matches, and it survives into sessions.gob (G/#…).
+		title, _ = redact.Text(title)
+		title = truncateTitle(title, 60)
+	} else {
+		// Titles come from unredacted places — an agent-generated summary, a
+		// composer name, the first user message — and are persisted in
+		// sessions.gob, so they need the same scrubbing as record text.
+		title, _ = redact.Text(title)
 	}
-	// Titles come from unredacted places — an agent-generated summary, a
-	// composer name, the first user message — and are persisted in
-	// sessions.gob, so they need the same scrubbing as record text.
-	title, _ = redact.Text(title)
 	// The import fields travel with the session, not with the transcript: a
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
@@ -1183,6 +1191,15 @@ func pluralS(n int) string {
 	return "s"
 }
 
+// derivedTitle is the title read out of the transcript, redacted and then cut.
+// The order matters: cutting first slices a secret in half, and half a pattern
+// matches nothing, so the plaintext prefix survives into sessions.gob and onto
+// every page that prints a title. The import path already redacts first.
+func derivedTitle(s model.Session) string {
+	t, _ := redact.Text(sessionTitle(s))
+	return truncateTitle(t, 60)
+}
+
 func sessionTitle(s model.Session) string {
 	t, _ := sessionTitleFrom(s)
 	return t
@@ -1245,7 +1262,7 @@ func earliestTitle(ms []model.Message, role string) string {
 		case !msg.Time.Before(bestAt):
 			continue
 		}
-		best, bestAt = truncateTitle(t, 60), msg.Time
+		best, bestAt = t, msg.Time
 	}
 	return best
 }
@@ -1771,7 +1788,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				meta.Path = s.Path
 			}
 			if meta.Title == "" {
+				// The incremental fallback redacted nothing at all before; keep
+				// sessionTitleFrom's correct fromAgent bit and redact before the
+				// cut, as the full rebuild does.
 				meta.Title, meta.AgentTitle = sessionTitleFrom(s)
+				meta.Title, _ = redact.Text(meta.Title)
+				meta.Title = truncateTitle(meta.Title, 60)
 			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
