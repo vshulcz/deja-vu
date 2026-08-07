@@ -108,6 +108,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 		return hits[i].ID < hits[j].ID
 	})
+	// The cap is a read budget, not a fact about the store. Every count this
+	// command prints is taken over the sessions it got to, so on a store where
+	// 301 sessions said the word the answer read "250 sessions mention
+	// "beacon"" — a number the reader has no way to tell from the real one.
+	matched := len(hits)
 	if len(hits) > filesMaxSessions {
 		hits = hits[:filesMaxSessions]
 	}
@@ -188,11 +193,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// "Recorded nothing" and "recorded files this build will not show" are
 		// different answers, and only the first is a fact about the past.
 		if filtered > 0 {
-			fmt.Fprintf(stdout, "%d session%s mention%s %q; %d recorded file%s %s not under a repository on this disk — moved, archived, or an unmounted volume\n",
-				scanned, plural(scanned), verbS(scanned), q, filtered, plural(filtered), verbIs(filtered))
+			fmt.Fprintf(stdout, "%d session%s mention%s %q%s; %d recorded file%s %s not under a repository on this disk — moved, archived, or an unmounted volume\n",
+				scanned, plural(scanned), verbS(scanned), q, filesReadNote(matched), filtered, plural(filtered), verbIs(filtered))
 			return nil
 		}
-		fmt.Fprintf(stdout, "%d session%s mention%s %q, none of them recorded a file near it\n", scanned, plural(scanned), verbS(scanned), q)
+		fmt.Fprintf(stdout, "%d session%s mention%s %q%s, none of them recorded a file near it\n", scanned, plural(scanned), verbS(scanned), q, filesReadNote(matched))
 		return nil
 	}
 
@@ -226,11 +231,20 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	if len(rows) > limit {
 		rows = rows[:limit]
 	}
-	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s\n", q, scanned, plural(scanned))
+	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s%s\n", q, scanned, plural(scanned), filesReadNote(matched))
 	for _, r := range rows {
 		fmt.Fprintf(stdout, "  %-56s %d\n", trimPath(r.path), r.n)
 	}
 	return nil
+}
+
+// filesReadNote names the read budget when it bit, so the session counts above
+// it read as "what deja got to" rather than as the size of the match.
+func filesReadNote(matched int) string {
+	if matched <= filesMaxSessions {
+		return ""
+	}
+	return fmt.Sprintf(" (of %d matching sessions, the %d most recent were read)", matched, filesMaxSessions)
 }
 
 // meaningful drops tool output, which carries no subject of its own and would
