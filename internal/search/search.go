@@ -956,17 +956,19 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 }
 
 func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok, matched bool)) int {
-	written := 0
+	// A digest is what someone pipes into a prompt, so it carries the
+	// conversation. The work records — tool output, the files a turn touched, the
+	// commands it ran, the spans it replaced — are indexed and searchable by role
+	// and are not what anyone means by context; before they were labelled
+	// honestly (#560) they arrived as `user` and filled this with `## tool-output`
+	// blocks. Collect the kept turns in one ordered pass so the include callback's
+	// prevKept bookkeeping still runs left to right.
+	type chunk struct {
+		text    string
+		matched bool
+	}
+	var chunks []chunk
 	for _, m := range s.Messages {
-		if written >= budget {
-			break
-		}
-		// A digest is what someone pipes into a prompt, so it carries the
-		// conversation. The work records — tool output, the files a turn
-		// touched, the commands it ran, the spans it replaced — are indexed and
-		// searchable by role, and they are not what anyone means by context.
-		// Before they were labelled honestly (#560) they arrived as `user` and
-		// filled this with `## tool-output` blocks.
 		if isWorkRecord(m.Role) {
 			continue
 		}
@@ -978,16 +980,42 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		chunk := fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text)
-		if written+len(chunk) > budget {
+		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text), matched})
+	}
+	if len(chunks) == 0 {
+		return 0
+	}
+	// Anchor the budget window on the first matched turn (with one turn of
+	// lead-in, usually the question when the answer is what matched). Walking from
+	// the top instead let earlier scaffolding crowd the match out of budget: a
+	// query whose answer sat deep in a long session got 8KB of unrelated opening
+	// and none of the turns it found (#R8-budget). No match means the fallback
+	// overview, which wants the session's start, so it stays anchored at 0.
+	start := 0
+	for i, c := range chunks {
+		if c.matched {
+			start = i
+			if start > 0 {
+				start--
+			}
+			break
+		}
+	}
+	written := 0
+	for _, c := range chunks[start:] {
+		if written >= budget {
+			break
+		}
+		text := c.text
+		if written+len(text) > budget {
 			cut := max(0, budget-written)
-			for cut > 0 && !utf8.RuneStart(chunk[cut]) {
+			for cut > 0 && !utf8.RuneStart(text[cut]) {
 				cut--
 			}
-			chunk = chunk[:cut]
+			text = text[:cut]
 		}
-		fmt.Fprint(w, chunk)
-		written += len(chunk)
+		fmt.Fprint(w, text)
+		written += len(text)
 	}
 	return written
 }
