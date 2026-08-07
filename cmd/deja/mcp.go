@@ -424,9 +424,7 @@ func attachAnswers(dir string, hits []search.Hit) {
 // Newlines are collapsed on top of SafeText because every line here is one
 // row of a numbered list: a project name or an answer spanning two lines
 // forges a second result, which is the shape #1080 fixed on the sync path.
-func recallListingLine(s string) string {
-	return strings.Join(strings.Fields(search.SafeText(s)), " ")
-}
+func recallListingLine(s string) string { return search.SafeLine(s) }
 
 func recallText(dir, q, harness string, limit, budget int) (string, error) {
 	text, _, _, _, err := recallTextResult(dir, q, harness, limit, 0, budget)

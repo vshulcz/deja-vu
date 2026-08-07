@@ -284,9 +284,7 @@ func noiseMessage(s string) bool {
 // went through SafeText: a zero-width space in a recalled reply reached the
 // hook context intact, and a project name is markdown a session never wrote.
 // Confining each field to one line stops it forging a row of its own.
-func digestLine(s string) string {
-	return strings.Join(strings.Fields(SafeText(s)), " ")
-}
+func digestLine(s string) string { return SafeLine(s) }
 
 func firstLine(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")

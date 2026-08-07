@@ -1284,6 +1284,14 @@ func SafeText(s string) string {
 	}, s)
 }
 
+// SafeLine is SafeText confined to a single line, for the places that print
+// an untrusted string as one row of something structured — a listing entry, a
+// digest row, a "saved <path>" confirmation. A newline there ends deja's own
+// line and starts a line of the caller's, which reads as deja's own output.
+func SafeLine(s string) string {
+	return strings.Join(strings.Fields(SafeText(s)), " ")
+}
+
 func unsafeForTerminal(r rune) bool {
 	if r == '\n' || r == '\t' {
 		return false

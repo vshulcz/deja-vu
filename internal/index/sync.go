@@ -17,6 +17,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -299,7 +300,7 @@ func Import(dir, inDir string) (int, error) {
 	fi, err := os.Stat(inDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 0, fmt.Errorf("no such directory: %s", inDir)
+			return 0, fmt.Errorf("no such directory: %s", search.SafeLine(inDir))
 		}
 		return 0, err
 	}
