@@ -254,7 +254,7 @@ func runHookContext(dir string, plain bool) error {
 			// The environment block is not the project's memory, and while a
 			// build runs it is all there is: without this the whole rebuild
 			// passed in silence on any machine with facts to report (#927).
-			resp.SystemMessage = joinNotes(rewireNote(rewired), buildNotice(dir))
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir)))
 			if b, err := json.Marshal(resp); err == nil {
 				fmt.Fprintln(os.Stdout, string(b))
 			}
@@ -284,7 +284,7 @@ func runHookContext(dir string, plain bool) error {
 			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
 				line = joinNotes(note, line)
 			}
-			line = joinNotes(rewireNote(rewired), line)
+			line = joinNotes(rewireNote(rewired), joinNotes(withheldEverythingNote(dir, withheld), line))
 			if line != "" {
 				var resp sessionStartHookResponse
 				resp.HookSpecificOutput.HookEventName = "SessionStart"
@@ -417,13 +417,35 @@ func unreadableStoreNote(dir string) string {
 // storeNoteIsNews keeps the line above from becoming wallpaper: it is repeated
 // only when the count changes, or once a day while it stands.
 func storeNoteIsNews(dir, note string) bool {
+	return noteIsNews(dir+".storenote", note)
+}
+
+// withheldEverythingNote is what session start says when the trust policy hid
+// every session this project had. The receipt reports a rule that withheld
+// something only on the path where memory also landed; when the rule hid all
+// of it the hook went out silent, which reads exactly like a project with no
+// history — and the one state where the fix is a config line the user owns.
+func withheldEverythingNote(dir string, withheld int) string {
+	if withheld == 0 {
+		return ""
+	}
+	note := fmt.Sprintf("deja: recalled nothing here — the trust policy (%s) withheld %s from this project; `deja doctor` shows the rule",
+		policy.Load().Describe(policy.ActivationAuto), doctorCount(withheld, "session"))
+	if !noteIsNews(dir+".policynote", note) {
+		return ""
+	}
+	return note
+}
+
+// noteIsNews reports whether a line is worth repeating: only when its text
+// changes, or once a day while it stands.
+func noteIsNews(p, note string) bool {
 	if note == "" {
 		return false
 	}
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(note))
 	sum := fmt.Sprintf("%x", h.Sum64())
-	p := dir + ".storenote"
 	if b, err := os.ReadFile(p); err == nil {
 		parts := strings.Fields(string(b))
 		if len(parts) == 2 && parts[0] == sum {
@@ -691,7 +713,9 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 	}
 	mark("load-sessions")
 	if len(ss) == 0 {
-		return "", 0, 0, nil, 0
+		// withheld travels even with nothing to show: it is the only thing
+		// that separates "the rule hid all of it" from "no history here".
+		return "", 0, 0, nil, withheld
 	}
 	scores, matched := taskScores(ss, taskFiles)
 	sort.Slice(ss, func(i, j int) bool {
