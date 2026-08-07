@@ -271,6 +271,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, mcpProgress()); err != nil {
 			return "", err
 		}
+		// The journal is where the user sees what the agent did with their
+		// store; a write belongs there at least as much as a read.
+		usage.RecordResult(dir, usage.KindRemember, len(a.Text), 1, false)
 		return fmt.Sprintf("Remembered under %s.", strings.TrimSpace(a.Project)), nil
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)

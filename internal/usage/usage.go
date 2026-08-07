@@ -31,6 +31,10 @@ const (
 	// same way blame did before #682.
 	KindResource = "resource"
 	KindHandoff  = "handoff"
+	// KindRemember is the MCP remember tool — the one tool that writes to the
+	// store. #682 covered the read tools only, so an agent could add a note
+	// that showed up nowhere in the journal the user reads.
+	KindRemember = "remember"
 	// KindDejaVu marks a per-prompt recall: the user asked something their
 	// own history already answers — the product's namesake moment.
 	KindDejaVu = "dejavu"
