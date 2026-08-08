@@ -138,3 +138,42 @@ func TestFilesDistinguishesFilteredFromAbsent(t *testing.T) {
 		t.Fatalf("the empty case lost its wording:\n%s", out.String())
 	}
 }
+
+// `files` lists the paths a session opened, so a trust rule that withholds a
+// peer's content must hold here too — it read imported file paths aloud while
+// search, blame and restore all refused (#1026).
+func TestFilesCommandHonoursTrustPolicy(t *testing.T) {
+	repo := writeFilesFixture(t) // a local session touching retry.go under repo
+	cfg := filepath.Join(filepath.Dir(filepath.Dir(repo)), "config")
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	// A peer's session opened a file under the same repo, arriving by sync.
+	tmp := filepath.Dir(repo)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	peer := `{"harness":"claude","session_id":"peer","project":"svc","role":"user","text":"the frobnicator retry loop, peer take","time":"2026-03-01T10:00:00Z"}` + "\n" +
+		`{"harness":"claude","session_id":"peer","project":"svc","role":"files","text":"` + filepath.Join(repo, "peer_secret.go") + `","time":"2026-03-01T10:00:30Z"}` + "\n"
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), []byte(peer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	writePolicy(t, `{"activations":{"search":{"imported":true}}}`)
+	if out, _ := captureRun(t, "files", "frobnicator", "retry"); !strings.Contains(out, "peer_secret.go") {
+		t.Fatalf("imported file did not surface under an allowing rule:\n%s", out)
+	}
+	writePolicy(t, `{"activations":{"search":{"imported":false}}}`)
+	out, _ := captureRun(t, "files", "frobnicator", "retry")
+	if strings.Contains(out, "peer_secret.go") {
+		t.Errorf("files leaked a peer's file path under deny-imported:\n%s", out)
+	}
+	if !strings.Contains(out, "retry.go") {
+		t.Errorf("files over-blocked the local session under deny-imported:\n%s", out)
+	}
+}

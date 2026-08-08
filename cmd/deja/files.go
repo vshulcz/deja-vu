@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -77,6 +78,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
+	// index.Search does not gate; the cmd layer does. Without this, `files`
+	// listed a peer's file paths under a rule that withholds imported content —
+	// browsing is the search activation, as it is for search, last and blame
+	// (#1026).
+	hits, _ = policyFilterSessionsCounted(policy.ActivationSearch, hits)
 	if len(hits) == 0 {
 		// A filter the caller set is not the topic's fault: three sessions can
 		// mention it and still be absent because they are in another project
