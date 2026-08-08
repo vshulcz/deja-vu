@@ -42,6 +42,12 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if !ok {
 		return fmt.Errorf("no session matches %q", prefix)
 	}
+	// Naming an exact id is still browsing under the search activation, so a
+	// session a trust rule withholds must not be reopenable here any more than
+	// through show, share, promote or handoff (#1026).
+	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
+		return err
+	}
 	dir, cmdline, err := resumeCommand(s)
 	if err != nil {
 		return err
