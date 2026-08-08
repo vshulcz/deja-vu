@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.9] - 2026-08-09
+
+Another audit pass, weighted toward two failures that lose data rather than
+just misreport it. A named pipe or socket sitting in a scanned session store
+froze `deja index` for good — the parser's Open blocks on a pipe with no writer
+and never returns. And `import` on a machine that had never indexed recorded
+every local transcript as already seen while ingesting none, so the reader's
+own history stayed invisible until a full rebuild.
+
+### Fixed
+- `index` skips FIFOs, sockets and other non-regular files across every discovery path instead of blocking forever on the first one it meets. (#1128)
+- `import` before the first `index` no longer hides local sessions: the initial manifest starts with an empty file set, so the next index ingests them next to the imported records. (#1128)
+- The semantic search tier is scoped by the trust policy like the lexical tier already was — an imported peer's withheld content no longer surfaces through the embedding fallback in `search`, MCP `recall` or `recall_context`. (#1128)
+- claude timestamps parse a stringified or fractional epoch and a zone-less or seconds-less RFC3339 instead of losing the turn's date and sorting it as "-". (#1128)
+- An identical re-promote no longer grows the note or lifts its recall weight; `promote` and `remember` say when the note they wrote is still tombstoned; the shared-id hint names `harness:id` instead of a `--harness` flag those commands reject; `search` honours `--` as end-of-options and says when results were capped; MCP `remember` accepts tags. (#1128)
+
 ## [0.16.8] - 2026-08-07
 
 A long audit pass. Most of it was one recurring shape: a surface that knew a
