@@ -114,25 +114,23 @@ func claudeTime(raw json.RawMessage) time.Time {
 	if len(raw) == 0 || string(raw) == "null" {
 		return time.Time{}
 	}
+	// Both shapes go through parseTimeAny so the claude fast path reads the
+	// same timestamp variants every other parser does: a stringified or
+	// fractional epoch, or an RFC3339 that dropped its zone or seconds. It used
+	// to accept only RFC3339 strings and whole-number epochs, so those turns
+	// lost their date to the zero time and sorted as "-".
 	if raw[0] == '"' {
 		var s string
 		if json.Unmarshal(raw, &s) != nil {
 			return time.Time{}
 		}
-		if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-			return t
-		}
-		return time.Time{}
+		return parseTimeAny(s)
 	}
 	var n json.Number
 	if json.Unmarshal(raw, &n) != nil {
 		return time.Time{}
 	}
-	i, err := n.Int64()
-	if err != nil {
-		return time.Time{}
-	}
-	return unixGuess(i)
+	return parseTimeAny(n)
 }
 
 // claudeText joins the text a message carries. Items that are not objects, or

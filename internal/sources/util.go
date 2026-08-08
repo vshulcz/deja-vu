@@ -31,11 +31,25 @@ func EnvPath(k, def string) string {
 func parseTimeAny(v any) time.Time {
 	switch x := v.(type) {
 	case string:
-		if t, err := time.Parse(time.RFC3339Nano, x); err == nil {
-			return t
+		// The field is always a timestamp, so try the layouts a store might
+		// have written it in before giving up. RFC3339 is the common one; the
+		// rest drop a piece it treats as optional — a missing zone, missing
+		// seconds, a space where the T should be — each of which used to lose
+		// the whole date to the zero time.
+		for _, layout := range []string{
+			time.RFC3339Nano,
+			"2006-01-02T15:04:05",
+			"2006-01-02T15:04Z07:00",
+			"2006-01-02T15:04",
+			"2006-01-02 15:04:05Z07:00",
+			"2006-01-02 15:04:05",
+		} {
+			if t, err := time.Parse(layout, x); err == nil {
+				return t
+			}
 		}
-		// Some stores stringify the epoch ("1777629600", fractional or not).
-		// The field is always a timestamp, so a bare number in it is an epoch.
+		// Some stores stringify the epoch ("1777629600", fractional or not),
+		// a bare number in a field that is always a timestamp.
 		if f, err := strconv.ParseFloat(x, 64); err == nil {
 			return unixGuess(int64(f))
 		}
