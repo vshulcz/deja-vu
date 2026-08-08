@@ -2,13 +2,15 @@ package main
 
 import (
 	"bytes"
-
+	"encoding/json"
 	"fmt"
-	"github.com/vshulcz/deja-vu/internal/index"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // writeFilesFixture lays down a claude session that discusses one subject and
@@ -155,9 +157,21 @@ func TestFilesCommandHonoursTrustPolicy(t *testing.T) {
 	if err := os.MkdirAll(exp, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	peer := `{"harness":"claude","session_id":"peer","project":"svc","role":"user","text":"the frobnicator retry loop, peer take","time":"2026-03-01T10:00:00Z"}` + "\n" +
-		`{"harness":"claude","session_id":"peer","project":"svc","role":"files","text":"` + filepath.Join(repo, "peer_secret.go") + `","time":"2026-03-01T10:00:30Z"}` + "\n"
-	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), []byte(peer), 0o644); err != nil {
+	// Build the records with json.Marshal so the file path — which carries
+	// backslashes on Windows — is escaped, not hand-spliced into a raw string.
+	at := time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)
+	var peer []byte
+	for _, r := range []index.SyncRecord{
+		{Harness: "claude", SessionID: "peer", Project: "svc", Role: "user", Text: "the frobnicator retry loop, peer take", Time: at},
+		{Harness: "claude", SessionID: "peer", Project: "svc", Role: "files", Text: filepath.Join(repo, "peer_secret.go"), Time: at.Add(30 * time.Second)},
+	} {
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		peer = append(peer, append(b, '\n')...)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), peer, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := captureRun(t, "sync", "import", exp); err != nil {
