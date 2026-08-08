@@ -95,7 +95,7 @@ func TestReadmeSidecarSizeMatchesWhatEmbedWrites(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if _, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "test", HTTP: ts.Client()}); err != nil {
+	if _, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "test", HTTP: ts.Client()}, nil); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(Path(dir))

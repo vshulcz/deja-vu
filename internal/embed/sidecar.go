@@ -32,10 +32,23 @@ func Path(dir string) string {
 	return strings.TrimSuffix(dir, string(os.PathSeparator)) + ".vectors.bin"
 }
 
-func EmbedIndex(dir string, client *Client) (Sidecar, error) {
+// EmbedIndex embeds the index's records through client and writes the sidecar.
+// keep decides which records are sent: it is how the caller keeps content the
+// trust policy withholds off the wire to an external endpoint. A nil keep
+// embeds every record.
+func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidecar, error) {
 	recs, err := index.ReadRecords(dir)
 	if err != nil {
 		return Sidecar{}, fmt.Errorf("read index records: %w", err)
+	}
+	if keep != nil {
+		kept := recs[:0:0]
+		for _, r := range recs {
+			if keep(r.Record) {
+				kept = append(kept, r)
+			}
+		}
+		recs = kept
 	}
 	gen, err := index.Generation(dir)
 	if err != nil {

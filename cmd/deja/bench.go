@@ -73,7 +73,7 @@ func runBenchRecall(jsonOutput bool, seed int64) error {
 	}
 	report := benchReport{CorpusHash: corpus.Hash, Sessions: len(corpus.Sessions), Queries: len(corpus.Queries), Lexical: lexical, HybridStatus: "endpoint unavailable, skipped"}
 	if client, probeErr := embed.New(); probeErr == nil {
-		if _, embedErr := embed.EmbedIndex(indexDir, client); embedErr == nil {
+		if _, embedErr := embed.EmbedIndex(indexDir, client, nil); embedErr == nil {
 			var hybrid benchMetric
 			hybrid, err = measureRecall(indexDir, corpus.Queries, client)
 			if err != nil {

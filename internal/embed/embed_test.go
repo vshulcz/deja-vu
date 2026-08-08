@@ -186,22 +186,22 @@ func TestEmbedIndexRoundTripAndWatermark(t *testing.T) {
 		}
 	}))
 	defer ts.Close()
-	s, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "m"})
+	s, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "m"}, nil)
 	if err != nil || calls != 1 || s.Covered != 1 || len(s.Vectors) != 1 {
 		t.Fatalf("first embed sidecar=%+v calls=%d err=%v", s, calls, err)
 	}
-	if _, err = EmbedIndex(dir, &Client{URL: ts.URL, Model: "m"}); err != nil || calls != 1 {
+	if _, err = EmbedIndex(dir, &Client{URL: ts.URL, Model: "m"}, nil); err != nil || calls != 1 {
 		t.Fatalf("watermark did not reuse vector calls=%d err=%v", calls, err)
 	}
 	if err := write(dir, Sidecar{Model: "m", Generation: s.Generation, Dim: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "m"}); err == nil || !strings.Contains(err.Error(), "dimension changed") {
+	if _, err := EmbedIndex(dir, &Client{URL: ts.URL, Model: "m"}, nil); err == nil || !strings.Contains(err.Error(), "dimension changed") {
 		t.Fatalf("dimension change err=%v", err)
 	}
 	bad := httptest.NewServer(http.NotFoundHandler())
 	defer bad.Close()
-	if _, err := EmbedIndex(dir, &Client{URL: bad.URL, Model: "other"}); err == nil {
+	if _, err := EmbedIndex(dir, &Client{URL: bad.URL, Model: "other"}, nil); err == nil {
 		t.Fatal("embedding endpoint error was ignored")
 	}
 	if err := write(filepath.Join(tmp, "no", "missing"), Sidecar{}); err == nil {
