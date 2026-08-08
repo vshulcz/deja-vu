@@ -61,3 +61,17 @@ func TestParseSearchTrimsSurroundingSpace(t *testing.T) {
 		t.Errorf("space-only query should be rejected")
 	}
 }
+
+func TestParseSearchDashDashEndsOptions(t *testing.T) {
+	// `--` stops flag parsing so a query can be the literal text of a flag.
+	// Before, --json after it still turned on JSON mode and "--" was left in
+	// the query, so flag-colliding text was unsearchable.
+	o, err := parseSearch([]string{"--", "--json"})
+	if err != nil || o.Query != "--json" || o.JSON {
+		t.Fatalf("parseSearch(-- --json): query=%q json=%v err=%v", o.Query, o.JSON, err)
+	}
+	o, err = parseSearch([]string{"pool", "--", "--limit", "5"})
+	if err != nil || o.Query != "pool --limit 5" || o.Limit != 0 {
+		t.Fatalf("parseSearch(pool -- --limit 5): query=%q limit=%d err=%v", o.Query, o.Limit, err)
+	}
+}
