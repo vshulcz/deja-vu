@@ -1494,6 +1494,14 @@ func parseSearch(args []string) (search.Options, error) {
 	args = splitEqualsForms(args)
 	for i := 0; i < len(args); i++ {
 		a := args[i]
+		if a == "--" {
+			// End of options: the rest is the query verbatim, even a word that
+			// spells a flag. Without this there is no way to search for the
+			// literal text of a flag name — `deja -- --json` kept parsing
+			// --json as the flag and left "--" stranded in the query.
+			q = append(q, args[i+1:]...)
+			break
+		}
 		switch a {
 		case "--json":
 			o.JSON = true
