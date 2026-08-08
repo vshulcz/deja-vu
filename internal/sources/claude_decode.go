@@ -252,6 +252,12 @@ func claudeContentText(raw json.RawMessage) string {
 }
 
 func trimJSONSpace(b []byte) []byte {
+	// A UTF-8 BOM on the first line of a transcript makes its JSON invalid, so
+	// the opening turn — usually the session's own question — was dropped while
+	// the rest of the session indexed (some Windows editors write the mark).
+	if len(b) >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
+		b = b[3:]
+	}
 	for len(b) > 0 && (b[0] == ' ' || b[0] == '\t' || b[0] == '\n' || b[0] == '\r') {
 		b = b[1:]
 	}

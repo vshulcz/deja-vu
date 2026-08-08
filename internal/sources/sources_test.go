@@ -25,6 +25,30 @@ func TestParseClaudeFile(t *testing.T) {
 	}
 }
 
+// A UTF-8 BOM on the first line of a transcript made its JSON invalid, so the
+// opening turn was dropped while the rest of the session indexed. Some Windows
+// editors write the mark; deja strips it.
+func TestParseSkipsAUTF8BOMOnTheFirstLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bom.jsonl")
+	body := []byte("\xef\xbb\xbf" +
+		`{"type":"user","sessionId":"bom","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"the very first turn"}}` + "\n" +
+		`{"type":"assistant","sessionId":"bom","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"the reply"}}` + "\n")
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseClaudeFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || len(ss[0].Messages) != 2 {
+		t.Fatalf("BOM dropped a turn: %#v", ss)
+	}
+	if ss[0].Messages[0].Text != "the very first turn" {
+		t.Fatalf("first turn = %q, want the BOM-prefixed opening turn", ss[0].Messages[0].Text)
+	}
+}
+
 func TestLoadersOffsetsAndUtilityVariants(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")

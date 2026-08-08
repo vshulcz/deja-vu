@@ -172,13 +172,16 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 	r := bufio.NewReaderSize(f, 1024*1024)
 	for {
 		line, err := r.ReadBytes('\n')
-		if len(line) > 0 {
+		// A UTF-8 BOM on the first line would fail the JSON decode below, so the
+		// opening turn was dropped; trimJSONSpace strips it (and surrounding
+		// space) the way the claude decode path already does.
+		if line = trimJSONSpace(line); len(line) > 0 {
 			var m map[string]any
 			d := json.NewDecoder(strings.NewReader(string(line)))
 			d.UseNumber()
 			if d.Decode(&m) == nil {
 				fn(m)
-			} else if len(strings.TrimSpace(string(line))) > 0 {
+			} else {
 				diagMalformedLine(path)
 			}
 		}
