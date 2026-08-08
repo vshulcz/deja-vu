@@ -13,7 +13,7 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 	internal := map[string]bool{
 		"hook-context": true, "hook-prompt": true, "hook-precompact": true,
 		"hook-antigravity": true, "hook-goose": true, "hook-refresh": true,
-		"warmup-status": true, "mcp": true,
+		"hook-plan": true, "warmup-status": true, "mcp": true,
 	}
 	shells := map[string]string{
 		"bash": bashCompletion,

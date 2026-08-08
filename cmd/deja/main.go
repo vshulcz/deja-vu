@@ -146,6 +146,12 @@ var commands = map[string]command{
 	"hook-antigravity": func(dir string, _ []string) error {
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},
+	"hook-plan": func(dir string, _ []string) error {
+		return runHookPlan(dir, os.Stdin, os.Stdout)
+	},
+	"check": func(dir string, rest []string) error {
+		return runCheck(dir, rest, os.Stdin, os.Stdout)
+	},
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
@@ -2309,6 +2315,8 @@ Usage:
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
+  deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
+  deja check -       (read a plan from stdin and print factual co-occurrences)
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
