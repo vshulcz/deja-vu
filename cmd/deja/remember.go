@@ -49,11 +49,20 @@ func runRemember(dir string, args []string) error {
 		}
 		project = sources.ClaudeProjectName(cwd)
 	}
-	if err := sources.AppendNoteTagged(project, text, tags, time.Now()); err != nil {
+	now := time.Now()
+	if err := sources.AppendNoteTagged(project, text, tags, now); err != nil {
 		return notesWriteError(err)
 	}
 	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		return err
+	}
+	// A day-note the reader forgot keeps its tombstone until unforget, so a
+	// later `remember` on the same day and project writes into a note that
+	// stays hidden — the silent success promote used to report on the same
+	// path. Name the restore command rather than lose the line quietly.
+	dayNote := "deja-" + now.Local().Format("2006-01-02") + "-" + strings.TrimSpace(project)
+	if index.Tombstoned("deja:" + dayNote) {
+		fmt.Fprintf(os.Stderr, "deja: it is written but stays hidden — %s was forgotten, and its tombstone lifts only through `deja forget --unforget deja:%s`\n", dayNote, dayNote)
 	}
 	suffix := ""
 	if norm := sources.NormalizeTags(tags); len(norm) > 0 {
