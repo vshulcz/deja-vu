@@ -74,6 +74,57 @@ func TestStatuslineMemoryNamesTheFileAndTheEarlierSession(t *testing.T) {
 	}
 }
 
+// The status line names an earlier session by title, so a trust rule that
+// withholds a peer's content must hold here too — it was the one surface an
+// imported session's title showed through while search, blame and restore all
+// refused (#1026).
+func TestStatuslineMemoryHonoursTrustPolicy(t *testing.T) {
+	tmp := hermeticEnv(t)
+	cfg := filepath.Join(tmp, "config")
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	root := filepath.Join(tmp, "claude", "proj-w")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The current, local session edits /w/pkg/cache.go.
+	cur := filepath.Join(root, "cur.jsonl")
+	body := `{"type":"user","sessionId":"cur","cwd":"/w","timestamp":"2026-05-02T10:00:00Z","message":{"role":"user","content":"cache work"}}` + "\n" +
+		`{"type":"assistant","sessionId":"cur","cwd":"/w","timestamp":"2026-05-02T10:00:05Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/pkg/cache.go","old_string":"x"}}]}}` + "\n"
+	if err := os.WriteFile(cur, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	// A peer's session touched the same absolute path, arriving by sync.
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	peer := `{"harness":"claude","session_id":"peer","project":"svc","role":"user","text":"IMPORTEDFILE a peer's cache fix"}` + "\n" +
+		`{"harness":"claude","session_id":"peer","project":"svc","role":"files","text":"/w/pkg/cache.go"}` + "\n"
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), []byte(peer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	in := transcriptSource{TranscriptPath: cur}
+
+	// Allowed: the peer's session is the earlier one the bar names.
+	writePolicy(t, `{"activations":{"search":{"imported":true}}}`)
+	if m, ok := statuslineMemory(dir, in); !ok || !strings.Contains(m.Title, "IMPORTEDFILE") {
+		t.Fatalf("imported file-memory did not surface under an allowing rule: ok=%v title=%q", ok, m.Title)
+	}
+	// Denied: no other session is allowed, so the bar stays silent rather than
+	// naming the peer.
+	writePolicy(t, `{"activations":{"search":{"imported":false}}}`)
+	if m, ok := statuslineMemory(dir, in); ok {
+		t.Errorf("status line leaked an imported session's title under deny-imported: %q", m.Title)
+	}
+}
+
 // newestOtherUpdated is the newest Updated among sessions that are not id.
 func newestOtherUpdated(t *testing.T, dir, id string) time.Time {
 	t.Helper()

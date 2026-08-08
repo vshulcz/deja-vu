@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -117,8 +118,21 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 	// written from scratch, which by definition no earlier session touched;
 	// stopping there was silent for 41 of 676 sessions on a real store that
 	// had memory to report one entry down.
+	// The bar names an earlier session by title, so a trust rule that withholds
+	// a peer's content has to hold here too — otherwise the status line was the
+	// one place an imported session's title showed through while search, blame
+	// and restore all refused (#1026). The bar is a browsing surface the reader
+	// watches, so it gates on the search activation like those do.
+	pol := policy.Load()
 	for _, here := range self.Touched {
 		others := sessionsTouching(metas, here, self)
+		kept := others[:0]
+		for _, m := range others {
+			if pol.Allows(policy.ActivationSearch, m.Project) {
+				kept = append(kept, m)
+			}
+		}
+		others = kept
 		if len(others) == 0 {
 			continue
 		}
