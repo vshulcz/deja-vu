@@ -207,7 +207,12 @@ func walkFiles(root string, pred func(string) bool) []string {
 			}
 			return nil
 		}
-		if d.Type()&os.ModeSymlink == 0 && !d.IsDir() && pred(p) {
+		// Only regular files. A FIFO or socket that matched the session glob
+		// hung the whole index: the parser's Open blocks on a named pipe with
+		// no writer and never returns, so one such file in a scanned store
+		// froze indexing for good. IsRegular already excludes symlinks and
+		// directories, so it subsumes the checks it replaces.
+		if d.Type().IsRegular() && pred(p) {
 			out = append(out, p)
 		}
 		return nil
