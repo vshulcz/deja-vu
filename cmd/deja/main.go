@@ -873,6 +873,13 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 			printNoMatches(os.Stderr, dir, o.Query)
 		}
 	}
+	if o.Capped && len(hits) > 0 {
+		// The cap is silent everywhere else: 15 results look like the whole
+		// answer, and nothing says another N are waiting behind --all. deja
+		// narrates every other place the ladder hides a session, so it says
+		// this one too.
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
+	}
 	search.Print(os.Stdout, hits, o)
 	return nil
 }
