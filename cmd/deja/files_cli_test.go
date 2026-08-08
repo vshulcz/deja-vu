@@ -191,3 +191,48 @@ func TestFilesCommandHonoursTrustPolicy(t *testing.T) {
 		t.Errorf("files over-blocked the local session under deny-imported:\n%s", out)
 	}
 }
+
+// When the only session that mentions the topic is one a rule withholds,
+// `files` used to say "no sessions mention it" — looked-and-absent, when the
+// truth is the rule hid it. search and last already name the rule (#686, #680).
+func TestFilesCommandNamesTheTrustPolicyOnAnEmptyResult(t *testing.T) {
+	tmp := hermeticEnv(t)
+	cfg := filepath.Join(tmp, "config")
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	repo := filepath.Join(tmp, "repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The only match is an imported session; no local session mentions it.
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)
+	var batch []byte
+	for _, r := range []index.SyncRecord{
+		{Harness: "claude", SessionID: "peer", Project: "svc", Role: "user", Text: "the frobnicator retry loop", Time: at},
+		{Harness: "claude", SessionID: "peer", Project: "svc", Role: "files", Text: filepath.Join(repo, "retry.go"), Time: at.Add(30 * time.Second)},
+	} {
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch = append(batch, append(b, '\n')...)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), batch, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	writePolicy(t, `{"activations":{"search":{"imported":false}}}`)
+	out, _ := captureRun(t, "files", "frobnicator", "retry")
+	if !strings.Contains(out, "trust policy") {
+		t.Errorf("files did not name the rule that emptied the result:\n%s", out)
+	}
+	if strings.Contains(out, "no sessions mention") {
+		t.Errorf("files still reads as looked-and-absent when a rule hid the match:\n%s", out)
+	}
+}

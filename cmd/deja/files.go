@@ -82,8 +82,15 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// listed a peer's file paths under a rule that withholds imported content —
 	// browsing is the search activation, as it is for search, last and blame
 	// (#1026).
-	hits, _ = policyFilterSessionsCounted(policy.ActivationSearch, hits)
+	hits, hidden := policyFilterSessionsCounted(policy.ActivationSearch, hits)
 	if len(hits) == 0 {
+		// The topic did match — a rule withheld it. Saying "no sessions
+		// mention it" reads as looked-and-absent, the same misread search and
+		// last already avoid by naming the rule (#686, #680).
+		if note := policyHiddenNote(policy.ActivationSearch, hidden); note != "" {
+			fmt.Fprint(stdout, note)
+			return nil
+		}
 		// A filter the caller set is not the topic's fault: three sessions can
 		// mention it and still be absent because they are in another project
 		// (#727, the same shape as #715 in search).
