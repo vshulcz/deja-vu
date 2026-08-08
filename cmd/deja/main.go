@@ -2014,6 +2014,19 @@ func runForget(dir string, args []string) error {
 		// before it lifts them — after the rebuild the manifest holds every
 		// session the selector matches, restored or never forgotten (#1095).
 		lifting := index.TombstonesMatching(unforget)
+		if o.DryRun {
+			// --dry-run on the undo brought the session back anyway: the
+			// destructive side runs a dry probe and never touches disk, but
+			// this path went straight to Unforget, which lifts the tombstone
+			// and rebuilds. Name what it would restore and stop (#1066).
+			if len(lifting) == 0 {
+				fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
+				return nil
+			}
+			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould restore %d tombstone%s and rebuild the index — %s\n",
+				len(lifting), pluralS(len(lifting)), joinCapped(lifting, 5))
+			return nil
+		}
 		if err := withBuildProgress(func() error {
 			var err error
 			lifted, err = index.Unforget(dir, unforget, os.Stderr)
