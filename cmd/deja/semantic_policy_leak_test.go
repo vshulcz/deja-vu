@@ -51,6 +51,16 @@ func TestSemanticSearchHonoursTheTrustPolicy(t *testing.T) {
 		t.Fatalf("semantic search leaked imported content under deny:\n%s", out)
 	}
 
+	// The MCP recall path (recallTextResult) has its own semantic fallback and
+	// must scope it the same way — an agent hitting recall must not receive a
+	// withheld imported session either.
+	writePolicyFile(t, `{"activations":{"mcp":{"imported":false},"search":{"imported":false}}}`)
+	if text, _, _, _, err := recallTextResult(index.DefaultDir(), "zzzlexicalmiss", "", 5, 0, 4096); err != nil {
+		t.Fatal(err)
+	} else if strings.Contains(text, "peeronlymarker") {
+		t.Fatalf("MCP recall leaked imported content via semantic under deny:\n%s", text)
+	}
+
 	// Allowed, the same query surfaces it — proving the query does reach the
 	// semantic tier and the deny above is what withheld it.
 	writePolicyFile(t, `{"activations":{"search":{"imported":true}}}`)

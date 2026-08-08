@@ -474,6 +474,12 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	}
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
+	if semantic {
+		// The semantic tier reaches the whole sidecar, past the policy scoping
+		// the lexical hits already had; scope its hits too or an imported peer's
+		// content the policy withholds reaches the agent through recall.
+		hits, _ = policyFilterHitsCounted(policy.ActivationMCP, hits)
+	}
 	o.Semantic = semantic
 	if len(hits) == 0 {
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
@@ -620,6 +626,9 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
 	if semantic {
 		o.Tier = search.TierSemantic
+		// Semantic hits skip the policy scoping the lexical ones got; apply it
+		// here too, or recall_context leaks a withheld imported session.
+		hits, _ = policyFilterHitsCounted(policy.ActivationMCP, hits)
 	}
 	if len(hits) == 0 {
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
