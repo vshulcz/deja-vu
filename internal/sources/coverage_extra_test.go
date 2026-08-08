@@ -194,6 +194,15 @@ func TestAiderClaudeAntigravityAndUtilityEdges(t *testing.T) {
 	if got := parseTimeAny(json.Number("bad")); !got.IsZero() {
 		t.Fatalf("bad json number time = %v", got)
 	}
+	// A fractional epoch is a valid Number that Int64 rejects; it must still
+	// date the turn rather than fall to the zero time (#UseNumber float loss).
+	if got := parseTimeAny(json.Number("1777629600.5")); got.Unix() != 1777629600 {
+		t.Fatalf("fractional epoch time = %v (want unix 1777629600)", got)
+	}
+	// A stringified epoch is not RFC3339 but is still a timestamp.
+	if got := parseTimeAny("1777629600"); got.Unix() != 1777629600 {
+		t.Fatalf("stringified epoch time = %v (want unix 1777629600)", got)
+	}
 	if got := parseNestedTime(map[string]any{"time": "not-map"}, "time", "created"); !got.IsZero() {
 		t.Fatalf("non-map nested time = %v", got)
 	}

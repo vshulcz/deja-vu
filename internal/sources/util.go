@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,11 +34,23 @@ func parseTimeAny(v any) time.Time {
 		if t, err := time.Parse(time.RFC3339Nano, x); err == nil {
 			return t
 		}
+		// Some stores stringify the epoch ("1777629600", fractional or not).
+		// The field is always a timestamp, so a bare number in it is an epoch.
+		if f, err := strconv.ParseFloat(x, 64); err == nil {
+			return unixGuess(int64(f))
+		}
 	case float64:
 		return unixGuess(int64(x))
 	case json.Number:
-		n, _ := x.Int64()
-		return unixGuess(n)
+		if n, err := x.Int64(); err == nil {
+			return unixGuess(n)
+		}
+		// A fractional epoch — Python's time.time() writes one — is a valid
+		// Number that Int64 rejects; without the Float64 fallback the whole
+		// turn lost its date to the zero time, and the session sorted as "-".
+		if f, err := x.Float64(); err == nil {
+			return unixGuess(int64(f))
+		}
 	}
 	return time.Time{}
 }
