@@ -64,6 +64,55 @@ func TestRestoreListsAndWritesSpans(t *testing.T) {
 	}
 }
 
+// restore hands back the exact bytes a session recorded, so a trust rule that
+// withholds a peer's content must hold here too — it was the one direct-access
+// command that read an imported edit span aloud while show, share, handoff and
+// ctx refused (#1026).
+func TestRestoreHonoursTrustPolicy(t *testing.T) {
+	tmp := writeEditFixture(t) // a local session that edited /w/pkg/retry.go
+	cfg := filepath.Join(tmp, "config")
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	// A peer's edit to the same file, arriving by sync.
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	peer := `{"harness":"claude","session_id":"peer","project":"svc","role":"edit","text":"pkg/retry.go\nIMPORTEDSPAN a peer's replaced code"}` + "\n"
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), []byte(peer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	spanOutputs := func() string {
+		var b strings.Builder
+		for _, n := range []string{"1", "2", "3", "4"} {
+			out, _ := captureRun(t, "restore", "retry.go", "--span", n)
+			b.WriteString(out)
+		}
+		return b.String()
+	}
+
+	// Allowed: the imported span comes back like any other.
+	writePolicy(t, `{"activations":{"search":{"imported":true}}}`)
+	if !strings.Contains(spanOutputs(), "IMPORTEDSPAN") {
+		t.Fatalf("imported span did not restore under an allowing rule")
+	}
+	// Denied: the imported span is withheld, the local ones stay.
+	writePolicy(t, `{"activations":{"search":{"imported":false}}}`)
+	got := spanOutputs()
+	if strings.Contains(got, "IMPORTEDSPAN") {
+		t.Errorf("restore leaked an imported span under deny-imported:\n%s", got)
+	}
+	if !strings.Contains(got, "func retry() error {") {
+		t.Errorf("restore over-blocked a local span under deny-imported:\n%s", got)
+	}
+}
+
 func TestRestoreRefusesToWriteOverTheOriginal(t *testing.T) {
 	writeEditFixture(t)
 	// Same path in and out: this command exists because something overwrote

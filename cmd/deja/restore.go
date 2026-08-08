@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -148,7 +149,15 @@ func findRestoreSpans(dir string, path string) ([]restoreSpan, error) {
 	}
 	var spans []restoreSpan
 	seen := map[string]bool{}
+	// restore hands back the exact bytes a session recorded, so a trust rule
+	// that withholds a peer's content has to hold here too — otherwise
+	// `restore` was the one direct-access command that read an imported edit
+	// span out loud while show, share, handoff and ctx all refused (#1026).
+	pol := policy.Load()
 	err := index.EachRecordOfRole(dir, index.RoleEdit, func(meta index.SessionMeta, r index.Record) {
+		if !pol.Allows(policy.ActivationSearch, meta.Project) {
+			return
+		}
 		if len(seen) >= restoreMaxSessions && !seen[meta.Harness+":"+meta.ID] {
 			return
 		}
