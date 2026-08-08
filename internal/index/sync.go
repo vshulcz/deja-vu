@@ -403,6 +403,11 @@ func Import(dir, inDir string) (int, error) {
 			added:  added,
 		}
 		fileDedupe := &before.dedupe
+		// Redactions this file contributed, applied to the manifest only once
+		// the file has been read whole: a truncated file is rolled back below,
+		// and its redaction count must not survive the records it counted.
+		fileRedacted := 0
+		fileRules := map[string]int{}
 		for k, v := range recsByKey {
 			before.counts[k] = len(v)
 		}
@@ -502,7 +507,17 @@ func Import(dir, inDir string) (int, error) {
 				return nil
 			}
 			key := sr.Harness + ":" + importID
-			text, _ := redact.Text(sr.Text)
+			text, cnt := redact.Text(sr.Text)
+			// Count what redaction removed, the way local ingest does — the
+			// import path redacted the text but threw the count away, so
+			// `stats --redaction` under-reported protection on an imported
+			// store (measured: two secrets redacted, total said one).
+			if n := cnt.Total(); n > 0 {
+				fileRedacted += n
+				for rule, c := range cnt {
+					fileRules[sr.Harness+":"+rule] += c
+				}
+			}
 			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
 			meta := metas[key]
 			if meta.ID == "" {
@@ -577,6 +592,16 @@ func Import(dir, inDir string) (int, error) {
 			restoreMap(titleRankOf, before.rank)
 			added = before.added
 			continue
+		}
+		// The file was read whole: its redactions are real and stay counted.
+		if fileRedacted > 0 {
+			m.Redacted += fileRedacted
+			if m.RedactionRules == nil {
+				m.RedactionRules = map[string]int{}
+			}
+			for rule, c := range fileRules {
+				m.RedactionRules[rule] += c
+			}
 		}
 	}
 	if added == 0 {
