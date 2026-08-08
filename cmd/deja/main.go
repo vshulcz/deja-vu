@@ -832,6 +832,14 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	}
 	var semantic bool
 	hits, semantic = maybeSemantic(dir, hits, o, os.Stderr)
+	if semantic {
+		// The lexical hits were scoped by the trust policy above, but the
+		// semantic tier reaches the whole sidecar and brings back sessions of
+		// its own — an imported peer's content the policy withholds from every
+		// other read path leaked straight through the embedding fallback. Scope
+		// the semantic hits the same way before they are shown.
+		hits, _ = policyFilterHitsCounted(policy.ActivationSearch, hits)
+	}
 	o.Semantic = semantic
 	// Policy scoping, reranking and the semantic tier all run after the cap, so
 	// the pre-cap count can no longer describe what is being returned. When
