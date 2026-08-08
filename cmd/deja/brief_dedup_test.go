@@ -29,8 +29,19 @@ func seedAgedSessions(t *testing.T, sessions map[string]struct {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	now := time.Now()
 	for sid, s := range sessions {
-		when := time.Now().Add(-s.age).UTC().Format("2006-01-02T15:04:05Z")
+		at := now.Add(-s.age)
+		// A session meant to be "today" (a sub-day age) lands on the previous
+		// calendar day when the test runs just after midnight, and the brief's
+		// today/week counts — which reckon the day in local time and have no
+		// injectable now — then read one line short. The premise is gone, not
+		// the code, so skip rather than fail a green build at 00:1x. Compare in
+		// local time, the frame the brief uses.
+		if s.age < 24*time.Hour && at.YearDay() != now.YearDay() {
+			t.Skip("seeded session crosses the midnight boundary; brief today/week semantics are clock-relative")
+		}
+		when := at.UTC().Format("2006-01-02T15:04:05Z")
 		body := fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/w/d","timestamp":%q,"message":{"role":"user","content":%q}}`,
 			sid, when, s.title) + "\n"
 		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
