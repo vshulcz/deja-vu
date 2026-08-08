@@ -194,6 +194,37 @@ func TestAiderClaudeAntigravityAndUtilityEdges(t *testing.T) {
 	if got := parseTimeAny(json.Number("bad")); !got.IsZero() {
 		t.Fatalf("bad json number time = %v", got)
 	}
+	// A fractional epoch is a valid Number that Int64 rejects; it must still
+	// date the turn rather than fall to the zero time (#UseNumber float loss).
+	if got := parseTimeAny(json.Number("1777629600.5")); got.Unix() != 1777629600 {
+		t.Fatalf("fractional epoch time = %v (want unix 1777629600)", got)
+	}
+	// A stringified epoch is not RFC3339 but is still a timestamp.
+	if got := parseTimeAny("1777629600"); got.Unix() != 1777629600 {
+		t.Fatalf("stringified epoch time = %v (want unix 1777629600)", got)
+	}
+	// RFC3339 that dropped its zone or seconds, or used a space instead of the
+	// T, is still a timestamp — parse it rather than lose the whole date.
+	for _, s := range []string{
+		"2026-05-01T10:00:00",
+		"2026-05-01T10:00Z",
+		"2026-05-01 10:00:00",
+	} {
+		if got := parseTimeAny(s); got.IsZero() || got.Year() != 2026 || got.Month() != 5 {
+			t.Fatalf("lenient timestamp %q = %v (want 2026-05)", s, got)
+		}
+	}
+	// The claude fast path reads timestamps through claudeTime; it must accept
+	// the same variants, not only whole-number epochs and RFC3339 strings.
+	if got := claudeTime(json.RawMessage(`"1777629600"`)); got.Unix() != 1777629600 {
+		t.Fatalf("claudeTime stringified epoch = %v", got)
+	}
+	if got := claudeTime(json.RawMessage(`1777629600.5`)); got.Unix() != 1777629600 {
+		t.Fatalf("claudeTime fractional epoch = %v", got)
+	}
+	if got := claudeTime(json.RawMessage(`"2026-05-01T10:00Z"`)); got.IsZero() || got.Year() != 2026 {
+		t.Fatalf("claudeTime seconds-less RFC3339 = %v", got)
+	}
 	if got := parseNestedTime(map[string]any{"time": "not-map"}, "time", "created"); !got.IsZero() {
 		t.Fatalf("non-map nested time = %v", got)
 	}
