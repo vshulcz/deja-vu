@@ -83,6 +83,15 @@ func TestDirectAccessHonoursTrustPolicy(t *testing.T) {
 			t.Errorf("%s leaked imported content under deny-imported:\n%s", args[0], out)
 		}
 	}
+	// promote --to wrote the imported content to a file the reader named, the
+	// one leak the others do not have; the whole command must refuse first.
+	exp := filepath.Join(t.TempDir(), "promoted.md")
+	if out, _ := captureRun(t, "promote", impID, "--to", exp); strings.Contains(out, "IMPORTEDMARKER") {
+		t.Errorf("promote leaked imported content under deny-imported:\n%s", out)
+	}
+	if b, err := os.ReadFile(exp); err == nil && strings.Contains(string(b), "IMPORTEDMARKER") {
+		t.Errorf("promote --to wrote imported content to the export file:\n%s", string(b))
+	}
 	// The local session stays reachable — the rule is about origin, not access.
 	if out, _ := captureRun(t, "show", "locz"); !strings.Contains(out, "LOCALMARKER") {
 		t.Errorf("show over-blocked a local session under deny-imported:\n%s", out)

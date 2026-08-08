@@ -77,6 +77,13 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if !ok {
 		return fmt.Errorf("no session matches %q%s", prefix, movedBucketHint(dir, prefix))
 	}
+	// A session the trust policy hides must not be promotable: `--to` wrote its
+	// content to a file and the note it built repeated the wall, both under a
+	// deny that share and handoff already honour on the same id. Gate here so
+	// the whole command refuses, the way share does.
+	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
+		return err
+	}
 	src := s.Harness + ":" + s.ID
 	if s.Harness == "deja" {
 		// A correction on a promoted note is what `promote` tells you to write,
