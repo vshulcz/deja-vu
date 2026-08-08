@@ -666,7 +666,14 @@ func initEmptyIndex(dir string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	m := Manifest{Version: version, Files: currentFiles(""), Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{}}
+	// Files stays empty on purpose. Snapshotting the local stores here recorded
+	// every transcript as already seen while ingesting none of them, so the
+	// next `deja index` found the manifest fresh and skipped the reader's own
+	// sessions — import on a machine that had never indexed left the local
+	// history invisible until a full rebuild. An empty file set makes the next
+	// index treat every local file as new and ingest it, next to the imported
+	// records this manifest carries.
+	m := Manifest{Version: version, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{}}
 	return writeManifest(dir, m)
 }
 
