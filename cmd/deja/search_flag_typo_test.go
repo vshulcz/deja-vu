@@ -46,3 +46,18 @@ func TestParseSearchRejectsAMisspelledFlag(t *testing.T) {
 		t.Errorf("limit = %d query = %q err = %v", o.Limit, o.Query, err)
 	}
 }
+
+func TestParseSearchTrimsSurroundingSpace(t *testing.T) {
+	// A leading space left the exact-match tier hunting for " token", so an
+	// exact-only term (an error code, a coined name) missed on a pasted query.
+	for _, in := range []string{" WHITEWORD", "WHITEWORD ", "  WHITEWORD  "} {
+		o, err := parseSearch([]string{in})
+		if err != nil || o.Query != "WHITEWORD" {
+			t.Errorf("parseSearch(%q): query = %q err = %v", in, o.Query, err)
+		}
+	}
+	// Space-only is empty once trimmed, so it is rejected rather than searched.
+	if _, err := parseSearch([]string{"   "}); err == nil {
+		t.Errorf("space-only query should be rejected")
+	}
+}

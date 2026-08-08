@@ -1541,8 +1541,11 @@ func parseSearch(args []string) (search.Options, error) {
 		}
 	}
 	// Match the NFC canonicalisation ingest applies to stored text, so a query
-	// typed in either normalisation reaches the same records (#1098).
-	o.Query = nfcfold.Compose(strings.Join(q, " "))
+	// typed in either normalisation reaches the same records (#1098). Trim
+	// surrounding space: a leading space left the exact-match tier hunting for
+	// " token" and an exact-only term (an error code, a coined name) missed,
+	// while a real word was rescued by its word-forms and hid the gap.
+	o.Query = nfcfold.Compose(strings.TrimSpace(strings.Join(q, " ")))
 	if o.Query == "" {
 		return o, fmt.Errorf("query required")
 	}
