@@ -46,7 +46,7 @@ func TestBlameFindsSessionsThatOnlyTouchedTheFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hits, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
+	hits, _, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestBlameTouchersMatchTheWholeName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hits, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
+	hits, _, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestBlameFindsASessionThatBothMentionsAndTouchesTheFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hits, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
+	hits, _, err := findBlameHits(dir, target, search.BlameOptions{All: true}, "search", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

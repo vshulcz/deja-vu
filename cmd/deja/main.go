@@ -1623,7 +1623,7 @@ func runBlame(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	hits, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
+	hits, hidden, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
 	}
@@ -1632,6 +1632,13 @@ func runBlame(dir string, args []string) error {
 		return nil
 	}
 	if len(hits) == 0 {
+		// The file was edited — a rule withheld the session that touched it.
+		// "no sessions mention it" reads as looked-and-absent, the misread
+		// search and last already avoid by naming the rule (#686, #680).
+		if note := policyHiddenNote(policy.ActivationSearch, hidden); note != "" {
+			fmt.Fprint(os.Stderr, note)
+			return nil
+		}
 		// "run deja index" is advice for an empty store. With sessions in the
 		// index it is advice for a state the tool is not in — indexing changes
 		// nothing and doctor reports the stores as found — and it sends the
@@ -1647,18 +1654,19 @@ func runBlame(dir string, args []string) error {
 	return nil
 }
 
-func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, error) {
+func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, error) {
 	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
 	if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, query, progress)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	hits := policyFilterBlame(activation, search.Blame(withFileTouchers(dir, result.Sessions, target), target, o))
+	all := search.Blame(withFileTouchers(dir, result.Sessions, target), target, o)
+	hits := policyFilterBlame(activation, all)
 	attachBlameLifecycles(hits)
-	return hits, nil
+	return hits, len(all) - len(hits), nil
 }
 
 // blameToucherCap bounds how many extra sessions a blame reads from the

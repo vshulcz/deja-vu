@@ -80,3 +80,42 @@ func TestBlameCLIAndMCP(t *testing.T) {
 		t.Fatal("mcp blame accepted blocked index")
 	}
 }
+
+// The file was edited, but the only session that touched it is one a rule
+// withholds. blame said "no sessions mention it" — looked-and-absent, when the
+// rule hid it. search, last and files name the rule (#686, #680).
+func TestBlameNamesTheTrustPolicyOnAnEmptyResult(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// An imported session edited token.go; no local session touches it.
+	var batch []byte
+	for _, r := range []index.SyncRecord{
+		{Harness: "claude", SessionID: "peer", Project: "svc", Role: "user", Text: "the token rotation work"},
+		{Harness: "claude", SessionID: "peer", Project: "svc", Role: "files", Text: filepath.Join(tmp, "repo", "token.go")},
+	} {
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch = append(batch, append(b, '\n')...)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), batch, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+
+	writePolicy(t, `{"activations":{"search":{"imported":false}}}`)
+	out, _ := captureRunStderr(t, "blame", "token.go")
+	if !strings.Contains(out, "trust policy") {
+		t.Errorf("blame did not name the rule that emptied the result:\n%s", out)
+	}
+	if strings.Contains(out, "no sessions mention") {
+		t.Errorf("blame still reads as looked-and-absent when a rule hid the match:\n%s", out)
+	}
+}

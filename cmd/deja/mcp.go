@@ -287,7 +287,7 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	if err != nil {
 		return "", 0, err
 	}
-	hits, err := findBlameHits(dir, target, o, policy.ActivationMCP, mcpProgress())
+	hits, _, err := findBlameHits(dir, target, o, policy.ActivationMCP, mcpProgress())
 	if err != nil {
 		return "", 0, err
 	}
