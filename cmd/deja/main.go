@@ -1311,11 +1311,18 @@ func noteAmbiguousPrefix(dir, id, action string) {
 		return
 	}
 	// When the matches are the same id in different harnesses there is no
-	// longer prefix to reach for, and --harness is the only thing that
-	// separates them (#719).
+	// longer prefix to reach for, and naming the harness is the only thing
+	// that separates them (#719). The `harness:id` form is the one every
+	// command that resolves a selector accepts — show/last also take
+	// --harness, but promote/handoff/resume/share do not, so advising the
+	// flag sent those readers into "unknown flag --harness".
 	if hs := index.PrefixHarnesses(dir, id); len(hs) > 1 {
-		fmt.Fprintf(os.Stderr, "deja: %d sessions share the id %q — %s the most recent; use --harness %s\n",
-			len(hs), id, action, strings.Join(hs, "|"))
+		forms := make([]string, len(hs))
+		for i, h := range hs {
+			forms[i] = h + ":" + id
+		}
+		fmt.Fprintf(os.Stderr, "deja: %d sessions share the id %q — %s the most recent; name one as %s\n",
+			len(hs), id, action, strings.Join(forms, " or "))
 		return
 	}
 	// "A longer prefix" is not available when the reader copied an elided id

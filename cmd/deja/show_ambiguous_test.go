@@ -10,7 +10,7 @@ import (
 )
 
 // "Use a longer prefix" cannot be followed when the ids are the same string;
-// --harness is the only thing that separates them (#719).
+// naming the harness (harness:id) is the only thing that separates them (#719).
 func TestShowNamesHarnessWhenIDsAreShared(t *testing.T) {
 	tmp := hermeticEnv(t)
 	claude := filepath.Join(tmp, "claude", "proj-p")
@@ -45,8 +45,13 @@ func TestShowNamesHarnessWhenIDsAreShared(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(shared, "share the id") || !strings.Contains(shared, "--harness claude|qwen") {
+	// The advice names the harness:id form, which every selector-resolving
+	// command accepts — promote/handoff/resume/share reject --harness (#872).
+	if !strings.Contains(shared, "share the id") || !strings.Contains(shared, "claude:abc12345 or qwen:abc12345") {
 		t.Errorf("shared id: %q", shared)
+	}
+	if strings.Contains(shared, "--harness") {
+		t.Errorf("still advised a flag some commands reject: %q", shared)
 	}
 	if strings.Contains(shared, "longer prefix") {
 		t.Errorf("still advised a longer prefix: %q", shared)
