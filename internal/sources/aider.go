@@ -30,7 +30,9 @@ func AiderFiles() []string {
 		if seen[p] {
 			return
 		}
-		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+		// Regular files only: a FIFO at the history path would block the
+		// parser's Open forever (same hang walkFiles guards against).
+		if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() {
 			seen[p] = true
 			out = append(out, p)
 		}

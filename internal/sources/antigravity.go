@@ -43,7 +43,7 @@ func AntigravityTranscripts() []string {
 	for _, root := range AntigravityRoots() {
 		matches, err := filepath.Glob(filepath.Join(root, "brain", "*", ".system_generated", "logs", "transcript.jsonl"))
 		if err == nil {
-			out = append(out, matches...)
+			out = append(out, keepRegular(matches)...)
 		}
 	}
 	return out

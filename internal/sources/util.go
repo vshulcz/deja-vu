@@ -221,6 +221,19 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 	}
 }
 
+// keepRegular drops any path that is not a regular file. Discovery paths that
+// glob or list names (rather than walking DirEntries) use it so a FIFO or
+// socket matching the pattern cannot reach a parser's Open and block it.
+func keepRegular(paths []string) []string {
+	out := paths[:0]
+	for _, p := range paths {
+		if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func walkFiles(root string, pred func(string) bool) []string {
 	var out []string
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
@@ -234,7 +247,12 @@ func walkFiles(root string, pred func(string) bool) []string {
 			}
 			return nil
 		}
-		if d.Type()&os.ModeSymlink == 0 && !d.IsDir() && pred(p) {
+		// Only regular files. A FIFO or socket that matched the session glob
+		// hung the whole index: the parser's Open blocks on a named pipe with
+		// no writer and never returns, so one such file in a scanned store
+		// froze indexing for good. IsRegular already excludes symlinks and
+		// directories, so it subsumes the checks it replaces.
+		if d.Type().IsRegular() && pred(p) {
 			out = append(out, p)
 		}
 		return nil

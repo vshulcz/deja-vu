@@ -45,7 +45,9 @@ func GeminiChatFiles() []string {
 		}
 		chats := filepath.Join(root, e.Name(), "chats")
 		_ = filepath.WalkDir(chats, func(p string, d os.DirEntry, err error) error {
-			if err == nil && !d.IsDir() && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
+			// Regular files only: a FIFO matching the glob would block the
+			// parser's Open forever (same hang walkFiles guards against).
+			if err == nil && d.Type().IsRegular() && (strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".jsonl")) {
 				out = append(out, p)
 			}
 			return nil
