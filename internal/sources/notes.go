@@ -280,6 +280,20 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("notes file is a symlink")
 	}
+	// An identical re-promote is not a correction. `promote` writes a record
+	// every run, so re-promoting an unchanged decision (same state, text,
+	// title and tags) used to append a duplicate: the note then carried the
+	// same line N times, and each copy lifted its own weight in recall —
+	// measured, a 5x-promoted note outscored an identical 1x one on the same
+	// date. Skip the write when the newest surviving record for this session
+	// already says the same thing; a real state or wording change differs and
+	// still appends, and a forget rewrites the record away so a later promote
+	// starts clean.
+	if last, ok := lastPromotedNote(path, session); ok &&
+		last.State == state && last.Text == text && last.Title == title &&
+		equalStrings(last.Tags, NormalizeTags(tags)) {
+		return nil
+	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
@@ -300,6 +314,47 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 		Kind: "promoted", Session: session, State: state, Title: title,
 		Tags: NormalizeTags(tags), SrcTS: stamp,
 	})
+}
+
+// lastPromotedNote returns the newest promoted record still on disk for a
+// source session. forget rewrites matching records away, so "still on disk"
+// is what re-promote-after-forget needs: no record found means start clean.
+func lastPromotedNote(path, session string) (note, bool) {
+	var last note
+	var found bool
+	_ = scanJSONLFromOffset(path, 0, func(m map[string]any) {
+		if k, _ := m["kind"].(string); k != "promoted" {
+			return
+		}
+		if s, _ := m["session"].(string); s != session {
+			return
+		}
+		last = note{}
+		last.State, _ = m["state"].(string)
+		last.Text, _ = m["text"].(string)
+		last.Title, _ = m["title"].(string)
+		if raw, ok := m["tags"].([]any); ok {
+			for _, x := range raw {
+				if v, ok := x.(string); ok {
+					last.Tags = append(last.Tags, v)
+				}
+			}
+		}
+		found = true
+	})
+	return last, found
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // renderNoteTags folds the tags array into "#tag" tokens appended to the
