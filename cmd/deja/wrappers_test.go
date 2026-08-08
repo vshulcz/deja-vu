@@ -83,6 +83,12 @@ func TestWrappersReportAMissingHarness(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(home, "idx"))
 	t.Setenv("PATH", filepath.Join(home, "empty"))
+	// cmdGoose sets GOOSE_MOIM_MESSAGE_FILE with a raw os.Setenv so the goose
+	// child inherits it. Scope it here, or the value — a path under this test's
+	// temp home — leaks to whatever test runs next and sends its goose hints to
+	// a directory that no longer exists (a shuffled-order failure of
+	// TestInstallGooseAutoWritesHints). t.Setenv's cleanup restores it either way.
+	t.Setenv("GOOSE_MOIM_MESSAGE_FILE", "")
 	for name, run := range map[string]func(string, []string, string) error{"aider": cmdAider, "goose": cmdGoose} {
 		err := run(filepath.Join(home, "idx"), []string{"--version"}, "")
 		if err == nil {
