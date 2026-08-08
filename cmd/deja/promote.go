@@ -127,6 +127,14 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "deja: the note is written; the index could not be updated yet — %v\n", err)
 	}
+	// Promoting a session that was forgotten writes the note back to disk, but
+	// a tombstone lifts only through unforget by design — so the note stayed
+	// suppressed and `promote` reported success over a note that never showed.
+	// Say so and name the one command that restores it, rather than silently
+	// clearing a tombstone the reader set on purpose.
+	if noteID := "deja-note-" + strings.ReplaceAll(src, ":", "-"); index.Tombstoned("deja:"+noteID) {
+		fmt.Fprintf(os.Stderr, "deja: the note is written but stays hidden — %s was forgotten, and its tombstone lifts only through `deja forget --unforget deja:%s`\n", noteID, noteID)
+	}
 	if exportPath != "" {
 		masked, err := exportPromoted(exportPath, title, text, src, state, s.Updated)
 		if err != nil {
