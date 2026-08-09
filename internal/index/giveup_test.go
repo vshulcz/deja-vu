@@ -86,3 +86,43 @@ func TestGiveUpLineDetectsRealProseReports(t *testing.T) {
 		}
 	}
 }
+
+// Precision review: a reversal that did not happen — negated, conditional,
+// future, or the reflexive Russian verb — must not mark the session.
+func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
+	notReports := []string{
+		// Negation.
+		"we haven't reverted the migration yet",
+		"we never gave up on the retry approach",
+		"не отказались от идеи с пулом соединений",
+		"он сказал не откатывать это ни в коем случае",
+		// Conditional / future.
+		"if this fails we just roll it back, no big deal",
+		"we could roll it back but we won't do that now",
+		"I'll be reverting the config change tomorrow",
+		// Question with an internal separator.
+		"did we roll it back, or is it still live?",
+		"should we have reverted, or patched forward?",
+		// Reflexive Russian verb, not a reversal action.
+		"мяч откатился под диван и застрял там надолго",
+	}
+	for _, l := range notReports {
+		if _, ok := GiveUpLine(l); ok {
+			t.Errorf("an unrealised or non-reversal was marked: %q", l)
+		}
+	}
+	// And genuine reports still pass, including a report that ends in a
+	// separate follow-up question.
+	reports := []string{
+		"reverted the retry cap, it made the queue worse",
+		"откатили, но не помогло, что дальше?",
+		"we backed out the migration and went with the view instead",
+		"* reverted the caching layer, it broke ordering",
+		"> rolled back the migration after the DBA complained",
+	}
+	for _, l := range reports {
+		if _, ok := GiveUpLine(l); !ok {
+			t.Errorf("a genuine report was dropped: %q", l)
+		}
+	}
+}

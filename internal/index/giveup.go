@@ -55,13 +55,23 @@ func GiveUpLine(l string) (string, bool) {
 	if n := utf8.RuneCountInString(l); n < giveUpLineMin || n > giveUpLineMax {
 		return l, false
 	}
+	// An assistant states a reversal inside a bulleted or quoted summary as
+	// often as in a sentence ("* reverted the caching layer, it broke
+	// ordering"). Strip a leading list or quote marker so the report inside is
+	// still read, before the code-shape checks below.
+	for _, bullet := range []string{"* ", "> ", "- ", "+ "} {
+		if strings.HasPrefix(l, bullet) {
+			l = strings.TrimSpace(l[len(bullet):])
+			break
+		}
+	}
 	// Source, not speech: a line that IS code — a comment, a string literal, a
 	// diff line — is talking about reverting, not reporting it. But the marker
 	// only ever runs on user/assistant prose, and real prose carries quotes,
 	// issue refs and URLs ("reverted the change from #1143", "rolled back after
 	// reading github.com/x/y//issues"). So reject a line that BEGINS like code,
 	// not any line that merely contains a quote or a slash somewhere.
-	for _, prefix := range []string{"//", "#", "/*", "*", "--", "-- ", ">", "|"} {
+	for _, prefix := range []string{"//", "#", "/*", "--", "-- ", "|"} {
 		if strings.HasPrefix(l, prefix) {
 			return l, false
 		}
@@ -76,40 +86,89 @@ func GiveUpLine(l string) (string, bool) {
 		}
 	}
 	low := strings.ToLower(l)
-	// A pure question is the moment before the decision, not the decision:
-	// "should we revert this?" must not mark the session that only considered
-	// it. But a report that ends with a follow-up question is still a report —
-	// "откатили, но не помогло, что дальше?" — so only reject a line that is
-	// nothing but a question: it ends in "?" and no reversal phrase precedes.
-	isQuestion := strings.HasSuffix(strings.TrimSpace(low), "?")
 	for _, p := range giveUpPhrases {
-		if strings.Contains(low, p) {
-			if isQuestion && phraseInQuestionClause(low, p) {
-				return l, false
-			}
-			return l, true
+		i := strings.Index(low, p)
+		if i < 0 {
+			continue
 		}
+		// A reflexive Russian verb is a thing rolling by itself, not someone
+		// rolling a change back: "откатил" is a substring of "откатился" ("the
+		// ball rolled under the couch"). The "-ся"/"-сь" suffix is the tell.
+		rest := low[i+len(p):]
+		if strings.HasPrefix(rest, "ся") || strings.HasPrefix(rest, "сь") {
+			continue
+		}
+		clause := reversalClause(low, i, len(p))
+		// A reversal that did not happen is not a report. Negation ("we
+		// haven't reverted", "never gave up on", "не откатывать"), a
+		// conditional or future ("if it fails we roll it back", "I'll be
+		// reverting tomorrow"), and a bare question ("should we have reverted
+		// this?") all describe a reversal that was considered, refused, or is
+		// still ahead — not one that was done.
+		if clauseNegatesOrDefers(clause, p) {
+			continue
+		}
+		return l, true
 	}
 	return l, false
 }
 
-// phraseInQuestionClause reports whether the reversal phrase shares the final
-// interrogative clause with the trailing "?" — "should we have reverted this?"
-// — rather than sitting in a statement before it — "откатили, но не помогло,
-// что дальше?". The test is whether any sentence boundary separates the phrase
-// from the question mark: none means the phrase is part of the question.
-func phraseInQuestionClause(low, phrase string) bool {
-	i := strings.Index(low, phrase)
-	if i < 0 {
-		return true
-	}
-	tail := low[i+len(phrase):]
-	for _, sep := range []string{". ", "! ", "? ", "— ", " - ", ", ", "; "} {
-		if strings.Contains(tail, sep) {
-			return false
+// reversalClause returns the sentence the phrase sits in, lowercased: from the
+// separator before it to the separator after. The verdict — did this reversal
+// happen — is a property of the clause, not the whole line, so a report in one
+// sentence is not overruled by a question in the next.
+func reversalClause(low string, phraseAt, phraseLen int) string {
+	seps := []string{". ", "! ", "? ", "; ", "— ", " - ", ", "}
+	start := 0
+	for _, sep := range seps {
+		if j := strings.LastIndex(low[:phraseAt], sep); j >= 0 && j+len(sep) > start {
+			start = j + len(sep)
 		}
 	}
-	return true
+	end := len(low)
+	after := phraseAt + phraseLen
+	for _, sep := range seps {
+		if j := strings.Index(low[after:], sep); j >= 0 && after+j < end {
+			end = after + j
+		}
+	}
+	return low[start:end]
+}
+
+// clauseNegatesOrDefers reports whether the clause holding the reversal phrase
+// says the reversal did not happen: a negator anywhere in the clause, a
+// conditional/future frame, or the clause being the interrogative one (it and
+// the "?" that ends the line are the same clause).
+func clauseNegatesOrDefers(clause, phrase string) bool {
+	for _, neg := range []string{
+		"not ", "n't ", "never ", "without ", "avoid ",
+		"не ", "нельзя ", "без ",
+	} {
+		if strings.Contains(clause, neg) && strings.Index(clause, neg) < strings.Index(clause, phrase) {
+			return true
+		}
+	}
+	for _, defer_ := range []string{
+		"if ", "would ", "could ", "should ", "might ", "planning to ",
+		"going to ", "i'll ", "we'll ", "will ", "если ", "надо ли ", "стоит ли ",
+	} {
+		if strings.Contains(clause, defer_) {
+			return true
+		}
+	}
+	// The clause itself is the question — "did we roll it back, or is it still
+	// live?" — even when the "?" lands in a later clause. An interrogative lead
+	// is the tell; a declarative report ("откатили, но не помогло") has none.
+	c := strings.TrimSpace(clause)
+	for _, q := range []string{
+		"did ", "do ", "does ", "is ", "are ", "was ", "were ", "can ",
+		"why ", "what ", "how ", "when ", "whether ",
+	} {
+		if strings.HasPrefix(c, q) {
+			return true
+		}
+	}
+	return strings.HasSuffix(c, "?")
 }
 
 // gaveUpFromRecords is gaveUp for the import path, which holds a session as
