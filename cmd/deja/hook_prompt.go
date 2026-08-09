@@ -98,16 +98,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// whole payload to a syntax error.
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
 	adoptHookCWD(input.CWD)
+	// The failure the user just reported is worth capturing whether or not
+	// this prompt also earns a recall, so it is decided before the gates that
+	// silence the recall path.
+	nudge := failureNudge(dir, string(input.Prompt))
 	terms := promptSearchTerms(string(input.Prompt))
 	if !promptTermsWorthAsking(terms) {
-		return nil
+		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	// Version, not just presence: terms hash into buckets an index from
 	// another format never wrote, so a stale store answers every prompt with
 	// nothing and looks exactly like a user with no history (#777).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return nil
+		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	if cwd == "" {
@@ -119,7 +123,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// excluding the current/too-fresh sessions.
 	ranked, matched, strong, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
 	if err != nil || len(ranked) == 0 {
-		return nil
+		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	ss := make([]model.Session, 0, 2)
 	confident := false
@@ -191,13 +195,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
 	var body string
 	if confident {
-		body = search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
-		if strings.TrimSpace(body) == "" {
-			return nil
+		digest := search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
+		if strings.TrimSpace(digest) == "" {
+			return emitNudgeOnly(stdout, plain, nudge)
 		}
-		body = promptHookLead + rejectedWarning + body + citationLine(ss[0])
+		tail := citationLine(ss[0])
+		if nudge != "" {
+			tail += "\n" + nudge
+		}
+		body = promptHookLead + rejectedWarning + digest + tail
 	} else {
 		body = weakRecallPointer(ss, terms) + rejectedWarning
+		if nudge != "" {
+			body += "\n" + nudge
+		}
 	}
 	out := frameRecall(body)
 	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms, sessionIDs(ss)...)
