@@ -120,37 +120,56 @@ func fixKey(p FixPair) string {
 // fixTermRE matches the words worth comparing: identifiers, paths, flags.
 var fixTermRE = regexp.MustCompile(`[A-Za-z0-9_./-]{4,}`)
 
-// fixCommonTerms appear in half the commands ever run and prove nothing about
-// whether this one answers that error.
+// fixCommonTerms appear in half the commands ever run, or are the prose an
+// error is phrased in, and prove nothing about whether this command answers
+// that error.
 var fixCommonTerms = map[string]bool{
+	// Ubiquitous command words.
 	"bash": true, "sudo": true, "true": true, "false": true, "null": true,
-	"file": true, "error": true, "http": true, "https": true, "test": true,
-	"main": true, "head": true, "tail": true, "grep": true, "echo": true,
+	"file": true, "http": true, "https": true, "test": true, "main": true,
+	"head": true, "tail": true, "grep": true, "echo": true,
+	// The prose errors are written in — present in the error, meaningless as a
+	// match. "command not found" shares "command"/"found" with any command
+	// mentioning them.
+	"error": true, "command": true, "found": true, "cannot": true,
+	"unable": true, "failed": true, "usage": true, "fatal": true,
+	"invalid": true, "unknown": true, "expected": true, "missing": true,
 }
 
 // sharesTerm reports whether the command names something the error named — the
 // missing binary, the path that was not there, the symbol that was undefined.
+//
+// The match is on whole tokens, not substrings. Substring matching let the
+// remedy for `command not found: timeout` be `kubectl … --request-timeout=20s`
+// because "timeout" is inside "request-timeout" — a wrong answer, and a missing
+// binary is not fixed by a flag that happens to spell it. A hyphen keeps a
+// token whole (fixTermRE), so "request-timeout" no longer matches "timeout".
 func sharesTerm(errLine, cmd string) bool {
 	seen := map[string]bool{}
 	for _, t := range fixTermRE.FindAllString(strings.ToLower(errLine), -1) {
-		if !fixCommonTerms[t] {
+		t = trimTermEdges(t)
+		if len(t) >= 4 && !fixCommonTerms[t] {
 			seen[t] = true
 		}
 	}
 	if len(seen) == 0 {
 		return false
 	}
-	// Substring rather than token equality: the remedy for
-	// `command not found: timeout` was `kubectl … --request-timeout=20s`, and
-	// tokenising both sides puts "timeout" and "request-timeout" in different
-	// buckets — the one case this is for.
-	low := strings.ToLower(cmd)
-	for t := range seen {
-		if strings.Contains(low, t) {
+	for _, t := range fixTermRE.FindAllString(strings.ToLower(cmd), -1) {
+		if seen[trimTermEdges(t)] {
 			return true
 		}
 	}
 	return false
+}
+
+// trimTermEdges drops the slash and dot the token regex captured at a boundary
+// — a URL matched inside quotes carries leading "//", a path a trailing "/" —
+// so the same identifier compares equal wherever it appeared. It deliberately
+// keeps a leading dash: `command not found: timeout` must match a command that
+// invokes `timeout`, not one that passes a `-timeout` flag to something else.
+func trimTermEdges(t string) string {
+	return strings.Trim(t, "/.")
 }
 
 // fixPairsIn mines one session.

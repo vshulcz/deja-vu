@@ -83,15 +83,20 @@ func TestBuildFixesDropsTheUnrelatedNextCommand(t *testing.T) {
 // through the same path almost everyone builds their first index on.
 func TestFixPairsAreRedactedLikeTheRecordLog(t *testing.T) {
 	dir := t.TempDir()
-	secret := "ghp_AbCdEf0123456789AbCdEf0123456789abcd"
-	ss := []model.Session{{
-		Harness: "claude", ID: "leak", Project: "p",
-		Messages: []model.Message{
-			{Role: "tool-output", Text: "fatal: could not read Username for github"},
-			{Role: "command", Text: "git remote set-url origin https://" + secret + "@github.com/me/repo"},
-			{Role: "tool-output", Text: "ok"},
-		},
-	}}
+	secret := "AKIAIOSFODNN7EXAMPLE"
+	// Two sessions with the same error and remedy, so the pair survives on
+	// corroboration alone — the point here is redaction, not the match rule.
+	session := func(id string) model.Session {
+		return model.Session{
+			Harness: "claude", ID: id, Project: "p",
+			Messages: []model.Message{
+				{Role: "tool-output", Text: "Unable to locate credentials. command not found: awscli"},
+				{Role: "command", Text: "AWS_ACCESS_KEY_ID=" + secret + " aws s3 ls"},
+				{Role: "tool-output", Text: "ok"},
+			},
+		}
+	}
+	ss := []model.Session{session("leak1"), session("leak2")}
 	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -249,5 +254,29 @@ func TestFixLooksPastAnUnusableCommand(t *testing.T) {
 	pairs := fixPairsIn(ms, "claude:s", "p")
 	if len(pairs) != 1 || pairs[0].Command != "brew services start postgresql" {
 		t.Fatalf("the real remedy after a heredoc was not found: %+v", pairs)
+	}
+}
+
+// A missing binary is not fixed by a flag that happens to spell it. sharesTerm
+// must reject `command not found: timeout` → `kubectl --request-timeout=20s`,
+// while still accepting a command that names the thing the error named.
+func TestSharesTermRejectsSubstringMatches(t *testing.T) {
+	if sharesTerm("zsh: command not found: timeout", "kubectl get nodes --request-timeout=20s") {
+		t.Error("a flag spelling the missing binary was accepted as its fix")
+	}
+	if !sharesTerm("ModuleNotFoundError: No module named 'aiokafka'", "uv pip install aiokafka") {
+		t.Error("the command that installs the missing module was rejected")
+	}
+	// Error prose alone must not carry a match.
+	if sharesTerm("command not found: xyz", "git commit -m done") {
+		t.Error("the word 'command' from error prose matched an unrelated command")
+	}
+	// A flag that spells the missing binary is not invoking it.
+	if sharesTerm("command not found: timeout", "go test ./... -timeout 60s") {
+		t.Error("a -timeout flag matched a missing timeout binary")
+	}
+	// Invoking the binary itself does match.
+	if !sharesTerm("command not found: timeout", "timeout 5 curl x") {
+		t.Error("running the missing binary was not recognised as its fix")
 	}
 }
