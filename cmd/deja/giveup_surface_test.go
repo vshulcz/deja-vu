@@ -26,12 +26,12 @@ func TestSearchSaysWhenASessionBackedSomethingOut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "reports backing something out") {
+	if !strings.Contains(out, "mentions backing an approach out") {
 		t.Errorf("the session that reverted its own change is served without a word about it:\n%s", out)
 	}
 	// And the session that reached an answer is not labelled with someone
 	// else's dead end.
-	if strings.Count(out, "reports backing something out") != 1 {
+	if strings.Count(out, "mentions backing an approach out") != 1 {
 		t.Errorf("the marker landed on more than the session that earned it:\n%s", out)
 	}
 }
