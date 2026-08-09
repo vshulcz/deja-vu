@@ -132,3 +132,33 @@ func TestToolHookIgnoresNonEditingTools(t *testing.T) {
 		t.Error("the hook stayed silent for an Edit on a file with history")
 	}
 }
+
+// Isolate the project-scoping branch: query a bare filename so the exact-path
+// escape hatch cannot fire, leaving project-scoping as the only thing that can
+// admit the session. And a file in no known project stays silent.
+func TestToolHookFileScopingIsLoadBearing(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 6; i++ {
+		id := "s" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	// Bare filename: t=="/work/alpha/config.go" != "config.go", so only project
+	// scoping (cwd alpha) can admit these sessions.
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"config.go"},"session_id":"now","cwd":"/work/alpha"}`); got == "" {
+		t.Error("project scoping did not admit a same-project session on a bare-filename query")
+	}
+	// Same bare query from an unrelated project: no session matches → silent.
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/gamma")
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"config.go"},"session_id":"now","cwd":"/work/gamma"}`); got != "" {
+		t.Errorf("a file in no known project produced a line: %q", got)
+	}
+}
