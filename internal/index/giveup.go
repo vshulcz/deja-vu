@@ -58,8 +58,10 @@ func GiveUpLine(l string) (string, bool) {
 	// An assistant states a reversal inside a bulleted or quoted summary as
 	// often as in a sentence ("* reverted the caching layer, it broke
 	// ordering"). Strip a leading list or quote marker so the report inside is
-	// still read, before the code-shape checks below.
-	for _, bullet := range []string{"* ", "> ", "- ", "+ "} {
+	// still read. Only "* " and "> ", which are unambiguous — "- " and "+ " are
+	// also diff markers, and a removed line "- reverted the old code" is not a
+	// report of anyone reverting anything.
+	for _, bullet := range []string{"* ", "> "} {
 		if strings.HasPrefix(l, bullet) {
 			l = strings.TrimSpace(l[len(bullet):])
 			break
@@ -71,7 +73,7 @@ func GiveUpLine(l string) (string, bool) {
 	// issue refs and URLs ("reverted the change from #1143", "rolled back after
 	// reading github.com/x/y//issues"). So reject a line that BEGINS like code,
 	// not any line that merely contains a quote or a slash somewhere.
-	for _, prefix := range []string{"//", "#", "/*", "--", "-- ", "|"} {
+	for _, prefix := range []string{"//", "#", "/*", "--", "- ", "+ ", "|"} {
 		if strings.HasPrefix(l, prefix) {
 			return l, false
 		}

@@ -105,6 +105,8 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		"should we have reverted, or patched forward?",
 		// Reflexive Russian verb, not a reversal action.
 		"мяч откатился под диван и застрял там надолго",
+		// A diff removed-line is not a report of a reversal.
+		"- reverted the old migration helper",
 	}
 	for _, l := range notReports {
 		if _, ok := GiveUpLine(l); ok {
