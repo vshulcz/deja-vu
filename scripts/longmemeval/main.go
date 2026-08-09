@@ -51,6 +51,7 @@ func main() {
 	verbose := flag.Bool("v", false, "log per-question results")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
+	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
 	flag.Parse()
 	evSum := map[int]float64{}
 	evN := 0
@@ -82,6 +83,10 @@ func main() {
 	}
 	if *precision {
 		runPrecision(questions)
+		return
+	}
+	if *agentCases > 0 {
+		runAgentCases(questions, *agentCases)
 		return
 	}
 	if *limit > 0 && len(questions) > *limit {
@@ -184,6 +189,7 @@ type questionDetail struct {
 	tier     string
 	top10    []string
 	topCount int
+	cands    []map[string]any
 	// evidence recall: how many of the question's answer sessions appear in
 	// the top-k, divided by how many exist — LongMemEval's official metric,
 	// stricter than any-hit on multi-evidence questions.
@@ -287,6 +293,13 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	want := map[string]bool{}
 	for _, id := range q.AnswerSessionIDs {
 		want[id] = true
+	}
+	for i := 0; i < len(hits) && i < 5; i++ {
+		snip := ""
+		if len(hits[i].Snippets) > 0 {
+			snip = hits[i].Snippets[0]
+		}
+		detail.cands = append(detail.cands, map[string]any{"n": i + 1, "id": hits[i].Session.ID, "is_answer": want[hits[i].Session.ID], "snippet": snip})
 	}
 	detail.evRecall = map[int]float64{}
 	for _, k := range []int{1, 5, 10, 20} {
@@ -395,6 +408,43 @@ func runPrecision(questions []lmeQuestion) {
 	for _, k := range []string{"count<=1", "count 2-3", "count 4-6", "count 7+"} {
 		if strengthHist[k] > 0 {
 			fmt.Printf("  %-10s %d\n", k, strengthHist[k])
+		}
+	}
+}
+
+// runAgentCases dumps cases where deja found the answer session in the top 5 but
+// ranked it below #1 — exactly the cases a human/agent could rescue by choosing
+// among the excerpts. Each case prints the question and the five candidate
+// snippets (unlabelled), plus the 1-based position of the true answer for
+// scoring. This is the raw material for the "let the agent pick" A/B.
+func runAgentCases(questions []lmeQuestion, n int) {
+	dumped := 0
+	for _, q := range questions {
+		rank, detail, _, err := runQuestion(q)
+		if err != nil || rank < 2 || rank > 5 {
+			continue
+		}
+		answerN := 0
+		for _, c := range detail.cands {
+			if c["is_answer"] == true {
+				answerN = c["n"].(int)
+			}
+		}
+		if answerN == 0 {
+			continue
+		}
+		rec := map[string]any{
+			"question":   q.Question,
+			"type":       q.QuestionType,
+			"deja_rank":  rank,
+			"answer_pos": answerN,
+			"candidates": detail.cands,
+		}
+		b, _ := json.Marshal(rec)
+		fmt.Println(string(b))
+		dumped++
+		if dumped >= n {
+			return
 		}
 	}
 }
