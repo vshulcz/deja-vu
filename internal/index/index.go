@@ -37,7 +37,11 @@ import (
 // 24: tokens() now folds NFD to NFC, so postings keys for accented words change
 // shape. A store built before the fold keyed "café" decomposed; the rebuild
 // re-derives every key on the composed form so an NFC query reaches it (#1098).
-const version = 24
+// 25: the fixes.gob sidecar (error → the command that settled it) is written
+// only by a full rebuild, so a store built before it existed answered `deja
+// fix` with a false "no session ran a command after that error". The bump
+// forces the one rebuild that mines it.
+const version = 25
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
