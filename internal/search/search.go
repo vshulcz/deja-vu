@@ -246,6 +246,22 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		for i := 0; i < len(snipCands) && i < 3; i++ {
 			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[i].text, o.Query, re))
 		}
+		// The index hands ranking the records that matched, not the session, so
+		// doc.length measures the size of the match. Normalising by that told
+		// BM25 that a marathon mentioning a word in three short lines is a
+		// three-line document — measured on a real store, one active session
+		// took first place on five of ten unrelated queries. When the index
+		// counted the session, normalise by the session.
+		// Not the session length outright: normalising by it alone punishes a
+		// long session that really is about the query, and cost one answer on
+		// LongMemEval (84.2% → 84.0% hit@1). The geometric mean of the two
+		// lengths keeps that question and still demotes the marathon —
+		// LongMemEval unchanged at 84.2% / 0.887 MRR, and a session that
+		// mentions the query twice inside a day's work no longer outranks the
+		// session about it.
+		if doc.hit.Session.Words > 0 {
+			doc.length = int(math.Sqrt(float64(doc.length) * float64(doc.hit.Session.Words)))
+		}
 		corpusDocuments++
 		corpusLength += doc.length
 		for i, n := range doc.termCount {

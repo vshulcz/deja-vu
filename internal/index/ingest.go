@@ -1034,7 +1034,7 @@ func metaForSession(s model.Session) SessionMeta {
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
 	// and the id it had on the machine it came from (#1049).
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages),
 		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
@@ -1265,6 +1265,24 @@ func nextSessionOrd(sessions map[string]SessionMeta) uint32 {
 	return maxOrd + 1
 }
 
+// sessionWords counts the words of a whole session, which is the document
+// length BM25 is supposed to normalise by. Runs of letters, digits and the
+// characters identifiers are made of, matching how the ranking side counts.
+func sessionWords(ms []model.Message) int {
+	n := 0
+	for _, m := range ms {
+		inWord := false
+		for _, r := range m.Text {
+			word := unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+			if word && !inWord {
+				n++
+			}
+			inWord = word
+		}
+	}
+	return n
+}
+
 // sessionFromMeta is the one place a manifest entry becomes a session. It
 // carries Touched, which retrieval used to copy by hand in a second, nearly
 // identical constructor — so a caller reading it off `Recent` got an empty
@@ -1279,6 +1297,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 		ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path,
 		Title: meta.Title, AgentTitle: meta.AgentTitle, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
 		GaveUp: meta.GaveUp,
+		Words:  meta.Words,
 		OrigID: meta.OrigID, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }

@@ -25,6 +25,13 @@ type Session struct {
 	// tried and backed out. Parsers do not set it; the index fills it from
 	// what it read, and it is false for a store indexed before it existed.
 	GaveUp bool `json:"gave_up,omitempty"`
+	// Words is how long the whole session is, in words. Search sees only the
+	// messages that matched a query, so it had no way to tell a short session
+	// that is about the query from a marathon that mentions it once — the two
+	// look the same size from inside a result. Parsers do not set it; the index
+	// fills it from what it counted at build time, and it is zero for a store
+	// indexed before it existed.
+	Words int `json:"words,omitempty"`
 	// Touched lists the few files this session worked on most. Parsers do not
 	// set it; the index fills it from what it stored, so a caller holding a
 	// search result can ask a cheap question about those files without reading

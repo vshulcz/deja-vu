@@ -150,6 +150,12 @@ type SessionMeta struct {
 	// the user's judgement and stay theirs. Additive: an older manifest
 	// decodes with it false and hits print as they did before.
 	GaveUp bool `json:",omitempty"`
+	// Words is the whole session's length in words. Ranking reads back only
+	// the records that matched, so BM25 normalised by the size of the match
+	// rather than by the size of the session. Additive: a manifest written
+	// before it existed decodes with it zero and ranking falls back to what it
+	// can see.
+	Words int `json:",omitempty"`
 	// Hit holds hashes of the specific errors this session tripped over, so
 	// the first screen can name a wall the machine keeps running into without
 	// reading a single session. Same trade as Asked: the text is recovered
