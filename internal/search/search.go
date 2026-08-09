@@ -1264,32 +1264,51 @@ func RelevanceHits(ss []model.Session, terms []string) []Hit {
 	hits := make([]Hit, 0, len(ss))
 	for rank, s := range ss {
 		hit := Hit{Session: s, Tier: TierRelevance}
-		for _, m := range s.Messages {
+		// Snippet the messages where the most query terms MEET, not the first
+		// message that contains any one of them. The passage that answers a
+		// question is where its words come together — a session about a gift
+		// from a sister used to be shown for "what did my dad give me" because
+		// "gift" matched first. Score each message by distinct terms hit; the
+		// best two become the excerpts an agent reads to decide.
+		type msgScore struct {
+			idx, distinct int
+			center        string
+		}
+		best := make([]msgScore, 0, 8)
+		for mi, m := range s.Messages {
 			low := strings.ToLower(m.Text)
 			var foldedLow string
+			distinct := 0
+			center := ""
 			for _, t := range terms {
 				if strings.Contains(low, t) {
-					hit.Count++
-					if len(hit.Snippets) < 2 {
-						hit.Snippets = append(hit.Snippets, snippet(m.Text, t, nil))
+					distinct++
+					if center == "" {
+						center = t
 					}
-					break
+					continue
 				}
-				// Cross-script: a Simplified term can describe Traditional
-				// text and vice versa.
 				if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
 					if foldedLow == "" {
 						foldedLow = cjkfold.String(low)
 					}
 					if strings.Contains(foldedLow, ft) {
-						hit.Count++
-						if len(hit.Snippets) < 2 {
-							hit.Snippets = append(hit.Snippets, snippet(m.Text, t, nil))
+						distinct++
+						if center == "" {
+							center = t
 						}
-						break
 					}
 				}
 			}
+			if distinct > 0 {
+				hit.Count++
+				best = append(best, msgScore{mi, distinct, center})
+			}
+		}
+		// Most distinct terms first; a stable sort keeps message order among ties.
+		sort.SliceStable(best, func(i, j int) bool { return best[i].distinct > best[j].distinct })
+		for i := 0; i < len(best) && i < 2; i++ {
+			hit.Snippets = append(hit.Snippets, snippet(s.Messages[best[i].idx].Text, best[i].center, nil))
 		}
 		hit.Score = float64(len(ss) - rank)
 		hits = append(hits, hit)
