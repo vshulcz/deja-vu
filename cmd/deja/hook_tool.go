@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -74,9 +75,7 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 		return nil
 	}
 	rememberInjectedIDs(dir, input.SessionID, token)
-	if len(line) > toolHookMaxBytes {
-		line = line[:toolHookMaxBytes]
-	}
+	line = truncateToolLine(line, toolHookMaxBytes)
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "PreToolUse"
 	resp.HookSpecificOutput.AdditionalContext = frameRecall(line)
@@ -213,12 +212,7 @@ func fileMetaInScope(meta index.SessionMeta, path string, projects []string) boo
 	return false
 }
 
-func baseName(p string) string {
-	if i := strings.LastIndexAny(p, `/\`); i >= 0 && i+1 < len(p) {
-		return p[i+1:]
-	}
-	return p
-}
+func baseName(p string) string { return index.CrossBase(p) }
 
 // inspectionCommand reports whether the command only looks at state rather than
 // changing it — the class whose reuse-count says nothing worth an injection.
@@ -242,6 +236,19 @@ func inspectionCommand(cmd string) bool {
 		}
 	}
 	return false
+}
+
+// truncateToolLine caps the line at max bytes on a rune boundary, so a
+// non-ASCII filename near the limit is not split mid-rune into a U+FFFD.
+func truncateToolLine(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	cut := max
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
 }
 
 // shortHash fingerprints the injected line for per-session dedupe.

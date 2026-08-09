@@ -154,3 +154,19 @@ func TestCommandLastIsPerProject(t *testing.T) {
 		t.Errorf("machine-wide last should be the newer date: %v", use.Last)
 	}
 }
+
+// A path synced from Windows uses backslashes; CrossBase must split them like a
+// Unix path so a same-file lookup still matches.
+func TestCrossBaseSplitsBothSeparators(t *testing.T) {
+	cases := map[string]string{
+		`C:\src\pkg\main.go`: "main.go",
+		"/home/u/proj/x.go":  "x.go",
+		`a\b\c`:              "c",
+		"bare.txt":           "bare.txt",
+	}
+	for in, want := range cases {
+		if got := CrossBase(in); got != want {
+			t.Errorf("CrossBase(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

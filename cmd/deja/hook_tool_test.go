@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	indexPkg "github.com/vshulcz/deja-vu/internal/index"
 )
@@ -245,5 +246,23 @@ func TestToolHookSkipsInspectionAndDedupes(t *testing.T) {
 	// A different agent session still hears it.
 	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent2"}`); got == "" {
 		t.Error("a fresh agent session was wrongly deduped")
+	}
+}
+
+// The per-action byte cap must fall on a rune boundary, or a non-ASCII line is
+// corrupted into U+FFFD when marshalled.
+func TestTruncateToolLineKeepsRunesWhole(t *testing.T) {
+	// A run of two-byte runes; cutting at an odd byte would split one.
+	s := strings.Repeat("é", 200) // 400 bytes
+	got := truncateToolLine(s, 301)
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncation produced invalid UTF-8: %q", got)
+	}
+	if len(got) > 301 {
+		t.Errorf("over budget: %d bytes", len(got))
+	}
+	// A short line is returned unchanged.
+	if truncateToolLine("ok", 300) != "ok" {
+		t.Error("a short line was altered")
 	}
 }

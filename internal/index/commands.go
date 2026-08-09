@@ -196,6 +196,17 @@ func CommandHistory(dir, cmd string) (CommandUse, bool) {
 	return CommandUse{}, false
 }
 
+// CrossBase is filepath.Base that splits on both separators regardless of the
+// host OS. A store synced from Windows holds paths like C:\src\main.go; on a
+// Unix host filepath.Base leaves them whole, so a same-file lookup missed and
+// the two "basename" notions disagreed with the hook's own splitter.
+func CrossBase(p string) string {
+	if i := strings.LastIndexAny(p, `/\`); i >= 0 && i+1 < len(p) {
+		return p[i+1:]
+	}
+	return p
+}
+
 // hasSecondLine reports whether the command carries a non-empty line after the
 // first — a compound the stored single-line invocations cannot vouch for.
 func hasSecondLine(cmd string) bool {
@@ -207,7 +218,7 @@ func hasSecondLine(cmd string) bool {
 // manifest already stores. The caller filters by its own trust policy: this
 // package sits below policy and must not decide what is showable.
 func FileSessions(dir, path string) []SessionMeta {
-	base := filepath.Base(path)
+	base := CrossBase(path)
 	if base == "" || base == "." || base == string(filepath.Separator) {
 		return nil
 	}
@@ -221,7 +232,7 @@ func FileSessions(dir, path string) []SessionMeta {
 			// Paths are stored as the session saw them — absolute in one
 			// harness, relative in another — so the comparison is on the file
 			// name, with the full path accepted as written.
-			if t == path || filepath.Base(t) == base {
+			if t == path || CrossBase(t) == base {
 				out = append(out, meta)
 				break
 			}
