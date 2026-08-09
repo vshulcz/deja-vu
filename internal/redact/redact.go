@@ -32,8 +32,17 @@ var (
 	// x-api-key) and, in JSON, a closing quote can sit between the key and the
 	// delimiter ("api_key": "..."). Tolerate both so env-var and JSON forms are
 	// caught, not just a bare `api_key=`.
+	// The key words are matched in the languages people actually type in, not
+	// only English: a Russian speaker writes "пароль: …" or "токен: …" and the
+	// secret sat in the clear because every pattern here was English-only. The
+	// value class and length floor are the same, so the looseness is unchanged.
 	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
-	bearerRE    = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	// The same shape in the languages people actually type in. \b is ASCII-only
+	// in RE2, so a Cyrillic or CJK key word can never sit behind it — these get
+	// their own pattern. A Russian speaker writing "пароль: …" had the secret
+	// stored in the clear because every pattern here was English-only.
+	genericKVIntlRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
+	bearerRE        = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
 	// with password "S3cr3tP@ssw0rd!"` — and genericKVRE cannot reach it:
@@ -92,7 +101,10 @@ func kvAssignmentNearby(lower string) bool {
 // value — the rest of a longer name, spaces and an optional quote — and looks
 // for the ':' or '=' the pattern requires.
 func assignmentFollows(s string, i int) bool {
-	for i < len(s) && (isWordByte(s[i]) || s[i] == '.' || s[i] == '-') {
+	// Bytes >= 0x80 continue a non-ASCII word: the hint "парол" stops one byte
+	// short of "пароля", and skipping only ASCII left the ':' unreachable, so
+	// the gate said no and the intl pattern never ran.
+	for i < len(s) && (isWordByte(s[i]) || s[i] >= 0x80 || s[i] == '.' || s[i] == '-') {
 		i++
 	}
 	// The pattern uses \s, which is more than a space: a fuzz case of
@@ -115,7 +127,14 @@ func isSpaceByte(c byte) bool {
 // kvHints are the substrings genericKVRE can anchor on; providerHints the
 // literal prefixes of providerRE. Checking them first keeps the regexes off
 // the vast majority of messages, which contain no credentials at all.
-var kvHints = []string{"key", "secret", "token", "passw", "authorization"}
+// The non-English words are here for the same reason they are in genericKVRE:
+// the gate runs first, so a Russian "пароль:" never reached the regex at all.
+var kvHints = []string{
+	"key", "secret", "token", "passw", "authorization",
+	"пароль", "парол", "токен", "секрет", "ключ",
+	"contraseña", "senha", "mot de passe", "passwort",
+	"密码", "密碼", "パスワード", "비밀번호",
+}
 
 // "github_pat_" is listed on its own: "gh" is not a substring of "github".
 var providerHints = []string{"gh", "github_pat_", "glpat-", "sk_", "rk_", "sk-", "gsk_", "xai-", "hf_", "npm_", "xox", "AIza"}
@@ -169,6 +188,9 @@ func Text(s string) (string, Counts) {
 	}
 	if kvAssignmentNearby(lower) {
 		s = replaceSubmatch(s, genericKVRE, "credential", counts, func(m []string) string {
+			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+		})
+		s = replaceSubmatch(s, genericKVIntlRE, "credential", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
 	}
