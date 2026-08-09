@@ -19,7 +19,7 @@ func TestTokens(t *testing.T) {
 	}{
 		{"Hello, WORLD hello", []string{"hello", "world"}},
 		{"  spaced   out  ", []string{"spaced", "out"}},
-		{"a I x", nil},                       // every token is a single rune, all dropped
+		{"a I x", nil}, // every token is a single rune, all dropped
 		{"(rate) [limit].", []string{"rate", "limit"}},
 		{"", nil},
 		{"Dup dup DUP", []string{"dup"}}, // lowercase + dedupe

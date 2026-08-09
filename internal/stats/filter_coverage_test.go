@@ -90,8 +90,8 @@ func TestTrimRunes(t *testing.T) {
 		n    int
 		want string
 	}{
-		{"short", 10, "short"},   // fits
-		{"exactly", 7, "exactly"},// exact length
+		{"short", 10, "short"},    // fits
+		{"exactly", 7, "exactly"}, // exact length
 		{"truncate me", 5, "trun…"},
 		{"x", 1, "x"},
 		{"multibyte ✓ é ж", 5, "mult…"},
