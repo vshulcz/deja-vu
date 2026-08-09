@@ -481,3 +481,75 @@ func dedupeStatus(ms []model.Message) []model.Message {
 	}
 	return out
 }
+
+// Conclusions is the short "what this session concluded" line-set recall shows
+// under its best hit. A recall answer used to be excerpts alone — the passages
+// where the query words appeared — so an agent had to open the session to learn
+// what came of it. These are the assistant's decision-carrying sentences, the
+// same ones `share` puts under "Key assistant conclusions", trimmed to one or
+// two lines each so the whole block costs a few hundred bytes.
+func Conclusions(s model.Session, budget int, max int) []string {
+	if budget <= 0 || max <= 0 {
+		return nil
+	}
+	var assistants []model.Message
+	for _, m := range s.Messages {
+		if m.Role != "assistant" || noisyMessage(m.Text) || IsAgentArtifact(m.Text) {
+			continue
+		}
+		assistants = append(assistants, m)
+	}
+	if len(assistants) == 0 {
+		return nil
+	}
+	picked := dedupeStatus(selectConclusions(assistants))
+	// Newest first: the last thing concluded outranks the first thing tried.
+	var out []string
+	spent := 0
+	for i := len(picked) - 1; i >= 0 && len(out) < max; i-- {
+		line := firstSentences(MessageText(picked[i].Text), 2)
+		if line == "" {
+			continue
+		}
+		if spent+len(line) > budget {
+			line = UTF8SafeCut(line, budget-spent)
+			if strings.TrimSpace(line) == "" {
+				break
+			}
+		}
+		out = append(out, line)
+		spent += len(line)
+		if spent >= budget {
+			break
+		}
+	}
+	return out
+}
+
+// firstSentences keeps the opening n sentences of a message: a conclusion
+// states itself up front and then explains, and recall pays for every byte.
+func firstSentences(s string, n int) string {
+	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	if s == "" {
+		return ""
+	}
+	count := 0
+	for i, r := range s {
+		if r != '.' && r != '!' && r != '?' {
+			continue
+		}
+		// "v1.2" and "e.g." are not sentence ends: require a space after.
+		if i+1 < len(s) && s[i+1] != ' ' {
+			continue
+		}
+		count++
+		if count == n {
+			return strings.TrimSpace(s[:i+1])
+		}
+	}
+	const cap = 240
+	if len(s) > cap {
+		return strings.TrimSpace(UTF8SafeCut(s, cap)) + "…"
+	}
+	return s
+}

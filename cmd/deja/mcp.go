@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
@@ -648,6 +649,31 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		}
 		for _, sn := range h.Snippets {
 			fmt.Fprintf(&b, "- %s\n", recallListingLine(sn))
+		}
+		// Under the best hit only, and only when there is budget left: the
+		// excerpts say where the query words appear, which is not the same as
+		// what the session concluded. An agent had to open the session to learn
+		// the outcome; these are the decision-carrying lines `share` surfaces,
+		// so the common case — "did we solve this before?" — is answered in the
+		// recall itself. Later hits stay excerpt-only; they are candidates to
+		// choose between, not answers.
+		if i == 0 {
+			if left := budget - b.Len() - recallConclusionsReserve; left > recallConclusionsMin {
+				// The hit carries only the matching messages, so the decision —
+				// usually worded nothing like the query — is not in it. Read the
+				// whole session for the best hit alone, the same upgrade
+				// recall_context makes for the same reason (#1011).
+				whole := h.Session
+				if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
+					whole = full
+				}
+				if cs := digest.Conclusions(whole, left, 3); len(cs) > 0 {
+					fmt.Fprintln(&b, "  what this session concluded:")
+					for _, c := range cs {
+						fmt.Fprintf(&b, "  → %s\n", recallListingLine(c))
+					}
+				}
+			}
 		}
 		served++
 		if b.Len() >= budget {
