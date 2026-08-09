@@ -428,7 +428,13 @@ func citationLine(s model.Session) string {
 		}
 		date = ", " + s.Updated.Local().Format(layout)
 	}
-	return fmt.Sprintf("\nIf it helped, say: \"deja-vu recalled: %s (%s%s) — reusing it.\"", title, s.Harness, date)
+	// The citation carries the session id because it is the only place a recall
+	// that actually helped becomes an observable fact: the agent's reply is
+	// indexed like any other message, so `deja:<id>` in it links the credit back
+	// to the session that earned it. Matching on title text instead was lexical
+	// and unreliable — two sessions opening with the same question are common.
+	return fmt.Sprintf("\nIf it helped, say: \"deja-vu recalled: %s (%s%s, deja:%s) — reusing it.\"",
+		title, s.Harness, date, shortID(s.ID))
 }
 
 // alreadyInjected returns the session ids this hook already injected into the
