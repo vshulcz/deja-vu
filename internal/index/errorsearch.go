@@ -30,22 +30,41 @@ func errorSigSearch(dir string, m Manifest, o query.Options) (SearchResult, erro
 	if len(sigs) == 0 {
 		return SearchResult{}, nil
 	}
-	var metas []SessionMeta
+	type scored struct {
+		meta SessionMeta
+		hits int
+	}
+	var cand []scored
 	for _, meta := range m.Sessions {
 		if !sessionMetaMatches(meta, o) {
 			continue
 		}
+		hits := 0
 		for _, h := range meta.Hit {
 			if sigs[h] {
-				metas = append(metas, meta)
-				break
+				hits++
 			}
 		}
+		if hits > 0 {
+			cand = append(cand, scored{meta, hits})
+		}
 	}
-	if len(metas) == 0 {
+	if len(cand) == 0 {
 		return SearchResult{}, nil
 	}
-	sort.SliceStable(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
+	// Rank by how much of the paste a session hit, not by recency alone. A long
+	// trace carries several error lines; the session that tripped over more of
+	// them is the closer match, and newest-first only decided ties before this.
+	sort.SliceStable(cand, func(i, j int) bool {
+		if cand[i].hits != cand[j].hits {
+			return cand[i].hits > cand[j].hits
+		}
+		return newestFirstMeta(cand[i].meta, cand[j].meta)
+	})
+	metas := make([]SessionMeta, len(cand))
+	for i := range cand {
+		metas[i] = cand[i].meta
+	}
 	total := len(metas)
 	if len(metas) > relevanceWindow {
 		metas = metas[:relevanceWindow]
@@ -69,7 +88,11 @@ func errorSigSearch(dir string, m Manifest, o query.Options) (SearchResult, erro
 	if len(kept) == 0 {
 		return SearchResult{}, nil
 	}
-	return SearchResult{Sessions: kept, Tier: query.TierRelevance, Total: total}, nil
+	// relevanceResult sets Total and Capped together, so a store with more than
+	// the window's worth of sessions on one error says "showing N of M" instead
+	// of reporting the window as the whole (the #497 shape).
+	res := relevanceResult(kept, total)
+	return res, nil
 }
 
 // querySigs hashes every line of the query that names something specific that

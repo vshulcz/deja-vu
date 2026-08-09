@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -113,5 +114,48 @@ func TestOrdinaryQuestionIsNotTreatedAsAnError(t *testing.T) {
 	}
 	if len(res.Sessions) != 0 {
 		t.Errorf("a question with no error line was answered by the error tier: %+v", res.Sessions)
+	}
+}
+
+// A long trace carries several error lines; the session that hit more of them
+// is the closer match, ahead of a fresher session that hit only one. And the
+// result reports Total/Capped honestly when more than the window matched.
+func TestErrorTierRanksByHowMuchOfThePasteMatched(t *testing.T) {
+	now := time.Now()
+	// "broad" hits two of the pasted error lines; "narrow" is newer but hits one.
+	broad := model.Session{
+		Harness: "claude", ID: "broad", Project: "p", Updated: now.Add(-time.Hour),
+		Messages: []model.Message{
+			{Role: "tool-output", Text: "panic: runtime error: invalid memory address"},
+			{Role: "tool-output", Text: "psql: connection refused on port 5432"},
+			{Role: "command", Text: "restarted postgres and added a nil guard"},
+		},
+	}
+	narrow := model.Session{
+		Harness: "claude", ID: "narrow", Project: "p", Updated: now,
+		Messages: []model.Message{
+			{Role: "tool-output", Text: "psql: connection refused on port 5432"},
+			{Role: "command", Text: "brew services start postgresql"},
+		},
+	}
+	dir := t.TempDir()
+	writeTestStore(t, dir, broad, narrow)
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paste := "panic: runtime error: invalid memory address\n...\npsql: connection refused on port 5432\n"
+	res, err := errorSigSearch(dir, m, mkOptions(paste))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) < 2 {
+		t.Fatalf("both sessions should match, got %d", len(res.Sessions))
+	}
+	if res.Sessions[0].ID != "broad" {
+		t.Errorf("the session that hit more of the paste is not first: %q", res.Sessions[0].ID)
+	}
+	if res.Tier != query.TierRelevance {
+		t.Errorf("wrong tier %q", res.Tier)
 	}
 }
