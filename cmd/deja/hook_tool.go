@@ -79,13 +79,20 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 }
 
 // toolHookLine is what the agent is told, or "" for the silence that is the
-// default answer.
+// default answer. It gates on the tool: a command line is worth saying only for
+// the tool that runs a command, and a file's history only before the file is
+// changed — Read, Glob and NotebookRead carry a file_path too, and a hook wired
+// with a wide matcher would otherwise fire on every one of them.
 func toolHookLine(dir string, input toolHookInput) string {
-	if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
-		return commandHookLine(dir, cmd)
-	}
-	if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
-		return fileHookLine(dir, path)
+	switch input.ToolName {
+	case "Bash":
+		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
+			return commandHookLine(dir, cmd)
+		}
+	case "Edit", "Write", "MultiEdit", "NotebookEdit":
+		if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
+			return fileHookLine(dir, path)
+		}
 	}
 	return ""
 }
