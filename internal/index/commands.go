@@ -111,6 +111,13 @@ func ReadCommands(dir string) []CommandUse {
 // the parsers prefix a stored invocation with — but not on flags: an
 // invocation that differs by a flag is a different invocation.
 func CommandHistory(dir, cmd string) (CommandUse, bool) {
+	// A multi-line command is never the stored single-line one, and matching it
+	// on its first line only is dangerous: "git status\nrm -rf /" would be
+	// endorsed as "this machine has run that command" on the strength of the
+	// harmless first line. Recognise only what was seen in full.
+	if hasSecondLine(cmd) {
+		return CommandUse{}, false
+	}
 	want := normalizeCommand(cmd)
 	if want == "" {
 		return CommandUse{}, false
@@ -121,6 +128,13 @@ func CommandHistory(dir, cmd string) (CommandUse, bool) {
 		}
 	}
 	return CommandUse{}, false
+}
+
+// hasSecondLine reports whether the command carries a non-empty line after the
+// first — a compound the stored single-line invocations cannot vouch for.
+func hasSecondLine(cmd string) bool {
+	i := strings.IndexByte(cmd, '\n')
+	return i >= 0 && strings.TrimSpace(cmd[i+1:]) != ""
 }
 
 // FileSessions returns the sessions that worked on a path, from what the
