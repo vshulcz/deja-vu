@@ -2,6 +2,7 @@ package index
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -48,29 +49,67 @@ var giveUpPhrases = []string{
 // GiveUpLine reports whether a line says an approach was tried and dropped.
 func GiveUpLine(l string) (string, bool) {
 	l = strings.TrimSpace(l)
-	if len(l) < giveUpLineMin || len(l) > giveUpLineMax {
+	// Length in runes, not bytes: a byte budget gives Cyrillic half the room,
+	// so a Russian report of a rollback was rejected as too long at 150 bytes
+	// (75 characters) and the 12-byte floor was only six Cyrillic characters.
+	if n := utf8.RuneCountInString(l); n < giveUpLineMin || n > giveUpLineMax {
 		return l, false
 	}
-	// Source, not speech: a string literal, a comment or a diff line that
-	// contains the words is code about reverting, not a report of one.
-	for _, source := range []string{"\"", "$(", "=~", "print(", "//", "#", "/*"} {
-		if strings.HasPrefix(l, source) || strings.Contains(l, source) {
+	// Source, not speech: a line that IS code — a comment, a string literal, a
+	// diff line — is talking about reverting, not reporting it. But the marker
+	// only ever runs on user/assistant prose, and real prose carries quotes,
+	// issue refs and URLs ("reverted the change from #1143", "rolled back after
+	// reading github.com/x/y//issues"). So reject a line that BEGINS like code,
+	// not any line that merely contains a quote or a slash somewhere.
+	for _, prefix := range []string{"//", "#", "/*", "*", "--", "-- ", ">", "|"} {
+		if strings.HasPrefix(l, prefix) {
+			return l, false
+		}
+	}
+	// A function call with a string argument is code, wherever it sits:
+	// `log.Printf("reverted %s", name)`. `("` is the call-with-string shape and
+	// does not appear in prose, whereas a bare quote (`reverted the "fast path"`)
+	// does — so this rejects the code without rejecting the report.
+	for _, code := range []string{"(\"", "('", "=~", "println", "printf(", "system("} {
+		if strings.Contains(l, code) {
 			return l, false
 		}
 	}
 	low := strings.ToLower(l)
-	// A question is not a report. "should we revert this?" is the moment
-	// before the decision, and marking it would put the label on the session
-	// that considered reverting rather than the one that did.
-	if strings.HasSuffix(low, "?") {
-		return l, false
-	}
+	// A pure question is the moment before the decision, not the decision:
+	// "should we revert this?" must not mark the session that only considered
+	// it. But a report that ends with a follow-up question is still a report —
+	// "откатили, но не помогло, что дальше?" — so only reject a line that is
+	// nothing but a question: it ends in "?" and no reversal phrase precedes.
+	isQuestion := strings.HasSuffix(strings.TrimSpace(low), "?")
 	for _, p := range giveUpPhrases {
 		if strings.Contains(low, p) {
+			if isQuestion && phraseInQuestionClause(low, p) {
+				return l, false
+			}
 			return l, true
 		}
 	}
 	return l, false
+}
+
+// phraseInQuestionClause reports whether the reversal phrase shares the final
+// interrogative clause with the trailing "?" — "should we have reverted this?"
+// — rather than sitting in a statement before it — "откатили, но не помогло,
+// что дальше?". The test is whether any sentence boundary separates the phrase
+// from the question mark: none means the phrase is part of the question.
+func phraseInQuestionClause(low, phrase string) bool {
+	i := strings.Index(low, phrase)
+	if i < 0 {
+		return true
+	}
+	tail := low[i+len(phrase):]
+	for _, sep := range []string{". ", "! ", "? ", "— ", " - ", ", ", "; "} {
+		if strings.Contains(tail, sep) {
+			return false
+		}
+	}
+	return true
 }
 
 // gaveUpFromRecords is gaveUp for the import path, which holds a session as

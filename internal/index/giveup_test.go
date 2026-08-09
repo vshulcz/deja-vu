@@ -59,3 +59,30 @@ func TestGaveUpReadsSpeechAndNotToolOutput(t *testing.T) {
 		t.Error("the assistant saying it reverted the change is not detected")
 	}
 }
+
+// P0-9/10/11: real prose reports carry quotes, issue refs and URLs, and can end
+// in a follow-up question; a byte budget must not halve the room for Cyrillic.
+func TestGiveUpLineDetectsRealProseReports(t *testing.T) {
+	reports := []string{
+		"reverted the change from #1143 and shipped the view instead",
+		"rolled back after reading github.com/foo/bar//issues/3, it deadlocked",
+		`reverted the "fast path" change because it broke ordering`,
+		"откатили, но не помогло, что дальше?", // report + question
+		"откатили миграцию пула соединений на постгресе, потому что она держала лок на всю таблицу и всё вставало намертво", // long Cyrillic
+	}
+	for _, l := range reports {
+		if _, ok := GiveUpLine(l); !ok {
+			t.Errorf("a real report was rejected: %q", l)
+		}
+	}
+	notReports := []string{
+		"should we revert this change?",       // pure question
+		`log.Printf("reverted %s", name)`,     // code with string arg
+		"// reverted in the previous release", // comment
+	}
+	for _, l := range notReports {
+		if _, ok := GiveUpLine(l); ok {
+			t.Errorf("a non-report was accepted: %q", l)
+		}
+	}
+}
