@@ -1052,11 +1052,11 @@ func snippet(s, q string, re *regexp.Regexp) string {
 			idx = utf8.RuneCountInString(s[:b])
 		}
 	}
-	start := idx - 70
+	start := idx - 100
 	if start < 0 {
 		start = 0
 	}
-	end := start + 180
+	end := start + 300
 	if end > len(r) {
 		end = len(r)
 	}
