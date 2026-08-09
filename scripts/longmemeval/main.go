@@ -50,6 +50,7 @@ func main() {
 	skipAbs := flag.Bool("skip-abs", false, "skip abstention (_abs) questions, matching cleaned-dataset runs")
 	verbose := flag.Bool("v", false, "log per-question results")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
+	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	flag.Parse()
 	evSum := map[int]float64{}
 	evN := 0
@@ -78,6 +79,10 @@ func main() {
 			}
 		}
 		questions = kept
+	}
+	if *precision {
+		runPrecision(questions)
+		return
 	}
 	if *limit > 0 && len(questions) > *limit {
 		questions = questions[:*limit]
@@ -322,4 +327,53 @@ func pct(a, n int) float64 {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, "longmemeval:", err)
 	os.Exit(1)
+}
+
+// runPrecision measures false-positive recalls. It pairs each question's prompt
+// with a DIFFERENT question's haystack, so the answer session is never present:
+// a well-behaved retrieval either returns nothing or only a low-confidence
+// (relevance-tier) guess. It reports how often anything surfaces at all, and how
+// often an exact/close tier fired — the recalls a reader is most likely to trust
+// and be misled by. Lower is better; this is the precision side the recall
+// numbers cannot see.
+func runPrecision(questions []lmeQuestion) {
+	n := len(questions)
+	if n < 2 {
+		fatal(fmt.Errorf("need at least 2 questions for precision pairing"))
+	}
+	var surfaced, exactish int
+	byTier := map[string]int{}
+	start := time.Now()
+	for i := range questions {
+		j := (i + 1) % n
+		hybrid := lmeQuestion{
+			QuestionID:        questions[i].QuestionID + "|hay:" + questions[j].QuestionID,
+			QuestionType:      questions[i].QuestionType,
+			Question:          questions[i].Question,
+			QuestionDate:      questions[i].QuestionDate,
+			HaystackDates:     questions[j].HaystackDates,
+			HaystackSessionID: questions[j].HaystackSessionID,
+			HaystackSessions:  questions[j].HaystackSessions,
+			AnswerSessionIDs:  nil,
+		}
+		_, detail, _, err := runQuestion(hybrid)
+		if err != nil {
+			fatal(fmt.Errorf("precision pair %d: %w", i, err))
+		}
+		if len(detail.top10) > 0 {
+			surfaced++
+			byTier[detail.tier]++
+			if detail.tier != "relevance" {
+				exactish++
+			}
+		}
+	}
+	fmt.Printf("LongMemEval-S · PRECISION (prompt_i × haystack_{i+1}, answer never present)\n")
+	fmt.Printf("pairs: %d · wall: %s\n\n", n, time.Since(start).Round(time.Second))
+	fmt.Printf("surfaced anything     %5d / %d = %.1f%%   (ideal: low)\n", surfaced, n, 100*float64(surfaced)/float64(n))
+	fmt.Printf("of those, exact/close %5d / %d = %.1f%%   (most misleading)\n", exactish, n, 100*float64(exactish)/float64(n))
+	fmt.Printf("\nby tier of the surfaced recall:\n")
+	for t, c := range byTier {
+		fmt.Printf("  %-12s %d\n", t, c)
+	}
 }
