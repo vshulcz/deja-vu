@@ -858,6 +858,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		if hh := hitFromRecords(recsByKey[key]); len(hh) > 0 {
 			meta.Hit = hh
 		}
+		// And whether the session reports backing something out, so a peer's
+		// dead end arrives marked instead of reading like a live answer.
+		if gaveUpFromRecords(recsByKey[key]) {
+			meta.GaveUp = true
+		}
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord

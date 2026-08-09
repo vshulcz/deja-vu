@@ -544,6 +544,14 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		if line := lifecycleLine(h); line != "" {
 			fmt.Fprintf(&b, "%s\n", line)
 		}
+		// A session that says it backed something out is the one result an
+		// agent must not follow to the letter, and nothing said so: the
+		// lifecycle states carry that meaning but are set by hand, and on a
+		// real store of 1160 sessions not one carried "rejected". The
+		// transcript said it in words instead.
+		if h.Session.GaveUp && h.Lifecycle == "" {
+			fmt.Fprintln(&b, "[this session reports backing something out — read the excerpts before reusing it]")
+		}
 		if h.Superseded != "" {
 			fmt.Fprintf(&b, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
 		}

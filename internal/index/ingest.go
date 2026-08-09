@@ -1023,7 +1023,7 @@ func metaForSession(s model.Session) SessionMeta {
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
 	// and the id it had on the machine it came from (#1049).
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages),
 		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
@@ -1267,6 +1267,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 	return model.Session{
 		ID: meta.ID, Harness: meta.Harness, Project: meta.Project, Path: meta.Path,
 		Title: meta.Title, AgentTitle: meta.AgentTitle, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
+		GaveUp: meta.GaveUp,
 		OrigID: meta.OrigID, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }

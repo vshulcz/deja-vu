@@ -21,6 +21,10 @@ type Session struct {
 	Updated  time.Time `json:"updated"`
 	Messages []Message `json:"messages,omitempty"`
 	Source   *Source   `json:"source,omitempty"`
+	// GaveUp marks a session that says, in its own words, that something was
+	// tried and backed out. Parsers do not set it; the index fills it from
+	// what it read, and it is false for a store indexed before it existed.
+	GaveUp bool `json:"gave_up,omitempty"`
 	// Touched lists the few files this session worked on most. Parsers do not
 	// set it; the index fills it from what it stored, so a caller holding a
 	// search result can ask a cheap question about those files without reading

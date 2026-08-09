@@ -145,6 +145,11 @@ type SessionMeta struct {
 	Lifecycle     string `json:",omitempty"`
 	LifecycleNote string `json:",omitempty"`
 	LifecycleAt   string `json:",omitempty"`
+	// GaveUp marks a session whose own text reports that something was tried
+	// and backed out. It is evidence, not a lifecycle state — the states are
+	// the user's judgement and stay theirs. Additive: an older manifest
+	// decodes with it false and hits print as they did before.
+	GaveUp bool `json:",omitempty"`
 	// Hit holds hashes of the specific errors this session tripped over, so
 	// the first screen can name a wall the machine keeps running into without
 	// reading a single session. Same trade as Asked: the text is recovered

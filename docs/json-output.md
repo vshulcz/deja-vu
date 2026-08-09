@@ -137,6 +137,7 @@ when empty:
 | `title` | first user turn, elided to terminal width |
 | `agent_title` | `title` came from the assistant because the session has no user turn |
 | `touched` | the few files this session worked on most |
+| `gave_up` | the session's own text reports something being tried and backed out |
 | `orig_id` | id this session had on the machine it was imported from |
 | `lifecycle` | state of an imported promoted note: `accepted`, `rejected`, `superseded` or `stale` |
 | `lifecycle_note` | the note left with that state |

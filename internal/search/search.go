@@ -844,6 +844,17 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			}
 			fmt.Fprintln(w, note)
 		}
+		// Nobody sets the rejected state by hand, so the sessions that ended in
+		// a dead end look exactly like the ones that ended in an answer. When
+		// the transcript itself says something was backed out, say so — as
+		// evidence from the session, not as a state someone recorded.
+		if h.Session.GaveUp && h.Lifecycle == "" {
+			note := "  reports backing something out — read before reusing"
+			if color {
+				note = cDim + note + cReset
+			}
+			fmt.Fprintln(w, note)
+		}
 		if h.Moved != "" {
 			note := h.Moved
 			if color {
