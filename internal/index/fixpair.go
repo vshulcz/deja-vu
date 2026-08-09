@@ -155,13 +155,34 @@ func sharesTerm(errLine, cmd string) bool {
 	if len(seen) == 0 {
 		return false
 	}
-	for _, t := range fixTermRE.FindAllString(strings.ToLower(cmd), -1) {
-		if seen[trimTermEdges(t)] {
+	low := strings.ToLower(cmd)
+	// An install command is allowed to name the missing thing as part of a
+	// longer token: `No module named 'yaml'` is fixed by `pip install pyyaml`,
+	// and `aiokafka` by `pip install aiokafka-python`. That containment is only
+	// trusted when the command is actually installing something — otherwise it
+	// is the `-timeout` flag class this function exists to reject.
+	installing := installVerbRE.MatchString(low)
+	for _, raw := range fixTermRE.FindAllString(low, -1) {
+		t := trimTermEdges(raw)
+		if seen[t] {
 			return true
+		}
+		if installing && len(t) >= 4 {
+			for s := range seen {
+				if strings.Contains(t, s) {
+					return true
+				}
+			}
 		}
 	}
 	return false
 }
+
+// installVerbRE marks a command that installs a package, where naming the
+// missing module inside a longer package name is a real match rather than a
+// coincidence. Only "install" — it is unambiguous (pip/npm/apt/brew/gem/go/
+// cargo install), where "get" and "add" also mean `kubectl get`, `git add`.
+var installVerbRE = regexp.MustCompile(`\binstall\b`)
 
 // trimTermEdges drops the slash and dot the token regex captured at a boundary
 // — a URL matched inside quotes carries leading "//", a path a trailing "/" —

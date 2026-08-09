@@ -279,4 +279,15 @@ func TestSharesTermRejectsSubstringMatches(t *testing.T) {
 	if !sharesTerm("command not found: timeout", "timeout 5 curl x") {
 		t.Error("running the missing binary was not recognised as its fix")
 	}
+	// An install command may name the missing module inside a longer package.
+	if !sharesTerm("ModuleNotFoundError: No module named 'yaml'", "pip install pyyaml") {
+		t.Error("the install of the package that provides the module was rejected")
+	}
+	if !sharesTerm("No module named 'aiokafka'", "pip install aiokafka-python") {
+		t.Error("the hyphenated install package was rejected")
+	}
+	// But containment without an install verb stays rejected (the flag class).
+	if sharesTerm("command not found: timeout", "go run ./cmd --request-timeout=5s") {
+		t.Error("a flag containing the binary name matched outside an install")
+	}
 }
