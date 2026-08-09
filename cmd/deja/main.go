@@ -149,6 +149,9 @@ var commands = map[string]command{
 	"hook-plan": func(dir string, _ []string) error {
 		return runHookPlan(dir, os.Stdin, os.Stdout)
 	},
+	"hook-tool": func(dir string, _ []string) error {
+		return runHookTool(dir, os.Stdin, os.Stdout)
+	},
 	"check": func(dir string, rest []string) error {
 		return runCheck(dir, rest, os.Stdin, os.Stdout)
 	},
@@ -2382,6 +2385,7 @@ Usage:
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
+  deja hook-tool     (PreToolUse Bash/Edit hook: one line on what this command or file already has)
   deja check -       (read a plan from stdin and print factual co-occurrences)
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>

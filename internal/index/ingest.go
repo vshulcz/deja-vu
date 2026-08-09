@@ -413,6 +413,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	dropEmptySessions(&m, wrote)
 	buildCooccur(tmp, ss)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
+	buildCommands(tmp, ss)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
@@ -751,6 +752,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	}
 	buildCooccur(tmp, ss)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
+	buildCommands(tmp, ss)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
