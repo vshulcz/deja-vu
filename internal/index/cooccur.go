@@ -76,33 +76,40 @@ func buildCooccur(tmp string, ss []model.Session) {
 		}
 		for i := 0; i < len(kept); i++ {
 			for j := i + 1; j < len(kept); j++ {
+				// Store each unordered pair once, in canonical order. The map
+				// used to hold both a→b and b→a, doubling the largest structure
+				// of the build; the neighbor pass below expands it back to both
+				// sides (#1137).
 				a, b := kept[i], kept[j]
+				if a > b {
+					a, b = b, a
+				}
 				if pairs[a] == nil {
 					pairs[a] = map[string]int{}
 				}
-				if pairs[b] == nil {
-					pairs[b] = map[string]int{}
-				}
 				pairs[a][b]++
-				pairs[b][a]++
 			}
 		}
 	}
-	neighbors := map[string][]string{}
-	for tok, ns := range pairs {
-		type nc struct {
-			t string
-			c int
-		}
-		list := make([]nc, 0, len(ns))
-		for n, c := range ns {
-			if c >= cooccurMinPair {
-				list = append(list, nc{n, c})
+	type nc struct {
+		t string
+		c int
+	}
+	// Each canonical pair (a,b) is a neighbor of both a and b, so one pass over
+	// the half-map rebuilds the full candidate lists. Filtering at threshold
+	// here keeps the transient cand map to the pairs that can actually survive.
+	cand := map[string][]nc{}
+	for a, ns := range pairs {
+		for b, c := range ns {
+			if c < cooccurMinPair {
+				continue
 			}
+			cand[a] = append(cand[a], nc{b, c})
+			cand[b] = append(cand[b], nc{a, c})
 		}
-		if len(list) == 0 {
-			continue
-		}
+	}
+	neighbors := map[string][]string{}
+	for tok, list := range cand {
 		sort.Slice(list, func(i, j int) bool {
 			if list[i].c == list[j].c {
 				return list[i].t < list[j].t
