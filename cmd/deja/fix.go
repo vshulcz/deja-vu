@@ -24,27 +24,41 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 	limit := 3
 	var parts []string
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--limit" && i+1 < len(args) {
+		switch args[i] {
+		case "--limit":
+			if i+1 >= len(args) {
+				return fmt.Errorf("fix: --limit wants a number")
+			}
 			i++
 			n, err := strconv.Atoi(args[i])
 			if err != nil || n <= 0 {
 				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i])
 			}
 			limit = n
-			continue
+		default:
+			// A flag deja does not know must not be swallowed into the error
+			// text — `deja fix "..." --json` used to search for a string that
+			// contained "--json" and answer "no session ran a command".
+			if strings.HasPrefix(args[i], "-") && args[i] != "-" {
+				return fmt.Errorf("fix: unknown flag %q", args[i])
+			}
+			parts = append(parts, args[i])
 		}
-		parts = append(parts, args[i])
 	}
 	text := strings.TrimSpace(strings.Join(parts, " "))
 	if text == "" {
-		// A pasted trace is many lines, and shells mangle those as arguments.
-		b, err := io.ReadAll(os.Stdin)
-		if err == nil {
-			text = strings.TrimSpace(string(b))
+		// A pasted trace is many lines, and shells mangle those as arguments,
+		// so it can be piped in — but only read stdin when it is actually a
+		// pipe. Reading a terminal blocks the command until Ctrl-D with no
+		// prompt, which reads as a hang.
+		if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice == 0 {
+			if b, rerr := io.ReadAll(os.Stdin); rerr == nil {
+				text = strings.TrimSpace(string(b))
+			}
 		}
 	}
 	if text == "" {
-		return fmt.Errorf("fix: give the error text, or pipe it in")
+		return fmt.Errorf("fix: give the error text as an argument, or pipe the failing output in")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
@@ -58,13 +72,10 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		return pol.Allows(policy.ActivationSearch, project)
 	})
 	if len(pairs) == 0 {
-		// Saying why costs nothing and stops the next question: an error deja
-		// does not recognise as an error is a different miss from one it has
-		// simply never seen.
-		if !index.LooksLikeError(text) {
-			fmt.Fprintln(stdout, "deja: that does not read like an error line — pass the failing output itself")
-			return nil
-		}
+		// One honest line. The old code tried to tell "not an error" apart from
+		// "never seen it", but the test it used rejects `Error: …`, `npm ERR!`
+		// and any line with a quote — the exact output people paste — so it
+		// accused users of not pasting an error when they had.
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
 		return nil
 	}
