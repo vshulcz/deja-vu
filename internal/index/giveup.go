@@ -12,30 +12,37 @@ import (
 // rejected`), and on a real store of 1160 sessions the count of sessions
 // carrying it is zero, because it is set by hand and nobody sets it by hand.
 //
-// The evidence is there in the transcripts regardless: on that same store, 557
-// records across 33 sessions say in so many words that something was reverted,
-// did not work, or was given up on. This detects those statements at ingest so
-// a hit can carry the fact. It says nothing about which approach was dropped —
-// that is what the excerpts are for — and it is not a lifecycle state: a state
-// is the user's own judgement, and this is only what the transcript reports.
+// The evidence is there in the transcripts regardless: people say in so many
+// words that they reverted, rolled back, or gave up on an approach. This
+// detects that class of statement at ingest — a reversal, not a description of
+// failure — so a hit can carry the fact. On a real 1165-session store it marks
+// about 2% of sessions. It says nothing about which approach was dropped — that
+// is what the excerpts are for — and it is not a lifecycle state: a state is
+// the user's own judgement, and this is only what the transcript reports.
 const (
 	giveUpLineMin = 12
 	giveUpLineMax = 300
 )
 
-// giveUpPhrases are the ways people say they backed something out. Kept
-// narrow: "failed" and "broken" describe the world, not a decision about it,
-// and matching them would mark most sessions in any store.
+// giveUpPhrases are the ways people say they backed something out. Kept to
+// reports of a reversal — the decision to undo — and deliberately not to
+// descriptions of failure. "didn't work", "does not work", "failed", "broken"
+// are how nearly every debugging session opens ("the retry doesn't work when
+// the queue is full") and how an assistant hedges ("if that doesn't work, we
+// can add an index"); matching them marked half of ordinary sessions as dead
+// ends. A reversal is a narrower, verifiable event: something was in, and was
+// taken back out.
 var giveUpPhrases = []string{
-	// English.
-	"reverted", "rolled back", "rolling back", "backed out", "back it out",
-	"gave up on", "giving up on", "abandoned that", "abandoned this",
-	"dropped that approach", "scrap that", "did not work", "didn't work",
-	"does not work", "doesn't work", "that approach failed", "undid the",
-	// Russian.
-	"откатил", "откатили", "откатываю", "вернул как было", "вернули как было",
-	"не сработал", "не заработал", "не помогло", "не получилось",
-	"отказались от", "отбросил", "отменил изменен",
+	// English — reversals only.
+	"reverted", "rolled back", "rolling back", "roll it back",
+	"backed out", "back it out", "gave up on", "giving up on",
+	"abandoned that", "abandoned this", "abandoned the",
+	"dropped that approach", "dropped this approach", "scrap that",
+	"undid the", "undo the change", "reverting the",
+	// Russian — reversals only.
+	"откатил", "откатили", "откатываю", "откатывать",
+	"вернул как было", "вернули как было", "вернул обратно", "вернули обратно",
+	"отказались от", "отказался от", "отбросил", "отменил изменен",
 }
 
 // GiveUpLine reports whether a line says an approach was tried and dropped.

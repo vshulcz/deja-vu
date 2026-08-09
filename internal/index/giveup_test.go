@@ -11,7 +11,8 @@ func TestGiveUpLineKeepsReportsAndDropsEverythingElse(t *testing.T) {
 		"reverted the retry cap, it made the queue worse",
 		"откатили пул соединений, стало хуже",
 		"we backed out the migration and went with the view instead",
-		"the sidecar approach did not work, dropping it",
+		"abandoned the sidecar approach and went back to the cron job",
+		"gave up on the websocket path, polling it is",
 	}
 	for _, l := range reports {
 		if _, ok := GiveUpLine(l); !ok {
@@ -26,7 +27,13 @@ func TestGiveUpLineKeepsReportsAndDropsEverythingElse(t *testing.T) {
 		"// reverted in the previous release",
 		// Too short to say anything, and too long to be a statement.
 		"reverted",
-		// Ordinary failure talk describes the world, not a decision about it.
+		// Ordinary failure talk describes the world, not a decision about it —
+		// this is how nearly every debugging session opens, and it must not
+		// mark the session as a dead end.
+		"the webhook retry doesn't work when the queue is full",
+		"if that does not work, we can add an index on created_at",
+		"the sidecar approach did not work, still digging",
+		"не сработал ретрай при переполнении очереди, смотрю почему",
 		"the build failed on the arm runner again",
 	}
 	for _, l := range notReports {
