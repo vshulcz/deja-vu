@@ -35,7 +35,18 @@ type CommandUse struct {
 	Runs     int
 	Sessions int
 	Last     time.Time
+	// ByProject counts distinct sessions per project, so a caller can apply the
+	// trust policy — a command that ran only in a withheld project must not
+	// surface, and the count shown must exclude withheld sessions. Empty on a
+	// table built before this field existed; the version bump forces the
+	// rebuild that fills it. Capped, so a command run everywhere does not bloat.
+	ByProject map[string]int `json:",omitempty"`
 }
+
+// commandProjectCap bounds the per-command project map. A command run in more
+// projects than this is ubiquitous; the extra keys say nothing new and cost
+// bytes across the whole table.
+const commandProjectCap = 24
 
 func commandsPath(dir string) string { return filepath.Join(dir, commandsFile) }
 
@@ -45,6 +56,9 @@ func buildCommands(tmp string, ss []model.Session) {
 	type acc struct {
 		use      CommandUse
 		sessions map[string]bool
+		// byProject holds the distinct session keys seen per project, so the
+		// stored count is of distinct sessions, not records.
+		byProject map[string]map[string]bool
 	}
 	by := map[string]*acc{}
 	for _, s := range ss {
@@ -63,11 +77,17 @@ func buildCommands(tmp string, ss []model.Session) {
 			}
 			a := by[low]
 			if a == nil {
-				a = &acc{use: CommandUse{Command: cmd}, sessions: map[string]bool{}}
+				a = &acc{use: CommandUse{Command: cmd}, sessions: map[string]bool{}, byProject: map[string]map[string]bool{}}
 				by[low] = a
 			}
 			a.use.Runs++
 			a.sessions[key] = true
+			if a.byProject[s.Project] == nil && len(a.byProject) < commandProjectCap {
+				a.byProject[s.Project] = map[string]bool{}
+			}
+			if seen := a.byProject[s.Project]; seen != nil {
+				seen[key] = true
+			}
 			if m.Time.After(a.use.Last) {
 				a.use.Last = m.Time
 			}
@@ -79,6 +99,10 @@ func buildCommands(tmp string, ss []model.Session) {
 			continue
 		}
 		a.use.Sessions = len(a.sessions)
+		a.use.ByProject = make(map[string]int, len(a.byProject))
+		for proj, keys := range a.byProject {
+			a.use.ByProject[proj] = len(keys)
+		}
 		out = append(out, a.use)
 	}
 	if len(out) == 0 {

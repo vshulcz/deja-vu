@@ -73,3 +73,39 @@ func TestCommandHistoryRejectsAMultilineLookup(t *testing.T) {
 		t.Error("a compound command was endorsed on its harmless first line")
 	}
 }
+
+// A command that ran only in a withheld project must not surface, and the count
+// shown must exclude withheld sessions. ByProject carries the per-project split
+// so the caller can apply its trust policy.
+func TestCommandsCarryPerProjectCounts(t *testing.T) {
+	dir := t.TempDir()
+	mk := func(id, project string) model.Session {
+		return model.Session{
+			Harness: "claude", ID: id, Project: project,
+			Messages: []model.Message{
+				{Role: "user", Text: "run it"},
+				{Role: "command", Text: "go test ./..."},
+			},
+		}
+	}
+	ss := []model.Session{
+		mk("l1", "local"), mk("l2", "local"),
+		mk("p1", "imported:peer"), mk("p2", "imported:peer"), mk("p3", "imported:peer"),
+	}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	use, ok := CommandHistory(dir, "go test ./...")
+	if !ok {
+		t.Fatal("the recurring command was not recorded")
+	}
+	if use.ByProject["local"] != 2 || use.ByProject["imported:peer"] != 3 {
+		t.Fatalf("per-project counts wrong: %v", use.ByProject)
+	}
+	if use.Sessions != 5 {
+		t.Errorf("machine-wide count wrong: %d", use.Sessions)
+	}
+}

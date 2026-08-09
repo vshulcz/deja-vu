@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	indexPkg "github.com/vshulcz/deja-vu/internal/index"
 )
 
 func toolHookRun(t *testing.T, payload string) string {
@@ -160,5 +162,54 @@ func TestToolHookFileScopingIsLoadBearing(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "/work/gamma")
 	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"config.go"},"session_id":"now","cwd":"/work/gamma"}`); got != "" {
 		t.Errorf("a file in no known project produced a line: %q", got)
+	}
+}
+
+// The command line honours the trust policy: a command that ran only in a
+// withheld project stays silent, and the count excludes withheld sessions.
+func TestToolHookCommandHonoursTrustPolicy(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	// A local session running a distinctive command.
+	writeClaudeFixture(t, filepath.Join(root, "m", "l1.jsonl"), "l1", []string{
+		`{"type":"user","sessionId":"l1","cwd":"/m","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"deploy"}}`,
+		`{"type":"assistant","sessionId":"l1","cwd":"/m","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"terraform apply -auto-approve"}}]}}`,
+	})
+	if err := indexPkg.Ensure(indexPkg.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// Import three peer sessions running a different distinctive command.
+	in := filepath.Join(tmp, "batch")
+	if err := os.MkdirAll(in, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for i := 1; i <= 3; i++ {
+		id := "pe" + string(rune('0'+i))
+		b.WriteString(`{"harness":"claude","session_id":"` + id + `","project":"peerproj","role":"user","text":"peer deploy","time":"2026-07-2` + string(rune('0'+i)) + `T10:00:00Z"}` + "\n")
+		b.WriteString(`{"harness":"claude","session_id":"` + id + `","project":"peerproj","role":"command","text":"helmfile sync --peer-only","time":"2026-07-2` + string(rune('0'+i)) + `T10:01:00Z"}` + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(in, "deja-sync-peer.jsonl"), []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := indexPkg.Import(indexPkg.DefaultDir(), in); err != nil {
+		t.Fatal(err)
+	}
+	// Rebuild so commands.gob mines the imported sessions too.
+	if err := indexPkg.Ensure(indexPkg.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// Deny imported for the auto activation.
+	pol := filepath.Join(os.Getenv("HOME"), ".config", "deja", "policy.json")
+	if err := os.MkdirAll(filepath.Dir(pol), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pol, []byte(`{"activations":{"auto":{"imported":false}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The peer-only command must stay silent under the deny policy.
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"helmfile sync --peer-only"},"session_id":"now"}`); got != "" {
+		t.Errorf("a command that ran only in a withheld project surfaced: %q", got)
 	}
 }

@@ -37,10 +37,12 @@ import (
 // 24: tokens() now folds NFD to NFC, so postings keys for accented words change
 // shape. A store built before the fold keyed "café" decomposed; the rebuild
 // re-derives every key on the composed form so an NFC query reaches it (#1098).
-// 25: the fixes.gob sidecar (error → the command that settled it) is written
-// only by a full rebuild, so a store built before it existed answered `deja
-// fix` with a false "no session ran a command after that error". The bump
-// forces the one rebuild that mines it.
+// 25: the fixes.gob and commands.gob sidecars are written only by a full
+// rebuild, so a store built before they existed answered `deja fix` with a
+// false "no session ran a command after that error" and the hook-tool command
+// line with nothing — or, once the field was added, without the per-project
+// session counts the trust policy needs. The bump forces the one rebuild that
+// mines them both.
 const version = 25
 const maxIndexedText = 64 * 1024
 

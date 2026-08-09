@@ -102,12 +102,30 @@ func commandHookLine(dir, cmd string) string {
 	if !ok {
 		return ""
 	}
+	// A hook that fires unasked is the auto activation. Count only the sessions
+	// in projects the trust policy allows, so a command that ran only in a
+	// withheld project stays silent and the number shown excludes withheld
+	// sessions. A table built before ByProject existed carries none; fall back
+	// to the machine-wide count so an un-rebuilt index still answers.
+	sessions := use.Sessions
+	if len(use.ByProject) > 0 {
+		pol := policy.Load()
+		sessions = 0
+		for proj, n := range use.ByProject {
+			if pol.Allows(policy.ActivationAuto, proj) {
+				sessions += n
+			}
+		}
+	}
+	if sessions < 1 {
+		return ""
+	}
 	when := ""
 	if !use.Last.IsZero() {
 		when = ", last " + use.Last.Local().Format("2006-01-02")
 	}
 	return fmt.Sprintf("This machine has run that command in %s%s.",
-		toolSessionCount(use.Sessions), when)
+		toolSessionCount(sessions), when)
 }
 
 func fileHookLine(dir, path string) string {
