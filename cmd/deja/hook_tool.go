@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -102,6 +104,16 @@ func commandHookLine(dir, cmd string) string {
 }
 
 func fileHookLine(dir, path string) string {
+	// FileSessions matches on the file's basename, so without scoping "main.go"
+	// or "README.md" collects every project's file of that name — the line then
+	// claims a history this file does not have and points `deja blame` at a
+	// pile of other repos. Count only sessions in the project being worked in,
+	// unless the stored path is the exact one (which cannot collide).
+	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+	projects := digest.ProjectNameCandidates(cwd)
 	// A hook that fires unasked is the auto activation, so a session the trust
 	// policy withholds must not even be counted here.
 	pol := policy.Load()
@@ -109,6 +121,9 @@ func fileHookLine(dir, path string) string {
 	var last time.Time
 	for _, meta := range index.FileSessions(dir, path) {
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
+			continue
+		}
+		if !fileMetaInScope(meta, path, projects) {
 			continue
 		}
 		sessions++
@@ -125,6 +140,28 @@ func fileHookLine(dir, path string) string {
 	}
 	return fmt.Sprintf("%s has been worked on in %s%s — `deja blame %s` has the history.",
 		search.SafeText(baseName(path)), toolSessionCount(sessions), when, search.SafeText(baseName(path)))
+}
+
+// fileMetaInScope keeps a session only if it worked on this exact path (an
+// absolute path cannot collide across projects) or if it belongs to the
+// project being worked in now. It is what stops a same-named file in an
+// unrelated repo from being counted.
+func fileMetaInScope(meta index.SessionMeta, path string, projects []string) bool {
+	for _, t := range meta.Touched {
+		if t == path {
+			return true
+		}
+	}
+	proj := strings.TrimPrefix(meta.Project, "imported:")
+	for _, cand := range projects {
+		if cand == "" {
+			continue
+		}
+		if proj == cand || strings.HasSuffix(proj, "/"+cand) || strings.HasSuffix(cand, "/"+proj) {
+			return true
+		}
+	}
+	return false
 }
 
 func baseName(p string) string {
