@@ -181,8 +181,9 @@ func main() {
 }
 
 type questionDetail struct {
-	tier  string
-	top10 []string
+	tier     string
+	top10    []string
+	topCount int
 	// evidence recall: how many of the question's answer sessions appear in
 	// the top-k, divided by how many exist — LongMemEval's official metric,
 	// stricter than any-hit on multi-evidence questions.
@@ -275,6 +276,9 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	elapsed := time.Since(t0)
 	hitCounts = append(hitCounts, len(ranked))
 	detail := questionDetail{tier: string(result.Tier)}
+	if len(hits) > 0 {
+		detail.topCount = hits[0].Count
+	}
 	if len(ranked) > 10 {
 		detail.top10 = ranked[:10]
 	} else {
@@ -343,6 +347,7 @@ func runPrecision(questions []lmeQuestion) {
 	}
 	var surfaced, exactish int
 	byTier := map[string]int{}
+	strengthHist := map[string]int{}
 	start := time.Now()
 	for i := range questions {
 		j := (i + 1) % n
@@ -366,6 +371,16 @@ func runPrecision(questions []lmeQuestion) {
 			if detail.tier != "relevance" {
 				exactish++
 			}
+			switch {
+			case detail.topCount <= 1:
+				strengthHist["count<=1"]++
+			case detail.topCount <= 3:
+				strengthHist["count 2-3"]++
+			case detail.topCount <= 6:
+				strengthHist["count 4-6"]++
+			default:
+				strengthHist["count 7+"]++
+			}
 		}
 	}
 	fmt.Printf("LongMemEval-S · PRECISION (prompt_i × haystack_{i+1}, answer never present)\n")
@@ -375,5 +390,11 @@ func runPrecision(questions []lmeQuestion) {
 	fmt.Printf("\nby tier of the surfaced recall:\n")
 	for t, c := range byTier {
 		fmt.Printf("  %-12s %d\n", t, c)
+	}
+	fmt.Printf("\nstrength (match count) of the surfaced top hit:\n")
+	for _, k := range []string{"count<=1", "count 2-3", "count 4-6", "count 7+"} {
+		if strengthHist[k] > 0 {
+			fmt.Printf("  %-10s %d\n", k, strengthHist[k])
+		}
 	}
 }
