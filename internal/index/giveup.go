@@ -88,6 +88,7 @@ func GiveUpLine(l string) (string, bool) {
 		}
 	}
 	low := strings.ToLower(l)
+	lineIsQuestion := strings.HasSuffix(strings.TrimSpace(low), "?")
 	for _, p := range giveUpPhrases {
 		i := strings.Index(low, p)
 		if i < 0 {
@@ -95,9 +96,10 @@ func GiveUpLine(l string) (string, bool) {
 		}
 		// A reflexive Russian verb is a thing rolling by itself, not someone
 		// rolling a change back: "откатил" is a substring of "откатился" ("the
-		// ball rolled under the couch"). The "-ся"/"-сь" suffix is the tell.
-		rest := low[i+len(p):]
-		if strings.HasPrefix(rest, "ся") || strings.HasPrefix(rest, "сь") {
+		// ball rolled under the couch"). The reflexive particle "-ся"/"-сь"
+		// comes after the gender/number vowel — откатил·ся, откатил·а·сь,
+		// откатил·о·сь, откатил·и·сь — so check for it with the vowel optional.
+		if reflexiveSuffix(low[i+len(p):]) {
 			continue
 		}
 		clause := reversalClause(low, i, len(p))
@@ -107,7 +109,7 @@ func GiveUpLine(l string) (string, bool) {
 		// reverting tomorrow"), and a bare question ("should we have reverted
 		// this?") all describe a reversal that was considered, refused, or is
 		// still ahead — not one that was done.
-		if clauseNegatesOrDefers(clause, p) {
+		if clauseNegatesOrDefers(clause, p, lineIsQuestion) {
 			continue
 		}
 		return l, true
@@ -137,37 +139,53 @@ func reversalClause(low string, phraseAt, phraseLen int) string {
 	return low[start:end]
 }
 
-// clauseNegatesOrDefers reports whether the clause holding the reversal phrase
-// says the reversal did not happen: a negator anywhere in the clause, a
-// conditional/future frame, or the clause being the interrogative one (it and
-// the "?" that ends the line are the same clause).
-func clauseNegatesOrDefers(clause, phrase string) bool {
-	for _, neg := range []string{
-		"not ", "n't ", "never ", "without ", "avoid ",
-		"не ", "нельзя ", "без ",
-	} {
-		if strings.Contains(clause, neg) && strings.Index(clause, neg) < strings.Index(clause, phrase) {
+// reflexiveSuffix reports whether the text right after a Russian reversal verb
+// is a reflexive particle — with the gender/number vowel that precedes it in
+// the past tense optional: ся, сь, ась, ось, ись, ялись, and so on.
+func reflexiveSuffix(rest string) bool {
+	for _, s := range []string{"ся", "сь", "ась", "ось", "ись", "лся", "лась", "лось", "лись"} {
+		if strings.HasPrefix(rest, s) {
 			return true
 		}
 	}
-	for _, defer_ := range []string{
+	return false
+}
+
+// clauseNegatesOrDefers reports whether the clause holding the reversal phrase
+// says the reversal did not happen: a negator or a conditional/future modal
+// that governs the phrase (both must sit BEFORE it — "if we roll it back", not
+// "reverted it since it would break"), or the clause being interrogative.
+func clauseNegatesOrDefers(clause, phrase string, lineIsQuestion bool) bool {
+	pi := strings.Index(clause, phrase)
+	// A negator or modal only governs the reversal when it comes before it. A
+	// modal after the phrase belongs to a different verb — "reverted it since
+	// it would corrupt state" is a report, not a hypothetical.
+	for _, w := range []string{
+		"not ", "n't ", "never ", "without ", "avoid ",
 		"if ", "would ", "could ", "should ", "might ", "planning to ",
-		"going to ", "i'll ", "we'll ", "will ", "если ", "надо ли ", "стоит ли ",
+		"going to ", "i'll ", "we'll ", "will ",
+		"не ", "нельзя ", "без ", "если ", "надо ли ", "стоит ли ",
 	} {
-		if strings.Contains(clause, defer_) {
+		if j := strings.Index(clause, w); j >= 0 && j < pi {
 			return true
 		}
 	}
 	// The clause itself is the question — "did we roll it back, or is it still
-	// live?" — even when the "?" lands in a later clause. An interrogative lead
-	// is the tell; a declarative report ("откатили, но не помогло") has none.
+	// live?" — even when the "?" lands in a later clause. Strong question words
+	// only ever lead a question; the copulas (is/was/are/were) also lead a
+	// passive report ("was rolled back after review"), so those reject only
+	// when the line actually ends in "?".
 	c := strings.TrimSpace(clause)
-	for _, q := range []string{
-		"did ", "do ", "does ", "is ", "are ", "was ", "were ", "can ",
-		"why ", "what ", "how ", "when ", "whether ",
-	} {
+	for _, q := range []string{"did ", "do ", "does ", "why ", "what ", "how ", "when ", "whether ", "can "} {
 		if strings.HasPrefix(c, q) {
 			return true
+		}
+	}
+	if lineIsQuestion {
+		for _, q := range []string{"is ", "are ", "was ", "were "} {
+			if strings.HasPrefix(c, q) {
+				return true
+			}
 		}
 	}
 	return strings.HasSuffix(c, "?")

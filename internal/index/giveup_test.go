@@ -103,8 +103,11 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		// Question with an internal separator.
 		"did we roll it back, or is it still live?",
 		"should we have reverted, or patched forward?",
-		// Reflexive Russian verb, not a reversal action.
+		// Reflexive Russian verb (all genders/numbers), not a reversal action.
 		"мяч откатился под диван и застрял там надолго",
+		"деталь откатилась назад и упала со стола",
+		"колесо откатилось в сторону от станка",
+		"камни откатились вниз по склону после дождя",
 		// A diff removed-line is not a report of a reversal.
 		"- reverted the old migration helper",
 	}
@@ -121,6 +124,11 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		"we backed out the migration and went with the view instead",
 		"* reverted the caching layer, it broke ordering",
 		"> rolled back the migration after the DBA complained",
+		// A modal AFTER the phrase belongs to another verb — still a report.
+		"reverted it since it would corrupt state otherwise",
+		"reverted the index because a full scan could deadlock",
+		// Subject-elided passive report is not a question.
+		"was rolled back after review, all good now",
 	}
 	for _, l := range reports {
 		if _, ok := GiveUpLine(l); !ok {
