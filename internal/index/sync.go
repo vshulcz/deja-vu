@@ -758,6 +758,48 @@ func fileEndsWithNewline(f *os.File) bool {
 	return buf[0] == '\n'
 }
 
+// mergeCappedStrings unions a and b, keeping a's order first and dropping
+// duplicates, then caps the result. Used to carry an imported session's earlier
+// Touched files across a re-import instead of overwriting them.
+func mergeCappedStrings(a, b []string, limit int) []string {
+	if len(b) == 0 {
+		return a
+	}
+	seen := make(map[string]bool, len(a)+len(b))
+	out := make([]string, 0, len(a)+len(b))
+	for _, s := range append(append([]string(nil), a...), b...) {
+		if s == "" || seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+// mergeCappedU64 is mergeCappedStrings for the hash lists (Asked, Hit).
+func mergeCappedU64(a, b []uint64, limit int) []uint64 {
+	if len(b) == 0 {
+		return a
+	}
+	seen := make(map[uint64]bool, len(a)+len(b))
+	out := make([]uint64, 0, len(a)+len(b))
+	for _, v := range append(append([]uint64(nil), a...), b...) {
+		if seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
 func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Record, metas map[string]SessionMeta) error {
 	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
@@ -825,6 +867,14 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			if old.Updated.After(meta.Updated) {
 				meta.Updated = old.Updated
 			}
+			// A re-import carries only the records new since last time; the ones
+			// behind the earlier Touched/Asked/Hit are in the ledger and skipped,
+			// so recomputing from this batch alone would drop them. Union with what
+			// the session already had — earlier entries first — so a file a peer
+			// edited in an earlier batch stays blamable (#1024 follow-up).
+			meta.Touched = mergeCappedStrings(old.Touched, meta.Touched, touchedFileCap)
+			meta.Asked = mergeCappedU64(old.Asked, meta.Asked, askedQuestionCap)
+			meta.Hit = mergeCappedU64(old.Hit, meta.Hit, frictionSessionCap)
 		} else {
 			meta.Ord = nextOrd
 			nextOrd++
