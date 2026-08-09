@@ -88,7 +88,6 @@ func GiveUpLine(l string) (string, bool) {
 		}
 	}
 	low := strings.ToLower(l)
-	lineIsQuestion := strings.HasSuffix(strings.TrimSpace(low), "?")
 	for _, p := range giveUpPhrases {
 		i := strings.Index(low, p)
 		if i < 0 {
@@ -109,7 +108,7 @@ func GiveUpLine(l string) (string, bool) {
 		// reverting tomorrow"), and a bare question ("should we have reverted
 		// this?") all describe a reversal that was considered, refused, or is
 		// still ahead — not one that was done.
-		if clauseNegatesOrDefers(clause, p, lineIsQuestion) {
+		if clauseNegatesOrDefers(clause, p) {
 			continue
 		}
 		return l, true
@@ -155,7 +154,7 @@ func reflexiveSuffix(rest string) bool {
 // says the reversal did not happen: a negator or a conditional/future modal
 // that governs the phrase (both must sit BEFORE it — "if we roll it back", not
 // "reverted it since it would break"), or the clause being interrogative.
-func clauseNegatesOrDefers(clause, phrase string, lineIsQuestion bool) bool {
+func clauseNegatesOrDefers(clause, phrase string) bool {
 	pi := strings.Index(clause, phrase)
 	// A negator or modal only governs the reversal when it comes before it. A
 	// modal after the phrase belongs to a different verb — "reverted it since
@@ -172,20 +171,20 @@ func clauseNegatesOrDefers(clause, phrase string, lineIsQuestion bool) bool {
 	}
 	// The clause itself is the question — "did we roll it back, or is it still
 	// live?" — even when the "?" lands in a later clause. Strong question words
-	// only ever lead a question; the copulas (is/was/are/were) also lead a
-	// passive report ("was rolled back after review"), so those reject only
-	// when the line actually ends in "?".
+	// only ever lead a question.
 	c := strings.TrimSpace(clause)
 	for _, q := range []string{"did ", "do ", "does ", "why ", "what ", "how ", "when ", "whether ", "can "} {
 		if strings.HasPrefix(c, q) {
 			return true
 		}
 	}
-	if lineIsQuestion {
-		for _, q := range []string{"is ", "are ", "was ", "were "} {
-			if strings.HasPrefix(c, q) {
-				return true
-			}
+	// A copula (is/was/are/were) leads both a passive report ("was rolled back
+	// after review") and a question ("was that rolled back"). The tell is what
+	// follows it: a passive report puts the reversal phrase straight after the
+	// copula, a question inserts a subject ("that", "this", "those") first.
+	for _, cop := range []string{"is ", "are ", "was ", "were "} {
+		if strings.HasPrefix(c, cop) && !strings.HasPrefix(c, cop+phrase) {
+			return true
 		}
 	}
 	return strings.HasSuffix(c, "?")

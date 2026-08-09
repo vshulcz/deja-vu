@@ -110,6 +110,10 @@ func TestGiveUpLineRejectsUnrealisedReversals(t *testing.T) {
 		"камни откатились вниз по склону после дождя",
 		// A diff removed-line is not a report of a reversal.
 		"- reverted the old migration helper",
+		// A copula question without a "?" is still a question, not a report.
+		"was that rolled back",
+		"is that reverted yet",
+		"were those changes reverted",
 	}
 	for _, l := range notReports {
 		if _, ok := GiveUpLine(l); ok {
