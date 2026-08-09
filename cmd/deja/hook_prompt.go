@@ -117,7 +117,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND. n=8 to leave room after
 	// excluding the current/too-fresh sessions.
-	ranked, matched, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
+	ranked, matched, strong, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return nil
 	}
@@ -132,11 +132,15 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if !pol.Allows(policy.ActivationAuto, s.Project) {
 			continue
 		}
-		// matched counts only informative terms — ones rare enough in this
-		// corpus to identify something. One of those is a weak claim but a
-		// fair answer to a question that was actually asked, so it is served
-		// without the déjà vu line; two or more earn the announcement.
-		if matched[i] < 1 || (matched[i] < 2 && !hasIdentifierTerm(terms)) {
+		// matched counts informative terms; strong counts the rare ones — a
+		// term that identifies something on its own rather than merely beating
+		// the corpus average. Two informative terms earn the announcement. A
+		// single term is a weak claim, so it only injects when that term is
+		// strong: "pgbouncer" answers a question, "problem" does not, and this
+		// hook pays its cost on every message the user sends. Measured on
+		// cross-paired prompts whose answer is absent, the old bar injected on
+		// 94% of them; half of those rested on one ordinary word.
+		if matched[i] < 1 || (matched[i] < 2 && strong[i] < 1) {
 			continue
 		}
 		if matched[i] >= 2 {

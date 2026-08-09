@@ -285,7 +285,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched, termsKnown, matched, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
+	metas, _, anyMatched, termsKnown, matched, _, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
 		return sessionMetaMatches(meta, o)
 	})
 	if rerr != nil {
@@ -359,6 +359,16 @@ func relevanceResult(ss []model.Session, matched int) SearchResult {
 // are informative regardless — small corpora never reach the ratio bar.
 const dejaVuIDFFloor = 2.0
 
+// dejaVuStrongIDFFloor is the bar for a term rare enough to justify an
+// UNPROMPTED recall on its own. The ordinary floor admits words that merely
+// beat the average — in a corpus of a few thousand sessions that includes
+// "session", "problem", "думать" — and the auto-recall hook fires on every
+// message, so one such word was enough to inject on nearly any prompt.
+// Measured on cross-paired prompts (the answer never present), the hook would
+// have injected on 94% of them; requiring a strong term for the single-match
+// case removes the half that rests on one ordinary word.
+const dejaVuStrongIDFFloor = 3.0
+
 // ProjectRelevant ranks the current project's sessions by how well they match
 // the prompt terms — without reconstructing an AND query, which poisons on
 // filler words. Each session scores the IDF-weighted sum of prompt terms it
@@ -369,7 +379,7 @@ const dejaVuIDFFloor = 2.0
 // the prompt terms. matched reports, per returned session, how many distinct
 // INFORMATIVE terms hit (idf >= dejaVuIDFFloor) — callers gate on it so
 // generic words cannot manufacture a confident "you have been here".
-func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, error) {
+func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, []int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -378,35 +388,35 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	// rebuild — which every user hits on an index-format upgrade.
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if ok {
 		defer unlock()
 	}
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	metas, matched, rerr := relevantMetasMatched(dir, m, projects, terms, n)
+	metas, matched, strong, rerr := relevantMetasMatched(dir, m, projects, terms, n)
 	if rerr != nil {
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
 		// stays quiet on an error.
-		return nil, nil, rerr
+		return nil, nil, nil, rerr
 	}
 	if len(metas) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	out, err := sessionsForMetas(dir, metas)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return out, matched, nil
+	return out, matched, strong, nil
 }
 
-func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, error) {
-	metas, informative, _, _, _, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
-	return metas, informative, err
+func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, error) {
+	metas, informative, _, _, _, strong, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
+	return metas, informative, strong, err
 }
 
 // relevantMetasCounts additionally reports how many terms of ANY frequency
@@ -424,7 +434,7 @@ func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n in
 // Returns, in order: the ranked metas, their informative-term counts, their
 // any-frequency term counts, how many query terms the corpus knows at all,
 // and that pre-truncation total.
-func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int, int, error) {
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int, int, []int, error) {
 	// A real bucket read error (a corrupt or unreadable postings file) must not
 	// pass as "the term is absent": that silently drops the term from the
 	// ranking. Remember the first one and hand it back so the caller triggers
@@ -449,13 +459,14 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	if len(inProject) == 0 {
-		return nil, nil, nil, 0, 0, nil
+		return nil, nil, nil, 0, 0, nil, readErr
 	}
 	br := newBucketReader(dir)
 	defer br.close()
 	totalDocs := float64(len(m.Sessions)) + 1
 	score := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
+	strongTerms := map[uint32]int{}
 	anyTerms := map[uint32]int{}
 	// perMessage tracks how many distinct terms hit each message (record
 	// offset) of a session: co-occurrence inside one message is a far
@@ -612,6 +623,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			idf = 0.1
 		}
 		informative := idf >= dejaVuIDFFloor || minDF <= 2
+		// Rare enough to identify something on its own: either well past the
+		// ordinary bar, or living in a single session of the whole corpus.
+		strong := idf >= dejaVuStrongIDFFloor || minDF <= 1
 		for ord := range hit {
 			mm := perMessage[ord]
 			if mm == nil {
@@ -637,6 +651,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			if informative {
 				matchedTerms[ord]++
 			}
+			if strong {
+				strongTerms[ord]++
+			}
 		}
 	}
 	type scored struct {
@@ -644,6 +661,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		score   float64
 		matched int
 		any     int
+		strong  int
 	}
 	ranked := make([]scored, 0, len(score))
 	for ord, sc := range score {
@@ -677,10 +695,10 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if matchedTerms[ord] > 1 {
 			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
 		}
-		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
+		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord]})
 	}
 	if len(ranked) == 0 {
-		return nil, nil, nil, termsKnown, 0, readErr
+		return nil, nil, nil, termsKnown, 0, nil, readErr
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score != ranked[j].score {
@@ -702,12 +720,14 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	metas := make([]SessionMeta, 0, len(ranked))
 	matched := make([]int, 0, len(ranked))
 	anyMatched := make([]int, 0, len(ranked))
+	strong := make([]int, 0, len(ranked))
 	for _, r := range ranked {
 		metas = append(metas, r.meta)
 		matched = append(matched, r.matched)
 		anyMatched = append(anyMatched, r.any)
+		strong = append(strong, r.strong)
 	}
-	return metas, matched, anyMatched, termsKnown, matchedTotal, readErr
+	return metas, matched, anyMatched, termsKnown, matchedTotal, strong, readErr
 }
 
 // loadSessionRecords materializes one session's transcript from the index.

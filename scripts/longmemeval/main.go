@@ -50,6 +50,7 @@ func main() {
 	skipAbs := flag.Bool("skip-abs", false, "skip abstention (_abs) questions, matching cleaned-dataset runs")
 	verbose := flag.Bool("v", false, "log per-question results")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
+	hookPrecision := flag.Int("hook-precision", 0, "measure the auto-recall hook gate on N cross-paired prompts (0 = off)")
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
 	flag.Parse()
@@ -80,6 +81,10 @@ func main() {
 			}
 		}
 		questions = kept
+	}
+	if *hookPrecision > 0 {
+		runHookPrecision(questions, *hookPrecision)
+		return
 	}
 	if *precision {
 		runPrecision(questions)
@@ -449,4 +454,106 @@ func runAgentCases(questions []lmeQuestion, n int) {
 			return
 		}
 	}
+}
+
+// buildHaystackIndex writes a question's haystack as Claude transcripts and
+// indexes it, returning the index dir. Shared by the search and hook probes so
+// both measure the same ingestion the CLI runs.
+func buildHaystackIndex(q lmeQuestion) (string, func(), error) {
+	tmp, err := os.MkdirTemp("", "lmehook")
+	if err != nil {
+		return "", func() {}, err
+	}
+	cleanup := func() { _ = os.RemoveAll(tmp) }
+	proj := filepath.Join(tmp, "claude", "-work-lme")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		return "", cleanup, err
+	}
+	for si, turns := range q.HaystackSessions {
+		id := q.HaystackSessionID[si]
+		ts := parseLMEDate(q.HaystackDates[si])
+		f, err := os.Create(filepath.Join(proj, id+".jsonl"))
+		if err != nil {
+			return "", cleanup, err
+		}
+		enc := json.NewEncoder(f)
+		for ti, turn := range turns {
+			var content any = turn.Content
+			if turn.Role == "assistant" {
+				content = []any{map[string]any{"type": "text", "text": turn.Content}}
+			}
+			if err := enc.Encode(map[string]any{
+				"type": turn.Role, "sessionId": id,
+				"timestamp": ts.Add(time.Duration(ti) * time.Minute).UTC().Format(time.RFC3339),
+				"message":   map[string]any{"role": turn.Role, "content": content},
+			}); err != nil {
+				_ = f.Close()
+				return "", cleanup, err
+			}
+		}
+		if err := f.Close(); err != nil {
+			return "", cleanup, err
+		}
+	}
+	dir := filepath.Join(tmp, "index.db")
+	_ = os.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	_ = os.Setenv("DEJA_INDEX_DIR", dir)
+	if err := index.Ensure(dir, "claude", true, nil); err != nil {
+		return "", cleanup, err
+	}
+	return dir, cleanup, nil
+}
+
+// runHookPrecision measures the UNPROMPTED path: the auto-recall hook fires on
+// every user message, so its false-positive rate is paid on every message.
+// Each prompt is paired with another question's haystack — the answer is never
+// present — and the probe reports how often the hook's gate would still inject.
+// It replicates the gate rather than calling the hook: ProjectRelevant with the
+// prompt's terms, then the matched-count bar the hook applies.
+func runHookPrecision(questions []lmeQuestion, limit int) {
+	if limit > 0 && limit < len(questions) {
+		questions = questions[:limit]
+	}
+	n := len(questions)
+	var wouldInject, oneTerm, twoPlus int
+	start := time.Now()
+	for i := range questions {
+		j := (i + 1) % n
+		dir, cleanup, err := buildHaystackIndex(questions[j])
+		if err != nil {
+			cleanup()
+			fatal(err)
+		}
+		terms := index.RelevanceTerms(questions[i].Question)
+		_, matched, strong, err := index.ProjectRelevant(dir, nil, terms, 8)
+		if err != nil {
+			cleanup()
+			fatal(err)
+		}
+		best, bestStrong := 0, 0
+		for k, m := range matched {
+			if m > best {
+				best = m
+			}
+			if k < len(strong) && strong[k] > bestStrong {
+				bestStrong = strong[k]
+			}
+		}
+		switch {
+		case best >= 2:
+			twoPlus++
+			wouldInject++
+		case best == 1:
+			oneTerm++
+			if bestStrong >= 1 {
+				wouldInject++ // a rare term still earns a single-match inject
+			}
+		}
+		cleanup()
+	}
+	fmt.Printf("auto-recall HOOK precision (prompt_i × haystack_{i+1}, answer never present)\n")
+	fmt.Printf("pairs: %d · wall: %s\n\n", n, time.Since(start).Round(time.Second))
+	fmt.Printf("would inject (current gate) %4d / %d = %.1f%%\n", wouldInject, n, 100*float64(wouldInject)/float64(n))
+	fmt.Printf("  on ONE informative term %4d / %d = %.1f%%   (the bar a rarity test would raise)\n", oneTerm, n, 100*float64(oneTerm)/float64(n))
+	fmt.Printf("  on TWO or more          %4d / %d = %.1f%%   (would still inject)\n", twoPlus, n, 100*float64(twoPlus)/float64(n))
 }

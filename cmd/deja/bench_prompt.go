@@ -166,7 +166,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}
