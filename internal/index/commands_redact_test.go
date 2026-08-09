@@ -170,3 +170,33 @@ func TestCrossBaseSplitsBothSeparators(t *testing.T) {
 		}
 	}
 }
+
+// Switching IsCurrentVersion/Damaged to the cached manifest read must not let a
+// stale cache mask a store that changed under it: the cache is keyed on
+// manifest.gob's mtime+size, so a corrupted manifest is still seen as damaged.
+func TestCachedManifestChecksSeeCorruption(t *testing.T) {
+	dir := t.TempDir()
+	ss := []model.Session{{
+		Harness: "claude", ID: "s", Project: "p",
+		Messages: []model.Message{{Role: "user", Text: "hi"}},
+	}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if !IsCurrentVersion(dir) {
+		t.Fatal("a fresh build is not current")
+	}
+	if Damaged(dir) {
+		t.Fatal("a fresh build reads as damaged")
+	}
+	// Corrupt the manifest — a different size/mtime invalidates the cache.
+	if err := os.WriteFile(filepath.Join(dir, "manifest.gob"), []byte("not a gob at all, longer than before"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !Damaged(dir) {
+		t.Error("a corrupted manifest is not detected through the cache")
+	}
+}

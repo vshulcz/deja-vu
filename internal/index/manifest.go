@@ -16,7 +16,11 @@ func IsCurrentVersion(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	// Cached: the hook path calls this next to Damaged and FileSessions in one
+	// short-lived process, so decoding the manifest three times per action was
+	// pure waste. The cache is keyed on manifest.gob's mtime+size, so a changed
+	// or corrupt store still forces a fresh read.
+	m, err := readManifestCached(dir)
 	return err == nil && m.Version == version
 }
 
@@ -342,7 +346,10 @@ func Damaged(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifest(dir)
+	// Cached like IsCurrentVersion: same short-lived hook process, same store.
+	// A manifest that fails to decode is not cached (readManifestCached returns
+	// the error), so corruption is still detected here.
+	m, err := readManifestCached(dir)
 	if err != nil {
 		// A manifest that is not there is "not built", which doctor reports
 		// already. One that is there but will not decode is a different story:
