@@ -339,7 +339,13 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	reportPhase("indexing messages", len(ss))
 	wrote := map[string]bool{}
 	var wroteMu sync.Mutex
-	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
+	sp, err := newSpiller(tmp)
+	if err != nil {
+		_ = rw.Close()
+		return err
+	}
+	defer sp.cleanup()
+	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			reportAdvance(1)
 			key := s.Harness + ":" + s.ID
@@ -406,10 +412,12 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	dropEmptySessions(&m, wrote)
 	buildCooccur(tmp, ss)
-	reportPhase("writing index", len(buckets))
-	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
+	reportPhase("writing index", sp.bucketCount())
+	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
 	}
+	// Before the swap: whatever is left in tmp ships inside the index.
+	sp.cleanup()
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
@@ -653,7 +661,13 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	reportPhase("indexing messages", len(ss))
 	wrote := map[string]bool{}
 	var wroteMu sync.Mutex
-	buckets, err := indexTextParallel(func(push func(tokenJob)) error {
+	sp, err := newSpiller(tmp)
+	if err != nil {
+		_ = rw.Close()
+		return err
+	}
+	defer sp.cleanup()
+	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
 			reportAdvance(1)
 			key := s.Harness + ":" + s.ID
@@ -719,10 +733,12 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	}
 	dropEmptySessions(&m, wrote)
 	buildCooccur(tmp, ss)
-	reportPhase("writing index", len(buckets))
-	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
+	reportPhase("writing index", sp.bucketCount())
+	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
 	}
+	// Before the swap: whatever is left in tmp ships inside the index.
+	sp.cleanup()
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
@@ -901,19 +917,28 @@ func signalLine(l string) bool {
 	return false
 }
 
-func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time, tool bool) {
+// eachIndexKey calls fn once per distinct token a message earns. Both the
+// in-memory incremental path and the spilling full build go through it, so
+// neither can drift from the other on what a message indexes to.
+func eachIndexKey(text string, when time.Time, fn func(tok string)) {
 	seen := map[string]bool{}
 	for _, tok := range append(indexKeys(text), dateTokens(when)...) {
 		if seen[tok] {
 			continue
 		}
 		seen[tok] = true
+		fn(tok)
+	}
+}
+
+func addIndexKeys(buckets bucketPostings, text string, off int64, sid uint32, when time.Time, tool bool) {
+	eachIndexKey(text, when, func(tok string) {
 		b := bucket(tok)
 		if buckets[b] == nil {
 			buckets[b] = map[string][]posting{}
 		}
 		buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: sid, Tool: tool})
-	}
+	})
 }
 
 func writeBucketsConcurrent(dir string, buckets bucketPostings) error {
