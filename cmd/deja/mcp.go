@@ -673,6 +673,13 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 						fmt.Fprintf(&b, "  → %s\n", recallListingLine(c))
 					}
 				}
+				// The files that work touched, for a few dozen bytes. Without
+				// them an agent that has just learned "we solved this before"
+				// still has to search the tree for where — and that search
+				// costs far more context than naming the paths here does.
+				if paths := recallTouchedLine(dir, h.Session); paths != "" {
+					fmt.Fprintf(&b, "  files it touched: %s\n", paths)
+				}
 			}
 		}
 		served++

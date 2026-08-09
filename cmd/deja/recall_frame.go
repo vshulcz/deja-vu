@@ -1,8 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // Recalled transcript text is historical data an attacker may have influenced
@@ -76,3 +81,75 @@ const (
 	// conclusion arrives as a truncated fragment, which reads worse than none.
 	recallConclusionsMin = 160
 )
+
+// recallTouchedFiles bounds how many paths recall names under its best hit:
+// enough to point at the work, short enough that it never crowds the answer.
+const recallTouchedFiles = 4
+
+// recallTouchedLine renders the files the session worked on, from the manifest
+// rather than the hit (a hit carries only matching messages). Empty when the
+// session touched nothing recorded — a conversation with no file work.
+func recallTouchedLine(dir string, s model.Session) string {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return ""
+	}
+	for _, m := range metas {
+		if m.ID != s.ID || len(m.Touched) == 0 {
+			continue
+		}
+		paths := m.Touched
+		extra := 0
+		if len(paths) > recallTouchedFiles {
+			extra = len(paths) - recallTouchedFiles
+			paths = paths[:recallTouchedFiles]
+		}
+		// Say the shared directory once instead of on every path: four files
+		// under one repo repeat its absolute prefix four times, which is most
+		// of the line's cost and none of its meaning. Relative paths are also
+		// what the agent will type next.
+		root := commonDirPrefix(paths)
+		shown := paths
+		if root != "" {
+			shown = make([]string, len(paths))
+			for i, p := range paths {
+				shown[i] = strings.TrimPrefix(p, root)
+			}
+		}
+		out := strings.Join(shown, ", ")
+		if extra > 0 {
+			out += fmt.Sprintf(" (+%d more)", extra)
+		}
+		if root != "" {
+			out = fmt.Sprintf("%s in %s", out, strings.TrimSuffix(root, "/"))
+		}
+		return search.SafeLine(out)
+	}
+	return ""
+}
+
+// commonDirPrefix returns the longest directory prefix every path shares,
+// ending in "/" — "" when they diverge at the root or there is only one path
+// worth naming a root for.
+func commonDirPrefix(paths []string) string {
+	if len(paths) < 2 {
+		return ""
+	}
+	pre := paths[0]
+	for _, p := range paths[1:] {
+		for !strings.HasPrefix(p, pre) {
+			cut := strings.LastIndexByte(strings.TrimSuffix(pre, "/"), '/')
+			if cut <= 0 {
+				return ""
+			}
+			pre = pre[:cut+1]
+		}
+	}
+	if i := strings.LastIndexByte(strings.TrimSuffix(pre, "/"), '/'); i > 0 && !strings.HasSuffix(pre, "/") {
+		pre = pre[:i+1]
+	}
+	if len(pre) < 2 || !strings.HasSuffix(pre, "/") {
+		return ""
+	}
+	return pre
+}
