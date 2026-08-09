@@ -88,7 +88,7 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("notes file is a symlink")
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,34 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 	if now.IsZero() {
 		now = time.Now()
 	}
+	if err := padTrailingNewline(f); err != nil {
+		return err
+	}
 	return json.NewEncoder(f).Encode(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
+}
+
+// padTrailingNewline writes a newline into the append handle f when the file's
+// existing content does not end with one. notes.jsonl is documented as a
+// hand-editable file, so an editor that drops the final newline is a real
+// input: without this, the next record is glued onto the last line and the
+// reader — which decodes only the first JSON value per line — silently drops
+// it. It reads the last byte through f's own descriptor (fstat + pread), so
+// there is no second path lookup to race against the symlink guard above.
+// Best effort: a stat or read error leaves the append untouched.
+func padTrailingNewline(f *os.File) error {
+	info, err := f.Stat()
+	if err != nil || info.Size() == 0 {
+		return nil
+	}
+	last := make([]byte, 1)
+	if _, err := f.ReadAt(last, info.Size()-1); err != nil {
+		return nil
+	}
+	if last[0] == '\n' {
+		return nil
+	}
+	_, err = f.Write([]byte{'\n'})
+	return err
 }
 
 func LoadNotes() []model.Session {
@@ -294,7 +321,7 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 		equalStrings(last.Tags, NormalizeTags(tags)) {
 		return nil
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}
@@ -308,6 +335,9 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 	stamp := ""
 	if !srcTS.IsZero() {
 		stamp = srcTS.UTC().Format(time.RFC3339Nano)
+	}
+	if err := padTrailingNewline(f); err != nil {
+		return err
 	}
 	return json.NewEncoder(f).Encode(note{
 		TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text,
