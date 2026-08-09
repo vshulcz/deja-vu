@@ -206,3 +206,48 @@ func TestFixesForFiltersByProject(t *testing.T) {
 		t.Fatal("the local pair was dropped too")
 	}
 }
+
+// A generic remedy settles several different errors. Keying dedupe on the
+// command alone deleted the pair for every signature but the newest, so the
+// remedy became unfindable for the others.
+func TestGenericRemedyIsKeptPerError(t *testing.T) {
+	now := time.Now()
+	s := model.Session{
+		Harness: "claude", ID: "s", Project: "p",
+		Messages: []model.Message{
+			{Role: "tool-output", Text: "cannot find module 'a'", Time: now},
+			{Role: "command", Text: "go mod tidy", Time: now.Add(time.Minute)},
+			{Role: "tool-output", Text: "ok", Time: now.Add(2 * time.Minute)},
+			{Role: "tool-output", Text: "cannot find module 'b'", Time: now.Add(3 * time.Minute)},
+			{Role: "command", Text: "go mod tidy", Time: now.Add(4 * time.Minute)},
+			{Role: "tool-output", Text: "ok", Time: now.Add(5 * time.Minute)},
+		},
+	}
+	dir := t.TempDir()
+	// Second corroborating session so the pairs clear the precision gate.
+	buildFixes(dir, []model.Session{s, s}, func(m model.Session) string { return m.Harness + ":" + m.ID })
+	sigs := map[uint64]bool{}
+	for _, p := range ReadFixes(dir) {
+		sigs[p.Sig] = true
+	}
+	if len(sigs) < 2 {
+		t.Fatalf("the shared remedy was kept for only %d error(s), want 2", len(sigs))
+	}
+}
+
+// A heredoc immediately after the error must not abandon the window: the real
+// one-liner two records on is the remedy.
+func TestFixLooksPastAnUnusableCommand(t *testing.T) {
+	now := time.Now()
+	long := "echo " + strings.Repeat("x", fixCommandMax+10)
+	ms := []model.Message{
+		{Role: "tool-output", Text: "psql: connection refused on port 5432", Time: now},
+		{Role: "command", Text: long, Time: now.Add(time.Minute)},
+		{Role: "command", Text: "brew services start postgresql", Time: now.Add(2 * time.Minute)},
+		{Role: "tool-output", Text: "ok", Time: now.Add(3 * time.Minute)},
+	}
+	pairs := fixPairsIn(ms, "claude:s", "p")
+	if len(pairs) != 1 || pairs[0].Command != "brew services start postgresql" {
+		t.Fatalf("the real remedy after a heredoc was not found: %+v", pairs)
+	}
+}

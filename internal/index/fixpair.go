@@ -90,12 +90,15 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 		return
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].When.After(out[j].When) })
-	// One command per error signature is enough to answer with; the rest are
-	// the same fix from other days.
+	// One command per (error, command) is enough — the rest are the same fix
+	// from other days. Keying on the command alone was wrong: a generic remedy
+	// (`go mod tidy`, `npm install`) is the answer to several different errors,
+	// and dropping all but its newest occurrence deleted the pair for every
+	// other signature it settled.
 	seen := map[string]bool{}
 	kept := out[:0]
 	for _, p := range out {
-		k := strings.ToLower(p.Command)
+		k := fixKey(p)
 		if seen[k] {
 			continue
 		}
@@ -167,7 +170,10 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			}
 			cmd := strings.TrimSpace(firstLineOf(ms[j].Text))
 			if cmd == "" || len(cmd) > fixCommandMax {
-				break
+				// A heredoc or pasted script right after the error is not the
+				// remedy; keep scanning the window for the real one-liner two
+				// records on, instead of abandoning the error entirely.
+				continue
 			}
 			if repeatsError(ms, j+1, j+fixQuietAfter, sig) {
 				break
