@@ -213,3 +213,37 @@ func TestToolHookCommandHonoursTrustPolicy(t *testing.T) {
 		t.Errorf("a command that ran only in a withheld project surfaced: %q", got)
 	}
 }
+
+// An inspection command carries no reusable signal, and a PreToolUse hook must
+// not repeat the same line to the same agent session on every action.
+func TestToolHookSkipsInspectionAndDedupes(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for _, id := range []string{"a", "b", "c"} {
+		writeClaudeFixture(t, filepath.Join(root, "p", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"go"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"git status --short"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"make deploy-prod REGION=eu"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	// git status ran in 3 sessions but is inspection — silent.
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status --short"},"session_id":"agent1"}`); got != "" {
+		t.Errorf("an inspection command produced a line: %q", got)
+	}
+	// A real deploy command speaks once...
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent1"}`); got == "" {
+		t.Fatal("a command with real history stayed silent")
+	}
+	// ...but not a second time in the same agent session.
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent1"}`); got != "" {
+		t.Errorf("the same line was re-injected to the same session: %q", got)
+	}
+	// A different agent session still hears it.
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent2"}`); got == "" {
+		t.Error("a fresh agent session was wrongly deduped")
+	}
+}

@@ -518,6 +518,26 @@ func rotateHookseen(p, sid string) {
 	_ = os.Rename(tmp, p)
 }
 
+// rememberInjectedIDs records arbitrary dedupe tokens against a session, so a
+// hook that injects something other than a session (a command, a file line)
+// can avoid repeating it to the same agent turn after turn.
+func rememberInjectedIDs(dir, sid string, ids ...string) {
+	if sid == "" {
+		return
+	}
+	f, err := os.OpenFile(dir+".hookseen", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if fi, err := f.Stat(); err == nil && fi.Size() > 1<<20 {
+		return
+	}
+	for _, id := range ids {
+		fmt.Fprintf(f, "%s %s\n", sid, id)
+	}
+}
+
 // dejaVuLineDue rate-limits the visible line: a déjà vu that fires every
 // prompt is wallpaper, and wallpaper trains the user to ignore the real
 // moments. Context still flows to the agent regardless.

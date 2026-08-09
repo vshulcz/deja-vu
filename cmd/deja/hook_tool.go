@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,6 +66,14 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	if line == "" {
 		return nil
 	}
+	// A PreToolUse hook fires on every action, so the same fact must not be
+	// re-injected turn after turn. Dedupe per agent session on the line itself,
+	// the way hook-plan and hook-prompt dedupe what they inject.
+	token := "tool:" + shortHash(line)
+	if alreadyInjected(dir, input.SessionID)[token] {
+		return nil
+	}
+	rememberInjectedIDs(dir, input.SessionID, token)
 	if len(line) > toolHookMaxBytes {
 		line = line[:toolHookMaxBytes]
 	}
@@ -98,6 +108,14 @@ func toolHookLine(dir string, input toolHookInput) string {
 }
 
 func commandHookLine(dir, cmd string) string {
+	// "You have run this before" is worthless for an inspection command the
+	// agent runs constantly — git status, git diff, ls, cat. On a real store
+	// these are the top of the table (git status --short in 116 sessions), and
+	// a line about them on every action is pure noise. The value is in a build,
+	// a test, a deploy — a command that does something.
+	if inspectionCommand(cmd) {
+		return ""
+	}
 	use, ok := index.CommandHistory(dir, cmd)
 	if !ok {
 		return ""
@@ -194,6 +212,37 @@ func baseName(p string) string {
 		return p[i+1:]
 	}
 	return p
+}
+
+// inspectionCommand reports whether the command only looks at state rather than
+// changing it — the class whose reuse-count says nothing worth an injection.
+func inspectionCommand(cmd string) bool {
+	f := strings.Fields(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(cmd), "$ ")))
+	if len(f) == 0 {
+		return true
+	}
+	switch f[0] {
+	case "ls", "cat", "pwd", "echo", "which", "whoami", "date", "env", "printenv",
+		"head", "tail", "less", "more", "stat", "file", "find", "tree", "df", "du",
+		"ps", "top", "htop", "id", "uname", "hostname", "clear", "history":
+		return true
+	case "git":
+		if len(f) > 1 {
+			switch f[1] {
+			case "status", "diff", "log", "show", "branch", "remote", "stash",
+				"blame", "reflog", "describe", "rev-parse", "ls-files":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// shortHash fingerprints the injected line for per-session dedupe.
+func shortHash(s string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(s))
+	return strconv.FormatUint(h.Sum64(), 16)
 }
 
 // toolSessionCount words a count for a line read inside an action.
