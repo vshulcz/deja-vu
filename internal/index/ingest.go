@@ -660,9 +660,10 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	// Redact in place before anything reads the sessions, so the record log,
-	// the sidecars (cooccur, fixes) and the per-session metadata all see the
-	// same scrubbed text. Doing it per-message into the record only — as this
-	// path used to — left ss raw, and buildFixes/buildCooccur then mined
+	// the sidecars (cooccur, fixes, commands) and the per-session metadata all
+	// see the same scrubbed text. Doing it per-message into the record only — as
+	// this path used to — left ss raw, and buildFixes/buildCommands/buildCooccur
+	// then mined
 	// secrets straight out of the unredacted commands.
 	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
