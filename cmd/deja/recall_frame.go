@@ -66,3 +66,13 @@ func neutralizeTag(tag string) string {
 	tag = strings.NewReplacer("&lt;", "", "&gt;", "", "<", "", ">", "", " ", "").Replace(tag)
 	return "(" + tag + ")"
 }
+
+const (
+	// recallConclusionsReserve keeps room after the best hit's conclusions for
+	// the remaining hits and the "N more match(es)" line, so the block never
+	// eats the page it is meant to explain.
+	recallConclusionsReserve = 900
+	// recallConclusionsMin is the smallest block worth printing: below this a
+	// conclusion arrives as a truncated fragment, which reads worse than none.
+	recallConclusionsMin = 160
+)
