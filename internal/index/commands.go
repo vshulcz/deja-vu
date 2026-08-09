@@ -35,18 +35,33 @@ type CommandUse struct {
 	Runs     int
 	Sessions int
 	Last     time.Time
-	// ByProject counts distinct sessions per project, so a caller can apply the
-	// trust policy — a command that ran only in a withheld project must not
-	// surface, and the count shown must exclude withheld sessions. Empty on a
-	// table built before this field existed; the version bump forces the
-	// rebuild that fills it. Capped, so a command run everywhere does not bloat.
-	ByProject map[string]int `json:",omitempty"`
+	// ByProject holds the per-project split, so a caller can apply the trust
+	// policy: exclude withheld projects from both the count AND the last-run
+	// date. Storing only a count leaked the date — a command surfaced from an
+	// allowed project still printed a withheld project's more-recent run. Empty
+	// on a table built before this field existed; the version bump forces the
+	// rebuild that fills it.
+	ByProject map[string]ProjectUse `json:",omitempty"`
+}
+
+// ProjectUse is one project's share of a command: how many distinct sessions
+// ran it there and when it last did.
+type ProjectUse struct {
+	Sessions int
+	Last     time.Time
 }
 
 // commandProjectCap bounds the per-command project map. A command run in more
 // projects than this is ubiquitous; the extra keys say nothing new and cost
 // bytes across the whole table.
 const commandProjectCap = 24
+
+// projAcc accumulates one project's distinct sessions and last run for a
+// command during a build.
+type projAcc struct {
+	sessions map[string]bool
+	last     time.Time
+}
 
 func commandsPath(dir string) string { return filepath.Join(dir, commandsFile) }
 
@@ -56,9 +71,8 @@ func buildCommands(tmp string, ss []model.Session) {
 	type acc struct {
 		use      CommandUse
 		sessions map[string]bool
-		// byProject holds the distinct session keys seen per project, so the
-		// stored count is of distinct sessions, not records.
-		byProject map[string]map[string]bool
+		// byProject holds the distinct session keys and last-run per project.
+		byProject map[string]*projAcc
 	}
 	by := map[string]*acc{}
 	for _, s := range ss {
@@ -77,16 +91,19 @@ func buildCommands(tmp string, ss []model.Session) {
 			}
 			a := by[low]
 			if a == nil {
-				a = &acc{use: CommandUse{Command: cmd}, sessions: map[string]bool{}, byProject: map[string]map[string]bool{}}
+				a = &acc{use: CommandUse{Command: cmd}, sessions: map[string]bool{}, byProject: map[string]*projAcc{}}
 				by[low] = a
 			}
 			a.use.Runs++
 			a.sessions[key] = true
-			if a.byProject[s.Project] == nil && len(a.byProject) < commandProjectCap {
-				a.byProject[s.Project] = map[string]bool{}
+			pa := a.byProject[s.Project]
+			if pa == nil {
+				pa = &projAcc{sessions: map[string]bool{}}
+				a.byProject[s.Project] = pa
 			}
-			if seen := a.byProject[s.Project]; seen != nil {
-				seen[key] = true
+			pa.sessions[key] = true
+			if m.Time.After(pa.last) {
+				pa.last = m.Time
 			}
 			if m.Time.After(a.use.Last) {
 				a.use.Last = m.Time
@@ -99,10 +116,7 @@ func buildCommands(tmp string, ss []model.Session) {
 			continue
 		}
 		a.use.Sessions = len(a.sessions)
-		a.use.ByProject = make(map[string]int, len(a.byProject))
-		for proj, keys := range a.byProject {
-			a.use.ByProject[proj] = len(keys)
-		}
+		a.use.ByProject = cappedProjects(a.byProject)
 		out = append(out, a.use)
 	}
 	if len(out) == 0 {
@@ -118,6 +132,34 @@ func buildCommands(tmp string, ss []model.Session) {
 		out = out[:commandsMax]
 	}
 	_ = writeGob(commandsPath(tmp), out)
+}
+
+// cappedProjects keeps at most commandProjectCap projects for a command,
+// choosing the ones with the most sessions (ties broken by name) so the choice
+// is deterministic across rebuilds — a map-order cap could silence a different
+// project on each build. All projects are counted; only storage is trimmed, and
+// only for a command run in more projects than the cap.
+func cappedProjects(byProject map[string]*projAcc) map[string]ProjectUse {
+	names := make([]string, 0, len(byProject))
+	for proj := range byProject {
+		names = append(names, proj)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		ni, nj := len(byProject[names[i]].sessions), len(byProject[names[j]].sessions)
+		if ni != nj {
+			return ni > nj
+		}
+		return names[i] < names[j]
+	})
+	if len(names) > commandProjectCap {
+		names = names[:commandProjectCap]
+	}
+	out := make(map[string]ProjectUse, len(names))
+	for _, proj := range names {
+		pa := byProject[proj]
+		out[proj] = ProjectUse{Sessions: len(pa.sessions), Last: pa.last}
+	}
+	return out
 }
 
 // ReadCommands loads the recurring-command table. An index built before it

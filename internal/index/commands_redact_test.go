@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -79,12 +80,13 @@ func TestCommandHistoryRejectsAMultilineLookup(t *testing.T) {
 // so the caller can apply its trust policy.
 func TestCommandsCarryPerProjectCounts(t *testing.T) {
 	dir := t.TempDir()
+	when := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
 	mk := func(id, project string) model.Session {
 		return model.Session{
 			Harness: "claude", ID: id, Project: project,
 			Messages: []model.Message{
 				{Role: "user", Text: "run it"},
-				{Role: "command", Text: "go test ./..."},
+				{Role: "command", Text: "go test ./...", Time: when},
 			},
 		}
 	}
@@ -102,10 +104,53 @@ func TestCommandsCarryPerProjectCounts(t *testing.T) {
 	if !ok {
 		t.Fatal("the recurring command was not recorded")
 	}
-	if use.ByProject["local"] != 2 || use.ByProject["imported:peer"] != 3 {
+	if use.ByProject["local"].Sessions != 2 || use.ByProject["imported:peer"].Sessions != 3 {
 		t.Fatalf("per-project counts wrong: %v", use.ByProject)
+	}
+	if use.ByProject["imported:peer"].Last.IsZero() {
+		t.Error("per-project last-run not recorded")
 	}
 	if use.Sessions != 5 {
 		t.Errorf("machine-wide count wrong: %d", use.Sessions)
+	}
+}
+
+// The last-run date must come from allowed projects only. A command run more
+// recently in a withheld project must not print that project's date when it
+// surfaces from an allowed one.
+func TestCommandLastIsPerProject(t *testing.T) {
+	dir := t.TempDir()
+	old := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
+	cmd := func(id, project string, when time.Time) model.Session {
+		return model.Session{
+			Harness: "claude", ID: id, Project: project,
+			Messages: []model.Message{
+				{Role: "user", Text: "run"},
+				{Role: "command", Text: "make release", Time: when},
+			},
+		}
+	}
+	ss := []model.Session{
+		cmd("l1", "local", old), cmd("l2", "local", old),
+		cmd("p1", "imported:peer", newer), cmd("p2", "imported:peer", newer),
+	}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	use, ok := CommandHistory(dir, "make release")
+	if !ok {
+		t.Fatal("not recorded")
+	}
+	// The allowed project's last is the older date; the machine-wide Last is
+	// the newer withheld one. The per-project split must keep them apart.
+	if !use.ByProject["local"].Last.Equal(old) {
+		t.Errorf("allowed project's last-run wrong: %v", use.ByProject["local"].Last)
+	}
+	if !use.Last.Equal(newer) {
+		t.Errorf("machine-wide last should be the newer date: %v", use.Last)
 	}
 }
