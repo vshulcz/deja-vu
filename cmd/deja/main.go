@@ -166,6 +166,7 @@ var commands = map[string]command{
 	"restore":         func(dir string, rest []string) error { return runRestore(dir, rest, os.Stdout) },
 	"friction":        func(dir string, rest []string) error { return runFriction(dir, rest, os.Stdout) },
 	"fix":             func(dir string, rest []string) error { return runFix(dir, rest, os.Stdout) },
+	"how":             func(dir string, rest []string) error { return runHow(dir, rest, os.Stdout) },
 	"log":             runLog,
 	"sync":            runSync,
 	"ctx":             cmdCtx,
@@ -2368,6 +2369,7 @@ Usage:
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n]
   deja fix "<error text>" [--limit n]  (what was run after this error before)
+  deja how <what> [--project name] [--limit n]  (commands this machine actually ran)
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]

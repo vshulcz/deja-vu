@@ -122,6 +122,18 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string", "description": "Absolute, relative, or bare filename."}, "harness": map[string]any{"type": "string"}, "project": map[string]any{"type": "string"}, "since": map[string]any{"type": "string", "description": "Age such as 30d or 24h."}, "limit": map[string]any{"type": "number"}, "all": map[string]any{"type": "boolean"}}, "required": []string{"path"}},
 			},
 			{
+				"name":        "fix",
+				"description": "You just hit an error — before diagnosing it, ask what this machine ran the last time that same error appeared. Pass the failing output verbatim (a whole stack trace is fine; every line is checked). Returns the commands that followed that error in past sessions without it coming back. Evidence from the user's own history, not a guaranteed fix: read the command, decide whether it applies, and say so if you reuse it. An empty result means this machine has no record of that error being followed by a command.",
+				"annotations": map[string]any{"title": "What was run after this error before", "readOnlyHint": true, "openWorldHint": false},
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "string", "description": "The failing output, verbatim. Multi-line pastes are fine."}, "limit": map[string]any{"type": "number", "description": "Max pairs to return (default 3)."}}, "required": []string{"error"}},
+			},
+			{
+				"name":        "how",
+				"description": "How this user actually runs a thing on this machine — the real command with the real flags, taken from commands their agents ran, ordered by how many separate sessions ran it. Call before inventing a build, test, deploy or debug invocation: a guessed command is plausible and fails on this setup. Query with the tool or target ('go test', 'docker compose', 'terraform apply', a script name). Optionally scope to a project. Command records are kept out of ordinary search, so this is the only way to reach them.",
+				"annotations": map[string]any{"title": "How this is run here", "readOnlyHint": true, "openWorldHint": false},
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"what": map[string]any{"type": "string", "description": "Tool or target, e.g. 'go test', 'docker compose', a script name. Every word must appear in the command."}, "project": map[string]any{"type": "string", "description": "Optional project substring filter."}, "limit": map[string]any{"type": "number", "description": "Max commands to return (default 8)."}}, "required": []string{"what"}},
+			},
+			{
 				"name":        "remember",
 				"description": "Store one durable decision or conclusion so a future session can recall it. Call right after a decision is settled, a tricky bug is resolved, or the user says 'remember this', 'note that for next time', 'don't forget we chose X'. Write a single self-contained fact (e.g. 'We use Postgres advisory locks for the job queue because Redis lost messages under load'). Do NOT store transcripts, routine conversation, or anything already obvious from the code. text is required; project defaults to notes.",
 				"annotations": map[string]any{"title": "Remember a decision", "readOnlyHint": false},
@@ -252,6 +264,74 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			usage.SnapshotPolicy(dir, usage.KindBlame, text, hits, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
+	case "fix":
+		var a struct {
+			Error string    `json:"error"`
+			Limit mcpNumber `json:"limit"`
+		}
+		if err := json.Unmarshal(raw, &a); err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(a.Error) == "" {
+			return "", fmt.Errorf("error text required")
+		}
+		if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
+			return "", err
+		}
+		pairs := index.FixesFor(dir, a.Error, int(a.Limit))
+		if len(pairs) == 0 {
+			if !index.LooksLikeError(a.Error) {
+				return "That text does not read like an error line - pass the failing output itself.", nil
+			}
+			return "No session on this machine ran a command after that error.", nil
+		}
+		var fb strings.Builder
+		for _, p := range pairs {
+			when := ""
+			if !p.When.IsZero() {
+				when = " (" + p.When.Local().Format("2006-01-02") + ")"
+			}
+			fmt.Fprintf(&fb, "%s%s\n  ran next: %s\n", recallListingLine(p.Error), when, recallListingLine(p.Command))
+		}
+		return strings.TrimRight(fb.String(), "\n"), nil
+	case "how":
+		var a struct {
+			What    string    `json:"what"`
+			Project string    `json:"project"`
+			Limit   mcpNumber `json:"limit"`
+		}
+		if err := json.Unmarshal(raw, &a); err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(a.What) == "" {
+			return "", fmt.Errorf("what required")
+		}
+		if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
+			return "", err
+		}
+		entries, _, err := howEntries(dir, strings.Fields(a.What), a.Project)
+		if err != nil {
+			return "", err
+		}
+		if len(entries) == 0 {
+			return fmt.Sprintf("No command on this machine mentions %q.", a.What), nil
+		}
+		limit := int(a.Limit)
+		if limit <= 0 {
+			limit = 8
+		}
+		var hb strings.Builder
+		for i, e := range entries {
+			if i >= limit {
+				break
+			}
+			when := ""
+			if !e.Last.IsZero() {
+				when = ", last " + e.Last.Local().Format("2006-01-02")
+			}
+			fmt.Fprintf(&hb, "%s\n  ran %s in %s%s\n", recallListingLine(e.Command), pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
+		}
+		return strings.TrimRight(hb.String(), "\n"), nil
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`
