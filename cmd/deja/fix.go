@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -48,7 +49,14 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	pairs := index.FixesFor(dir, text, limit)
+	// The trust policy gates browsing everywhere else (search, friction,
+	// files); a peer's command must not surface here when imported content is
+	// withheld. FixesFor returns candidates; the cmd layer filters, as it does
+	// for every other surface.
+	pol := policy.Load()
+	pairs := index.FixesFor(dir, text, limit, func(project string) bool {
+		return pol.Allows(policy.ActivationSearch, project)
+	})
 	if len(pairs) == 0 {
 		// Saying why costs nothing and stops the next question: an error deja
 		// does not recognise as an error is a different miss from one it has

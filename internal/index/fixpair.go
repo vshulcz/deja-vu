@@ -50,6 +50,11 @@ type FixPair struct {
 	// Key is harness:id of the session it came from; When is that record's time.
 	Key  string
 	When time.Time
+	// Project is the session's project, so a caller can apply the trust policy
+	// — a peer's command must not surface when imported content is withheld.
+	// Empty on a pair mined before this field existed; the version bump that
+	// ships it forces the rebuild that fills it.
+	Project string
 }
 
 func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
@@ -60,7 +65,7 @@ func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
 func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string) {
 	var all []FixPair
 	for _, s := range ss {
-		all = append(all, fixPairsIn(s.Messages, keyOf(s))...)
+		all = append(all, fixPairsIn(s.Messages, keyOf(s), s.Project)...)
 	}
 	if len(all) == 0 {
 		return
@@ -146,7 +151,7 @@ func sharesTerm(errLine, cmd string) bool {
 }
 
 // fixPairsIn mines one session.
-func fixPairsIn(ms []model.Message, key string) []FixPair {
+func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 	var out []FixPair
 	for i, m := range ms {
 		if m.Role != roleToolOutput && m.Role != "assistant" {
@@ -167,7 +172,7 @@ func fixPairsIn(ms []model.Message, key string) []FixPair {
 			if repeatsError(ms, j+1, j+fixQuietAfter, sig) {
 				break
 			}
-			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time})
+			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
 			break
 		}
 	}
@@ -231,8 +236,10 @@ func ReadFixes(dir string) []FixPair {
 
 // FixesFor returns the commands that followed this error before, newest first.
 // The text can be a whole pasted stack trace: every line is tried, so the
-// caller does not have to know which one carries the signature.
-func FixesFor(dir, text string, limit int) []FixPair {
+// caller does not have to know which one carries the signature. allow, when
+// non-nil, gates each pair by its project — the caller applies its trust
+// policy here, since this package sits below policy.
+func FixesFor(dir, text string, limit int, allow func(project string) bool) []FixPair {
 	if limit <= 0 {
 		limit = 3
 	}
@@ -247,11 +254,15 @@ func FixesFor(dir, text string, limit int) []FixPair {
 	}
 	var out []FixPair
 	for _, p := range ReadFixes(dir) {
-		if sigs[p.Sig] {
-			out = append(out, p)
-			if len(out) >= limit {
-				break
-			}
+		if !sigs[p.Sig] {
+			continue
+		}
+		if allow != nil && !allow(p.Project) {
+			continue
+		}
+		out = append(out, p)
+		if len(out) >= limit {
+			break
 		}
 	}
 	return out

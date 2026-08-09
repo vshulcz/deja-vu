@@ -18,7 +18,7 @@ func TestFixPairsKeepTheCommandThatSettledTheError(t *testing.T) {
 		{Role: "command", Text: "curl --max-time 5 example.internal", Time: now.Add(time.Minute)},
 		{Role: "tool-output", Text: "200 OK", Time: now.Add(2 * time.Minute)},
 	}
-	pairs := fixPairsIn(ms, "claude:s1")
+	pairs := fixPairsIn(ms, "claude:s1", "p")
 	if len(pairs) != 1 {
 		t.Fatalf("want one pair, got %d", len(pairs))
 	}
@@ -36,7 +36,7 @@ func TestFixPairsDropACommandTheErrorSurvived(t *testing.T) {
 		{Role: "command", Text: "timeout 5 curl example.internal", Time: now.Add(time.Minute)},
 		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now.Add(2 * time.Minute)},
 	}
-	if pairs := fixPairsIn(ms, "claude:s1"); len(pairs) != 0 {
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 0 {
 		t.Errorf("a command the error outlived was stored as a fix: %+v", pairs)
 	}
 }
@@ -71,7 +71,7 @@ func TestBuildFixesDropsTheUnrelatedNextCommand(t *testing.T) {
 	}
 	// And a lookup finds it from the error text alone, wherever in a paste the
 	// line sits.
-	found := FixesFor(dir, "traceback follows\npsql: connection refused on port 5432\n", 3)
+	found := FixesFor(dir, "traceback follows\npsql: connection refused on port 5432\n", 3, nil)
 	if len(found) != 1 {
 		t.Errorf("the pair is not findable from the pasted error: %+v", found)
 	}
@@ -137,7 +137,7 @@ func TestUpgradedIndexRebuildsForFixes(t *testing.T) {
 	if m.Version != version {
 		t.Fatalf("fresh build stamped version %d, want %d", m.Version, version)
 	}
-	if got := FixesFor(dir, "psql: connection refused on port 5432", 3); len(got) == 0 {
+	if got := FixesFor(dir, "psql: connection refused on port 5432", 3, nil); len(got) == 0 {
 		t.Fatal("fresh build did not mine the fix pair")
 	}
 	// A store stamped by the previous version must not be judged fresh, so
@@ -147,5 +147,62 @@ func TestUpgradedIndexRebuildsForFixes(t *testing.T) {
 	m.Version = version - 1
 	if manifestFresh(m, m.Files, "") {
 		t.Fatal("a store from the previous version is judged fresh — deja fix stays empty on upgrade")
+	}
+}
+
+// A peer's command must be filterable by the trust policy, so a pair carries
+// its project and FixesFor gates each one through the caller's allow func.
+func TestFixesForFiltersByProject(t *testing.T) {
+	dir := t.TempDir()
+	ss := []model.Session{
+		{
+			Harness: "claude", ID: "local", Project: "p",
+			Messages: []model.Message{
+				{Role: "tool-output", Text: "psql: connection refused on port 5432"},
+				{Role: "command", Text: "psql -h localhost -c 'select 1'"},
+				{Role: "tool-output", Text: "ok"},
+			},
+		},
+		{
+			Harness: "claude", ID: "peer", Project: "imported:peer",
+			Messages: []model.Message{
+				{Role: "tool-output", Text: "psql: connection refused on port 5432"},
+				{Role: "command", Text: "psql -h 192.0.2.5 -c 'select 1'"},
+				{Role: "tool-output", Text: "ok"},
+			},
+		},
+	}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	q := "psql: connection refused on port 5432"
+	// No filter: both remedies are candidates, and each carries its project.
+	all := FixesFor(dir, q, 5, nil)
+	if len(all) < 2 {
+		t.Fatalf("both pairs should be mined, got %d: %+v", len(all), all)
+	}
+	sawImported := false
+	for _, p := range all {
+		if p.Project == "imported:peer" {
+			sawImported = true
+		}
+	}
+	if !sawImported {
+		t.Fatal("the imported pair lost its project")
+	}
+	// Deny imported: the peer command must not come back.
+	local := FixesFor(dir, q, 5, func(project string) bool {
+		return !strings.HasPrefix(project, "imported:")
+	})
+	for _, p := range local {
+		if strings.Contains(p.Command, "192.0.2.5") {
+			t.Errorf("a denied imported command surfaced: %q", p.Command)
+		}
+	}
+	if len(local) == 0 {
+		t.Fatal("the local pair was dropped too")
 	}
 }
