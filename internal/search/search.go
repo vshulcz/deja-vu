@@ -159,6 +159,12 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	}
 	merged := mergeSessions(ss)
 	documents := make([]bm25Document, 0, len(merged))
+	// Reused across sessions: each one refills it, so a single allocation serves all.
+	type snipCand struct {
+		text   string
+		weight int
+	}
+	snipCands := make([]snipCand, 0, 16)
 	df := make([]int, len(qtoks))
 	corpusDocuments := 0
 	corpusLength := 0
@@ -189,6 +195,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			doc.termCount = []int{0}
 			doc.userCount = []int{0}
 		}
+		snipCands = snipCands[:0]
 		for _, m := range s.Messages {
 			if o.Role != "" && !roleMatches(m.Role, o.Role) {
 				continue
@@ -215,9 +222,11 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				if doc.hit.Tier == TierClose && doc.hit.TierDetail == "" {
 					doc.hit.TierDetail = variantDetail(m.Text, qtoks, o.FuzzyVariants)
 				}
-				if len(doc.hit.Snippets) < 3 {
-					doc.hit.Snippets = append(doc.hit.Snippets, snippet(m.Text, o.Query, re))
-				}
+				// Collect every matching message with its match count; the
+				// strongest few become the excerpts after the scan. Taking the
+				// first three showed wherever a word happened to appear early
+				// rather than the passage that carries the answer.
+				snipCands = append(snipCands, snipCand{text: m.Text, weight: c})
 				if w := tokenWindow(low, qtoks); w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
 					doc.minWindow = w
 				}
@@ -230,6 +239,11 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 					doc.userCount[0] += n
 				}
 			}
+		}
+		// Strongest matches first, original order among equals, top three shown.
+		sort.SliceStable(snipCands, func(i, j int) bool { return snipCands[i].weight > snipCands[j].weight })
+		for i := 0; i < len(snipCands) && i < 3; i++ {
+			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[i].text, o.Query, re))
 		}
 		corpusDocuments++
 		corpusLength += doc.length
