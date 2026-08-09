@@ -658,6 +658,12 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		_ = rf.Close()
 		return err
 	}
+	// Redact in place before anything reads the sessions, so the record log,
+	// the sidecars (cooccur, fixes) and the per-session metadata all see the
+	// same scrubbed text. Doing it per-message into the record only — as this
+	// path used to — left ss raw, and buildFixes/buildCooccur then mined
+	// secrets straight out of the unredacted commands.
+	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
 	reportPhase("indexing messages", len(ss))
 	wrote := map[string]bool{}
@@ -705,7 +711,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 					continue
 				}
-				text := redactForIngest(&m, s.Path, msg.Text)
+				// Already redacted (and length-capped) by preRedactSessions.
+				text := msg.Text
 				// A message that is nothing but harness plumbing strips to empty
 				// (#551). Writing it would store a record with no content and give
 				// it a posting.
