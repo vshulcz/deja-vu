@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // `deja hook-tool` is recall at the moment of the action rather than at the
@@ -76,9 +77,14 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	rememberInjectedIDs(dir, input.SessionID, token)
 	line = truncateToolLine(line, toolHookMaxBytes)
+	out := frameRecall(line)
+	// Record the injection so deja's most frequent surface is not invisible to
+	// stats and the receipt. Deduped above, so this counts a distinct fact
+	// served, not every action.
+	usage.RecordResult(dir, usage.KindTool, len(out), 1, false)
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "PreToolUse"
-	resp.HookSpecificOutput.AdditionalContext = frameRecall(line)
+	resp.HookSpecificOutput.AdditionalContext = out
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil

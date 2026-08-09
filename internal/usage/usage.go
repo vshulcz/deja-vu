@@ -38,6 +38,11 @@ const (
 	// KindDejaVu marks a per-prompt recall: the user asked something their
 	// own history already answers — the product's namesake moment.
 	KindDejaVu = "dejavu"
+	// KindTool is the PreToolUse hook injection — one line about a command or
+	// file the agent is acting on. It is deduped per session, so it counts a
+	// distinct fact served, not every action. Leaving it out made deja's most
+	// frequent injection surface invisible to stats and the receipt.
+	KindTool = "tool"
 )
 
 type Event struct {
@@ -145,7 +150,7 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 		case KindRecall, KindContext, KindBlame:
 			recalls++
 			bytes += e.Bytes
-		case KindHook, KindDejaVu:
+		case KindHook, KindDejaVu, KindTool:
 			recalls++
 			bytes += e.Bytes
 			injected += e.Bytes
@@ -177,7 +182,7 @@ func TodayRaw(indexDir string) int64 {
 			continue
 		}
 		switch e.Kind {
-		case KindRecall, KindContext, KindBlame, KindHook, KindDejaVu:
+		case KindRecall, KindContext, KindBlame, KindHook, KindDejaVu, KindTool:
 			raw += e.RawBytes
 		}
 	}
@@ -201,7 +206,7 @@ func Totals(indexDir string) Summary {
 			if e.Empty {
 				empty++
 			}
-		case KindHook, KindDejaVu:
+		case KindHook, KindDejaVu, KindTool:
 			out.Injections++
 			out.InjectedSessions += e.Sessions
 			out.InjectedBytes += e.Bytes
@@ -232,7 +237,7 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 		case KindRecall, KindContext, KindBlame:
 			recalls++
 			bytes += e.Bytes
-		case KindHook, KindDejaVu:
+		case KindHook, KindDejaVu, KindTool:
 			injected++
 			injectedBytes += e.Bytes
 		}

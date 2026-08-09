@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	indexPkg "github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 func toolHookRun(t *testing.T, payload string) string {
@@ -264,5 +265,34 @@ func TestTruncateToolLineKeepsRunesWhole(t *testing.T) {
 	// A short line is returned unchanged.
 	if truncateToolLine("ok", 300) != "ok" {
 		t.Error("a short line was altered")
+	}
+}
+
+// The hook-tool injection is recorded so it is visible to stats and the
+// receipt, and deduped so it is counted once per fact, not per action.
+func TestToolHookRecordsTheInjection(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for _, id := range []string{"a", "b"} {
+		writeClaudeFixture(t, filepath.Join(root, "p", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"go"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"make deploy-prod REGION=eu"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	before := usage.Totals(dir).Injections
+	payload := `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agentX"}`
+	toolHookRun(t, payload)
+	if got := usage.Totals(dir).Injections; got != before+1 {
+		t.Fatalf("injection not recorded: before=%d after=%d", before, got)
+	}
+	// The dedup means a repeat in the same session records nothing more.
+	toolHookRun(t, payload)
+	if got := usage.Totals(dir).Injections; got != before+1 {
+		t.Errorf("a deduped repeat still recorded an injection: %d", got)
 	}
 }
