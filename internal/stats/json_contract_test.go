@@ -10,7 +10,7 @@ import (
 // through structs, slices and pointers. time.Time and the like carry no json
 // tags on their exported fields, so they contribute nothing.
 func collectJSONKeys(t reflect.Type, into map[string]bool) {
-	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {

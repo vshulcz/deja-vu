@@ -10,7 +10,7 @@ import (
 // through structs, slices, pointers and maps. Map keys are dynamic data
 // (harness names, activation names), so only the value type is walked.
 func collectDoctorKeys(t reflect.Type, into map[string]bool) {
-	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Slice || t.Kind() == reflect.Array || t.Kind() == reflect.Map {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice || t.Kind() == reflect.Array || t.Kind() == reflect.Map {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {
