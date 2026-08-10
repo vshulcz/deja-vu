@@ -39,3 +39,29 @@ func TestBlameCLIRejectsUnknownHarness(t *testing.T) {
 		t.Fatalf("blame did not name the typo'd harness: %v", err)
 	}
 }
+
+// The validators exist, but the bug is a command that parses the flag and
+// forgets to call them (blame did). Pin the wiring on every surface that takes
+// these flags so a refactor cannot quietly drop the call again.
+func TestFilterValidationWiredAcrossCommands(t *testing.T) {
+	dir := t.TempDir()
+	rejects := func(err error) bool {
+		return err != nil && (strings.Contains(err.Error(), "not a harness") || strings.Contains(err.Error(), "not a role"))
+	}
+	cases := []struct {
+		name string
+		run  func() error
+	}{
+		{"search --harness", func() error { return runSearch(dir, []string{"q", "--harness", "cluade"}, "") }},
+		{"search --role", func() error { return runSearch(dir, []string{"q", "--role", "toool"}, "") }},
+		{"last --harness", func() error { return cmdLast(dir, []string{"--harness", "cluade"}, "") }},
+		{"last --role", func() error { return cmdLast(dir, []string{"--role", "toool"}, "") }},
+		{"stats --harness", func() error { return runStats(dir, []string{"--harness", "cluade"}) }},
+		{"stats --role", func() error { return runStats(dir, []string{"--role", "toool"}) }},
+	}
+	for _, c := range cases {
+		if err := c.run(); !rejects(err) {
+			t.Errorf("%s: expected a typo rejection, got %v", c.name, err)
+		}
+	}
+}
