@@ -174,6 +174,54 @@ func main() {
 		len(probes), hit1, 100*float64(hit1)/float64(len(probes)), hit3, 100*float64(hit3)/float64(len(probes)))
 	report("noise     ", sessions, noise, *verbose)
 	reportUsage(sessions, *verbose)
+	reportOutcome(*verbose)
+}
+
+// reportOutcome asks whether a conclusion that held outranks one the transcript
+// later backed out of. Both sessions decide the same thing in the same words;
+// one carries GaveUp because its own text reports the reversal. deja marks
+// GaveUp on a printed result but does not rank by it, so an agent is handed the
+// abandoned answer as readily as the one that worked. This measures that gap —
+// the first honest number for outcome-aware ranking.
+func reportOutcome(verbose bool) {
+	base := time.Date(2026, 2, 1, 3, 4, 5, 0, time.UTC)
+	var corpus []model.Session
+	var probes []probe
+	topics := []struct{ id, terms, held, reverted string }{
+		{"retry", "retry budget backoff", "We capped retries at 3 with jitter; the pool stopped saturating.", "We tried capping retries at 3 but reverted it — it did not help and we backed it out."},
+		{"cache", "cache stampede lock", "We added a per-key lock on the cache fill; stampedes stopped.", "We tried a per-key lock on the cache fill but gave up — it deadlocked, reverted."},
+		{"index", "search index rebuild", "We rebuilt the index incrementally; the memory spike is gone.", "We tried an incremental rebuild, abandoned it — it corrupted the index, backed out."},
+		{"schema", "schema migration lock", "We ran the migration in batches; no more lock timeouts.", "We tried a batched migration but reverted — it left half-migrated rows, gave up."},
+	}
+	for i, t := range topics {
+		day := base.AddDate(0, 0, -i*3)
+		// The trap: the session that backed out is the LOUDER one — it repeats
+		// the terms while flailing — and both are equally recent. On the text
+		// alone the abandoned answer wins, which is the dead end handed to the
+		// agent. Only knowing the outcome demotes it below the quieter one that
+		// held.
+		held := session(t.id+"-held", day, []string{t.terms + " failing", t.held})
+		rev := session(t.id+"-reverted", day, []string{
+			t.terms + " " + t.terms + " again", t.terms + " still", t.reverted,
+		})
+		rev.GaveUp = true
+		corpus = append(corpus, held, rev)
+		probes = append(probes, probe{query: t.terms, decision: t.id + "-held"})
+	}
+	first := 0
+	for _, p := range probes {
+		hits, _ := search.Run(corpus, search.Options{Query: p.query, All: true})
+		if len(hits) > 0 && hits[0].Session.ID == p.decision {
+			first++
+		} else if verbose {
+			top := "—"
+			if len(hits) > 0 {
+				top = hits[0].Session.ID
+			}
+			fmt.Printf("  miss  %-30q want=%s top=%s\n", p.query, p.decision, top)
+		}
+	}
+	fmt.Printf("outcome    %d · held ranked first %d (%.0f%%)\n", len(probes), first, 100*float64(first)/float64(len(probes)))
 }
 
 // corpus builds, for each question, one deciding session and several louder

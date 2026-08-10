@@ -487,7 +487,13 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		// answered says them once and then explains. Measured on a corpus built
 		// for exactly that shape, the deciding session was ranked last of four
 		// in every case before this.
-		if decidesSomething(doc.hit.Session) {
+		//
+		// A session can both back out one attempt and land another ("reverted
+		// the pool cap; the fix was switching to pgx"). That still reached a
+		// conclusion, so it earns the boost — the give-up penalty below is what
+		// stays clear of it.
+		decided := decidesSomething(doc.hit.Session)
+		if decided {
 			score *= decisionBoost
 		}
 		// A pasted log outranks a human answer on term frequency alone: it
@@ -495,6 +501,24 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		// this existed, the paste won every question of that shape.
 		if looksPasted(doc.hit.Session) {
 			score *= pastePenalty
+		}
+		// A session whose own text says the approach was backed out and reached
+		// no other conclusion is the dead end, not the answer: handed to an
+		// agent first, it invites repeating what already failed — and the
+		// louder it flailed, the higher term frequency ranks it. Demote it
+		// below a session that held, without hiding it (the marker still
+		// explains it was reverted). Only when it decided nothing else: a
+		// session that reverted one thing and settled another keeps the boost
+		// above. Skipped only when a person accepted the session afterwards —
+		// that is a fresher judgement that overrides the transcript. The other
+		// lifecycle states do not rescue it: rejected and stale agree it was a
+		// dead end, and superseded means a better record exists, so the give-up
+		// penalty still applies. Read the state off the session, not the hit: a
+		// hit's Lifecycle is attached by the CLI after ranking, so it is empty
+		// here, while a promoted session that arrived by sync carries its state
+		// on the session itself.
+		if doc.hit.Session.GaveUp && !decided && doc.hit.Session.Lifecycle != "accepted" {
+			score *= gaveUpPenalty
 		}
 		score *= freshnessDecay(doc.hit.Session.Updated, now)
 		doc.hit.Score = score
@@ -682,6 +706,12 @@ func decidesSomething(s model.Session) bool {
 // trace someone diagnosed, a config that turned out to be wrong — so this
 // lowers them behind real discussion rather than hiding them.
 const pastePenalty = 0.5
+
+// gaveUpPenalty damps a session whose own text reports the approach was backed
+// out. Same magnitude as pastePenalty and for the same reason: it lowers the
+// dead end behind a conclusion that held, but does not hide it — "we tried this
+// and reverted" is worth reading, second, so an agent learns what not to redo.
+const gaveUpPenalty = 0.5
 
 // pasteMinLines is the length below which repetition means nothing. Three
 // identical short lines are a list; fourteen are a log.
