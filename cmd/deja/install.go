@@ -1125,7 +1125,10 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 	var next []byte
 	var err error
 	if strings.HasSuffix(path, ".jsonc") {
-		next = updateOpencodeJSONC(old, exe, uninstall)
+		next, err = updateOpencodeJSONC(old, exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
 	} else {
 		next, err = updateOpencodeJSON(old, exe, uninstall)
 		if err != nil {
@@ -1160,14 +1163,14 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, error) 
 	return append(next, '\n'), nil
 }
 
-func updateOpencodeJSONC(old []byte, exe string, uninstall bool) []byte {
+func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error) {
 	line := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
 	s := string(old)
 	if strings.TrimSpace(s) == "" {
 		if uninstall {
-			return []byte("{}\n")
+			return []byte("{}\n"), nil
 		}
-		return []byte("{\n  \"mcp\": {\n" + line + "\n  }\n}\n")
+		return []byte("{\n  \"mcp\": {\n" + line + "\n  }\n}\n"), nil
 	}
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	start, end := -1, -1
@@ -1205,10 +1208,18 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) []byte {
 		out := append([]string{}, lines[:start+1]...)
 		out = append(out, body...)
 		out = append(out, lines[end:]...)
-		return []byte(strings.Join(out, "\n") + "\n")
+		return []byte(strings.Join(out, "\n") + "\n"), nil
 	}
 	if uninstall {
-		return []byte(strings.Join(lines, "\n") + "\n")
+		return []byte(strings.Join(lines, "\n") + "\n"), nil
+	}
+	// An "mcp" key exists but brace-counting could not bound it — its opening
+	// brace is on a later line, or the braces are unbalanced. Adding a fresh
+	// block here would leave the file with two "mcp" keys, which drops the
+	// user's other servers. Refuse rather than corrupt a config that cannot be
+	// rebuilt; the caller surfaces this so the user can wire deja by hand.
+	if start >= 0 || opencodeHasMCPKey(lines) {
+		return nil, fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	insert := len(lines) - 1
 	comma := ""
@@ -1223,7 +1234,20 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) []byte {
 	out := append([]string{}, lines[:insert]...)
 	out = append(out, mcp...)
 	out = append(out, lines[insert:]...)
-	return []byte(strings.Join(out, "\n") + "\n")
+	return []byte(strings.Join(out, "\n") + "\n"), nil
+}
+
+// opencodeHasMCPKey reports whether any line declares an "mcp" key, so the
+// brace-counting editor can tell "there is a block I failed to bound" from
+// "there is no block, add one".
+func opencodeHasMCPKey(lines []string) bool {
+	for _, l := range lines {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, `"mcp"`) && strings.Contains(t, ":") {
+			return true
+		}
+	}
+	return false
 }
 
 // withAutoTargets pairs each target with its -auto sibling where one exists,

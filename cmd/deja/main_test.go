@@ -1045,16 +1045,31 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 		{"top trailing", "{\n  \"theme\": \"dark\",\n}\n", `"mcp"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := string(updateOpencodeJSONC([]byte(tc.old), "/bin/deja", false))
-			if !strings.Contains(got, tc.want) || !strings.Contains(got, `"deja"`) {
+			got, err := updateOpencodeJSONC([]byte(tc.old), "/bin/deja", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(got), tc.want) || !strings.Contains(string(got), `"deja"`) {
 				t.Fatalf("jsonc got:\n%s\nwant contains %q", got, tc.want)
 			}
-			un := string(updateOpencodeJSONC([]byte(got), "/bin/deja", true))
-			if strings.Contains(un, `"deja"`) {
+			un, err := updateOpencodeJSONC(got, "/bin/deja", true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(un), `"deja"`) {
 				t.Fatalf("uninstall left deja: %s", un)
 			}
 		})
 	}
+	// An mcp block whose opening brace is on the next line cannot be bounded by
+	// counting braces on the key's own line. Editing anyway would leave two
+	// "mcp" keys and drop the user's other servers, so it errors instead.
+	t.Run("mcp brace on next line errors, not corrupts", func(t *testing.T) {
+		braceNext := "{\n  \"mcp\":\n  {\n    \"other\": {\"type\":\"local\"}\n  }\n}\n"
+		if _, err := updateOpencodeJSONC([]byte(braceNext), "/bin/deja", false); err == nil {
+			t.Fatal("expected an error rather than a duplicate mcp block")
+		}
+	})
 }
 
 func TestRunIndexCommand(t *testing.T) {

@@ -152,8 +152,8 @@ func TestInstallWriteAndJSONEdges(t *testing.T) {
 	if _, err := updateOpencodeJSON([]byte(`{"mcp":`), "/bin/deja", false); err == nil {
 		t.Fatal("expected malformed opencode json error")
 	}
-	if got := string(updateOpencodeJSONC([]byte("{}\n"), "/bin/deja", true)); got != "{}\n" {
-		t.Fatalf("jsonc uninstall no mcp = %q", got)
+	if b, err := updateOpencodeJSONC([]byte("{}\n"), "/bin/deja", true); err != nil || string(b) != "{}\n" {
+		t.Fatalf("jsonc uninstall no mcp = %q err=%v", b, err)
 	}
 }
 
