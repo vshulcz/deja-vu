@@ -102,7 +102,7 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 			s = &model.Session{
 				ID:      r.ID,
 				Harness: "grok",
-				Project: r.CWD,
+				Project: projectName(r.CWD),
 				Path:    db,
 				Title:   r.Title,
 				Started: at,

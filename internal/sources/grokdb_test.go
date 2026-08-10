@@ -50,7 +50,11 @@ func TestParseGrokDB(t *testing.T) {
 		t.Fatalf("sessions = %d", len(ss))
 	}
 	s := ss[0]
-	if s.Harness != "grok" || s.Project != "/work/api" || s.Title != "Pool timeouts" {
+	// Project is the directory's short name, not the whole cwd path: trust
+	// policy and per-project scoping key on the same name the file-based grok
+	// parser produces (projectName), so /work/api and its sibling must both
+	// scope as "api".
+	if s.Harness != "grok" || s.Project != "api" || s.Title != "Pool timeouts" {
 		t.Fatalf("session metadata wrong: %+v", s)
 	}
 	// A user message carries a plain string, an assistant message an array of
