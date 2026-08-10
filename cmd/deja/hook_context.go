@@ -676,6 +676,16 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 	mark("names+worktrees")
 	pol := policy.Load()
 	mark("policy")
+	// The standing decisions are scoped by the same trust policy as the session
+	// digest: a project the policy withholds from auto-activation must not leak
+	// its decisions here either.
+	var allowedNames []string
+	for _, n := range names {
+		if pol.Allows(policy.ActivationAuto, n) {
+			allowedNames = append(allowedNames, n)
+		}
+	}
+	conventions := projectConventions(allowedNames, 6, 800)
 	var ss []model.Session
 	seen := map[string]bool{}
 	lookupNames := names
@@ -713,6 +723,13 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 	}
 	mark("load-sessions")
 	if len(ss) == 0 {
+		// A project can have settled decisions and no recent session left to
+		// show them (the transcript was forgotten, or aged past the window).
+		// The standing decisions still apply, so serve them alone rather than
+		// going out empty.
+		if conventions != "" {
+			return conventions, 0, 0, nil, withheld
+		}
 		// withheld travels even with nothing to show: it is the only thing
 		// that separates "the rule hid all of it" from "no history here".
 		return "", 0, 0, nil, withheld
@@ -761,8 +778,8 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 	// settled choices, and an agent should read them before the session digest,
 	// not after. Query-independent, so a convention surfaces even when nothing
 	// in the task names it — the gap plain recall cannot close.
-	if conv := projectConventions(names, 6, 800); conv != "" {
-		text = conv + "\n" + text
+	if conventions != "" {
+		text = conventions + "\n" + text
 	}
 	mark("conventions")
 	// The candidates that never made it into the digest were never served:

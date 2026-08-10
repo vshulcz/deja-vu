@@ -107,3 +107,27 @@ func TestSessionStartSurfacesADecisionTheDigestDropped(t *testing.T) {
 		t.Fatalf("the decision was already in the digest; the block proves nothing here:\n%s", text)
 	}
 }
+
+// Standing decisions are scoped by the same trust policy as the session digest:
+// a project whose origin the policy withholds from auto-activation must not have
+// its decisions injected either.
+func TestStandingDecisionsRespectTheTrustPolicy(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("CLAUDE_PROJECT_DIR", "/proj")
+
+	seedDecision(t, "proj", "decision", "we standardised on pgx pgxpolicymarker")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "promote", "decision"); err != nil {
+		t.Fatal(err)
+	}
+	// Deny local memory for auto-activation.
+	writePolicyFile(t, `{"activations":{"auto":{"local":false}}}`)
+
+	text, _, _, _, _ := hookDigestResult(dir)
+	if strings.Contains(text, "pgxpolicymarker") {
+		t.Fatalf("a policy-denied project's decision was injected into the hook:\n%s", text)
+	}
+}
