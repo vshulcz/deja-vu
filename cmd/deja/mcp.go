@@ -464,7 +464,9 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		o.FuzzyVariants = result.Variants
 	}
 	var hits []search.Hit
-	if result.Tier == search.TierRelevance {
+	if result.Tier == search.TierError {
+		hits = search.ErrorHits(ss)
+	} else if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(q))
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
@@ -514,6 +516,8 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Fuzzy {
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
+	} else if result.Tier == search.TierError {
+		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
 	} else if result.Tier == search.TierRelevance {
 		fmt.Fprintln(&b, "No exact match; sessions ranked by relevance to the whole query.")
 	}
@@ -617,7 +621,9 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 		o.FuzzyVariants = result.Variants
 	}
 	var hits []search.Hit
-	if result.Tier == search.TierRelevance {
+	if result.Tier == search.TierError {
+		hits = search.ErrorHits(ss)
+	} else if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(q))
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err

@@ -80,6 +80,11 @@ const (
 	// exact ladder finds nothing — natural-language questions rarely survive
 	// an AND over every word.
 	TierRelevance = "relevance"
+	// TierError answers a pasted error by matching it against stored friction
+	// signatures. Unlike relevance, it IS a match — the sessions returned hit
+	// the exact error — so it is shown with the error neighbourhood as the
+	// snippet, not re-scored against the paste's words.
+	TierError = "error"
 )
 
 // QueryParts separates ordinary terms from quoted phrases without changing

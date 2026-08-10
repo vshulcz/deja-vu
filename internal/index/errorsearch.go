@@ -95,7 +95,7 @@ func errorSigSearch(dir string, m Manifest, o query.Options) (SearchResult, erro
 	// it must not read as "showing N of M". Cap only when the window trimmed.
 	return SearchResult{
 		Sessions: kept,
-		Tier:     query.TierRelevance,
+		Tier:     query.TierError,
 		Total:    total,
 		Capped:   total > relevanceWindow,
 	}, nil

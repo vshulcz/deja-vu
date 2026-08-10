@@ -155,7 +155,7 @@ func TestErrorTierRanksByHowMuchOfThePasteMatched(t *testing.T) {
 	if res.Sessions[0].ID != "broad" {
 		t.Errorf("the session that hit more of the paste is not first: %q", res.Sessions[0].ID)
 	}
-	if res.Tier != query.TierRelevance {
+	if res.Tier != query.TierError {
 		t.Errorf("wrong tier %q", res.Tier)
 	}
 }

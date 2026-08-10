@@ -270,7 +270,9 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 	// Exactly the CLI/MCP code path: search.Run for exact/stem/fuzzy tiers,
 	// order-preserving RelevanceHits when the ladder degraded to relevance.
 	var hits []search.Hit
-	if result.Tier == search.TierRelevance {
+	if result.Tier == search.TierError {
+		hits = search.ErrorHits(result.Sessions)
+	} else if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHits(result.Sessions, index.RelevanceTerms(q.Question))
 	} else if hits, err = search.Run(result.Sessions, o); err != nil {
 		return 0, questionDetail{}, 0, err

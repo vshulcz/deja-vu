@@ -126,3 +126,30 @@ func TestSnippetCentresOnTheMatch(t *testing.T) {
 		t.Fatal("snippet for an absent term is empty")
 	}
 }
+
+// The error tier renders the neighbourhood it found as the snippet, without
+// re-scoring against the paste's words — a trace whose only shared token is a
+// goroutine id would otherwise show "0 matches" over the very session that hit
+// the error.
+func TestErrorHitsSnippetTheNeighbourhood(t *testing.T) {
+	ss := []model.Session{{
+		ID: "hit", Messages: []model.Message{
+			{Role: "tool-output", Text: "panic: runtime error: invalid memory address"},
+			{Role: "command", Text: "added a nil guard in worker.go"},
+		},
+	}}
+	hits := ErrorHits(ss)
+	if len(hits) != 1 {
+		t.Fatalf("hits = %d", len(hits))
+	}
+	if hits[0].Tier != TierError {
+		t.Errorf("tier = %q", hits[0].Tier)
+	}
+	if hits[0].Count == 0 || len(hits[0].Snippets) == 0 {
+		t.Fatalf("the neighbourhood was not snippeted: count=%d snips=%d", hits[0].Count, len(hits[0].Snippets))
+	}
+	joined := strings.Join(hits[0].Snippets, " ")
+	if !strings.Contains(joined, "nil guard") {
+		t.Errorf("the recovery is not in the snippet: %q", joined)
+	}
+}

@@ -39,6 +39,7 @@ const (
 	TierClose    = query.TierClose
 	TierSemantic = query.TierSemantic
 	TierStemmed  = "stemmed"
+	TierError    = query.TierError
 )
 
 func QueryParts(q string) (terms []string, phrases []string) { return query.QueryParts(q) }
@@ -1269,6 +1270,29 @@ func contextText(s string, matched bool) string {
 
 // TierRelevance mirrors query.TierRelevance for callers of this package.
 const TierRelevance = query.TierRelevance
+
+// ErrorHits renders the error-signature tier. The sessions arrive already
+// ranked and already narrowed to the neighbourhood of the pasted error, so
+// each becomes one hit whose snippets are those messages — re-scoring them
+// against the paste's words (as the relevance tier would) throws away the
+// passage the tier found and can render a real match as "0 matches".
+func ErrorHits(ss []model.Session) []Hit {
+	hits := make([]Hit, 0, len(ss))
+	for rank, s := range ss {
+		hit := Hit{Session: s, Tier: TierError, Count: len(s.Messages), Score: float64(len(ss) - rank)}
+		for _, m := range s.Messages {
+			if strings.TrimSpace(m.Text) == "" {
+				continue
+			}
+			hit.Snippets = append(hit.Snippets, snippet(m.Text, "", nil))
+			if len(hit.Snippets) == 2 {
+				break
+			}
+		}
+		hits = append(hits, hit)
+	}
+	return hits
+}
 
 // RelevanceHits wraps relevance-ranked sessions as hits WITHOUT re-scoring:
 // the index already ordered them by IDF overlap, and exact-match BM25 (which

@@ -24,10 +24,12 @@ could not tell which it had without inspecting the value. It now always returns
 the envelope, and the envelope answers the two questions a caller cannot answer
 from a list of hits:
 
-- `tier` — which tier answered: `exact`, `close`, `stemmed`, `semantic`, or
-  `relevance`. **`relevance` means nothing matched** and these are the nearest
-  sessions deja could find. Counting those as hits overstates recall, and this
-  used to be readable only as a sentence on stderr.
+- `tier` — which tier answered: `exact`, `close`, `stemmed`, `semantic`,
+  `error`, or `relevance`. **`relevance` means nothing matched** and these are
+  the nearest sessions deja could find. Counting those as hits overstates
+  recall, and this used to be readable only as a sentence on stderr. **`error`
+  IS a match** — the query was a pasted error and these sessions hit that exact
+  error (matched by signature, not by words); count them as hits.
 - `total` and `capped` — how many sessions matched, and whether a cap hid some.
 - `policy_withheld` — how many matching sessions this machine's trust policy
   kept out of the answer. Omitted when none were. Present on `search --json`,
