@@ -45,7 +45,7 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		`from sessions s join messages m on m.session_id=s.id` +
 		` where m.role in ('user','assistant')` + where +
 		` order by s.id,m.seq`
-	cmd := exec.Command("sqlite3", "-json", db, q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err

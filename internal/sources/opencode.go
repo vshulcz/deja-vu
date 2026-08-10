@@ -130,7 +130,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	cmd := exec.Command("sqlite3", "-json", db, q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	if fi, e := os.Stat(OpencodeDB()); e != nil || fi.Size() == 0 {
 		return 0, 0, nil
 	}
-	cmd := exec.Command("sqlite3", OpencodeDB(), "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
+	cmd := exec.Command("sqlite3", "-readonly", OpencodeDB(), ".timeout 5000", "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
 	b, err := cmd.Output()
 	if err != nil {
 		return 0, 0, err
@@ -286,7 +286,7 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	out, err := exec.Command("sqlite3", db, "select id from session order by time_created desc limit 1").Output()
+	out, err := exec.Command("sqlite3", "-readonly", db, ".timeout 5000", "select id from session order by time_created desc limit 1").Output()
 	if err != nil {
 		return nil, err
 	}
