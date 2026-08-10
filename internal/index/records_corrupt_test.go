@@ -9,6 +9,42 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// FirstMatch (the per-prompt hook path) probes candidate queries and used to
+// lump a scanRecords error together with "no match" and skip to the next
+// candidate, so a corrupt store looked like a prompt with nothing to recall.
+func TestFirstMatchSurfacesCorruption(t *testing.T) {
+	dir := t.TempDir()
+	ss := []model.Session{{
+		Harness: "claude", ID: "a", Project: "proj",
+		Messages: []model.Message{{Role: "user", Text: "kafka consumer lag climbing"}},
+	}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	rp := filepath.Join(dir, "records.bin")
+	b, err := os.ReadFile(rp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	off := 4
+	_, k := binary.Uvarint(b[off:])
+	off += k
+	_, k = binary.Uvarint(b[off:])
+	off += k
+	b[off] = 0xFF
+	if err := os.WriteFile(rp, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = FirstMatch(dir, []string{"kafka"}, 5)
+	if err == nil || !IsCorrupt(err) {
+		t.Fatalf("want a corrupt-index error from FirstMatch, got %v", err)
+	}
+}
+
 // The offset read path (postings resolve to record offsets) must also surface a
 // corrupt record rather than skipping it and reporting a clean result. A posting
 // offset is committed, so a record that will not decode there is corruption.

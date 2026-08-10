@@ -746,7 +746,10 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 			continue
 		}
 		ss, err := scanRecords(dir, m, o, postingOffsets(posts))
-		if err != nil || len(ss) == 0 {
+		if err != nil {
+			return nil, "", fmt.Errorf("records: %w", err)
+		}
+		if len(ss) == 0 {
 			continue
 		}
 		if len(ss) > limit {
