@@ -125,55 +125,78 @@ func TestRecordsIntactMissingFile(t *testing.T) {
 	}
 }
 
-// intersectSubstringPostings must skip non-.bin entries and subdirectories in
-// buckets/, skip a bucket file it can't open, skip a posting whose declared
-// offset/length falls past the file's actual data, and surface a genuine
-// ReadDir failure (as opposed to ErrNotExist, handled elsewhere).
+// intersectSubstringPostings ignores non-.bin entries and subdirectories in
+// buckets/, but a bucket it cannot open or a posting block that will not read is
+// corruption: it surfaces for the recovery path to rebuild rather than being
+// skipped into a silent under-match. A genuine ReadDir failure surfaces too.
 func TestIntersectSubstringPostingsSkipBranches(t *testing.T) {
-	tmp := t.TempDir()
-	bucketsDir := filepath.Join(tmp, "buckets")
-	if err := os.MkdirAll(filepath.Join(bucketsDir, "subdir"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(bucketsDir, "notes.txt"), []byte("ignored"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(bucketsDir, "corrupt.bin"), []byte("bad"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	goodPath := filepath.Join(bucketsDir, "good.bin")
-	if err := writeBucket(goodPath, map[string][]posting{"talpha": {{Off: 1, Sid: 1}}}); err != nil {
-		t.Fatal(err)
-	}
-	// Truncate the good bucket right after its directory section so any
-	// ReadAt into the postings payload runs past EOF.
-	fi, err := os.Stat(goodPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entries, gf, err := openBucketDir(goodPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dataStart := entries[0].off
-	gf.Close()
-	if err := os.Truncate(goodPath, int64(dataStart)); err != nil {
-		t.Fatal(err)
-	}
-	if fi.Size() <= int64(dataStart) {
-		t.Fatal("test setup: nothing to truncate")
-	}
+	// Benign non-bucket entries beside a valid bucket are ignored and the real
+	// match still comes back.
+	func() {
+		tmp := t.TempDir()
+		bucketsDir := filepath.Join(tmp, "buckets")
+		if err := os.MkdirAll(filepath.Join(bucketsDir, "subdir"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(bucketsDir, "notes.txt"), []byte("ignored"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeBucket(filepath.Join(bucketsDir, "good.bin"), map[string][]posting{"talpha": {{Off: 1, Sid: 1}}}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := intersectSubstringPostings(tmp, []string{"alp"})
+		if err != nil {
+			t.Fatalf("benign skips surfaced an error: %v", err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("substring match lost through the skip branches: %#v", got)
+		}
+	}()
 
-	got, err := intersectSubstringPostings(tmp, []string{"alp"})
-	if err != nil {
-		t.Fatalf("intersectSubstringPostings with skip branches err=%v", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("truncated postings payload should yield no matches, got %#v", got)
-	}
+	// A bucket that will not open is corruption, surfaced now.
+	func() {
+		tmp := t.TempDir()
+		bucketsDir := filepath.Join(tmp, "buckets")
+		if err := os.MkdirAll(bucketsDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(bucketsDir, "corrupt.bin"), []byte("bad"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := intersectSubstringPostings(tmp, []string{"alp"}); !IsCorrupt(err) {
+			t.Fatalf("unopenable bucket err=%v, want a corruption error", err)
+		}
+	}()
+
+	// A posting block truncated past EOF is corruption, surfaced now.
+	func() {
+		tmp := t.TempDir()
+		bucketsDir := filepath.Join(tmp, "buckets")
+		if err := os.MkdirAll(bucketsDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		goodPath := filepath.Join(bucketsDir, "good.bin")
+		if err := writeBucket(goodPath, map[string][]posting{"talpha": {{Off: 1, Sid: 1}}}); err != nil {
+			t.Fatal(err)
+		}
+		// Truncate right after the directory section so openBucketDir still
+		// succeeds but the ReadAt into the postings payload runs past EOF.
+		entries, gf, err := openBucketDir(goodPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dataStart := entries[0].off
+		gf.Close()
+		if err := os.Truncate(goodPath, int64(dataStart)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := intersectSubstringPostings(tmp, []string{"alp"}); !IsCorrupt(err) {
+			t.Fatalf("truncated posting block err=%v, want a corruption error", err)
+		}
+	}()
 
 	if runtime.GOOS != "windows" {
-		unreadableParent := filepath.Join(tmp, "unreadable-parent")
+		unreadableParent := filepath.Join(t.TempDir(), "unreadable-parent")
 		unreadableBuckets := filepath.Join(unreadableParent, "buckets")
 		if err := os.MkdirAll(unreadableBuckets, 0o755); err != nil {
 			t.Fatal(err)

@@ -9,6 +9,41 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// The substring (fuzzy) tier scans every bucket and used to skip a bucket it
+// could not open, so a corrupt store silently under-matched instead of
+// surfacing the damage for the recovery path to rebuild.
+func TestSubstringTierSurfacesACorruptBucket(t *testing.T) {
+	dir := t.TempDir()
+	ss := []model.Session{{
+		Harness: "claude", ID: "a", Project: "p",
+		Messages: []model.Message{{Role: "user", Text: "opencode indexing throughput"}},
+	}}
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, "buckets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("no buckets to corrupt")
+	}
+	for _, e := range entries {
+		if err := os.WriteFile(filepath.Join(dir, "buckets", e.Name()), []byte("XXXXXXXX garbage"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// "code" is a substring of the indexed "opencode", so this reaches the
+	// substring scan rather than short-circuiting empty.
+	_, _, err = intersectSubstringPostingsDetailed(dir, []string{"code"})
+	if err == nil || !IsCorrupt(err) {
+		t.Fatalf("want a corrupt-index error from the substring tier, got %v", err)
+	}
+}
+
 // FirstMatch (the per-prompt hook path) probes candidate queries and used to
 // lump a scanRecords error together with "no match" and skip to the next
 // candidate, so a corrupt store looked like a prompt with nothing to recall.

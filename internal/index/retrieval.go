@@ -1641,7 +1641,14 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 		path := filepath.Join(dir, "buckets", de.Name())
 		entries, f, err := openBucketDir(path)
 		if err != nil {
-			continue
+			// The directory listing named this bucket, so a miss now means a
+			// concurrent rebuild swapped it out — tolerate that. Anything else
+			// (a corrupt header, a denied read) is real and is surfaced so the
+			// fuzzy tier does not silently under-match a damaged store.
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, nil, err
 		}
 		for _, e := range entries {
 			tok := strings.TrimPrefix(e.tok, "t")
@@ -1652,7 +1659,10 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 				variants[b] = append(variants[b], tok)
 				buf := make([]byte, e.n)
 				if _, err := f.ReadAt(buf, int64(e.off)); err != nil {
-					continue
+					// The bucket directory validated but the block it points to
+					// will not read: corruption, not a missing token. Surface it.
+					f.Close()
+					return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 				}
 				for _, p := range decodePostings(buf) {
 					perTok[i][p.Off] = p
