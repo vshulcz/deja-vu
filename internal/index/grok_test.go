@@ -22,6 +22,20 @@ func TestMain(m *testing.M) {
 		// developer who has it set would otherwise have the suite write into
 		// their real ~/.config/deja.
 		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		// Notes resolve via XDG_DATA_HOME, then APPDATA on Windows, then
+		// DEJA_NOTES_FILE — none of which HOME can reach. Without these the
+		// suite appended fixture notes to the developer's real store and then
+		// failed reading them back as leaked `deja` sessions (#1141). cmd/deja's
+		// TestMain already blanks the same keys; this closes the drift.
+		"XDG_DATA_HOME":           "",
+		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
+		"DEJA_NOTES_FILE":         "",
+		"DEJA_SOURCE_INSTANCE":    "",
+		"CLAUDE_CONFIG_DIR":       "",
+		"CODEX_HOME":              "",
+		"GEMINI_CLI_HOME":         "",
+		"CURSOR_CONFIG_DIR":       "",
+		"AIDER_CHAT_HISTORY_FILE": "",
 		// A developer with DEJA_INDEX_DIR exported reads their own index
 		// here, and the suite went red on their machine only.
 		"DEJA_INDEX_DIR":        "",
