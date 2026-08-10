@@ -240,16 +240,24 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 		if !hit.Session.Updated.IsZero() {
 			date = hit.Session.Updated.Format("2006-01-02")
 		}
+		// id, project and title reach a terminal here and the agent through the
+		// MCP blame tool. All three are free text from the transcript — an
+		// imported peer's title especially — so a bare escape or bidi run would
+		// repaint the line or reorder it. SafeLine strips them the way the
+		// digest and snippet paths already do.
+		id := SafeLine(short(hit.Session.ID))
+		project := SafeLine(hit.Session.Project)
+		title := SafeLine(hit.Title)
 		if color {
 			sep := cDim + " · " + cReset
-			fmt.Fprintf(w, "%s%s%s %s%s%s%s", harnessTag(hit.Session.Harness, true), sep, date, cBold+short(hit.Session.ID)+cReset, sep, hit.Session.Project, "")
-			if hit.Title != "" {
-				fmt.Fprintf(w, "%s%s", sep, cBold+hit.Title+cReset)
+			fmt.Fprintf(w, "%s%s%s %s%s%s%s", harnessTag(hit.Session.Harness, true), sep, date, cBold+id+cReset, sep, project, "")
+			if title != "" {
+				fmt.Fprintf(w, "%s%s", sep, cBold+title+cReset)
 			}
 		} else {
-			fmt.Fprintf(w, "%s · %s · %s · %s", date, hit.Session.Harness, short(hit.Session.ID), hit.Session.Project)
-			if hit.Title != "" {
-				fmt.Fprintf(w, " · %s", hit.Title)
+			fmt.Fprintf(w, "%s · %s · %s · %s", date, hit.Session.Harness, id, project)
+			if title != "" {
+				fmt.Fprintf(w, " · %s", title)
 			}
 		}
 		fmt.Fprintln(w)
@@ -285,13 +293,16 @@ func BlameLifecycleLine(h BlameHit) string {
 	case "stale":
 		head = "marked stale — may no longer hold"
 	default:
-		head = h.Lifecycle
+		head = SafeLine(h.Lifecycle)
 	}
+	// LifecycleAt and especially LifecycleNote are free text carried from
+	// another machine by sync, and this line reaches a terminal and the MCP
+	// blame tool — sanitise them like the fields above.
 	if h.LifecycleAt != "" {
-		head += " (" + h.LifecycleAt + ")"
+		head += " (" + SafeLine(h.LifecycleAt) + ")"
 	}
 	if h.LifecycleNote != "" {
-		head += ": " + h.LifecycleNote
+		head += ": " + SafeLine(h.LifecycleNote)
 	}
 	return head
 }
