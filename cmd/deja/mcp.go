@@ -278,7 +278,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
 			return "", err
 		}
-		pairs := index.FixesFor(dir, a.Error, int(a.Limit))
+		pol := policy.Load()
+		pairs := index.FixesFor(dir, a.Error, int(a.Limit), func(project string) bool {
+			return pol.Allows(policy.ActivationMCP, project)
+		})
 		if len(pairs) == 0 {
 			if !index.LooksLikeError(a.Error) {
 				return "That text does not read like an error line - pass the failing output itself.", nil
