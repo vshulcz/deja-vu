@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/redact"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -411,7 +412,13 @@ func citationLine(s model.Session) string {
 	if title == "" {
 		title = s.Title
 	}
-	title = strings.TrimSpace(title)
+	// The digest body is display-safe (contextText strips it), but this title
+	// is pulled straight from a message or the stored title and appended to the
+	// same agent-facing block. An escape sequence or an invisible tag-block
+	// character in a hostile session's title would otherwise ride into the
+	// context unaltered — the injection the frame warns about, one layer down.
+	// Collapse whitespace too so a newline cannot split the one-line citation.
+	title = strings.Join(strings.Fields(redact.SafeForDisplay(title)), " ")
 	if len([]rune(title)) > 60 {
 		title = string([]rune(title)[:60]) + "…"
 	}
