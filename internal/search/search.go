@@ -613,13 +613,15 @@ func lifecycleSummary(h Hit) string {
 	case "stale":
 		head = "marked stale — may no longer hold"
 	default:
-		head = h.Lifecycle
+		head = SafeLine(h.Lifecycle)
 	}
+	// LifecycleAt and LifecycleNote are free text a peer may have synced; this
+	// line prints to a terminal, so strip them like blame's lifecycle line.
 	if h.LifecycleAt != "" {
-		head += " (" + h.LifecycleAt + ")"
+		head += " (" + SafeLine(h.LifecycleAt) + ")"
 	}
 	if h.LifecycleNote != "" {
-		head += ": " + h.LifecycleNote
+		head += ": " + SafeLine(h.LifecycleNote)
 	}
 	return head
 }
@@ -822,10 +824,15 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		if day, ok := NoteBucketDay(h.Session); ok {
 			d = relativeDate(noteBucketNoon(day))
 		}
+		// project and id are transcript/peer free text printed to a terminal;
+		// an escape or bidi run in an imported project name would repaint the
+		// line the way it would in blame. Snippets below are already SafeText'd.
+		project := SafeLine(h.Session.Project)
+		id := SafeLine(short(h.Session.ID))
 		if color {
-			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), h.Session.Project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, short(h.Session.ID), cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))
+			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, id, cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))
 		} else {
-			fmt.Fprintf(w, "[%s] %-10s · %s · %s — %d matches%s\n", h.Session.Harness, h.Session.Project, d, short(h.Session.ID), h.Count, tierLabel(h))
+			fmt.Fprintf(w, "[%s] %-10s · %s · %s — %d matches%s\n", h.Session.Harness, project, d, id, h.Count, tierLabel(h))
 		}
 		if h.Reused > 1 {
 			note := fmt.Sprintf("  reused %d× by agents recently", h.Reused)
@@ -845,7 +852,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintln(w, note)
 		}
 		if h.Moved != "" {
-			note := h.Moved
+			note := SafeLine(h.Moved)
 			if color {
 				note = cDim + note + cReset
 			}
