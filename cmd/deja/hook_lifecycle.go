@@ -93,7 +93,10 @@ func earlierAttemptWarning(ss []model.Session) string {
 	var lines []string
 	for _, s := range ss {
 		if when := older[s.ID]; when != "" {
-			lines = append(lines, fmt.Sprintf("session %s is an earlier attempt — this project has a newer session on the same ground (%s)", s.ID, when))
+			// The id is free text from the transcript; sanitise it the way the
+			// rejected-warning above does, or a crafted sessionId carries an
+			// escape or an invisible run into the agent block this line joins.
+			lines = append(lines, fmt.Sprintf("session %s is an earlier attempt — this project has a newer session on the same ground (%s)", recallListingLine(s.ID), when))
 		}
 	}
 	if len(lines) == 0 {
