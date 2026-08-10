@@ -29,3 +29,13 @@ func TestCheckHarnessRejectsOnlyUnknownNames(t *testing.T) {
 		t.Errorf("refusal does not list the known harnesses: %v", err)
 	}
 }
+
+// blame accepts --harness like search does, so it must validate it the same way
+// — the check used to live only on search, last, stats and the MCP blame, so
+// `deja blame file --harness cluade` read as "nobody touched this file" (#1113).
+func TestBlameCLIRejectsUnknownHarness(t *testing.T) {
+	err := runBlame(t.TempDir(), []string{"parser.go", "--harness", "cluade"})
+	if err == nil || !strings.Contains(err.Error(), "not a harness") {
+		t.Fatalf("blame did not name the typo'd harness: %v", err)
+	}
+}

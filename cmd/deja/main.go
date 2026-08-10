@@ -1658,6 +1658,12 @@ func runBlame(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
+	// A typo'd harness must name the mistake, not read as "nobody touched this
+	// file under harness X" — the same reason search and the MCP blame validate
+	// it (#1113). blame has no --role to check.
+	if err := checkHarness(o.Harness); err != nil {
+		return err
+	}
 	target, err := search.ResolveBlamePath(path)
 	if err != nil {
 		return err
