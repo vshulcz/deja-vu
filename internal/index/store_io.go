@@ -270,7 +270,12 @@ func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn fu
 		}
 		rec, derr := decodeRecord(b, t)
 		if derr != nil {
-			continue
+			// The record was fully framed (a valid length prefix, n bytes read),
+			// so a payload that will not decode is real corruption in the middle
+			// of the log, not the tolerated in-flight tail that the EOF branches
+			// above return nil for. Surface it like the length-cap check does so
+			// the read path rebuilds instead of silently dropping the message.
+			return fmt.Errorf("%w: %v", errCorruptIndex, derr)
 		}
 		fn(rec)
 	}
