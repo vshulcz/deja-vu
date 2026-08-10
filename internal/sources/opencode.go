@@ -42,7 +42,7 @@ func LoadOpencode() []model.Session {
 }
 
 func LoadOpencodeMatching(q string) []model.Session {
-	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%'", sqlEscape(strings.ToLower(q)))
+	where := fmt.Sprintf(" and lower(p.data) like '%%%s%%' escape '\\'", sqlEscape(sqlLikeEscape(strings.ToLower(q))))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 5000)
 	return ss
 }
@@ -58,7 +58,7 @@ func LoadOpencodeSince(t time.Time) []model.Session {
 }
 
 func LoadOpencodePrefix(p string) []model.Session {
-	where := fmt.Sprintf(" and s.id like '%s%%'", sqlEscape(p))
+	where := fmt.Sprintf(" and s.id like '%s%%' escape '\\'", sqlEscape(sqlLikeEscape(p)))
 	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), where, 0)
 	return ss
 }
@@ -268,6 +268,18 @@ func OpencodeCounts() (sessions, messages int, err error) {
 // cost two bugs in one day: both times the quotes were left off and sqlite
 // rejected the query, which the parsers then reported as an empty store.
 func sqlEscape(s string) string { return strings.ReplaceAll(s, "'", "''") }
+
+// sqlLikeEscape neutralises the LIKE wildcards % and _ (and the escape
+// character itself) so a search term is matched literally. The pattern must be
+// built with `escape '\'`; without this an id like `a_b` matched `axb` and a
+// query with a `%` degenerated into a full-table scan. The caller still runs
+// the result through sqlEscape for the surrounding quotes.
+func sqlLikeEscape(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "%", `\%`)
+	s = strings.ReplaceAll(s, "_", `\_`)
+	return s
+}
 
 func str(v any) string { s, _ := v.(string); return s }
 func parseNestedTime(m map[string]any, k, sub string) time.Time {
