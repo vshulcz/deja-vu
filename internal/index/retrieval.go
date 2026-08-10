@@ -1551,6 +1551,11 @@ func TermSessionCounts(dir string, terms []string) map[string]int {
 		key := "t" + t
 		posts, err := postingsFor(dir, key)
 		if err != nil {
+			// Best effort by design: this only decorates the "try fewer words"
+			// hint after a search that already returned. A term whose bucket
+			// will not read drops out of the advice rather than failing the
+			// command — a real corruption already surfaced on the search path
+			// that ran first.
 			continue
 		}
 		seen := map[uint32]bool{}
