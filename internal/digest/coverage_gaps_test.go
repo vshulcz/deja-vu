@@ -104,6 +104,24 @@ func TestIsAgentArtifactSpotsPlumbing(t *testing.T) {
 	}
 }
 
+// The prose-density and file-echo branches the plumbing test above does not
+// reach: a marker hit, the "The file " echo, and a long dump measured by how
+// few letters it holds against symbols and digits.
+func TestIsAgentArtifactLongDumpsAndEchoes(t *testing.T) {
+	longSymbols := strings.Repeat("|-+=/\\<>[]{}0123456789 ", 30)
+	longProse := strings.Repeat("the parser kept failing on the same input again and ", 12)
+	for text, want := range map[string]bool{
+		"<system-reminder>ctx</system-reminder>":    true,
+		"The file internal/x.go has been rewritten": true,
+		longSymbols: true,
+		longProse:   false,
+	} {
+		if got := IsAgentArtifact(text); got != want {
+			t.Errorf("IsAgentArtifact(%.30q) = %v, want %v", text, got, want)
+		}
+	}
+}
+
 // Terminal output lands in transcripts with escape codes in it. Left in, they
 // are indexed as tokens and shown back to the user as garbage.
 func TestStripANSIRemovesEscapesOnly(t *testing.T) {
