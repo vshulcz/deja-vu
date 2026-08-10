@@ -727,10 +727,12 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 		// project label and the harness tag, which are rendered into result
 		// lines a human and a model both read. A newline there forged a whole
 		// extra entry — one with no "imported:" prefix, so it read as local
-		// work (#1080). Message text is redacted further down; these fields
-		// were never touched.
+		// work (#1080). The role is rendered the same way (view.go writes it
+		// into the preview) and is the same forgery vector, so it gets the same
+		// flattening. Message text is redacted further down.
 		rec.Project = sanitizeSyncField(rec.Project, syncFieldMax)
 		rec.Harness = sanitizeSyncField(rec.Harness, syncFieldMax)
+		rec.Role = sanitizeSyncField(rec.Role, syncFieldMax)
 		if err := fn(rec); err != nil {
 			return err
 		}
