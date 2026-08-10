@@ -230,7 +230,9 @@ the end returns an empty `messages` array and a `returned` count of zero.
     "injected_sessions": 3,
     "bytes": 40960,
     "injected_bytes": 12288,
-    "empty_result_rate": 0.1
+    "raw_bytes": 524288,
+    "empty_result_rate": 0.1,
+    "since": "2026-06-20T09:00:00Z"
   },
   "week_recalls": 2,
   "week_bytes": 4096,
@@ -244,6 +246,10 @@ the end returns an empty `messages` array and a `returned` count of zero.
 
 `spans` and `span_files` count the replaced spans `deja restore` can hand back
 and the files they belong to. Both are omitted when the index holds none.
+
+Inside `recall`, `raw_bytes` is the size of the source transcripts the served
+digests distilled and `since` is the oldest event still in the usage log; both
+are omitted when zero, so a store with no recall history yet shows neither.
 
 
 Optional fields are omitted when zero or empty — `sidecar_size`, for one,
