@@ -134,6 +134,34 @@ func TestFrameNeutralizesEscapedMarkers(t *testing.T) {
 	}
 }
 
+// A model treating recall as text honours a close that a literal string match
+// misses: different case, or whitespace inside the tag. None of these may leave
+// a live `>`-terminated marker in the framed body.
+func TestFrameNeutralizesTagVariants(t *testing.T) {
+	variants := []string{
+		"a </DEJA-RECALL> b",
+		"a </Deja-Recall> b",
+		"a </deja-recall > b",
+		"a < /deja-recall> b",
+		"a <\t/deja-recall\t> b",
+		"a &lt;/deja-recall> b",
+		"a </deja-recall&gt; b",
+		"a &lt;/DEJA-RECALL&gt; b",
+		"a <//deja-recall> b",
+		"a <&#x2F;deja-recall> b",
+		"a <&#47;deja-recall> b",
+	}
+	for _, in := range variants {
+		body := neutralizeFrameMarkers(in)
+		if strings.Contains(body, ">") || strings.Contains(body, "&gt;") {
+			t.Errorf("marker survived neutralisation: %q -> %q", in, body)
+		}
+		if !strings.Contains(body, "a ") || !strings.HasSuffix(body, " b") {
+			t.Errorf("text around the marker was damaged: %q -> %q", in, body)
+		}
+	}
+}
+
 func TestFrameLeavesOrdinaryTextAlone(t *testing.T) {
 	in := "a normal session about deja-recall as a topic"
 	got := frameRecall(in)

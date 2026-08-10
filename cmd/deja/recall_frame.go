@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Recalled transcript text is historical data an attacker may have influenced
 // (a directive copied off a web page persists in the index and replays into
@@ -15,6 +18,14 @@ const (
 // recallFrameOverhead is subtracted from byte budgets so framing never pushes
 // an injection over its cap.
 var recallFrameOverhead = len(recallFrameHeader) + len(recallFrameFooter)
+
+// frameMarkerRe matches a frame tag in raw or HTML-escaped form, in any case,
+// with whitespace tolerated inside the brackets. The slash class also swallows
+// repeated slashes (`<//deja-recall>`) and entity-encoded slashes (`&#x2f;`,
+// `&#47;`), both of which an LLM would still read as a close. The tail accepts
+// only whitespace before the bracket, not arbitrary attributes: an `[^>]*`
+// there would greedily reach a distant `>` and eat ordinary text between them.
+var frameMarkerRe = regexp.MustCompile(`(?i)(?:<|&lt;)(?:\s|/|&#x2f;|&#47;)*deja-recall\s*(?:>|&gt;)`)
 
 func frameRecall(text string) string {
 	if strings.TrimSpace(text) == "" {
@@ -38,19 +49,20 @@ func frameRecall(text string) string {
 // went through untouched. Since the whole point of the frame is that the text
 // inside it is hostile, the markers are neutralised rather than trusted: the
 // words survive for a reader, the brackets do not.
+//
+// The consumer is a language model, not a strict parser, so it honours a close
+// that a literal string match misses: `</DEJA-RECALL>`, `</deja-recall >`,
+// `< /deja-recall>` all read as "the block ended". The match is therefore
+// case-insensitive and tolerant of whitespace inside the tag, in both the raw
+// and HTML-escaped spellings. Bare `deja-recall` with no brackets is left
+// alone — it is an ordinary topic word, not a delimiter.
 func neutralizeFrameMarkers(text string) string {
-	for _, m := range []string{
-		"</deja-recall>", "<deja-recall>",
-		"&lt;/deja-recall&gt;", "&lt;deja-recall&gt;",
-	} {
-		text = strings.ReplaceAll(text, m, neutralizeTag(m))
-	}
-	return text
+	return frameMarkerRe.ReplaceAllStringFunc(text, neutralizeTag)
 }
 
 // neutralizeTag keeps the text readable while making it inert: a marker with
 // no brackets cannot delimit anything.
 func neutralizeTag(tag string) string {
-	tag = strings.NewReplacer("&lt;", "", "&gt;", "", "<", "", ">", "").Replace(tag)
+	tag = strings.NewReplacer("&lt;", "", "&gt;", "", "<", "", ">", "", " ", "").Replace(tag)
 	return "(" + tag + ")"
 }
