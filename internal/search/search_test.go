@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/jsonout"
@@ -612,6 +613,27 @@ func TestSnippetPrefersProseOverToolDump(t *testing.T) {
 	}
 	if !strings.Contains(hits[0].Snippets[0], "migration strategy") {
 		t.Fatalf("missing prose snippet: %#v", hits[0].Snippets[0])
+	}
+}
+
+// A snippet window that falls in the middle of multibyte runs must not split a
+// rune or emit a stray control byte: the cut is on a []rune, so it is safe by
+// construction, and this pins that against a future rewrite that reaches for a
+// byte offset. Long multibyte fill on both sides forces both boundary cuts.
+func TestSnippetWindowIsRuneSafeAtBoundaries(t *testing.T) {
+	fill := strings.Repeat("déjà café résumé naïve ", 20) // >100 runes of multibyte
+	text := fill + " QUERYWORD " + fill
+	out := Snippet(text, "QUERYWORD")
+	if !utf8.ValidString(out) {
+		t.Fatalf("snippet cut a rune: %q", out)
+	}
+	if !strings.Contains(out, "…") {
+		t.Fatalf("expected an elision marker on a windowed snippet: %q", out)
+	}
+	for _, r := range out {
+		if r != '\n' && r != '\t' && unicode.IsControl(r) {
+			t.Fatalf("snippet emitted a control rune %U: %q", r, out)
+		}
 	}
 }
 
