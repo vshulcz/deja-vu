@@ -16,7 +16,7 @@ import (
 func TestCitationLineStripsDisplayControls(t *testing.T) {
 	s := model.Session{
 		Harness: "claude",
-		Title:   "deploy ‮plan​ now\x1b[31m red\ttab\nline",
+		Title:   "deploy \u202eplan\u200b now\x1b[31m red\ttab\nline",
 		Updated: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
 	got := citationLine(s)
@@ -28,7 +28,7 @@ func TestCitationLineStripsDisplayControls(t *testing.T) {
 			t.Fatalf("citation carried a control rune %U: %q", r, got)
 		}
 	}
-	for _, bad := range []rune{'‮', '​'} {
+	for _, bad := range []rune{'\u202e', '\u200b'} {
 		if strings.ContainsRune(got, bad) {
 			t.Fatalf("citation carried %U: %q", bad, got)
 		}

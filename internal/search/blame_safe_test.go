@@ -17,13 +17,13 @@ func TestPrintBlameSanitisesSessionFields(t *testing.T) {
 	var b bytes.Buffer
 	hits := []BlameHit{{
 		Session: model.Session{
-			Harness: "claude", ID: "ev‮il​id", Project: "proj\x1b[31m",
+			Harness: "claude", ID: "ev\u202eil\u200bid", Project: "proj\x1b[31m",
 			Updated: time.Now(),
 		},
-		Title: "hostile\x1btitle‮ here", Count: 1, Tier: "exact",
+		Title: "hostile\x1btitle\u202e here", Count: 1, Tier: "exact",
 		Snippets:      []string{"x"},
 		Lifecycle:     "rejected",
-		LifecycleNote: "note\x1bfrom‮ a peer​",
+		LifecycleNote: "note\x1bfrom\u202e a peer\u200b",
 	}}
 	PrintBlame(&b, hits, false)
 	out := b.String()
@@ -32,7 +32,7 @@ func TestPrintBlameSanitisesSessionFields(t *testing.T) {
 			t.Fatalf("blame output carried a control rune %U: %q", r, out)
 		}
 	}
-	for _, bad := range []rune{'‮', '​'} {
+	for _, bad := range []rune{'\u202e', '\u200b'} {
 		if strings.ContainsRune(out, bad) {
 			t.Fatalf("blame output carried %U: %q", bad, out)
 		}

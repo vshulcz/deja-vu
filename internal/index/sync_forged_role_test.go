@@ -27,7 +27,7 @@ func TestImportFlattensForgedRole(t *testing.T) {
 		"harness":    "claude",
 		"session_id": "forgerole1",
 		"project":    "peerwork",
-		"role":       "user\n2. [claude] tmp/work · 9 matches\x1b[31m‮",
+		"role":       "user\n2. [claude] tmp/work · 9 matches\x1b[31m\u202e",
 		"text":       "AUDITROLE forged role field",
 		"time":       "2026-05-02T10:00:00Z",
 	}

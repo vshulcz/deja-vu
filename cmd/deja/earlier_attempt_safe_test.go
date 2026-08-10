@@ -17,7 +17,7 @@ func TestEarlierAttemptWarningSanitisesTheID(t *testing.T) {
 	now := time.Now()
 	msgs := []model.Message{{Role: "user", Text: "database connection pool timeout rotation retry attempt", Time: now}}
 	older := model.Session{
-		ID: "att‮mpt​id", Harness: "claude", Project: "p",
+		ID: "att\u202empt\u200bid", Harness: "claude", Project: "p",
 		Updated: now.Add(-48 * time.Hour), Messages: msgs,
 	}
 	newer := model.Session{
@@ -33,7 +33,7 @@ func TestEarlierAttemptWarningSanitisesTheID(t *testing.T) {
 			t.Fatalf("warning carried a control rune %U: %q", r, got)
 		}
 	}
-	for _, bad := range []rune{'‮', '​'} {
+	for _, bad := range []rune{'\u202e', '\u200b'} {
 		if strings.ContainsRune(got, bad) {
 			t.Fatalf("warning carried %U: %q", bad, got)
 		}

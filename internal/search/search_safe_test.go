@@ -18,12 +18,12 @@ func TestSearchPrintSanitisesHeaderFields(t *testing.T) {
 	var b bytes.Buffer
 	hits := []Hit{{
 		Session: model.Session{
-			Harness: "claude", ID: "ev‮il​id", Project: "proj\x1b[31m",
+			Harness: "claude", ID: "ev\u202eil\u200bid", Project: "proj\x1b[31m",
 			Updated: time.Now(),
 		},
 		Count: 1, Tier: TierExact,
-		Lifecycle: "rejected", LifecycleNote: "note\x1bfrom‮ a peer​",
-		Moved:    "moved\x1bsince‮",
+		Lifecycle: "rejected", LifecycleNote: "note\x1bfrom\u202e a peer\u200b",
+		Moved:    "moved\x1bsince\u202e",
 		Snippets: []string{"a clean snippet"},
 	}}
 	Print(&b, hits, Options{})
@@ -33,7 +33,7 @@ func TestSearchPrintSanitisesHeaderFields(t *testing.T) {
 			t.Fatalf("search output carried a control rune %U: %q", r, out)
 		}
 	}
-	for _, bad := range []rune{'‮', '​'} {
+	for _, bad := range []rune{'\u202e', '\u200b'} {
 		if strings.ContainsRune(out, bad) {
 			t.Fatalf("search output carried %U: %q", bad, out)
 		}
