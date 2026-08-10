@@ -151,6 +151,13 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		var err error
 		re, err = regexp.Compile("(?i)" + o.Query)
 		if err != nil {
+			// The (?i) prefix is deja's, not the user's. Reporting the compile
+			// error verbatim echoes `(?i)(` back at someone who typed `(`, so
+			// re-compile their pattern alone for a message that names what they
+			// actually wrote.
+			if _, uerr := regexp.Compile(o.Query); uerr != nil {
+				return nil, uerr
+			}
 			return nil, err
 		}
 	}
