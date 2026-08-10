@@ -40,6 +40,35 @@ func TestCooccurMapBuiltOnFullRebuild(t *testing.T) {
 	}
 }
 
+// The same connection string is pasted into five sessions. Its password is a
+// secret redaction strips from the record log; it must not survive into
+// cooccur.gob, which the builder reads straight off ss.Messages.
+func TestCooccurNeverStoresARepeatedSecret(t *testing.T) {
+	const secret = "supersecretpw"
+	url := "postgres://admin:" + secret + "@db.example.com/prod"
+	dir := nlIndex(t,
+		"deploy pipeline uses "+url,
+		"deploy pipeline again "+url,
+		"deploy pipeline retry "+url,
+		"deploy pipeline once more "+url,
+		"deploy pipeline final "+url,
+	)
+	m := readCooccur(dir)
+	if m == nil {
+		t.Fatal("cooccur map missing; corpus did not build pairs")
+	}
+	if _, ok := m[secret]; ok {
+		t.Fatalf("secret is a cooccur key: %v", m[secret])
+	}
+	for tok, ns := range m {
+		for _, n := range ns {
+			if n == secret {
+				t.Fatalf("secret leaked as a neighbor of %q: %v", tok, ns)
+			}
+		}
+	}
+}
+
 func TestCooccurRescueSwapsOneToken(t *testing.T) {
 	dir := cooccurCorpus(t)
 	// "login" never appears with "monitoring" in one session; the rescue may

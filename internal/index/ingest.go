@@ -732,6 +732,15 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 		return err
 	}
 	dropEmptySessions(&m, wrote)
+	// The loop above redacted each message into a local for the record log but
+	// left ss.Messages holding the raw text; cooccur reads ss directly, so a
+	// secret repeated across cooccurMinDF sessions would land in cooccur.gob
+	// unredacted. Scrub in place first — nil manifest, the loop already counted.
+	// Gated on the same bounds as buildCooccur so a huge store is not redacted
+	// twice for a sidecar it would skip anyway.
+	if len(ss) >= cooccurMinDF && len(ss) <= cooccurMaxSessions {
+		preRedactSessions(nil, ss)
+	}
 	buildCooccur(tmp, ss)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
