@@ -959,7 +959,11 @@ func isWorkRecord(role string) bool {
 }
 
 func PrintContext(w io.Writer, s model.Session, query string) {
-	fmt.Fprintf(w, "# deja context: %s · %s · %s", s.Harness, s.Project, s.ID)
+	// Project and id are transcript text a harness wrote, and this is one line:
+	// an escape byte in either recolours the header and a carriage return
+	// rewinds it. The body below is already SafeText'd; the header was not, so
+	// `deja show`, `deja ctx` and the MCP context tools printed it raw (#1090).
+	fmt.Fprintf(w, "# deja context: %s · %s · %s", s.Harness, SafeLine(s.Project), SafeLine(s.ID))
 	if !s.Updated.IsZero() {
 		fmt.Fprintf(w, " · updated %s", s.Updated.Format("2006-01-02"))
 	}
