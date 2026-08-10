@@ -757,6 +757,14 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 		}
 	}
 	mark("environment")
+	// The project's standing decisions lead the block: they are the user's own
+	// settled choices, and an agent should read them before the session digest,
+	// not after. Query-independent, so a convention surfaces even when nothing
+	// in the task names it — the gap plain recall cannot close.
+	if conv := projectConventions(names, 6, 800); conv != "" {
+		text = conv + "\n" + text
+	}
+	mark("conventions")
 	// The candidates that never made it into the digest were never served:
 	// counting their transcripts here inflated the distillation ratio deja
 	// prints about itself (1 session distilled, 3 sessions' bytes claimed).
