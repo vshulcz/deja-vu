@@ -88,11 +88,17 @@ func errorSigSearch(dir string, m Manifest, o query.Options) (SearchResult, erro
 	if len(kept) == 0 {
 		return SearchResult{}, nil
 	}
-	// relevanceResult sets Total and Capped together, so a store with more than
-	// the window's worth of sessions on one error says "showing N of M" instead
-	// of reporting the window as the whole (the #497 shape).
-	res := relevanceResult(kept, total)
-	return res, nil
+	// Capped is about the window, not the neighbourhood filter. relevanceResult
+	// would set Capped = total > len(kept), but kept also shrinks when
+	// aroundErrorLines drops a session whose stored Hit hash no longer appears
+	// in its records — that is not the window hiding a retrievable session, so
+	// it must not read as "showing N of M". Cap only when the window trimmed.
+	return SearchResult{
+		Sessions: kept,
+		Tier:     query.TierRelevance,
+		Total:    total,
+		Capped:   total > relevanceWindow,
+	}, nil
 }
 
 // querySigs hashes every line of the query that names something specific that

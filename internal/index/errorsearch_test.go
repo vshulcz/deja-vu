@@ -159,3 +159,57 @@ func TestErrorTierRanksByHowMuchOfThePasteMatched(t *testing.T) {
 		t.Errorf("wrong tier %q", res.Tier)
 	}
 }
+
+// Total/Capped must be honest: a pool bigger than the window says "showing N of
+// M" (Capped true, Total = full count); a small pool is not capped even when the
+// neighbourhood filter dropped a session (that is not the window hiding one).
+func TestErrorTierTotalAndCapped(t *testing.T) {
+	dir := t.TempDir()
+	// 60 sessions all hitting the same error line — more than relevanceWindow.
+	ss := make([]model.Session, 0, 60)
+	for i := 0; i < 60; i++ {
+		id := "s" + string(rune('A'+i/26)) + string(rune('a'+i%26))
+		ss = append(ss, model.Session{
+			Harness: "claude", ID: id, Project: "p",
+			Messages: []model.Message{
+				{Role: "tool-output", Text: "psql: connection refused on port 5432"},
+			},
+		})
+	}
+	writeTestStore(t, dir, ss...)
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := errorSigSearch(dir, m, mkOptions("psql: connection refused on port 5432"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 60 {
+		t.Errorf("Total = %d, want 60 (the full match count, not the window)", res.Total)
+	}
+	if !res.Capped {
+		t.Error("a match pool larger than the window must report Capped")
+	}
+	if len(res.Sessions) > relevanceWindow {
+		t.Errorf("served %d sessions, past the window of %d", len(res.Sessions), relevanceWindow)
+	}
+
+	// A small pool is not capped.
+	dir2 := t.TempDir()
+	writeTestStore(t, dir2, model.Session{
+		Harness: "claude", ID: "one", Project: "p",
+		Messages: []model.Message{{Role: "tool-output", Text: "psql: connection refused on port 5432"}},
+	})
+	m2, err := readManifest(dir2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2, err := errorSigSearch(dir2, m2, mkOptions("psql: connection refused on port 5432"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res2.Capped {
+		t.Errorf("a single-session match reported Capped: total=%d served=%d", res2.Total, len(res2.Sessions))
+	}
+}
