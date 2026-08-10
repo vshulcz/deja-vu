@@ -57,8 +57,10 @@ not-json
 	if s.Started != s.Messages[0].Time || s.Updated != s.Messages[2].Time {
 		t.Fatalf("session times wrong: started=%v updated=%v", s.Started, s.Updated)
 	}
-	if len(s.Messages[2].Text) != 64*1024 {
-		t.Fatalf("message cap = %d, want %d", len(s.Messages[2].Text), 64*1024)
+	// The parser passes the full 70 KiB body through; ingest redacts and caps it
+	// to 64 KiB, so the truncation the index needs happens after redaction, not here.
+	if len(s.Messages[2].Text) != 70*1024 {
+		t.Fatalf("message len = %d, want %d", len(s.Messages[2].Text), 70*1024)
 	}
 }
 

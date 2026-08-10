@@ -14,9 +14,33 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
+
+// maxParsedMessage bounds one parsed message before it reaches the index. It
+// sits well above the index's own maxIndexedText (64 KiB): redaction runs at
+// ingest on the full message before that smaller cap, so keeping more text
+// here lets a secret that straddles the 64 KiB indexed boundary be redacted
+// whole instead of losing its closing marker to an earlier cut. The stored
+// text is unchanged — ingest still caps it to 64 KiB after redacting. The cap
+// only guards memory against a pathological single message.
+const maxParsedMessage = 1 << 20
+
+// capParsedMessage bounds s to maxParsedMessage on a rune boundary. A raw byte
+// slice would split a multibyte rune and hand invalid UTF-8 to NFC folding and
+// redaction downstream.
+func capParsedMessage(s string) string {
+	if len(s) <= maxParsedMessage {
+		return s
+	}
+	cut := maxParsedMessage
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
 
 type Source struct{ Name, Root string }
 

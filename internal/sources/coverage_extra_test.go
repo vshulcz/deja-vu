@@ -325,7 +325,9 @@ insert into cursorDiskKV values
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("cursor fallback ss=%#v err=%v", ss, err)
 	}
-	if ss[0].ID != "fallback" || len(ss[0].Messages[0].Text) != 64*1024 || ss[0].Messages[0].Time != ss[0].Started {
+	// The parser no longer pre-truncates at 64 KiB: redaction runs at ingest on
+	// the full message and caps it there, so the 70 KiB body passes through whole.
+	if ss[0].ID != "fallback" || len(ss[0].Messages[0].Text) != 70*1024 || ss[0].Messages[0].Time != ss[0].Started {
 		t.Fatalf("cursor fallback wrong: %#v", ss[0])
 	}
 	if _, err := cursorQuery(db, "select 1 as x where 0"); err != nil {

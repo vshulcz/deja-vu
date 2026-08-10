@@ -174,9 +174,7 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 		if txt == "" {
 			continue
 		}
-		if len(txt) > 64*1024 {
-			txt = txt[:64*1024]
-		}
+		txt = capParsedMessage(txt)
 		t := hermesTime(r["timestamp"])
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: str(r["role"]), Text: txt, Time: t})

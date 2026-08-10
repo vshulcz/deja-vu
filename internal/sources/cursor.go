@@ -193,9 +193,7 @@ func parseCursorDB(db string, sinceMS int64) ([]model.Session, error) {
 			if strings.TrimSpace(text) == "" {
 				continue
 			}
-			if len(text) > 64*1024 {
-				text = text[:64*1024]
-			}
+			text = capParsedMessage(text)
 			role := "assistant"
 			if n, ok := numberVal(b["type"]); ok && n == 1 {
 				role = "user"

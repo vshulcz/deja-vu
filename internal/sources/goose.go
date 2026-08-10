@@ -243,9 +243,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		if txt == "" {
 			continue
 		}
-		if len(txt) > 64*1024 {
-			txt = txt[:64*1024]
-		}
+		txt = capParsedMessage(txt)
 		t := parseTimeAny(r["created_timestamp"])
 		if t.IsZero() {
 			t = s.Updated

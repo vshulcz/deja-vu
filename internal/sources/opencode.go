@@ -223,9 +223,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		if txt == "" {
 			continue
 		}
-		if len(txt) > 64*1024 {
-			txt = txt[:64*1024]
-		}
+		txt = capParsedMessage(txt)
 		t := parseTimeAny(r["pt"])
 		if t.IsZero() {
 			t = parseTimeAny(r["mt"])

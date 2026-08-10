@@ -80,9 +80,7 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 		if strings.TrimSpace(text) == "" {
 			return
 		}
-		if len(text) > 64*1024 {
-			text = text[:64*1024]
-		}
+		text = capParsedMessage(text)
 		t, _ := time.Parse(time.RFC3339Nano, str(m["created_at"]))
 		if t.IsZero() {
 			t = s.Started
