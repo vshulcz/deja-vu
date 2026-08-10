@@ -269,9 +269,14 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched, termsKnown, matched := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
+	metas, _, anyMatched, termsKnown, matched, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
 		return sessionMetaMatches(meta, o)
 	})
+	if rerr != nil {
+		// A corrupt or unreadable bucket: surface it so the recovery path
+		// rebuilds, rather than serving a silently short-ranked answer.
+		return SearchResult{}, rerr
+	}
 	if len(metas) == 0 {
 		return SearchResult{}, nil
 	}
@@ -366,7 +371,13 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	if err != nil {
 		return nil, nil, err
 	}
-	metas, matched := relevantMetasMatched(dir, m, projects, terms, n)
+	metas, matched, rerr := relevantMetasMatched(dir, m, projects, terms, n)
+	if rerr != nil {
+		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
+		// it rather than inject a silently short-ranked déjà vu; the caller
+		// stays quiet on an error.
+		return nil, nil, rerr
+	}
 	if len(metas) == 0 {
 		return nil, nil, nil
 	}
@@ -377,9 +388,9 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	return out, matched, nil
 }
 
-func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int) {
-	metas, informative, _, _, _ := relevantMetasCounts(dir, m, projects, terms, n, nil)
-	return metas, informative
+func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, error) {
+	metas, informative, _, _, _, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
+	return metas, informative, err
 }
 
 // relevantMetasCounts additionally reports how many terms of ANY frequency
@@ -397,7 +408,12 @@ func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n in
 // Returns, in order: the ranked metas, their informative-term counts, their
 // any-frequency term counts, how many query terms the corpus knows at all,
 // and that pre-truncation total.
-func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int, int) {
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int, int, error) {
+	// A real bucket read error (a corrupt or unreadable postings file) must not
+	// pass as "the term is absent": that silently drops the term from the
+	// ranking. Remember the first one and hand it back so the caller triggers
+	// the same self-heal the exact tier already does.
+	var readErr error
 	inProject := map[uint32]SessionMeta{}
 	for _, meta := range m.Sessions {
 		if keep != nil && !keep(meta) {
@@ -417,7 +433,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	if len(inProject) == 0 {
-		return nil, nil, nil, 0, 0
+		return nil, nil, nil, 0, 0, nil
 	}
 	br := newBucketReader(dir)
 	defer br.close()
@@ -485,6 +501,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			offs = map[uint32]map[int64]bool{}
 			for _, key := range orKeys {
 				posts, err := br.postings(key)
+				if err != nil && readErr == nil {
+					readErr = err
+				}
 				if err != nil || len(posts) == 0 {
 					continue
 				}
@@ -511,6 +530,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		} else {
 			for _, key := range keys {
 				posts, err := br.postings(key)
+				if err != nil && readErr == nil {
+					readErr = err
+				}
 				if err != nil || len(posts) == 0 {
 					missed = true
 					break
@@ -642,7 +664,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord]})
 	}
 	if len(ranked) == 0 {
-		return nil, nil, nil, termsKnown, 0
+		return nil, nil, nil, termsKnown, 0, readErr
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score != ranked[j].score {
@@ -669,7 +691,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		matched = append(matched, r.matched)
 		anyMatched = append(anyMatched, r.any)
 	}
-	return metas, matched, anyMatched, termsKnown, matchedTotal
+	return metas, matched, anyMatched, termsKnown, matchedTotal, readErr
 }
 
 // loadSessionRecords materializes one session's transcript from the index.
