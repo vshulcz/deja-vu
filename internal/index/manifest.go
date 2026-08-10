@@ -252,9 +252,15 @@ func recordsIntact(dir string, m Manifest) bool {
 // records.bin before it rewrites the manifest, and a reader that lands in that
 // window would otherwise see the new size against the old stamp and call a
 // perfectly healthy concurrent append "corrupt" — triggering a needless full
-// rebuild on the MCP path, or a hard error on `deja files`. The extra bytes are
-// an uncommitted tail no bucket references, so reading the committed extent is a
-// consistent snapshot. Only a SHORTER file is real truncation.
+// rebuild on the MCP path, or a hard error on `deja files`. Only a SHORTER file
+// is real truncation.
+//
+// Reading the longer file is safe not because the tail is never read — a
+// keyless or regex query full-scans records.bin to EOF — but because a tail
+// record for a not-yet-committed session resolves against the old manifest:
+// scanRecords skips a record whose Key is absent from m.Sessions, and a
+// half-flushed tail decodes to a short read that eachRecord treats as a clean
+// end. So the extra bytes contribute nothing rather than a wrong answer.
 func recordsReadable(dir string, m Manifest) bool {
 	return recordsIntactSized(dir, m, true)
 }
