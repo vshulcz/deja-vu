@@ -37,10 +37,13 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		cmd, args := mcpCommandArgs(exe)
 		var b strings.Builder
 		b.WriteString("  deja:\n    enabled: true\n    type: stdio\n    name: deja\n")
-		fmt.Fprintf(&b, "    cmd: %s\n", cmd)
+		// Quote both: on Unix cmd is the exe path, on Windows the exe lands in
+		// args — either way a YAML metacharacter in the path (a ": ", a " #")
+		// would break the config Goose has to read back.
+		fmt.Fprintf(&b, "    cmd: %s\n", yamlQuote(cmd))
 		b.WriteString("    args:\n")
 		for _, a := range args {
-			fmt.Fprintf(&b, "      - %s\n", a)
+			fmt.Fprintf(&b, "      - %s\n", yamlQuote(a))
 		}
 		b.WriteString("    timeout: 60\n")
 		entry := b.String()

@@ -41,6 +41,29 @@ func TestInstallGooseWritesTheExtension(t *testing.T) {
 	}
 }
 
+// The exe path lands in cmd (Unix) or args (Windows); either way a YAML
+// metacharacter in it must be quoted, or Goose cannot load the extension it was
+// just handed.
+func TestInstallGooseQuotesThePath(t *testing.T) {
+	home := t.TempDir()
+	cfg := filepath.Join(home, "cfg")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	exe := "/opt/deja: v#2/deja"
+	if _, err := installGoose(exe, false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	conf := gooseConf(t, cfg)
+	if !strings.Contains(conf, `"/opt/deja: v#2/deja"`) {
+		t.Fatalf("exe path is not YAML-quoted, so Goose cannot parse it:\n%s", conf)
+	}
+	// The raw path on a value line would break the YAML at the ": ".
+	if strings.Contains(conf, "- /opt/deja: v#2/deja") || strings.Contains(conf, "cmd: /opt/deja: v#2/deja") {
+		t.Fatalf("raw unquoted path written, breaks the YAML:\n%s", conf)
+	}
+}
+
 func TestInstallGooseKeepsOtherExtensions(t *testing.T) {
 	home := t.TempDir()
 	cfg := filepath.Join(home, "cfg")
