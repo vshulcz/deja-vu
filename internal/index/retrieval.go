@@ -72,7 +72,7 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if err != nil {
 		return SearchResult{}, fmt.Errorf("manifest: %w", err)
 	}
-	if !recordsIntact(dir, m) {
+	if !recordsReadable(dir, m) {
 		return SearchResult{}, fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
 	}
 	var posts []posting
@@ -728,7 +728,7 @@ func FirstMatch(dir string, queries []string, limit int) ([]model.Session, strin
 	if err != nil {
 		return nil, "", fmt.Errorf("manifest: %w", err)
 	}
-	if !recordsIntact(dir, m) {
+	if !recordsReadable(dir, m) {
 		return nil, "", fmt.Errorf("%w: records.bin size does not match the manifest (crash-truncated or uncommitted tail)", errCorruptIndex)
 	}
 	for _, q := range queries {

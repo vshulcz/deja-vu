@@ -244,6 +244,22 @@ func hasBucketFile(dir string) bool {
 // committed. A shorter file means a crash truncated the record log; the index
 // must rebuild rather than silently return fewer messages.
 func recordsIntact(dir string, m Manifest) bool {
+	return recordsIntactSized(dir, m, false)
+}
+
+// recordsReadable is recordsIntact for a lock-free reader: it tolerates a
+// records.bin LONGER than the manifest committed. An incremental append grows
+// records.bin before it rewrites the manifest, and a reader that lands in that
+// window would otherwise see the new size against the old stamp and call a
+// perfectly healthy concurrent append "corrupt" — triggering a needless full
+// rebuild on the MCP path, or a hard error on `deja files`. The extra bytes are
+// an uncommitted tail no bucket references, so reading the committed extent is a
+// consistent snapshot. Only a SHORTER file is real truncation.
+func recordsReadable(dir string, m Manifest) bool {
+	return recordsIntactSized(dir, m, true)
+}
+
+func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
 	if m.RecordsSize <= 0 {
 		return true // empty index, or one written before the size stamp existed
 	}
@@ -252,8 +268,9 @@ func recordsIntact(dir string, m Manifest) bool {
 		return false
 	}
 	// Shorter: a crash truncated the log. Longer: a crash landed records the
-	// manifest never committed; re-appending them would duplicate messages.
-	if fi.Size() != m.RecordsSize {
+	// manifest never committed, or an incremental append is in flight; either
+	// way the tail is unreferenced, so a reader may treat it as a snapshot.
+	if fi.Size() < m.RecordsSize || (!tolerateLonger && fi.Size() != m.RecordsSize) {
 		return false
 	}
 	// The postings live in buckets/, and losing that directory is not

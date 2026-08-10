@@ -65,7 +65,7 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 	}
 
 	manifest, err := readManifestCached(dir)
-	if err != nil || len(manifest.Sessions) == 0 || !recordsIntact(dir, manifest) {
+	if err != nil || len(manifest.Sessions) == 0 || !recordsReadable(dir, manifest) {
 		return nil
 	}
 
