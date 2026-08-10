@@ -49,7 +49,9 @@ func collectSpan(t *testing.T, path string, offs []int64) []string {
 	}
 	defer func() { _ = f.Close() }()
 	var got []string
-	eachRecordAt(f, offs, newRecordTables(), func(r Record) { got = append(got, r.Text) })
+	if err := eachRecordAt(f, offs, newRecordTables(), func(r Record) { got = append(got, r.Text) }); err != nil {
+		t.Fatalf("eachRecordAt over valid data: %v", err)
+	}
 	return got
 }
 
@@ -96,9 +98,11 @@ func TestEachRecordAtMatchesIndividualReads(t *testing.T) {
 	}
 }
 
-// TestEachRecordAtSurvivesUnreadableSpan checks the part that would fail
-// quietly: a span that cannot be read must not swallow the records after it.
-func TestEachRecordAtSurvivesUnreadableSpan(t *testing.T) {
+// TestEachRecordAtReportsAnUnreadableFile checks the part that would fail
+// quietly: a file that cannot be read must surface the IO error, not hand back a
+// clean-looking empty result. A closed file is a real IO error, not corruption,
+// so it must propagate as itself and not be mistaken for a store to rebuild.
+func TestEachRecordAtReportsAnUnreadableFile(t *testing.T) {
 	path, offs := writeSpanFixture(t, []string{"one", "two", "three"})
 	f, err := os.Open(path)
 	if err != nil {
@@ -108,7 +112,13 @@ func TestEachRecordAtSurvivesUnreadableSpan(t *testing.T) {
 		t.Fatal(err)
 	}
 	n := 0
-	eachRecordAt(f, offs, newRecordTables(), func(Record) { n++ })
+	err = eachRecordAt(f, offs, newRecordTables(), func(Record) { n++ })
+	if err == nil {
+		t.Fatal("a closed file was read as an empty result")
+	}
+	if IsCorrupt(err) {
+		t.Fatalf("a closed file was misreported as index corruption: %v", err)
+	}
 	if n != 0 {
 		t.Fatalf("closed file yielded %d records", n)
 	}
