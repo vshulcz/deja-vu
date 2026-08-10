@@ -129,6 +129,16 @@ func pyQuote(s string) string {
 	return `"` + r.Replace(s) + `"`
 }
 
+// yamlQuote renders a YAML double-quoted scalar. An unquoted exe path breaks the
+// file the moment it holds a YAML metacharacter — a ": " reads as a nested key,
+// a " #" starts a comment, a Windows "C:\..." is at least fragile — and the
+// harness then cannot parse its own config. Double-quoting escapes only \ and ",
+// which is all a double-quoted scalar needs.
+func yamlQuote(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+	return `"` + r.Replace(s) + `"`
+}
+
 // installHermesMCP edits config.yaml by hand rather than through a YAML
 // round-trip: the file ships with section comments a re-serialise would drop,
 // and `hermes mcp add` prompts before saving, which an installer cannot answer.
@@ -140,7 +150,7 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	next := removeHermesMCPBlock(string(old))
 	if !uninstall {
-		entry := "  deja:\n    command: " + exe + "\n    args:\n      - mcp\n    enabled: true\n"
+		entry := "  deja:\n    command: " + yamlQuote(exe) + "\n    args:\n      - mcp\n    enabled: true\n"
 		if i := strings.Index(next, "\nmcp_servers:\n"); i >= 0 {
 			at := i + len("\nmcp_servers:\n")
 			next = next[:at] + entry + next[at:]

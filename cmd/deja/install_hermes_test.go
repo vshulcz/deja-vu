@@ -54,6 +54,31 @@ func TestInstallHermesPlugin(t *testing.T) {
 	}
 }
 
+// An exe path with a YAML metacharacter (a ": " reads as a nested key, a " #"
+// starts a comment) must be quoted, or Hermes cannot parse the config it was
+// just handed.
+func TestInstallHermesQuotesTheCommandPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_HERMES_HOME", "")
+	exe := "/opt/deja: v#2/deja"
+	if _, err := installHermesMCP(exe, false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	cfg, err := os.ReadFile(filepath.Join(home, ".hermes", "config.yaml"))
+	if err != nil {
+		t.Fatalf("config missing: %v", err)
+	}
+	s := string(cfg)
+	if !strings.Contains(s, "command: "+`"/opt/deja: v#2/deja"`) {
+		t.Fatalf("command path is not YAML-quoted, so Hermes cannot parse it:\n%s", s)
+	}
+	if strings.Contains(s, "command: /opt/deja: v#2/deja") {
+		t.Fatalf("raw unquoted path written, breaks the YAML:\n%s", s)
+	}
+}
+
 func TestInstallHermesUninstallLeavesNeighbours(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
