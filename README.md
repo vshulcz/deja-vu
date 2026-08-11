@@ -71,7 +71,7 @@ claude plugin marketplace add vshulcz/deja-vu
 claude plugin install deja-vu@deja-vu
 ```
 
-The plugin wires the same three hooks, the `/deja` command and the MCP server. It stands down on its own if `deja install` already wired them, so having both does not recall twice.
+The plugin wires the same hooks — session start, per-prompt, pre-compaction and the point-of-action PreToolUse — plus the `/deja` command and the MCP server. It stands down on its own if `deja install` already wired them, so having both does not recall twice.
 
 Codex, Cursor and Qwen read the same bundle from their own registries:
 
@@ -117,7 +117,7 @@ Claude Code, Codex, opencode, aider, Gemini CLI, Cursor, Antigravity, Grok Build
 | **Knows what held** | `deja promote <id> --state rejected --note "why"` — a decision you reverted comes back marked *tried and rejected*, with the reason and the date, on every hit for that session. Nothing is deleted: the agent sees what was decided **and** that it changed. Judged it wrong? `deja promote <id> --state accepted` takes the mark back — the latest mark wins, and the note keeps both |
 | **Sync** | `deja sync ssh laptop` — your memory follows you between machines, append-only, idempotent, no cloud in the middle |
 | **Handoff** | `deja handoff --to codex` — stuck in one agent? package the live context and continue in another: `codex "$(deja handoff --to codex)"`; fourteen harnesses can be started directly, the rest print the prompt to paste |
-| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~120 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
+| **Auto-recall** | `install --auto` adds a SessionStart hook: relevant memory lands in context before you ask — ranked by the files your repo is touching, ~50 ms on a 1000-session index; Claude Code also captures the current transcript before compaction |
 | **At the point of an action** | before an agent edits a file or runs a command, deja names that file's or command's prior decision — the fix that held, the invocation that worked — from a `PreToolUse` hook, so it acts on what was settled instead of re-deciding it. `install --auto` wires it for codex and Claude |
 | **Project decisions up front** | the decisions you promoted *accepted* for a project are injected at session start, independent of the query, so the agent follows a settled choice — *we use pgx, not database/sql* — without anyone naming it |
 | **Indexes the work** | not just the talk about it: the files each turn opened, the commands that ran, and the exact spans an edit replaced — the part every summary throws away |

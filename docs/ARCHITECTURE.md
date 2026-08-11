@@ -131,7 +131,25 @@ The MCP server calls the same index/search code as the CLI. It writes protocol r
 {"type":"command","command":"/abs/path/to/deja hook-context"}
 ```
 
-`deja hook-context` is intentionally hidden from normal help. It derives the current project from `CLAUDE_PROJECT_DIR` or `cwd` using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB. It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked.
+`deja hook-context` is intentionally hidden from normal help. It derives the current project from `CLAUDE_PROJECT_DIR` or `cwd` using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB. It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked.
+
+`--auto` wires three more hooks with the same fail-open contract, each a hidden subcommand that reads only a warm index and exits 0 on anything unexpected:
+
+- **`hook-prompt`** (`UserPromptSubmit`) searches the index for the prompt's content and injects a small digest, or the `you have been here` line on a déjà-vu match.
+- **`hook-tool`** (`PreToolUse`, matched to the editing/command tools) reads the tool payload — a `Bash` command or an `Edit`/`Write`/`apply_patch` target — and injects one line naming that file's or command's prior decision. Deliberately thin: it fires once per action, so it dedupes per agent session, stays silent unless the history is a pattern, and carries at most one decision.
+- **`hook-precompact`** (`PreCompact`, Claude Code) captures the current transcript into the index before compaction discards it.
+
+## Ranking
+
+Search intersects postings to find candidates, then scores each with BM25 over the query tokens and multiplies in a few bounded signals — each able to break a tie, none able to outrank plain relevance:
+
+- **decision** — a session that reached a conclusion is lifted, and the decision-carrying line (not the query-match line) is what recall shows.
+- **outcome** — a session whose own text reports it reverted an approach and settled nothing else is damped; one that reverted and then settled keeps the decision lift. A promoted `rejected`/`superseded`/`stale` lifecycle state travels with the session and is surfaced on every hit.
+- **worn (reuse)** — a session agents keep recalling is lifted on a `log2` curve capped at +50%, on the theory that what the machine keeps needing is worth surfacing; the cap keeps popularity below relevance.
+- **promoted note** — a curated note outranks the raw transcript it was distilled from.
+- **freshness** — recency decays the score gently so time is a hint, not a filter.
+
+`recall_context` and the hooks reuse the same scored order; the point-of-action decision line comes from the same conclusion extraction the digest uses.
 
 ## Add a new harness
 

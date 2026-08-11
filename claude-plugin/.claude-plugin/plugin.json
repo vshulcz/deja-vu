@@ -42,6 +42,19 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-tool",
+            "timeout": 10,
+            "statusMessage": "Checking what this touches\u2026"
+          }
+        ]
+      }
     ]
   },
   "mcpServers": {
