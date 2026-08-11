@@ -31,7 +31,6 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.25.x'
-          cache: false
       - run: go mod verify
       - run: go vet ./...
       # -timeout below the job's own patience: a hung test then dies with every
