@@ -77,7 +77,7 @@ func TestWornBoostBreaksTiesButIsCapped(t *testing.T) {
 	if hits[0].Session.ID != "worn" || hits[0].Reused != 4 {
 		t.Fatalf("worn tie-break missing: %+v", hits[0])
 	}
-	if wornBoost(1000) != 1.2 {
+	if wornBoost(1000) != 1.5 {
 		t.Fatalf("worn boost uncapped: %f", wornBoost(1000))
 	}
 	// A clearly better match must beat a worn weak one: relevance > popularity.
@@ -89,5 +89,27 @@ func TestWornBoostBreaksTiesButIsCapped(t *testing.T) {
 	}
 	if hits2[0].Session.ID != "strong" {
 		t.Fatalf("popularity outranked relevance: %+v", hits2)
+	}
+}
+
+// Reuse must reach past a dead tie: a recurring answer the user keeps pulling
+// back should surface even when a louder session repeats the query terms a
+// couple more times. At the old 0.05/1.2 shape it did not — a single extra term
+// buried the reused answer, so the signal was nearly inert. This pins the reach.
+func TestWornBoostRescuesAnOutmatchedRecurringAnswer(t *testing.T) {
+	// The answer names the topic and says it was settled; the distractor repeats
+	// the terms twice more and was never reused — louder on the text alone.
+	answer := rankSession("answer", "", "retry budget issue; we resolved retry budget before and it held")
+	distractor := rankSession("distractor", "", "retry budget retry budget retry budget keeps failing; raw logs about retry budget")
+	hits, err := Run([]model.Session{distractor, answer}, Options{Query: "retry budget", All: true, RecallWorn: map[string]int{"answer": 6}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Session.ID != "answer" {
+		top := "—"
+		if len(hits) > 0 {
+			top = hits[0].Session.ID
+		}
+		t.Fatalf("reuse did not rescue an out-matched recurring answer: top=%s", top)
 	}
 }

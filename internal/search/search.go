@@ -747,12 +747,17 @@ func looksPasted(s model.Session) bool {
 // relevance. Kept modest: a note about X must not bury a transcript about Y.
 const promotedNoteBoost = 1.25
 
-// wornBoost rewards sessions agents keep recalling — capped hard at +20% so
-// popularity can never outrank relevance, only break near-ties.
+// wornBoost rewards sessions agents keep recalling. The shape is set by
+// measurement (scripts/reusebench, internal/search reuse tests): at the old
+// 0.05 slope / 1.2 cap the boost rescued a reused answer only when a louder
+// session tied it exactly — a single extra term of noise buried it, so the
+// signal was nearly inert. A 0.10 slope and 1.5 cap let reuse surface an answer
+// out-matched by a couple of terms, while a heavily-reused near-miss still loses
+// to a strong match: relevance stays dominant, reuse breaks more than dead ties.
 func wornBoost(n int) float64 {
-	boost := 1 + 0.05*math.Log2(float64(1+n))
-	if boost > 1.2 {
-		return 1.2
+	boost := 1 + 0.10*math.Log2(float64(1+n))
+	if boost > 1.5 {
+		return 1.5
 	}
 	return boost
 }
