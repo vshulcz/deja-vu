@@ -104,6 +104,7 @@ func TestUnrelatedPushDoesNotWipeOtherBoundaries(t *testing.T) {
 // what arrives next: the exclude list is a privacy control, not a filter on
 // new traffic.
 func TestExcludeAppliesToAlreadyImportedSessions(t *testing.T) {
+	skipWindowsPortability(t)
 	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "nda project notes"))
 	batch := filepath.Join(tmp, "batch")
 	if _, err := Export(dir, batch); err != nil {

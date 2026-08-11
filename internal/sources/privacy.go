@@ -3,6 +3,7 @@ package sources
 import (
 	"bufio"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -61,10 +62,14 @@ func (e Excluder) Match(project string) bool {
 		if strings.Contains(project, pattern) {
 			return true
 		}
-		if ok, _ := filepath.Match(pattern, project); ok {
+		// path.Match, not filepath.Match: a project name is a "/"-separated
+		// logical name, not a host path, so a glob must match the same way
+		// wherever deja runs — filepath.Match reads "\\" as the separator on
+		// windows and would not glob a "/"-joined name there.
+		if ok, _ := path.Match(pattern, project); ok {
 			return true
 		}
-		if ok, _ := filepath.Match(pattern, bare); ok {
+		if ok, _ := path.Match(pattern, bare); ok {
 			return true
 		}
 	}

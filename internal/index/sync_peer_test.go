@@ -143,6 +143,7 @@ func TestImportHonorsTombstonesAfterCacheWipe(t *testing.T) {
 // The exclude list keeps a project out of this machine's memory; a sync from
 // another machine must not put it back.
 func TestImportHonorsExcludeList(t *testing.T) {
+	skipWindowsPortability(t)
 	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "nda project notes"))
 	batch := filepath.Join(tmp, "batch")
 	if _, err := Export(dir, batch); err != nil {
