@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -102,6 +103,16 @@ func runView(dir string, args []string) error {
 		return err
 	}
 	fmt.Fprintf(os.Stdout, "deja: view written to %s\n", path)
+	// The page is a self-contained file whose whole purpose is to be looked at
+	// and passed around, so it carries the same redaction floor the other
+	// outbound paths (share, sync export, promote --to) print — but only when it
+	// actually holds masked content, so local browsing stays quiet (#857).
+	// Redaction happens at index time, so the markers are already in the page.
+	if body, rerr := os.ReadFile(path); rerr == nil {
+		if masked := strings.Count(string(body), redact.Marker); masked > 0 {
+			fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this page. pattern redaction is a floor — review before sharing; rotate anything that leaked.\n", masked, pluralS(masked))
+		}
+	}
 	if openBrowser {
 		openInBrowser(path)
 	}

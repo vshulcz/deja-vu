@@ -29,6 +29,42 @@ func viewFixtureIndex(t *testing.T) string {
 	return dir
 }
 
+// The view page is a self-contained file made to be passed around, so it must
+// carry the same redaction floor the other outbound paths print when it holds a
+// masked secret — and stay quiet when it does not, so local browsing is silent
+// (#857).
+func TestViewNamesTheRedactionFloorWhenThePageHoldsAMaskedSecret(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	ts := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-app", "sec.jsonl"), "sec", []string{
+		`{"type":"user","sessionId":"sec","timestamp":"` + ts + `","message":{"role":"user","content":"the key was AKIAABCDABCDABCDABCD in the config"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "v.html")
+	stderr, err := captureRunStderr(t, "view", "--no-open", "--out", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr, "pattern redaction is a floor") {
+		t.Fatalf("view did not name the redaction floor for a page carrying a masked secret:\n%s", stderr)
+	}
+}
+
+func TestViewStaysQuietWhenNothingIsMasked(t *testing.T) {
+	viewFixtureIndex(t)
+	out := filepath.Join(t.TempDir(), "v.html")
+	stderr, err := captureRunStderr(t, "view", "--no-open", "--out", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stderr, "pattern redaction is a floor") {
+		t.Fatalf("view printed the floor on a page with no masked content:\n%s", stderr)
+	}
+}
+
 func TestViewGeneratesSelfContainedHTML(t *testing.T) {
 	dir := viewFixtureIndex(t)
 	out := filepath.Join(t.TempDir(), "view.html")
