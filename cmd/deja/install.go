@@ -733,6 +733,10 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
 	nextRoot = updateClaudeHook(nextRoot, "PreCompact", exe+" hook-precompact", "manual|auto", uninstall)
 	nextRoot = updateClaudeHook(nextRoot, "UserPromptSubmit", exe+" hook-prompt", "", uninstall)
+	// Recall at the moment of the action: before an edit or a command, hook-tool
+	// names the file's or command's prior decision. Scoped to the tools that
+	// change something so it never fires on a Read or a Glob.
+	nextRoot = updateClaudeHook(nextRoot, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit", uninstall)
 	next, err := json.MarshalIndent(nextRoot, "", "  ")
 	if err != nil {
 		return installResult{}, err
@@ -759,6 +763,8 @@ func hookStatusMessage(event string) string {
 		return "Searching past sessions…"
 	case "PreCompact":
 		return "Saving this session to memory…"
+	case "PreToolUse":
+		return "Checking what this touches…"
 	}
 	return ""
 }

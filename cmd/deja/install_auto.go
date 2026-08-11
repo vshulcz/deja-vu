@@ -29,46 +29,12 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, err
 	}
-	cmd := exe + " hook-context"
-	hooks, _ := root["hooks"].(map[string]any)
-	if hooks == nil {
-		hooks = map[string]any{}
-		root["hooks"] = hooks
-	}
-	entries, _ := hooks["SessionStart"].([]any)
-	var kept []any
-	found := false
-	for _, entryAny := range entries {
-		entry, _ := entryAny.(map[string]any)
-		if entry != nil && entryHasCommand(entry, cmd) {
-			if uninstall {
-				continue
-			}
-			// Take the entry over rather than leaving it as it was: an install
-			// from a new binary path, or from a version that gained a field,
-			// has to update ours in place or the change never reaches anyone
-			// who already had it.
-			found = true
-			adoptCodexHookEntry(entry, cmd)
-		}
-		kept = append(kept, entryAny)
-	}
-	if !uninstall && !found {
-		kept = append(kept, map[string]any{
-			"matcher": "startup|resume",
-			"hooks": []any{map[string]any{
-				"type": "command", "command": cmd, "timeout": 10,
-				// Codex surfaces statusMessage in its hook run summary.
-				"statusMessage": hookStatusMessage("SessionStart"),
-			}},
-		})
-	}
-	if len(kept) == 0 {
-		delete(hooks, "SessionStart")
-	} else {
-		hooks["SessionStart"] = kept
-	}
-	if len(hooks) == 0 {
+	// SessionStart carries the project digest; PreToolUse (hook-tool) carries
+	// the prior decision for the file or command about to change. Codex uses the
+	// same hooks.json shape as Claude Code, so both wire the same way.
+	updateCodexHook(root, "SessionStart", exe+" hook-context", "startup|resume", uninstall)
+	updateCodexHook(root, "PreToolUse", exe+" hook-tool", ".*", uninstall)
+	if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
 		delete(root, "hooks")
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
@@ -80,9 +46,47 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a}, err
 }
 
+// updateCodexHook merges one deja hook for an event into codex's hooks.json,
+// idempotently: it adopts an entry we already own (so a move or an upgrade
+// updates in place) and adds one otherwise. Same shape as updateClaudeHook.
+func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall bool) {
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+		root["hooks"] = hooks
+	}
+	entries, _ := hooks[event].([]any)
+	var kept []any
+	found := false
+	for _, entryAny := range entries {
+		entry, _ := entryAny.(map[string]any)
+		if entry != nil && entryHasCommand(entry, cmd) {
+			if uninstall {
+				continue
+			}
+			found = true
+			adoptCodexHookEntry(entry, cmd, event)
+		}
+		kept = append(kept, entryAny)
+	}
+	if !uninstall && !found {
+		h := map[string]any{"type": "command", "command": cmd, "timeout": 10}
+		// Codex surfaces statusMessage in its hook run summary.
+		if msg := hookStatusMessage(event); msg != "" {
+			h["statusMessage"] = msg
+		}
+		kept = append(kept, map[string]any{"matcher": matcher, "hooks": []any{h}})
+	}
+	if len(kept) == 0 {
+		delete(hooks, event)
+	} else {
+		hooks[event] = kept
+	}
+}
+
 // adoptCodexHookEntry rewrites the command and status message of an entry deja
 // already owns.
-func adoptCodexHookEntry(entry map[string]any, cmd string) {
+func adoptCodexHookEntry(entry map[string]any, cmd, event string) {
 	hs, _ := entry["hooks"].([]any)
 	for _, hAny := range hs {
 		h, _ := hAny.(map[string]any)
@@ -90,7 +94,7 @@ func adoptCodexHookEntry(entry map[string]any, cmd string) {
 			continue
 		}
 		h["command"] = cmd
-		if msg := hookStatusMessage("SessionStart"); msg != "" {
+		if msg := hookStatusMessage(event); msg != "" {
 			h["statusMessage"] = msg
 		}
 	}
@@ -316,7 +320,7 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			// has to update ours in place or the change never reaches anyone
 			// who already had it.
 			found = true
-			adoptCodexHookEntry(entry, cmd)
+			adoptCodexHookEntry(entry, cmd, event)
 		}
 		kept = append(kept, entryAny)
 	}

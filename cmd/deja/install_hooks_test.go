@@ -134,6 +134,76 @@ func TestCodexHookInstallAdoptsAnOlderEntry(t *testing.T) {
 	}
 }
 
+// Point-of-action recall is wired as a PreToolUse hook for both codex and
+// Claude, idempotently, and removed on uninstall.
+func TestPreToolUseWiresHookTool(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))
+	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	countHookTool := func(path, event string) int {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return 0
+		}
+		var root struct {
+			Hooks map[string][]struct {
+				Hooks []struct {
+					Command string `json:"command"`
+				} `json:"hooks"`
+			} `json:"hooks"`
+		}
+		if err := json.Unmarshal(b, &root); err != nil {
+			t.Fatalf("bad json in %s: %v", path, err)
+		}
+		n := 0
+		for _, g := range root.Hooks[event] {
+			for _, h := range g.Hooks {
+				if strings.Contains(h.Command, "deja") && strings.HasSuffix(h.Command, "hook-tool") {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	codexPath := filepath.Join(home, ".codex", "hooks.json")
+	claudePath := filepath.Join(home, ".claude", "settings.json")
+
+	// Install twice: the PreToolUse hook-tool entry lands once, not twice.
+	for i := 0; i < 2; i++ {
+		if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+			t.Fatalf("codex install: %v", err)
+		}
+		if _, err := installClaudeHook("/usr/local/bin/deja", false); err != nil {
+			t.Fatalf("claude install: %v", err)
+		}
+	}
+	if n := countHookTool(codexPath, "PreToolUse"); n != 1 {
+		t.Errorf("codex PreToolUse hook-tool count = %d, want 1", n)
+	}
+	if n := countHookTool(claudePath, "PreToolUse"); n != 1 {
+		t.Errorf("claude PreToolUse hook-tool count = %d, want 1", n)
+	}
+
+	// Uninstall removes it.
+	if _, err := installCodexHooks("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installClaudeHook("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if n := countHookTool(codexPath, "PreToolUse"); n != 0 {
+		t.Errorf("codex PreToolUse hook-tool survived uninstall: %d", n)
+	}
+	if n := countHookTool(claudePath, "PreToolUse"); n != 0 {
+		t.Errorf("claude PreToolUse hook-tool survived uninstall: %d", n)
+	}
+}
+
 // Kimi took three wrong readings: it injects the hook's plain stdout rather
 // than a JSON field, only UserPromptSubmit does it, and its prompt arrives as
 // content parts. Each one on its own looks like "recall found nothing".
