@@ -167,6 +167,100 @@ func TestToolHookFileScopingIsLoadBearing(t *testing.T) {
 	}
 }
 
+// Codex and other OpenAI-style agents edit through a single apply_patch tool,
+// with the path inside the patch body rather than in file_path. The hook must
+// read that path so its file-history line fires on those agents' edits too,
+// not only on Claude's Edit/Write.
+func TestToolHookReadsTheFileFromAnApplyPatch(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 6; i++ {
+		id := "s" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	patch := "*** Begin Patch\n*** Update File: /work/alpha/config.go\n@@\n+x\n*** End Patch\n"
+	payloadBytes, _ := json.Marshal(map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "apply_patch",
+		"tool_input":      map[string]any{"command": patch},
+		"session_id":      "now",
+		"cwd":             "/work/alpha",
+	})
+	out := toolHookRun(t, string(payloadBytes))
+	if out == "" {
+		t.Fatal("apply_patch on a file with history produced no line")
+	}
+	var resp sessionStartHookResponse
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(resp.HookSpecificOutput.AdditionalContext, "6 sessions") {
+		t.Errorf("apply_patch file history not surfaced:\n%s", resp.HookSpecificOutput.AdditionalContext)
+	}
+	if !strings.Contains(resp.HookSpecificOutput.AdditionalContext, "config.go") {
+		t.Errorf("the line does not name the file: %q", resp.HookSpecificOutput.AdditionalContext)
+	}
+	// A patch that only touches a file with no history stays silent.
+	noHist := "*** Begin Patch\n*** Add File: /work/alpha/brandnew.go\n@@\n+package p\n*** End Patch\n"
+	nb, _ := json.Marshal(map[string]any{
+		"hook_event_name": "PreToolUse", "tool_name": "apply_patch",
+		"tool_input": map[string]any{"command": noHist}, "session_id": "now2", "cwd": "/work/alpha",
+	})
+	if got := toolHookRun(t, string(nb)); got != "" {
+		t.Errorf("apply_patch on a file with no history spoke: %q", got)
+	}
+}
+
+// The file line carries the prior decision, not just a pointer to it: a
+// measured A/B showed a bare "deja blame has the history" changed nothing an
+// agent did, while the same moment carrying the decision drove reuse. When a
+// session that touched the file recorded a decision, it must appear in the line.
+func TestToolHookFileLineCarriesThePriorDecision(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	// Five plain edits so the file clears the history threshold.
+	for i := 0; i < 5; i++ {
+		id := "s" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+		})
+	}
+	// The deciding session edits config.go and states the decision.
+	writeClaudeFixture(t, filepath.Join(root, "alpha", "decide.jsonl"), "decide", []string{
+		`{"type":"user","sessionId":"decide","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"settle config.go"}}`,
+		`{"type":"assistant","sessionId":"decide","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"Decision: config.go must load the ARENAGUARD sentinel before any read."},{"type":"tool_use","id":"td","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"x","new_string":"y"}}]}}`,
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"now","cwd":"/work/alpha"}`)
+	if out == "" {
+		t.Fatal("no line for a file with history and a decision")
+	}
+	var resp sessionStartHookResponse
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		t.Fatal(err)
+	}
+	ctx := resp.HookSpecificOutput.AdditionalContext
+	if !strings.Contains(ctx, "prior decision:") {
+		t.Errorf("the line does not carry the decision:\n%s", ctx)
+	}
+	if !strings.Contains(ctx, "ARENAGUARD") {
+		t.Errorf("the decision content is missing:\n%s", ctx)
+	}
+}
+
 // The command line honours the trust policy: a command that ran only in a
 // withheld project stays silent, and the count excludes withheld sessions.
 func TestToolHookCommandHonoursTrustPolicy(t *testing.T) {

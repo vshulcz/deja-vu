@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,16 +30,22 @@ import (
 // 1165-session store, 335 commands were run in three or more separate sessions
 // and 487 files were touched in five or more.
 //
-// The cost side is the reason this is deliberately thin. A prompt hook is paid
-// once per message; this is paid once per action, and there are an order of
-// magnitude more of those. So: a hard cap of one short line, no digest, no
-// snippets, and silence unless the history is a pattern rather than a
-// coincidence.
+// The cost side is the reason this stays lean. A prompt hook is paid once per
+// message; this is paid once per action, and there are an order of magnitude
+// more of those. So: at most one line carrying at most one prior decision, no
+// digest, no snippets, and silence unless the history is a pattern rather than a
+// coincidence. A measured A/B settled the payload: a line that only pointed at
+// `deja blame` changed nothing an agent did, while the same line carrying the
+// decision drove it to reuse the prior fix — so the file line names the decision
+// and keeps the pointer only as a fallback.
 
 const (
-	// toolHookMaxBytes is the whole payload. The line is a pointer, not an
-	// answer: an agent that wants the story calls recall.
-	toolHookMaxBytes = 300
+	// toolHookMaxBytes caps the whole payload. Wider than a bare pointer because
+	// the file line now carries one prior decision, which the measurement showed
+	// is what makes the difference; still one line, still per-action cheap.
+	toolHookMaxBytes = 480
+	// toolHookDecisionBudget bounds the extracted decision inside that cap.
+	toolHookDecisionBudget = 200
 	// toolHookMinFileSessions is when a file's history stops being noise. A
 	// file two sessions touched is ordinary work; five is a place with a past.
 	toolHookMinFileSessions = 5
@@ -108,8 +115,38 @@ func toolHookLine(dir string, input toolHookInput) string {
 		if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
 			return fileHookLine(dir, path)
 		}
+	case "apply_patch":
+		// Codex and other OpenAI-style agents make every file edit through a
+		// single apply_patch tool: the patch text is in `command` and the path
+		// is in its header, not in file_path. Pull the targets out so the
+		// file-history line fires here too — without this the hook is blind to
+		// every edit those agents make.
+		for _, path := range applyPatchFiles(input.ToolInput.Command) {
+			if line := fileHookLine(dir, path); line != "" {
+				return line
+			}
+		}
 	}
 	return ""
+}
+
+// applyPatchFiles pulls the target paths out of an apply_patch body. Each file
+// section is headed by "*** Add File: p", "*** Update File: p" or "*** Delete
+// File: p", and a rename adds "*** Move to: p".
+func applyPatchFiles(patch string) []string {
+	var out []string
+	for _, line := range strings.Split(patch, "\n") {
+		line = strings.TrimSpace(line)
+		for _, pfx := range []string{"*** Update File: ", "*** Add File: ", "*** Delete File: ", "*** Move to: "} {
+			if strings.HasPrefix(line, pfx) {
+				if p := strings.TrimSpace(line[len(pfx):]); p != "" {
+					out = append(out, p)
+				}
+				break
+			}
+		}
+	}
+	return out
 }
 
 func commandHookLine(dir, cmd string) string {
@@ -173,6 +210,7 @@ func fileHookLine(dir, path string) string {
 	pol := policy.Load()
 	var sessions int
 	var last time.Time
+	var inScope []index.SessionMeta
 	for _, meta := range index.FileSessions(dir, path) {
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
 			continue
@@ -181,6 +219,7 @@ func fileHookLine(dir, path string) string {
 			continue
 		}
 		sessions++
+		inScope = append(inScope, meta)
 		if meta.Updated.After(last) {
 			last = meta.Updated
 		}
@@ -192,8 +231,40 @@ func fileHookLine(dir, path string) string {
 	if !last.IsZero() {
 		when = ", last " + last.Local().Format("2006-01-02")
 	}
-	return fmt.Sprintf("%s has been worked on in %s%s — `deja blame %s` has the history.",
-		search.SafeText(baseName(path)), toolSessionCount(sessions), when, search.SafeText(baseName(path)))
+	name := search.SafeText(baseName(path))
+	head := fmt.Sprintf("%s has been worked on in %s%s", name, toolSessionCount(sessions), when)
+	// The measured difference between a nudge that changes what an agent does
+	// and one it ignores is whether it carries the decision or only points at
+	// it: a line that said "deja blame X has the history" drove no reuse, while
+	// the same moment carrying the prior decision did. So surface the decision
+	// here, and fall back to the pointer only when none can be extracted.
+	if d := fileDecisionLine(dir, inScope); d != "" {
+		return head + " — prior decision: " + d
+	}
+	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, name)
+}
+
+// fileDecisionLine returns the single most relevant prior decision recorded
+// about this file, or "" if none can be extracted. It reads the newest in-scope
+// sessions (bounded, newest first) and takes the first one that yields a
+// conclusion — the same decision-carrying line the SessionStart digest surfaces,
+// but delivered at the moment the file is about to change.
+func fileDecisionLine(dir string, metas []index.SessionMeta) string {
+	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	const scan = 5
+	for i, meta := range metas {
+		if i >= scan {
+			break
+		}
+		s, ok, err := index.FindByIdentity(dir, meta.Harness, meta.ID)
+		if err != nil || !ok {
+			continue
+		}
+		if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
+			return search.SafeText(strings.TrimSpace(cs[0]))
+		}
+	}
+	return ""
 }
 
 // fileMetaInScope keeps a session only if it worked on this exact path (an
