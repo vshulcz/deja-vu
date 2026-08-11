@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-11
+
+This release moves deja from finding the right past session to putting its
+decision in front of the agent when it matters — before an edit or a command, at
+the start of a session, and inside the recall itself — and ranks by what actually
+held rather than what merely matched.
+
+### Added
+- Recall at the point of an action: before an agent edits a file or runs a command, deja names that file's or command's prior decision, not just that history exists. It is wired into `PreToolUse` for codex and Claude, and reads codex's `apply_patch` edits, not only `Edit`/`Write`. A measured A/B on a real agent settled the wording — a bare pointer to `blame` changed nothing it did, the decision itself drove it to reuse the earlier fix. (#1153, #1163)
+- A project's settled decisions at session start: the accepted notes promoted for the current project are injected up front, independent of the query, so the agent follows what was decided instead of re-deciding it. Trust-policy gated and capped. (#1160)
+- `how` reports how this machine actually runs a thing — the real command with the real flags, from what agents have run before — so a build, test or deploy invocation is reused rather than guessed. (#1154)
+- Recall matches by error signature when nothing matches exactly, and pairs an error with the command that followed it, so hitting a failure surfaces what cleared it last time. (#1149, #1151)
+- Recall says what the best session concluded, not only where the query words appear, and the credit line names the session that earned a reuse. (#1145, #1148)
+- A hit says when its session backed an approach out, and `deja` offers to record a dead end in the sentence that reports it. (#1152, #1150)
+- An off-by-default plan check, with the harness to re-measure it. (#1125)
+
+### Changed
+- Outcome-aware ranking: a session whose own text says it reverted an approach and reached no other conclusion ranks below one that held, while a session that reverted one thing and settled another keeps its place. (#1159)
+- Reuse reaches past dead ties: a recurring answer a louder session out-matches by a couple of terms is still surfaced by how often it was pulled back, and a heavily-reused near-miss still loses to a strong match. (#1164)
+- Ranking weighs how much of a session matched against how long it is, sizes the unprompted recall to the strength of the match, and snippets show where the query terms meet — a wider window, strongest matches first. (#1155, #1146, #1140, #1142, #1143)
+
+### Fixed
+- Secrets named in languages other than English are redacted. (#1144)
+- `resume` obeys the trust policy; a re-run `import` keeps a session's earlier touched files; `forget --unforget --dry-run` no longer restores. (#1131, #1133, #1130)
+- The project and id in the injected context header are sanitized; a notes append starts a fresh line when the file has no trailing newline; an invalid `--re` names the pattern you typed rather than deja's injected prefix; the stats card replaces an extension it cannot honour instead of doubling it. (#1156, #1132, #1161, #1162)
+- The test suite no longer writes to the developer's real notes store. (#1158)
+
+### Performance
+- A full index build spills postings to disk instead of holding them all in memory, and co-occurrence pairs are stored once rather than in both directions. (#1136, #1137)
+
 ## [0.16.9] - 2026-08-09
 
 Another audit pass, weighted toward two failures that lose data rather than
