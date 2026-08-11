@@ -70,7 +70,7 @@ deja "have we dealt with jwt refresh rotation before"</pre>
 <h2>Wire it into your agents</h2>
 <pre>deja install --all      # MCP recall for every agent found on this machine
 deja install --auto     # same, plus session-start auto-recall where supported</pre>
-<p>Four harnesses can pull deja straight from their own plugin registry instead — same wiring, no local step:</p>
+<p>Six harnesses can pull deja straight from their own plugin registry instead — same wiring, no local step:</p>
 <pre>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu
 codex  plugin marketplace add vshulcz/deja-vu &amp;&amp; codex plugin add deja-vu@deja-vu
 cursor-agent plugin marketplace add https://github.com/vshulcz/deja-vu

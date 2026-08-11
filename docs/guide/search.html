@@ -67,6 +67,7 @@
 <li><b>Stop-word handling</b> — natural phrasing like "have we dealt with jwt refresh rotation" drops filler words so the content tokens drive the search.</li>
 <li><b>Word forms</b> — <code>rotation</code> ↔ <code>rotated</code> via suffix folding.</li>
 <li><b>Typos</b> — close spellings within edit distance.</li>
+<li><b>Error signature</b> — paste a failing stack trace and deja matches the sessions that hit the same error by its <em>signature</em>, not its words, and can name the command that cleared it last time (<code>deja fix</code>, MCP <code>fix</code>).</li>
 <li><b>Semantic</b> — if a vector sidecar exists, a rephrased query with no shared words still matches.</li>
 </ul>
 <p>Each result carries a tier — <code>exact</code>, <code>close</code> (with the variant), or <code>semantic</code> (with the cosine) — in the CLI, JSON and MCP output.</p>
@@ -81,6 +82,14 @@ deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
 <p>Every message also carries its month and year in the postings, and a query with no exact match reads them: <code>deja "what did we do in may"</code> meets May's sessions structurally, and relative phrases resolve against the moment you ask — <code>a week ago</code>, <code>last month</code>, <code>10 days ago</code>. They rank the fallback, they never filter, and a query whose words already match something is answered on those words alone — so for a hard cutoff, or to narrow a query that does match, use <code>--since</code>.</p>
 <h2>Earlier attempts</h2>
 <p>When an old session and a newer one from the same project match the same ground, the older hit is labeled an earlier attempt with the newer session's date — in CLI output, MCP digests, and as an additive <code>superseded</code> field in <code>--json</code>. History stays; the direction the project moved is visible.</p>
+<h2>What ranks first</h2>
+<p>Lexical overlap decides who is a candidate; what settled something decides who wins. Above the raw term match, deja weighs a few signals — none of them able to outrank plain relevance, only to break the ties it leaves:</p>
+<ul>
+<li><b>The session that concluded, not the one that kept asking.</b> A session that reached a decision outranks one that only discussed the topic, and recall surfaces the decision-carrying line, not just where the words appeared.</li>
+<li><b>What held over what was backed out.</b> A session whose own text says it reverted an approach and settled nothing else ranks below one that held — the dead end is still there, marked, but it is not the first thing an agent sees. A session that reverted one thing and settled another keeps its place.</li>
+<li><b>A recorded judgement over a raw guess.</b> A note you promoted outranks the transcript it came from, and a lifecycle state travels with the session on every hit: <em>tried and rejected</em>, <em>replaced by a later decision</em>, <em>marked stale</em>, with the reason and the date. Nothing is deleted — the agent sees what was decided and that it changed.</li>
+<li><b>What gets reused.</b> A session agents keep pulling back is lifted a little, on the theory that what the machine keeps needing is worth surfacing — bounded, so popularity never buries a stronger match.</li>
+</ul>
 </article>
 </div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
