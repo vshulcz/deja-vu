@@ -261,6 +261,43 @@ func TestToolHookFileLineCarriesThePriorDecision(t *testing.T) {
 	}
 }
 
+// A decision the session itself took back must not be surfaced at the point of
+// an edit — that would push the agent to redo what was undone. When the only
+// session with a conclusion says it reverted, the line falls back to the pointer.
+func TestToolHookFileLineSkipsARevertedDecision(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 5; i++ {
+		id := "s" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+		})
+	}
+	// The only session with a decision also says it reverted it.
+	writeClaudeFixture(t, filepath.Join(root, "alpha", "decide.jsonl"), "decide", []string{
+		`{"type":"user","sessionId":"decide","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"settle config.go"}}`,
+		`{"type":"assistant","sessionId":"decide","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"Decision: config.go should load the ARENAGUARD sentinel.\nBut we reverted it — it did not help and we backed it out."},{"type":"tool_use","id":"td","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"x","new_string":"y"}}]}}`,
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"now","cwd":"/work/alpha"}`)
+	var resp sessionStartHookResponse
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		t.Fatal(err)
+	}
+	ctx := resp.HookSpecificOutput.AdditionalContext
+	if strings.Contains(ctx, "ARENAGUARD") {
+		t.Errorf("a reverted decision was surfaced at the edit:\n%s", ctx)
+	}
+	if !strings.Contains(ctx, "deja blame config.go") {
+		t.Errorf("with no usable decision it should fall back to the pointer:\n%s", ctx)
+	}
+}
+
 // The command line honours the trust policy: a command that ran only in a
 // withheld project stays silent, and the count excludes withheld sessions.
 func TestToolHookCommandHonoursTrustPolicy(t *testing.T) {

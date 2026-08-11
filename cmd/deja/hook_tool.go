@@ -15,8 +15,10 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -46,6 +48,12 @@ const (
 	toolHookMaxBytes = 480
 	// toolHookDecisionBudget bounds the extracted decision inside that cap.
 	toolHookDecisionBudget = 200
+	// toolHookDecisionScan caps how many of the newest sessions the file line
+	// reads for a decision — this runs inside an action the agent waits on.
+	toolHookDecisionScan = 3
+	// toolHookMsgTail caps the messages scanned per session for the same reason:
+	// a decision states itself near the end, not buried in a long transcript.
+	toolHookMsgTail = 150
 	// toolHookMinFileSessions is when a file's history stops being noise. A
 	// file two sessions touched is ordinary work; five is a place with a past.
 	toolHookMinFileSessions = 5
@@ -246,25 +254,66 @@ func fileHookLine(dir, path string) string {
 
 // fileDecisionLine returns the single most relevant prior decision recorded
 // about this file, or "" if none can be extracted. It reads the newest in-scope
-// sessions (bounded, newest first) and takes the first one that yields a
-// conclusion — the same decision-carrying line the SessionStart digest surfaces,
-// but delivered at the moment the file is about to change.
+// sessions (bounded, newest first) and takes the first that yields a conclusion
+// and was not later taken back — the same decision-carrying line the SessionStart
+// digest surfaces, but delivered at the moment the file is about to change.
 func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
-	const scan = 5
+	states := sources.PromotedLifecycles()
 	for i, meta := range metas {
-		if i >= scan {
+		if i >= toolHookDecisionScan {
 			break
 		}
 		s, ok, err := index.FindByIdentity(dir, meta.Harness, meta.ID)
-		if err != nil || !ok {
+		if err != nil || !ok || !decisionUsable(s, states) {
 			continue
 		}
+		// Bound the work inside a hook the agent is blocked on: a marathon
+		// session's whole history is not worth scanning for one line, and a
+		// decision states itself near the end anyway.
+		if len(s.Messages) > toolHookMsgTail {
+			s.Messages = s.Messages[len(s.Messages)-toolHookMsgTail:]
+		}
 		if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
-			return search.SafeText(strings.TrimSpace(cs[0]))
+			return trimTrailingFragment(search.SafeText(strings.TrimSpace(cs[0])))
 		}
 	}
 	return ""
+}
+
+// decisionUsable rejects a session whose decision should not be reused: one that
+// says in its own words it backed the approach out (GaveUp), and one a later
+// state marked rejected, superseded or stale. Surfacing either at the point of an
+// edit would push the agent to redo exactly what was undone.
+func decisionUsable(s model.Session, states map[string]sources.Lifecycle) bool {
+	if s.GaveUp {
+		return false
+	}
+	state := s.Lifecycle // a note that arrived by sync carries its own state
+	if lc, ok := states[s.Harness+":"+s.ID]; ok && lc.State != "" {
+		state = lc.State
+	}
+	switch state {
+	case "rejected", "superseded", "stale":
+		return false
+	}
+	return true
+}
+
+// trimTrailingFragment drops a half-word left by a byte-budget cut, so a decision
+// reads as "capped retries" rather than "capped retr". Only when the text was
+// actually cut (near the budget and not ending a sentence).
+func trimTrailingFragment(s string) string {
+	if len(s) < toolHookDecisionBudget-4 {
+		return s
+	}
+	if r := s[len(s)-1]; r == '.' || r == '!' || r == '?' {
+		return s
+	}
+	if i := strings.LastIndexAny(s, " \t"); i > 0 {
+		return strings.TrimRight(s[:i], " \t") + "…"
+	}
+	return s
 }
 
 // fileMetaInScope keeps a session only if it worked on this exact path (an

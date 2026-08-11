@@ -33,7 +33,9 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	// the prior decision for the file or command about to change. Codex uses the
 	// same hooks.json shape as Claude Code, so both wire the same way.
 	updateCodexHook(root, "SessionStart", exe+" hook-context", "startup|resume", uninstall)
-	updateCodexHook(root, "PreToolUse", exe+" hook-tool", ".*", uninstall)
+	// Scoped to the tools that run a command or change a file (codex edits via
+	// apply_patch), so the hook does not spawn on every read.
+	updateCodexHook(root, "PreToolUse", exe+" hook-tool", "Bash|apply_patch", uninstall)
 	if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
 		delete(root, "hooks")
 	}
