@@ -30,7 +30,7 @@ import (
 // question equally well on the text; one of them is the one agents keep pulling
 // back. That is the only signal deja has about what actually helped someone,
 // as opposed to what reads like an answer — and until now nothing measured
-// whether the 1.2× ceiling on it does anything at all.
+// whether the 1.5× ceiling on it does anything at all.
 func reportUsage(sessions []model.Session, verbose bool) {
 	// Two equally-worded sessions per topic, one of them worn.
 	var corpus []model.Session
