@@ -189,10 +189,22 @@ func TestReindexingOneHalfOfACollisionKeepsTheOther(t *testing.T) {
 	if len(metas) != 1 || metas[0].Project != "alpha" || metas[0].Title != "the alpha work on pool sizing" {
 		t.Fatalf("metas = %#v — alpha's row was lost or overwritten", metas)
 	}
-	// The records are a separate matter: they are keyed by harness:id too, so
-	// re-indexing beta drops alpha's text from the postings even though its
-	// row survives. Tracked in #699 — this test pins the row.
-	if _, err := Search(dir, search.Options{Query: "beta rewritten", All: true}); err != nil {
+	// #699 was the other half of the same collision: records are keyed by
+	// harness:id too, so re-indexing beta dropped alpha's text from the postings
+	// even though alpha's row survived — content loss until a full rebuild.
+	// Alpha was never re-read, so its content must still be there.
+	alpha, err := Search(dir, search.Options{Query: "pool sizing", All: true})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(alpha) == 0 {
+		t.Fatal("re-indexing beta dropped alpha's content from the index (#699)")
+	}
+	beta, err := Search(dir, search.Options{Query: "beta rewritten", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beta) == 0 {
+		t.Fatal("beta's rewritten content was not indexed")
 	}
 }

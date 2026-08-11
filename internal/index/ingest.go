@@ -1756,7 +1756,15 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// Superseded sessions are handled by replaceKeys.
 		h := harnessForPath(r.SourcePath)
 		sharedStore := h == "opencode" || h == "cursor-db" || h == "goose-db"
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !sharedStore) || replaceKeys[r.Key] {
+		// replaceKeys is scoped to shared stores. A shared store is parsed since
+		// a watermark, so a superseded session's old record is not re-read and
+		// clause two never reaches it — replaceKeys is what drops it. For a
+		// per-file harness, a removed or changed file's old records are already
+		// dropped by the two clauses above, so applying replaceKeys there only
+		// hurts: two transcripts in different projects can share a filename-derived
+		// id, and dropping by key alone erased the sibling that was never re-read
+		// (#699). The record's own SourcePath decides its fate for those.
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !sharedStore) || (sharedStore && replaceKeys[r.Key]) {
 			return
 		}
 		recErr = addRec(r)
