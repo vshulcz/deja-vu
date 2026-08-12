@@ -301,19 +301,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": true,
     "resume": true,
     "handoff": "paste",
     "prereq": "sqlite3"
    },
-   "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "has a SKILL.md skills system; note a plugin-bundled skill is opt-in and absent from skills_list, so it would need to be a top-level skill to be found",
-     "source": "https://hermes-agent.nousresearch.com/docs/user-guide/features/skills"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "goose",

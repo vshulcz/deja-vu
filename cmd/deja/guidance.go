@@ -91,6 +91,11 @@ func guidancePath(harness string) string {
 		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
 	case "pi":
 		return filepath.Join(sources.PiConfigDir(), "skills", "deja-history", "SKILL.md")
+	case "hermes":
+		// Top-level, not inside the plugin deja generates: a plugin-bundled
+		// skill in Hermes is opt-in, absent from skills_list and never in the
+		// system prompt, so the agent would never find it on its own.
+		return filepath.Join(sources.HermesHome(), "skills", "deja-history", "SKILL.md")
 	case "grok":
 		// grok reads <cwd>/.grok/GROK.md first and only falls back to the
 		// home copy, so this never shadows a project's own instructions.
@@ -372,7 +377,7 @@ func guidanceOwnsWholeFile(harness string) bool {
 		return true
 	}
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode", "hermes":
 		return true
 	}
 	return false
