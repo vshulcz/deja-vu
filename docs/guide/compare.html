@@ -77,7 +77,7 @@
 <tr><td>Stored as</td><td class="us">verbatim, redacted</td><td>LLM facts</td><td>memory blocks</td><td>markdown</td><td>SQL rows</td><td>LLM summaries</td><td>events + vectors</td></tr>
 <tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>model or API</td></tr>
 <tr><td>Background process</td><td class="us y">none</td><td>server / cloud</td><td>server + Postgres</td><td>server / cloud</td><td class="y">none</td><td>worker</td><td>daemon, ports</td></tr>
-<tr><td>Coding agents</td><td class="us">16 native parsers (Claude Code, Codex, opencode, Cursor, Goose, OpenClaw…)</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>frameworks</td><td>Claude Code</td><td>via hooks</td></tr>
+<tr><td>Coding agents</td><td class="us">17 native parsers (Claude Code, Codex, opencode, Cursor, Goose, OpenClaw…)</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>frameworks</td><td>Claude Code, opencode, Antigravity, OpenClaw</td><td>via hooks</td></tr>
 <tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td>cloud</td><td>server-side</td><td>cloud / self-host</td><td>your DB</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Recall provenance</td><td class="us y">✓ log + receipts</td><td class="n">—</td><td>partial</td><td class="n">—</td><td>queryable rows</td><td>viewer</td><td>dashboard</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>vector + graph</td><td>agent + vector</td><td>embeddings</td><td>SQL + vector</td><td>vector</td><td>hybrid RRF</td></tr>
@@ -117,7 +117,7 @@
 <p><b>Mem0 / Memori</b> — you are building an application and want to give <em>your users</em> memory through an API. deja has no SDK; it is not for app-embedded memory.</p>
 <p><b>Letta</b> — you want a full agent runtime with self-editing memory and you're happy living inside it. deja is the opposite bet: memory only, bring whatever agent you already use.</p>
 <p><b>memU</b> — you want curated, distilled knowledge files and don't mind the agent doing the distilling. deja keeps the verbatim record and searches it instead.</p>
-<p><b>claude-mem</b> — you only use Claude Code and prefer compressed summaries over raw history. deja covers 17 agents and keeps recall lossless.</p>
+<p><b>claude-mem</b> — you prefer compressed summaries over raw history. It installs into Claude Code, opencode, Antigravity and OpenClaw gateways; deja parses 17 agents and keeps recall lossless.</p>
 <p><b>MemPalace</b> — the closest overlap by far, and the honest comparison is narrow: it also reads Claude Code sessions off disk and also keeps them verbatim. It brings a local embedding model and a vector store; deja is one binary with neither, parses 17 harnesses rather than three, and adds the things built around a code history specifically — <code>deja blame</code>, SSH sync, sanitized digests. If you want semantic paraphrase matching and don't mind a Python install with a 300&nbsp;MB model, theirs is the better fit.</p>
 <p><b>cognee / Graphiti</b> — you want a knowledge graph with entities, relationships and time-valid facts to reason over, and you accept a database and an LLM key as the price. deja does not build a graph; it searches what was said.</p>
 <p><b>Hindsight</b> — you want an agent to accumulate curated beliefs about the world over time, through an API you call. deja never writes memories of its own: it indexes the record your agents already produced.</p>
