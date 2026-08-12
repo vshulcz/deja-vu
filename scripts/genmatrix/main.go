@@ -23,6 +23,30 @@ type entry struct {
 		Handoff string `json:"handoff"`
 		Prereq  string `json:"prereq"`
 	} `json:"capabilities"`
+	Gaps map[string]struct {
+		State  string `json:"state"`
+		Why    string `json:"why"`
+		Source string `json:"source"`
+	} `json:"gaps"`
+}
+
+// gapMark distinguishes the four reasons a capability is missing. A single dash
+// for all of them is what let coverage this thin go unnoticed: work and dead
+// ends looked identical.
+func gapMark(e entry, cap string, have bool) string {
+	if have {
+		return "✅"
+	}
+	switch e.Gaps[cap].State {
+	case "impossible":
+		return "✕"
+	case "blocked":
+		return "⚠"
+	case "todo":
+		return "—"
+	default:
+		return "?"
+	}
 }
 
 type registry struct {
@@ -65,11 +89,40 @@ func markdownTable(r registry) string {
 			prereq = "—"
 		}
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-			e.DisplayName, store, mark(e.Capabilities.MCP), mark(e.Capabilities.Auto),
-			mark(e.Capabilities.Skill), mark(e.Capabilities.Command),
+			e.DisplayName, store, gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
+			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
 			mark(e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
+	b.WriteString("\n✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated\n")
+	b.WriteString(notes(r, func(s string) string { return "`" + s + "`" }))
 	return b.String()
+}
+
+// notes prints the reasons worth reading: what a harness cannot do, and what is
+// waiting on someone else's fix. "todo" and "unknown" are backlog and stay out
+// of the published table.
+func notes(r registry, code func(string) string) string {
+	var b strings.Builder
+	for _, e := range r.Harnesses {
+		if e.ID == "deja" {
+			continue
+		}
+		for _, cap := range []string{"mcp", "auto", "skill", "command"} {
+			g, ok := e.Gaps[cap]
+			if !ok || (g.State != "impossible" && g.State != "blocked") {
+				continue
+			}
+			line := fmt.Sprintf("\n- %s %s — %s", e.DisplayName, code(cap), g.Why)
+			if g.Source != "" {
+				line += " (" + g.Source + ")"
+			}
+			b.WriteString(line)
+		}
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "\n" + b.String() + "\n"
 }
 
 func htmlTable(r registry) string {
@@ -85,11 +138,23 @@ func htmlTable(r registry) string {
 		}
 		fmt.Fprintf(&b, "<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
 			e.DisplayName, strings.Join(e.StorePaths, "</code><br><code>"),
-			mark(e.Capabilities.MCP), mark(e.Capabilities.Auto),
-			mark(e.Capabilities.Skill), mark(e.Capabilities.Command), mark(e.Capabilities.Resume),
-			handoffMark(e.Capabilities.Handoff), prereq)
+			gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
+			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
+			mark(e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
-	b.WriteString("</table>")
+	b.WriteString("</table>\n")
+	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated</p>")
+	if n := notes(r, func(s string) string { return "<code>" + s + "</code>" }); n != "" {
+		b.WriteString("\n<ul>")
+		for _, line := range strings.Split(strings.TrimSpace(n), "\n") {
+			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))
+			if line == "" {
+				continue
+			}
+			b.WriteString("\n<li>" + line + "</li>")
+		}
+		b.WriteString("\n</ul>")
+	}
 	return b.String()
 }
 

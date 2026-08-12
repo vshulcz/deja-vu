@@ -22,8 +22,20 @@ type capRegistry struct {
 			Resume  bool   `json:"resume"`
 			Handoff string `json:"handoff"`
 		} `json:"capabilities"`
+		Gaps map[string]struct {
+			State  string `json:"state"`
+			Why    string `json:"why"`
+			Source string `json:"source"`
+		} `json:"gaps"`
 	} `json:"harnesses"`
 }
+
+// A capability we do not have is one of four different things, and a bare
+// "false" in the matrix reads as all of them at once. Only "todo" is work;
+// "impossible" is a fact about the harness, "blocked" decays into work when
+// someone else fixes their bug, and "unknown" is an admission that nobody has
+// looked. Every false capability carries one, so no dash goes unexplained.
+var gapStates = map[string]bool{"todo": true, "impossible": true, "blocked": true, "unknown": true}
 
 // The capability matrix in README/site is generated from the registry; this
 // test pins the registry to what the code actually does, so the published
@@ -103,6 +115,33 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		}
 		if gotCommand != c.Command {
 			t.Fatalf("%s: registry command=%v, generated install artifact says %v", h.ID, c.Command, gotCommand)
+		}
+
+		// Every capability we do not have needs a reason, and the reason has to
+		// be one of the four kinds — otherwise the matrix prints a dash that
+		// could mean anything and nobody can tell work from a dead end.
+		for cap, have := range map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command} {
+			g, ok := h.Gaps[cap]
+			if have {
+				if ok {
+					t.Fatalf("%s: %s is supported but still carries a gap entry", h.ID, cap)
+				}
+				continue
+			}
+			if !ok {
+				t.Fatalf("%s: %s is false with no gaps entry saying why", h.ID, cap)
+			}
+			if !gapStates[g.State] {
+				t.Fatalf("%s: %s gap state %q is not one of todo/impossible/blocked/unknown", h.ID, cap, g.State)
+			}
+			if strings.TrimSpace(g.Why) == "" {
+				t.Fatalf("%s: %s gap has no why", h.ID, cap)
+			}
+			// "Blocked" is a claim about someone else's bug, so it has to point
+			// at it — otherwise nobody can tell when it stops being true.
+			if g.State == "blocked" && !strings.HasPrefix(g.Source, "http") {
+				t.Fatalf("%s: %s is blocked upstream but has no source link", h.ID, cap)
+			}
 		}
 
 		// Resume: resumeCommand must succeed for a plausible session.
