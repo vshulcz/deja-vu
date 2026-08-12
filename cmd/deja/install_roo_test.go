@@ -75,32 +75,45 @@ func TestInstallRooSkipsHostsWithoutStorage(t *testing.T) {
 
 // Roo has no hook that could refresh a digest, so what goes into the global
 // rules is guidance — text that stays true — not recalled sessions.
-func TestRooGuidanceGoesToGlobalRules(t *testing.T) {
+// Roo reads ~/.roo/skills, which costs its frontmatter until something looks
+// relevant. The rules file it used before is read verbatim into the system
+// prompt for every mode and every task, so install takes that one away.
+func TestRooGuidanceIsASkillAndDropsTheRulesFile(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	rules := rooRulesPath()
+	if err := os.MkdirAll(filepath.Dir(rules), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rules, []byte(guidanceStart+"\nold\n"+guidanceEnd+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := installGuidance("roo", false); err != nil {
 		t.Fatalf("guidance: %v", err)
 	}
-	p := filepath.Join(home, ".roo", "rules", "deja.md")
+	p := filepath.Join(home, ".roo", "skills", "deja-history", "SKILL.md")
 	b, err := os.ReadFile(p)
 	if err != nil {
-		t.Fatalf("rules file missing: %v", err)
+		t.Fatalf("skill missing: %v", err)
 	}
-	if !strings.Contains(string(b), guidanceStart) {
-		t.Fatalf("no deja block:\n%s", b)
+	if !strings.Contains(string(b), "name: deja-history") {
+		t.Fatalf("no skill frontmatter:\n%s", b)
 	}
 	// Mode-specific directories sit beside this one; writing into one of them
 	// would make recall advice appear in Code mode and vanish in Ask mode.
-	if strings.Contains(p, "rules-") {
+	if strings.Contains(p, "skills-") {
 		t.Fatalf("guidance landed in a mode-specific directory: %s", p)
+	}
+	if _, err := os.Stat(rules); !os.IsNotExist(err) {
+		left, _ := os.ReadFile(rules)
+		t.Fatalf("always-on rules file survived: %q err=%v", left, err)
 	}
 	if _, err := installGuidance("roo", true); err != nil {
 		t.Fatalf("uninstall: %v", err)
 	}
-	b, _ = os.ReadFile(p)
-	if strings.Contains(string(b), guidanceStart) {
-		t.Fatalf("uninstall left the block:\n%s", b)
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatal("uninstall left the skill")
 	}
 }
 

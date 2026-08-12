@@ -16,7 +16,7 @@ func TestOpencodeGuidanceMigratesOffAgentsFile(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	agents := retiredGuidancePath("opencode")
+	agents := retiredGuidancePaths("opencode")[0]
 	if err := os.MkdirAll(filepath.Dir(agents), 0o755); err != nil {
 		t.Fatal(err)
 	}

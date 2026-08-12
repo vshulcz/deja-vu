@@ -24,8 +24,8 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	}
 	// The AGENTS.md block an older deja wrote is stripped on install, so it
 	// does not sit in every session beside the skill that replaced it.
-	if got := retiredGuidancePath("opencode"); got != filepath.Join(xdg, "opencode", "AGENTS.md") {
-		t.Fatalf("opencode retired path = %q", got)
+	if got := retiredGuidancePaths("opencode"); len(got) != 1 || got[0] != filepath.Join(xdg, "opencode", "AGENTS.md") {
+		t.Fatalf("opencode retired paths = %q", got)
 	}
 	// Inside the plugin: antigravity ingests skills/ from a directory marked by
 	// plugin.json, and `agy plugin validate` confirms it there. Beside the

@@ -97,9 +97,9 @@ func guidancePath(harness string) string {
 		// whether or not anyone asks about past work.
 		return filepath.Join(opencodeConfigHome(), "opencode", "skills", "deja-history", "SKILL.md")
 	case "roo":
-		// Global rules are read verbatim into the system prompt for every
-		// mode and every task, which is the only always-on channel Roo has.
-		return rooRulesPath()
+		// Roo scans ~/.roo/skills; the rules file it used before is read
+		// verbatim into the system prompt for every mode and every task.
+		return filepath.Join(homeDir(), ".roo", "skills", "deja-history", "SKILL.md")
 	default:
 		return ""
 	}
@@ -141,49 +141,61 @@ When recalled history genuinely helps, say so to the user in one short line: "de
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
 }
 
-// retiredGuidancePath is where a previous version of deja wrote guidance for a
+// retiredGuidancePaths are where previous versions of deja wrote guidance for a
 // harness that has since moved. Install strips deja's block from it, because a
 // harness that reads both would otherwise carry the old copy in every session
 // forever — the file belongs to the user and nothing else would ever clean it.
-func retiredGuidancePath(harness string) string {
+func retiredGuidancePaths(harness string) []string {
 	switch harness {
 	case "opencode":
-		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
+		return []string{filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")}
 	case "gemini":
-		return filepath.Join(sources.GeminiHome(), "GEMINI.md")
+		return []string{filepath.Join(sources.GeminiHome(), "GEMINI.md")}
 	case "qwen":
-		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
+		return []string{filepath.Join(sources.QwenConfigDir(), "QWEN.md")}
 	case "kimi":
-		return filepath.Join(sources.KimiConfigDir(), "AGENTS.md")
+		return []string{filepath.Join(sources.KimiConfigDir(), "AGENTS.md")}
+	case "roo":
+		return []string{rooRulesPath()}
 	}
-	return ""
+	return nil
 }
 
 // dropRetiredGuidance removes deja's marked block from a file it no longer
 // writes, leaving every other line in it alone.
 func dropRetiredGuidance(harness string) error {
-	path := retiredGuidancePath(harness)
-	if path == "" {
-		return nil
-	}
-	old, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	for _, path := range retiredGuidancePaths(harness) {
+		old, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
 		}
-		return err
+		// A whole file deja owned, such as roo's own rules file, has no markers
+		// in it and is simply removed.
+		if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
+			if strings.Contains(string(old), "deja") && filepath.Base(path) == "deja.md" {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		next := updateGuidanceBlock(string(old), true)
+		// A file that held nothing but our block was ours to begin with, so
+		// leaving it behind empty would be litter rather than someone's content.
+		if strings.TrimSpace(next) == "" {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := writeIfChanged(path, old, []byte(next)); err != nil {
+			return err
+		}
 	}
-	if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
-		return nil
-	}
-	next := updateGuidanceBlock(string(old), true)
-	// A file that held nothing but our block was ours to begin with, so leaving
-	// an empty AGENTS.md behind would be litter rather than someone's content.
-	if strings.TrimSpace(next) == "" {
-		return os.Remove(path)
-	}
-	_, err = writeIfChanged(path, old, []byte(next))
-	return err
+	return nil
 }
 
 func installGuidance(harness string, uninstall bool) (installResult, error) {
@@ -297,7 +309,7 @@ func guidanceHarness(harness string) string {
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi", "roo":
 		return true
 	}
 	return false

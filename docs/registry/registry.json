@@ -283,14 +283,14 @@
      "state": "unknown",
      "why": "not investigated yet"
     },
-    "skill": {
-     "state": "todo",
-     "why": "loads skills from ~/.grok/skills/ and also reads Claude Code skills and plugins with no extra setup",
-     "source": "https://docs.x.ai/build/features/skills-plugins-marketplaces"
-    },
     "command": {
      "state": "unknown",
      "why": "not investigated yet"
+    },
+    "skill": {
+     "state": "todo",
+     "why": "Grok Build reads ~/.grok/skills, but deja writes guidance to both GROK.md and AGENTS.md because three grok CLIs share that directory; which of them read skills is not established",
+     "source": "https://docs.x.ai/build/features/skills-plugins-marketplaces"
     }
    }
   },
@@ -529,7 +529,7 @@
    "capabilities": {
     "mcp": true,
     "auto": false,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": false,
     "handoff": "paste",
@@ -539,11 +539,6 @@
     "auto": {
      "state": "unknown",
      "why": "not investigated yet"
-    },
-    "skill": {
-     "state": "todo",
-     "why": "parses SKILL.md frontmatter and loads the body when a request matches",
-     "source": "https://roocodeinc.github.io/Roo-Code/features/skills/"
     },
     "command": {
      "state": "todo",
