@@ -14,7 +14,7 @@ histories under `agents/agent-*`, tool payloads and media are out of scope.
 
 - **MCP**: `deja install kimi` writes `mcpServers.deja` into
   `$KIMI_CODE_HOME/mcp.json` (common JSON shape, existing entries preserved).
-- **Guidance**: global `AGENTS.md` in `$KIMI_CODE_HOME`.
+- **Guidance**: a skill at `$KIMI_CODE_HOME/skills/deja-history/`. Kimi Code scans that directory; the `~/.kimi/skills/` in some write-ups belongs to `MoonshotAI/kimi-cli`, a different tool with the same name. An older deja wrote a block into the global `AGENTS.md`, which install now removes.
 - **Resume**: `kimi --session <sessionId>` (verified live on 0.28.1).
 - **Handoff**: paste — the CLI has no documented start-with-prompt flag.
 
