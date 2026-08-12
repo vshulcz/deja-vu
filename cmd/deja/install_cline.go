@@ -32,20 +32,25 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}
+	old, _ := os.ReadFile(path)
+	a, err := writeIfChanged(path, old, []byte(clinePluginJS(exe)))
+	if err != nil {
+		return installResult{}, err
+	}
 	// Cline discovers skills bundled in the plugin package, which is the only
 	// channel it has for one: it has no user-level instructions file, so until
-	// now it got the recall rule and no manual at all.
+	// now it got the recall rule and no manual at all. Written after index.js
+	// so a failure here leaves a working plugin rather than a directory the
+	// uninstall path would not recognise.
 	skill := filepath.Join(dir, "skills", "deja-history")
 	if err := os.MkdirAll(skill, 0o755); err != nil {
 		return installResult{}, err
 	}
 	oldSkill, _ := os.ReadFile(filepath.Join(skill, "SKILL.md"))
-	if _, err := writeIfChanged(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(guidanceText("claude"))); err != nil {
+	if _, err := writeIfChanged(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(skillFile(skillBody))); err != nil {
 		return installResult{}, err
 	}
-	old, _ := os.ReadFile(path)
-	a, err := writeIfChanged(path, old, []byte(clinePluginJS(exe)))
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a}, nil
 }
 
 func clinePluginJS(exe string) string {

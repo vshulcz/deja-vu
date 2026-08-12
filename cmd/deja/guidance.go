@@ -112,6 +112,13 @@ func opencodeConfigHome() string {
 	return filepath.Join(homeDir(), ".config")
 }
 
+// skillFile wraps a body in the SKILL.md frontmatter every harness expects.
+// The name has to match the directory, and the description is the only part
+// loaded before the skill is used, so it carries the trigger phrases.
+func skillFile(body string) string {
+	return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
+}
+
 func guidanceText(harness string) string {
 	if guidanceOwnsWholeFile(harness) {
 		body := skillBody
@@ -136,7 +143,7 @@ Example: for "what did we decide about token refresh?", try recall first; if una
 When recalled history genuinely helps, say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.`
 		}
 
-		return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
+		return skillFile(body)
 	}
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
 }
