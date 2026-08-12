@@ -94,8 +94,15 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		// Skill: guidance is a skill file only where install owns the whole
 		// file. Everywhere else it is a marked block inside a file the user
 		// owns, which is loaded for the whole session rather than on demand.
-		if got := guidanceOwnsWholeFile(id); got != c.Skill {
-			t.Fatalf("%s: registry skill=%v, guidanceOwnsWholeFile(%q)=%v", h.ID, c.Skill, id, got)
+		gotSkill := guidanceOwnsWholeFile(id)
+		// Cline has no user-level instructions file at all, so its skill rides
+		// inside the plugin deja generates. Read that off the generated
+		// manifest rather than trusting the registry.
+		if h.ID == "cline" {
+			gotSkill = strings.Contains(clinePluginJS("/bin/deja"), `"skills"`)
+		}
+		if gotSkill != c.Skill {
+			t.Fatalf("%s: registry skill=%v, code says %v", h.ID, c.Skill, gotSkill)
 		}
 
 		// Command: read it off the artifact install actually generates, not a

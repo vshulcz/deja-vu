@@ -43,19 +43,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
    },
-   "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "the plugin API has a `skills` capability that discovers bundled skills; our generated manifest declares only rules and commands",
-     "source": "https://docs.cline.bot/sdk"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "codex",

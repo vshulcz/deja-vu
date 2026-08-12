@@ -32,6 +32,17 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}
+	// Cline discovers skills bundled in the plugin package, which is the only
+	// channel it has for one: it has no user-level instructions file, so until
+	// now it got the recall rule and no manual at all.
+	skill := filepath.Join(dir, "skills", "deja-history")
+	if err := os.MkdirAll(skill, 0o755); err != nil {
+		return installResult{}, err
+	}
+	oldSkill, _ := os.ReadFile(filepath.Join(skill, "SKILL.md"))
+	if _, err := writeIfChanged(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(guidanceText("claude"))); err != nil {
+		return installResult{}, err
+	}
 	old, _ := os.ReadFile(path)
 	a, err := writeIfChanged(path, old, []byte(clinePluginJS(exe)))
 	return installResult{Path: path, Action: a}, err
@@ -60,7 +71,7 @@ function run(args, input = "", timeout = 10000) {
 
 export default {
   name: "deja",
-  manifest: { capabilities: ["rules", "commands"] },
+  manifest: { capabilities: ["rules", "commands", "skills"] },
   setup(api) {
     api.registerRule({
       id: "deja:recall",
