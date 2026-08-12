@@ -54,9 +54,10 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 	return last, nil
 }
 
-// rooRulesPath is the global rules directory: <home>/.roo/rules, read for
-// every mode. Mode-specific directories (rules-code, rules-ask, …) sit beside
-// it and would each need their own copy.
+// rooRulesPath is where deja used to write guidance: the global rules
+// directory <home>/.roo/rules, read verbatim into the system prompt for every
+// mode and every task. Guidance is a skill now and install removes this file;
+// the path survives so it can be cleaned up on machines that still have it.
 func rooRulesPath() string {
 	return filepath.Join(homeDir(), ".roo", "rules", "deja.md")
 }

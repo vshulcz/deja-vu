@@ -172,14 +172,10 @@ func dropRetiredGuidance(harness string) error {
 			}
 			return err
 		}
-		// A whole file deja owned, such as roo's own rules file, has no markers
-		// in it and is simply removed.
+		// No markers means the file is not ours, whatever its name. Roo's old
+		// rules file carried them like every other block, so stripping it
+		// empties the file and the branch below removes it.
 		if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
-			if strings.Contains(string(old), "deja") && filepath.Base(path) == "deja.md" {
-				if err := os.Remove(path); err != nil {
-					return err
-				}
-			}
 			continue
 		}
 		next := updateGuidanceBlock(string(old), true)
