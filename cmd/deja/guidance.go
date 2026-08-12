@@ -77,6 +77,11 @@ func guidancePath(harness string) string {
 		return filepath.Join(sources.CursorCLIHome(), "skills", "deja-history", "SKILL.md")
 	case "qwen":
 		return filepath.Join(sources.QwenConfigDir(), "skills", "deja-history", "SKILL.md")
+	case "hermes":
+		// Top-level, not inside the plugin deja generates: a plugin-bundled
+		// skill in Hermes is opt-in, absent from skills_list and never in the
+		// system prompt, so the agent would never find it on its own.
+		return filepath.Join(sources.HermesHome(), "skills", "deja-history", "SKILL.md")
 	case "codex":
 		return filepath.Join(sources.CodexHome(), "AGENTS.md")
 	case "kimi":
@@ -305,7 +310,7 @@ func guidanceHarness(harness string) string {
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi", "roo":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi", "roo", "hermes":
 		return true
 	}
 	return false
