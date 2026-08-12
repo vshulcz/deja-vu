@@ -51,8 +51,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "the plugin API has a `skills` capability that discovers bundled skills; our generated manifest declares only rules and commands",
+     "source": "https://docs.cline.bot/sdk"
     }
    }
   },
@@ -116,8 +117,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "discovers skills in ~/.config/opencode/skills, .opencode/skills, .claude/skills and .agents/skills; deja writes an AGENTS.md block instead",
+     "source": "https://opencode.ai/docs/skills/"
     },
     "command": {
      "state": "unknown",
@@ -188,12 +190,14 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "loads skills from ~/.gemini/skills/ and .gemini/skills/",
+     "source": "https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md"
     },
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "supports custom slash commands defined as .toml files",
+     "source": "https://geminicli.com/docs/extensions/writing-extensions/"
     }
    }
   },
@@ -224,8 +228,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "reads .cursor/skills/ and .agents/skills/ anywhere in a repository; deja currently writes it no guidance at all",
+     "source": "https://cursor.com/docs/skills"
     },
     "command": {
      "state": "unknown",
@@ -291,8 +296,9 @@
      "why": "not investigated yet"
     },
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "loads skills from ~/.grok/skills/ and also reads Claude Code skills and plugins with no extra setup",
+     "source": "https://docs.x.ai/build/features/skills-plugins-marketplaces"
     },
     "command": {
      "state": "unknown",
@@ -361,8 +367,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "matches a request against each SKILL.md description and loads the matching one",
+     "source": "https://goose-docs.ai/docs/guides/context-engineering/using-skills/"
     },
     "command": {
      "state": "unknown",
@@ -393,8 +400,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "loads SKILL.md and lists them under /skills",
+     "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/skills/"
     },
     "command": {
      "state": "unknown",
@@ -426,8 +434,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "reads SKILL.md from its skills scan directory and invokes it as /skill:<name>",
+     "source": "https://moonshotai.github.io/kimi-cli/en/customization/skills.html"
     },
     "command": {
      "state": "unknown",
@@ -551,12 +560,14 @@
      "why": "not investigated yet"
     },
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "parses SKILL.md frontmatter and loads the body when a request matches",
+     "source": "https://roocodeinc.github.io/Roo-Code/features/skills/"
     },
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "reads custom slash commands from ~/.roo/commands/ and .roo/commands/",
+     "source": "https://roocodeinc.github.io/Roo-Code/features/slash-commands/"
     }
    }
   }
