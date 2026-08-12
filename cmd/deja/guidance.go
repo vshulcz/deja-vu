@@ -184,7 +184,14 @@ func retiredGuidancePaths(harness string) []string {
 // dropRetiredGuidance removes deja's marked block from a file it no longer
 // writes, leaving every other line in it alone.
 func dropRetiredGuidance(harness string) error {
+	keep := guidancePath(harness)
 	for _, path := range retiredGuidancePaths(harness) {
+		// A relocation variable can point a harness's own directory at the
+		// shared one. Retiring what we are about to write — or what seven
+		// other harnesses read — would delete the live skill.
+		if path == keep || path == sharedSkillPath() {
+			continue
+		}
 		old, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -228,7 +235,14 @@ func dropRetiredGuidance(harness string) error {
 // removed still reads the shared skill, according to what install recorded.
 // Without this, uninstalling one of eight would silently blind the other seven.
 func sharedSkillStillWanted(leaving string) bool {
-	for _, t := range readWiringState().Targets {
+	targets := readWiringState().Targets
+	// No record means we cannot show we are the last reader. Keeping a file
+	// nobody needs costs a few hundred bytes; removing one seven harnesses
+	// still read costs them their memory, and nothing would report it.
+	if len(targets) == 0 {
+		return true
+	}
+	for _, t := range targets {
 		other := guidanceHarness(t)
 		if other != leaving && sharedSkillHarnesses[other] {
 			return true

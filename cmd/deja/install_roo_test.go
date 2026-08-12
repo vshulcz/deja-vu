@@ -109,6 +109,9 @@ func TestRooGuidanceIsASkillAndDropsTheRulesFile(t *testing.T) {
 		left, _ := os.ReadFile(rules)
 		t.Fatalf("always-on rules file survived: %q err=%v", left, err)
 	}
+	// The skill is shared, so it only goes when the last harness reading it
+	// does. Record roo as the only one, then take it away.
+	recordWiring([]string{"roo"}, false)
 	if _, err := installGuidance("roo", true); err != nil {
 		t.Fatalf("uninstall: %v", err)
 	}
