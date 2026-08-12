@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"strings"
 )
@@ -94,14 +95,14 @@ func markdownTable(r registry) string {
 			mark(e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
 	b.WriteString("\n✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated\n")
-	b.WriteString(notes(r, func(s string) string { return "`" + s + "`" }))
+	b.WriteString(notes(r, func(s string) string { return "`" + s + "`" }, func(s string) string { return s }))
 	return b.String()
 }
 
 // notes prints the reasons worth reading: what a harness cannot do, and what is
 // waiting on someone else's fix. "todo" and "unknown" are backlog and stay out
 // of the published table.
-func notes(r registry, code func(string) string) string {
+func notes(r registry, code, esc func(string) string) string {
 	var b strings.Builder
 	for _, e := range r.Harnesses {
 		if e.ID == "deja" {
@@ -112,9 +113,11 @@ func notes(r registry, code func(string) string) string {
 			if !ok || (g.State != "impossible" && g.State != "blocked") {
 				continue
 			}
-			line := fmt.Sprintf("\n- %s %s — %s", e.DisplayName, code(cap), g.Why)
+			// esc guards the registry-authored halves only: the display name,
+			// the reason and the link. The markup around them is ours.
+			line := fmt.Sprintf("\n- %s %s — %s", esc(e.DisplayName), code(cap), esc(g.Why))
 			if g.Source != "" {
-				line += " (" + g.Source + ")"
+				line += " (" + esc(g.Source) + ")"
 			}
 			b.WriteString(line)
 		}
@@ -144,7 +147,7 @@ func htmlTable(r registry) string {
 	}
 	b.WriteString("</table>\n")
 	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated</p>")
-	if n := notes(r, func(s string) string { return "<code>" + s + "</code>" }); n != "" {
+	if n := notes(r, func(s string) string { return "<code>" + s + "</code>" }, html.EscapeString); n != "" {
 		b.WriteString("\n<ul>")
 		for _, line := range strings.Split(strings.TrimSpace(n), "\n") {
 			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))

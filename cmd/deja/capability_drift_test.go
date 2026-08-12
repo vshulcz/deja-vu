@@ -120,7 +120,12 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		// Every capability we do not have needs a reason, and the reason has to
 		// be one of the four kinds — otherwise the matrix prints a dash that
 		// could mean anything and nobody can tell work from a dead end.
-		for cap, have := range map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command} {
+		// Fixed order, not a map range: with a map the first of several bad
+		// entries to fail is whichever came up, and the rest stay hidden until
+		// the next run reports a different one.
+		have := map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command}
+		for _, cap := range []string{"mcp", "auto", "skill", "command"} {
+			have := have[cap]
 			g, ok := h.Gaps[cap]
 			if have {
 				if ok {
