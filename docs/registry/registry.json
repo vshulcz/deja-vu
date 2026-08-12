@@ -122,8 +122,9 @@
      "source": "https://opencode.ai/docs/skills/"
     },
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "reads markdown commands from ~/.config/opencode/commands/ and .opencode/commands/",
+     "source": "https://opencode.ai/docs/commands/"
     }
    }
   },
@@ -156,12 +157,14 @@
      "why": "aider has no MCP client; recall arrives through the read: context file it re-reads every message"
     },
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "impossible",
+     "why": "aider has no plugin surface: no MCP client, no hooks, and a fixed built-in command set; the read: context file is the only channel it offers",
+     "source": "https://aider.chat/docs/usage/commands.html"
     },
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "impossible",
+     "why": "the slash command set is built in and cannot be extended by a third party",
+     "source": "https://aider.chat/docs/usage/commands.html"
     }
    }
   },
@@ -233,8 +236,9 @@
      "source": "https://cursor.com/docs/skills"
     },
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "reads markdown commands from .cursor/commands/",
+     "source": "https://cursor.com/docs/commands"
     }
    }
   },
@@ -262,8 +266,9 @@
    },
    "gaps": {
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "reads commands from a commands/*.toml convention inside a plugin",
+     "source": "https://toolsbase.dev/en/reference/antigravity-cli-commands"
     }
    }
   },
@@ -331,8 +336,9 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "has a SKILL.md skills system; note a plugin-bundled skill is opt-in and absent from skills_list, so it would need to be a top-level skill to be found",
+     "source": "https://hermes-agent.nousresearch.com/docs/user-guide/features/skills"
     }
    }
   },
@@ -490,12 +496,14 @@
    },
    "gaps": {
     "skill": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "watches skill roots and reloads on SKILL.md change",
+     "source": "https://docs.openclaw.ai/tools/skills"
     },
     "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
+     "state": "todo",
+     "why": "a skill is invocable by its stable command name, so this follows from shipping one",
+     "source": "https://docs.openclaw.ai/tools/skills"
     }
    }
   },
