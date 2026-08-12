@@ -114,11 +114,13 @@ func guidanceText(harness string) string {
 If MCP is not available, use the deja CLI via bash instead:
 
 - Search: bash("deja 'connection pool exhausted'")
-- Context: bash("deja context 'connection pool exhausted'")
+- Context: bash("deja ctx 'connection pool exhausted'")
 - Blame: bash("deja blame src/db.go")
 - Remember: bash("deja remember 'we use advisory locks because redis lost messages'")
 
-Example: for "what did we decide about token refresh?", try recall first; if unavailable, run bash("deja 'token refresh decision'").`
+Example: for "what did we decide about token refresh?", try recall first; if unavailable, run bash("deja 'token refresh decision'").
+
+When recalled history genuinely helps, say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.`
 		}
 
 		return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
