@@ -273,17 +273,15 @@ func guidanceMarkerLines(s string) (start, end int) {
 	return start, end
 }
 
+// guidanceHarness maps an install target to the harness whose guidance file it
+// shares. An -auto target is the same harness with hooks on top, so it gets the
+// same guidance — stripped generally rather than listed, because the three that
+// were listed were the only three that ever got it (#1199).
 func guidanceHarness(harness string) string {
-	switch harness {
-	case "claude-auto":
+	if harness == "claude-auto" {
 		return "claude-code"
-	case "codex-auto":
-		return "codex"
-	case "opencode-auto":
-		return "opencode"
-	default:
-		return harness
 	}
+	return strings.TrimSuffix(harness, "-auto")
 }
 
 // guidanceOwnsWholeFile reports whether install writes the whole file rather
