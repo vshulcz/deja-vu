@@ -320,7 +320,7 @@ limits, trust assumptions, and release verification.
 | Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | — | ✕ | ✅ | ✅ | — |
 | opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | — | — | ✅ | ✅ | sqlite3 |
-| aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | ✕ | ✅ | ✕ | ✕ | — | ✅ | deja aider |
+| aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | ✕ | ✅ | ? | ? | — | ✅ | deja aider |
 | Gemini CLI | `${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}`<br>`${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}` | ✅ | ✅ | — | — | — | ✅ | — |
 | Cursor | `~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl`<br>`${DEJA_CURSOR_ROOT}`<br>`${DEJA_CURSOR_CLI_ROOT}` | ✅ | ✅ | — | — | — | ✅ | sqlite3 (IDE chats) |
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
@@ -339,8 +339,6 @@ limits, trust assumptions, and release verification.
 
 - Codex CLI `command` — the Codex plugin format has no command component; interface.defaultPrompt is starter text, not a command (https://developers.openai.com/plugins/build/plugins)
 - aider `mcp` — aider has no MCP client; recall arrives through the read: context file it re-reads every message
-- aider `skill` — aider has no plugin surface: no MCP client, no hooks, and a fixed built-in command set; the read: context file is the only channel it offers (https://aider.chat/docs/usage/commands.html)
-- aider `command` — the slash command set is built in and cannot be extended by a third party (https://aider.chat/docs/usage/commands.html)
 - Copilot CLI `auto` — Copilot runs the hooks but drops their context, so recall there is MCP plus the skill
 <!-- matrix:end -->
 

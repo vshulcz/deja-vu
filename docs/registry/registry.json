@@ -157,14 +157,12 @@
      "why": "aider has no MCP client; recall arrives through the read: context file it re-reads every message"
     },
     "skill": {
-     "state": "impossible",
-     "why": "aider has no plugin surface: no MCP client, no hooks, and a fixed built-in command set; the read: context file is the only channel it offers",
-     "source": "https://aider.chat/docs/usage/commands.html"
+     "state": "unknown",
+     "why": "no source found either way; aider has no MCP client and no hooks, but that is not evidence about skills"
     },
     "command": {
-     "state": "impossible",
-     "why": "the slash command set is built in and cannot be extended by a third party",
-     "source": "https://aider.chat/docs/usage/commands.html"
+     "state": "unknown",
+     "why": "aider documents a fixed built-in command set and no extension mechanism, but nothing states one cannot exist — needs a source before this is called a limit"
     }
    }
   },
