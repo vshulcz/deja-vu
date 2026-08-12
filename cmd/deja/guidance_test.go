@@ -33,8 +33,13 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("antigravity"); got != filepath.Join(home, ".gemini", "config", "plugins", "deja", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("antigravity path = %q", got)
 	}
-	if got := guidancePath("qwen"); got != filepath.Join(home, ".qwen", "skills", "deja-history", "SKILL.md") {
+	// qwen, and seven others, read the cross-agent directory rather than one
+	// of their own, so they share a single file.
+	if got := guidancePath("qwen"); got != filepath.Join(home, ".agents", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("qwen path = %q", got)
+	}
+	if got := guidancePath("codex"); got != guidancePath("qwen") {
+		t.Fatalf("codex path = %q, does not match the shared skill", got)
 	}
 	if got := guidancePath("copilot"); got != filepath.Join(home, ".copilot", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("copilot path = %q", got)
@@ -45,8 +50,8 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 		t.Fatalf("grok path = %q", got)
 	}
 	// Cursor has no user-level instructions file, which is why it went without
-	// guidance for so long. It does read user-level skills.
-	if got := guidancePath("cursor"); got != filepath.Join(home, ".cursor", "skills", "deja-history", "SKILL.md") {
+	// guidance for so long. It reads the shared skills directory.
+	if got := guidancePath("cursor"); got != guidancePath("qwen") {
 		t.Fatalf("cursor path = %q", got)
 	}
 }
@@ -126,14 +131,14 @@ func TestGuidanceAppendPreservesAndRewrites(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	path := guidancePath("codex")
+	path := guidancePath("grok")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte("# Personal rules\n\nkeep this\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r, err := installGuidance("codex", false)
+	r, err := installGuidance("grok", false)
 	if err != nil || r.Action != "updated" {
 		t.Fatalf("install = %#v, %v", r, err)
 	}
@@ -144,10 +149,10 @@ func TestGuidanceAppendPreservesAndRewrites(t *testing.T) {
 	if !strings.Contains(string(b), "keep this") || strings.Count(string(b), guidanceStart) != 1 {
 		t.Fatalf("surrounding content or marker lost: %s", b)
 	}
-	if r, err = installGuidance("codex", false); err != nil || r.Action != "unchanged" {
+	if r, err = installGuidance("grok", false); err != nil || r.Action != "unchanged" {
 		t.Fatalf("second install = %#v, %v", r, err)
 	}
-	if r, err = installGuidance("codex", true); err != nil || r.Action != "updated" {
+	if r, err = installGuidance("grok", true); err != nil || r.Action != "updated" {
 		t.Fatalf("uninstall = %#v, %v", r, err)
 	}
 	b, _ = os.ReadFile(path)
@@ -192,9 +197,9 @@ func TestGuidanceBlockHandlesCRLFAndUnsupportedResult(t *testing.T) {
 	if strings.Count(got, guidanceStart) != 1 || !strings.Contains(got, "\r\n") || strings.Contains(got, "old") {
 		t.Fatalf("CRLF rewrite = %q", got)
 	}
-	// goose has no guidance location at all, so it stands in for the
-	// unsupported branch that cursor used to occupy.
-	if r, err := guidanceResult("goose", false); err != nil || r.Path != "" {
+	// aider has no guidance location at all — recall reaches it through the
+	// read: context file — so it stands in for the unsupported branch.
+	if r, err := guidanceResult("aider", false); err != nil || r.Path != "" {
 		t.Fatalf("unsupported guidance = %#v, %v", r, err)
 	}
 }
@@ -266,8 +271,8 @@ func TestCopilotInstallWritesMCPConfig(t *testing.T) {
 func TestInstallGuidanceSkillErrorBranches(t *testing.T) {
 	tmp := hermeticEnv(t)
 	// path == "" branch for a harness without a guidance location.
-	if r, err := installGuidance("goose", false); err != nil || r.Path != "" {
-		t.Fatalf("goose guidance = %#v err=%v", r, err)
+	if r, err := installGuidance("aider", false); err != nil || r.Path != "" {
+		t.Fatalf("aider guidance = %#v err=%v", r, err)
 	}
 	// Read failure that is not IsNotExist must surface (copilot skill dir
 	// squatted by a file).
@@ -308,24 +313,24 @@ func TestGuidanceStatusReadsTheMarkerNotTheFile(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
-	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
+	path := guidancePath("grok")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(home, ".codex", "AGENTS.md")
 
-	if got := guidanceStatus("codex"); got != "missing" {
+	if got := guidanceStatus("grok"); got != "missing" {
 		t.Fatalf("no file at all: got %q", got)
 	}
 	if err := os.WriteFile(path, []byte("# my own agents file\n\nnothing from deja\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := guidanceStatus("codex"); got != "absent" {
+	if got := guidanceStatus("grok"); got != "absent" {
 		t.Fatalf("someone else's file: got %q, want absent", got)
 	}
 	if err := os.WriteFile(path, []byte("# mine\n\n"+guidanceStart+"\nbody\n"+guidanceEnd+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := guidanceStatus("codex"); got != "written" {
+	if got := guidanceStatus("grok"); got != "written" {
 		t.Fatalf("our block is in it: got %q", got)
 	}
 }
@@ -367,7 +372,7 @@ func TestGuidanceStatusForAFileDejaOwnsWhole(t *testing.T) {
 // can be dropped from the helper unnoticed — and the helper must name exactly
 // the set the install path branches on, or doctor starts lying again.
 func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
-	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi"} {
+	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi", "roo", "codex", "goose", "openclaw"} {
 		if !guidanceOwnsWholeFile(h) {
 			t.Errorf("%q is written whole by installGuidance", h)
 		}
@@ -377,7 +382,7 @@ func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
 			t.Errorf("%q got marker text for a file deja owns whole", h)
 		}
 	}
-	for _, h := range []string{"codex", "grok"} {
+	for _, h := range []string{"grok"} {
 		if guidanceOwnsWholeFile(h) {
 			t.Errorf("%q shares its file with the user", h)
 		}

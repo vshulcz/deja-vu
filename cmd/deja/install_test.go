@@ -103,7 +103,7 @@ func TestUninstallLeavesNoFileOrDirItCreated(t *testing.T) {
 	if _, err := captureRun(t, "install", "--all", "--no-index"); err != nil {
 		t.Fatal(err)
 	}
-	agents := filepath.Join(home, ".codex", "AGENTS.md")
+	agents := guidancePath("codex")
 	skill := filepath.Join(home, ".claude", "skills", "deja-history", "SKILL.md")
 	for _, p := range []string{agents, skill} {
 		if _, err := os.Stat(p); err != nil {

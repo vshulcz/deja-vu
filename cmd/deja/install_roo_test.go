@@ -92,7 +92,7 @@ func TestRooGuidanceIsASkillAndDropsTheRulesFile(t *testing.T) {
 	if _, err := installGuidance("roo", false); err != nil {
 		t.Fatalf("guidance: %v", err)
 	}
-	p := filepath.Join(home, ".roo", "skills", "deja-history", "SKILL.md")
+	p := guidancePath("roo")
 	b, err := os.ReadFile(p)
 	if err != nil {
 		t.Fatalf("skill missing: %v", err)

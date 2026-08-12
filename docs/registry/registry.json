@@ -68,17 +68,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "the Codex bundle ships a skill, but `deja install codex` writes a guidance block instead of one"
-    },
     "command": {
      "state": "impossible",
      "why": "the Codex plugin format has no command component; interface.defaultPrompt is starter text, not a command",
@@ -342,18 +338,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": "deja goose"
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "matches a request against each SKILL.md description and loads the matching one",
-     "source": "https://goose-docs.ai/docs/guides/context-engineering/using-skills/"
-    },
     "command": {
      "state": "unknown",
      "why": "not investigated yet"
@@ -455,18 +446,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": false,
     "handoff": "paste",
     "prereq": ""
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "watches skill roots and reloads on SKILL.md change",
-     "source": "https://docs.openclaw.ai/tools/skills"
-    },
     "command": {
      "state": "todo",
      "why": "a skill is invocable by its stable command name, so this follows from shipping one",

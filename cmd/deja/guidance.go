@@ -53,7 +53,29 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 - If deja is unavailable or the index is empty, say that history search is unavailable. Do not invent what it might have found.
 - Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.`
 
+// sharedSkillHarnesses read the cross-agent skills directory defined by the
+// Agent Skills standard. Measured, not assumed, for gemini, openclaw and qwen:
+// each finds a skill placed only there. The rest are from their own docs.
+//
+// Writing one file instead of one per harness is not only tidier. Gemini prints
+// "Skill conflict detected" when the same skill exists in both its own
+// directory and the shared one, so having both is a visible fault rather than
+// harmless duplication.
+var sharedSkillHarnesses = map[string]bool{
+	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
+	"roo": true, "codex": true, "goose": true, "openclaw": true,
+}
+
+// sharedSkillPath is the one file all of them read. Claude Code is deliberately
+// not among them: its docs list every directory it scans and this is not one.
+func sharedSkillPath() string {
+	return filepath.Join(homeDir(), ".agents", "skills", "deja-history", "SKILL.md")
+}
+
 func guidancePath(harness string) string {
+	if sharedSkillHarnesses[harness] {
+		return sharedSkillPath()
+	}
 	switch harness {
 	case "claude-code", "claude":
 		return filepath.Join(sources.ClaudeConfigDir(), "skills", "deja-history", "SKILL.md")
@@ -69,24 +91,6 @@ func guidancePath(harness string) string {
 		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
 	case "pi":
 		return filepath.Join(sources.PiConfigDir(), "skills", "deja-history", "SKILL.md")
-	case "cursor":
-		// Cursor was the one harness deja wrote nothing for: it has no
-		// user-level instructions file to append a block to. It does read
-		// user-level skills, which is a place that did not exist when that was
-		// decided.
-		return filepath.Join(sources.CursorCLIHome(), "skills", "deja-history", "SKILL.md")
-	case "qwen":
-		return filepath.Join(sources.QwenConfigDir(), "skills", "deja-history", "SKILL.md")
-	case "codex":
-		return filepath.Join(sources.CodexHome(), "AGENTS.md")
-	case "kimi":
-		// Kimi Code scans $KIMI_CODE_HOME/skills. Note the two products sharing
-		// the name: MoonshotAI/kimi-cli keeps its skills under ~/.kimi, and
-		// writing there would land beside a tool deja does not index.
-		return filepath.Join(sources.KimiConfigDir(), "skills", "deja-history", "SKILL.md")
-	case "gemini":
-		// User skills, the tier above extensions and below the workspace copy.
-		return filepath.Join(sources.GeminiHome(), "skills", "deja-history", "SKILL.md")
 	case "grok":
 		// grok reads <cwd>/.grok/GROK.md first and only falls back to the
 		// home copy, so this never shadows a project's own instructions.
@@ -96,10 +100,6 @@ func guidancePath(harness string) string {
 		// channel: a block in AGENTS.md is in context for the whole session
 		// whether or not anyone asks about past work.
 		return filepath.Join(opencodeConfigHome(), "opencode", "skills", "deja-history", "SKILL.md")
-	case "roo":
-		// Roo scans ~/.roo/skills; the rules file it used before is read
-		// verbatim into the system prompt for every mode and every task.
-		return filepath.Join(homeDir(), ".roo", "skills", "deja-history", "SKILL.md")
 	default:
 		return ""
 	}
@@ -157,13 +157,26 @@ func retiredGuidancePaths(harness string) []string {
 	case "opencode":
 		return []string{filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")}
 	case "gemini":
-		return []string{filepath.Join(sources.GeminiHome(), "GEMINI.md")}
+		return []string{
+			filepath.Join(sources.GeminiHome(), "GEMINI.md"),
+			filepath.Join(sources.GeminiHome(), "skills", "deja-history", "SKILL.md"),
+		}
 	case "qwen":
-		return []string{filepath.Join(sources.QwenConfigDir(), "QWEN.md")}
+		return []string{
+			filepath.Join(sources.QwenConfigDir(), "QWEN.md"),
+			filepath.Join(sources.QwenConfigDir(), "skills", "deja-history", "SKILL.md"),
+		}
 	case "kimi":
-		return []string{filepath.Join(sources.KimiConfigDir(), "AGENTS.md")}
+		return []string{
+			filepath.Join(sources.KimiConfigDir(), "AGENTS.md"),
+			filepath.Join(sources.KimiConfigDir(), "skills", "deja-history", "SKILL.md"),
+		}
+	case "codex":
+		return []string{filepath.Join(sources.CodexHome(), "AGENTS.md")}
+	case "cursor":
+		return []string{filepath.Join(sources.CursorCLIHome(), "skills", "deja-history", "SKILL.md")}
 	case "roo":
-		return []string{rooRulesPath()}
+		return []string{rooRulesPath(), filepath.Join(homeDir(), ".roo", "skills", "deja-history", "SKILL.md")}
 	}
 	return nil
 }
@@ -179,10 +192,20 @@ func dropRetiredGuidance(harness string) error {
 			}
 			return err
 		}
-		// No markers means the file is not ours, whatever its name. Roo's old
-		// rules file carried them like every other block, so stripping it
-		// empties the file and the branch below removes it.
 		if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
+			// A skill file has frontmatter rather than markers. Ours is
+			// identifiable without guessing: we generate the directory name and
+			// the name field, and both have to match before anything is
+			// deleted, so a skill someone wrote themselves is never touched.
+			if filepath.Base(path) == "SKILL.md" &&
+				filepath.Base(filepath.Dir(path)) == "deja-history" &&
+				strings.Contains(string(old), "name: deja-history") {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
+				// Take the directory too, but only if we emptied it.
+				_ = os.Remove(filepath.Dir(path))
+			}
 			continue
 		}
 		next := updateGuidanceBlock(string(old), true)
@@ -199,6 +222,19 @@ func dropRetiredGuidance(harness string) error {
 		}
 	}
 	return nil
+}
+
+// sharedSkillStillWanted reports whether a harness other than the one being
+// removed still reads the shared skill, according to what install recorded.
+// Without this, uninstalling one of eight would silently blind the other seven.
+func sharedSkillStillWanted(leaving string) bool {
+	for _, t := range readWiringState().Targets {
+		other := guidanceHarness(t)
+		if other != leaving && sharedSkillHarnesses[other] {
+			return true
+		}
+	}
+	return false
 }
 
 func installGuidance(harness string, uninstall bool) (installResult, error) {
@@ -218,6 +254,11 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		if uninstall {
 			if len(old) == 0 {
 				return installResult{Path: path, Action: "unchanged"}, nil
+			}
+			// One file serves several harnesses, so removing it because one of
+			// them was uninstalled would take the memory away from the rest.
+			if sharedSkillHarnesses[harness] && sharedSkillStillWanted(harness) {
+				return installResult{Path: path, Action: "kept"}, nil
 			}
 			if err := os.Remove(path); err != nil {
 				return installResult{}, err
@@ -311,8 +352,13 @@ func guidanceHarness(harness string) string {
 // directory and has no marker in it; AGENTS.md and its siblings belong to the
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
+	// A shared-skill harness owns a file too — the same one as its neighbours,
+	// which is what the uninstall guard is for.
+	if sharedSkillHarnesses[harness] {
+		return true
+	}
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi", "roo":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode":
 		return true
 	}
 	return false

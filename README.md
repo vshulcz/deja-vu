@@ -96,7 +96,7 @@ aider has no MCP client and no hooks, but read-only files are re-read from disk 
 
 On Windows, register the MCP server through the shell wrapper most stdio servers need there: `cmd /c deja mcp` (deja install writes this form automatically; use it if you wire configs by hand).
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor and Roo Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead — read only when something looks relevant, rather than every session.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw and Roo Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead — read only when something looks relevant, rather than every session.
 
 Install reports whether it found local history and builds the first index immediately when history is present.
 
@@ -318,7 +318,7 @@ limits, trust assumptions, and release verification.
 | --- | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
 | Claude Code | `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl`<br>`${DEJA_CLAUDE_ROOT}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | — | ✕ | ✅ | ✅ | — |
+| Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | — |
 | opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | ✅ | — | ✅ | ✅ | sqlite3 |
 | aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | ✕ | ✅ | ? | ? | — | ✅ | deja aider |
 | Gemini CLI | `${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}`<br>`${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}` | ✅ | ✅ | ✅ | — | — | ✅ | — |
@@ -326,11 +326,11 @@ limits, trust assumptions, and release verification.
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
 | Grok Build | `${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl`<br>`${DEJA_GROK_ROOT}/sessions/**/updates.jsonl`<br>`${GROK_HOME:-~/.grok}/grok.db` | ✅ | ? | — | ? | — | ✅ | sqlite3 (grok-dev store) |
 | Hermes | `~/.hermes/profiles/*/state.db`<br>`${DEJA_HERMES_PROFILES_ROOT}/*/state.db`<br>`${DEJA_HERMES_DB}` | ✅ | ✅ | — | ✅ | ✅ | paste | sqlite3 |
-| Goose | `${GOOSE_PATH_ROOT}/data/sessions/sessions.db`<br>`~/.local/share/goose/sessions/*.jsonl`<br>`~/.local/share/goose/sessions/sessions.db`<br>`${XDG_DATA_HOME}/goose/sessions/*.jsonl`<br>`${XDG_DATA_HOME}/goose/sessions/sessions.db`<br>`${DEJA_GOOSE_ROOT}/sessions/*.jsonl`<br>`${DEJA_GOOSE_ROOT}/sessions/sessions.db`<br>`${DEJA_GOOSE_DB}` | ✅ | ✅ | — | ? | ✅ | ✅ | deja goose |
+| Goose | `${GOOSE_PATH_ROOT}/data/sessions/sessions.db`<br>`~/.local/share/goose/sessions/*.jsonl`<br>`~/.local/share/goose/sessions/sessions.db`<br>`${XDG_DATA_HOME}/goose/sessions/*.jsonl`<br>`${XDG_DATA_HOME}/goose/sessions/sessions.db`<br>`${DEJA_GOOSE_ROOT}/sessions/*.jsonl`<br>`${DEJA_GOOSE_ROOT}/sessions/sessions.db`<br>`${DEJA_GOOSE_DB}` | ✅ | ✅ | ✅ | ? | ✅ | ✅ | deja goose |
 | Qwen Code | `${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl` | ✅ | ✅ | ✅ | ? | — | ✅ | — |
 | Kimi Code | `${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl`<br>`${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl` | ✅ | ✅ | ✅ | ? | ✅ | ✅ | — |
 | pi | `${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| OpenClaw | `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl`<br>`${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl` | ✅ | ✅ | — | — | — | paste | — |
+| OpenClaw | `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl`<br>`${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl` | ✅ | ✅ | ✅ | — | — | paste | — |
 | Copilot CLI | `${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl` | ✅ | ✕ | ✅ | ? | ✅ | ✅ | — |
 | Roo Code | `<vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json`<br>`${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json`<br>`~/.vscode-mock/global-storage/tasks/*/api_conversation_history.json` | ✅ | ? | ✅ | — | — | paste | — |
 

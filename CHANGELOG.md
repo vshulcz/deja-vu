@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Cursor, opencode, Gemini CLI, Qwen Code, Kimi Code and Roo Code get deja's guidance as a skill rather than a block of text that sits in context all session. Cursor had nothing at all before — it has no user-level instructions file — and the old blocks in `AGENTS.md`, `GEMINI.md` and `QWEN.md`, and Roo's always-on rules file, are removed on the next install, leaving everything else in that file alone.
+- Guidance is a skill rather than a block of text that sits in context all session. Eight harnesses — Cursor, Codex, Gemini CLI, Qwen Code, Kimi Code, Goose, OpenClaw and Roo Code — read one shared skill at `~/.agents/skills/`; Claude Code, opencode, Antigravity, Copilot, pi, Hermes and Cline each read their own place. Old blocks in `AGENTS.md`, `GEMINI.md`, `QWEN.md` and Roo's rules file are removed on the next install, and so are the per-harness skills an earlier version wrote.
+
 
 ## [0.17.0] - 2026-08-11
 
