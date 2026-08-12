@@ -87,10 +87,18 @@ func TestCodexPluginManifest(t *testing.T) {
 	}
 }
 
-// The skill the plugin ships must be the same one `deja install` writes.
-func TestCodexPluginSkillMatchesInstaller(t *testing.T) {
-	got := string(repoFile(t, "codex-plugin/skills/deja-history/SKILL.md"))
-	if want := guidanceText("claude"); got != want {
-		t.Fatalf("bundled skill has drifted from guidanceText:\n--- file ---\n%s\n--- installer ---\n%s", got, want)
+// Every bundled skill must be the same one `deja install` writes. Both plugin
+// directories ship one, and a harness that reads the bundle gets whatever is in
+// it — so a stale copy would teach an agent something the installed skill no
+// longer says.
+func TestBundledSkillsMatchInstaller(t *testing.T) {
+	for _, p := range []string{
+		"codex-plugin/skills/deja-history/SKILL.md",
+		"claude-plugin/skills/deja-history/SKILL.md",
+	} {
+		got := string(repoFile(t, p))
+		if want := guidanceText("claude"); got != want {
+			t.Fatalf("%s has drifted from guidanceText:\n--- file ---\n%s\n--- installer ---\n%s", p, got, want)
+		}
 	}
 }
