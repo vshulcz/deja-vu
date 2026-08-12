@@ -17,6 +17,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": true,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -41,6 +43,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -63,6 +67,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -85,6 +91,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": "sqlite3"
@@ -107,6 +115,8 @@
    "capabilities": {
     "mcp": false,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": "deja aider"
@@ -129,6 +139,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": ""
@@ -153,6 +165,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (IDE chats)"
@@ -174,6 +188,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": true,
+    "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -196,6 +212,8 @@
    "capabilities": {
     "mcp": true,
     "auto": false,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (grok-dev store)"
@@ -218,6 +236,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": true,
     "resume": true,
     "handoff": "paste",
     "prereq": "sqlite3"
@@ -246,6 +266,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": "deja goose"
@@ -266,6 +288,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": ""
@@ -287,6 +311,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -307,6 +333,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": true,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -328,6 +356,8 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "paste",
     "prereq": ""
@@ -348,6 +378,8 @@
    "capabilities": {
     "mcp": true,
     "auto": false,
+    "skill": true,
+    "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -370,6 +402,8 @@
    "capabilities": {
     "mcp": true,
     "auto": false,
+    "skill": false,
+    "command": false,
     "resume": false,
     "handoff": "paste",
     "prereq": ""

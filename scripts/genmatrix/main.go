@@ -17,6 +17,8 @@ type entry struct {
 	Capabilities struct {
 		MCP     bool   `json:"mcp"`
 		Auto    bool   `json:"auto"`
+		Skill   bool   `json:"skill"`
+		Command bool   `json:"command"`
 		Resume  bool   `json:"resume"`
 		Handoff string `json:"handoff"`
 		Prereq  string `json:"prereq"`
@@ -47,8 +49,8 @@ func handoffMark(kind string) string {
 
 func markdownTable(r registry) string {
 	var b strings.Builder
-	b.WriteString("| Harness | Store | MCP recall | Auto-recall | Resume | Handoff | Needs |\n")
-	b.WriteString("| --- | --- | :-: | :-: | :-: | :-: | --- |\n")
+	b.WriteString("| Harness | Store | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |\n")
+	b.WriteString("| --- | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |\n")
 	for _, e := range r.Harnesses {
 		if e.ID == "deja" {
 			continue
@@ -62,8 +64,9 @@ func markdownTable(r registry) string {
 		if prereq == "" {
 			prereq = "—"
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s |\n",
+		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 			e.DisplayName, store, mark(e.Capabilities.MCP), mark(e.Capabilities.Auto),
+			mark(e.Capabilities.Skill), mark(e.Capabilities.Command),
 			mark(e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
 	return b.String()
@@ -71,7 +74,7 @@ func markdownTable(r registry) string {
 
 func htmlTable(r registry) string {
 	var b strings.Builder
-	b.WriteString("<table>\n<tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>\n")
+	b.WriteString("<table>\n<tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Skill</th><th>Command</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>\n")
 	for _, e := range r.Harnesses {
 		if e.ID == "deja" {
 			continue
@@ -80,9 +83,10 @@ func htmlTable(r registry) string {
 		if prereq == "" {
 			prereq = "—"
 		}
-		fmt.Fprintf(&b, "<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
+		fmt.Fprintf(&b, "<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
 			e.DisplayName, strings.Join(e.StorePaths, "</code><br><code>"),
-			mark(e.Capabilities.MCP), mark(e.Capabilities.Auto), mark(e.Capabilities.Resume),
+			mark(e.Capabilities.MCP), mark(e.Capabilities.Auto),
+			mark(e.Capabilities.Skill), mark(e.Capabilities.Command), mark(e.Capabilities.Resume),
 			handoffMark(e.Capabilities.Handoff), prereq)
 	}
 	b.WriteString("</table>")

@@ -17,6 +17,8 @@ type capRegistry struct {
 		Capabilities *struct {
 			MCP     bool   `json:"mcp"`
 			Auto    bool   `json:"auto"`
+			Skill   bool   `json:"skill"`
+			Command bool   `json:"command"`
 			Resume  bool   `json:"resume"`
 			Handoff string `json:"handoff"`
 		} `json:"capabilities"`
@@ -75,6 +77,32 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			if _, err := installTarget(h.ID+"-auto", "/bin/deja", false); (err == nil) != c.Auto {
 				t.Fatalf("%s: registry auto=%v disagrees with install targets", h.ID, c.Auto)
 			}
+		}
+
+		// Skill: guidance is a skill file only where install owns the whole
+		// file. Everywhere else it is a marked block inside a file the user
+		// owns, which is loaded for the whole session rather than on demand.
+		if got := guidanceOwnsWholeFile(id); got != c.Skill {
+			t.Fatalf("%s: registry skill=%v, guidanceOwnsWholeFile(%q)=%v", h.ID, c.Skill, id, got)
+		}
+
+		// Command: read it off the artifact install actually generates, not a
+		// list kept beside it — a list would only ever agree with itself.
+		// Claude Code gets a file in commands/; cline, hermes and pi register
+		// theirs inside the plugin deja writes for them.
+		gotCommand := false
+		switch h.ID {
+		case "claude":
+			gotCommand = strings.Contains(claudeCommandMD("/bin/deja"), "deja")
+		case "cline":
+			gotCommand = strings.Contains(clinePluginJS("/bin/deja"), "registerCommand")
+		case "hermes":
+			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
+		case "pi":
+			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
+		}
+		if gotCommand != c.Command {
+			t.Fatalf("%s: registry command=%v, generated install artifact says %v", h.ID, c.Command, gotCommand)
 		}
 
 		// Resume: resumeCommand must succeed for a plausible session.
