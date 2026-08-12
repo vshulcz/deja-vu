@@ -165,7 +165,13 @@ func dropRetiredGuidance(harness string) error {
 	if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
 		return nil
 	}
-	_, err = writeIfChanged(path, old, []byte(updateGuidanceBlock(string(old), true)))
+	next := updateGuidanceBlock(string(old), true)
+	// A file that held nothing but our block was ours to begin with, so leaving
+	// an empty AGENTS.md behind would be litter rather than someone's content.
+	if strings.TrimSpace(next) == "" {
+		return os.Remove(path)
+	}
+	_, err = writeIfChanged(path, old, []byte(next))
 	return err
 }
 
