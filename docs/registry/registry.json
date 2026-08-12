@@ -109,18 +109,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": "sqlite3"
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "discovers skills in ~/.config/opencode/skills, .opencode/skills, .claude/skills and .agents/skills; deja writes an AGENTS.md block instead",
-     "source": "https://opencode.ai/docs/skills/"
-    },
     "command": {
      "state": "todo",
      "why": "reads markdown commands from ~/.config/opencode/commands/ and .opencode/commands/",

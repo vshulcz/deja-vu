@@ -88,7 +88,10 @@ func guidancePath(harness string) string {
 		// home copy, so this never shadows a project's own instructions.
 		return filepath.Join(sources.GrokHome(), "GROK.md")
 	case "opencode":
-		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
+		// opencode reads skills from its config directory, which is the cheaper
+		// channel: a block in AGENTS.md is in context for the whole session
+		// whether or not anyone asks about past work.
+		return filepath.Join(opencodeConfigHome(), "opencode", "skills", "deja-history", "SKILL.md")
 	case "roo":
 		// Global rules are read verbatim into the system prompt for every
 		// mode and every task, which is the only always-on channel Roo has.
@@ -134,10 +137,45 @@ When recalled history genuinely helps, say so to the user in one short line: "de
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
 }
 
+// retiredGuidancePath is where a previous version of deja wrote guidance for a
+// harness that has since moved. Install strips deja's block from it, because a
+// harness that reads both would otherwise carry the old copy in every session
+// forever — the file belongs to the user and nothing else would ever clean it.
+func retiredGuidancePath(harness string) string {
+	if harness == "opencode" {
+		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
+	}
+	return ""
+}
+
+// dropRetiredGuidance removes deja's marked block from a file it no longer
+// writes, leaving every other line in it alone.
+func dropRetiredGuidance(harness string) error {
+	path := retiredGuidancePath(harness)
+	if path == "" {
+		return nil
+	}
+	old, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
+		return nil
+	}
+	_, err = writeIfChanged(path, old, []byte(updateGuidanceBlock(string(old), true)))
+	return err
+}
+
 func installGuidance(harness string, uninstall bool) (installResult, error) {
 	path := guidancePath(harness)
 	if path == "" {
 		return installResult{}, nil
+	}
+	if err := dropRetiredGuidance(harness); err != nil {
+		return installResult{}, err
 	}
 	old, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -244,7 +282,7 @@ func guidanceHarness(harness string) string {
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode":
 		return true
 	}
 	return false

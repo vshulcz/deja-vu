@@ -19,8 +19,13 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("claude-code"); got != filepath.Join(home, ".claude", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("claude path = %q", got)
 	}
-	if got := guidancePath("opencode"); got != filepath.Join(xdg, "opencode", "AGENTS.md") {
+	if got := guidancePath("opencode"); got != filepath.Join(xdg, "opencode", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("opencode path = %q", got)
+	}
+	// The AGENTS.md block an older deja wrote is stripped on install, so it
+	// does not sit in every session beside the skill that replaced it.
+	if got := retiredGuidancePath("opencode"); got != filepath.Join(xdg, "opencode", "AGENTS.md") {
+		t.Fatalf("opencode retired path = %q", got)
 	}
 	// Inside the plugin: antigravity ingests skills/ from a directory marked by
 	// plugin.json, and `agy plugin validate` confirms it there. Beside the
@@ -357,7 +362,7 @@ func TestGuidanceStatusForAFileDejaOwnsWhole(t *testing.T) {
 // can be dropped from the helper unnoticed — and the helper must name exactly
 // the set the install path branches on, or doctor starts lying again.
 func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
-	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi"} {
+	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode"} {
 		if !guidanceOwnsWholeFile(h) {
 			t.Errorf("%q is written whole by installGuidance", h)
 		}
@@ -367,7 +372,7 @@ func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
 			t.Errorf("%q got marker text for a file deja owns whole", h)
 		}
 	}
-	for _, h := range []string{"codex", "opencode", "gemini", "qwen", "kimi", "grok"} {
+	for _, h := range []string{"codex", "gemini", "qwen", "kimi", "grok"} {
 		if guidanceOwnsWholeFile(h) {
 			t.Errorf("%q shares its file with the user", h)
 		}
