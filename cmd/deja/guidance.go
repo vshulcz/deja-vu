@@ -82,7 +82,8 @@ func guidancePath(harness string) string {
 	case "kimi":
 		return filepath.Join(sources.KimiConfigDir(), "AGENTS.md")
 	case "gemini":
-		return filepath.Join(sources.GeminiHome(), "GEMINI.md")
+		// User skills, the tier above extensions and below the workspace copy.
+		return filepath.Join(sources.GeminiHome(), "skills", "deja-history", "SKILL.md")
 	case "grok":
 		// grok reads <cwd>/.grok/GROK.md first and only falls back to the
 		// home copy, so this never shadows a project's own instructions.
@@ -142,8 +143,11 @@ When recalled history genuinely helps, say so to the user in one short line: "de
 // harness that reads both would otherwise carry the old copy in every session
 // forever — the file belongs to the user and nothing else would ever clean it.
 func retiredGuidancePath(harness string) string {
-	if harness == "opencode" {
+	switch harness {
+	case "opencode":
 		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
+	case "gemini":
+		return filepath.Join(sources.GeminiHome(), "GEMINI.md")
 	}
 	return ""
 }
@@ -288,7 +292,7 @@ func guidanceHarness(harness string) string {
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini":
 		return true
 	}
 	return false

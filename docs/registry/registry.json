@@ -178,18 +178,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": ""
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "loads skills from ~/.gemini/skills/ and .gemini/skills/",
-     "source": "https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md"
-    },
     "command": {
      "state": "todo",
      "why": "supports custom slash commands defined as .toml files",

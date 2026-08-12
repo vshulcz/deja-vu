@@ -362,7 +362,7 @@ func TestGuidanceStatusForAFileDejaOwnsWhole(t *testing.T) {
 // can be dropped from the helper unnoticed — and the helper must name exactly
 // the set the install path branches on, or doctor starts lying again.
 func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
-	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode"} {
+	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini"} {
 		if !guidanceOwnsWholeFile(h) {
 			t.Errorf("%q is written whole by installGuidance", h)
 		}
@@ -372,7 +372,7 @@ func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
 			t.Errorf("%q got marker text for a file deja owns whole", h)
 		}
 	}
-	for _, h := range []string{"codex", "gemini", "qwen", "kimi", "grok"} {
+	for _, h := range []string{"codex", "qwen", "kimi", "grok"} {
 		if guidanceOwnsWholeFile(h) {
 			t.Errorf("%q shares its file with the user", h)
 		}

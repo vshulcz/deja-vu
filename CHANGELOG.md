@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Cursor and opencode get deja's guidance as a skill rather than a block of text that sits in context all session. Cursor had nothing at all before — it has no user-level instructions file — and opencode's old block in `AGENTS.md` is removed on the next install, leaving everything else in that file alone.
+- Cursor, opencode and Gemini CLI get deja's guidance as a skill rather than a block of text that sits in context all session. Cursor had nothing at all before — it has no user-level instructions file — and the old blocks in opencode's `AGENTS.md` and Gemini's `GEMINI.md` are removed on the next install, leaving everything else in that file alone.
 
 ## [0.17.0] - 2026-08-11
 
