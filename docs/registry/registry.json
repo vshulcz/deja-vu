@@ -221,18 +221,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (IDE chats)"
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "reads .cursor/skills/ and .agents/skills/ anywhere in a repository; deja currently writes it no guidance at all",
-     "source": "https://cursor.com/docs/skills"
-    },
     "command": {
      "state": "todo",
      "why": "reads markdown commands from .cursor/commands/",

@@ -23,6 +23,7 @@ var readmeGuidanceNames = map[string]string{
 	"kimi":        "Kimi Code",
 	"pi":          "pi",
 	"copilot":     "Copilot",
+	"cursor":      "Cursor",
 	"roo":         "Roo Code",
 	// Grok is named in its own sentence in the same paragraph, because the
 	// home copy only applies when a project has no .grok/GROK.md.
@@ -72,18 +73,20 @@ func TestReadmeNamesEveryHarnessThatGetsGuidance(t *testing.T) {
 	}
 }
 
-// Cursor is the one the paragraph calls out as skipped; if it ever starts
-// writing guidance the sentence becomes wrong in the other direction.
-func TestReadmeCursorGuidanceExclusion(t *testing.T) {
+// Cursor used to be the one the paragraph called out as skipped. It now gets a
+// skill, so the general test above covers it and the paragraph has to say where
+// that skill lands rather than that there is nowhere to put one.
+func TestReadmeCursorGetsASkill(t *testing.T) {
 	hermeticEnv(t)
 	para := readmeGuidanceParagraph(t)
 	r, err := guidanceResult("cursor", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	skipped := r.Path == ""
-	says := strings.Contains(para, "Cursor has no documented user-level guidance location and is skipped")
-	if skipped != says {
-		t.Errorf("cursor guidance path %q vs README claim of skipping %v", r.Path, says)
+	if r.Path == "" {
+		t.Fatal("cursor writes no guidance again — the README paragraph now says it does")
+	}
+	if !strings.Contains(para, "~/.cursor/skills/") {
+		t.Errorf("README does not say where Cursor's skill goes:\n%s", para)
 	}
 }

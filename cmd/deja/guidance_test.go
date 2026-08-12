@@ -39,8 +39,10 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("grok"); got != filepath.Join(home, ".grok", "GROK.md") {
 		t.Fatalf("grok path = %q", got)
 	}
-	if got := guidancePath("cursor"); got != "" {
-		t.Fatalf("cursor path = %q, want unsupported", got)
+	// Cursor has no user-level instructions file, which is why it went without
+	// guidance for so long. It does read user-level skills.
+	if got := guidancePath("cursor"); got != filepath.Join(home, ".cursor", "skills", "deja-history", "SKILL.md") {
+		t.Fatalf("cursor path = %q", got)
 	}
 }
 
@@ -180,7 +182,9 @@ func TestGuidanceBlockHandlesCRLFAndUnsupportedResult(t *testing.T) {
 	if strings.Count(got, guidanceStart) != 1 || !strings.Contains(got, "\r\n") || strings.Contains(got, "old") {
 		t.Fatalf("CRLF rewrite = %q", got)
 	}
-	if r, err := guidanceResult("cursor", false); err != nil || r.Path != "" {
+	// goose has no guidance location at all, so it stands in for the
+	// unsupported branch that cursor used to occupy.
+	if r, err := guidanceResult("goose", false); err != nil || r.Path != "" {
 		t.Fatalf("unsupported guidance = %#v, %v", r, err)
 	}
 }
@@ -252,8 +256,8 @@ func TestCopilotInstallWritesMCPConfig(t *testing.T) {
 func TestInstallGuidanceSkillErrorBranches(t *testing.T) {
 	tmp := hermeticEnv(t)
 	// path == "" branch for a harness without a guidance location.
-	if r, err := installGuidance("cursor", false); err != nil || r.Path != "" {
-		t.Fatalf("cursor guidance = %#v err=%v", r, err)
+	if r, err := installGuidance("goose", false); err != nil || r.Path != "" {
+		t.Fatalf("goose guidance = %#v err=%v", r, err)
 	}
 	// Read failure that is not IsNotExist must surface (copilot skill dir
 	// squatted by a file).

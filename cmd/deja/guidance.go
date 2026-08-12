@@ -69,6 +69,12 @@ func guidancePath(harness string) string {
 		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
 	case "pi":
 		return filepath.Join(sources.PiConfigDir(), "skills", "deja-history", "SKILL.md")
+	case "cursor":
+		// Cursor was the one harness deja wrote nothing for: it has no
+		// user-level instructions file to append a block to. It does read
+		// user-level skills, which is a place that did not exist when that was
+		// decided.
+		return filepath.Join(sources.CursorCLIHome(), "skills", "deja-history", "SKILL.md")
 	case "qwen":
 		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
 	case "codex":
@@ -238,7 +244,7 @@ func guidanceHarness(harness string) string {
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor":
 		return true
 	}
 	return false
@@ -277,11 +283,7 @@ func guidanceStatus(harness string) string {
 }
 
 func guidanceResult(harness string, uninstall bool) (installResult, error) {
-	canonical := guidanceHarness(harness)
-	if canonical == "cursor" {
-		return installResult{}, nil
-	}
-	return installGuidance(canonical, uninstall)
+	return installGuidance(guidanceHarness(harness), uninstall)
 }
 
 func guidanceOutput(harness string, result installResult) string {
