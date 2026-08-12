@@ -5,6 +5,7 @@
     "name": "vshulcz",
     "url": "https://github.com/vshulcz"
   },
+  "skills": "./skills/",
   "hooks": {
     "SessionStart": [
       {
