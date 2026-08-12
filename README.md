@@ -2,7 +2,7 @@
 
 <p align="center"><strong>Your agents already solved this. deja finds it.</strong><br>Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; and serves them back to any agent over MCP.</p>
 
-<p align="center">Then it keeps working: it ranks by what actually held rather than what merely matched, and before your agent edits a file or runs a command it names the decision already reached there. One zero-dependency binary, fully local, no model.</p>
+<p align="center">Then it keeps working: it ranks by what actually held rather than what merely matched, and once its hooks are wired it names the decision already reached on a file before your agent edits it. One zero-dependency binary, fully local.</p>
 
 <p align="center"><strong>84.9% hit@1</strong> on LongMemEval-S retrieval &mdash; no LLM, no embeddings, no API key. <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Harness in-repo, run it yourself.</a></p>
 
