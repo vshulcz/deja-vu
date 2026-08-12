@@ -381,18 +381,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": false,
     "handoff": "exec",
     "prereq": ""
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "loads SKILL.md and lists them under /skills",
-     "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/skills/"
-    },
     "command": {
      "state": "unknown",
      "why": "not investigated yet"
@@ -415,18 +410,13 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
    },
    "gaps": {
-    "skill": {
-     "state": "todo",
-     "why": "reads SKILL.md from its skills scan directory and invokes it as /skill:<name>",
-     "source": "https://moonshotai.github.io/kimi-cli/en/customization/skills.html"
-    },
     "command": {
      "state": "unknown",
      "why": "not investigated yet"

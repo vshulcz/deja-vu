@@ -33,7 +33,7 @@ func TestGuidanceTargetsAreUserLevelAndRespectXDG(t *testing.T) {
 	if got := guidancePath("antigravity"); got != filepath.Join(home, ".gemini", "config", "plugins", "deja", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("antigravity path = %q", got)
 	}
-	if got := guidancePath("qwen"); got != filepath.Join(home, ".qwen", "QWEN.md") {
+	if got := guidancePath("qwen"); got != filepath.Join(home, ".qwen", "skills", "deja-history", "SKILL.md") {
 		t.Fatalf("qwen path = %q", got)
 	}
 	if got := guidancePath("copilot"); got != filepath.Join(home, ".copilot", "skills", "deja-history", "SKILL.md") {
@@ -64,7 +64,7 @@ func TestOwnedGuidanceTargetsAndMarkerBoundaries(t *testing.T) {
 			t.Fatalf("%s rerun = %#v, %v", harness, r, err)
 		}
 		b, _ := os.ReadFile(guidancePath(harness))
-		if harness != "qwen" && !strings.Contains(string(b), "name: deja-history") {
+		if !strings.Contains(string(b), "name: deja-history") {
 			t.Fatalf("%s frontmatter missing: %s", harness, b)
 		}
 	}
@@ -73,23 +73,28 @@ func TestOwnedGuidanceTargetsAndMarkerBoundaries(t *testing.T) {
 	if got := updateGuidanceBlock(old, false); got != want {
 		t.Fatalf("inline markers were replaced: %q", got)
 	}
-	qwen := guidancePath("qwen")
-	if err := os.WriteFile(qwen, []byte("# Personal context\n"), 0o644); err != nil {
+	// grok still shares its file with the user, so it stands in for the
+	// marked-block path that qwen took before it moved to a skill.
+	shared := guidancePath("grok")
+	if err := os.MkdirAll(filepath.Dir(shared), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := installGuidance("qwen", false); err != nil {
+	if err := os.WriteFile(shared, []byte("# Personal context\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(qwen)
+	if _, err := installGuidance("grok", false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(shared)
 	if !strings.Contains(string(b), "# Personal context") {
-		t.Fatalf("qwen context was not preserved: %s", b)
+		t.Fatalf("grok context was not preserved: %s", b)
 	}
-	if _, err := installGuidance("qwen", true); err != nil {
+	if _, err := installGuidance("grok", true); err != nil {
 		t.Fatal(err)
 	}
-	b, _ = os.ReadFile(qwen)
+	b, _ = os.ReadFile(shared)
 	if strings.Contains(string(b), guidanceStart) || !strings.Contains(string(b), "# Personal context") {
-		t.Fatalf("qwen uninstall changed personal context: %s", b)
+		t.Fatalf("grok uninstall changed personal context: %s", b)
 	}
 
 	squat := filepath.Join(home, ".copilot", "skills", "deja-history")
@@ -362,7 +367,7 @@ func TestGuidanceStatusForAFileDejaOwnsWhole(t *testing.T) {
 // can be dropped from the helper unnoticed — and the helper must name exactly
 // the set the install path branches on, or doctor starts lying again.
 func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
-	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini"} {
+	for _, h := range []string{"claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi"} {
 		if !guidanceOwnsWholeFile(h) {
 			t.Errorf("%q is written whole by installGuidance", h)
 		}
@@ -372,7 +377,7 @@ func TestGuidanceOwnsWholeFileMatchesTheInstallPath(t *testing.T) {
 			t.Errorf("%q got marker text for a file deja owns whole", h)
 		}
 	}
-	for _, h := range []string{"codex", "qwen", "kimi", "grok"} {
+	for _, h := range []string{"codex", "grok"} {
 		if guidanceOwnsWholeFile(h) {
 			t.Errorf("%q shares its file with the user", h)
 		}

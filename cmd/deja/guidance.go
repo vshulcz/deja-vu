@@ -76,11 +76,14 @@ func guidancePath(harness string) string {
 		// decided.
 		return filepath.Join(sources.CursorCLIHome(), "skills", "deja-history", "SKILL.md")
 	case "qwen":
-		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
+		return filepath.Join(sources.QwenConfigDir(), "skills", "deja-history", "SKILL.md")
 	case "codex":
 		return filepath.Join(sources.CodexHome(), "AGENTS.md")
 	case "kimi":
-		return filepath.Join(sources.KimiConfigDir(), "AGENTS.md")
+		// Kimi Code scans $KIMI_CODE_HOME/skills. Note the two products sharing
+		// the name: MoonshotAI/kimi-cli keeps its skills under ~/.kimi, and
+		// writing there would land beside a tool deja does not index.
+		return filepath.Join(sources.KimiConfigDir(), "skills", "deja-history", "SKILL.md")
 	case "gemini":
 		// User skills, the tier above extensions and below the workspace copy.
 		return filepath.Join(sources.GeminiHome(), "skills", "deja-history", "SKILL.md")
@@ -148,6 +151,10 @@ func retiredGuidancePath(harness string) string {
 		return filepath.Join(opencodeConfigHome(), "opencode", "AGENTS.md")
 	case "gemini":
 		return filepath.Join(sources.GeminiHome(), "GEMINI.md")
+	case "qwen":
+		return filepath.Join(sources.QwenConfigDir(), "QWEN.md")
+	case "kimi":
+		return filepath.Join(sources.KimiConfigDir(), "AGENTS.md")
 	}
 	return ""
 }
@@ -290,7 +297,7 @@ func guidanceHarness(harness string) string {
 // user, and deja only ever appends a marked block there.
 func guidanceOwnsWholeFile(harness string) bool {
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "cursor", "opencode", "gemini", "qwen", "kimi":
 		return true
 	}
 	return false
