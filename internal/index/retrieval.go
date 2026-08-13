@@ -1820,6 +1820,12 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 	return out, variants, nil
 }
 
+// commonTokenPostings is where a word stops being worth widening. Below it a
+// near-neighbour is usually the same thing spelled differently and is worth
+// the candidate walk; at or above it the word is ordinary vocabulary the
+// corpus is full of, and its neighbours only cost time.
+const commonTokenPostings = 200
+
 func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
 	if !hasFuzzyToken(terms) {
 		return nil, nil, nil
@@ -1831,7 +1837,22 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 	perToken := make([]map[int64]posting, len(terms))
 	variants := map[string][]string{}
 	for i, term := range terms {
-		matches := closeTokens(term, idx)
+		// A term the corpus spells exactly is not a typo, and this tier exists
+		// for typos. One bucket read settles it; the candidate walk behind
+		// closeTokens compares the term against every token of a similar
+		// length and was running for words like "rice" and "favorite" that
+		// the index already holds verbatim.
+		// A word the corpus already uses everywhere gains nothing from its
+		// neighbours: it is not a typo, and widening it only adds postings
+		// that discriminate nothing. A rare word is still worth widening even
+		// when it is spelled correctly, because a near-neighbour of a rare
+		// word is usually the same thing said differently.
+		var matches []string
+		if exact, eerr := postingsFor(dir, "t"+term); eerr == nil && len(exact) >= commonTokenPostings {
+			matches = []string{term}
+		} else {
+			matches = closeTokens(term, idx)
+		}
 		if len(matches) == 0 {
 			return nil, nil, nil
 		}
