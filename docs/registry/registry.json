@@ -469,7 +469,8 @@
    "gaps": {
     "auto": {
      "state": "unknown",
-     "why": "not investigated yet"
+     "why": "Roo's docs enumerate skills, slash commands, modes, auto-approve and the orchestrator, and have no hooks page — /features/hooks is a 404. Without a lifecycle hook there is nowhere to put a per-session recall, so this may be a limit rather than work; absence from the docs is not proof, and nobody has asked them",
+     "source": "https://roocodeinc.github.io/Roo-Code/"
     }
    }
   }
