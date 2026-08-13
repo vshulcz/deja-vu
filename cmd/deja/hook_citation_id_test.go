@@ -21,7 +21,7 @@ func TestCitationLineCarriesTheSessionID(t *testing.T) {
 			{Role: "user", Text: "why does the reconciler double count refunds"},
 		},
 	}
-	line := citationLine(s)
+	line := citationLine(s, nil)
 	if !strings.Contains(line, "deja:"+shortID(s.ID)) {
 		t.Errorf("citation cannot be linked back to the session it came from: %q", line)
 	}

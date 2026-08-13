@@ -402,6 +402,29 @@ func wasBlocked(conclusions []string) bool {
 	return true
 }
 
+// MatchedUserLine is the line of a session that best answers what was asked,
+// taken from what the user said. The citation the agent is told to speak aloud
+// used to name a session's opening message, which after focusing a long session
+// is whatever chatter began the matched window — seen on a real screen naming
+// "migration locked the table" for a session the digest was quoting about token
+// rotation. Empty when nothing matches, so the caller keeps its own fallback.
+func MatchedUserLine(s model.Session, terms []string) string {
+	if len(terms) == 0 {
+		return ""
+	}
+	best, bestHits := "", 0
+	for _, m := range s.Messages {
+		if m.Role != "user" || noiseMessage(m.Text) {
+			continue
+		}
+		line, hits := densestLine(m.Text, terms)
+		if hits > bestHits {
+			best, bestHits = strings.TrimSpace(line), hits
+		}
+	}
+	return best
+}
+
 func relativeDay(updated, now time.Time) string {
 	if updated.IsZero() {
 		return "unknown date"

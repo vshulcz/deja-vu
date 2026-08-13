@@ -199,7 +199,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
-		tail := citationLine(ss[0])
+		tail := citationLine(ss[0], terms)
 		if nudge != "" {
 			tail += "\n" + nudge
 		}
@@ -417,9 +417,15 @@ func techTerm(f string) bool {
 
 // citationLine pre-writes the narration so the agent copies structure instead
 // of having to follow an instruction — models do the former far more reliably.
-func citationLine(s model.Session) string {
-	title := ""
+func citationLine(s model.Session, terms []string) string {
+	// What the digest quoted, so the sentence the agent says names the thing
+	// the user can see. Falls through to the session's opening when nothing
+	// matched literally.
+	title := search.MatchedUserLine(s, terms)
 	for _, m := range s.Messages {
+		if title != "" {
+			break
+		}
 		if m.Role == "user" && !digest.IsAgentArtifact(m.Text) {
 			tt := strings.TrimSpace(digest.MessageText(m.Text))
 			if tt == "" || strings.HasPrefix(tt, "Exit code") {
