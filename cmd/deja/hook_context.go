@@ -163,7 +163,7 @@ func rewireNote(targets []string) string {
 	// nothing was hand-edited, and claiming an edit was destroyed reads as an
 	// accusation. Someone who did edit those commands still learns that they
 	// were rewritten, and where to put the change instead.
-	return fmt.Sprintf("deja: rewrote its wiring for %s after an upgrade — `deja install` is what writes those commands", strings.Join(targets, ", "))
+	return fmt.Sprintf("deja rewrote its wiring for %s after an upgrade — `deja install` is what writes those commands", strings.Join(targets, ", "))
 }
 
 // buildNotice is what a session start says while a build runs: the published
@@ -190,14 +190,14 @@ func buildNotice(dir string) string {
 		// sends them nowhere. `deja index` and doctor already separate the
 		// two; session start is where the state is first noticed (#1054).
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
-			return fmt.Sprintf("deja: the index is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
+			return fmt.Sprintf("deja cannot find the index (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
 		}
-		return fmt.Sprintf("deja: the index needs rebuilding and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
+		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
 	}
 	if !warmupJustRequested(dir) {
 		return ""
 	}
-	return "deja: indexing your history — recall comes online in a few seconds"
+	return "deja is indexing your history — recall comes online in a few seconds"
 }
 
 // indexNeedsRebuild reports that the index on disk cannot answer as it stands:
@@ -430,7 +430,7 @@ func unreadableStoreNote(dir string) string {
 	if total == 0 {
 		return ""
 	}
-	return fmt.Sprintf("deja: %d path%s in %s could not be read — sessions are missing from recall; `deja doctor` names %s",
+	return fmt.Sprintf("deja could not read %d path%s in %s — sessions are missing from recall; `deja doctor` names %s",
 		total, pluralS(total), strings.Join(names, ", "), pluralWhich(total))
 }
 
@@ -979,7 +979,7 @@ func staleReadOnlyNote(dir string) string {
 	if indexCanCatchUp(dir) {
 		return ""
 	}
-	return fmt.Sprintf("deja: this is the index as it was — it cannot be updated because %s is not writable", filepath.Dir(dir))
+	return fmt.Sprintf("deja is serving the index as it was — it cannot be updated because %s is not writable", filepath.Dir(dir))
 }
 
 // indexCanCatchUp reports whether the index is either current or able to
