@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -27,6 +28,19 @@ func writeSession(t *testing.T, proj, sid, text string) {
 	t.Helper()
 	line := `{"type":"user","sessionId":"` + sid + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n"
 	if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeMessages puts one session on disk carrying a message per line, for the
+// tests that need many postings rather than many sessions.
+func writeMessages(t *testing.T, proj, sid, body string) {
+	t.Helper()
+	var b strings.Builder
+	for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
+		b.WriteString(`{"type":"user","sessionId":"` + sid + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + line + `"}}` + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(b.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

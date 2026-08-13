@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,10 +26,14 @@ func TestFuzzyWidensRareWordsAndLeavesCommonOnesAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	// "deploy" lands well past the common bar; "rice" and "ice" stay rare and
-	// one edit apart.
+	// one edit apart. The bar counts postings, which are per message, so one
+	// busy session carries it — a file per posting made this the slowest test
+	// in the package on Windows.
+	var busy strings.Builder
 	for i := range commonTokenPostings + 20 {
-		writeSession(t, proj, fmt.Sprintf("common-%d", i), "we deploy the service again")
+		fmt.Fprintf(&busy, "we deploy the service again, run %d\n", i)
 	}
+	writeMessages(t, proj, "common", busy.String())
 	writeSession(t, proj, "rice", "jasmine rice is the one I keep buying")
 	writeSession(t, proj, "ice", "the ice machine in the hotel was broken")
 	if err := Ensure(dir, "", true, nil); err != nil {
