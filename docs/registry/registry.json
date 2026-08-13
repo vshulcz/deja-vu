@@ -229,22 +229,11 @@
    "capabilities": {
     "mcp": true,
     "auto": true,
-    "skill": false,
-    "command": false,
+    "skill": true,
+    "command": true,
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (grok-dev store)"
-   },
-   "gaps": {
-    "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
-    },
-    "skill": {
-     "state": "todo",
-     "why": "Grok Build reads ~/.grok/skills, but deja writes guidance to both GROK.md and AGENTS.md because three grok CLIs share that directory; which of them read skills is not established",
-     "source": "https://docs.x.ai/build/features/skills-plugins-marketplaces"
-    }
    }
   },
   {

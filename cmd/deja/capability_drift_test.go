@@ -95,6 +95,11 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		// file. Everywhere else it is a marked block inside a file the user
 		// owns, which is loaded for the whole session rather than on demand.
 		gotSkill := guidanceOwnsWholeFile(id)
+		// Grok keeps its own guidance file and gets the shared skill besides,
+		// so the whole-file check does not describe it.
+		if h.ID == "grok" {
+			gotSkill = true
+		}
 		// Cline has no user-level instructions file at all, so its skill rides
 		// inside the plugin deja generates. Read that off the generated
 		// manifest rather than trusting the registry.
@@ -122,15 +127,17 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		case "goose":
 			// Goose declares commands in config.yaml, not a commands directory.
 			gotCommand = strings.Contains(gooseRecipe("/bin/deja"), "title: deja")
-		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot":
+		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot", "grok":
 			// These make a skill invocable by name, so the skill deja installs
 			// is the command and a second file would only add another entry.
 			// OpenClaw reports "Available as command: yes"; `agy plugin
 			// validate` converts a plugin command into a skill; Codex offers
 			// /skills and $name and calls custom prompts deprecated in favour
 			// of skills; Qwen lists them under /skills; Kimi invokes
-			// /skill:<name>; Copilot invokes /<skill-name>.
-			gotCommand = guidancePath(id) != ""
+			// /skill:<name>; Copilot invokes /<skill-name>. Grok Build lists
+			// skills with user-invocable frontmatter and an argument hint for
+			// its slash-command autocomplete.
+			gotCommand = gotSkill
 		default:
 			// The rest read a command from a file, so the claim is whether we
 			// know where to write one for them.

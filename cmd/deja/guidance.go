@@ -256,6 +256,28 @@ func sharedSkillStillWanted(leaving string) bool {
 	return false
 }
 
+// writeSharedSkill puts the cross-agent skill in place for a harness whose own
+// guidance lives elsewhere. Removal goes through the same guard the shared
+// readers use: one harness leaving must not take the file from the rest.
+func writeSharedSkill(harness string, uninstall bool) error {
+	path := sharedSkillPath()
+	old, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if uninstall {
+		if len(old) == 0 || sharedSkillStillWanted(harness) {
+			return nil
+		}
+		return os.Remove(path)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	_, err = writeIfChanged(path, old, []byte(skillFile(skillBody)))
+	return err
+}
+
 func installGuidance(harness string, uninstall bool) (installResult, error) {
 	path := guidancePath(harness)
 	if path == "" {
@@ -263,6 +285,15 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	}
 	if err := dropRetiredGuidance(harness); err != nil {
 		return installResult{}, err
+	}
+	// Grok Build reads the cross-agent skills directory, so it gets the shared
+	// skill on top of its own guidance rather than instead of it: a second
+	// product, @vibe-kit/grok-cli, shares ~/.grok and reads GROK.md, and
+	// retiring that block would take deja away from whoever runs it.
+	if harness == "grok" {
+		if err := writeSharedSkill(harness, uninstall); err != nil {
+			return installResult{}, err
+		}
 	}
 	old, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
