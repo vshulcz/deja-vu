@@ -334,9 +334,17 @@ func isSmokeTest(problem string, conclusions []string) bool {
 		return false
 	}
 	low := strings.ToLower(strings.TrimSpace(problem))
-	for _, p := range smokeAsks {
-		if strings.HasPrefix(low, p) {
-			return true
+	// The ask is usually the last sentence, not the first: a harness check
+	// says what to do and then how to answer — "search for X. Reply with the
+	// name only." Matching the prompt's opening alone let those through, and
+	// two of the three sessions an agent was handed on a real store were that
+	// exact shape. Sentence starts rather than a bare substring: prose about
+	// what a server should reply with is work, not a smoke test.
+	for _, sentence := range splitSentences(low) {
+		for _, p := range smokeAsks {
+			if strings.HasPrefix(sentence, p) {
+				return true
+			}
 		}
 	}
 	return false
