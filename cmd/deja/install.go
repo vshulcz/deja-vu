@@ -572,6 +572,10 @@ func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 	if _, err := installOpenClawMCP(exe, uninstall); err != nil {
 		return installResult{}, err
 	}
+	// The plugin covers the prompt; the bootstrap hook covers the session.
+	if _, err := installOpenClawPlugin(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
 	return installOpenClawHooks(exe, uninstall)
 }
 
