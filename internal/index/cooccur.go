@@ -31,22 +31,45 @@ func buildCooccur(tmp string, ss []model.Session) {
 	if len(ss) < cooccurMinDF || len(ss) > cooccurMaxSessions {
 		return
 	}
-	df := map[string]int{}
-	perSession := make([][]string, 0, len(ss))
+	// Tokens become dense ids once, so the pair pass hashes integers instead
+	// of strings. That inner loop runs for every pair of every session's kept
+	// tokens — thousands of sessions times up to 64 tokens each — and string
+	// hashing there was most of what a cold build spent on this map.
+	ids := map[string]uint32{}
+	var toks []string
+	id := func(t string) uint32 {
+		if v, ok := ids[t]; ok {
+			return v
+		}
+		v := uint32(len(toks))
+		ids[t] = v
+		toks = append(toks, t)
+		return v
+	}
+	var df []int
+	perSession := make([][]uint32, 0, len(ss))
+	seen := map[uint32]bool{}
 	for _, s := range ss {
-		seen := map[string]bool{}
+		clear(seen)
 		for _, m := range s.Messages {
 			for _, tok := range tokens(m.Text) {
-				if len(tok) < 4 || query.IsStopWord(tok) || seen[tok] {
+				if len(tok) < 4 || query.IsStopWord(tok) {
 					continue
 				}
-				seen[tok] = true
+				v := id(tok)
+				if seen[v] {
+					continue
+				}
+				seen[v] = true
 			}
 		}
-		list := make([]string, 0, len(seen))
-		for tok := range seen {
-			list = append(list, tok)
-			df[tok]++
+		list := make([]uint32, 0, len(seen))
+		for v := range seen {
+			list = append(list, v)
+			for len(df) <= int(v) {
+				df = append(df, 0)
+			}
+			df[v]++
 		}
 		perSession = append(perSession, list)
 	}
@@ -54,20 +77,24 @@ func buildCooccur(tmp string, ss []model.Session) {
 	if maxDF < 8 {
 		maxDF = 8
 	}
-	band := func(tok string) bool { return df[tok] >= cooccurMinDF && df[tok] <= maxDF }
+	band := func(v uint32) bool { return df[v] >= cooccurMinDF && df[v] <= maxDF }
 
-	pairs := map[string]map[string]int{}
+	// One packed key per unordered pair, canonical by id. The neighbour pass
+	// below expands it back to both sides, so which side is canonical never
+	// reaches the output.
+	pairs := map[uint64]int{}
+	kept := make([]uint32, 0, cooccurTokensPerSn)
 	for _, list := range perSession {
-		kept := make([]string, 0, len(list))
-		for _, tok := range list {
-			if band(tok) {
-				kept = append(kept, tok)
+		kept = kept[:0]
+		for _, v := range list {
+			if band(v) {
+				kept = append(kept, v)
 			}
 		}
 		// rarest first, capped: ubiquitous sessions must not explode the map
 		sort.Slice(kept, func(i, j int) bool {
 			if df[kept[i]] == df[kept[j]] {
-				return kept[i] < kept[j]
+				return toks[kept[i]] < toks[kept[j]]
 			}
 			return df[kept[i]] < df[kept[j]]
 		})
@@ -76,18 +103,11 @@ func buildCooccur(tmp string, ss []model.Session) {
 		}
 		for i := 0; i < len(kept); i++ {
 			for j := i + 1; j < len(kept); j++ {
-				// Store each unordered pair once, in canonical order. The map
-				// used to hold both a→b and b→a, doubling the largest structure
-				// of the build; the neighbor pass below expands it back to both
-				// sides (#1137).
 				a, b := kept[i], kept[j]
 				if a > b {
 					a, b = b, a
 				}
-				if pairs[a] == nil {
-					pairs[a] = map[string]int{}
-				}
-				pairs[a][b]++
+				pairs[uint64(a)<<32|uint64(b)]++
 			}
 		}
 	}
@@ -99,14 +119,13 @@ func buildCooccur(tmp string, ss []model.Session) {
 	// the half-map rebuilds the full candidate lists. Filtering at threshold
 	// here keeps the transient cand map to the pairs that can actually survive.
 	cand := map[string][]nc{}
-	for a, ns := range pairs {
-		for b, c := range ns {
-			if c < cooccurMinPair {
-				continue
-			}
-			cand[a] = append(cand[a], nc{b, c})
-			cand[b] = append(cand[b], nc{a, c})
+	for key, c := range pairs {
+		if c < cooccurMinPair {
+			continue
 		}
+		a, b := toks[uint32(key>>32)], toks[uint32(key)]
+		cand[a] = append(cand[a], nc{b, c})
+		cand[b] = append(cand[b], nc{a, c})
 	}
 	neighbors := map[string][]string{}
 	for tok, list := range cand {
