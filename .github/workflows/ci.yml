@@ -39,7 +39,14 @@ jobs:
       # to 12m as the suite grew — cmd/deja under -race on the windows runner
       # runs ~6m of real, non-hung work, and 12m keeps a wide margin below the
       # job's 30m so a true hang still dies with a stack.
+      # Coverage instrumentation is only read on Linux, where the floor runs.
+      # Windows paid for -covermode=atomic on top of -race and threw the
+      # profile away: the test step alone was 1726s of the job's 30m cap.
       - run: go test -race -timeout 12m -coverprofile=coverage.out -covermode=atomic ./...
+        if: runner.os == 'Linux'
+        shell: bash
+      - run: go test -race -timeout 12m ./...
+        if: runner.os != 'Linux'
         shell: bash
       - run: go build ./cmd/deja
       - name: Benchmark lexical recall floor
