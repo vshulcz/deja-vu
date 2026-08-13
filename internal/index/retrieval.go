@@ -201,7 +201,69 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 		}
 		return relevanceSearch(dir, m, o)
 	}
-	return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
+	if err != nil {
+		return SearchResult{}, err
+	}
+	return withRelevanceTail(dir, m, o, ss, fallbackTier, fallbackVariants)
+}
+
+// thinAND is how few sessions an AND has to return before its own strictness
+// becomes the suspect. A question asked in plain words requires every content
+// word to be present, so on a large history it lands on a handful of sessions
+// or on nothing — measured over a 1910-session corpus, the queries whose answer
+// never came back returned between one and eight. Above that the intersection
+// is describing a real cluster and needs no help.
+const thinAND = 10
+
+// withRelevanceTail keeps a thin AND result and hangs the relevance ranking
+// underneath it, so a question whose wording excluded the answer can still
+// reach it. The strict sessions stay in front: they are why hit@1 is what it
+// is, and relevance ranked alone scores worse at the first position.
+//
+// Order is the contract here. RelevanceHits scores by arrival (len-rank), so
+// the merged order survives to the caller untouched; anything that re-sorts
+// this by exact-match scoring would undo the point.
+func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Session, tier string, variants map[string][]string) (SearchResult, error) {
+	if len(ss) == 0 || len(ss) >= thinAND {
+		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+	}
+	// A store smaller than the window the tail is drawn from has nothing to
+	// rank: relevance would hand back most of it, which is a dump rather than
+	// a ranking, and a precise query would come back with the rest of the
+	// store attached. Few results out of few sessions is an answer, not a
+	// symptom; the case this exists for is a handful out of thousands.
+	if len(m.Sessions) <= relevanceWindow {
+		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+	}
+	// relevanceSearch declines quoted phrases, regex, and queries with fewer
+	// than two informative words, which is exactly the set that wants its
+	// strict answer left alone.
+	rel, err := relevanceSearch(dir, m, o)
+	if err != nil || len(rel.Sessions) == 0 {
+		// A tail is an improvement, not a requirement: if ranking the whole
+		// store fails, the strict answer is still a correct answer.
+		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+	}
+	seen := make(map[string]bool, len(ss))
+	for _, s := range ss {
+		seen[s.Harness+":"+s.ID] = true
+	}
+	merged := ss
+	added := 0
+	for _, r := range rel.Sessions {
+		if seen[r.Harness+":"+r.ID] {
+			continue
+		}
+		merged = append(merged, r)
+		added++
+	}
+	if added == 0 {
+		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+	}
+	// Total counts the pool the tail was drawn from plus the strict sessions
+	// that pool did not hold, so capped keeps meaning what it means: there is
+	// more behind the relevance window, not behind the result.
+	return relevanceResult(merged, rel.Total+len(ss)), nil
 }
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:
