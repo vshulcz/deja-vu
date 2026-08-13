@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -269,6 +270,12 @@ func trimJSONSpace(b []byte) []byte {
 	return b
 }
 
+// jsonlReaders keeps the megabyte read buffer alive between files. A history
+// is thousands of transcripts, and allocating the buffer per file made the
+// buffer itself half of everything a cold index build allocated — 3.7 GB of
+// churn over 3745 sessions, for one buffer's worth of actual working memory.
+var jsonlReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, 1024*1024) }}
+
 // scanJSONLBytes hands each line to the caller without copying it or building a
 // decoder for it. The slice is only valid for the duration of the call.
 func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
@@ -282,7 +289,11 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 			return err
 		}
 	}
-	r := bufio.NewReaderSize(f, 1024*1024)
+	r := jsonlReaders.Get().(*bufio.Reader)
+	// Reset before returning it as well as after taking it: a pooled reader
+	// must not keep the last file open through its reference.
+	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
+	r.Reset(f)
 	for {
 		line, err := r.ReadBytes('\n')
 		if trimmed := trimJSONSpace(line); len(trimmed) > 0 {
