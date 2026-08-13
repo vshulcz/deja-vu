@@ -211,17 +211,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
-   },
-   "gaps": {
-    "command": {
-     "state": "todo",
-     "why": "reads commands from a commands/*.toml convention inside a plugin",
-     "source": "https://toolsbase.dev/en/reference/antigravity-cli-commands"
-    }
    }
   },
   {
@@ -420,17 +413,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": false,
     "handoff": "paste",
     "prereq": ""
-   },
-   "gaps": {
-    "command": {
-     "state": "todo",
-     "why": "a skill is invocable by its stable command name, so this follows from shipping one",
-     "source": "https://docs.openclaw.ai/tools/skills"
-    }
    }
   },
   {

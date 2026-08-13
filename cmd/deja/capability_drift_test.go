@@ -119,6 +119,12 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
 		case "pi":
 			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
+		case "antigravity", "openclaw":
+			// Both make a skill invocable: OpenClaw reports "Available as
+			// command: yes" for one, and `agy plugin validate` converts a
+			// plugin command into a skill. So the skill deja installs is the
+			// command, and writing a second file would only add another entry.
+			gotCommand = guidancePath(id) != ""
 		default:
 			// The rest read a command from a file, so the claim is whether we
 			// know where to write one for them.
