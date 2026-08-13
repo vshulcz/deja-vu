@@ -42,27 +42,33 @@ type harness struct {
 	// block, an endpoint, a model name. Without it most of them stop at a
 	// login prompt and the sweep learns nothing.
 	setup func(home, base, model string) error
+	// wrapped means deja ships a `deja <name>` front end for this harness.
+	// Those two invocations are different products: the wrapper refreshes the
+	// context and says so, while the bare binary reads whatever was left on
+	// disk in silence. A sweep that only ran one of them would describe the
+	// harness wrongly whichever it chose.
+	wrapped bool
 }
 
 func harnesses() []harness {
 	return []harness{
 		{"opencode", "opencode-auto", "opencode",
-			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode},
+			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false},
 		{"codex", "codex-auto", "codex",
-			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex},
+			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false},
 		{"goose", "goose-auto", "goose",
-			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose},
+			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true},
 		{"qwen", "qwen-auto", "qwen",
-			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil},
+			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false},
 		{"grok", "grok-auto", "grok",
 			func(p, base, model string) []string {
 				return []string{"-p", p, "-u", base, "-k", "local", "-m", model}
-			}, nil},
+			}, nil, false},
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
 					"--openai-api-key", "local", "--model", "openai/" + model, "--message", p}
-			}, nil},
+			}, nil, true},
 	}
 }
 
@@ -128,6 +134,12 @@ type result struct {
 	ran      bool
 	requests int
 	recall   bool
+	// shown is whether the person running the harness was told any of this
+	// happened. Memory that works and says nothing is the complaint the
+	// product hears most, and it is invisible to every check that only reads
+	// the request: on a real sweep the recall reached four harnesses and only
+	// some of them mentioned it.
+	shown    bool
 	rejected bool
 	err      string
 	took     time.Duration
@@ -180,13 +192,21 @@ func main() {
 			fmt.Printf("%-10s SKIP  %s is not installed\n", h.name, h.bin)
 			continue
 		}
-		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true)
-		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, false)
+		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, false)
+		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, false, false)
 		report(h.name, withDeja, control)
+		if h.wrapped {
+			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, true)
+			seen := "silent"
+			if w.shown {
+				seen = "receipt shown"
+			}
+			fmt.Printf("%-10s %-34s %-14s (via `deja %s`)\n", "", "", seen, h.bin)
+		}
 	}
 }
 
-func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, install bool) result {
+func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, install, wrapper bool) result {
 	var out result
 	home, err := os.MkdirTemp("", "sweep-"+h.name)
 	if err != nil {
@@ -231,7 +251,11 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, inst
 		start = fi.Size()
 	}
 	t0 := time.Now()
-	cmd := exec.Command(h.bin, h.args(prompt, base, model)...)
+	bin, args := h.bin, h.args(prompt, base, model)
+	if wrapper {
+		bin, args = exe, append([]string{h.bin}, args...)
+	}
+	cmd := exec.Command(bin, args...)
 	cmd.Env = env
 	cmd.Dir = repo
 	stdout, runErr := cmd.CombinedOutput()
@@ -241,6 +265,11 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, inst
 		out.err = firstLine(string(stdout))
 	}
 	out.rejected = strings.Contains(string(stdout), "System message must be at the beginning")
+	// The receipt as every host renders it: deja's own wording, whatever
+	// framing the harness wraps around it.
+	out.shown = strings.Contains(string(stdout), "deja recalled") ||
+		strings.Contains(string(stdout), "deja-vu recalled") ||
+		strings.Contains(string(stdout), "deja: recalled")
 
 	sent, n := readSince(logPath, start)
 	out.requests = n
@@ -290,10 +319,14 @@ func report(name string, withDeja, control result) {
 	case !withDeja.recall:
 		verdict = "NO RECALL in the request"
 	}
+	seen := "silent"
+	if withDeja.shown {
+		seen = "receipt shown"
+	}
 	broke := ""
 	if control.ran && !withDeja.ran {
 		broke = "  · deja broke a turn that worked without it"
 	}
-	fmt.Printf("%-10s %-34s (%d request(s), %s)%s\n", name, verdict, withDeja.requests,
-		withDeja.took.Round(time.Millisecond), broke)
+	fmt.Printf("%-10s %-34s %-14s (%d request(s), %s)%s\n", name, verdict, seen,
+		withDeja.requests, withDeja.took.Round(time.Millisecond), broke)
 }
