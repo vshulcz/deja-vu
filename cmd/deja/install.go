@@ -90,7 +90,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			case "antigravity":
 				targets = append(targets, "antigravity-auto")
 			case "cline":
-				targets = append(targets, "cline", "cline-auto")
+				targets = append(targets, "cline-auto")
 			case "goose":
 				targets = append(targets, "goose-auto")
 			case "grok":
@@ -477,6 +477,14 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 	case "gemini-auto":
+		// MCP first, then the hooks extension. `--auto` maps gemini to this
+		// target alone, so installing only the extension left the harness
+		// without the tools: its own `gemini mcp list` said "No MCP servers
+		// configured" on a machine that had just run `deja install --auto`.
+		// grok-auto pairs them the same way.
+		if _, err := installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installGeminiAuto(exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
@@ -492,16 +500,25 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
+		if _, err := installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installQwenAuto(exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
 	case "kimi-auto":
+		if _, err := installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installKimiAuto(exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "roo":
 		return installRoo(exe, uninstall)
 	case "cline-auto":
+		if _, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installClineAuto(exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
