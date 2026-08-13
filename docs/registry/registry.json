@@ -69,17 +69,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
-   },
-   "gaps": {
-    "command": {
-     "state": "impossible",
-     "why": "the Codex plugin format has no command component; interface.defaultPrompt is starter text, not a command",
-     "source": "https://developers.openai.com/plugins/build/plugins"
-    }
    }
   },
   {
@@ -323,17 +316,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": false,
     "handoff": "exec",
     "prereq": ""
-   },
-   "gaps": {
-    "command": {
-     "state": "unknown",
-     "why": "its docs say /skills lists skills you can invoke directly, which would make the skill deja installs the command surface — but /skills is rejected in non-interactive mode, so this needs an interactive session to confirm",
-     "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/skills/"
-    }
    }
   },
   {
@@ -353,17 +339,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
-   },
-   "gaps": {
-    "command": {
-     "state": "unknown",
-     "why": "its docs describe invoking a skill as /skill:<name>, which would make deja's skill reachable without a command file; not confirmed against a running session",
-     "source": "https://moonshotai.github.io/kimi-code/docs/en/customization/skills.html"
-    }
    }
   },
   {
@@ -427,7 +406,7 @@
     "mcp": true,
     "auto": false,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
@@ -436,10 +415,6 @@
     "auto": {
      "state": "impossible",
      "why": "Copilot runs the hooks but drops their context, so recall there is MCP plus the skill"
-    },
-    "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
     }
    }
   },
