@@ -51,6 +51,9 @@ func runCtx(bin string, qs []question, control bool) (runResult, error) {
 		return out, err
 	}
 
+	// Only the Claude shape is laid down for ctx. The harness rows above differ
+	// in on-disk format, not in content — every one carries the same sessions
+	// and turns — so this is the same corpus either row was scored on.
 	projects := filepath.Join(home, ".claude", "projects")
 	seen := map[string]bool{}
 	for _, q := range qs {
@@ -72,9 +75,11 @@ func runCtx(bin string, qs []question, control bool) (runResult, error) {
 
 	ctx := func(quiet bool, args ...string) (string, error) {
 		cmd := exec.Command(bin, args...)
-		// A sandboxed HOME is the whole isolation here: ctx discovers history
-		// under it and keeps its index there too, so nothing touches the real one.
-		cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
+		// The environment is built from nothing rather than inherited: ctx reads
+		// CTX_DATA_ROOT, and a machine that has it set would answer these
+		// questions out of the real index instead of the corpus under test,
+		// which would look like a very good score and mean nothing.
+		cmd.Env = []string{"HOME=" + home, "USERPROFILE=" + home, "PATH=" + os.Getenv("PATH")}
 		if quiet {
 			cmd.Env = append(cmd.Env, "CTX_QUIET=1")
 		}

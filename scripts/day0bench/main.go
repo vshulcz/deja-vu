@@ -173,6 +173,11 @@ func main() {
 			os.Exit(1)
 		}
 		report("ctx", r)
+		// Said plainly here because the number is easy to misread: deja is timed
+		// in-process and ctx is timed as a subprocess, so its first answer
+		// carries process start and a freshness check that deja's does not.
+		// That is the wait a person at a terminal gets, not engine speed.
+		fmt.Println("\nnote: ctx is timed as a subprocess, deja in-process — first-answer times are not engine-to-engine")
 	}
 	if *control {
 		fmt.Println("\ncontrol: every hit above should be 0 — a memory that starts empty knows none of this")
