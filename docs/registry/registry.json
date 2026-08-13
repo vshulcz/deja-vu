@@ -341,7 +341,8 @@
    "gaps": {
     "command": {
      "state": "unknown",
-     "why": "not investigated yet"
+     "why": "its docs say /skills lists skills you can invoke directly, which would make the skill deja installs the command surface — but /skills is rejected in non-interactive mode, so this needs an interactive session to confirm",
+     "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/skills/"
     }
    }
   },
@@ -370,7 +371,8 @@
    "gaps": {
     "command": {
      "state": "unknown",
-     "why": "not investigated yet"
+     "why": "its docs describe invoking a skill as /skill:<name>, which would make deja's skill reachable without a command file; not confirmed against a running session",
+     "source": "https://moonshotai.github.io/kimi-code/docs/en/customization/skills.html"
     }
    }
   },
