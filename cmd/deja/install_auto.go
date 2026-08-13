@@ -333,9 +333,16 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 		kept = append(kept, entryAny)
 	}
 	if !uninstall && !found {
-		entry := map[string]any{
-			"hooks": []any{map[string]any{"type": "command", "command": cmd, "timeout": timeout}},
+		h := map[string]any{"type": "command", "command": cmd, "timeout": timeout}
+		// The same line the adopt path above sets. Setting it only there meant
+		// a first install wrote the entry without it and a second install
+		// added it, so whoever installed once never saw the status line their
+		// harness would have shown while the hook ran — and the two installs
+		// produced different files, which is its own trap.
+		if msg := hookStatusMessage(event); msg != "" {
+			h["statusMessage"] = msg
 		}
+		entry := map[string]any{"hooks": []any{h}}
 		if matcher != "" {
 			entry["matcher"] = matcher
 		}

@@ -33,6 +33,13 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	next := removeGooseExtension(string(old))
+	// Removing our entry can leave the key it lived under with nothing in it,
+	// and the insert below only recognises "extensions:" when a line follows
+	// it — so a second install appended a second key and left the file with
+	// "extensions:" twice, which is not a config goose can read. Dropping the
+	// empty key first makes the two paths meet: either the key has other
+	// extensions and ours joins them, or it is gone and one is written.
+	next = dropEmptyYAMLKey(next, "extensions:")
 	if !uninstall {
 		cmd, args := mcpCommandArgs(exe)
 		var b strings.Builder
