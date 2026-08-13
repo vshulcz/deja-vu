@@ -40,6 +40,13 @@ func TestInstallReportsAReadOnlyConfigDir(t *testing.T) {
 				t.Skipf("cannot make the directory read-only: %v", err)
 			}
 			t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+			// Windows ignores the permission bits on a directory, so ask the
+			// filesystem whether the change took rather than assuming it.
+			probe := filepath.Join(dir, "deja-write-probe")
+			if err := os.WriteFile(probe, []byte("x"), 0o644); err == nil {
+				_ = os.Remove(probe)
+				t.Skip("this filesystem still allows writes into a read-only directory")
+			}
 
 			_, err := installTarget(tc.target, "/usr/local/bin/deja", false)
 			after, rerr := os.ReadFile(path)
