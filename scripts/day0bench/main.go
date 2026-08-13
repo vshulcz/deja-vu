@@ -146,6 +146,7 @@ func main() {
 	limit := flag.Int("limit", 20, "questions to run")
 	control := flag.Bool("control", false, "write the corpus but read an empty store: must score zero")
 	ctxBin := flag.String("ctx", "", "path to a ctx binary to run over the same corpus, scored the same way")
+	misses := flag.Bool("misses", false, "print the questions whose answer session never came back, for triage")
 	flag.Parse()
 	if *data == "" {
 		fmt.Fprintln(os.Stderr, "day0bench: -data is required")
@@ -166,7 +167,7 @@ func main() {
 	}
 
 	for _, w := range writers() {
-		r, err := run(w, qs, *control)
+		r, err := run(w, qs, *control, *misses)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "day0bench %s: %v\n", w.harness, err)
 			os.Exit(1)
@@ -204,7 +205,7 @@ func report(name string, r runResult) {
 		r.hit1, r.n, r.hit5, r.n, depthK, r.found, r.n)
 }
 
-func run(w writer, qs []question, control bool) (runResult, error) {
+func run(w writer, qs []question, control bool, misses bool) (runResult, error) {
 	var out runResult
 	tmp, err := os.MkdirTemp("", "day0")
 	if err != nil {
@@ -292,6 +293,7 @@ func run(w writer, qs []question, control bool) (runResult, error) {
 			want[id] = true
 		}
 		out.n++
+		hit := false
 		if len(hits) > depthK {
 			hits = hits[:depthK]
 		}
@@ -306,7 +308,13 @@ func run(w writer, qs []question, control bool) (runResult, error) {
 				out.hit5++
 			}
 			out.found++
+			hit = true
 			break
+		}
+		// A question whose answer session never came back at all is a retrieval
+		// miss, not a ranking one, and no amount of reordering reaches it.
+		if !hit && misses {
+			fmt.Printf("  miss %s: %s\n", q.ID, q.Question)
 		}
 	}
 	return out, nil
