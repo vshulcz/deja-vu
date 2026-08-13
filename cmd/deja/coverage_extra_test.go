@@ -146,7 +146,7 @@ func TestInstallWriteAndJSONEdges(t *testing.T) {
 	if action, err := writeIfChanged(path, []byte("x"), []byte("x")); err != nil || action != "unchanged" {
 		t.Fatalf("unchanged = %q %v", action, err)
 	}
-	if err := backupOnce(filepath.Join(dir, "missing")); err != nil {
+	if made, err := backupOnce(filepath.Join(dir, "missing")); err != nil || made {
 		t.Fatal(err)
 	}
 	if _, err := updateOpencodeJSON([]byte(`{"mcp":`), "/bin/deja", false); err == nil {

@@ -195,6 +195,13 @@ func main() {
 		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, false)
 		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, false, false)
 		report(h.name, withDeja, control)
+		// Uninstalling has to leave the harness exactly as it was found. The
+		// failure this catches is not theoretical: grok's hooks survived
+		// `uninstall --all` and went on calling a binary the user had just
+		// removed, which is a harness that errors on every turn.
+		if left, ok := checkUninstall(h, exe, *corpus, *base, *model, *repo); !ok {
+			fmt.Printf("%-10s %-34s %-14s\n", "", "UNINSTALL LEFT FILES", strings.Join(left, " "))
+		}
 		if h.wrapped {
 			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, true)
 			seen := "silent"
@@ -281,6 +288,56 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, inst
 // records that is. Reading the whole file and slicing is enough here: a sweep's
 // log is small, and the alternative is holding a handle on a file another
 // process is appending to.
+// checkUninstall installs, uninstalls, and reports any deja file still on disk.
+// Files are matched by content rather than by name: a harness config deja
+// edited in place keeps its own name, and what matters is whether deja's
+// command is still in it.
+func checkUninstall(h harness, exe, corpus, base, model, repo string) ([]string, bool) {
+	home, err := os.MkdirTemp("", "sweep-uninstall-"+h.name)
+	if err != nil {
+		return nil, true
+	}
+	defer os.RemoveAll(home)
+	env := append(os.Environ(),
+		"HOME="+home, "USERPROFILE="+home,
+		"XDG_CONFIG_HOME="+filepath.Join(home, ".config"),
+		"DEJA_CLAUDE_ROOT="+corpus,
+		"DEJA_INDEX_DIR="+filepath.Join(home, "idx"))
+	deja := func(args ...string) {
+		cmd := exec.Command(exe, args...)
+		cmd.Env = env
+		cmd.Dir = repo
+		_ = cmd.Run()
+	}
+	deja("install", h.target, "--no-index")
+	deja("uninstall", h.target)
+
+	var left []string
+	_ = filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
+		// deja's own state directory is not residue: uninstall clears the
+		// target list inside it and the file is deja's to keep.
+		if err != nil || d.IsDir() ||
+			strings.HasPrefix(path, filepath.Join(home, "idx")) ||
+			strings.HasPrefix(path, filepath.Join(home, ".config", "deja")) {
+			return nil
+		}
+		b, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return nil
+		}
+		// The binary's own path is what a stale hook would still be calling.
+		if strings.Contains(string(b), exe) || strings.Contains(string(b), "deja hook-") {
+			if rel, rerr := filepath.Rel(home, path); rerr == nil {
+				left = append(left, rel)
+			} else {
+				left = append(left, path)
+			}
+		}
+		return nil
+	})
+	return left, len(left) == 0
+}
+
 func readSince(path string, offset int64) (string, int) {
 	b, err := os.ReadFile(path)
 	if err != nil || int64(len(b)) <= offset {

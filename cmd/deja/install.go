@@ -623,21 +623,23 @@ func isRealDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
-func backupOnce(path string) error {
+// backupOnce reports whether it created the snapshot, so an uninstall can take
+// its own back out afterwards without touching one the user made.
+func backupOnce(path string) (bool, error) {
 	if _, err := os.Stat(path); err != nil {
-		return nil
+		return false, nil
 	}
 	bak := path + ".bak"
 	if _, err := os.Stat(bak); err == nil {
-		return nil
+		return false, nil
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// Configs can carry MCP credentials; the snapshot is owner-only even
 	// when the live file is looser.
-	return os.WriteFile(bak, b, 0o600)
+	return true, os.WriteFile(bak, b, 0o600)
 }
 
 // removingWiring is set for the length of an uninstall run. Thirty-seven call
@@ -646,6 +648,23 @@ func backupOnce(path string) error {
 // exist, is an empty config it then creates (#676). The flag is process-wide
 // because the command is: one run, one direction.
 var removingWiring bool
+
+// mentionsDeja reports whether a config snapshot carries deja's own wiring.
+// The markers are what every generator writes: the subcommands the hooks call,
+// and the name of the MCP server and extension entries.
+func mentionsDeja(b []byte) bool {
+	// The subcommands rather than the binary's name: a snapshot names whatever
+	// path deja was installed from, which need not end in "deja" at all.
+	for _, marker := range []string{
+		"hook-prompt", "hook-context", "hook-tool", "hook-goose", "hook-plan",
+		"hook-precompact", "hook-antigravity", "deja:", "\"deja\"", "deja-recall",
+	} {
+		if bytes.Contains(b, []byte(marker)) {
+			return true
+		}
+	}
+	return false
+}
 
 func writeIfChanged(path string, old, next []byte) (string, error) {
 	if bytes.Equal(old, next) {
@@ -674,12 +693,27 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
-	if err := backupOnce(path); err != nil {
+	if _, err := backupOnce(path); err != nil {
 		return "", err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
-	if err != nil {
-		return "", err
+	// On the way out, a snapshot that itself contains deja's wiring is deja's
+	// own and nothing the user asked to keep: leaving it puts a file naming a
+	// binary they just removed back in their config directory. Ownership is
+	// read from the content rather than from who wrote it — installing a
+	// harness whose config deja edits twice takes the snapshot on the second
+	// write, so the uninstall that meets it did not create it and would
+	// otherwise leave it (goose). A backup with no deja in it is the user's.
+	if removingWiring {
+		defer func() {
+			bak := path + ".bak"
+			if b, err := os.ReadFile(bak); err == nil && mentionsDeja(b) {
+				_ = os.Remove(bak)
+			}
+		}()
+	}
+	tmp, terr := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
+	if terr != nil {
+		return "", terr
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
