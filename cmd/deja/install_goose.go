@@ -32,7 +32,12 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	if err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
 	}
-	next := removeGooseExtension(string(old))
+	// A config written on Windows, or by an editor set that way, uses CRLF.
+	// Every edit below splits and searches on "\n", so a key reads as
+	// "extensions:\r" and matches nothing: deja added a second one and left a
+	// file goose cannot read. Edit in LF and put the line endings back.
+	body, crlf := normaliseNewlines(string(old))
+	next := removeGooseExtension(body)
 	// Removing our entry can leave the key it lived under with nothing in it,
 	// and the insert below only recognises "extensions:" when a line follows
 	// it — so a second install appended a second key and left the file with
@@ -67,8 +72,20 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
+	if crlf {
+		next = strings.ReplaceAll(next, "\n", "\r\n")
+	}
 	a, werr := writeIfChanged(path, old, []byte(next))
 	return installResult{Path: path, Action: a}, werr
+}
+
+// normaliseNewlines returns the text with LF endings and whether it had CRLF,
+// so an edit can be made in one convention and written back in the other.
+func normaliseNewlines(s string) (string, bool) {
+	if !strings.Contains(s, "\r\n") {
+		return s, false
+	}
+	return strings.ReplaceAll(s, "\r\n", "\n"), true
 }
 
 // removeGooseExtension drops our entry and stops at the next key at the same
