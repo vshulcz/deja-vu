@@ -161,6 +161,20 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			if gr.Path != "" && !uninstall {
 				guidanceCount++
 			}
+			// The command rides with guidance rather than with the wiring: both
+			// are text telling the agent deja exists, and --no-guidance is the
+			// switch for someone who wants the plumbing without either.
+			cr, err := installCommandFile(guidanceHarness(t), exe, uninstall)
+			if err != nil {
+				note(t, err)
+				continue
+			}
+			if cr.Path != "" && !banner {
+				fmt.Printf("%s: command %s %s\n", t, cr.Action, cr.Path)
+			}
+			if cr.Path != "" && uninstall {
+				pruneGuidanceDirs(cr.Path)
+			}
 		}
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})

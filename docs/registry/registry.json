@@ -100,17 +100,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": "sqlite3"
-   },
-   "gaps": {
-    "command": {
-     "state": "todo",
-     "why": "reads markdown commands from ~/.config/opencode/commands/ and .opencode/commands/",
-     "source": "https://opencode.ai/docs/commands/"
-    }
    }
   },
   {
@@ -169,17 +162,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": false,
     "handoff": "exec",
     "prereq": ""
-   },
-   "gaps": {
-    "command": {
-     "state": "todo",
-     "why": "supports custom slash commands defined as .toml files",
-     "source": "https://geminicli.com/docs/extensions/writing-extensions/"
-    }
    }
   },
   {
@@ -202,17 +188,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (IDE chats)"
-   },
-   "gaps": {
-    "command": {
-     "state": "todo",
-     "why": "reads markdown commands from .cursor/commands/",
-     "source": "https://cursor.com/docs/commands"
-    }
    }
   },
   {
@@ -504,7 +483,7 @@
     "mcp": true,
     "auto": false,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": false,
     "handoff": "paste",
     "prereq": ""
@@ -513,11 +492,6 @@
     "auto": {
      "state": "unknown",
      "why": "not investigated yet"
-    },
-    "command": {
-     "state": "todo",
-     "why": "reads custom slash commands from ~/.roo/commands/ and .roo/commands/",
-     "source": "https://roocodeinc.github.io/Roo-Code/features/slash-commands/"
     }
    }
   }

@@ -1,0 +1,101 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+// A command is the one surface a person reaches for deliberately. Auto-recall
+// and the skill both wait to be needed; typing "/" and seeing deja listed is
+// how someone who never read the docs finds it at all.
+//
+// Unlike skills, commands are not in the Agent Plugins standard, so every
+// harness has its own file format and its own directory. Each writer below
+// follows that harness's documented shape rather than a shared one.
+
+// commandBody is the instruction the command sends, in the plain second person
+// each harness expects. $ARGUMENTS is substituted by markdown-based harnesses;
+// the TOML ones use {{args}} and get their own copy.
+func commandBody(exe, argsToken string) string {
+	return `Search the user's own past sessions across every AI coding tool on this
+machine, then answer from what you find.
+
+Use the deja recall tool with the user's words as the query — the most specific
+tokens win: an exact error string, a function name, a file path, a flag. If a
+result looks right but is too short to act on, follow up with recall_context.
+
+If the deja MCP tools are unavailable, run the CLI instead:
+
+` + "```bash\n" + exe + ` "` + argsToken + `"
+` + "```" + `
+
+Answer with what actually happened in those sessions — when it was, which
+project and tool, what was decided or fixed. Say plainly if nothing matched
+rather than filling the gap from general knowledge.
+`
+}
+
+func markdownCommand(exe string) string {
+	return `---
+description: Search this machine's past AI coding sessions (deja-vu)
+---
+
+` + commandBody(exe, "$ARGUMENTS")
+}
+
+// tomlCommand is Gemini's shape: a description line and a prompt string. Args
+// arrive through {{args}}; without it the CLI appends them to the prompt, which
+// would read as an unrelated paragraph.
+func tomlCommand(exe string) string {
+	return "description = \"Search this machine's past AI coding sessions (deja-vu)\"\nprompt = \"\"\"\n" +
+		commandBody(exe, "{{args}}") + "\"\"\"\n"
+}
+
+// commandFilePaths is where each harness reads a user-level command from.
+func commandFilePath(harness string) string {
+	switch harness {
+	case "opencode":
+		return filepath.Join(opencodeConfigHome(), "opencode", "commands", "deja.md")
+	case "cursor":
+		return filepath.Join(sources.CursorCLIHome(), "commands", "deja.md")
+	case "roo":
+		return filepath.Join(homeDir(), ".roo", "commands", "deja.md")
+	case "gemini":
+		return filepath.Join(sources.GeminiHome(), "commands", "deja.toml")
+	}
+	return ""
+}
+
+func commandFileText(harness, exe string) string {
+	if harness == "gemini" {
+		return tomlCommand(exe)
+	}
+	return markdownCommand(exe)
+}
+
+// installCommandFile writes the /deja command for harnesses that read one from
+// a file. Silent when the harness has none: not every one does, and a missing
+// command is not a failure to install.
+func installCommandFile(harness, exe string, uninstall bool) (installResult, error) {
+	path := commandFilePath(harness)
+	if path == "" {
+		return installResult{}, nil
+	}
+	if uninstall {
+		if _, err := os.Stat(path); err != nil {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		if err := os.Remove(path); err != nil {
+			return installResult{}, err
+		}
+		return installResult{Path: path, Action: "removed"}, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return installResult{}, err
+	}
+	old, _ := os.ReadFile(path)
+	a, err := writeIfChanged(path, old, []byte(commandFileText(harness, exe)))
+	return installResult{Path: path, Action: a}, err
+}

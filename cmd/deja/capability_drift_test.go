@@ -119,6 +119,10 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
 		case "pi":
 			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
+		default:
+			// The rest read a command from a file, so the claim is whether we
+			// know where to write one for them.
+			gotCommand = commandFilePath(id) != ""
 		}
 		if gotCommand != c.Command {
 			t.Fatalf("%s: registry command=%v, generated install artifact says %v", h.ID, c.Command, gotCommand)

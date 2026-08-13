@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `/deja` reaches four more harnesses: opencode, Cursor and Roo Code read a markdown command, Gemini CLI a TOML one, each in that harness's own documented shape. It was Claude Code, Cline, Hermes and pi before.
+
 ### Changed
 - Guidance is a skill rather than a block of text that sits in context all session. Eight harnesses — Cursor, Codex, Gemini CLI, Qwen Code, Kimi Code, Goose, OpenClaw and Roo Code — read one shared skill at `~/.agents/skills/`; Claude Code, opencode, Antigravity, Copilot, pi, Hermes and Cline each read their own place. Old blocks in `AGENTS.md`, `GEMINI.md`, `QWEN.md` and Roo's rules file are removed on the next install, and so are the per-harness skills an earlier version wrote.
 
