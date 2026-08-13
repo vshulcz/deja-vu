@@ -21,7 +21,11 @@
 // If it does not, the questions are answerable from something other than the
 // history and every number here is inflated.
 //
-//	go run ./scripts/day0bench -data longmemeval_s_cleaned.json [-limit N] [-control]
+// Pass -ctx with a path to a ctx binary and it runs over the same corpus and
+// is scored by the same rule, so the neighbouring column is a run anyone can
+// repeat rather than a number quoted from somewhere.
+//
+//	go run ./scripts/day0bench -data longmemeval_s_cleaned.json [-limit N] [-control] [-ctx PATH]
 package main
 
 import (
@@ -134,6 +138,7 @@ func main() {
 	data := flag.String("data", "", "LongMemEval-shaped corpus to lay down as history")
 	limit := flag.Int("limit", 20, "questions to run")
 	control := flag.Bool("control", false, "write the corpus but read an empty store: must score zero")
+	ctxBin := flag.String("ctx", "", "path to a ctx binary to run over the same corpus, scored the same way")
 	flag.Parse()
 	if *data == "" {
 		fmt.Fprintln(os.Stderr, "day0bench: -data is required")
@@ -159,18 +164,32 @@ func main() {
 			fmt.Fprintf(os.Stderr, "day0bench %s: %v\n", w.harness, err)
 			os.Exit(1)
 		}
-		reach := 0.0
-		if r.written > 0 {
-			reach = float64(r.indexed) / float64(r.written) * 100
+		report(w.harness, r)
+	}
+	if *ctxBin != "" {
+		r, err := runCtx(*ctxBin, qs, *control)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "day0bench ctx:", err)
+			os.Exit(1)
 		}
-		fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first answer %s  hit@1 %d/%d  hit@5 %d/%d\n",
-			w.harness, r.indexed, r.written, reach,
-			r.build.Round(time.Millisecond), r.first.Round(time.Millisecond),
-			r.hit1, r.n, r.hit5, r.n)
+		report("ctx", r)
 	}
 	if *control {
 		fmt.Println("\ncontrol: every hit above should be 0 — a memory that starts empty knows none of this")
 	}
+}
+
+// report prints one row. Both sides go through it so the columns cannot drift
+// apart into two different definitions of the same word.
+func report(name string, r runResult) {
+	reach := 0.0
+	if r.written > 0 {
+		reach = float64(r.indexed) / float64(r.written) * 100
+	}
+	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first answer %s  hit@1 %d/%d  hit@5 %d/%d\n",
+		name, r.indexed, r.written, reach,
+		r.build.Round(time.Millisecond), r.first.Round(time.Millisecond),
+		r.hit1, r.n, r.hit5, r.n)
 }
 
 func run(w writer, qs []question, control bool) (runResult, error) {
@@ -243,10 +262,10 @@ func run(w writer, qs []question, control bool) (runResult, error) {
 			o.FuzzyVariants = result.Variants
 		}
 		var hits []search.Hit
-		switch {
-		case result.Tier == search.TierError:
+		switch result.Tier {
+		case search.TierError:
 			hits = search.ErrorHits(result.Sessions)
-		case result.Tier == search.TierRelevance:
+		case search.TierRelevance:
 			hits = search.RelevanceHits(result.Sessions, index.RelevanceTerms(q.Question))
 		default:
 			if hits, err = search.Run(result.Sessions, o); err != nil {
