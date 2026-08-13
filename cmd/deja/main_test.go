@@ -822,8 +822,10 @@ func TestHookContextSyntheticFixtures(t *testing.T) {
 	if resp.HookSpecificOutput.HookEventName != "SessionStart" || !strings.Contains(digest, "Find frobnicator bug") || !strings.Contains(digest, "parser.go") {
 		t.Fatalf("bad hook response: %#v", resp)
 	}
-	// A non-trivial injection must come with a visible receipt.
-	if !strings.Contains(resp.SystemMessage, "deja: recalled") || !strings.Contains(resp.SystemMessage, "prior session") {
+	// A non-trivial injection must come with a visible receipt. No colon
+	// after the name: hosts add their own introduction, and Claude Code's
+	// turned it into "says: deja: recalled".
+	if !strings.Contains(resp.SystemMessage, "deja recalled") || !strings.Contains(resp.SystemMessage, "prior session") {
 		t.Fatalf("receipt = %q", resp.SystemMessage)
 	}
 	if len(digest) > 2000 {

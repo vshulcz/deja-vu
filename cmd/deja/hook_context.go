@@ -372,7 +372,12 @@ func runHookContext(dir string, plain bool) error {
 		if svc != "" {
 			teaching = ""
 		}
-		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja: recalled %d prior session%s %s%s%s%s%s",
+		// No colon after the name: hosts introduce the line themselves, and
+		// Claude Code's is "SessionStart:startup says:", which turned the
+		// receipt into "says: deja: recalled …" on screen. Without it the
+		// sentence reads whole after any host's prefix and still carries the
+		// name for hosts that add none.
+		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja recalled %d prior session%s %s%s%s%s%s",
 			sessions, plural, why, teaching, svc, polNote, earned)+fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest)))))
 	}
 	// Nothing to recall yet because the index is still being built: say so
@@ -444,7 +449,7 @@ func withheldEverythingNote(dir string, withheld int) string {
 	if withheld == 0 {
 		return ""
 	}
-	note := fmt.Sprintf("deja: recalled nothing here — the trust policy (%s) withheld %s from this project; `deja doctor` shows the rule",
+	note := fmt.Sprintf("deja recalled nothing here — the trust policy (%s) withheld %s from this project; `deja doctor` shows the rule",
 		policy.Load().Describe(policy.ActivationAuto), doctorCount(withheld, "session"))
 	if !noteIsNews(dir+".policynote", note) {
 		return ""
