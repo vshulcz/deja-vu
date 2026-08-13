@@ -313,25 +313,30 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 	var bestUser scored
 	var assistants []scored
 	for i, m := range s.Messages {
-		text := contextText(m.Text, false)
-		if strings.TrimSpace(text) == "" {
+		// Score the raw text, not what contextText returns: it joins lines and
+		// keeps only the first eight of them, so by then there is nothing left
+		// to choose between and most of a long answer is already gone.
+		//
+		// Score the best single line rather than the whole message, too. A
+		// compaction summary or a standing-constraints block mentions
+		// everything the session ever touched, so counting terms across a
+		// message hands the slot to the longest text rather than to the one
+		// that answers.
+		line, hits := densestLine(m.Text, terms)
+		if hits == 0 {
 			continue
 		}
-		// Score the best single line, not the whole message. A compaction
-		// summary or a standing-constraints block mentions everything the
-		// session ever touched, so counting terms across a message hands the
-		// slot to the longest text rather than to the one that answers.
-		line, hits := densestLine(text, terms)
-		if hits == 0 {
+		text := contextText(line, false)
+		if strings.TrimSpace(text) == "" {
 			continue
 		}
 		switch m.Role {
 		case "user":
 			if !noiseMessage(m.Text) && hits > bestUser.hits {
-				bestUser = scored{i, hits, firstLine(line, 160)}
+				bestUser = scored{i, hits, firstLine(text, 160)}
 			}
 		case "assistant":
-			assistants = append(assistants, scored{i, hits, firstLine(line, 220)})
+			assistants = append(assistants, scored{i, hits, firstLine(text, 220)})
 		}
 	}
 	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].hits > assistants[j].hits })
