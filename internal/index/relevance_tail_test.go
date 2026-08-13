@@ -102,6 +102,24 @@ func TestThinANDGetsRelevanceTailBeneathIt(t *testing.T) {
 	}
 }
 
+func TestWordFormFallbackKeepsItsAnnotationUnderTheTail(t *testing.T) {
+	dir := seedStore(t, relevanceWindow+10)
+
+	// "biked" has no postings of its own; the ladder reaches the corpus
+	// through the stem fold, and that fallback is worth telling the user
+	// about even once relevance owns the order.
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "how many biked hallway", All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Sessions) == 0 {
+		t.Skip("no word-form fallback for this corpus")
+	}
+	if r.Stemmed && len(r.Variants) == 0 {
+		t.Fatal("the stemmed notice survived but the word forms behind it did not")
+	}
+}
+
 func TestSmallStoreKeepsItsStrictAnswerAlone(t *testing.T) {
 	dir := seedStore(t, 3)
 

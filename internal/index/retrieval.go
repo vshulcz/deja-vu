@@ -150,12 +150,12 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 			if result, ferr := stemSearch(dir, m, o); ferr != nil {
 				return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
 			} else if result.Stemmed {
-				return result, nil
+				return withRelevanceTail(dir, m, o, result)
 			}
 			if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
 				return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
 			} else if result.Fuzzy {
-				return result, nil
+				return withRelevanceTail(dir, m, o, result)
 			}
 			// A pasted error that matched no postings is the case the word
 			// ladder cannot win: its identifiers are line numbers and hashes.
@@ -179,17 +179,17 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 		if result, ferr := stemSearch(dir, m, o); ferr != nil {
 			return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
 		} else if result.Stemmed {
-			return result, nil
+			return withRelevanceTail(dir, m, o, result)
 		}
 		if result, ferr := fuzzySearch(dir, m, o); ferr != nil {
 			return SearchResult{}, fmt.Errorf("fuzzy postings: %w", ferr)
 		} else if result.Fuzzy {
-			return result, nil
+			return withRelevanceTail(dir, m, o, result)
 		}
 		if result, ferr := cooccurSearch(dir, m, o); ferr != nil {
 			return SearchResult{}, fmt.Errorf("cooccur postings: %w", ferr)
 		} else if len(result.Sessions) > 0 {
-			return result, nil
+			return withRelevanceTail(dir, m, o, result)
 		}
 		// A pasted error that matched no postings is the case the word
 		// ladder cannot win: its identifiers are line numbers and hashes.
@@ -204,7 +204,7 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return withRelevanceTail(dir, m, o, ss, fallbackTier, fallbackVariants)
+	return withRelevanceTail(dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants})
 }
 
 // thinAND is how few sessions an AND has to return before its own strictness
@@ -223,9 +223,10 @@ const thinAND = 10
 // Order is the contract here. RelevanceHits scores by arrival (len-rank), so
 // the merged order survives to the caller untouched; anything that re-sorts
 // this by exact-match scoring would undo the point.
-func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Session, tier string, variants map[string][]string) (SearchResult, error) {
+func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult) (SearchResult, error) {
+	ss := res.Sessions
 	if len(ss) == 0 || len(ss) >= thinAND {
-		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+		return res, nil
 	}
 	// A store smaller than the window the tail is drawn from has nothing to
 	// rank: relevance would hand back most of it, which is a dump rather than
@@ -233,7 +234,7 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Sessi
 	// store attached. Few results out of few sessions is an answer, not a
 	// symptom; the case this exists for is a handful out of thousands.
 	if len(m.Sessions) <= relevanceWindow {
-		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+		return res, nil
 	}
 	// relevanceSearch declines quoted phrases, regex, and queries with fewer
 	// than two informative words, which is exactly the set that wants its
@@ -242,13 +243,31 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Sessi
 	if err != nil || len(rel.Sessions) == 0 {
 		// A tail is an improvement, not a requirement: if ranking the whole
 		// store fails, the strict answer is still a correct answer.
-		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+		return res, nil
 	}
 	seen := make(map[string]bool, len(ss))
 	for _, s := range ss {
 		seen[s.Harness+":"+s.ID] = true
 	}
-	merged := ss
+	// The head arrives in posting order, not in any ranking: the tier that
+	// produced it expected the caller to rank it, and the caller cannot once
+	// this is labelled relevance. Order it by where the same sessions sit in
+	// the relevance pool, which is a real ranking over the same query, and
+	// leave anything the pool never scored at the back of the head.
+	relRank := make(map[string]int, len(rel.Sessions))
+	for i, r := range rel.Sessions {
+		relRank[r.Harness+":"+r.ID] = i
+	}
+	head := append([]model.Session(nil), ss...)
+	sort.SliceStable(head, func(i, j int) bool {
+		ri, oki := relRank[head[i].Harness+":"+head[i].ID]
+		rj, okj := relRank[head[j].Harness+":"+head[j].ID]
+		if oki != okj {
+			return oki
+		}
+		return oki && ri < rj
+	})
+	merged := head
 	added := 0
 	for _, r := range rel.Sessions {
 		if seen[r.Harness+":"+r.ID] {
@@ -258,7 +277,7 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Sessi
 		added++
 	}
 	if added == 0 {
-		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
+		return res, nil
 	}
 	// A session that satisfies the AND carries every query key, so it is
 	// already inside the pool relevance scored, and adding the strict count on
@@ -266,7 +285,12 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Sessi
 	// a term the ranking derives rather than reads, a date from a relative
 	// word, which the AND never had to match; the floor keeps the total from
 	// claiming fewer sessions than were handed back.
-	return relevanceResult(merged, max(rel.Total, len(merged))), nil
+	out := relevanceResult(merged, max(rel.Total, len(merged)))
+	// Keep the word-form annotations the ladder earned: the caller still tells
+	// the user it fell back to stems or close spellings, even though the order
+	// is now this tier's to keep.
+	out.Stemmed, out.Fuzzy, out.Variants = res.Stemmed, res.Fuzzy, res.Variants
+	return out, nil
 }
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:
