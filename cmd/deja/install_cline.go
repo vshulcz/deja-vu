@@ -17,6 +17,12 @@ import (
 // its content, resolved when the session builds its instructions — which is
 // session-start recall by another name — and a registered command puts /deja
 // in the same session.
+//
+// A rule is handed nothing, so it recalls against the session rather than the
+// question. registerMessageBuilder is the prompt-aware half: its build is
+// called with the messages on their way to the model, and a new array returned
+// from it is what gets sent. Editing the array in place is discarded, as is a
+// string or a {messages} wrapper — verified against CLI 3.0.54.
 func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	dir := filepath.Join(sources.ClinePluginsDir(), "deja")
 	path := filepath.Join(dir, "index.js")
@@ -74,10 +80,62 @@ function run(args, input = "", timeout = 10000) {
   }
 }
 
+// Cline wraps what the user typed in a mode tag before it becomes a message.
+function userText(message) {
+  if (!message || message.role !== "user" || !Array.isArray(message.content)) return "";
+  const text = message.content
+    .filter((part) => part && part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n");
+  return text.replace(/<\/?user_input[^>]*>/g, "").trim();
+}
+
 export default {
   name: "deja",
   manifest: { capabilities: ["rules", "commands", "skills"] },
-  setup(api) {
+  setup(api, ctx) {
+    const sessionID = (ctx && ctx.session && ctx.session.sessionId) || "";
+    // build runs more than once for a single prompt — cline calls it again
+    // with the message list it is about to send — and only the last return is
+    // used. So the answer is cached per prompt rather than skipped after the
+    // first call, which would inject into the copy nobody sends.
+    let asked = "";
+    let recalled = "";
+    api.registerMessageBuilder({
+      id: "deja:prompt",
+      source: "deja-vu",
+      build: (messages) => {
+        if (!Array.isArray(messages)) return;
+        let at = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i] && messages[i].role === "user") {
+            at = i;
+            break;
+          }
+        }
+        if (at < 0) return;
+        const prompt = userText(messages[at]);
+        if (!prompt) return;
+        if (prompt !== asked) {
+          asked = prompt;
+          recalled = run(["hook-prompt", "--plain"], JSON.stringify({
+            prompt,
+            session_id: sessionID,
+            cwd: process.cwd(),
+          }));
+        }
+        // Silence is the common case: the hook only speaks when the history
+        // actually answers the question.
+        const recall = recalled;
+        if (!recall) return;
+        const out = messages.slice();
+        out[at] = {
+          ...messages[at],
+          content: [{ type: "text", text: recall }, ...messages[at].content],
+        };
+        return out;
+      },
+    });
     api.registerRule({
       id: "deja:recall",
       source: "deja-vu",
