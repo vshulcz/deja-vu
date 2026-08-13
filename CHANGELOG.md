@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Grok Build gets auto-recall: it reads hooks from `~/.grok/hooks` in the same shape Claude Code uses, and deja now writes all four events there instead of leaving grok with MCP alone.
 - `/deja` reaches five more harnesses: opencode, Cursor and Roo Code read a markdown command, Gemini CLI a TOML one, and Goose a `slash_commands` entry in its config pointing at a recipe. It was Claude Code, Cline, Hermes and pi before.
 
 ### Changed

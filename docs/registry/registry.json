@@ -233,7 +233,7 @@
    "display_name": "Grok Build",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "skill": false,
     "command": false,
     "resume": false,
@@ -241,10 +241,6 @@
     "prereq": "sqlite3 (grok-dev store)"
    },
    "gaps": {
-    "auto": {
-     "state": "unknown",
-     "why": "not investigated yet"
-    },
     "command": {
      "state": "unknown",
      "why": "not investigated yet"

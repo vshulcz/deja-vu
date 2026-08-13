@@ -93,9 +93,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				targets = append(targets, "cline", "cline-auto")
 			case "goose":
 				targets = append(targets, "goose-auto")
+			case "grok":
+				targets = append(targets, "grok-auto")
 			default:
-				// grok and the IDE extensions: the MCP server is the deepest
-				// integration those harnesses support.
+				// The IDE extensions: the MCP server is the deepest integration
+				// those harnesses support.
 				targets = append(targets, t)
 			}
 		}
@@ -482,6 +484,11 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installAntigravityAuto(exe, uninstall)
 	case "grok":
 		return installGrok(exe, uninstall)
+	case "grok-auto":
+		if _, err := installGrok(exe, uninstall); err != nil {
+			return installResult{}, err
+		}
+		return installGrokAuto(exe, uninstall)
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":

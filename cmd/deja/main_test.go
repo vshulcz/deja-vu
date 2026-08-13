@@ -1016,11 +1016,12 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 		t.Fatalf("install --all out=%q err=%v", out, err)
 	}
 	// --auto wires MCP-only harnesses too, not just the ones with hooks, and
-	// gemini and cursor now get their own injection point rather than MCP alone.
+	// gemini, cursor and grok now get their own injection point rather than MCP
+	// alone — grok reads hooks from ~/.grok/hooks in the Claude Code shape.
 	if out, err := captureRun(t, "install", "--auto"); err != nil ||
 		!strings.Contains(out, "claude-auto:") || !strings.Contains(out, "cursor-auto:") ||
 		!strings.Contains(out, "gemini-auto:") || !strings.Contains(out, "antigravity-auto:") ||
-		!strings.Contains(out, "grok:") {
+		!strings.Contains(out, "grok-auto:") {
 		t.Fatalf("install --auto out=%q err=%v", out, err)
 	}
 	for _, p := range []string{
