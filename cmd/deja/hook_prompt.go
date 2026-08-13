@@ -195,7 +195,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
 	var body string
 	if confident {
-		digest := search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
+		digest := search.AutoRecallDigestFor(ss, promptHookBudget-recallFrameOverhead, terms)
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
