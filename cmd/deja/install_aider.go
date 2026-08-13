@@ -117,7 +117,14 @@ func refreshAiderContext(dir string) error {
 	if strings.TrimSpace(body) == "" {
 		// No history for this project yet. An empty file still has to exist:
 		// aider refuses to start when a configured read file is missing.
-		body = "No matching history yet.\n"
+		//
+		// The line says what to do about it because of where it is read. This
+		// file is written at install, when there is usually no index yet, and
+		// only `deja aider` rewrites it afterwards. Someone who runs plain
+		// `aider` therefore sees this text in every session forever — driven
+		// through the real interface, it read as "deja has nothing", when what
+		// it means is "nothing has refreshed this".
+		body = "No matching history yet — start aider as `deja aider` and this file fills with what this project already knows.\n"
 	}
 	path := aiderContextPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
