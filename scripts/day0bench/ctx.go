@@ -106,7 +106,7 @@ func runCtx(bin string, qs []question, control bool) (runResult, error) {
 
 	for i, q := range qs {
 		t1 := time.Now()
-		raw, err := ctx(true, "search", q.Question, "--limit", "5", "--json")
+		raw, err := ctx(true, "search", q.Question, "--limit", strconv.Itoa(depthK), "--json")
 		if err != nil {
 			return out, fmt.Errorf("ctx search: %w", err)
 		}
@@ -139,6 +139,7 @@ func runCtx(bin string, qs []question, control bool) (runResult, error) {
 			if rank < 5 {
 				out.hit5++
 			}
+			out.found++
 			break
 		}
 	}

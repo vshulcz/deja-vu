@@ -131,8 +131,15 @@ func writeCodex(root, id string, ts time.Time, turns []turn) error {
 type runResult struct {
 	written, indexed int
 	build, first     time.Duration
-	hit1, hit5, n    int
+	// found counts the answer session appearing anywhere in the top depthK,
+	// which separates the two ways a query fails: ranked badly, or never
+	// retrieved at all. Only the second one is fixed by ranking work.
+	hit1, hit5, found, n int
 }
+
+// depthK bounds both sides' result list, so found means the same thing in
+// every row.
+const depthK = 50
 
 func main() {
 	data := flag.String("data", "", "LongMemEval-shaped corpus to lay down as history")
@@ -191,10 +198,10 @@ func report(name string, r runResult) {
 	if r.written > 0 {
 		reach = float64(r.indexed) / float64(r.written) * 100
 	}
-	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first answer %s  hit@1 %d/%d  hit@5 %d/%d\n",
+	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first answer %s  hit@1 %d/%d  hit@5 %d/%d  found@%d %d/%d\n",
 		name, r.indexed, r.written, reach,
 		r.build.Round(time.Millisecond), r.first.Round(time.Millisecond),
-		r.hit1, r.n, r.hit5, r.n)
+		r.hit1, r.n, r.hit5, r.n, depthK, r.found, r.n)
 }
 
 func run(w writer, qs []question, control bool) (runResult, error) {
@@ -285,6 +292,9 @@ func run(w writer, qs []question, control bool) (runResult, error) {
 			want[id] = true
 		}
 		out.n++
+		if len(hits) > depthK {
+			hits = hits[:depthK]
+		}
 		for rank, h := range hits {
 			if !want[h.Session.ID] {
 				continue
@@ -295,6 +305,7 @@ func run(w writer, qs []question, control bool) (runResult, error) {
 			if rank < 5 {
 				out.hit5++
 			}
+			out.found++
 			break
 		}
 	}
