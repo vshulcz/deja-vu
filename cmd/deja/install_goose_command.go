@@ -46,7 +46,10 @@ func removeGooseSlashCommand(s string) string {
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
 	for i := 0; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) != `- command: "deja"` {
+		// Quoted is what we write, but a hand-edited config may say
+		// `- command: deja`, and missing that would add a second entry beside
+		// the one already there rather than replacing it.
+		if t := strings.TrimSpace(lines[i]); t != `- command: "deja"` && t != "- command: deja" && t != "- command: 'deja'" {
 			out = append(out, lines[i])
 			continue
 		}
@@ -92,11 +95,7 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	recipe := gooseRecipePath()
-	if uninstall {
-		if err := os.Remove(recipe); err != nil && !os.IsNotExist(err) {
-			return installResult{}, err
-		}
-	} else {
+	if !uninstall {
 		if err := os.MkdirAll(filepath.Dir(recipe), 0o755); err != nil {
 			return installResult{}, err
 		}
@@ -123,5 +122,16 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	a, err := writeIfChanged(path, old, []byte(next))
-	return installResult{Path: path, Action: a}, err
+	if err != nil {
+		return installResult{}, err
+	}
+	// The recipe goes last on the way out. Removing it first and then failing
+	// to rewrite the config would leave a command pointing at a file that is
+	// no longer there, which fails when someone types /deja rather than now.
+	if uninstall {
+		if err := os.Remove(recipe); err != nil && !os.IsNotExist(err) {
+			return installResult{}, err
+		}
+	}
+	return installResult{Path: path, Action: a}, nil
 }

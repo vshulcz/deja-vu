@@ -45,6 +45,21 @@ func TestGooseCommandKeepsTheRestOfConfig(t *testing.T) {
 	if r, err := installGooseCommand("/bin/deja", false); err != nil || r.Action != "unchanged" {
 		t.Fatalf("second install = %#v, %v", r, err)
 	}
+	// A hand-written entry in the unquoted form must be replaced, not doubled.
+	if err := os.WriteFile(cfg, []byte(own+"  - command: deja\n    recipe_path: \"/old.yaml\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installGooseCommand("/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = os.ReadFile(cfg)
+	if n := strings.Count(string(got), `command: "deja"`) + strings.Count(string(got), "command: deja\n"); n != 1 {
+		t.Fatalf("unquoted entry not replaced, %d deja commands:\n%s", n, got)
+	}
+	if strings.Contains(string(got), "/old.yaml") {
+		t.Fatalf("the replaced entry kept its old recipe path:\n%s", got)
+	}
+
 	if _, err := installGooseCommand("/bin/deja", true); err != nil {
 		t.Fatal(err)
 	}
