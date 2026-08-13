@@ -147,6 +147,7 @@ func main() {
 	control := flag.Bool("control", false, "write the corpus but read an empty store: must score zero")
 	ctxBin := flag.String("ctx", "", "path to a ctx binary to run over the same corpus, scored the same way")
 	misses := flag.Bool("misses", false, "print the questions whose answer session never came back, for triage")
+	corpus := flag.Int("corpus", 0, "lay down history from this many questions while scoring -limit of them; holds the questions fixed so only the pile grows")
 	flag.Parse()
 	if *data == "" {
 		fmt.Fprintln(os.Stderr, "day0bench: -data is required")
@@ -162,12 +163,23 @@ func main() {
 		fmt.Fprintln(os.Stderr, "day0bench:", err)
 		os.Exit(1)
 	}
+	// The corpus and the scored set are separate knobs. Growing -limit alone
+	// grows the pile and swaps in different questions at the same time, so a
+	// drop could be either one; holding the questions still and moving -corpus
+	// asks only whether more history makes the same question harder.
+	all := qs
+	if *corpus > 0 && len(all) > *corpus {
+		all = all[:*corpus]
+	}
 	if *limit > 0 && len(qs) > *limit {
 		qs = qs[:*limit]
 	}
+	if *corpus <= 0 {
+		all = qs
+	}
 
 	for _, w := range writers() {
-		r, err := run(w, qs, *control, *misses)
+		r, err := run(w, all, qs, *control, *misses)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "day0bench %s: %v\n", w.harness, err)
 			os.Exit(1)
@@ -175,7 +187,7 @@ func main() {
 		report(w.harness, r)
 	}
 	if *ctxBin != "" {
-		r, err := runCtx(*ctxBin, qs, *control)
+		r, err := runCtx(*ctxBin, all, qs, *control)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "day0bench ctx:", err)
 			os.Exit(1)
@@ -205,7 +217,7 @@ func report(name string, r runResult) {
 		r.hit1, r.n, r.hit5, r.n, depthK, r.found, r.n)
 }
 
-func run(w writer, qs []question, control bool, misses bool) (runResult, error) {
+func run(w writer, all, qs []question, control bool, misses bool) (runResult, error) {
 	var out runResult
 	tmp, err := os.MkdirTemp("", "day0")
 	if err != nil {
@@ -220,7 +232,7 @@ func run(w writer, qs []question, control bool, misses bool) (runResult, error) 
 	// One shared corpus for every question, laid down once: this is a machine
 	// with months of history, not one haystack per query.
 	seen := map[string]bool{}
-	for _, q := range qs {
+	for _, q := range all {
 		for i, turns := range q.Sessions {
 			id := q.SessionIDs[i]
 			if seen[id] {

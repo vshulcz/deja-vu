@@ -35,7 +35,7 @@ var indexedSources = regexp.MustCompile(`indexed_sources:\s*([\d,]+)`)
 // runCtx mirrors run() for an external binary: same corpus, same questions,
 // same scoring. The control writes nothing, which is the day-0 state of a tool
 // that only records forward.
-func runCtx(bin string, qs []question, control bool) (runResult, error) {
+func runCtx(bin string, all, qs []question, control bool) (runResult, error) {
 	var out runResult
 	tmp, err := os.MkdirTemp("", "day0ctx")
 	if err != nil {
@@ -56,7 +56,7 @@ func runCtx(bin string, qs []question, control bool) (runResult, error) {
 	// and turns — so this is the same corpus either row was scored on.
 	projects := filepath.Join(home, ".claude", "projects")
 	seen := map[string]bool{}
-	for _, q := range qs {
+	for _, q := range all {
 		for i, turns := range q.Sessions {
 			id := q.SessionIDs[i]
 			if seen[id] {
