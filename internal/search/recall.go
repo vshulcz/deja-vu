@@ -236,12 +236,22 @@ func termHits(text string, terms []string) int {
 func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms []string) string {
 	var problem string
 	var conclusions []string
+	matched := false
 	if len(terms) > 0 {
 		problem, conclusions = matchedLines(s, terms)
+		matched = len(conclusions) > 0
 	}
 	for _, m := range s.Messages {
-		if problem != "" && len(conclusions) >= 2 {
+		if problem != "" && (len(conclusions) >= 2 || matched) {
 			break
+		}
+		// One line that answers beats that line plus a filler. When the
+		// session matched, the second slot is left empty rather than topped up
+		// from the top of the session: on a real block that padding read as
+		// "two schedulers were live after the failover" under an answer about
+		// the retry budget.
+		if matched && m.Role == "assistant" {
+			continue
 		}
 		text := contextText(m.Text, false)
 		if strings.TrimSpace(text) == "" {
