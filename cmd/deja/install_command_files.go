@@ -16,9 +16,6 @@ import (
 // harness has its own file format and its own directory. Each writer below
 // follows that harness's documented shape rather than a shared one.
 
-// commandBody is the instruction the command sends, in the plain second person
-// each harness expects. $ARGUMENTS is substituted by markdown-based harnesses;
-// the TOML ones use {{args}} and get their own copy.
 // shellQuoteIfNeeded quotes a path only when a shell would otherwise split it.
 // This snippet is copied into a terminal by whoever reads it — a model or a
 // person — and a home like "/Users/John Smith" makes the bare form run
@@ -32,6 +29,9 @@ func shellQuoteIfNeeded(s string) string {
 	return shellQuote(s)
 }
 
+// commandBody is the instruction the command sends, in the plain second person
+// each harness expects. $ARGUMENTS is substituted by markdown-based harnesses;
+// the TOML ones use {{args}} and get their own copy.
 func commandBody(exe, argsToken string) string {
 	return `Search the user's own past sessions across every AI coding tool on this
 machine, then answer from what you find.
