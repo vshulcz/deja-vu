@@ -260,10 +260,13 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, ss []model.Sessi
 	if added == 0 {
 		return SearchResult{Sessions: ss, Tier: tier, Variants: variants}, nil
 	}
-	// Total counts the pool the tail was drawn from plus the strict sessions
-	// that pool did not hold, so capped keeps meaning what it means: there is
-	// more behind the relevance window, not behind the result.
-	return relevanceResult(merged, rel.Total+len(ss)), nil
+	// A session that satisfies the AND carries every query key, so it is
+	// already inside the pool relevance scored, and adding the strict count on
+	// top would count it twice — that pool size is the total. The exception is
+	// a term the ranking derives rather than reads, a date from a relative
+	// word, which the AND never had to match; the floor keeps the total from
+	// claiming fewer sessions than were handed back.
+	return relevanceResult(merged, max(rel.Total, len(merged))), nil
 }
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:

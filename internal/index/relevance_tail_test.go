@@ -91,6 +91,15 @@ func TestThinANDGetsRelevanceTailBeneathIt(t *testing.T) {
 	if r.Tier != query.TierRelevance {
 		t.Fatalf("tier = %q, want relevance so the merged order survives", r.Tier)
 	}
+	// The strict hit is inside the pool the ranking scored, so counting it
+	// again would tell the caller there is more behind the window than there
+	// is. The total may never be smaller than what was handed back either.
+	if r.Total < len(r.Sessions) {
+		t.Fatalf("total %d is under the %d sessions returned", r.Total, len(r.Sessions))
+	}
+	if r.Total > len(r.Sessions) != r.Capped {
+		t.Fatalf("capped=%v disagrees with total %d over %d sessions", r.Capped, r.Total, len(r.Sessions))
+	}
 }
 
 func TestSmallStoreKeepsItsStrictAnswerAlone(t *testing.T) {
