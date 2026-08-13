@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -51,8 +52,14 @@ type request struct {
 
 type server struct {
 	reply string
-	mu    sync.Mutex
-	logw  *os.File
+	// toolCall makes the first answer a call to the harness's shell tool
+	// instead of text. Nothing else exercises what a harness does around a
+	// tool — its PreToolUse hooks, its approval flow — and a mock that only
+	// ever talks leaves that whole path untested.
+	toolCall string
+	mu       sync.Mutex
+	logw     *os.File
+	called   atomic.Bool
 }
 
 func (s *server) record(path string, msgs []message) {
@@ -160,13 +167,23 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request, req request) 
 		{Role: "instructions", Content: json.RawMessage(strconv.Quote(req.Instructions))},
 		{Role: "input", Content: req.Input},
 	})
+	output := []any{map[string]any{"id": "msg_mock", "type": "message", "role": "assistant",
+		"status":  "completed",
+		"content": []any{map[string]any{"type": "output_text", "text": s.reply, "annotations": []any{}}}}}
+	// One call, on the first turn only: the harness sends the result back and
+	// the second request must not ask for the same call again or the run loops.
+	if s.toolCall != "" && !s.called.Swap(true) {
+		output = []any{map[string]any{
+			"id": "fc_mock", "type": "function_call", "status": "completed",
+			"name": s.toolCall, "call_id": "call_mock",
+			"arguments": `{"command":["/bin/echo","mockmodel probe"]}`,
+		}}
+	}
 	body := map[string]any{
 		"id": "resp_mock", "object": "response", "created_at": time.Now().Unix(),
 		"status": "completed", "model": model,
-		"output": []any{map[string]any{"id": "msg_mock", "type": "message", "role": "assistant",
-			"status":  "completed",
-			"content": []any{map[string]any{"type": "output_text", "text": s.reply, "annotations": []any{}}}}},
-		"usage": map[string]any{"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+		"output": output,
+		"usage":  map[string]any{"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
 	}
 	if !req.Stream {
 		writeJSON(w, http.StatusOK, body)
@@ -241,9 +258,10 @@ func main() {
 	port := flag.Int("port", 18777, "port to listen on")
 	logPath := flag.String("log", "", "write every request here as JSON lines")
 	reply := flag.String("reply", "47", "what the model answers")
+	toolCall := flag.String("tool-call", "", "answer the first turn by calling this tool (e.g. shell)")
 	flag.Parse()
 
-	s := &server{reply: *reply}
+	s := &server{reply: *reply, toolCall: *toolCall}
 	if *logPath != "" {
 		f, err := os.Create(*logPath)
 		if err != nil {

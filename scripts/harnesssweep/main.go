@@ -202,6 +202,9 @@ func main() {
 		if left, ok := checkUninstall(h, exe, *corpus, *base, *model, *repo); !ok {
 			fmt.Printf("%-10s %-34s %-14s\n", "", "UNINSTALL LEFT FILES", strings.Join(left, " "))
 		}
+		for _, problem := range checkReinstall(h, exe, *corpus, *repo) {
+			fmt.Printf("%-10s %-34s %s\n", "", "REINSTALL", problem)
+		}
 		if h.wrapped {
 			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, true)
 			seen := "silent"
@@ -292,6 +295,85 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, inst
 // Files are matched by content rather than by name: a harness config deja
 // edited in place keeps its own name, and what matters is whether deja's
 // command is still in it.
+// checkReinstall covers the two things that happen to an install after it is
+// made: it is run again, and the binary moves. Running it again must not leave
+// two of anything, and moving the binary must not leave a config calling the
+// old path — a hook pointing at a binary that is no longer there fails on
+// every turn, and the harness reports it as deja being broken.
+func checkReinstall(h harness, exe, corpus, repo string) []string {
+	home, err := os.MkdirTemp("", "sweep-reinstall-"+h.name)
+	if err != nil {
+		return nil
+	}
+	defer os.RemoveAll(home)
+
+	// A second binary at a different path, standing in for an upgrade that
+	// moved it: brew to go install, a version directory, a rename.
+	moved := filepath.Join(home, "moved-deja")
+	if b, err := os.ReadFile(exe); err == nil {
+		_ = os.WriteFile(moved, b, 0o755)
+	} else {
+		return nil
+	}
+
+	env := append(os.Environ(),
+		"HOME="+home, "USERPROFILE="+home,
+		"XDG_CONFIG_HOME="+filepath.Join(home, ".config"),
+		"DEJA_CLAUDE_ROOT="+corpus,
+		"DEJA_INDEX_DIR="+filepath.Join(home, "idx"))
+	install := func(bin string) {
+		cmd := exec.Command(bin, "install", h.target, "--no-index")
+		cmd.Env = env
+		cmd.Dir = repo
+		_ = cmd.Run()
+	}
+
+	install(exe)
+	first := snapshot(home)
+	install(exe)
+	again := snapshot(home)
+
+	var problems []string
+	for path, before := range first {
+		after, ok := again[path]
+		if !ok {
+			continue
+		}
+		if n, m := strings.Count(before, "hook-"), strings.Count(after, "hook-"); m > n {
+			problems = append(problems, fmt.Sprintf("%s gained a second wiring on reinstall (%d then %d)",
+				path, n, m))
+		}
+	}
+
+	install(moved)
+	for path, body := range snapshot(home) {
+		if strings.Contains(body, exe) {
+			problems = append(problems, path+" still calls the old binary path after it moved")
+		}
+	}
+	return problems
+}
+
+// snapshot reads every file under home except deja's own state and index.
+func snapshot(home string) map[string]string {
+	out := map[string]string{}
+	_ = filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() ||
+			strings.HasPrefix(path, filepath.Join(home, "idx")) ||
+			strings.HasPrefix(path, filepath.Join(home, ".config", "deja")) ||
+			strings.HasSuffix(path, ".bak") {
+			return nil
+		}
+		if b, rerr := os.ReadFile(path); rerr == nil {
+			if rel, rerr := filepath.Rel(home, path); rerr == nil {
+				out[rel] = string(b)
+			}
+		}
+		return nil
+	})
+	return out
+}
+
 func checkUninstall(h harness, exe, corpus, base, model, repo string) ([]string, bool) {
 	home, err := os.MkdirTemp("", "sweep-uninstall-"+h.name)
 	if err != nil {
