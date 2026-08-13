@@ -693,6 +693,18 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
+	// Config files are very often symlinks into a dotfiles repository. Writing
+	// by rename would replace the link with a regular file: the repo stops
+	// tracking the config, and the next stow or chezmoi run either clobbers
+	// deja's wiring or stops on a conflict. Follow the link and write where it
+	// points, so the link stays a link and the change lands in the repo.
+	// A dangling link has nothing to follow and keeps the old behaviour.
+	if resolved, rerr := filepath.EvalSymlinks(path); rerr == nil && resolved != path {
+		path = resolved
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return "", err
+		}
+	}
 	if _, err := backupOnce(path); err != nil {
 		return "", err
 	}
