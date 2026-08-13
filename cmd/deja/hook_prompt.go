@@ -610,7 +610,11 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	if strings.HasPrefix(s.Project, "imported:") {
 		who = "this was done on another machine"
 	}
-	return fmt.Sprintf("deja-vu: %s — %q (%s%s)", who, topic, search.RelativeDate(s.Updated), why)
+	// No colon after the name, for the reason the session-start receipts lost
+	// theirs: the host introduces the line itself. Claude Code renders this as
+	// "UserPromptSubmit says: …", which read "says: deja-vu: you have been
+	// here" — seen on screen, two colons in four words.
+	return fmt.Sprintf("deja-vu — %s: %q (%s%s)", who, topic, search.RelativeDate(s.Updated), why)
 }
 
 // dejaVuTopic picks something a human actually typed. Session titles are the
