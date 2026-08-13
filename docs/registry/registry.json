@@ -434,9 +434,9 @@
    },
    "gaps": {
     "auto": {
-     "state": "unknown",
-     "why": "Roo's docs enumerate skills, slash commands, modes, auto-approve and the orchestrator, and have no hooks page — /features/hooks is a 404. Without a lifecycle hook there is nowhere to put a per-session recall, so this may be a limit rather than work; absence from the docs is not proof, and nobody has asked them",
-     "source": "https://roocodeinc.github.io/Roo-Code/"
+     "state": "blocked",
+     "why": "Roo's hooks are in flight upstream, not shipped: PR #10785 implements a Claude Code-style hooks system, #11128 is Hooks beta and #11663 Hooks phase 1, all still open, and no release names lifecycle hooks. A user's bug report about PreToolUse coverage (#10834) shows they work on a branch build. Becomes work the day one of those merges",
+     "source": "https://github.com/RooCodeInc/Roo-Code/pull/10785"
     }
    }
   }
