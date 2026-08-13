@@ -136,8 +136,18 @@ var kvHints = []string{
 	"密码", "密碼", "パスワード", "비밀번호",
 }
 
-// "github_pat_" is listed on its own: "gh" is not a substring of "github".
-var providerHints = []string{"gh", "github_pat_", "glpat-", "sk_", "rk_", "sk-", "gsk_", "xai-", "hf_", "npm_", "xox", "AIza"}
+// Each hint is a literal the regex cannot match without, so skipping on a
+// negative cannot change what is redacted. They have to be as long as the
+// literal prefix actually is: "gh" alone is inside "through", "right" and
+// "enough", so it let ordinary English through the gate and put the provider
+// regex on nearly every message in a chat history — a third of index build
+// time spent proving that "thought" is not a GitHub token. The regex wants
+// gh[opsur]_, so the hints spell that out. "github_pat_" is separate because
+// "gh" is not a substring of "github".
+var providerHints = []string{
+	"ghp_", "gho_", "ghs_", "ghu_", "ghr_", "github_pat_",
+	"glpat-", "sk_", "rk_", "sk-", "gsk_", "xai-", "hf_", "npm_", "xox", "AIza",
+}
 
 func containsAnyFold(s string, hints []string) bool {
 	for _, h := range hints {

@@ -34,6 +34,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
+	"sort"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -131,6 +133,10 @@ func writeCodex(root, id string, ts time.Time, turns []turn) error {
 type runResult struct {
 	written, indexed int
 	build, first     time.Duration
+	// lat holds every query's wall time, so the report can show the typical
+	// query and the worst one rather than only the first, which is the one
+	// most distorted by a cold cache.
+	lat []time.Duration
 	// found counts the answer session appearing anywhere in the top depthK,
 	// which separates the two ways a query fails: ranked badly, or never
 	// retrieved at all. Only the second one is fixed by ranking work.
@@ -146,6 +152,7 @@ func main() {
 	limit := flag.Int("limit", 20, "questions to run")
 	control := flag.Bool("control", false, "write the corpus but read an empty store: must score zero")
 	ctxBin := flag.String("ctx", "", "path to a ctx binary to run over the same corpus, scored the same way")
+	cpuprofile := flag.String("cpuprofile", "", "write a CPU profile of the whole run here")
 	misses := flag.Bool("misses", false, "print the questions whose answer session never came back, for triage")
 	corpus := flag.Int("corpus", 0, "lay down history from this many questions while scoring -limit of them; holds the questions fixed so only the pile grows")
 	flag.Parse()
@@ -170,6 +177,19 @@ func main() {
 	all := qs
 	if *corpus > 0 && len(all) > *corpus {
 		all = all[:*corpus]
+	}
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "day0bench:", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintln(os.Stderr, "day0bench:", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
 	}
 	if *limit > 0 && len(qs) > *limit {
 		qs = qs[:*limit]
@@ -211,10 +231,27 @@ func report(name string, r runResult) {
 	if r.written > 0 {
 		reach = float64(r.indexed) / float64(r.written) * 100
 	}
-	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first answer %s  hit@1 %d/%d  hit@5 %d/%d  found@%d %d/%d\n",
+	p50, p95 := percentiles(r.lat)
+	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first %s  p50 %s  p95 %s  hit@1 %d/%d  hit@5 %d/%d  found@%d %d/%d\n",
 		name, r.indexed, r.written, reach,
 		r.build.Round(time.Millisecond), r.first.Round(time.Millisecond),
+		p50.Round(time.Microsecond), p95.Round(time.Microsecond),
 		r.hit1, r.n, r.hit5, r.n, depthK, r.found, r.n)
+}
+
+// percentiles reports the median and the tail of a query-latency sample. The
+// first query alone says more about a cold page cache than about the search.
+func percentiles(ds []time.Duration) (time.Duration, time.Duration) {
+	if len(ds) == 0 {
+		return 0, 0
+	}
+	s := append([]time.Duration(nil), ds...)
+	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	at := func(q float64) time.Duration {
+		i := int(float64(len(s)-1) * q)
+		return s[i]
+	}
+	return at(0.5), at(0.95)
 }
 
 func run(w writer, all, qs []question, control bool, misses bool) (runResult, error) {
@@ -300,6 +337,7 @@ func run(w writer, all, qs []question, control bool, misses bool) (runResult, er
 		if i == 0 {
 			out.first = time.Since(t1)
 		}
+		out.lat = append(out.lat, time.Since(t1))
 		want := map[string]bool{}
 		for _, id := range q.AnswerSession {
 			want[id] = true
