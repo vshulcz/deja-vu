@@ -272,6 +272,14 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 	if isSmokeTest(problem, conclusions) {
 		return ""
 	}
+	// A session where the agent only ever said it could not proceed carries
+	// nothing to reuse. One had been sitting in a real store for twenty days,
+	// blocked on a permission prompt, taking a slot in every agent's opening
+	// context. This asks that *every* conclusion be a refusal, so work that
+	// hit a wall and then got past it is untouched.
+	if wasBlocked(conclusions) {
+		return ""
+	}
 	var b strings.Builder
 	if provenance {
 		fmt.Fprintf(&b, "✓ recalled from %s session · %s\n", digestLine(s.Harness), relativeDay(s.Updated, now))
@@ -358,6 +366,35 @@ func densestLine(text string, terms []string) (string, int) {
 		return text, 0
 	}
 	return best, bestHits
+}
+
+// blockedPhrases are how a harness reports that a call did not happen. They
+// have to appear in what the agent said, not in the tool output, so that a
+// session discussing permissions is not mistaken for one denied them.
+var blockedPhrases = []string{
+	"not granted", "call blocked", "permission denied", "requires approval",
+	"denied permission", "не разрешен", "не разрешён", "нет доступа",
+}
+
+// wasBlocked reports whether every conclusion a session reached was a refusal.
+func wasBlocked(conclusions []string) bool {
+	if len(conclusions) == 0 {
+		return false
+	}
+	for _, c := range conclusions {
+		low := strings.ToLower(c)
+		hit := false
+		for _, p := range blockedPhrases {
+			if strings.Contains(low, p) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return false
+		}
+	}
+	return true
 }
 
 func relativeDay(updated, now time.Time) string {

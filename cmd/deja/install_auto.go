@@ -170,7 +170,13 @@ export const DejaRecall = async ({ $, client }) => {
         }
         const ctx = cache.get(key)
         if (ctx) {
-          output.system.push(ctx)
+          // Fold into the first system block rather than appending a second
+          // one. An OpenAI-compatible endpoint that requires the system
+          // message to come first rejects the whole request otherwise, so
+          // installing deja made opencode fail every turn against a local
+          // model: "Not Found: System message must be at the beginning."
+          if (output.system.length) output.system[0] = ctx + "\n\n" + output.system[0]
+          else output.system.push(ctx)
           return
         }
         // Nothing to recall: either there is no history yet, or the first
