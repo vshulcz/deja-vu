@@ -77,7 +77,7 @@ func TestWithAutoTargetsPairsEveryTarget(t *testing.T) {
 		"claude-code": true, "claude-auto": true,
 		"cline": true, "cline-auto": true,
 		"opencode": true, "opencode-auto": true,
-		"grok": true,
+		"grok": true, "grok-auto": true,
 	}
 	for _, g := range got {
 		if !want[g] {
@@ -88,10 +88,16 @@ func TestWithAutoTargetsPairsEveryTarget(t *testing.T) {
 	if len(want) != 0 {
 		t.Fatalf("missing targets %v (got %v)", want, got)
 	}
-	// grok has no -auto target; asking for one would be an unknown-target error.
+	// grok does have one, and it writes hooks. It was missing from the name
+	// list, so uninstall --all left ~/.grok/hooks/deja.json behind pointing at
+	// a binary the user had just removed.
+	sawGrokAuto := false
 	for _, g := range got {
 		if g == "grok-auto" {
-			t.Fatal("invented an -auto target that does not exist")
+			sawGrokAuto = true
 		}
+	}
+	if !sawGrokAuto {
+		t.Fatalf("grok did not gain its -auto sibling: %v", got)
 	}
 }

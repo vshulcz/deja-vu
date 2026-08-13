@@ -1400,7 +1400,7 @@ func installTargetNames() []string {
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",
-		"grok", "copilot", "roo", "aider",
+		"grok", "grok-auto", "copilot", "roo", "aider",
 		"statusline",
 	}
 }

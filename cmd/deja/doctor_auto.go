@@ -48,6 +48,7 @@ func autoWirings() []autoWiring {
 		}, "hook-context"},
 		{"cline", func() string { return filepath.Join(sources.ClinePluginsDir(), "deja", "index.js") }, "hook-context"},
 		{"goose", func() string { return gooseHookPath() }, "hook-goose"},
+		{"grok", func() string { return grokHooksPath() }, "hook-context"},
 		{"aider", func() string { return aiderContextPath() }, ""},
 		// Roo's guidance moved out of the always-on rules file into a skill;
 		// checking the old path reported a correctly wired machine as missing.
