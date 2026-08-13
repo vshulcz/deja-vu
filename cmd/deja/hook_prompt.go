@@ -53,7 +53,7 @@ type hookPromptText string
 func (h *hookPromptText) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err == nil {
-		*h = hookPromptText(s)
+		*h = hookPromptText(withoutInjectedContext(s))
 		return nil
 	}
 	var parts []struct {
@@ -73,8 +73,39 @@ func (h *hookPromptText) UnmarshalJSON(b []byte) error {
 		}
 		sb.WriteString(p.Text)
 	}
-	*h = hookPromptText(sb.String())
+	*h = hookPromptText(withoutInjectedContext(sb.String()))
 	return nil
+}
+
+// withoutInjectedContext drops context an earlier hook already put in front of
+// the question. Gemini hands BeforeAgent the whole request, which by then
+// carries the <hook_context> block SessionStart returned — deja's own recall.
+// Left in, the six search terms all come from that block and none from the
+// user, so every prompt recalls whatever the last one did. Gemini escapes the
+// angle brackets of anything inside, so both spellings are removed.
+func withoutInjectedContext(s string) string {
+	for _, tag := range []struct{ open, close string }{
+		{"<hook_context>", "</hook_context>"},
+		{"&lt;hook_context&gt;", "&lt;/hook_context&gt;"},
+		{"<deja-recall>", "</deja-recall>"},
+		{"&lt;deja-recall&gt;", "&lt;/deja-recall&gt;"},
+	} {
+		for {
+			start := strings.Index(s, tag.open)
+			if start < 0 {
+				break
+			}
+			end := strings.Index(s[start:], tag.close)
+			if end < 0 {
+				// An unclosed block is still not the user's words, and what
+				// follows it cannot be told apart from more of the same.
+				s = s[:start]
+				break
+			}
+			s = s[:start] + s[start+end+len(tag.close):]
+		}
+	}
+	return strings.TrimSpace(s)
 }
 
 // runHookPrompt is the UserPromptSubmit hook: search the user's own prompt
