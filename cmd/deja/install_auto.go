@@ -66,6 +66,12 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 			if uninstall {
 				continue
 			}
+			// One of ours is enough. A config can carry the entry twice — a
+			// hand-edited copy, a merge that kept both sides — and adopting
+			// each of them left the hook firing twice on every prompt.
+			if found {
+				continue
+			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
 		}
@@ -326,7 +332,11 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			// Take the entry over rather than leaving it as it was: an install
 			// from a new binary path, or from a version that gained a field,
 			// has to update ours in place or the change never reaches anyone
-			// who already had it.
+			// who already had it. Only the first, for the same reason as
+			// above: a doubled entry is a hook that runs twice.
+			if found {
+				continue
+			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
 		}
