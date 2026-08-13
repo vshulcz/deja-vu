@@ -358,7 +358,22 @@ func runHookContext(dir string, plain bool) error {
 		if r, ok := findReusedMemory(dir); ok {
 			earned = fmt.Sprintf(" · most re-used recently: %q, %d×", trimBriefTitle(r.Title), r.Times)
 		}
-		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja: recalled %d prior session%s %s (%s of context) — the agent starts already knowing them%s%s%s", sessions, plural, why, humanBytes(int64(len(digest))), serviceReceipt(dir), polNote, earned))
+		// The receipt is read at a glance, and several hosts show it in a
+		// toast about fifty columns wide. At 130 characters it wrapped to
+		// three lines over the conversation, splitting "2.4 KB" across two of
+		// them. What it says has to survive that, so the claim leads and the
+		// numbers trail, where a wrap costs least.
+		//
+		// The clause explaining what a recall is has a job exactly once. The
+		// service line only appears from the second recall of the day, so its
+		// presence is the signal that this is no longer news.
+		svc := serviceReceipt(dir)
+		teaching := " — the agent starts already knowing them"
+		if svc != "" {
+			teaching = ""
+		}
+		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja: recalled %d prior session%s %s%s%s%s%s",
+			sessions, plural, why, teaching, svc, polNote, earned)+fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest)))))
 	}
 	// Nothing to recall yet because the index is still being built: say so
 	// rather than starting in silence. The build runs detached, so the agent
