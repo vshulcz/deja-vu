@@ -586,7 +586,7 @@ func dejaVuLineDue(dir string) bool {
 // dejaVuLine is the one visible line a déjà vu moment earns: which past
 // session answered, and how old it is.
 func dejaVuLine(s model.Session, terms ...string) string {
-	topic := dejaVuTopic(s)
+	topic := dejaVuTopic(s, terms...)
 	if topic == "" {
 		return ""
 	}
@@ -617,7 +617,15 @@ func dejaVuLine(s model.Session, terms ...string) string {
 // first user message, which for some harnesses is injected plumbing
 // ("# AGENTS.md instructions <INSTRUCTIONS>...") — showing that as "you have
 // been here" reads as a glitch, not a memory.
-func dejaVuTopic(s model.Session) string {
+func dejaVuTopic(s model.Session, terms ...string) string {
+	// What the recall actually matched, before the session's title or its
+	// opening line. This is the one line a person reads, and on a long session
+	// narrowed to its matching region the opening line is whatever chatter
+	// began that window: seen on screen as "you have been here — \"migration
+	// locked the table\"" answering a question about token rotation.
+	if t := strings.TrimSpace(search.MatchedUserLine(s, terms)); t != "" && presentableTopic(t) {
+		return t
+	}
 	if t := strings.TrimSpace(s.Title); t != "" && presentableTopic(t) {
 		return t
 	}
