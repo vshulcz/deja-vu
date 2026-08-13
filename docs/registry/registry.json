@@ -305,16 +305,10 @@
     "mcp": true,
     "auto": true,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": "deja goose"
-   },
-   "gaps": {
-    "command": {
-     "state": "unknown",
-     "why": "not investigated yet"
-    }
    }
   },
   {

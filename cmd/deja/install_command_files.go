@@ -83,6 +83,10 @@ func commandFileText(harness, exe string) string {
 // a file. Silent when the harness has none: not every one does, and a missing
 // command is not a failure to install.
 func installCommandFile(harness, exe string, uninstall bool) (installResult, error) {
+	// Goose keeps its commands in config.yaml rather than a commands directory.
+	if harness == "goose" {
+		return installGooseCommand(exe, uninstall)
+	}
 	path := commandFilePath(harness)
 	if path == "" {
 		return installResult{}, nil
