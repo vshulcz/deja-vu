@@ -124,16 +124,18 @@
    },
    "gaps": {
     "mcp": {
-     "state": "impossible",
-     "why": "aider has no MCP client; recall arrives through the read: context file it re-reads every message"
+     "state": "blocked",
+     "why": "aider has no MCP client. Not a design limit but an unimplemented feature: several open requests and an open PR adding it, so this becomes work the day they ship it. Until then recall reaches aider through the read: context file",
+     "source": "https://github.com/Aider-AI/aider/pull/5539"
     },
     "skill": {
      "state": "unknown",
-     "why": "no source found either way; aider has no MCP client and no hooks, but that is not evidence about skills"
+     "why": "no skills mechanism found and none requested beyond surfacing skills published elsewhere; aider offers no plugin surface deja could use, but nothing states it cannot"
     },
     "command": {
-     "state": "unknown",
-     "why": "aider documents a fixed built-in command set and no extension mechanism, but nothing states one cannot exist — needs a source before this is called a limit"
+     "state": "blocked",
+     "why": "the slash command set is built in; adding custom commands is an open feature request upstream, not something a third party can wire today",
+     "source": "https://github.com/Aider-AI/aider/issues/894"
     }
    }
   },

@@ -320,7 +320,7 @@ limits, trust assumptions, and release verification.
 | Cline | `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json`<br>`<vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json`<br>`${DEJA_CLINE_ROOT}/*/*.messages.json`<br>`${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | `${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl`<br>`${CODEX_HOME:-~/.codex}/history.jsonl`<br>`${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | opencode | `~/.local/share/opencode/opencode.db`<br>`${XDG_DATA_HOME}/opencode/opencode.db`<br>`${DEJA_OPENCODE_DB}` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | ✕ | ✅ | ? | ? | — | ✅ | deja aider |
+| aider | `~/.aider.chat.history.md`<br>`${AIDER_CHAT_HISTORY_FILE}`<br>`${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md` | ⚠ | ✅ | ? | ⚠ | — | ✅ | deja aider |
 | Gemini CLI | `${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}`<br>`${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | Cursor | `~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb`<br>`${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl`<br>`${DEJA_CURSOR_ROOT}`<br>`${DEJA_CURSOR_CLI_ROOT}` | ✅ | ✅ | ✅ | ✅ | — | ✅ | sqlite3 (IDE chats) |
 | Antigravity | `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`<br>`${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
@@ -337,7 +337,8 @@ limits, trust assumptions, and release verification.
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated
 
 
-- aider `mcp` — aider has no MCP client; recall arrives through the read: context file it re-reads every message
+- aider `mcp` — aider has no MCP client. Not a design limit but an unimplemented feature: several open requests and an open PR adding it, so this becomes work the day they ship it. Until then recall reaches aider through the read: context file (https://github.com/Aider-AI/aider/pull/5539)
+- aider `command` — the slash command set is built in; adding custom commands is an open feature request upstream, not something a third party can wire today (https://github.com/Aider-AI/aider/issues/894)
 - Copilot CLI `auto` — Copilot runs the hooks but drops their context, so recall there is MCP plus the skill
 <!-- matrix:end -->
 
