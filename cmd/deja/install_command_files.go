@@ -48,9 +48,13 @@ description: Search this machine's past AI coding sessions (deja-vu)
 // tomlCommand is Gemini's shape: a description line and a prompt string. Args
 // arrive through {{args}}; without it the CLI appends them to the prompt, which
 // would read as an unrelated paragraph.
+//
+// The prompt is a literal string, not a basic one. A Windows exe path is full
+// of backslashes, and TOML reads those as escapes inside "…" — C:\Users would
+// have become an invalid escape and taken the whole file with it.
 func tomlCommand(exe string) string {
-	return "description = \"Search this machine's past AI coding sessions (deja-vu)\"\nprompt = \"\"\"\n" +
-		commandBody(exe, "{{args}}") + "\"\"\"\n"
+	return "description = \"Search this machine's past AI coding sessions (deja-vu)\"\nprompt = '''\n" +
+		commandBody(exe, "{{args}}") + "'''\n"
 }
 
 // commandFilePaths is where each harness reads a user-level command from.
