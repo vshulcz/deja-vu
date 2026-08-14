@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -14,6 +15,19 @@ import (
 // Unlike skills, commands are not in the Agent Plugins standard, so every
 // harness has its own file format and its own directory. Each writer below
 // follows that harness's documented shape rather than a shared one.
+
+// shellQuoteIfNeeded quotes a path only when a shell would otherwise split it.
+// This snippet is copied into a terminal by whoever reads it — a model or a
+// person — and a home like "/Users/John Smith" makes the bare form run
+// "/Users/John" with the rest as arguments. Ordinary paths are left plain:
+// quoting every one of them makes the instruction look like escaping matters
+// when it does not.
+func shellQuoteIfNeeded(s string) string {
+	if !strings.ContainsAny(s, " \t'\"\\$`") {
+		return s
+	}
+	return shellQuote(s)
+}
 
 // commandBody is the instruction the command sends, in the plain second person
 // each harness expects. $ARGUMENTS is substituted by markdown-based harnesses;
@@ -28,7 +42,7 @@ result looks right but is too short to act on, follow up with recall_context.
 
 If the deja MCP tools are unavailable, run the CLI instead:
 
-` + "```bash\n" + exe + ` "` + argsToken + `"
+` + "```bash\n" + shellQuoteIfNeeded(exe) + ` "` + argsToken + `"
 ` + "```" + `
 
 Answer with what actually happened in those sessions — when it was, which

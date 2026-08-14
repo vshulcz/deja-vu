@@ -52,14 +52,23 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	}
 	hooks, err := json.MarshalIndent(map[string]any{
 		"hooks": map[string]any{
-			// SessionStart, not BeforeAgent: it injects additionalContext into
-			// the session history and prints systemMessage, while BeforeAgent
-			// surfaces the message only when the hook blocks execution.
+			// SessionStart injects additionalContext into the session history
+			// and prints systemMessage.
 			"SessionStart": []any{map[string]any{
 				"hooks": []any{map[string]any{
 					"type": "command", "command": exe + " hook-context",
 					// Gemini reads timeout in milliseconds; a Claude-style 10
 					// kills the hook before it can answer.
+					"timeout": 10000,
+				}},
+			}},
+			// BeforeAgent is gemini's name for UserPromptSubmit — it is handed
+			// the prompt and appends what the hook returns to the request as
+			// <hook_context>. Only systemMessage is limited to the blocking
+			// case; additionalContext is not.
+			"BeforeAgent": []any{map[string]any{
+				"hooks": []any{map[string]any{
+					"type": "command", "command": exe + " hook-prompt",
 					"timeout": 10000,
 				}},
 			}},

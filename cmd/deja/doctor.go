@@ -156,17 +156,23 @@ func deepDriftErr(r *index.DeepReport) error {
 
 func doctorHooks(w io.Writer) {
 	fmt.Fprintln(w, "Hooks:")
+	// Every harness's row is printed whatever Claude Code's file says. This
+	// used to return early when that one file was missing or unreadable, so a
+	// machine without Claude Code — which is most of them — saw nothing at all
+	// about the twelve other harnesses deja can wire. The one command someone
+	// runs when memory is not working told them least exactly when they had
+	// the most to check.
+	defer doctorAutoRecall(w)
+	defer doctorCodexHook(w)
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", path)
-		doctorCodexHook(w)
 		return
 	}
 	var root map[string]any
 	if json.Unmarshal(b, &root) != nil {
 		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", path)
-		doctorCodexHook(w)
 		return
 	}
 	hooks, _ := root["hooks"].(map[string]any)
@@ -176,8 +182,6 @@ func doctorHooks(w io.Writer) {
 		status = "wired"
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, path)
-	doctorCodexHook(w)
-	doctorAutoRecall(w)
 }
 
 // doctorWiringExe reports configs that name a binary which is no longer there.

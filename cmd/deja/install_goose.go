@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -32,7 +33,19 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	if err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
 	}
-	next := removeGooseExtension(string(old))
+	// A config written on Windows, or by an editor set that way, uses CRLF.
+	// Every edit below splits and searches on "\n", so a key reads as
+	// "extensions:\r" and matches nothing: deja added a second one and left a
+	// file goose cannot read. Edit in LF and put the line endings back.
+	body, crlf := normaliseNewlines(string(old))
+	next := removeGooseExtension(body)
+	// Removing our entry can leave the key it lived under with nothing in it,
+	// and the insert below only recognises "extensions:" when a line follows
+	// it — so a second install appended a second key and left the file with
+	// "extensions:" twice, which is not a config goose can read. Dropping the
+	// empty key first makes the two paths meet: either the key has other
+	// extensions and ours joins them, or it is gone and one is written.
+	next = dropEmptyYAMLKey(next, "extensions:")
 	if !uninstall {
 		cmd, args := mcpCommandArgs(exe)
 		var b strings.Builder
@@ -60,8 +73,20 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
+	if crlf {
+		next = strings.ReplaceAll(next, "\n", "\r\n")
+	}
 	a, werr := writeIfChanged(path, old, []byte(next))
 	return installResult{Path: path, Action: a}, werr
+}
+
+// normaliseNewlines returns the text with LF endings and whether it had CRLF,
+// so an edit can be made in one convention and written back in the other.
+func normaliseNewlines(s string) (string, bool) {
+	if !strings.Contains(s, "\r\n") {
+		return s, false
+	}
+	return strings.ReplaceAll(s, "\r\n", "\n"), true
 }
 
 // removeGooseExtension drops our entry and stops at the next key at the same
@@ -158,6 +183,19 @@ func writeGooseHook() error {
 					"timeout": 20,
 				}},
 			}},
+			// Goose discards what a hook prints, so this one cannot answer
+			// directly. It does not have to: the hook is handed the prompt,
+			// and the MOIM file is re-read after hooks run — verified by
+			// writing it from the hook and watching the new text, not the old,
+			// arrive in the same turn. So the pair is a prompt-time channel
+			// wherever MOIM is on, which is the `deja goose` wrapper.
+			"UserPromptSubmit": []any{map[string]any{
+				"hooks": []any{map[string]any{
+					"type":    "command",
+					"command": shellQuote(exe) + " hook-goose-prompt",
+					"timeout": 20,
+				}},
+			}},
 		},
 	}, "", "  ")
 	if err != nil {
@@ -175,9 +213,52 @@ func writeGooseHook() error {
 
 // cmdGooseHook is what the SessionStart hook runs. Under the wrapper it
 // refreshes the MOIM file instead, so the digest is not injected twice.
+//
+// The UserPromptSubmit half is hook-goose-prompt: same file, but the recall is
+// searched against what the user just typed rather than chosen when the
+// session opened.
 func cmdGooseHook(_ string, _ []string) error {
 	_ = readHookStdin()
 	return refreshGooseHints()
+}
+
+// refreshGooseForPrompt writes prompt-scoped recall where goose will read it.
+//
+// Only the MOIM file is re-read per turn; .goosehints is read once when the
+// session opens. Overwriting the hints file mid-session would therefore
+// replace the recall that is already in front of the model with nothing the
+// model will ever see, so without MOIM this leaves the session as it is.
+func refreshGooseForPrompt(dir string, payload []byte) error {
+	if os.Getenv("GOOSE_MOIM_MESSAGE_FILE") == "" {
+		return nil
+	}
+	var input struct {
+		// Goose calls it message; matcher_context carries the same text.
+		Message string `json:"message"`
+		Prompt  string `json:"prompt"`
+	}
+	_ = json.Unmarshal(payload, &input)
+	prompt := input.Message
+	if prompt == "" {
+		prompt = input.Prompt
+	}
+	var out strings.Builder
+	if err := runHookPromptMode(dir, strings.NewReader(
+		`{"prompt":`+strconv.Quote(prompt)+`}`), &out, true); err != nil {
+		return err
+	}
+	// Silence means the history has nothing for this question. Leave the
+	// session-start digest in place rather than blanking the file.
+	if strings.TrimSpace(out.String()) == "" {
+		return nil
+	}
+	path := gooseRecallPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	old, _ := os.ReadFile(path)
+	_, err := writeIfChanged(path, old, []byte(out.String()))
+	return err
 }
 
 // gooseRecallPath is the hints file, or the MOIM file when the wrapper set

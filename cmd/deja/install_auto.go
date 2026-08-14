@@ -66,6 +66,12 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 			if uninstall {
 				continue
 			}
+			// One of ours is enough. A config can carry the entry twice — a
+			// hand-edited copy, a merge that kept both sides — and adopting
+			// each of them left the hook firing twice on every prompt.
+			if found {
+				continue
+			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
 		}
@@ -170,7 +176,13 @@ export const DejaRecall = async ({ $, client }) => {
         }
         const ctx = cache.get(key)
         if (ctx) {
-          output.system.push(ctx)
+          // Fold into the first system block rather than appending a second
+          // one. An OpenAI-compatible endpoint that requires the system
+          // message to come first rejects the whole request otherwise, so
+          // installing deja made opencode fail every turn against a local
+          // model: "Not Found: System message must be at the beginning."
+          if (output.system.length) output.system[0] = ctx + "\n\n" + output.system[0]
+          else output.system.push(ctx)
           return
         }
         // Nothing to recall: either there is no history yet, or the first
@@ -320,16 +332,27 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			// Take the entry over rather than leaving it as it was: an install
 			// from a new binary path, or from a version that gained a field,
 			// has to update ours in place or the change never reaches anyone
-			// who already had it.
+			// who already had it. Only the first, for the same reason as
+			// above: a doubled entry is a hook that runs twice.
+			if found {
+				continue
+			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
 		}
 		kept = append(kept, entryAny)
 	}
 	if !uninstall && !found {
-		entry := map[string]any{
-			"hooks": []any{map[string]any{"type": "command", "command": cmd, "timeout": timeout}},
+		h := map[string]any{"type": "command", "command": cmd, "timeout": timeout}
+		// The same line the adopt path above sets. Setting it only there meant
+		// a first install wrote the entry without it and a second install
+		// added it, so whoever installed once never saw the status line their
+		// harness would have shown while the hook ran — and the two installs
+		// produced different files, which is its own trap.
+		if msg := hookStatusMessage(event); msg != "" {
+			h["statusMessage"] = msg
 		}
+		entry := map[string]any{"hooks": []any{h}}
 		if matcher != "" {
 			entry["matcher"] = matcher
 		}

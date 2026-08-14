@@ -90,7 +90,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			case "antigravity":
 				targets = append(targets, "antigravity-auto")
 			case "cline":
-				targets = append(targets, "cline", "cline-auto")
+				targets = append(targets, "cline-auto")
 			case "goose":
 				targets = append(targets, "goose-auto")
 			case "grok":
@@ -477,6 +477,14 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 	case "gemini-auto":
+		// MCP first, then the hooks extension. `--auto` maps gemini to this
+		// target alone, so installing only the extension left the harness
+		// without the tools: its own `gemini mcp list` said "No MCP servers
+		// configured" on a machine that had just run `deja install --auto`.
+		// grok-auto pairs them the same way.
+		if _, err := installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installGeminiAuto(exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
@@ -492,16 +500,25 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
+		if _, err := installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installQwenAuto(exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
 	case "kimi-auto":
+		if _, err := installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installKimiAuto(exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "roo":
 		return installRoo(exe, uninstall)
 	case "cline-auto":
+		if _, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall); err != nil {
+			return installResult{}, err
+		}
 		return installClineAuto(exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
@@ -553,6 +570,10 @@ func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
 
 func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
 	if _, err := installOpenClawMCP(exe, uninstall); err != nil {
+		return installResult{}, err
+	}
+	// The plugin covers the prompt; the bootstrap hook covers the session.
+	if _, err := installOpenClawPlugin(exe, uninstall); err != nil {
 		return installResult{}, err
 	}
 	return installOpenClawHooks(exe, uninstall)
@@ -623,21 +644,23 @@ func isRealDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
-func backupOnce(path string) error {
+// backupOnce reports whether it created the snapshot, so an uninstall can take
+// its own back out afterwards without touching one the user made.
+func backupOnce(path string) (bool, error) {
 	if _, err := os.Stat(path); err != nil {
-		return nil
+		return false, nil
 	}
 	bak := path + ".bak"
 	if _, err := os.Stat(bak); err == nil {
-		return nil
+		return false, nil
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// Configs can carry MCP credentials; the snapshot is owner-only even
 	// when the live file is looser.
-	return os.WriteFile(bak, b, 0o600)
+	return true, os.WriteFile(bak, b, 0o600)
 }
 
 // removingWiring is set for the length of an uninstall run. Thirty-seven call
@@ -646,6 +669,23 @@ func backupOnce(path string) error {
 // exist, is an empty config it then creates (#676). The flag is process-wide
 // because the command is: one run, one direction.
 var removingWiring bool
+
+// mentionsDeja reports whether a config snapshot carries deja's own wiring.
+// The markers are what every generator writes: the subcommands the hooks call,
+// and the name of the MCP server and extension entries.
+func mentionsDeja(b []byte) bool {
+	// The subcommands rather than the binary's name: a snapshot names whatever
+	// path deja was installed from, which need not end in "deja" at all.
+	for _, marker := range []string{
+		"hook-prompt", "hook-context", "hook-tool", "hook-goose", "hook-plan",
+		"hook-precompact", "hook-antigravity", "deja:", "\"deja\"", "deja-recall",
+	} {
+		if bytes.Contains(b, []byte(marker)) {
+			return true
+		}
+	}
+	return false
+}
 
 func writeIfChanged(path string, old, next []byte) (string, error) {
 	if bytes.Equal(old, next) {
@@ -674,12 +714,39 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
-	if err := backupOnce(path); err != nil {
+	// Config files are very often symlinks into a dotfiles repository. Writing
+	// by rename would replace the link with a regular file: the repo stops
+	// tracking the config, and the next stow or chezmoi run either clobbers
+	// deja's wiring or stops on a conflict. Follow the link and write where it
+	// points, so the link stays a link and the change lands in the repo.
+	// A dangling link has nothing to follow and keeps the old behaviour.
+	if resolved, rerr := filepath.EvalSymlinks(path); rerr == nil && resolved != path {
+		path = resolved
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return "", err
+		}
+	}
+	if _, err := backupOnce(path); err != nil {
 		return "", err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
-	if err != nil {
-		return "", err
+	// On the way out, a snapshot that itself contains deja's wiring is deja's
+	// own and nothing the user asked to keep: leaving it puts a file naming a
+	// binary they just removed back in their config directory. Ownership is
+	// read from the content rather than from who wrote it — installing a
+	// harness whose config deja edits twice takes the snapshot on the second
+	// write, so the uninstall that meets it did not create it and would
+	// otherwise leave it (goose). A backup with no deja in it is the user's.
+	if removingWiring {
+		defer func() {
+			bak := path + ".bak"
+			if b, err := os.ReadFile(bak); err == nil && mentionsDeja(b) {
+				_ = os.Remove(bak)
+			}
+		}()
+	}
+	tmp, terr := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
+	if terr != nil {
+		return "", terr
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
@@ -1400,7 +1467,7 @@ func installTargetNames() []string {
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",
-		"grok", "copilot", "roo", "aider",
+		"grok", "grok-auto", "copilot", "roo", "aider",
 		"statusline",
 	}
 }

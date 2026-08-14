@@ -178,7 +178,10 @@ var commands = map[string]command{
 	// an editor, and launching one from a search is not a mistake worth
 	// making. See cmdAider/cmdGoose.
 	"hook-goose": cmdGooseHook,
-	"blame":      runBlame,
+	"hook-goose-prompt": func(dir string, _ []string) error {
+		return refreshGooseForPrompt(dir, readHookStdin())
+	},
+	"blame": runBlame,
 }
 
 func run(args []string) error {

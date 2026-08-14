@@ -3,6 +3,7 @@ package sources
 import (
 	"encoding/json"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -98,6 +99,11 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 	})
 	if len(s.Messages) == 0 {
 		return nil, err
+	}
+	if s.Project == "-" || s.Project == "" {
+		if p := antigravityProjectFromFiles(s.Messages); p != "" {
+			s.Project = p
+		}
 	}
 	return []model.Session{s}, err
 }
@@ -225,5 +231,88 @@ func antigravityProject(id string) string {
 			}
 		}
 	}
+	// conversation_metadata.json is written by the IDE. The CLI never appears
+	// in it, so every `agy` session landed with no project — and a session
+	// with no project is invisible to recall, which ranks within the project
+	// the user is in. The CLI records the mapping in its own cache instead.
+	for _, root := range AntigravityRoots() {
+		b, err := os.ReadFile(filepath.Join(root, "cache", "last_conversations.json"))
+		if err != nil {
+			continue
+		}
+		var byWorkspace map[string]string
+		if json.Unmarshal(b, &byWorkspace) != nil {
+			continue
+		}
+		for workspace, conv := range byWorkspace {
+			if workspace == "" {
+				continue
+			}
+			if strings.HasPrefix(conv, id) || strings.HasPrefix(id, conv) {
+				return projectName(workspace)
+			}
+		}
+	}
 	return "-"
+}
+
+// isAbsolutePath accepts both conventions, not the host's. A synced store
+// holds whatever the machine that wrote it used.
+func isAbsolutePath(p string) bool {
+	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\\`) {
+		return true
+	}
+	// C:\src or C:/src
+	return len(p) > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')
+}
+
+// slashed puts a path in one convention so the segment arithmetic below reads
+// the same on either host. Go's own path handling accepts forward slashes on
+// Windows, so nothing has to be converted back.
+func slashed(p string) string { return strings.ReplaceAll(p, `\`, "/") }
+
+// antigravityProjectFromFiles reads the project off the work itself.
+//
+// The CLI's cache holds only the newest conversation per workspace, so
+// yesterday's sessions — the ones recall exists to surface — have no entry by
+// the time they matter. The files a session opened do not expire: the deepest
+// directory shared by all of them is the checkout it ran in.
+func antigravityProjectFromFiles(messages []model.Message) string {
+	var common []string
+	for _, m := range messages {
+		// Absolute either way round: a store synced from Windows holds
+		// C:\src\main.go, and requiring a leading slash dropped every one of
+		// those — on Windows itself, no CLI session would ever find its
+		// project. Split on both separators for the same reason CrossBase
+		// exists.
+		if m.Role != RoleFiles || !isAbsolutePath(m.Text) {
+			continue
+		}
+		parts := strings.Split(path.Dir(slashed(m.Text)), "/")
+		if common == nil {
+			common = parts
+			continue
+		}
+		n := 0
+		for n < len(common) && n < len(parts) && common[n] == parts[n] {
+			n++
+		}
+		common = common[:n]
+	}
+	// Three segments past the root is "/Users/<name>" — a home directory,
+	// which names no project.
+	if len(common) < 4 {
+		return ""
+	}
+	dir := strings.Join(common, "/")
+	// A session that touched one file deep in a tree shares only that file's
+	// own directory, which is a package and not the project. The checkout
+	// above it is the answer whenever it is still on disk.
+	for probe, depth := dir, len(common); depth >= 4; depth-- {
+		if fi, err := os.Stat(filepath.Join(probe, ".git")); err == nil && (fi.IsDir() || fi.Mode().IsRegular()) {
+			return projectName(probe)
+		}
+		probe = path.Dir(probe)
+	}
+	return projectName(dir)
 }
