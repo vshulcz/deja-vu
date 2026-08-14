@@ -58,7 +58,7 @@ func TestBuildProgressRepaintErasesItsOwnHeight(t *testing.T) {
 	}
 	buf.Reset()
 	p.paint(2)
-	if p.painted <= len(loopArt) {
+	if p.painted <= len(catArt) {
 		t.Fatalf("a column of 21 stores still drew only %d lines", p.painted)
 	}
 	plain := ansiRE.ReplaceAllString(buf.String(), "")

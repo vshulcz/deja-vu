@@ -13,29 +13,24 @@ import (
 // and the first index build. Everywhere else deja lives in pipes, hooks and
 // status bars, where a banner is noise.
 //
-// loopArt is the rewind-loop from logo.svg rendered to half-block cells with
-// the same purple-to-teal gradient, neofetch style: art on the left, an info
-// column on the right. It is generated from the vector mark, not hand-drawn
-// (scripts live outside the repo; regenerate by rasterizing logo.svg at
-// 2x2 quadrant cells and mapping to the xterm-256 cube).
-var loopArt = []string{
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;104m▗\x1b[38;5;104m▄\x1b[38;5;68m▄\x1b[38;5;68m▟\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;104m▄\x1b[38;5;104m▟\x1b[38;5;104m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▛\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;104m▄\x1b[38;5;104m█\x1b[38;5;104m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▛\x1b[38;5;68m▀\x1b[38;5;68m▀\x1b[38;5;68m▘\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;104m▗\x1b[38;5;104m█\x1b[38;5;104m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▀\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[38;5;104m▗\x1b[38;5;104m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▛\x1b[38;5;68m▘\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▛\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▗\x1b[38;5;74m▄\x1b[38;5;74m▄\x1b[38;5;74m▟\x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[38;5;68m▐\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▘\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m▄\x1b[38;5;68m▄\x1b[38;5;68m▄\x1b[38;5;68m▄\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▗\x1b[38;5;74m▟\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▌\x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[38;5;68m▐\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m▐\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▌\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▗\x1b[38;5;74m▟\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▌\x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[38;5;68m▐\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▖\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▀\x1b[38;5;74m▀\x1b[38;5;74m▀\x1b[38;5;74m▀\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▜\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▌\x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▙\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▟\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m▝\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m▙\x1b[38;5;68m▖\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▗\x1b[38;5;74m▟\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▘\x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m▝\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;68m█\x1b[38;5;74m▄\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▄\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▘\x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;68m▀\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▙\x1b[38;5;74m▄\x1b[38;5;74m▄\x1b[38;5;74m▖\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▗\x1b[38;5;74m▄\x1b[38;5;74m▄\x1b[38;5;74m▟\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▀\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▀\x1b[38;5;74m▜\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▛\x1b[38;5;74m▀\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[38;5;74m▝\x1b[38;5;74m▀\x1b[38;5;74m▀\x1b[38;5;74m▜\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m█\x1b[38;5;74m▛\x1b[38;5;74m▀\x1b[38;5;74m▀\x1b[38;5;74m▘\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
-	"\x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m \x1b[0m\x1b[0m",
+// catArt is the mark drawn as a 24x22 pixel sprite and printed as half blocks,
+// which fit two pixel rows into one cell and so cost eleven lines for twenty-two
+// rows of detail. Every feature sits on a whole pair of rows and every colour
+// band starts on an even row: split either across a cell boundary and the cell
+// has to carry two colours, which prints as a seam. The palette is the one the
+// old mark used, kept because a white cat vanishes on a light background.
+var catArt = []string{
+	"   \x1b[38;5;104m▄█▄\x1b[0m          \x1b[38;5;104m▄█▄\x1b[0m     \x1b[0m",
+	"   \x1b[38;5;104m████▄\x1b[0m      \x1b[38;5;104m▄████\x1b[0m     \x1b[0m",
+	"  \x1b[38;5;104m▄████████████████▄\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;68m██████████████████\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;68m███▀▄▄▀████▀▄▄▀███\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;68m████████\x1b[38;5;68m\x1b[48;5;208m▀\x1b[0m\x1b[38;5;68m\x1b[48;5;208m▀\x1b[0m\x1b[38;5;68m████████\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;68m▀██████▀▄▄▀██████▀\x1b[0m    \x1b[0m",
+	"    \x1b[38;5;74m▀████████████▀\x1b[0m \x1b[38;5;74m██\x1b[0m   \x1b[0m",
+	"     \x1b[38;5;74m████████████\x1b[0m  \x1b[38;5;74m██\x1b[0m   \x1b[0m",
+	"    \x1b[38;5;74m▄████████████▄▄█▀\x1b[0m   \x1b[0m",
+	"    \x1b[38;5;74m▀████▀▀▀▀████▀▀▀\x1b[0m    \x1b[0m",
 }
 
 const (
@@ -76,14 +71,14 @@ func defaultLogoWanted(f *os.File) bool {
 }
 
 // logoInfoCol is where the info column starts when the terminal has room for
-// it. The mark is a fixed 40-column block, so this is a two-space margin plus
-// the mark.
-const logoInfoCol = 42
+// it. The mark is a fixed 24-column block, so this is a two-space margin, the
+// mark, and a four-column gutter.
+const logoInfoCol = 30
 
 // logoArtWidth is the widest line of the mark itself, without the margin.
 func logoArtWidth() int {
 	w := 0
-	for _, a := range loopArt {
+	for _, a := range catArt {
 		if n := visibleLen(a); n > w {
 			w = n
 		}
@@ -119,12 +114,12 @@ func logoInfoStart(info []string) (col int, stacked bool) {
 // layout has to be shared with printLogo rather than reimplemented.
 func logoLines(info []string) []string {
 	col, stacked := logoInfoStart(info)
-	out := make([]string, 0, len(loopArt)+len(info)+2)
+	out := make([]string, 0, len(catArt)+len(info)+2)
 	out = append(out, "")
 	if stacked {
 		// Too narrow for two columns. The mark still fits on its own, so keep
 		// it and put the numbers underneath rather than shredding both.
-		for _, a := range loopArt {
+		for _, a := range catArt {
 			out = append(out, "  "+a)
 		}
 		out = append(out, "")
@@ -137,11 +132,11 @@ func logoLines(info []string) []string {
 		}
 		return append(out, "")
 	}
-	top := (len(loopArt) - len(info)) / 2
+	top := (len(catArt) - len(info)) / 2
 	if top < 0 {
 		top = 0
 	}
-	for i, a := range loopArt {
+	for i, a := range catArt {
 		line := "  " + a
 		if j := i - top; j >= 0 && j < len(info) && info[j] != "" {
 			line += spaces(col-2-visibleLen(a)) + info[j]
@@ -151,7 +146,7 @@ func logoLines(info []string) []string {
 	// An info column taller than the mark keeps going underneath it rather
 	// than being cut off: sixteen harnesses plus a header already overflow,
 	// so the last stores were silently dropped from the greeting.
-	for j := len(loopArt) - top; j < len(info); j++ {
+	for j := len(catArt) - top; j < len(info); j++ {
 		if j < 0 {
 			continue
 		}

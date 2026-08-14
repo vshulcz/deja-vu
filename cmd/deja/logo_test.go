@@ -17,8 +17,8 @@ func TestPrintLogo(t *testing.T) {
 	if !strings.Contains(out, "█") || !strings.Contains(out, "deja-vu") || !strings.Contains(out, "memory for coding agents") {
 		t.Fatalf("logo output: %q", out)
 	}
-	if n := len(strings.Split(strings.TrimSpace(out), "\n")); n != len(loopArt) {
-		t.Fatalf("mark should be %d lines, got %d: %q", len(loopArt), n, out)
+	if n := len(strings.Split(strings.TrimSpace(out), "\n")); n != len(catArt) {
+		t.Fatalf("mark should be %d lines, got %d: %q", len(catArt), n, out)
 	}
 }
 
