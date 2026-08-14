@@ -54,6 +54,13 @@ type harness struct {
 	// could break the second is real — deja suppresses recall it has already
 	// injected into a session, and the plugins cache per prompt.
 	resume func(prompt, base, model string) []string
+	// wrongProduct reports that the binary on PATH is not the product deja
+	// wires, and why. Two different tools ship as `grok`: xAI's Grok Build,
+	// which reads Claude-shaped hooks out of ~/.grok, and a community CLI of
+	// the same name that shares the directory and reads none. Running the
+	// second and reporting "no recall" blames deja for a harness it was never
+	// talking to.
+	wrongProduct func() string
 	// toolHook marks a harness deja wires a PreToolUse hook into. That hook
 	// speaks at the moment of an action rather than at the start of a session,
 	// and nothing exercised it until the mock learned to answer with a tool
@@ -75,25 +82,25 @@ func harnesses() []harness {
 			}, nil, false,
 			func(p, _, _ string) []string {
 				return []string{"-p", p, "--continue", "--permission-mode", "bypassPermissions"}
-			}, true, false},
+			}, nil, true, false},
 		{"opencode", "opencode-auto", "opencode",
 			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false,
-			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, false, false},
+			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, nil, false, false},
 		{"codex", "codex-auto", "codex",
-			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, true, false},
+			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, nil, true, false},
 		{"goose", "goose-auto", "goose",
 			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true,
 			// Bare goose has no working prompt channel: it discards hook stdout,
 			// and .goosehints is read once when the session opens. MOIM, which is
 			// re-read every turn, is env-only — so the wrapper arm below is where
 			// goose recalls for the question.
-			nil, false, true},
+			nil, nil, false, true},
 		{"qwen", "qwen-auto", "qwen",
-			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, false, false},
+			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, nil, false, false},
 		{"grok", "grok-auto", "grok",
 			func(p, base, model string) []string {
 				return []string{"-p", p, "-u", base, "-k", "local", "-m", model}
-			}, nil, false, nil, true, false},
+			}, nil, false, nil, grokIsTheOtherProduct, true, false},
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
@@ -103,13 +110,13 @@ func harnesses() []harness {
 					// browser once per arm, on the machine running the sweep.
 					"--no-analytics", "--no-browser", "--no-check-update",
 					"--no-show-release-notes", "--message", p}
-			}, nil, true, nil, false, true},
+			}, nil, true, nil, nil, false, true},
 		// Both of these were assumed to need an account and were left out for
 		// it. Neither does: cline takes any OpenAI-compatible base URL, and
 		// openclaw takes a provider block in its own config.
 		{"cline", "cline-auto", "cline",
 			func(p, _, _ string) []string { return []string{"--auto-approve", "true", p} },
-			setupCline, false, nil, false, false},
+			setupCline, false, nil, nil, false, false},
 		{"openclaw", "openclaw-auto", "openclaw",
 			func(p, _, model string) []string {
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
@@ -121,7 +128,7 @@ func harnesses() []harness {
 				// The same key is the same session.
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
 					"--session-key", "harnesssweep"}
-			}, false, false},
+			}, nil, false, false},
 		{"kimi", "kimi-auto", "kimi",
 			func(p, _, model string) []string {
 				// -p is already non-interactive; kimi refuses both --auto and
@@ -130,8 +137,28 @@ func harnesses() []harness {
 			}, setupKimi, false,
 			func(p, _, model string) []string {
 				return []string{"-p", p, "-c", "-m", "mock/" + model}
-			}, false, false},
+			}, nil, false, false},
 	}
+}
+
+// grokIsTheOtherProduct returns a reason to skip when the `grok` on PATH is
+// the community CLI rather than xAI's Grok Build. It has no hook system at
+// all — only MCP — so deja's hooks sit in ~/.grok unread, and a sweep that
+// does not say so reports a defect against the wrong program.
+func grokIsTheOtherProduct() string {
+	out, err := exec.Command("grok", "--help").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	help := strings.ToLower(string(out))
+	if strings.Contains(help, "hook") {
+		return ""
+	}
+	if strings.Contains(help, "conversational ai cli") || strings.Contains(help, "--base-url") {
+		return "the `grok` on PATH is the community CLI, which has no hooks; " +
+			"deja wires xAI's Grok Build"
+	}
+	return ""
 }
 
 func setupKimi(home, base, model string) error {
@@ -351,6 +378,12 @@ func main() {
 		if _, err := exec.LookPath(h.bin); err != nil {
 			fmt.Printf("%-10s SKIP  %s is not installed\n", h.name, h.bin)
 			continue
+		}
+		if h.wrongProduct != nil {
+			if why := h.wrongProduct(); why != "" {
+				fmt.Printf("%-10s SKIP  %s\n", h.name, why)
+				continue
+			}
 		}
 		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, *prompt2, *answer2, true, false)
 		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, "", "", false, false)
