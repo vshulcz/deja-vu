@@ -33,4 +33,3 @@ History entries map to one-message sessions with role `user` and project `histor
 - Older records use `payload.message`; current records generally use structured `payload.content`.
 
 **Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c

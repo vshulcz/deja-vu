@@ -391,7 +391,7 @@
     "fixtures/registry/copilot/7cf44517-55ca-435c-893a-3fde1973a44e/events.jsonl"
    ],
    "parser_source": "internal/sources/copilot.go",
-   "last_verified": "2026-07-20",
+   "last_verified": "2026-08-14",
    "display_name": "Copilot CLI",
    "capabilities": {
     "mcp": true,

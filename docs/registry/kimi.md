@@ -20,3 +20,5 @@ histories under `agents/agent-*`, tool payloads and media are out of scope.
 
 Requested and specified by [@yearth](https://github.com/yearth) in
 [#248](https://github.com/vshulcz/deja-vu/issues/248).
+
+**Last verified:** 2026-07-28

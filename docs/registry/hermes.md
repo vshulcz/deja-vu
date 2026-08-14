@@ -15,3 +15,5 @@ profile name stands in for the project.
 - **Handoff**: paste.
 
 Requested in [#355](https://github.com/vshulcz/deja-vu/issues/355).
+
+**Last verified:** 2026-07-28

@@ -25,5 +25,4 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 - The chats tree also contains non-session JSON such as checkpoints; files without a valid session ID and messages are ignored.
 - Nested subagent chat files occur below a parent chat directory.
 
-**Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c
+**Last verified:** 2026-07-24

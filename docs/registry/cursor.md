@@ -33,4 +33,3 @@ Only `user` and `assistant` roles are retained. Content follows the Anthropic st
 - SQLite text is capped at 64 KiB. CLI subagent duplication is opt-in.
 
 **Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c

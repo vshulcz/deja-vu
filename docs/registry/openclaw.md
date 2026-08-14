@@ -24,3 +24,5 @@ deja reads. Format verified against openclaw source
   calls `recall` mid-turn.
 - **Resume**: OpenClaw's own session continuity.
 - **Handoff**: paste.
+
+**Last verified:** 2026-07-23

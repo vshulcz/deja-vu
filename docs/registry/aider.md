@@ -30,5 +30,4 @@ The header timestamp uses local time with layout `YYYY-MM-DD HH:MM:SS`. aider do
 - Tool output terminates an assistant block but does not become a message.
 - Moving a history file changes deja's derived session IDs because the path is part of the ID.
 
-**Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c
+**Last verified:** 2026-07-27

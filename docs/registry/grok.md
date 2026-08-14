@@ -35,5 +35,4 @@ Consecutive assistant chunks with the same `promptId` are joined. Consecutive us
 - Missing summary files fall back to directory IDs and the `.cwd` or URL-decoded path.
 - Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.
 
-**Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c
+**Last verified:** 2026-07-27

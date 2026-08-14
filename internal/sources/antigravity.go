@@ -128,7 +128,7 @@ func cleanAntigravityUserContent(text string) string {
 // RUN_COMMAND names its command on a "Task Description:" line, VIEW_FILE and
 // CODE_ACTION name their file. So the same change that stops shell output
 // being ranked as speech also gives antigravity the file and command records
-// the four supported harnesses have.
+// the other harnesses with work records have.
 func antigravityStep(kind, text string, t time.Time) []model.Message {
 	if kind == "PLANNER_RESPONSE" || kind == "" {
 		return []model.Message{{Role: "assistant", Text: text, Time: t}}

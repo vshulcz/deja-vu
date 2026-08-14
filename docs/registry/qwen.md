@@ -23,4 +23,3 @@ Each line is a JSON object with `type`, `sessionId`, `timestamp`, and a `message
 - Project path encoding is ambiguous because `-` represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.
 
 **Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c

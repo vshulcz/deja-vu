@@ -30,4 +30,3 @@ the same target — starts it directly. Verified on agy 1.1.7.
 - If a timestamp is absent, later messages fall back to the session start when one has already been observed.
 
 **Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c

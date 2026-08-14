@@ -30,6 +30,6 @@ Open an issue with the harness name and version, operating system, observed stor
 2. Add a synthetic fixture that contains no user data or credentials.
 3. Add or update the `registry.json` entry. Paths are repository-relative; store paths use environment-variable placeholders where applicable.
 4. Update the parser and its focused tests, then run the registry conformance test and the full suite.
-5. Set **Last verified** to the observation date and **deja parser version** to the version used for verification.
+5. Set **Last verified** to the observation date, here and in `registry.json` — those two are compared, so a page cannot claim a check the registry does not have.
 
 SQLite fixture sources are stored as SQL so changes remain reviewable. The conformance test materializes them in a temporary directory before parsing.

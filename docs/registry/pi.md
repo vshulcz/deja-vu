@@ -76,3 +76,5 @@ pi does not include built-in MCP but supports it via the `pi-mcp-adapter` packag
 - Project directory encoding uses `--` prefix and suffix (e.g. `--Users-max-code-foo--`) compared to Claude Code's single `-` prefix. The `resolveEncodedPath` function handles both.
 - Version field observed: `3`. No version migration behavior is known.
 - The `parentId` chain forms a tree, not a flat list; deja ignores the tree structure and processes messages in file order.
+
+**Last verified:** 2026-07-19

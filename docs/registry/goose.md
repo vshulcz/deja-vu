@@ -17,3 +17,5 @@ seconds) and `content` blocks (`type: text` only for v1). SQLite: `sessions` joi
 - **Handoff**: paste — no documented start-with-prompt flag.
 
 Requested in [#255](https://github.com/vshulcz/deja-vu/issues/255).
+
+**Last verified:** 2026-07-28

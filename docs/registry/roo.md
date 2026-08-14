@@ -16,3 +16,5 @@ serves it to other agents rather than injecting into Roo itself.
   (`mcp_settings.json`); point it at `deja mcp` manually if desired.
 - **Resume**: extension UI only.
 - **Handoff**: paste.
+
+**Last verified:** 2026-07-27

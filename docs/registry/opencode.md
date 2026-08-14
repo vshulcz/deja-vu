@@ -32,4 +32,3 @@ Only parts with `type: "text"` are messages. The role comes from `message.data.r
 - The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.
 
 **Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c

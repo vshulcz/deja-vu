@@ -24,4 +24,3 @@ Message records have `type`, `sessionId`, `timestamp`, and a `message` object. `
 - Subagent logs largely duplicate parent content and are opt-in.
 
 **Last verified:** 2026-07-17
-**deja parser version:** v0.12.0-1-g9e2088c
