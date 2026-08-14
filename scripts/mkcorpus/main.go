@@ -27,10 +27,18 @@ import (
 
 // The one fact a sweep asks about, planted deep enough that the ranking has to
 // find it rather than stumble on it.
-const (
-	answerQuestion = "how often does the deploy token for the billing gateway rotate?"
-	answerFact     = "we settled it: the billing gateway deploy token rotates every 47 days, pinned to the vault lease"
-)
+//
+// The interval is a flag, not a constant, because an agent with tools reads
+// the repository: given permission to run commands, antigravity answered "47
+// days" from this file with no memory involved at all, in the arm that was
+// supposed to have none. A sweep that wants an answer only memory can give
+// passes -interval with a number this checkout does not contain.
+const answerQuestion = "how often does the deploy token for the billing gateway rotate?"
+
+func answerFact(days int) string {
+	return fmt.Sprintf("we settled it: the billing gateway deploy token rotates every %d days, "+
+		"pinned to the vault lease", days)
+}
 
 var chatter = [][2]string{
 	{"the login page flashes on reload", "a layout shift: the avatar image had no width attribute"},
@@ -108,6 +116,9 @@ func main() {
 	out := flag.String("out", "", "where to write the corpus")
 	project := flag.String("project", "-Users-you-code-deja-vu",
 		"the transcript directory name, which is the project deja records")
+	interval := flag.Int("interval", 47,
+		"the rotation interval the planted fact states; pass a number this "+
+			"checkout does not contain so an agent with tools cannot grep it")
 	flag.Parse()
 	if *out == "" {
 		fmt.Fprintln(os.Stderr, "mkcorpus: -out is required")
@@ -135,7 +146,7 @@ func main() {
 	for i, c := range chatter {
 		turns := []turn{say("user", c[0]), say("assistant", c[1])}
 		if i == 1 {
-			turns = append([]turn{say("user", answerQuestion), say("assistant", answerFact)}, turns...)
+			turns = append([]turn{say("user", answerQuestion), say("assistant", answerFact(*interval))}, turns...)
 		}
 		fail(w.session(fmt.Sprintf("chat-%02d", i), turns))
 	}
