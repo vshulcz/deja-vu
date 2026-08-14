@@ -361,6 +361,19 @@ type toolDialect struct {
 	// with a path and an old_string, which is how the Claude decoder has always
 	// read MultiEdit's sub-edits.
 	editTools map[string]bool
+	// oldKey names the argument holding the text an edit replaced. Copilot
+	// calls it old_str where Claude calls it old_string, and reading the wrong
+	// one loses the only record of what stopped existing. Empty means
+	// old_string.
+	oldKey string
+}
+
+// oldSpanKey is oldKey with its default applied.
+func (d toolDialect) oldSpanKey() string {
+	if d.oldKey == "" {
+		return "old_string"
+	}
+	return d.oldKey
 }
 
 var claudeDialect = toolDialect{
@@ -430,7 +443,7 @@ func editSpansIn(v any, d toolDialect) []string {
 		if path == "" {
 			continue
 		}
-		old, _ := in["old_string"].(string)
+		old, _ := in[d.oldSpanKey()].(string)
 		spans := []string{old}
 		if edits, ok := in["edits"].([]any); ok {
 			for _, e := range edits {
@@ -438,7 +451,7 @@ func editSpansIn(v any, d toolDialect) []string {
 				if !ok {
 					continue
 				}
-				o, _ := em["old_string"].(string)
+				o, _ := em[d.oldSpanKey()].(string)
 				spans = append(spans, o)
 			}
 		}

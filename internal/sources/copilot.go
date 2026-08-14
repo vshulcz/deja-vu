@@ -34,6 +34,18 @@ func ParseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 	return parseCopilotFileFromOffset(path, offset)
 }
 
+// copilotDialect is Copilot's tool vocabulary, read off events.jsonl its own
+// CLI wrote. Names are lowercase where Claude's are capitalised, the file key
+// is `path`, and the replaced span is `old_str` rather than `old_string` —
+// reading the wrong one loses the only record of what stopped existing.
+var copilotDialect = toolDialect{
+	pathKey:   "path",
+	pathTools: map[string]bool{"edit": true, "read": true, "write": true, "create": true},
+	shellTool: "bash",
+	editTools: map[string]bool{"edit": true},
+	oldKey:    "old_str",
+}
+
 func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	s := model.Session{
 		Harness: "copilot",
@@ -70,6 +82,55 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 			if txt, _ := data["content"].(string); txt != "" {
 				s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 			}
+		case "tool.execution_start":
+			// The call carries the work: which file, what it replaced, what
+			// command ran. Copilot files these outside the message stream, so
+			// the assistant turns that do nothing but call tools were being
+			// stored as empty and the work was reachable from nothing.
+			if data == nil {
+				return
+			}
+			name, _ := data["toolName"].(string)
+			args, _ := data["arguments"].(map[string]any)
+			if name == "" || args == nil {
+				return
+			}
+			part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
+			var records []model.Message
+			if IndexToolPaths() {
+				if p := toolPathsIn(part, copilotDialect); p != "" {
+					records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
+				}
+			}
+			if IndexEdits() {
+				for _, span := range editSpansIn(part, copilotDialect) {
+					records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
+				}
+			}
+			if IndexCommands() {
+				for _, cmd := range commandsIn(part, copilotDialect) {
+					records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+				}
+			}
+			if len(records) == 0 {
+				return
+			}
+			s.Touch(t)
+			s.Messages = append(s.Messages, records...)
+		case "tool.execution_complete":
+			// Kept whether or not the call succeeded: the error a command hit
+			// is exactly what a later search reaches for, and copilot's own
+			// failure text was unreachable before this.
+			if !IndexToolOutput() || data == nil {
+				return
+			}
+			result, _ := data["result"].(map[string]any)
+			out, _ := result["content"].(string)
+			if out = strings.TrimSpace(out); out == "" {
+				return
+			}
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
 		}
 	})
 	if len(s.Messages) == 0 {
