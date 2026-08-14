@@ -642,7 +642,9 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.16.7...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/vshulcz/deja-vu/compare/v0.17.0...v0.17.1
+[0.17.0]: https://github.com/vshulcz/deja-vu/compare/v0.16.9...v0.17.0
 [0.16.7]: https://github.com/vshulcz/deja-vu/compare/v0.16.6...v0.16.7
 [0.16.1]: https://github.com/vshulcz/deja-vu/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vshulcz/deja-vu/compare/v0.15.7...v0.16.0
