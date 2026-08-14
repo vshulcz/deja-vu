@@ -64,6 +64,13 @@ type harness struct {
 
 func harnesses() []harness {
 	return []harness{
+		{"claude", "claude-auto", "claude",
+			func(p, _, _ string) []string {
+				return []string{"-p", p, "--permission-mode", "bypassPermissions"}
+			}, nil, false,
+			func(p, _, _ string) []string {
+				return []string{"-p", p, "--continue", "--permission-mode", "bypassPermissions"}
+			}, false},
 		{"opencode", "opencode-auto", "opencode",
 			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false,
 			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, false},
@@ -388,7 +395,22 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer, pro
 		"DEJA_INDEX_DIR="+filepath.Join(home, "idx"),
 		"OPENAI_API_KEY=local", "OPENAI_BASE_URL="+base, "OPENAI_API_BASE="+base,
 		"OPENAI_MODEL="+model, "OPENAI_HOST="+strings.TrimSuffix(base, "/v1"),
-		"OPENAI_BASE_PATH=v1/chat/completions")
+		"OPENAI_BASE_PATH=v1/chat/completions",
+		// Claude Code speaks the messages API, which the mock also serves, and
+		// it takes the endpoint from the environment. It is the harness deja
+		// is most used with and it was not in this sweep at all.
+		"ANTHROPIC_BASE_URL="+strings.TrimSuffix(base, "/v1"),
+		"ANTHROPIC_AUTH_TOKEN=local", "ANTHROPIC_API_KEY=local",
+		"ANTHROPIC_MODEL=claude-mock", "ANTHROPIC_SMALL_FAST_MODEL=claude-mock",
+		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
+		// Nothing in a sweep may open a browser on the machine running it.
+		// aider's flags were not enough — it still reached for one — and
+		// Python's webbrowser obeys BROWSER, so point it at a command that
+		// does nothing. The rest are the per-tool switches, set as env so they
+		// hold for any invocation, including the wrapper's.
+		"BROWSER=true", "AIDER_ANALYTICS=false", "AIDER_ANALYTICS_DISABLE=1",
+		"AIDER_CHECK_UPDATE=false", "AIDER_SHOW_RELEASE_NOTES=false",
+		"DO_NOT_TRACK=1")
 
 	deja := func(args ...string) {
 		cmd := exec.Command(exe, args...)
