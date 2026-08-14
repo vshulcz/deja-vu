@@ -218,7 +218,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	rememberInjected(dir, input.SessionID, ss)
 	// "You have been here" on the strength of one word teaches the user to
 	// ignore the line. The recall itself still goes in.
-	showLine := confident && dejaVuLineDue(dir)
+	showLine := confident && dejaVuLineDue(dir, input.SessionID)
 	// The payload is sized to the claim. Two informative terms is a real match
 	// and earns the digest; a single rare term is a hint, and a hint that costs
 	// a full digest on every message is most of what deja spends. The pointer
@@ -603,14 +603,78 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 // dejaVuLineDue rate-limits the visible line: a déjà vu that fires every
 // prompt is wallpaper, and wallpaper trains the user to ignore the real
 // moments. Context still flows to the agent regardless.
-func dejaVuLineDue(dir string) bool {
+//
+// The limit is per session, not per machine. Keyed on the index alone it also
+// silenced sessions that had never shown a line at all: on one index, four
+// fresh sessions inside twenty minutes received recall and one of them said
+// so. The people deja is for run several agents at once, so that was the
+// common case rather than the corner. A session with no id — a host that
+// sends none — falls back to the machine-wide window, which is the old
+// behaviour and still better than talking on every prompt.
+func dejaVuLineDue(dir, sid string) bool {
 	p := dir + ".dejavu"
+	now := time.Now()
+	if sid == "" {
+		if b, err := os.ReadFile(p); err == nil {
+			for _, line := range strings.Split(string(b), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) != 2 || fields[0] != "-" {
+					continue
+				}
+				if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
+					now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
+					return false
+				}
+			}
+		}
+		return recordDejaVuLine(p, "-", now)
+	}
 	if b, err := os.ReadFile(p); err == nil {
-		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && time.Since(time.Unix(ts, 0)) < 20*time.Minute {
-			return false
+		for _, line := range strings.Split(string(b), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) != 2 || fields[0] != sid {
+				continue
+			}
+			if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
+				now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
+				return false
+			}
 		}
 	}
-	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	return recordDejaVuLine(p, sid, now)
+}
+
+const (
+	dejaVuLineWindow = 20 * time.Minute
+	// dejaVuLineKeep bounds the file: one line per session that saw a notice
+	// recently, and an agent fleet is tens rather than thousands. Entries
+	// older than the window are dropped on every write, so this only caps a
+	// burst.
+	dejaVuLineKeep = 64
+)
+
+// recordDejaVuLine stamps this session and rewrites the file without the
+// entries that have aged out. It reports true so callers can return it
+// directly: failing to write is not a reason to withhold the line.
+func recordDejaVuLine(path, sid string, now time.Time) bool {
+	kept := []string{sid + " " + strconv.FormatInt(now.Unix(), 10)}
+	if b, err := os.ReadFile(path); err == nil {
+		for _, line := range strings.Split(string(b), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) != 2 || fields[0] == sid {
+				continue
+			}
+			ts, err := strconv.ParseInt(fields[1], 10, 64)
+			if err != nil || now.Sub(time.Unix(ts, 0)) >= dejaVuLineWindow {
+				continue
+			}
+			if len(kept) >= dejaVuLineKeep {
+				break
+			}
+			kept = append(kept, line)
+		}
+	}
+	_ = os.WriteFile(path, []byte(strings.Join(kept, "\n")+"\n"), 0o600)
 	return true
 }
 
