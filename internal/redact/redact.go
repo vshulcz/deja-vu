@@ -340,6 +340,24 @@ func isHexish(s string) bool {
 	return true
 }
 
+// looksLikePath reports whether a token is a filesystem path rather than
+// something that merely contains slashes. Rooted, more than one separator, and
+// carrying none of the punctuation a credential or a URL brings with it — a
+// base64 blob has no leading slash, and `https://…` and `key:value` both fail
+// on the characters they are named for.
+func looksLikePath(tok string) bool {
+	if !strings.HasPrefix(tok, "/") && !strings.HasPrefix(tok, "~/") &&
+		!strings.HasPrefix(tok, "./") && !strings.HasPrefix(tok, "../") {
+		return false
+	}
+	if strings.Count(tok, "/") < 2 {
+		return false
+	}
+	// '=' is base64 padding and the assignment a secret arrives in; ':' is a
+	// scheme or a key. Either one means this is not a bare path.
+	return !strings.ContainsAny(tok, "=:")
+}
+
 func entropyCandidate(tok string) bool {
 	if len(tok) > 256 || isHexish(tok) || charClasses(tok) < 3 {
 		return false
@@ -347,6 +365,17 @@ func entropyCandidate(tok string) bool {
 	// Lowercase-only path segments sneak into the charset via '/' and '-';
 	// real secrets with slashes (base64) mix cases.
 	if strings.Contains(tok, "/") && strings.ToLower(tok) == tok {
+		return false
+	}
+	// A filesystem path is not a blob whatever its case. The lowercase rule
+	// above was standing in for "looks like base64", and a macOS scratch
+	// directory defeats it twice over: `-Users-<name>` supplies the uppercase
+	// and a uuid directory supplies the entropy, so `/private/tmp/…/<uuid>/…`
+	// scored as a secret. When the record was nothing but that path — the
+	// output of a `pwd` — the whole message became `[redacted:entropy]`, which
+	// destroys the content rather than masking it, and says a key was removed
+	// when none was there.
+	if looksLikePath(tok) {
 		return false
 	}
 	return shannonBits(tok) >= entropyMinBits
