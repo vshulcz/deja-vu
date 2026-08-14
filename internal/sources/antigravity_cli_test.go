@@ -125,6 +125,10 @@ func TestAntigravityProjectClimbsToTheCheckout(t *testing.T) {
 
 // End to end: a CLI transcript that no cache knows about still lands in the
 // project it was worked in.
+// The path goes into the fixture slashed, because the fixture is JSON: a
+// Windows path pasted in raw carries backslashes that JSON reads as escapes,
+// the line fails to decode, and the session arrives with no files at all — a
+// green test on one OS and an unexplained "-" on the other.
 func TestParseAntigravityCLISessionGetsAProject(t *testing.T) {
 	checkout := filepath.Join(t.TempDir(), "api-gateway")
 	if err := os.MkdirAll(filepath.Join(checkout, ".git"), 0o755); err != nil {
@@ -136,7 +140,7 @@ func TestParseAntigravityCLISessionGetsAProject(t *testing.T) {
 	}
 	_, transcript := antigravityTree(t)
 	body := `{"source":"USER_EXPLICIT","content":"why is the pool exhausted?","created_at":"2026-08-14T09:00:00Z","type":""}
-{"source":"MODEL","type":"VIEW_FILE","content":"Created At: 2026-08-14T09:00:01Z\nFile Path: file://` + filepath.Join(deep, "pool.go") + `\n\nthe pool is capped at 4","created_at":"2026-08-14T09:00:01Z"}
+{"source":"MODEL","type":"VIEW_FILE","content":"Created At: 2026-08-14T09:00:01Z\nFile Path: file://` + filepath.ToSlash(filepath.Join(deep, "pool.go")) + `\n\nthe pool is capped at 4","created_at":"2026-08-14T09:00:01Z"}
 {"source":"MODEL","type":"PLANNER_RESPONSE","content":"the pool is capped at 4","created_at":"2026-08-14T09:00:02Z"}
 `
 	if err := os.WriteFile(transcript, []byte(body), 0o644); err != nil {
