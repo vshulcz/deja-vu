@@ -7,12 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.17.1] - 2026-08-14
+
+Four harnesses were being handed memory chosen before the user had typed
+anything, and three sessions in four were helped without being told. Both were
+found the same way: by driving every installed harness against a recording
+endpoint and reading what actually arrived.
+
 ### Added
 - Grok Build gets auto-recall: it reads hooks from `~/.grok/hooks` in the same shape Claude Code uses, and deja now writes all four events there instead of leaving grok with MCP alone.
 - `/deja` reaches five more harnesses: opencode, Cursor and Roo Code read a markdown command, Gemini CLI a TOML one, and Goose a `slash_commands` entry in its config pointing at a recipe. It was Claude Code, Cline, Hermes and pi before.
+- Recall against the question you asked, in four more harnesses. Cline, OpenClaw, Goose and Gemini CLI each had a prompt-time channel deja was not using, so they were getting the session's opening context no matter what was typed next. (#1227)
+- Work records for Kimi Code and Copilot: the commands they ran and the files they changed are indexed, not just what was said. Both file that work outside the message stream, so it was reachable from nothing. (#1221, #1231)
+- Antigravity's CLI sessions carry a project. Its conversation metadata is written by the IDE, so every `agy` session parsed without one — and a session with no project is invisible to recall, which ranks within the project you are in. (#1227)
+- A benchmark for the first minute: install onto history you already have, and measure time to first correct answer, how much of that history was reachable, and hit@1/hit@5 on questions only it can answer. (#1215)
 
 ### Changed
 - Guidance is a skill rather than a block of text that sits in context all session. Eight harnesses — Cursor, Codex, Gemini CLI, Qwen Code, Kimi Code, Goose, OpenClaw and Roo Code — read one shared skill at `~/.agents/skills/`; Claude Code, opencode, Antigravity, Copilot, pi, Hermes and Cline each read their own place. Old blocks in `AGENTS.md`, `GEMINI.md`, `QWEN.md` and Roo's rules file are removed on the next install, and so are the per-harness skills an earlier version wrote.
+- A plainly worded question no longer excludes its own answer. When requiring every content word leaves only a handful of sessions, relevance ranking is hung underneath, and `found@50` went from 28/40 to 34/40 on a 1910-session corpus with `hit@1` unchanged. (#1226)
+- Before running a command deja has seen before, the line now says what happened last time rather than how often it was run. (#1228)
+- Redaction is faster on ordinary prose, transcripts are read with a pooled buffer, and the co-occurrence pass interns its tokens: peak memory on a full build drops from 619MB to 387MB. (#1226)
+
+### Fixed
+- You are told once per session rather than once per machine. The notice that deja recalled something was rate-limited against the index, so with several agents open only the first one said anything while all of them were being helped. (#1228)
+- A filesystem path is no longer redacted as a secret. A macOS scratch directory supplies both the case mix and the entropy the heuristic looked for, so a record that was nothing but a path was destroyed rather than masked. (#1233)
+- Imported sessions are indexed the way ingested ones are. Sync skipped date tokens, the tool bit and the tool-output cut, so a synced store could not answer "what did we do in may" and spent its budget differently from a rebuilt one. (#1223)
+- A recalled session is quoted at the line that matched, not the line it opened with, and receipts no longer stutter after the host's own prefix. (#1228)
+- `deja install --auto` no longer leaves Gemini, Qwen, Kimi and Cline without their MCP server; installing twice leaves what installing once left; a config reached through a symlink is written through rather than replaced; a CRLF config no longer gains a second `extensions:` key; and `deja doctor` prints its table on a machine without Claude Code. (#1227)
+- The date column holds one form per list, so two sessions a day apart no longer read as "6d ago" and "Jul 26". (#1232)
+- Windows CJK build cost is down without changing a byte of the index. (#1220)
 
 
 ## [0.17.0] - 2026-08-11
