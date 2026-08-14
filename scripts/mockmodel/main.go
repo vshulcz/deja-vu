@@ -85,6 +85,7 @@ func toolNames(raw json.RawMessage) []string {
 // completions, {type,name,parameters} on responses, {name,input_schema} on
 // messages.
 type declaredTool struct {
+	Type        string          `json:"type"`
 	Name        string          `json:"name"`
 	Parameters  json.RawMessage `json:"parameters"`
 	InputSchema json.RawMessage `json:"input_schema"`
@@ -92,6 +93,11 @@ type declaredTool struct {
 		Name       string          `json:"name"`
 		Parameters json.RawMessage `json:"parameters"`
 	} `json:"function"`
+	// Tools is the namespace form: codex declares an MCP server as one entry
+	// of type "namespace" holding the server's tools, rather than one flat
+	// entry per tool. Calling the namespace itself does nothing, which is
+	// what made codex the only harness whose MCP arm came back empty.
+	Tools []declaredTool `json:"tools"`
 }
 
 func (d declaredTool) name() string {
@@ -164,6 +170,12 @@ func recallTool(raw json.RawMessage, query string) (string, string) {
 		if !strings.Contains(name, "deja") {
 			continue
 		}
+		if t.Type == "namespace" || len(t.Tools) > 0 {
+			if inner, args := recallInNamespace(t, query); inner != "" {
+				return inner, args
+			}
+			continue
+		}
 		if strings.Contains(name, "recall") && !strings.Contains(name, "context") {
 			return t.name(), queryArguments(t.schema(), query)
 		}
@@ -175,6 +187,27 @@ func recallTool(raw json.RawMessage, query string) (string, string) {
 		return "", ""
 	}
 	return fallback.name(), queryArguments(fallback.schema(), query)
+}
+
+// recallInNamespace returns the name of the recall tool inside a namespace
+// entry. The namespace declares no parameters of its own and its tools carry
+// plain names, so the call goes to the plain name; both qualified forms —
+// namespace.tool and namespace__tool — are rejected by codex's router.
+func recallInNamespace(ns declaredTool, query string) (string, string) {
+	var first declaredTool
+	for _, t := range ns.Tools {
+		name := strings.ToLower(t.name())
+		if strings.Contains(name, "recall") && !strings.Contains(name, "context") {
+			return t.name(), queryArguments(t.schema(), query)
+		}
+		if first.name() == "" {
+			first = t
+		}
+	}
+	if first.name() == "" {
+		return "", ""
+	}
+	return first.name(), queryArguments(first.schema(), query)
 }
 
 // queryArguments renders the search text under whichever property the tool's
