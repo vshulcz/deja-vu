@@ -19,8 +19,9 @@ import (
 // wire.jsonl is the append-only main-agent transcript. User turns arrive as
 // context.append_message records; streamed assistant turns never do — they
 // have to be reconstructed from step.begin → content.part → step.end loop
-// events. Only the main agent is indexed; sub-agents, tool payloads and
-// think-parts are skipped by design (issue #248).
+// events. Tool calls and their results arrive as loop events too (tool.call,
+// tool.result) and become work records (#655). Only the main agent is indexed;
+// sub-agents and think-parts are skipped by design (issue #248).
 
 // KimiConfigDir is the native Kimi Code home. DEJA_KIMI_ROOT intentionally
 // does not affect it because that variable only relocates reads.
@@ -42,6 +43,19 @@ func ParseKimiFile(path string) ([]model.Session, error) {
 
 func ParseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseKimiFileFromOffset(path, offset)
+}
+
+// kimiDialect is Kimi Code's tool vocabulary, read off wire.jsonl transcripts
+// its own CLI had just written. The names mirror Claude Code's — Kimi Code is
+// built in that shape — but the file key is `path` where Claude's is
+// `file_path`, and only Edit carries a replaced span; there is no MultiEdit.
+// ReadMediaFile is Kimi's own path tool. The shell tool's argument key is
+// `command`, which is what commandsIn already reads.
+var kimiDialect = toolDialect{
+	pathKey:   "path",
+	pathTools: map[string]bool{"Read": true, "Edit": true, "Write": true, "ReadMediaFile": true},
+	shellTool: "Bash",
+	editTools: map[string]bool{"Edit": true},
 }
 
 // kimiState is the slice of state.json deja cares about.
@@ -130,6 +144,59 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 				pending.WriteString(text)
 			case "step.end":
 				flush()
+			case "tool.call":
+				// A call sits between the text parts of its step, so the
+				// pending stream is flushed before the record to keep the
+				// words that led to the call ahead of it. The flush happens
+				// only when the call yields a record: with every DEJA_INDEX_*
+				// switch off, the messages come out exactly as they did
+				// before tool events were read.
+				name, _ := e["name"].(string)
+				args, _ := e["args"].(map[string]any)
+				if name == "" || args == nil {
+					return
+				}
+				part := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
+				t := parseTimeAny(m["time"])
+				var records []model.Message
+				if IndexToolPaths() {
+					if p := toolPathsIn(part, kimiDialect); p != "" {
+						records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
+					}
+				}
+				if IndexEdits() {
+					for _, span := range editSpansIn(part, kimiDialect) {
+						records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
+					}
+				}
+				if IndexCommands() {
+					for _, cmd := range commandsIn(part, kimiDialect) {
+						records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+					}
+				}
+				if len(records) == 0 {
+					return
+				}
+				flush()
+				s.Touch(t)
+				s.Messages = append(s.Messages, records...)
+			case "tool.result":
+				// Every observed result shape carries its text under
+				// `output` — plain, with a note, truncated, or flagged
+				// isError. The error ones are kept on purpose: the error a
+				// command hit is exactly what a later search reaches for.
+				if !IndexToolOutput() {
+					return
+				}
+				r, _ := e["result"].(map[string]any)
+				out, _ := r["output"].(string)
+				if out = strings.TrimSpace(out); out == "" {
+					return
+				}
+				t := parseTimeAny(m["time"])
+				flush()
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
 			}
 		}
 	})
