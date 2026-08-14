@@ -54,6 +54,11 @@ type harness struct {
 	// could break the second is real — deja suppresses recall it has already
 	// injected into a session, and the plugins cache per prompt.
 	resume func(prompt, base, model string) []string
+	// toolHook marks a harness deja wires a PreToolUse hook into. That hook
+	// speaks at the moment of an action rather than at the start of a session,
+	// and nothing exercised it until the mock learned to answer with a tool
+	// call — the sweep only ever asked questions, so no tool was ever used.
+	toolHook bool
 	// sessionScoped marks a harness with no way to recall against the prompt.
 	// aider has neither hooks nor an MCP client; its read-only files are the
 	// whole channel, and nothing tells deja what was typed. Recall that does
@@ -70,25 +75,25 @@ func harnesses() []harness {
 			}, nil, false,
 			func(p, _, _ string) []string {
 				return []string{"-p", p, "--continue", "--permission-mode", "bypassPermissions"}
-			}, false},
+			}, true, false},
 		{"opencode", "opencode-auto", "opencode",
 			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false,
-			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, false},
+			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, false, false},
 		{"codex", "codex-auto", "codex",
-			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, false},
+			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, true, false},
 		{"goose", "goose-auto", "goose",
 			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true,
 			// Bare goose has no working prompt channel: it discards hook stdout,
 			// and .goosehints is read once when the session opens. MOIM, which is
 			// re-read every turn, is env-only — so the wrapper arm below is where
 			// goose recalls for the question.
-			nil, true},
+			nil, false, true},
 		{"qwen", "qwen-auto", "qwen",
-			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, false},
+			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, false, false},
 		{"grok", "grok-auto", "grok",
 			func(p, base, model string) []string {
 				return []string{"-p", p, "-u", base, "-k", "local", "-m", model}
-			}, nil, false, nil, false},
+			}, nil, false, nil, true, false},
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
@@ -98,13 +103,13 @@ func harnesses() []harness {
 					// browser once per arm, on the machine running the sweep.
 					"--no-analytics", "--no-browser", "--no-check-update",
 					"--no-show-release-notes", "--message", p}
-			}, nil, true, nil, true},
+			}, nil, true, nil, false, true},
 		// Both of these were assumed to need an account and were left out for
 		// it. Neither does: cline takes any OpenAI-compatible base URL, and
 		// openclaw takes a provider block in its own config.
 		{"cline", "cline-auto", "cline",
 			func(p, _, _ string) []string { return []string{"--auto-approve", "true", p} },
-			setupCline, false, nil, false},
+			setupCline, false, nil, false, false},
 		{"openclaw", "openclaw-auto", "openclaw",
 			func(p, _, model string) []string {
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
@@ -116,7 +121,7 @@ func harnesses() []harness {
 				// The same key is the same session.
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
 					"--session-key", "harnesssweep"}
-			}, false},
+			}, false, false},
 		{"kimi", "kimi-auto", "kimi",
 			func(p, _, model string) []string {
 				// -p is already non-interactive; kimi refuses both --auto and
@@ -125,7 +130,7 @@ func harnesses() []harness {
 			}, setupKimi, false,
 			func(p, _, model string) []string {
 				return []string{"-p", p, "-c", "-m", "mock/" + model}
-			}, false},
+			}, false, false},
 	}
 }
 
@@ -302,6 +307,13 @@ func main() {
 		"a second, different question, asked in the same session")
 	answer2 := flag.String("answer2", "per-process, not per-cluster",
 		"a phrase from the corpus that answers -prompt2")
+	toolBase := flag.String("tool-base", "",
+		"a second mockmodel endpoint started with -tool-call; enables the tool arm")
+	toolLog := flag.String("tool-log", "", "the request log of that second endpoint")
+	toolPrompt := flag.String("tool-prompt", "Run `npm run build` and tell me what happens.",
+		"the question that leads to the tool call")
+	toolEvidence := flag.String("tool-evidence", "last time:",
+		"what deja's PreToolUse hook should contribute for that command")
 	only := flag.String("only", "", "comma-separated harness names")
 	flag.Parse()
 
@@ -343,6 +355,18 @@ func main() {
 		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, *prompt2, *answer2, true, false)
 		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, "", "", false, false)
 		report(h.name, withDeja, control, *answer != "", h.sessionScoped)
+		if h.toolHook && *toolBase != "" && *toolLog != "" {
+			t := run(h, exe, *corpus, *toolLog, *toolBase, *model, *repo,
+				*toolPrompt, *toolEvidence, "", "", true, false)
+			verdict := "PreToolUse recall reached the model"
+			switch {
+			case t.requests < 2:
+				verdict = "no tool call happened: " + firstLine(t.err)
+			case !t.answered:
+				verdict = "PRETOOLUSE RECALL MISSING"
+			}
+			fmt.Printf("%-10s %-34s %-14s (tool)\n", "", verdict, "")
+		}
 		// Uninstalling has to leave the harness exactly as it was found. The
 		// failure this catches is not theoretical: grok's hooks survived
 		// `uninstall --all` and went on calling a binary the user had just

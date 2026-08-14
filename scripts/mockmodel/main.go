@@ -30,7 +30,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -48,6 +47,130 @@ type request struct {
 	Input        json.RawMessage `json:"input"`
 	Instructions string          `json:"instructions"`
 	System       json.RawMessage `json:"system"`
+	// Tools is what the harness says it can do. Every harness names its shell
+	// tool differently — Bash, shell, run_commands — so a mock configured with
+	// one fixed name calls something two of them do not have, and the whole
+	// PreToolUse path silently goes untested. Reading the name out of the
+	// request removes that per-harness knowledge.
+	Tools json.RawMessage `json:"tools"`
+}
+
+// toolNames lists every tool the request declared, in the order given.
+func toolNames(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var tools []struct {
+		Name     string `json:"name"`
+		Function struct {
+			Name string `json:"name"`
+		} `json:"function"`
+	}
+	if json.Unmarshal(raw, &tools) != nil {
+		return nil
+	}
+	var out []string
+	for _, t := range tools {
+		if t.Name != "" {
+			out = append(out, t.Name)
+		} else if t.Function.Name != "" {
+			out = append(out, t.Function.Name)
+		}
+	}
+	return out
+}
+
+// declaredTool is one entry of the request's tools array, in whichever shape
+// the wire protocol uses: {type,function:{name,parameters}} on chat
+// completions, {type,name,parameters} on responses, {name,input_schema} on
+// messages.
+type declaredTool struct {
+	Name        string          `json:"name"`
+	Parameters  json.RawMessage `json:"parameters"`
+	InputSchema json.RawMessage `json:"input_schema"`
+	Function    struct {
+		Name       string          `json:"name"`
+		Parameters json.RawMessage `json:"parameters"`
+	} `json:"function"`
+}
+
+func (d declaredTool) name() string {
+	if d.Name != "" {
+		return d.Name
+	}
+	return d.Function.Name
+}
+
+func (d declaredTool) schema() json.RawMessage {
+	switch {
+	case len(d.Parameters) > 0:
+		return d.Parameters
+	case len(d.InputSchema) > 0:
+		return d.InputSchema
+	default:
+		return d.Function.Parameters
+	}
+}
+
+// shellTool picks the tool that runs a command and builds the arguments its own
+// schema asks for. Both halves have to come from the request: harnesses differ
+// on the name (Bash, bash, exec_command) and on the shape — codex takes a
+// string under "cmd", Claude takes one under "command", and another takes an
+// argv array. Hardcoding either meant the call was rejected on arrival and the
+// PreToolUse hook never ran, which reads like a harness that ignores tools.
+func shellTool(raw json.RawMessage, command string) (string, string) {
+	if len(raw) == 0 {
+		return "", ""
+	}
+	var tools []declaredTool
+	if json.Unmarshal(raw, &tools) != nil {
+		return "", ""
+	}
+	// Longest first so "run_commands" is not matched by "run".
+	wanted := []string{"run_commands", "execute_command", "run_terminal_cmd",
+		"exec_command", "local_shell", "bash", "shell", "terminal", "exec"}
+	best, bestRank := declaredTool{}, len(wanted)
+	for _, t := range tools {
+		name := strings.ToLower(t.name())
+		if name == "" {
+			continue
+		}
+		for rank, w := range wanted {
+			if name == w && rank < bestRank {
+				best, bestRank = t, rank
+			}
+		}
+	}
+	if bestRank == len(wanted) {
+		return "", ""
+	}
+	return best.name(), commandArguments(best.schema(), command)
+}
+
+// commandArguments renders the command under the property the schema names for
+// it, as the type the schema asks for.
+func commandArguments(schema json.RawMessage, command string) string {
+	var doc struct {
+		Properties map[string]struct {
+			Type string `json:"type"`
+		} `json:"properties"`
+	}
+	_ = json.Unmarshal(schema, &doc)
+	for _, key := range []string{"command", "cmd", "commands", "script"} {
+		prop, ok := doc.Properties[key]
+		if !ok {
+			continue
+		}
+		if prop.Type == "array" {
+			argv, _ := json.Marshal([]string{"/bin/sh", "-c", command})
+			return `{"` + key + `":` + string(argv) + `}`
+		}
+		return `{"` + key + `":` + strconv.Quote(command) + `}`
+	}
+	// No property this mock recognises: fall back to the commonest spelling
+	// rather than sending nothing, so the failure is visible in the harness's
+	// own error instead of as silence.
+	return `{"command":` + strconv.Quote(command) + `}`
 }
 
 type server struct {
@@ -63,10 +186,56 @@ type server struct {
 	toolArg string
 	mu      sync.Mutex
 	logw    *os.File
-	called  atomic.Bool
+}
+
+// resolveTool returns the tool this request should be answered with: the one
+// named on the command line, or — with "auto" — whatever this harness calls
+// its shell.
+func (s *server) resolveTool(req request) (string, string) {
+	if s.toolCall == "" {
+		return "", ""
+	}
+	// Once per conversation, not once per process: a sweep points every
+	// harness at one mock, and a process-wide flag meant the first harness
+	// took the only tool call and every later one silently got prose — which
+	// reads exactly like a harness that refuses to use tools.
+	if alreadyCalled(req) {
+		return "", ""
+	}
+	if s.toolCall != "auto" {
+		return s.toolCall, commandArguments(nil, s.toolArg)
+	}
+	return shellTool(req.Tools, s.toolArg)
+}
+
+// alreadyCalled reports whether this conversation already carries the result of
+// a call, in any of the three protocols' spellings. Asking again would loop.
+func alreadyCalled(req request) bool {
+	var b strings.Builder
+	for _, m := range req.Messages {
+		b.WriteString(m.Role)
+		b.Write(m.Content)
+	}
+	b.Write(req.Input)
+	body := b.String()
+	for _, marker := range []string{"tool_result", "function_call_output",
+		"call_mock", "toolu_mock", "fc_mock"} {
+		if strings.Contains(body, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *server) record(path string, msgs []message) {
+	s.recordWith(path, msgs, nil)
+}
+
+// recordWith also stores the tool names the request declared. Without them a
+// run that produced no tool call is unreadable: it looks the same whether the
+// harness offered nothing, offered something under a name the mock did not
+// recognise, or refused the call.
+func (s *server) recordWith(path string, msgs []message, tools []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.logw == nil {
@@ -76,7 +245,8 @@ func (s *server) record(path string, msgs []message) {
 		Path     string    `json:"path"`
 		At       time.Time `json:"at"`
 		Messages []message `json:"messages"`
-	}{path, time.Now().UTC(), msgs}
+		Tools    []string  `json:"tools,omitempty"`
+	}{path, time.Now().UTC(), msgs, tools}
 	if b, err := json.Marshal(rec); err == nil {
 		fmt.Fprintln(s.logw, string(b))
 	}
@@ -123,7 +293,8 @@ func systemAfterUser(msgs []message) bool {
 }
 
 func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
-	s.record(r.URL.Path, req.Messages)
+	s.recordWith(r.URL.Path, req.Messages, toolNames(req.Tools))
+	tool, toolArgs := s.resolveTool(req)
 	if systemAfterUser(req.Messages) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]any{"message": "System message must be at the beginning."},
@@ -135,10 +306,10 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
 	// Without this the whole PreToolUse surface — deja's hook-tool, which
 	// several harnesses wire — went untested against every harness that
 	// speaks chat completions rather than responses.
-	if s.toolCall != "" && !s.called.Swap(true) {
+	if tool != "" {
 		call := map[string]any{"id": "call_mock", "type": "function",
-			"function": map[string]any{"name": s.toolCall,
-				"arguments": `{"command":` + strconv.Quote(s.toolArg) + `}`}}
+			"function": map[string]any{"name": tool,
+				"arguments": toolArgs}}
 		if !req.Stream {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"id": "mock", "object": "chat.completion", "created": time.Now().Unix(), "model": model,
@@ -151,8 +322,8 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		streamed := map[string]any{"index": 0, "id": "call_mock", "type": "function",
-			"function": map[string]any{"name": s.toolCall,
-				"arguments": `{"command":` + strconv.Quote(s.toolArg) + `}`}}
+			"function": map[string]any{"name": tool,
+				"arguments": toolArgs}}
 		for _, chunk := range []map[string]any{
 			{"delta": map[string]any{"role": "assistant", "tool_calls": []any{streamed}}},
 			{"delta": map[string]any{}, "finish_reason": "tool_calls"},
@@ -207,20 +378,21 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
 }
 
 func (s *server) responses(w http.ResponseWriter, r *http.Request, req request) {
-	s.record(r.URL.Path, []message{
+	tool, toolArgs := s.resolveTool(req)
+	s.recordWith(r.URL.Path, []message{
 		{Role: "instructions", Content: json.RawMessage(strconv.Quote(req.Instructions))},
 		{Role: "input", Content: req.Input},
-	})
+	}, toolNames(req.Tools))
 	output := []any{map[string]any{"id": "msg_mock", "type": "message", "role": "assistant",
 		"status":  "completed",
 		"content": []any{map[string]any{"type": "output_text", "text": s.reply, "annotations": []any{}}}}}
-	// One call, on the first turn only: the harness sends the result back and
-	// the second request must not ask for the same call again or the run loops.
-	if s.toolCall != "" && !s.called.Swap(true) {
+	// One call per conversation: the harness sends the result back, and asking
+	// again would loop. resolveTool decides that from the request.
+	if tool != "" {
 		output = []any{map[string]any{
 			"id": "fc_mock", "type": "function_call", "status": "completed",
-			"name": s.toolCall, "call_id": "call_mock",
-			"arguments": `{"command":["/bin/sh","-c",` + strconv.Quote(s.toolArg) + `]}`,
+			"name": tool, "call_id": "call_mock",
+			"arguments": toolArgs,
 		}}
 	}
 	body := map[string]any{
@@ -241,6 +413,24 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request, req request) 
 	inProgress["status"] = "in_progress"
 	inProgress["output"] = []any{}
 	sse(w, "response.created", map[string]any{"type": "response.created", "response": inProgress})
+	// A streamed function call is its own event sequence. Streaming text
+	// deltas and then completing with a function_call in the output is a
+	// response no client can reconcile: codex took it as a disconnected
+	// stream and gave up before running anything.
+	if item, ok := output[0].(map[string]any); ok && item["type"] == "function_call" {
+		sse(w, "response.output_item.added", map[string]any{
+			"type": "response.output_item.added", "output_index": 0, "item": item})
+		sse(w, "response.function_call_arguments.delta", map[string]any{
+			"type": "response.function_call_arguments.delta", "item_id": "fc_mock",
+			"output_index": 0, "delta": item["arguments"]})
+		sse(w, "response.function_call_arguments.done", map[string]any{
+			"type": "response.function_call_arguments.done", "item_id": "fc_mock",
+			"output_index": 0, "arguments": item["arguments"]})
+		sse(w, "response.output_item.done", map[string]any{
+			"type": "response.output_item.done", "output_index": 0, "item": item})
+		sse(w, "response.completed", map[string]any{"type": "response.completed", "response": body})
+		return
+	}
 	sse(w, "response.output_text.delta", map[string]any{
 		"type": "response.output_text.delta", "item_id": "msg_mock",
 		"output_index": 0, "content_index": 0, "delta": s.reply})
@@ -252,7 +442,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 	if len(req.System) > 0 {
 		msgs = append([]message{{Role: "system", Content: req.System}}, msgs...)
 	}
-	s.record(r.URL.Path, msgs)
+	s.recordWith(r.URL.Path, msgs, toolNames(req.Tools))
 	body := map[string]any{
 		"id": "msg_mock", "type": "message", "role": "assistant", "model": model,
 		"content":     []any{map[string]any{"type": "text", "text": s.reply}},
@@ -262,10 +452,12 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 	// The tool call, on the first turn only, as on the other two paths. This
 	// is what puts deja's PreToolUse hook under test: it is wired for Claude,
 	// codex and grok, and of those only Claude runs hooks headless.
-	if s.toolCall != "" && !s.called.Swap(true) {
+	if tool, args := s.resolveTool(req); tool != "" {
+		var input map[string]any
+		_ = json.Unmarshal([]byte(args), &input)
 		body["content"] = []any{map[string]any{
-			"type": "tool_use", "id": "toolu_mock", "name": s.toolCall,
-			"input": map[string]any{"command": s.toolArg},
+			"type": "tool_use", "id": "toolu_mock", "name": tool,
+			"input": input,
 		}}
 		body["stop_reason"] = "tool_use"
 	}
