@@ -53,8 +53,10 @@ claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@d
 ```
 
 One bundle installs into six harnesses. The [agent setup guide](https://vshulcz.github.io/deja-vu/guide/agents.html)
-covers the rest: what each harness supports, the guidance files install writes, aider's
-read-only context file, and the Windows `cmd /c deja mcp` wrapper.
+covers the rest: what each harness supports, aider's read-only context file, and the
+Windows `cmd /c deja mcp` wrapper.
+
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes and Roo Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
 
 That's it. Next session, ask your agent:
 
@@ -74,7 +76,7 @@ into a memory layer that any of them can read.
 | **Cross-agent recall** | Solve it in Codex, Claude remembers. The MCP `recall` tool answers *"we fixed this three weeks ago"* instead of re-debugging it. |
 | **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
-| **It knows what held** | `deja promote <id> --state rejected --note "why"` marks a decision you reverted. Every later hit for that session shows it was tried and rejected, with the reason. Nothing is deleted. |
+| **It knows what held** | `deja promote <id> --state rejected --note "why"` marks a decision you reverted. Every later hit for that session shows it was tried and rejected, with the reason. Nothing is deleted, and `--state accepted` takes the mark back. |
 | **It survives compaction** | Measured over 43 compactions: 77% of decisions survive the summary, 0.2% of the commands. deja hands the session its own specifics back. |
 | **It says when the ground moved** | A hit reports *4 files this session touched have changed since*, and says nothing when it cannot tell. It never claims anything is unchanged. |
 | **Sync and handoff** | `deja sync ssh laptop` moves memory between machines, append-only, no cloud in the middle. `deja handoff --to codex` packages the live context so you can continue in another agent. |
@@ -95,7 +97,7 @@ $ deja "jwt refresh token"
 
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search every history. Multi-word is AND, quoted phrases require contiguous text, and a query with no exact match tries word forms and close spellings. `--harness`, `--project`, `--since 30d`, `--limit`, `--json`. |
+| `deja <query>` | Search every history. Multi-word is AND, quoted phrases require contiguous text, and a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). `--harness`, `--project`, `--since 30d`, `--limit`, `--json`. |
 | `deja` | With an index and a terminal: today's sessions, recalls served, a question you asked in more than one session, and a wall your agents keep hitting. |
 | `deja ctx <query>` | Markdown digest of the best match, ready to pipe into a prompt. |
 | `deja blame <path>` | Which sessions discussed a file, what was decided, and why. |
@@ -161,6 +163,17 @@ Custom store locations go through `DEJA_*_ROOT` variables, and each agent's own 
 variable is honored too. The [session format registry](docs/registry/README.md) documents
 the observed paths, record schemas and role mapping per harness, with synthetic fixtures
 keeping those descriptions checked against the parsers.
+
+## Semantic recall (optional)
+
+Point `deja embed` at a local Ollama, LM Studio or OpenAI-compatible endpoint with
+`DEJA_EMBED_URL` and rephrased queries still hit. Without a reachable runtime, lexical
+search and MCP recall continue unchanged.
+
+The vector sidecar sits beside the index as `.vectors.bin`, not inside `index.db`.
+Float32 vectors cost roughly 4 MB per 1k messages for a 1,024 dimension model. Embedding
+is local, and it never sends raw source files, only the redacted indexed text truncated to
+about 2k characters.
 
 ## Performance
 
