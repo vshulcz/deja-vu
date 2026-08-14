@@ -31,6 +31,32 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.25.x'
+          # setup-go's own cache is keyed on go.sum alone, and a GitHub cache
+          # entry is immutable — written once under that key and never
+          # refreshed. So it held the standard library and dependencies from
+          # whenever it was first saved, and none of this repository's own
+          # packages, which change every commit and are the expensive half to
+          # instrument with -race. The cache below rotates instead (#1229).
+          cache: false
+      - id: gocache
+        shell: bash
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      # Saved under a key carrying the run id and restored by prefix, so every
+      # run starts from the previous run's compiled objects. Windows was
+      # spending nineteen of its twenty-eight minutes compiling, against a
+      # thirty-minute cap, and a cancelled job there prints no test output at
+      # all — the silence is the compiler, which reads exactly like a hang.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.gocache.outputs.build }}
+            ${{ steps.gocache.outputs.mod }}
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.run_id }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
+            go-${{ runner.os }}-
       - run: go mod verify
       - run: go vet ./...
       # -timeout below the job's own patience: a hung test then dies with every
