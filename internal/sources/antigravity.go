@@ -3,6 +3,7 @@ package sources
 import (
 	"encoding/json"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -255,6 +256,21 @@ func antigravityProject(id string) string {
 	return "-"
 }
 
+// isAbsolutePath accepts both conventions, not the host's. A synced store
+// holds whatever the machine that wrote it used.
+func isAbsolutePath(p string) bool {
+	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\\`) {
+		return true
+	}
+	// C:\src or C:/src
+	return len(p) > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')
+}
+
+// slashed puts a path in one convention so the segment arithmetic below reads
+// the same on either host. Go's own path handling accepts forward slashes on
+// Windows, so nothing has to be converted back.
+func slashed(p string) string { return strings.ReplaceAll(p, `\`, "/") }
+
 // antigravityProjectFromFiles reads the project off the work itself.
 //
 // The CLI's cache holds only the newest conversation per workspace, so
@@ -264,10 +280,15 @@ func antigravityProject(id string) string {
 func antigravityProjectFromFiles(messages []model.Message) string {
 	var common []string
 	for _, m := range messages {
-		if m.Role != RoleFiles || !strings.HasPrefix(m.Text, "/") {
+		// Absolute either way round: a store synced from Windows holds
+		// C:\src\main.go, and requiring a leading slash dropped every one of
+		// those — on Windows itself, no CLI session would ever find its
+		// project. Split on both separators for the same reason CrossBase
+		// exists.
+		if m.Role != RoleFiles || !isAbsolutePath(m.Text) {
 			continue
 		}
-		parts := strings.Split(filepath.Dir(m.Text), string(filepath.Separator))
+		parts := strings.Split(path.Dir(slashed(m.Text)), "/")
 		if common == nil {
 			common = parts
 			continue
@@ -283,7 +304,7 @@ func antigravityProjectFromFiles(messages []model.Message) string {
 	if len(common) < 4 {
 		return ""
 	}
-	dir := strings.Join(common, string(filepath.Separator))
+	dir := strings.Join(common, "/")
 	// A session that touched one file deep in a tree shares only that file's
 	// own directory, which is a package and not the project. The checkout
 	// above it is the answer whenever it is still on disk.
@@ -291,7 +312,7 @@ func antigravityProjectFromFiles(messages []model.Message) string {
 		if fi, err := os.Stat(filepath.Join(probe, ".git")); err == nil && (fi.IsDir() || fi.Mode().IsRegular()) {
 			return projectName(probe)
 		}
-		probe = filepath.Dir(probe)
+		probe = path.Dir(probe)
 	}
 	return projectName(dir)
 }

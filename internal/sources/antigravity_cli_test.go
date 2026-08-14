@@ -76,6 +76,21 @@ func TestAntigravityProjectFromTheFilesASessionOpened(t *testing.T) {
 			paths: nil,
 			want:  "",
 		},
+		// A store synced from Windows holds these, and on Windows itself every
+		// path looks like this. Requiring a leading slash dropped all of them:
+		// the CLI sessions there could never find their project, and the two
+		// tests below only caught it because the Windows runner builds its
+		// fixtures with the local separator.
+		{
+			name:  "windows paths",
+			paths: []string{`C:\Users\me\coding\api-gateway\cmd\main.go`, `C:\Users\me\coding\api-gateway\internal\db\pool.go`},
+			want:  "api-gateway",
+		},
+		{
+			name:  "a windows home directory names nothing",
+			paths: []string{`C:\Users\me\notes.md`, `C:\Users\me\todo.txt`},
+			want:  "",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var messages []model.Message
