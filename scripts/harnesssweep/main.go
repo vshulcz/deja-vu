@@ -320,7 +320,13 @@ type result struct {
 	// block. A tool result comes back as a tool result, in whatever shape the
 	// protocol uses, so the stricter check would call a working MCP round trip
 	// a failure.
-	echoed   bool
+	echoed bool
+	// refused is the harness rejecting the call itself rather than deja
+	// answering badly. codex declares its MCP tools inside a namespace and
+	// routes none of the call shapes a mock can produce — reporting that as
+	// "the tool returned nothing useful" blames deja for a call that never
+	// reached it.
+	refused  bool
 	rejected bool
 	err      string
 	took     time.Duration
@@ -410,6 +416,8 @@ func main() {
 			switch {
 			case m.requests < 2:
 				verdict = "the harness never called deja's MCP tool"
+			case m.refused:
+				verdict = "the harness would not route the call"
 			case !m.echoed:
 				verdict = "MCP TOOL RETURNED NOTHING USEFUL"
 			}
@@ -535,6 +543,7 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer, pro
 		out.err = firstLine(string(stdout))
 	}
 	out.rejected = strings.Contains(string(stdout), "System message must be at the beginning")
+	out.refused = strings.Contains(string(stdout), "unsupported call")
 	// The receipt as every host renders it: deja's own wording, whatever
 	// framing the harness wraps around it.
 	out.shown = strings.Contains(string(stdout), "deja recalled") ||
