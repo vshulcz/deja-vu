@@ -51,9 +51,11 @@ func TestClaudePluginManifestsAreWellFormed(t *testing.T) {
 	if plugin.Name != market.Plugins[0].Name {
 		t.Fatalf("plugin name %q does not match the marketplace entry %q", plugin.Name, market.Plugins[0].Name)
 	}
-	// The same three events the local installer wires, so a plugin user is
-	// not quietly getting less than someone who ran `deja install`.
-	for _, event := range []string{"SessionStart", "UserPromptSubmit", "PreCompact"} {
+	// Which events these are is checked against the installer itself in
+	// TestPluginManifestHooksWhatTheInstallerHooks; restating the list here as
+	// well is how the two drifted apart. This loop is about the shape of each
+	// entry, so it walks whatever the manifest declares.
+	for event := range plugin.Hooks {
 		groups, ok := plugin.Hooks[event]
 		if !ok || len(groups) == 0 || len(groups[0].Hooks) == 0 {
 			t.Fatalf("plugin does not hook %s", event)
