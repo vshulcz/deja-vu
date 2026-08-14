@@ -15,7 +15,7 @@ import (
 func TestCitationLineKeepsTheYearOfAnOldRecall(t *testing.T) {
 	old := model.Session{Harness: "claude", Updated: time.Now().AddDate(-1, -1, 0),
 		Messages: []model.Message{{Role: "user", Text: "why does the reconciler double count refunds"}}}
-	line := citationLine(old)
+	line := citationLine(old, nil)
 	year := old.Updated.Local().Format("2006")
 	if !strings.Contains(line, year) {
 		t.Errorf("a %s recall is narrated without its year: %q", year, line)
@@ -25,7 +25,7 @@ func TestCitationLineKeepsTheYearOfAnOldRecall(t *testing.T) {
 	// and the line is read aloud.
 	recent := old
 	recent.Updated = time.Now().AddDate(0, 0, -3)
-	line = citationLine(recent)
+	line = citationLine(recent, nil)
 	if strings.Contains(line, recent.Updated.Local().Format("2006")) {
 		t.Errorf("this year's recall carries a redundant year: %q", line)
 	}

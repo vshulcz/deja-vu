@@ -19,7 +19,7 @@ func TestCitationLineStripsDisplayControls(t *testing.T) {
 		Title:   "deploy \u202eplan\u200b now\x1b[31m red\ttab\nline",
 		Updated: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
-	got := citationLine(s)
+	got := citationLine(s, nil)
 	// The function opens with a newline of its own; every other rune must be
 	// plain text.
 	body := strings.TrimPrefix(got, "\n")

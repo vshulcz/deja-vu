@@ -53,7 +53,7 @@ type hookPromptText string
 func (h *hookPromptText) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err == nil {
-		*h = hookPromptText(s)
+		*h = hookPromptText(withoutInjectedContext(s))
 		return nil
 	}
 	var parts []struct {
@@ -73,8 +73,39 @@ func (h *hookPromptText) UnmarshalJSON(b []byte) error {
 		}
 		sb.WriteString(p.Text)
 	}
-	*h = hookPromptText(sb.String())
+	*h = hookPromptText(withoutInjectedContext(sb.String()))
 	return nil
+}
+
+// withoutInjectedContext drops context an earlier hook already put in front of
+// the question. Gemini hands BeforeAgent the whole request, which by then
+// carries the <hook_context> block SessionStart returned — deja's own recall.
+// Left in, the six search terms all come from that block and none from the
+// user, so every prompt recalls whatever the last one did. Gemini escapes the
+// angle brackets of anything inside, so both spellings are removed.
+func withoutInjectedContext(s string) string {
+	for _, tag := range []struct{ open, close string }{
+		{"<hook_context>", "</hook_context>"},
+		{"&lt;hook_context&gt;", "&lt;/hook_context&gt;"},
+		{"<deja-recall>", "</deja-recall>"},
+		{"&lt;deja-recall&gt;", "&lt;/deja-recall&gt;"},
+	} {
+		for {
+			start := strings.Index(s, tag.open)
+			if start < 0 {
+				break
+			}
+			end := strings.Index(s[start:], tag.close)
+			if end < 0 {
+				// An unclosed block is still not the user's words, and what
+				// follows it cannot be told apart from more of the same.
+				s = s[:start]
+				break
+			}
+			s = s[:start] + s[start+end+len(tag.close):]
+		}
+	}
+	return strings.TrimSpace(s)
 }
 
 // runHookPrompt is the UserPromptSubmit hook: search the user's own prompt
@@ -187,7 +218,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	rememberInjected(dir, input.SessionID, ss)
 	// "You have been here" on the strength of one word teaches the user to
 	// ignore the line. The recall itself still goes in.
-	showLine := confident && dejaVuLineDue(dir)
+	showLine := confident && dejaVuLineDue(dir, input.SessionID)
 	// The payload is sized to the claim. Two informative terms is a real match
 	// and earns the digest; a single rare term is a hint, and a hint that costs
 	// a full digest on every message is most of what deja spends. The pointer
@@ -195,11 +226,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
 	var body string
 	if confident {
-		digest := search.AutoRecallDigest(ss, promptHookBudget-recallFrameOverhead)
+		digest := search.AutoRecallDigestFor(ss, promptHookBudget-recallFrameOverhead, terms)
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
-		tail := citationLine(ss[0])
+		tail := citationLine(ss[0], terms)
 		if nudge != "" {
 			tail += "\n" + nudge
 		}
@@ -417,9 +448,15 @@ func techTerm(f string) bool {
 
 // citationLine pre-writes the narration so the agent copies structure instead
 // of having to follow an instruction — models do the former far more reliably.
-func citationLine(s model.Session) string {
-	title := ""
+func citationLine(s model.Session, terms []string) string {
+	// What the digest quoted, so the sentence the agent says names the thing
+	// the user can see. Falls through to the session's opening when nothing
+	// matched literally.
+	title := search.MatchedUserLine(s, terms)
 	for _, m := range s.Messages {
+		if title != "" {
+			break
+		}
 		if m.Role == "user" && !digest.IsAgentArtifact(m.Text) {
 			tt := strings.TrimSpace(digest.MessageText(m.Text))
 			if tt == "" || strings.HasPrefix(tt, "Exit code") {
@@ -566,21 +603,85 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 // dejaVuLineDue rate-limits the visible line: a déjà vu that fires every
 // prompt is wallpaper, and wallpaper trains the user to ignore the real
 // moments. Context still flows to the agent regardless.
-func dejaVuLineDue(dir string) bool {
+//
+// The limit is per session, not per machine. Keyed on the index alone it also
+// silenced sessions that had never shown a line at all: on one index, four
+// fresh sessions inside twenty minutes received recall and one of them said
+// so. The people deja is for run several agents at once, so that was the
+// common case rather than the corner. A session with no id — a host that
+// sends none — falls back to the machine-wide window, which is the old
+// behaviour and still better than talking on every prompt.
+func dejaVuLineDue(dir, sid string) bool {
 	p := dir + ".dejavu"
+	now := time.Now()
+	if sid == "" {
+		if b, err := os.ReadFile(p); err == nil {
+			for _, line := range strings.Split(string(b), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) != 2 || fields[0] != "-" {
+					continue
+				}
+				if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
+					now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
+					return false
+				}
+			}
+		}
+		return recordDejaVuLine(p, "-", now)
+	}
 	if b, err := os.ReadFile(p); err == nil {
-		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && time.Since(time.Unix(ts, 0)) < 20*time.Minute {
-			return false
+		for _, line := range strings.Split(string(b), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) != 2 || fields[0] != sid {
+				continue
+			}
+			if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
+				now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
+				return false
+			}
 		}
 	}
-	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	return recordDejaVuLine(p, sid, now)
+}
+
+const (
+	dejaVuLineWindow = 20 * time.Minute
+	// dejaVuLineKeep bounds the file: one line per session that saw a notice
+	// recently, and an agent fleet is tens rather than thousands. Entries
+	// older than the window are dropped on every write, so this only caps a
+	// burst.
+	dejaVuLineKeep = 64
+)
+
+// recordDejaVuLine stamps this session and rewrites the file without the
+// entries that have aged out. It reports true so callers can return it
+// directly: failing to write is not a reason to withhold the line.
+func recordDejaVuLine(path, sid string, now time.Time) bool {
+	kept := []string{sid + " " + strconv.FormatInt(now.Unix(), 10)}
+	if b, err := os.ReadFile(path); err == nil {
+		for _, line := range strings.Split(string(b), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) != 2 || fields[0] == sid {
+				continue
+			}
+			ts, err := strconv.ParseInt(fields[1], 10, 64)
+			if err != nil || now.Sub(time.Unix(ts, 0)) >= dejaVuLineWindow {
+				continue
+			}
+			if len(kept) >= dejaVuLineKeep {
+				break
+			}
+			kept = append(kept, line)
+		}
+	}
+	_ = os.WriteFile(path, []byte(strings.Join(kept, "\n")+"\n"), 0o600)
 	return true
 }
 
 // dejaVuLine is the one visible line a déjà vu moment earns: which past
 // session answered, and how old it is.
 func dejaVuLine(s model.Session, terms ...string) string {
-	topic := dejaVuTopic(s)
+	topic := dejaVuTopic(s, terms...)
 	if topic == "" {
 		return ""
 	}
@@ -604,14 +705,26 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	if strings.HasPrefix(s.Project, "imported:") {
 		who = "this was done on another machine"
 	}
-	return fmt.Sprintf("deja-vu: %s — %q (%s%s)", who, topic, search.RelativeDate(s.Updated), why)
+	// No colon after the name, for the reason the session-start receipts lost
+	// theirs: the host introduces the line itself. Claude Code renders this as
+	// "UserPromptSubmit says: …", which read "says: deja-vu: you have been
+	// here" — seen on screen, two colons in four words.
+	return fmt.Sprintf("deja-vu — %s: %q (%s%s)", who, topic, search.RelativeDate(s.Updated), why)
 }
 
 // dejaVuTopic picks something a human actually typed. Session titles are the
 // first user message, which for some harnesses is injected plumbing
 // ("# AGENTS.md instructions <INSTRUCTIONS>...") — showing that as "you have
 // been here" reads as a glitch, not a memory.
-func dejaVuTopic(s model.Session) string {
+func dejaVuTopic(s model.Session, terms ...string) string {
+	// What the recall actually matched, before the session's title or its
+	// opening line. This is the one line a person reads, and on a long session
+	// narrowed to its matching region the opening line is whatever chatter
+	// began that window: seen on screen as "you have been here — \"migration
+	// locked the table\"" answering a question about token rotation.
+	if t := strings.TrimSpace(search.MatchedUserLine(s, terms)); t != "" && presentableTopic(t) {
+		return t
+	}
 	if t := strings.TrimSpace(s.Title); t != "" && presentableTopic(t) {
 		return t
 	}

@@ -38,6 +38,19 @@ type AutoRecallResult struct {
 }
 
 func AutoRecallDigest(ss []model.Session, budget int) string {
+	return AutoRecallDigestFor(ss, budget, nil)
+}
+
+// AutoRecallDigestFor renders the digest around the words that were asked
+// about. Without terms it keeps the session-start behaviour, where there is no
+// question yet and the opening of a session is the best summary of it.
+//
+// With terms it matters a great deal. A long session narrowed to the region
+// that matched still holds hundreds of messages, and showing that region's
+// first three lines answers a different question than the one asked: measured
+// on a real 8608-message session, the block an agent received carried one or
+// two of the four words it had searched for.
+func AutoRecallDigestFor(ss []model.Session, budget int, terms []string) string {
 	if budget <= 0 {
 		budget = 2000
 	}
@@ -46,7 +59,7 @@ func AutoRecallDigest(ss []model.Session, budget int) string {
 		if b.Len() >= budget {
 			break
 		}
-		section := autoRecallSession(s, time.Now(), false)
+		section := autoRecallSessionFor(s, time.Now(), false, terms)
 		if section == "" {
 			continue
 		}
@@ -199,9 +212,47 @@ func nearDuplicate(candidate map[string]bool, prior []map[string]bool) bool {
 }
 
 func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
+	return autoRecallSessionFor(s, now, provenance, nil)
+}
+
+// termHits counts how many distinct query terms a text carries. It decides
+// which lines of a matched session are worth showing, so it folds case and
+// nothing else: a term the ranking reached through a stem fold is not found
+// here, which costs that line its place and never costs correctness.
+func termHits(text string, terms []string) int {
+	if len(terms) == 0 {
+		return 0
+	}
+	low := strings.ToLower(text)
+	n := 0
+	for _, t := range terms {
+		if t != "" && strings.Contains(low, strings.ToLower(t)) {
+			n++
+		}
+	}
+	return n
+}
+
+func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms []string) string {
 	var problem string
 	var conclusions []string
+	matched := false
+	if len(terms) > 0 {
+		problem, conclusions = matchedLines(s, terms)
+		matched = len(conclusions) > 0
+	}
 	for _, m := range s.Messages {
+		if problem != "" && (len(conclusions) >= 2 || matched) {
+			break
+		}
+		// One line that answers beats that line plus a filler. When the
+		// session matched, the second slot is left empty rather than topped up
+		// from the top of the session: on a real block that padding read as
+		// "two schedulers were live after the failover" under an answer about
+		// the retry budget.
+		if matched && m.Role == "assistant" {
+			continue
+		}
 		text := contextText(m.Text, false)
 		if strings.TrimSpace(text) == "" {
 			continue
@@ -231,6 +282,14 @@ func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 	if isSmokeTest(problem, conclusions) {
 		return ""
 	}
+	// A session where the agent only ever said it could not proceed carries
+	// nothing to reuse. One had been sitting in a real store for twenty days,
+	// blocked on a permission prompt, taking a slot in every agent's opening
+	// context. This asks that *every* conclusion be a refusal, so work that
+	// hit a wall and then got past it is untouched.
+	if wasBlocked(conclusions) {
+		return ""
+	}
 	var b strings.Builder
 	if provenance {
 		fmt.Fprintf(&b, "✓ recalled from %s session · %s\n", digestLine(s.Harness), relativeDay(s.Updated, now))
@@ -249,6 +308,131 @@ func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 		fmt.Fprintf(&b, "  - Assistant: %s\n", digestLine(c))
 	}
 	return b.String()
+}
+
+// matchedLines picks the lines of a session that carry what was asked about:
+// the best-matching user message, and the two best-matching assistant
+// messages in the order they were said. What matches nothing is left to the
+// caller's fallback, so a session that ranked through a stem fold still shows
+// something rather than nothing.
+func matchedLines(s model.Session, terms []string) (string, []string) {
+	type scored struct {
+		idx, hits int
+		text      string
+	}
+	var bestUser scored
+	var assistants []scored
+	for i, m := range s.Messages {
+		// Score the raw text, not what contextText returns: it joins lines and
+		// keeps only the first eight of them, so by then there is nothing left
+		// to choose between and most of a long answer is already gone.
+		//
+		// Score the best single line rather than the whole message, too. A
+		// compaction summary or a standing-constraints block mentions
+		// everything the session ever touched, so counting terms across a
+		// message hands the slot to the longest text rather than to the one
+		// that answers.
+		line, hits := densestLine(m.Text, terms)
+		if hits == 0 {
+			continue
+		}
+		text := contextText(line, false)
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		switch m.Role {
+		case "user":
+			if !noiseMessage(m.Text) && hits > bestUser.hits {
+				bestUser = scored{i, hits, firstLine(text, 160)}
+			}
+		case "assistant":
+			assistants = append(assistants, scored{i, hits, firstLine(text, 220)})
+		}
+	}
+	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].hits > assistants[j].hits })
+	if len(assistants) > 2 {
+		assistants = assistants[:2]
+	}
+	// Back into the order they were said: two conclusions read as a sequence,
+	// and keeping them in score order tells the story backwards.
+	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].idx < assistants[j].idx })
+	out := make([]string, 0, len(assistants))
+	for _, a := range assistants {
+		out = append(out, a.text)
+	}
+	return bestUser.text, out
+}
+
+// densestLine returns the line of a message carrying the most query terms, and
+// how many, so a message is both chosen and quoted where it answers rather
+// than where it opens.
+func densestLine(text string, terms []string) (string, int) {
+	best, bestHits := "", 0
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if h := termHits(line, terms); h > bestHits {
+			best, bestHits = line, h
+		}
+	}
+	if best == "" {
+		return text, 0
+	}
+	return best, bestHits
+}
+
+// blockedPhrases are how a harness reports that a call did not happen. They
+// have to appear in what the agent said, not in the tool output, so that a
+// session discussing permissions is not mistaken for one denied them.
+var blockedPhrases = []string{
+	"not granted", "call blocked", "permission denied", "requires approval",
+	"denied permission", "не разрешен", "не разрешён", "нет доступа",
+}
+
+// wasBlocked reports whether every conclusion a session reached was a refusal.
+func wasBlocked(conclusions []string) bool {
+	if len(conclusions) == 0 {
+		return false
+	}
+	for _, c := range conclusions {
+		low := strings.ToLower(c)
+		hit := false
+		for _, p := range blockedPhrases {
+			if strings.Contains(low, p) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return false
+		}
+	}
+	return true
+}
+
+// MatchedUserLine is the line of a session that best answers what was asked,
+// taken from what the user said. The citation the agent is told to speak aloud
+// used to name a session's opening message, which after focusing a long session
+// is whatever chatter began the matched window — seen on a real screen naming
+// "migration locked the table" for a session the digest was quoting about token
+// rotation. Empty when nothing matches, so the caller keeps its own fallback.
+func MatchedUserLine(s model.Session, terms []string) string {
+	if len(terms) == 0 {
+		return ""
+	}
+	best, bestHits := "", 0
+	for _, m := range s.Messages {
+		if m.Role != "user" || noiseMessage(m.Text) {
+			continue
+		}
+		line, hits := densestLine(m.Text, terms)
+		if hits > bestHits {
+			best, bestHits = strings.TrimSpace(line), hits
+		}
+	}
+	return best
 }
 
 func relativeDay(updated, now time.Time) string {
@@ -334,9 +518,17 @@ func isSmokeTest(problem string, conclusions []string) bool {
 		return false
 	}
 	low := strings.ToLower(strings.TrimSpace(problem))
-	for _, p := range smokeAsks {
-		if strings.HasPrefix(low, p) {
-			return true
+	// The ask is usually the last sentence, not the first: a harness check
+	// says what to do and then how to answer — "search for X. Reply with the
+	// name only." Matching the prompt's opening alone let those through, and
+	// two of the three sessions an agent was handed on a real store were that
+	// exact shape. Sentence starts rather than a bare substring: prose about
+	// what a server should reply with is work, not a smoke test.
+	for _, sentence := range splitSentences(low) {
+		for _, p := range smokeAsks {
+			if strings.HasPrefix(sentence, p) {
+				return true
+			}
 		}
 	}
 	return false

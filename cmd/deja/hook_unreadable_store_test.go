@@ -69,7 +69,7 @@ func TestHookNamesAStoreItCouldNotRead(t *testing.T) {
 	}
 
 	got := message(t)
-	if !strings.Contains(got, "could not be read") || !strings.Contains(got, "deja doctor") {
+	if !strings.Contains(got, "could not read") || !strings.Contains(got, "deja doctor") {
 		t.Errorf("the hook said nothing about the locked store: %q", got)
 	}
 	// …and it is not repeated every session: the same standing fact is

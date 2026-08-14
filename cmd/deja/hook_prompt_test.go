@@ -296,10 +296,10 @@ func TestHookPromptSkipsMarathonSessions(t *testing.T) {
 
 func TestDejaVuLineCooldown(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	if !dejaVuLineDue(dir) {
+	if !dejaVuLineDue(dir, "s1") {
 		t.Fatal("first call must be due")
 	}
-	if dejaVuLineDue(dir) {
+	if dejaVuLineDue(dir, "s1") {
 		t.Fatal("second call within cooldown must be suppressed")
 	}
 }
