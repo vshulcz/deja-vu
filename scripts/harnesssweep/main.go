@@ -78,7 +78,12 @@ func harnesses() []harness {
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
-					"--openai-api-key", "local", "--model", "openai/" + model, "--message", p}
+					"--openai-api-key", "local", "--model", "openai/" + model,
+					// Every arm gets an empty home, so every arm is a first run:
+					// without these aider opened its release notes in the
+					// browser once per arm, on the machine running the sweep.
+					"--no-analytics", "--no-browser", "--no-check-update",
+					"--no-show-release-notes", "--message", p}
 			}, nil, true, true},
 		// Both of these were assumed to need an account and were left out for
 		// it. Neither does: cline takes any OpenAI-compatible base URL, and
@@ -93,7 +98,52 @@ func harnesses() []harness {
 					// exits before reaching the model.
 					"--session-key", "harnesssweep"}
 			}, setupOpenClaw, false, false},
+		{"kimi", "kimi-auto", "kimi",
+			func(p, _, model string) []string {
+				// -p is already non-interactive; kimi refuses both --auto and
+				// --yolo alongside it.
+				return []string{"-p", p, "-m", "mock/" + model}
+			}, setupKimi, false, false},
 	}
+}
+
+func setupKimi(home, base, model string) error {
+	dir := filepath.Join(home, ".kimi-code")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	// kimi's own `provider add` imports from a models.dev-shaped registry over
+	// HTTP, which a sweep would have to serve. The config it writes afterwards
+	// is this, and writing it directly needs no server.
+	body := fmt.Sprintf(`[providers.mock]
+type = "openai"
+api_key = "local"
+base_url = %q
+
+[models."mock/%s"]
+provider = "mock"
+model = %q
+max_context_size = 128000
+capabilities = [ "tool_use" ]
+display_name = "Mock Model"
+`, base, model, model)
+	path := filepath.Join(dir, "config.toml")
+	// Appended, never written over: kimi's hook lives in this same file, and
+	// deja has already installed it by the time setup runs. Replacing the file
+	// deleted that block, and the sweep then reported kimi as getting no
+	// recall — a defect in the sweep that reads exactly like one in deja.
+	old, _ := os.ReadFile(path)
+	if strings.Contains(string(old), "[providers.") {
+		return nil
+	}
+	next := string(old)
+	if next != "" && !strings.HasSuffix(next, "\n") {
+		next += "\n"
+	}
+	if next != "" {
+		next += "\n"
+	}
+	return os.WriteFile(path, []byte(next+body), 0o644)
 }
 
 func setupCline(home, base, model string) error {
