@@ -872,16 +872,24 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		return
 	}
 	color := colorOK(w)
+	// One form for the whole column, decided before the first row is printed.
+	when := make([]time.Time, 0, len(hits))
 	for _, h := range hits {
-		d := "-"
-		if !h.Session.Updated.IsZero() {
-			d = relativeDate(h.Session.Updated)
-		}
-		// A day of notes is one session whose id *is* a date, minted in UTC.
-		// The reader's zone put a different day on the line than the id beside
-		// it, and only for deja's own buckets (#883).
+		t := h.Session.Updated
 		if day, ok := NoteBucketDay(h.Session); ok {
-			d = relativeDate(noteBucketNoon(day))
+			t = noteBucketNoon(day)
+		}
+		when = append(when, t)
+	}
+	dated := dateColumn(when)
+	for i, h := range hits {
+		d := "-"
+		if !when[i].IsZero() {
+			// A day of notes is one session whose id *is* a date, minted in
+			// UTC. The reader's zone put a different day on the line than the
+			// id beside it, and only for deja's own buckets (#883) — which is
+			// why the time was chosen above rather than here.
+			d = dated(when[i])
 		}
 		// project and id are transcript/peer free text printed to a terminal;
 		// an escape or bidi run in an imported project name would repaint the
@@ -1279,6 +1287,52 @@ func harnessTag(h string, color bool) string {
 		return cGreen + tag + cReset + cBold
 	}
 	return tag
+}
+
+// dateColumn picks one form for a whole column and returns a formatter that
+// holds to it.
+//
+// Both forms are correct, and mixing them is what makes the column unreadable:
+// two sessions a day apart printed "6d ago" and "Jul 26" one row under the
+// other, because the relative form stops at a week. A reader scanning down
+// cannot see they are consecutive without doing the arithmetic. So the rule is
+// per rendering rather than per row — if any row has aged out of the relative
+// form, every row is dated.
+func dateColumn(times []time.Time) func(time.Time) string {
+	for _, t := range times {
+		if t.IsZero() {
+			continue
+		}
+		if !isRelativeAge(t) {
+			return absoluteDate
+		}
+	}
+	return relativeDate
+}
+
+// isRelativeAge reports whether relativeDate would answer in the relative form.
+func isRelativeAge(t time.Time) bool {
+	return daysAgo(t) < 7
+}
+
+func daysAgo(t time.Time) int {
+	now := time.Now()
+	// In the reader's zone, not the timestamp's — see relativeDate.
+	t = t.In(now.Location())
+	y1, m1, d1 := now.Date()
+	y2, m2, d2 := t.Date()
+	today := time.Date(y1, m1, d1, 0, 0, 0, 0, now.Location())
+	day := time.Date(y2, m2, d2, 0, 0, 0, 0, now.Location())
+	return int(today.Sub(day).Hours() / 24)
+}
+
+func absoluteDate(t time.Time) string {
+	now := time.Now()
+	t = t.In(now.Location())
+	if t.Year() == now.Year() {
+		return t.Format("Jan 2")
+	}
+	return t.Format("Jan 2 2006")
 }
 
 func relativeDate(t time.Time) string {
