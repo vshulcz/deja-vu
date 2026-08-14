@@ -48,28 +48,87 @@ type harness struct {
 	// disk in silence. A sweep that only ran one of them would describe the
 	// harness wrongly whichever it chose.
 	wrapped bool
+	// sessionScoped marks a harness with no way to recall against the prompt.
+	// aider has neither hooks nor an MCP client; its read-only files are the
+	// whole channel, and nothing tells deja what was typed. Recall that does
+	// not answer the question is the best such a harness can do, so reporting
+	// it as a defect would bury the harnesses where it is one.
+	sessionScoped bool
 }
 
 func harnesses() []harness {
 	return []harness{
 		{"opencode", "opencode-auto", "opencode",
-			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false},
+			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false, false},
 		{"codex", "codex-auto", "codex",
-			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false},
+			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, false},
 		{"goose", "goose-auto", "goose",
-			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true},
+			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true,
+			// Bare goose has no working prompt channel: it discards hook stdout,
+			// and .goosehints is read once when the session opens. MOIM, which is
+			// re-read every turn, is env-only — so the wrapper arm below is where
+			// goose recalls for the question.
+			true},
 		{"qwen", "qwen-auto", "qwen",
-			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false},
+			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, false},
 		{"grok", "grok-auto", "grok",
 			func(p, base, model string) []string {
 				return []string{"-p", p, "-u", base, "-k", "local", "-m", model}
-			}, nil, false},
+			}, nil, false, false},
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
 					"--openai-api-key", "local", "--model", "openai/" + model, "--message", p}
-			}, nil, true},
+			}, nil, true, true},
+		// Both of these were assumed to need an account and were left out for
+		// it. Neither does: cline takes any OpenAI-compatible base URL, and
+		// openclaw takes a provider block in its own config.
+		{"cline", "cline-auto", "cline",
+			func(p, _, _ string) []string { return []string{"--auto-approve", "true", p} },
+			setupCline, false, false},
+		{"openclaw", "openclaw-auto", "openclaw",
+			func(p, _, model string) []string {
+				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
+					// Without a session key openclaw refuses to pick one and
+					// exits before reaching the model.
+					"--session-key", "harnesssweep"}
+			}, setupOpenClaw, false, false},
 	}
+}
+
+func setupCline(home, base, model string) error {
+	// cline keeps provider credentials in its own store, written by its own
+	// command; there is no file to drop in.
+	cmd := exec.Command("cline", "auth", "-p", "openai", "-k", "local",
+		"-b", base, "-m", model)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cline auth: %v: %s", err, firstLine(string(out)))
+	}
+	return nil
+}
+
+func setupOpenClaw(home, base, model string) error {
+	dir := filepath.Join(home, ".openclaw")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "openclaw.json")
+	cfg := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(b, &cfg)
+	}
+	// openai-completions, not the default: openclaw's openai provider speaks
+	// the responses API, which the recording endpoint does not serve.
+	cfg["models"] = map[string]any{"mode": "merge", "providers": map[string]any{
+		"mock": map[string]any{
+			"baseUrl": base, "apiKey": "local", "api": "openai-completions",
+			"models": []any{map[string]any{"id": model, "name": "mock"}},
+		},
+	}}
+	b, _ := json.MarshalIndent(cfg, "", "  ")
+	return os.WriteFile(path, b, 0o644)
 }
 
 func setupOpencode(home, base, model string) error {
@@ -139,7 +198,14 @@ type result struct {
 	// product hears most, and it is invisible to every check that only reads
 	// the request: on a real sweep the recall reached four harnesses and only
 	// some of them mentioned it.
-	shown    bool
+	shown bool
+	// answered is whether what arrived is about the question. A harness can
+	// pass every other check and still be blind: cline's plugin got a rule,
+	// which is handed nothing, so it recalled whatever the session opened
+	// with; gemini's prompt hook was handed the request with the previous
+	// recall already inside it, so every search term came from deja's own
+	// output. Both showed "recall reached the model" here.
+	answered bool
 	rejected bool
 	err      string
 	took     time.Duration
@@ -154,6 +220,9 @@ func main() {
 	repo := flag.String("repo", ".", "run the harnesses from here; recall is project-scoped")
 	prompt := flag.String("prompt", "How often does the deploy token for the billing gateway rotate?",
 		"the question to ask")
+	answer := flag.String("answer", "rotates every",
+		"a phrase from the corpus that answers -prompt; the recall has to carry "+
+			"it, or the harness is getting memory that is not about the question")
 	only := flag.String("only", "", "comma-separated harness names")
 	flag.Parse()
 
@@ -192,9 +261,9 @@ func main() {
 			fmt.Printf("%-10s SKIP  %s is not installed\n", h.name, h.bin)
 			continue
 		}
-		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, false)
-		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, false, false)
-		report(h.name, withDeja, control)
+		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, true, false)
+		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, false, false)
+		report(h.name, withDeja, control, *answer != "", h.sessionScoped)
 		// Uninstalling has to leave the harness exactly as it was found. The
 		// failure this catches is not theoretical: grok's hooks survived
 		// `uninstall --all` and went on calling a binary the user had just
@@ -206,17 +275,30 @@ func main() {
 			fmt.Printf("%-10s %-34s %s\n", "", "REINSTALL", problem)
 		}
 		if h.wrapped {
-			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, true, true)
+			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, true, true)
 			seen := "silent"
 			if w.shown {
 				seen = "receipt shown"
 			}
-			fmt.Printf("%-10s %-34s %-14s (via `deja %s`)\n", "", "", seen, h.bin)
+			// The wrapper is where a harness can gain a channel the bare
+			// binary does not have: goose's MOIM file is re-read every turn
+			// and is env-only, so only `deja goose` gets recall for the
+			// question. Reporting only the receipt here hid that difference.
+			verdict := ""
+			switch {
+			case !w.recall:
+				verdict = "NO RECALL in the request"
+			case *answer != "" && !w.answered:
+				verdict = "session-scoped recall"
+			case *answer != "":
+				verdict = "recall answers the question"
+			}
+			fmt.Printf("%-10s %-34s %-14s (via `deja %s`)\n", "", verdict, seen, h.bin)
 		}
 	}
 }
 
-func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, install, wrapper bool) result {
+func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer string, install, wrapper bool) result {
 	var out result
 	home, err := os.MkdirTemp("", "sweep-"+h.name)
 	if err != nil {
@@ -284,7 +366,35 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt string, inst
 	sent, n := readSince(logPath, start)
 	out.requests = n
 	out.recall = strings.Contains(sent, "deja-recall")
+	// The answer has to be inside the recall, not merely somewhere in the
+	// request: the prompt itself quotes the question, and a harness that
+	// echoes the corpus for other reasons would otherwise read as a pass.
+	out.answered = answer != "" && strings.Contains(recallBlocks(sent), answer)
 	return out
+}
+
+// recallBlocks returns just what deja put in the request. The block is JSON
+// encoded by the time it reaches the log, so the closing tag is matched in both
+// spellings; an unterminated block is taken to run to the end, which is the
+// reading that cannot hide a missing answer.
+func recallBlocks(sent string) string {
+	var b strings.Builder
+	rest := sent
+	for {
+		i := strings.Index(rest, "deja-recall")
+		if i < 0 {
+			return b.String()
+		}
+		rest = rest[i+len("deja-recall"):]
+		end := len(rest)
+		for _, close := range []string{"/deja-recall", `</deja-recall`} {
+			if j := strings.Index(rest, close); j >= 0 && j < end {
+				end = j
+			}
+		}
+		b.WriteString(rest[:end])
+		rest = rest[end:]
+	}
 }
 
 // readSince returns what was appended to the log after offset, and how many
@@ -443,7 +553,7 @@ func firstLine(s string) string {
 	return s
 }
 
-func report(name string, withDeja, control result) {
+func report(name string, withDeja, control result, wantAnswer, sessionScoped bool) {
 	// A harness that cannot complete a turn without deja cannot say anything
 	// about deja: an account wall, a missing model, a flag this sweep got
 	// wrong. Naming that separately keeps it out of the defect column.
@@ -457,6 +567,10 @@ func report(name string, withDeja, control result) {
 		verdict = "REJECTED the request deja produced"
 	case !withDeja.recall:
 		verdict = "NO RECALL in the request"
+	case wantAnswer && !withDeja.answered && sessionScoped:
+		verdict = "session-scoped recall (no prompt channel)"
+	case wantAnswer && !withDeja.answered:
+		verdict = "RECALL MISSED THE QUESTION"
 	}
 	seen := "silent"
 	if withDeja.shown {
