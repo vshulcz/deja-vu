@@ -896,13 +896,27 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 				_ = rw.Close()
 				return err
 			}
-			for _, tok := range indexKeys(r.Text) {
+			// Index an imported record exactly as ingestion would: the same
+			// slice of the text earns postings (tokenizedPart), the same date
+			// tokens ride along, and the tool bit survives the trip. Routing
+			// through bare indexKeys left synced stores without date keys and
+			// with unfiltered tool output — the route a record takes into an
+			// index must not change what it indexes to.
+			var bucketErr error
+			eachIndexKey(tokenizedPart(r.Role, r.Text), r.Time, func(tok string) {
+				if bucketErr != nil {
+					return
+				}
 				data, err := loadBucket(tok)
 				if err != nil {
-					_ = rw.Close()
-					return err
+					bucketErr = err
+					return
 				}
-				data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
+				data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord, Tool: isToolRole(r.Role)})
+			})
+			if bucketErr != nil {
+				_ = rw.Close()
+				return bucketErr
 			}
 		}
 	}
