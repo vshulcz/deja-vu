@@ -147,6 +147,56 @@ func shellTool(raw json.RawMessage, command string) (string, string) {
 	return best.name(), commandArguments(best.schema(), command)
 }
 
+// recallTool picks deja's own recall tool out of what the harness declared.
+// The prefix is the harness's: deja__recall in one, mcp__deja__recall in
+// another, a single mcp__deja entry in a third.
+func recallTool(raw json.RawMessage, query string) (string, string) {
+	if len(raw) == 0 {
+		return "", ""
+	}
+	var tools []declaredTool
+	if json.Unmarshal(raw, &tools) != nil {
+		return "", ""
+	}
+	var fallback declaredTool
+	for _, t := range tools {
+		name := strings.ToLower(t.name())
+		if !strings.Contains(name, "deja") {
+			continue
+		}
+		if strings.Contains(name, "recall") && !strings.Contains(name, "context") {
+			return t.name(), queryArguments(t.schema(), query)
+		}
+		if fallback.name() == "" {
+			fallback = t
+		}
+	}
+	if fallback.name() == "" {
+		return "", ""
+	}
+	return fallback.name(), queryArguments(fallback.schema(), query)
+}
+
+// queryArguments renders the search text under whichever property the tool's
+// schema names for it.
+func queryArguments(schema json.RawMessage, query string) string {
+	var doc struct {
+		Properties map[string]struct {
+			Type string `json:"type"`
+		} `json:"properties"`
+		Required []string `json:"required"`
+	}
+	_ = json.Unmarshal(schema, &doc)
+	for _, key := range []string{"query", "q", "search", "terms", "text", "prompt"} {
+		if _, ok := doc.Properties[key]; ok {
+			return `{"` + key + `":` + strconv.Quote(query) + `}`
+		}
+	}
+	// A required property this mock does not know about would make the call
+	// fail on arrival; naming the commonest one keeps the failure legible.
+	return `{"query":` + strconv.Quote(query) + `}`
+}
+
 // commandArguments renders the command under the property the schema names for
 // it, as the type the schema asks for.
 func commandArguments(schema json.RawMessage, command string) string {
@@ -202,10 +252,17 @@ func (s *server) resolveTool(req request) (string, string) {
 	if alreadyCalled(req) {
 		return "", ""
 	}
-	if s.toolCall != "auto" {
-		return s.toolCall, commandArguments(nil, s.toolArg)
+	switch s.toolCall {
+	case "auto":
+		return shellTool(req.Tools, s.toolArg)
+	case "recall":
+		// The MCP path end to end: whether the server deja installs is
+		// actually reachable from inside the harness and answers. Every other
+		// check reads what deja put in the request; this one makes the harness
+		// come back to deja for it.
+		return recallTool(req.Tools, s.toolArg)
 	}
-	return shellTool(req.Tools, s.toolArg)
+	return s.toolCall, commandArguments(nil, s.toolArg)
 }
 
 // alreadyCalled reports whether this conversation already carries the result of
@@ -213,6 +270,13 @@ func (s *server) resolveTool(req request) (string, string) {
 func alreadyCalled(req request) bool {
 	var b strings.Builder
 	for _, m := range req.Messages {
+		// Chat completions send the result as its own message, whose only
+		// marks are the role and a tool_call_id this struct does not keep.
+		// Matching on the body alone missed it, and the mock then asked for
+		// the same call again on every turn.
+		if m.Role == "tool" {
+			return true
+		}
 		b.WriteString(m.Role)
 		b.Write(m.Content)
 	}

@@ -66,6 +66,11 @@ type harness struct {
 	// and nothing exercised it until the mock learned to answer with a tool
 	// call — the sweep only ever asked questions, so no tool was ever used.
 	toolHook bool
+	// mcp marks a harness deja installs its MCP server into. Everything else
+	// here reads what deja pushed into the request; this is the other
+	// direction — whether the harness can reach back to deja and get an
+	// answer. It is the only channel some of them have for a follow-up.
+	mcp bool
 	// sessionScoped marks a harness with no way to recall against the prompt.
 	// aider has neither hooks nor an MCP client; its read-only files are the
 	// whole channel, and nothing tells deja what was typed. Recall that does
@@ -82,25 +87,25 @@ func harnesses() []harness {
 			}, nil, false,
 			func(p, _, _ string) []string {
 				return []string{"-p", p, "--continue", "--permission-mode", "bypassPermissions"}
-			}, nil, true, false},
+			}, nil, true, true, false},
 		{"opencode", "opencode-auto", "opencode",
 			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false,
-			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, nil, false, false},
+			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, nil, false, true, false},
 		{"codex", "codex-auto", "codex",
-			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, nil, true, false},
+			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, nil, true, true, false},
 		{"goose", "goose-auto", "goose",
 			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true,
 			// Bare goose has no working prompt channel: it discards hook stdout,
 			// and .goosehints is read once when the session opens. MOIM, which is
 			// re-read every turn, is env-only — so the wrapper arm below is where
 			// goose recalls for the question.
-			nil, nil, false, true},
+			nil, nil, false, true, true},
 		{"qwen", "qwen-auto", "qwen",
-			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, nil, false, false},
+			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, nil, false, true, false},
 		{"grok", "grok-auto", "grok",
 			func(p, base, model string) []string {
 				return []string{"-p", p, "-u", base, "-k", "local", "-m", model}
-			}, nil, false, nil, grokIsTheOtherProduct, true, false},
+			}, nil, false, nil, grokIsTheOtherProduct, true, true, false},
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
@@ -110,13 +115,14 @@ func harnesses() []harness {
 					// browser once per arm, on the machine running the sweep.
 					"--no-analytics", "--no-browser", "--no-check-update",
 					"--no-show-release-notes", "--message", p}
-			}, nil, true, nil, nil, false, true},
+				// aider has no MCP client at all.
+			}, nil, true, nil, nil, false, false, true},
 		// Both of these were assumed to need an account and were left out for
 		// it. Neither does: cline takes any OpenAI-compatible base URL, and
 		// openclaw takes a provider block in its own config.
 		{"cline", "cline-auto", "cline",
 			func(p, _, _ string) []string { return []string{"--auto-approve", "true", p} },
-			setupCline, false, nil, nil, false, false},
+			setupCline, false, nil, nil, false, true, false},
 		{"openclaw", "openclaw-auto", "openclaw",
 			func(p, _, model string) []string {
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
@@ -128,7 +134,7 @@ func harnesses() []harness {
 				// The same key is the same session.
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
 					"--session-key", "harnesssweep"}
-			}, nil, false, false},
+			}, nil, false, true, false},
 		{"kimi", "kimi-auto", "kimi",
 			func(p, _, model string) []string {
 				// -p is already non-interactive; kimi refuses both --auto and
@@ -137,7 +143,7 @@ func harnesses() []harness {
 			}, setupKimi, false,
 			func(p, _, model string) []string {
 				return []string{"-p", p, "-c", "-m", "mock/" + model}
-			}, nil, false, false},
+			}, nil, false, true, false},
 	}
 }
 
@@ -310,6 +316,11 @@ type result struct {
 	// recall already inside it, so every search term came from deja's own
 	// output. Both showed "recall reached the model" here.
 	answered bool
+	// echoed is the answer anywhere in the request, not only inside a recall
+	// block. A tool result comes back as a tool result, in whatever shape the
+	// protocol uses, so the stricter check would call a working MCP round trip
+	// a failure.
+	echoed   bool
 	rejected bool
 	err      string
 	took     time.Duration
@@ -341,6 +352,9 @@ func main() {
 		"the question that leads to the tool call")
 	toolEvidence := flag.String("tool-evidence", "last time:",
 		"what deja's PreToolUse hook should contribute for that command")
+	mcpBase := flag.String("mcp-base", "",
+		"a mockmodel endpoint started with -tool-call recall; enables the MCP arm")
+	mcpLog := flag.String("mcp-log", "", "the request log of that endpoint")
 	only := flag.String("only", "", "comma-separated harness names")
 	flag.Parse()
 
@@ -388,6 +402,19 @@ func main() {
 		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, *prompt2, *answer2, true, false)
 		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, "", "", false, false)
 		report(h.name, withDeja, control, *answer != "", h.sessionScoped)
+		if h.mcp && *mcpBase != "" && *mcpLog != "" {
+			m := run(h, exe, *corpus, *mcpLog, *mcpBase, *model, *repo,
+				"What did we settle about the billing gateway deploy token?",
+				*answer, "", "", true, false)
+			verdict := "MCP answered from inside the harness"
+			switch {
+			case m.requests < 2:
+				verdict = "the harness never called deja's MCP tool"
+			case !m.echoed:
+				verdict = "MCP TOOL RETURNED NOTHING USEFUL"
+			}
+			fmt.Printf("%-10s %-34s %-14s (mcp)\n", "", verdict, "")
+		}
 		if h.toolHook && *toolBase != "" && *toolLog != "" {
 			t := run(h, exe, *corpus, *toolLog, *toolBase, *model, *repo,
 				*toolPrompt, *toolEvidence, "", "", true, false)
@@ -521,6 +548,7 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer, pro
 	// request: the prompt itself quotes the question, and a harness that
 	// echoes the corpus for other reasons would otherwise read as a pass.
 	out.answered = answer != "" && strings.Contains(recallBlocks(sent), answer)
+	out.echoed = answer != "" && strings.Contains(sent, answer)
 	out.second = secondTurn(h, env, logPath, base, model, repo, prompt2, answer2)
 	return out
 }
