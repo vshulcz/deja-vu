@@ -36,7 +36,7 @@ func TestArchitectureNamesTheZoneNotesAreGroupedIn(t *testing.T) {
 	}
 	groupedInUTC := strings.Contains(ss[0].ID, "2026-07-20")
 
-	doc, err := os.ReadFile(filepath.Join("..", "..", "ARCHITECTURE.md"))
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "ARCHITECTURE.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

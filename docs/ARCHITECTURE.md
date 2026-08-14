@@ -48,6 +48,16 @@ Beyond `user`, `assistant` and `developer`, records carry what the agent did:
 
 These are indexed and searchable by `--role`, and served in ordinary results only when asked for by role: a path that happens to contain the words of a question is not an answer to it. The postings carry a bit for them so the per-session read bound can spend its budget on speech first.
 
+## Notes source
+
+Explicit notes are stored as one JSON object per line in
+`~/.local/share/deja/notes.jsonl`, or under `XDG_DATA_HOME`; `DEJA_NOTES_FILE`
+overrides the path. Each record contains an RFC3339 `ts`, `project`, and
+`text`. Notes are grouped into one user-message session per project and
+calendar day in the local zone of whichever run indexed them, then redacted and
+indexed like every other source. `deja index` regroups buckets minted in
+another zone. The file is primary data; the index remains a rebuildable cache.
+
 ## Secret redaction
 
 `internal/redact` runs before every `writeRecord` path: cold rebuild, `writeSessions`, non-append incremental replacement, and append-only incremental ingest. The pass is disabled only when `DEJA_NO_REDACT=1` is set; that escape hatch is unsafe because plaintext credentials will be written to the local index.
@@ -150,6 +160,22 @@ Search intersects postings to find candidates, then scores each with BM25 over t
 - **freshness** — recency decays the score gently so time is a hint, not a filter.
 
 `recall_context` and the hooks reuse the same scored order; the point-of-action decision line comes from the same conclusion extraction the digest uses.
+
+## Semantic sidecar
+
+`deja embed` writes `<index-dir>.vectors.bin`. The file begins with `DJV1`, a
+version, vector dimension, model name, manifest generation, vector count, and
+covered-record watermark. Each entry stores the records.bin byte offset, its
+session key, and fixed-width float32 values. Writes use a temporary file and
+rename. A changed manifest generation or model discards old entries; a corrupt
+sidecar is treated as absent and rebuilt.
+
+### Hybrid reranking
+
+Search first produces lexical BM25 results. When a matching sidecar exists, up
+to 64 candidates are reranked using the query vector. The final score is
+`0.5 * normalized lexical score + 0.5 * cosine similarity`. A failed query
+embedding prints one notice and returns the original lexical order.
 
 ## Add a new harness
 
