@@ -1,20 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="200" viewBox="0 0 760 200" role="img" aria-label="deja-vu">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="36" y1="34" x2="180" y2="166">
       <stop offset="0" stop-color="#7c6cf0"/>
       <stop offset="1" stop-color="#4ecdc4"/>
     </linearGradient>
   </defs>
-  <!-- rewind-loop mark: an arrow circling back on itself -->
-  <g transform="translate(36,36)">
-    <path d="M64 16 A48 48 0 1 0 112 64" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
-    <path d="M112 64 l-20 -14 M112 64 l-24 6" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
-    <circle cx="64" cy="64" r="8" fill="url(#g)"/>
+  <!-- The cat is a 24x22 pixel sprite, the same grid cmd/deja/logo.go
+     prints as half blocks. Eyes and mouth are holes, not shapes, so the
+     mark carries the page behind it. -->
+  <g fill="url(#g)">
+    <rect x="60" y="34" width="6" height="6"/>
+    <rect x="138" y="34" width="6" height="6"/>
+    <rect x="54" y="40" width="18" height="6"/>
+    <rect x="132" y="40" width="18" height="6"/>
+    <rect x="54" y="46" width="24" height="6"/>
+    <rect x="126" y="46" width="24" height="6"/>
+    <rect x="54" y="52" width="30" height="6"/>
+    <rect x="120" y="52" width="30" height="6"/>
+    <rect x="54" y="58" width="96" height="6"/>
+    <rect x="48" y="64" width="108" height="6"/>
+    <rect x="48" y="70" width="108" height="6"/>
+    <rect x="48" y="76" width="108" height="6"/>
+    <rect x="48" y="82" width="24" height="6"/>
+    <rect x="84" y="82" width="36" height="6"/>
+    <rect x="132" y="82" width="24" height="6"/>
+    <rect x="48" y="88" width="18" height="6"/>
+    <rect x="72" y="88" width="12" height="6"/>
+    <rect x="90" y="88" width="24" height="6"/>
+    <rect x="120" y="88" width="12" height="6"/>
+    <rect x="138" y="88" width="18" height="6"/>
+    <rect x="48" y="94" width="108" height="6"/>
+    <rect x="48" y="100" width="48" height="6"/>
+    <rect x="108" y="100" width="48" height="6"/>
+    <rect x="48" y="106" width="48" height="6"/>
+    <rect x="108" y="106" width="48" height="6"/>
+    <rect x="54" y="112" width="36" height="6"/>
+    <rect x="96" y="112" width="12" height="6"/>
+    <rect x="114" y="112" width="36" height="6"/>
+    <rect x="60" y="118" width="84" height="6"/>
+    <rect x="150" y="118" width="12" height="6"/>
+    <rect x="66" y="124" width="72" height="6"/>
+    <rect x="150" y="124" width="12" height="6"/>
+    <rect x="66" y="130" width="72" height="6"/>
+    <rect x="150" y="130" width="12" height="6"/>
+    <rect x="66" y="136" width="72" height="6"/>
+    <rect x="150" y="136" width="12" height="6"/>
+    <rect x="66" y="142" width="72" height="6"/>
+    <rect x="150" y="142" width="12" height="6"/>
+    <rect x="60" y="148" width="96" height="6"/>
+    <rect x="60" y="154" width="96" height="6"/>
+    <rect x="66" y="160" width="24" height="6"/>
+    <rect x="114" y="160" width="24" height="6"/>
   </g>
-  <!-- wordmark -->
+    <rect x="96" y="100" width="12" height="6" fill="#ff8700"/>
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
-    <text x="200" y="118" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>
-    <text x="203" y="160" font-size="20" fill="#8a87a0">your agents already solved this. deja finds it.</text>
+    <text x="212" y="112" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>
+    <text x="215" y="152" font-size="20" fill="#8a87a0">your agents already solved this. deja finds it.</text>
   </g>
   <style>
     @media (prefers-color-scheme: light) {

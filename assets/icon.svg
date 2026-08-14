@@ -1,14 +1,57 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" role="img" aria-label="deja-vu">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="32" y1="46" x2="368" y2="354">
       <stop offset="0" stop-color="#7c6cf0"/>
       <stop offset="1" stop-color="#4ecdc4"/>
     </linearGradient>
   </defs>
   <rect width="400" height="400" rx="88" fill="#1d1b2e"/>
-  <g transform="translate(72,72) scale(2)">
-    <path d="M64 16 A48 48 0 1 0 112 64" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
-    <path d="M112 64 l-20 -14 M112 64 l-24 6" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
-    <circle cx="64" cy="64" r="8" fill="url(#g)"/>
+  <!-- The cat is a 24x22 pixel sprite, the same grid cmd/deja/logo.go
+     prints as half blocks. Eyes and mouth are holes, not shapes, so the
+     mark carries the page behind it. -->
+  <g fill="url(#g)">
+    <rect x="88" y="46" width="14" height="14"/>
+    <rect x="270" y="46" width="14" height="14"/>
+    <rect x="74" y="60" width="42" height="14"/>
+    <rect x="256" y="60" width="42" height="14"/>
+    <rect x="74" y="74" width="56" height="14"/>
+    <rect x="242" y="74" width="56" height="14"/>
+    <rect x="74" y="88" width="70" height="14"/>
+    <rect x="228" y="88" width="70" height="14"/>
+    <rect x="74" y="102" width="224" height="14"/>
+    <rect x="60" y="116" width="252" height="14"/>
+    <rect x="60" y="130" width="252" height="14"/>
+    <rect x="60" y="144" width="252" height="14"/>
+    <rect x="60" y="158" width="56" height="14"/>
+    <rect x="144" y="158" width="84" height="14"/>
+    <rect x="256" y="158" width="56" height="14"/>
+    <rect x="60" y="172" width="42" height="14"/>
+    <rect x="116" y="172" width="28" height="14"/>
+    <rect x="158" y="172" width="56" height="14"/>
+    <rect x="228" y="172" width="28" height="14"/>
+    <rect x="270" y="172" width="42" height="14"/>
+    <rect x="60" y="186" width="252" height="14"/>
+    <rect x="60" y="200" width="112" height="14"/>
+    <rect x="200" y="200" width="112" height="14"/>
+    <rect x="60" y="214" width="112" height="14"/>
+    <rect x="200" y="214" width="112" height="14"/>
+    <rect x="74" y="228" width="84" height="14"/>
+    <rect x="172" y="228" width="28" height="14"/>
+    <rect x="214" y="228" width="84" height="14"/>
+    <rect x="88" y="242" width="196" height="14"/>
+    <rect x="298" y="242" width="28" height="14"/>
+    <rect x="102" y="256" width="168" height="14"/>
+    <rect x="298" y="256" width="28" height="14"/>
+    <rect x="102" y="270" width="168" height="14"/>
+    <rect x="298" y="270" width="28" height="14"/>
+    <rect x="102" y="284" width="168" height="14"/>
+    <rect x="298" y="284" width="28" height="14"/>
+    <rect x="102" y="298" width="168" height="14"/>
+    <rect x="298" y="298" width="28" height="14"/>
+    <rect x="88" y="312" width="224" height="14"/>
+    <rect x="88" y="326" width="224" height="14"/>
+    <rect x="102" y="340" width="56" height="14"/>
+    <rect x="214" y="340" width="56" height="14"/>
   </g>
+    <rect x="172" y="200" width="28" height="14" fill="#ff8700"/>
 </svg>
