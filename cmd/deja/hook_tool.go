@@ -198,8 +198,72 @@ func commandHookLine(dir, cmd string) string {
 	if !last.IsZero() {
 		when = ", last " + last.Local().Format("2006-01-02")
 	}
-	return fmt.Sprintf("This machine has run that command in %s%s.",
+	head := fmt.Sprintf("This machine has run that command in %s%s",
 		toolSessionCount(sessions), when)
+	// The file path carries the prior decision rather than a pointer to it,
+	// for the measured reason recorded there — a line that only says history
+	// exists changes nothing. A command deserves the same: before `npm run
+	// build`, what matters is that it failed here last time and why, not that
+	// it has been run twice.
+	if d := commandDecisionLine(dir, cmd); d != "" {
+		return head + " — last time: " + d
+	}
+	return head + "."
+}
+
+// commandDecisionLine returns what happened the last time this command ran, or
+// "" when the history holds no conclusion about it.
+//
+// The command's sessions are found by searching for it: the manifest records
+// the files a session touched but not the commands it ran, so there is no
+// cheaper lookup, and this hook fires on a build or a deploy rather than on
+// every message — the prompt hook already pays a search per keystroke.
+func commandDecisionLine(dir, cmd string) string {
+	terms := promptSearchTerms(normalizedCommandText(cmd))
+	if len(terms) == 0 {
+		return ""
+	}
+	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+	ranked, matched, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
+	if err != nil {
+		return ""
+	}
+	pol := policy.Load()
+	states := sources.PromotedLifecycles()
+	for i, s := range ranked {
+		// Every term or nothing: a build command's words are common, and one
+		// of them matching finds a session about something else entirely.
+		if matched[i] < len(terms) {
+			continue
+		}
+		if !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
+			continue
+		}
+		if len(s.Messages) > toolHookMsgTail {
+			s.Messages = s.Messages[len(s.Messages)-toolHookMsgTail:]
+		}
+		if cs := digest.Conclusions(s, toolHookDecisionBudget, 1); len(cs) > 0 {
+			return trimTrailingFragment(search.SafeText(strings.TrimSpace(cs[0])))
+		}
+	}
+	return ""
+}
+
+// normalizedCommandText is the command as words to search for: the invocation
+// without its flags, which are punctuation to the tokeniser and noise to the
+// ranking.
+func normalizedCommandText(cmd string) string {
+	var out []string
+	for _, f := range strings.Fields(cmd) {
+		if strings.HasPrefix(f, "-") {
+			continue
+		}
+		out = append(out, f)
+	}
+	return strings.Join(out, " ")
 }
 
 func fileHookLine(dir, path string) string {

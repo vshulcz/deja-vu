@@ -57,9 +57,13 @@ type server struct {
 	// tool — its PreToolUse hooks, its approval flow — and a mock that only
 	// ever talks leaves that whole path untested.
 	toolCall string
-	mu       sync.Mutex
-	logw     *os.File
-	called   atomic.Bool
+	// toolArg is the command the call asks for. It matters: deja's PreToolUse
+	// hook speaks only about commands the history has seen, so a fixed `echo`
+	// made every run look like a hook that produces nothing.
+	toolArg string
+	mu      sync.Mutex
+	logw    *os.File
+	called  atomic.Bool
 }
 
 func (s *server) record(path string, msgs []message) {
@@ -126,6 +130,46 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request, req request) {
 		})
 		return
 	}
+	// One call, on the first turn only, the same rule the responses path
+	// follows: the harness sends the result back, and asking again loops.
+	// Without this the whole PreToolUse surface — deja's hook-tool, which
+	// several harnesses wire — went untested against every harness that
+	// speaks chat completions rather than responses.
+	if s.toolCall != "" && !s.called.Swap(true) {
+		call := map[string]any{"id": "call_mock", "type": "function",
+			"function": map[string]any{"name": s.toolCall,
+				"arguments": `{"command":` + strconv.Quote(s.toolArg) + `}`}}
+		if !req.Stream {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"id": "mock", "object": "chat.completion", "created": time.Now().Unix(), "model": model,
+				"choices": []any{map[string]any{"index": 0, "finish_reason": "tool_calls",
+					"message": map[string]any{"role": "assistant", "content": nil,
+						"tool_calls": []any{call}}}},
+				"usage": map[string]any{"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+			})
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		streamed := map[string]any{"index": 0, "id": "call_mock", "type": "function",
+			"function": map[string]any{"name": s.toolCall,
+				"arguments": `{"command":` + strconv.Quote(s.toolArg) + `}`}}
+		for _, chunk := range []map[string]any{
+			{"delta": map[string]any{"role": "assistant", "tool_calls": []any{streamed}}},
+			{"delta": map[string]any{}, "finish_reason": "tool_calls"},
+		} {
+			body := map[string]any{"id": "mock", "object": "chat.completion.chunk",
+				"created": time.Now().Unix(), "model": model}
+			choice := map[string]any{"index": 0, "delta": chunk["delta"]}
+			choice["finish_reason"] = chunk["finish_reason"]
+			body["choices"] = []any{choice}
+			sse(w, "", body)
+		}
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		return
+	}
 	if !req.Stream {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id": "mock", "object": "chat.completion", "created": time.Now().Unix(), "model": model,
@@ -176,7 +220,7 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request, req request) 
 		output = []any{map[string]any{
 			"id": "fc_mock", "type": "function_call", "status": "completed",
 			"name": s.toolCall, "call_id": "call_mock",
-			"arguments": `{"command":["/bin/echo","mockmodel probe"]}`,
+			"arguments": `{"command":["/bin/sh","-c",` + strconv.Quote(s.toolArg) + `]}`,
 		}}
 	}
 	body := map[string]any{
@@ -215,6 +259,16 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 		"stop_reason": "end_turn", "stop_sequence": nil,
 		"usage": map[string]any{"input_tokens": 1, "output_tokens": 1},
 	}
+	// The tool call, on the first turn only, as on the other two paths. This
+	// is what puts deja's PreToolUse hook under test: it is wired for Claude,
+	// codex and grok, and of those only Claude runs hooks headless.
+	if s.toolCall != "" && !s.called.Swap(true) {
+		body["content"] = []any{map[string]any{
+			"type": "tool_use", "id": "toolu_mock", "name": s.toolCall,
+			"input": map[string]any{"command": s.toolArg},
+		}}
+		body["stop_reason"] = "tool_use"
+	}
 	if !req.Stream {
 		writeJSON(w, http.StatusOK, body)
 		return
@@ -226,6 +280,23 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request, req request) {
 	}
 	start["content"] = []any{}
 	sse(w, "message_start", map[string]any{"type": "message_start", "message": start})
+	if block, ok := body["content"].([]any); ok && len(block) > 0 {
+		if first, ok := block[0].(map[string]any); ok && first["type"] == "tool_use" {
+			sse(w, "content_block_start", map[string]any{"type": "content_block_start",
+				"index": 0, "content_block": map[string]any{"type": "tool_use",
+					"id": first["id"], "name": first["name"], "input": map[string]any{}}})
+			raw, _ := json.Marshal(first["input"])
+			sse(w, "content_block_delta", map[string]any{"type": "content_block_delta",
+				"index": 0, "delta": map[string]any{"type": "input_json_delta",
+					"partial_json": string(raw)}})
+			sse(w, "content_block_stop", map[string]any{"type": "content_block_stop", "index": 0})
+			sse(w, "message_delta", map[string]any{"type": "message_delta",
+				"delta": map[string]any{"stop_reason": "tool_use", "stop_sequence": nil},
+				"usage": map[string]any{"output_tokens": 1}})
+			sse(w, "message_stop", map[string]any{"type": "message_stop"})
+			return
+		}
+	}
 	sse(w, "content_block_start", map[string]any{"type": "content_block_start", "index": 0,
 		"content_block": map[string]any{"type": "text", "text": ""}})
 	sse(w, "content_block_delta", map[string]any{"type": "content_block_delta", "index": 0,
@@ -259,9 +330,11 @@ func main() {
 	logPath := flag.String("log", "", "write every request here as JSON lines")
 	reply := flag.String("reply", "47", "what the model answers")
 	toolCall := flag.String("tool-call", "", "answer the first turn by calling this tool (e.g. shell)")
+	toolArg := flag.String("tool-arg", "echo mockmodel probe",
+		"the command -tool-call asks for; use one the corpus has run to exercise the PreToolUse hook")
 	flag.Parse()
 
-	s := &server{reply: *reply, toolCall: *toolCall}
+	s := &server{reply: *reply, toolCall: *toolCall, toolArg: *toolArg}
 	if *logPath != "" {
 		f, err := os.Create(*logPath)
 		if err != nil {
