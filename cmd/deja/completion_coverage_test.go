@@ -12,8 +12,9 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 	// Hooks are invoked by agents, not typed; warmup-status is internal.
 	internal := map[string]bool{
 		"hook-context": true, "hook-prompt": true, "hook-precompact": true,
-		"hook-antigravity": true, "hook-goose": true, "hook-refresh": true,
-		"hook-plan": true, "hook-tool": true, "warmup-status": true, "mcp": true,
+		"hook-antigravity": true, "hook-goose": true, "hook-goose-prompt": true,
+		"hook-refresh": true,
+		"hook-plan":    true, "hook-tool": true, "warmup-status": true, "mcp": true,
 	}
 	shells := map[string]string{
 		"bash": bashCompletion,
