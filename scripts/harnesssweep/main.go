@@ -48,6 +48,12 @@ type harness struct {
 	// disk in silence. A sweep that only ran one of them would describe the
 	// harness wrongly whichever it chose.
 	wrapped bool
+	// resume continues the session the first turn opened, for the harnesses
+	// that can do it without a terminal. One turn only ever tests the opening
+	// move; the promise is memory for every question, and the machinery that
+	// could break the second is real — deja suppresses recall it has already
+	// injected into a session, and the plugins cache per prompt.
+	resume func(prompt, base, model string) []string
 	// sessionScoped marks a harness with no way to recall against the prompt.
 	// aider has neither hooks nor an MCP client; its read-only files are the
 	// whole channel, and nothing tells deja what was typed. Recall that does
@@ -59,22 +65,23 @@ type harness struct {
 func harnesses() []harness {
 	return []harness{
 		{"opencode", "opencode-auto", "opencode",
-			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false, false},
+			func(p, _, _ string) []string { return []string{"run", p} }, setupOpencode, false,
+			func(p, _, _ string) []string { return []string{"run", "--continue", p} }, false},
 		{"codex", "codex-auto", "codex",
-			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, false},
+			func(p, _, _ string) []string { return []string{"exec", "--skip-git-repo-check", p} }, setupCodex, false, nil, false},
 		{"goose", "goose-auto", "goose",
 			func(p, _, _ string) []string { return []string{"run", "-t", p} }, setupGoose, true,
 			// Bare goose has no working prompt channel: it discards hook stdout,
 			// and .goosehints is read once when the session opens. MOIM, which is
 			// re-read every turn, is env-only — so the wrapper arm below is where
 			// goose recalls for the question.
-			true},
+			nil, true},
 		{"qwen", "qwen-auto", "qwen",
-			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, false},
+			func(p, _, _ string) []string { return []string{"-p", p, "-y"} }, nil, false, nil, false},
 		{"grok", "grok-auto", "grok",
 			func(p, base, model string) []string {
 				return []string{"-p", p, "-u", base, "-k", "local", "-m", model}
-			}, nil, false, false},
+			}, nil, false, nil, false},
 		{"aider", "aider", "aider",
 			func(p, base, model string) []string {
 				return []string{"--no-git", "--yes", "--openai-api-base", base,
@@ -84,26 +91,34 @@ func harnesses() []harness {
 					// browser once per arm, on the machine running the sweep.
 					"--no-analytics", "--no-browser", "--no-check-update",
 					"--no-show-release-notes", "--message", p}
-			}, nil, true, true},
+			}, nil, true, nil, true},
 		// Both of these were assumed to need an account and were left out for
 		// it. Neither does: cline takes any OpenAI-compatible base URL, and
 		// openclaw takes a provider block in its own config.
 		{"cline", "cline-auto", "cline",
 			func(p, _, _ string) []string { return []string{"--auto-approve", "true", p} },
-			setupCline, false, false},
+			setupCline, false, nil, false},
 		{"openclaw", "openclaw-auto", "openclaw",
 			func(p, _, model string) []string {
 				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
 					// Without a session key openclaw refuses to pick one and
 					// exits before reaching the model.
 					"--session-key", "harnesssweep"}
-			}, setupOpenClaw, false, false},
+			}, setupOpenClaw, false,
+			func(p, _, model string) []string {
+				// The same key is the same session.
+				return []string{"agent", "--local", "-m", p, "--model", "mock/" + model,
+					"--session-key", "harnesssweep"}
+			}, false},
 		{"kimi", "kimi-auto", "kimi",
 			func(p, _, model string) []string {
 				// -p is already non-interactive; kimi refuses both --auto and
 				// --yolo alongside it.
 				return []string{"-p", p, "-m", "mock/" + model}
-			}, setupKimi, false, false},
+			}, setupKimi, false,
+			func(p, _, model string) []string {
+				return []string{"-p", p, "-c", "-m", "mock/" + model}
+			}, false},
 	}
 }
 
@@ -259,6 +274,9 @@ type result struct {
 	rejected bool
 	err      string
 	took     time.Duration
+	// second is the follow-up turn in the same session, when the harness can
+	// be resumed without a terminal. nil means it cannot.
+	second *result
 }
 
 func main() {
@@ -273,6 +291,10 @@ func main() {
 	answer := flag.String("answer", "rotates every",
 		"a phrase from the corpus that answers -prompt; the recall has to carry "+
 			"it, or the harness is getting memory that is not about the question")
+	prompt2 := flag.String("prompt2", "why does the rate limiter reject valid traffic?",
+		"a second, different question, asked in the same session")
+	answer2 := flag.String("answer2", "per-process, not per-cluster",
+		"a phrase from the corpus that answers -prompt2")
 	only := flag.String("only", "", "comma-separated harness names")
 	flag.Parse()
 
@@ -311,8 +333,8 @@ func main() {
 			fmt.Printf("%-10s SKIP  %s is not installed\n", h.name, h.bin)
 			continue
 		}
-		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, true, false)
-		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, false, false)
+		withDeja := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, *prompt2, *answer2, true, false)
+		control := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, "", "", false, false)
 		report(h.name, withDeja, control, *answer != "", h.sessionScoped)
 		// Uninstalling has to leave the harness exactly as it was found. The
 		// failure this catches is not theoretical: grok's hooks survived
@@ -325,7 +347,7 @@ func main() {
 			fmt.Printf("%-10s %-34s %s\n", "", "REINSTALL", problem)
 		}
 		if h.wrapped {
-			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, true, true)
+			w := run(h, exe, *corpus, *logPath, *base, *model, *repo, *prompt, *answer, "", "", true, true)
 			seen := "silent"
 			if w.shown {
 				seen = "receipt shown"
@@ -348,7 +370,7 @@ func main() {
 	}
 }
 
-func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer string, install, wrapper bool) result {
+func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer, prompt2, answer2 string, install, wrapper bool) result {
 	var out result
 	home, err := os.MkdirTemp("", "sweep-"+h.name)
 	if err != nil {
@@ -420,7 +442,35 @@ func run(h harness, exe, corpus, logPath, base, model, repo, prompt, answer stri
 	// request: the prompt itself quotes the question, and a harness that
 	// echoes the corpus for other reasons would otherwise read as a pass.
 	out.answered = answer != "" && strings.Contains(recallBlocks(sent), answer)
+	out.second = secondTurn(h, env, logPath, base, model, repo, prompt2, answer2)
 	return out
+}
+
+// secondTurn continues the session the first turn opened and asks about
+// something else, in the home the first turn left behind — so whatever the
+// harness and deja wrote is still there.
+func secondTurn(h harness, env []string, logPath, base, model, repo, prompt, answer string) *result {
+	if h.resume == nil || prompt == "" {
+		return nil
+	}
+	var out result
+	start := int64(0)
+	if fi, err := os.Stat(logPath); err == nil {
+		start = fi.Size()
+	}
+	cmd := exec.Command(h.bin, h.resume(prompt, base, model)...)
+	cmd.Env = env
+	cmd.Dir = repo
+	stdout, runErr := cmd.CombinedOutput()
+	out.ran = runErr == nil
+	if runErr != nil {
+		out.err = firstLine(string(stdout))
+	}
+	sent, n := readSince(logPath, start)
+	out.requests = n
+	out.recall = strings.Contains(sent, "deja-recall")
+	out.answered = answer != "" && strings.Contains(recallBlocks(sent), answer)
+	return &out
 }
 
 // recallBlocks returns just what deja put in the request. The block is JSON
@@ -632,4 +682,16 @@ func report(name string, withDeja, control result, wantAnswer, sessionScoped boo
 	}
 	fmt.Printf("%-10s %-34s %-14s (%d request(s), %s)%s\n", name, verdict, seen,
 		withDeja.requests, withDeja.took.Round(time.Millisecond), broke)
+	if s := withDeja.second; s != nil {
+		follow := "recall answers the follow-up"
+		switch {
+		case !s.ran && s.requests == 0:
+			follow = "could not resume: " + s.err
+		case !s.recall:
+			follow = "NO RECALL on the follow-up"
+		case !s.answered:
+			follow = "FOLLOW-UP GOT THE FIRST QUESTION'S MEMORY"
+		}
+		fmt.Printf("%-10s %-34s %-14s (turn 2)\n", "", follow, "")
+	}
 }
