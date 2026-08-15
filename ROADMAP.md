@@ -10,8 +10,13 @@ the place to discuss design.
   fixtures that only pass off Windows by accident, and the exclude-on-rebuild
   path reads paths differently under Windows semantics — so a real privacy
   control is unverified there ([#1119](https://github.com/vshulcz/deja-vu/issues/1119)).
-  Close the gap between "green on Linux and macOS" and "correct on Windows," on
-  real installations ([#9](https://github.com/vshulcz/deja-vu/issues/9)).
+  The Windows CI leg now runs on `main`, on the weekly canary and on any pull
+  request labelled `windows`, rather than on every commit: it took twenty
+  minutes against two for the other platforms, and varied by a third between
+  identical runs ([#1229](https://github.com/vshulcz/deja-vu/issues/1229)). That
+  buys back the development loop and moves the burden onto keeping the label
+  habit, so the gap between "green on Linux and macOS" and "correct on Windows"
+  has to be closed deliberately rather than by CI running all the time.
 - **Keep the claims measured.** Every ranking signal — outcome, reuse, decision,
   point-of-action — has an in-repo benchmark, and a change ships with the
   before/after. Extend the agent-in-the-loop A/B beyond the point-of-action hook
