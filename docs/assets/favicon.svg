@@ -1,35 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="deja-vu">
-  <defs>
-    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="1" y1="10" x2="127" y2="118">
-      <stop offset="0" stop-color="#7c6cf0"/>
-      <stop offset="1" stop-color="#4ecdc4"/>
-    </linearGradient>
-  </defs>
   <!-- Drawn at 14x12 rather than scaled down from the mark: the squint and the
        sparkle are single pixels there, and a 16px tab strip eats them. -->
-  <g fill="url(#g)">
-    <rect x="19" y="10" width="9" height="9"/>
-    <rect x="100" y="10" width="9" height="9"/>
-    <rect x="19" y="19" width="18" height="9"/>
-    <rect x="91" y="19" width="18" height="9"/>
-    <rect x="10" y="28" width="108" height="9"/>
-    <rect x="10" y="37" width="108" height="9"/>
-    <rect x="10" y="46" width="9" height="9"/>
-    <rect x="37" y="46" width="54" height="9"/>
-    <rect x="109" y="46" width="9" height="9"/>
-    <rect x="10" y="55" width="9" height="9"/>
-    <rect x="37" y="55" width="54" height="9"/>
-    <rect x="109" y="55" width="9" height="9"/>
-    <rect x="10" y="64" width="45" height="9"/>
-    <rect x="73" y="64" width="45" height="9"/>
-    <rect x="10" y="73" width="108" height="9"/>
-    <rect x="19" y="82" width="108" height="9"/>
-    <rect x="28" y="91" width="72" height="9"/>
-    <rect x="109" y="91" width="18" height="9"/>
-    <rect x="28" y="100" width="72" height="9"/>
-    <rect x="109" y="100" width="18" height="9"/>
-    <rect x="19" y="109" width="27" height="9"/>
-    <rect x="82" y="109" width="27" height="9"/>
-  </g>
-    <rect x="55" y="64" width="18" height="9" fill="#ff8700"/>
+    <g fill="#8787af">
+      <rect x="19" y="10" width="9" height="9"/>
+      <rect x="100" y="10" width="9" height="9"/>
+      <rect x="19" y="19" width="18" height="9"/>
+      <rect x="91" y="19" width="18" height="9"/>
+      <rect x="10" y="28" width="108" height="9"/>
+      <rect x="10" y="37" width="108" height="9"/>
+      <rect x="10" y="46" width="9" height="9"/>
+      <rect x="37" y="46" width="54" height="9"/>
+      <rect x="109" y="46" width="9" height="9"/>
+      <rect x="10" y="55" width="9" height="9"/>
+      <rect x="37" y="55" width="54" height="9"/>
+      <rect x="109" y="55" width="9" height="9"/>
+      <rect x="10" y="64" width="45" height="9"/>
+      <rect x="73" y="64" width="45" height="9"/>
+      <rect x="10" y="73" width="108" height="9"/>
+      <rect x="19" y="82" width="90" height="9"/>
+      <rect x="28" y="91" width="72" height="9"/>
+      <rect x="28" y="100" width="72" height="9"/>
+      <rect x="19" y="109" width="27" height="9"/>
+      <rect x="82" y="109" width="27" height="9"/>
+    </g>
+    <g fill="#1c1c1c">
+      <rect x="19" y="46" width="18" height="9"/>
+      <rect x="91" y="46" width="18" height="9"/>
+      <rect x="19" y="55" width="18" height="9"/>
+      <rect x="91" y="55" width="18" height="9"/>
+    </g>
+    <g fill="#ff8700">
+      <rect x="55" y="64" width="18" height="9"/>
+      <rect x="109" y="82" width="18" height="9"/>
+      <rect x="109" y="91" width="18" height="9"/>
+      <rect x="109" y="100" width="18" height="9"/>
+    </g>
 </svg>

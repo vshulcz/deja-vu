@@ -17,20 +17,25 @@ import (
 // which fit two pixel rows into one cell and so cost eleven lines for twenty-two
 // rows of detail. Every feature sits on a whole pair of rows and every colour
 // band starts on an even row: split either across a cell boundary and the cell
-// has to carry two colours, which prints as a seam. The palette is the one the
-// old mark used, kept because a white cat vanishes on a light background.
+// has to carry two colours, which prints as a seam.
+//
+// Three colours, each one xterm-256 holds exactly so the banner and the SVGs
+// are the same colour rather than two approximations: 103 for the coat, 208 for
+// the tail and nose, 234 for the eyes and mouth. The features are painted
+// rather than left transparent — a hole takes the background, which on a light
+// terminal turns the eye near-white against the coat and softens the face.
 var catArt = []string{
-	"   \x1b[38;5;104m▄█▄\x1b[0m          \x1b[38;5;104m▄█▄\x1b[0m     \x1b[0m",
-	"   \x1b[38;5;104m████▄\x1b[0m      \x1b[38;5;104m▄████\x1b[0m     \x1b[0m",
-	"  \x1b[38;5;104m▄████████████████▄\x1b[0m    \x1b[0m",
-	"  \x1b[38;5;68m██████████████████\x1b[0m    \x1b[0m",
-	"  \x1b[38;5;68m███▀▄▄▀████▀▄▄▀███\x1b[0m    \x1b[0m",
-	"  \x1b[38;5;68m████████\x1b[38;5;68m\x1b[48;5;208m▀\x1b[0m\x1b[38;5;68m\x1b[48;5;208m▀\x1b[0m\x1b[38;5;68m████████\x1b[0m    \x1b[0m",
-	"  \x1b[38;5;68m▀██████▀▄▄▀██████▀\x1b[0m    \x1b[0m",
-	"    \x1b[38;5;74m▀████████████▀\x1b[0m \x1b[38;5;74m██\x1b[0m   \x1b[0m",
-	"     \x1b[38;5;74m████████████\x1b[0m  \x1b[38;5;74m██\x1b[0m   \x1b[0m",
-	"    \x1b[38;5;74m▄████████████▄▄█▀\x1b[0m   \x1b[0m",
-	"    \x1b[38;5;74m▀████▀▀▀▀████▀▀▀\x1b[0m    \x1b[0m",
+	"   \x1b[38;5;103m▄█▄\x1b[0m          \x1b[38;5;103m▄█▄\x1b[0m     \x1b[0m",
+	"   \x1b[38;5;103m████▄\x1b[0m      \x1b[38;5;103m▄████\x1b[0m     \x1b[0m",
+	"  \x1b[38;5;103m▄████████████████▄\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;103m██████████████████\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;103m███\x1b[38;5;103m\x1b[48;5;234m▀\x1b[0m\x1b[38;5;234m\x1b[48;5;103m▀\x1b[0m\x1b[38;5;234m\x1b[48;5;103m▀\x1b[0m\x1b[38;5;103m\x1b[48;5;234m▀\x1b[0m\x1b[38;5;103m████\x1b[38;5;103m\x1b[48;5;234m▀\x1b[0m\x1b[38;5;234m\x1b[48;5;103m▀\x1b[0m\x1b[38;5;234m\x1b[48;5;103m▀\x1b[0m\x1b[38;5;103m\x1b[48;5;234m▀\x1b[0m\x1b[38;5;103m███\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;103m████████\x1b[38;5;103m\x1b[48;5;208m▀\x1b[0m\x1b[38;5;103m\x1b[48;5;208m▀\x1b[0m\x1b[38;5;103m████████\x1b[0m    \x1b[0m",
+	"  \x1b[38;5;103m▀██████\x1b[38;5;103m\x1b[48;5;234m▀\x1b[0m\x1b[38;5;234m\x1b[48;5;103m▀\x1b[0m\x1b[38;5;234m\x1b[48;5;103m▀\x1b[0m\x1b[38;5;103m\x1b[48;5;234m▀\x1b[0m\x1b[38;5;103m██████▀\x1b[0m    \x1b[0m",
+	"    \x1b[38;5;103m▀████████████▀\x1b[0m \x1b[38;5;208m██\x1b[0m   \x1b[0m",
+	"     \x1b[38;5;103m████████████\x1b[0m  \x1b[38;5;208m██\x1b[0m   \x1b[0m",
+	"    \x1b[38;5;103m▄████████████▄\x1b[38;5;208m▄█▀\x1b[0m   \x1b[0m",
+	"    \x1b[38;5;103m▀████▀▀▀▀████▀\x1b[38;5;208m▀▀\x1b[0m    \x1b[0m",
 }
 
 const (
