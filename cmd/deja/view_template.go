@@ -1,10 +1,18 @@
 package main
 
-import "html/template"
+import (
+	"html/template"
+	"strings"
+)
 
 // viewTemplate is the whole viewer: one self-contained dark-terminal page,
 // no external assets, all data embedded as JSON and filtered client-side.
-var viewTemplate = template.Must(template.New("view").Parse(`<!doctype html>
+// The mark is substituted into the source before parsing rather than passed as
+// data: html/template escapes data into an SVG context, and this markup is ours,
+// not a value.
+var viewTemplate = template.Must(template.New("view").Parse(strings.Replace(viewSource, "{{MARK_STILL}}", markStill(0, 0, 1), 1)))
+
+const viewSource = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deja view</title>
@@ -40,7 +48,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 .note{color:var(--faint);font-size:.78rem;margin:10px 0 30px}
 .empty{color:var(--faint);padding:24px 0}
 </style></head><body>
-<header><b><svg class="mark" viewBox="0 0 24 22" width="22" height="20" aria-hidden="true"><path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v1h-18ZM2 6h18v1h-18ZM2 7h3v1h-3ZM7 7h8v1h-8ZM17 7h3v1h-3ZM2 8h3v1h-3ZM7 8h8v1h-8ZM17 8h3v1h-3ZM2 9h3v1h-3ZM7 9h8v1h-8ZM17 9h3v1h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v1h-2ZM5 15h12v1h-12ZM19 15h2v1h-2ZM5 16h12v1h-12ZM19 16h2v1h-2ZM5 17h12v1h-12ZM19 17h2v1h-2ZM5 18h12v1h-12ZM19 18h2v1h-2ZM4 19h16v1h-16ZM4 20h16v1h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#1c1c1c" d="M5 7h2v1h-2ZM15 7h2v1h-2ZM5 8h2v1h-2ZM15 8h2v1h-2ZM5 9h2v1h-2ZM15 9h2v1h-2Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/></svg>deja view</b><span class="meta">generated {{.GeneratedAt}} · local file, nothing leaves this machine</span></header>
+<header><b><svg class="mark" viewBox="0 0 24 22" width="22" height="20" aria-hidden="true">{{MARK_STILL}}</svg>deja view</b><span class="meta">generated {{.GeneratedAt}} · local file, nothing leaves this machine</span></header>
 <div class="wrap">
 <div class="stats">
 <div class="stat"><b>{{.TotalSessions}}</b><span>sessions</span></div>
@@ -82,4 +90,4 @@ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b
 ['sessions','recalls','notes'].forEach(t=>document.getElementById('tab-'+t).style.display=t===b.dataset.tab?'':'none')}));
 draw();
 </script></body></html>
-`))
+`
