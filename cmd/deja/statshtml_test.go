@@ -62,10 +62,19 @@ func TestStatsHTMLCapAndWrite(t *testing.T) {
 	}
 }
 
+// The ramp has four visible steps rather than a linear one: against a single
+// busy day a linear scale renders an ordinary week as nothing.
 func TestStatsHTMLHelpers(t *testing.T) {
-	months := []stats.MonthStats{{Messages: 0}, {Messages: 10}}
-	if barHeight(0, months) != 4 || barHeight(5, months) != 56 || monthShort("2026-02") != "02" || monthShort("x") != "x" {
-		t.Fatal("unexpected HTML helper output")
+	for _, c := range []struct {
+		count, max int
+		want       string
+	}{{0, 20, "0.06"}, {1, 20, "0.22"}, {5, 20, "0.40"}, {10, 20, "0.66"}, {20, 20, "1"}, {3, 0, "1"}} {
+		if got := heatOpacity(c.count, c.max); got != c.want {
+			t.Errorf("heatOpacity(%d,%d)=%s want %s", c.count, c.max, got, c.want)
+		}
+	}
+	if monthShort("2026-02") != "02" || monthShort("x") != "x" {
+		t.Fatal("unexpected month label")
 	}
 }
 
