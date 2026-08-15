@@ -171,18 +171,20 @@ Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html
 
 ### MCP tools
 
-The server exposes `recall`, `recall_context`, `blame` and `remember`. `deja install` wires
-them in, so this is only needed to configure an agent by hand.
+The server exposes `recall`, `recall_context`, `blame`, `fix`, `how` and `remember`.
+`deja install` wires them in, so this is only needed to configure an agent by hand.
 
 <details>
 <summary>Arguments and return shapes</summary>
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `recall` | `query`, `harness?`, `limit?` | Dense matching snippets, capped at 4KB. |
+| `recall` | `query`, `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
 | `recall_context` | `query`, `harness?` | Markdown digest of the best-matching session. |
-| `blame` | `path`, `harness?`, `project?`, `since?`, `limit?` | Sessions that discussed a file. |
-| `remember` | `text`, `project?` | Stores a durable decision for later recall. |
+| `blame` | `path`, `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
+| `fix` | `error`, `project?`, `limit?` | What this machine ran after that same error before. |
+| `how` | `what`, `project?`, `limit?` | The real invocation, from what agents ran here. |
+| `remember` | `text`, `project?`, `tags?` | Stores a durable decision for later recall. |
 
 </details>
 
