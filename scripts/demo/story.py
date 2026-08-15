@@ -146,20 +146,31 @@ def ease(t: float) -> float:
 QUESTION = "prepared statement errors behind pgbouncer. again."
 
 
+def must_fit(d, text, f, x, margin=40):
+    """A line that runs off the canvas is invisible until someone looks at a
+    frame, and raising a type size without re-checking the width has now done it
+    three times. This turns that into a crash."""
+    end = x + d.textlength(text, font=f)
+    if end > W - margin:
+        raise SystemExit(f"{text[:40]!r} ends at {end:.0f} of {W}")
+
+
 def scene_question(t: float):
-    """The question types itself. Nothing else on screen."""
+    """The question types itself. Nothing else on screen — so it has to be big
+    enough to be the screen, or the frame reads as empty."""
     base, ink, d = frame()
-    f = font(29)
+    f = font(31)
     shown = int(len(QUESTION) * min(1.0, t / 1.6))
     text = QUESTION[:shown]
-    x, y = 104, H / 2 - 60
+    x, y = 104, H / 2 - 96
     d.text((x, y), "$", font=f, fill=AMBER)
-    d.text((x + 40, y), text, font=f, fill=PH_HI)
+    must_fit(d, QUESTION, f, x + 56)
+    d.text((x + 56, y), text, font=f, fill=PH_HI)
     if t % 0.8 < 0.5:
-        cx = x + 40 + d.textlength(text, font=f)
-        d.rectangle([cx + 3, y + 4, cx + 16, y + 36], fill=PH)
-    if t > 1.9:
-        centred(d, y + 90, "asked of the same agent, twice", font(20), FAINT)
+        cx = x + 56 + d.textlength(text, font=f)
+        d.rectangle([cx + 4, y + 6, cx + 22, y + 52], fill=PH)
+    if t > 1.4:
+        centred(d, y + 120, "asked of the same agent, twice", font(24), FAINT)
     return glow(base, ink)
 
 
@@ -296,7 +307,7 @@ def scene_cta(t: float):
 
 
 SCENES = [
-    (scene_question, 3.0),
+    (scene_question, 2.6),
     (scene_split, 5.6),
     (scene_decision, 4.2),
     (scene_cta, 3.6),

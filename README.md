@@ -7,7 +7,7 @@
 
 <p align="center"><strong>Your agent is about to re-debug something you fixed in March.</strong></p>
 
-<p align="center"><img src="assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
+<p align="center"><img src="assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
 <p align="center"><em>The same question, the same agent, once without memory and once with deja. Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></p>
 
