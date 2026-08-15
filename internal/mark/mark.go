@@ -6,6 +6,12 @@
 // them and nothing would say so. Now both readers take the same grid.
 package mark
 
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
 // The mark is a 24x22 pixel sprite. In the terminal it prints as half blocks:
 // one cell carries two pixel rows, so twenty-two rows of detail cost eleven
 // lines. Every feature sits on a whole pair of rows, because a feature split
@@ -63,6 +69,10 @@ type Cell struct{ Row, Col int }
 // Eyes carry the whole expression: the mark has no mouth, because at this size
 // a mouth reads as a dark blob stuck to the nose rather than as a curve.
 var Eyes = map[string][]Cell{
+	// "none" is the face with no eyes painted at all. An animated mark needs it:
+	// the still body underneath has to carry coat where the eyes will go, or
+	// hiding the open-eye group leaves two holes in the head.
+	"none":   nil,
 	"tall":   {{7, 5}, {7, 6}, {8, 5}, {8, 6}, {9, 5}, {9, 6}, {7, 15}, {7, 16}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
 	"wide":   {{6, 5}, {6, 6}, {7, 5}, {7, 6}, {8, 5}, {8, 6}, {9, 5}, {9, 6}, {6, 15}, {6, 16}, {7, 15}, {7, 16}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
 	"closed": {{9, 4}, {9, 5}, {9, 6}, {9, 7}, {9, 14}, {9, 15}, {9, 16}, {9, 17}},
@@ -96,9 +106,16 @@ var Ears = map[string][]string{
 var Tails = map[string][]Cell{
 	"up":   {{20, 18}, {20, 19}, {19, 18}, {19, 19}, {18, 19}, {18, 20}, {17, 19}, {17, 20}, {16, 19}, {16, 20}, {15, 19}, {15, 20}, {14, 19}, {14, 20}},
 	"mid":  {{20, 18}, {20, 19}, {19, 18}, {19, 19}, {18, 19}, {18, 20}, {17, 19}, {17, 20}, {16, 19}, {16, 20}, {15, 19}, {15, 20}, {14, 20}, {14, 21}},
+	"out":  {{20, 18}, {20, 19}, {19, 18}, {19, 19}, {18, 19}, {18, 20}, {17, 19}, {17, 20}, {16, 19}, {16, 20}, {15, 20}, {15, 21}, {14, 21}, {14, 22}},
 	"curl": {{20, 18}, {20, 19}, {21, 19}, {21, 20}, {21, 21}, {20, 21}, {20, 22}},
 	"down": {{20, 18}, {20, 19}, {21, 19}, {21, 20}, {21, 21}},
 }
+
+// WagCycle is the wag: three positions of the same cells, ping-ponged, so the
+// tip travels out and comes back rather than snapping between two poses. Two
+// poses alternating reads as a twitch — the middle one is what makes it a
+// gesture. The body never moves, or the whole animal reads as jitter.
+var WagCycle = []string{"up", "mid", "out", "mid"}
 
 // Mood is what the cat is doing about the thing that just happened. Only the
 // moments the CLI actually has are listed: the banner prints twice, and a mood
@@ -135,6 +152,78 @@ func Grid(m Mood) [][]byte {
 		g[c.Row][c.Col] = 'o'
 	}
 	return g
+}
+
+// Path is one SVG fill: every cell of a single colour, as path data.
+type Path struct {
+	Fill string
+	D    string
+}
+
+// cellsPath writes cells as path data, merging horizontally adjacent ones into a
+// single rectangle. One path per colour rather than one rect per pixel: at
+// fractional scale a per-row fill leaves a hairline of background between rows,
+// which is the seam the first hand-drawn assets had.
+func cellsPath(cells []Cell, x0, y0, size int) string {
+	byRow := map[int][]int{}
+	rows := []int{}
+	for _, c := range cells {
+		if _, seen := byRow[c.Row]; !seen {
+			rows = append(rows, c.Row)
+		}
+		byRow[c.Row] = append(byRow[c.Row], c.Col)
+	}
+	sort.Ints(rows)
+	var b strings.Builder
+	for _, r := range rows {
+		cols := byRow[r]
+		sort.Ints(cols)
+		for i := 0; i < len(cols); {
+			j := i
+			for j+1 < len(cols) && cols[j+1] == cols[j]+1 {
+				j++
+			}
+			w := (j - i + 1) * size
+			fmt.Fprintf(&b, "M%d %dh%dv%dh-%dZ", x0+cols[i]*size, y0+r*size, w, size, w)
+			i = j + 1
+		}
+	}
+	return b.String()
+}
+
+// order keeps the colours in a fixed sequence: coat, features, nose. A map walk
+// would reorder the paths on every run and turn a no-op regeneration into a diff.
+var order = []int{Coat, Feature, Accent}
+
+// Paths draws a mood as one path per colour, placed at x0,y0 with the given cell
+// size. Callers that animate a part pass a skip so they can draw that part
+// themselves.
+func Paths(m Mood, x0, y0, size int, skip func(Cell) bool) []Path {
+	g := Grid(m)
+	byColour := map[int][]Cell{}
+	for r, row := range g {
+		for c := range row {
+			col, ok := Colour(row[c], m.CoatColour)
+			cell := Cell{Row: r, Col: c}
+			if !ok || (skip != nil && skip(cell)) {
+				continue
+			}
+			byColour[col] = append(byColour[col], cell)
+		}
+	}
+	out := make([]Path, 0, len(order))
+	for _, col := range order {
+		if cells := byColour[col]; len(cells) > 0 {
+			out = append(out, Path{Fill: Hex[col], D: cellsPath(cells, x0, y0, size)})
+		}
+	}
+	return out
+}
+
+// CellsD is path data for a named set of cells — one wag position, one eye set —
+// so an animated caller can put each frame in its own group.
+func CellsD(cells []Cell, x0, y0, size int) string {
+	return cellsPath(cells, x0, y0, size)
 }
 
 // Colour maps a grid character to its palette entry.
