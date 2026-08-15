@@ -27,6 +27,17 @@ func CursorUserRoot() string {
 	if runtime.GOOS == "darwin" {
 		return filepath.Join(h, "Library", "Application Support", "Cursor", "User")
 	}
+	if runtime.GOOS == "windows" {
+		// The IDE writes to %APPDATA%\Cursor\User on Windows; the XDG and
+		// ~/.config paths below are not where it writes, so this root resolved to a
+		// directory Cursor never touches and every chat store stayed
+		// invisible. Same resolution roo.go and cline.go already use.
+		app := os.Getenv("APPDATA")
+		if app == "" {
+			app = filepath.Join(h, "AppData", "Roaming")
+		}
+		return filepath.Join(app, "Cursor", "User")
+	}
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		if _, err := os.Stat(filepath.Join(xdg, "Cursor", "User")); err == nil {
 			return filepath.Join(xdg, "Cursor", "User")

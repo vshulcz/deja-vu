@@ -366,6 +366,13 @@ type toolDialect struct {
 	// one loses the only record of what stopped existing. Empty means
 	// old_string.
 	oldKey string
+	// commandKey names the argument holding the command. Empty means
+	// "command"; cline's run_commands takes "commands", a list.
+	commandKey string
+	// pathListKey names an argument holding several files at once — cline's
+	// read_files takes "files", whose elements each name a path under pathKey.
+	// Empty means a call names at most one file.
+	pathListKey string
 }
 
 // oldSpanKey is oldKey with its default applied.
@@ -412,14 +419,43 @@ func toolPathsIn(v any, d toolDialect) string {
 		if !ok || !d.pathTools[name] {
 			continue
 		}
-		p, _ := in[d.pathKey].(string)
-		if p == "" || seen[p] {
-			continue
+		for _, p := range toolPathStrings(in, d) {
+			if seen[p] {
+				continue
+			}
+			seen[p] = true
+			out = append(out, p)
 		}
-		seen[p] = true
-		out = append(out, p)
 	}
 	return strings.Join(out, "\n")
+}
+
+// toolPathStrings pulls the paths out of one call. A call can name one file
+// under the dialect's key, or carry a list of read requests — cline's
+// read_files takes `files`, an array whose elements each name a path — and
+// reading only the scalar key indexed none of those.
+func toolPathStrings(in map[string]any, d toolDialect) []string {
+	if p, _ := in[d.pathKey].(string); p != "" {
+		return []string{p}
+	}
+	if d.pathListKey == "" {
+		return nil
+	}
+	items, _ := in[d.pathListKey].([]any)
+	var out []string
+	for _, it := range items {
+		switch e := it.(type) {
+		case string:
+			if e != "" {
+				out = append(out, e)
+			}
+		case map[string]any:
+			if p, _ := e[d.pathKey].(string); p != "" {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 // editSpansFromContent is claudeEditSpans for the reference parser.
@@ -482,13 +518,43 @@ func commandsIn(v any, d toolDialect) []string {
 		if !ok || name != d.shellTool {
 			continue
 		}
-		cmd, _ := in["command"].(string)
-		if cmd == "" || !worthIndexing(cmd) {
-			continue
+		// One call can carry a list rather than a single command: cline's
+		// run_commands takes `commands`, an array of complete shell strings.
+		// Reading only the singular key indexed none of them.
+		for _, cmd := range commandStrings(in, d) {
+			if !worthIndexing(cmd) {
+				continue
+			}
+			out = append(out, "$ "+cmd)
 		}
-		out = append(out, "$ "+cmd)
 	}
 	return out
+}
+
+// commandStrings pulls the commands out of one call, singular or plural.
+func commandStrings(in map[string]any, d toolDialect) []string {
+	key := d.commandKey
+	if key == "" {
+		key = "command"
+	}
+	switch v := in[key].(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil
+		}
+		return []string{v}
+	case []any:
+		var out []string
+		for _, it := range v {
+			s, _ := it.(string)
+			if strings.TrimSpace(s) == "" {
+				continue
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+	return nil
 }
 
 // HarnessAuthored reports whether a role marks text the harness wrote to the

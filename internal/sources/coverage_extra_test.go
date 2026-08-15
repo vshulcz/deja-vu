@@ -269,11 +269,11 @@ func TestSourceRemainingDiscoveryBranches(t *testing.T) {
 	if err := os.MkdirAll(xdgCursor, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := CursorUserRoot(); runtime.GOOS != "darwin" && got != xdgCursor {
+	if got := CursorUserRoot(); runtime.GOOS != "darwin" && runtime.GOOS != "windows" && got != xdgCursor {
 		t.Fatalf("CursorUserRoot xdg=%q want %q", got, xdgCursor)
 	}
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "missing-xdg"))
-	if got := CursorUserRoot(); !strings.Contains(got, filepath.Join(".config", "Cursor", "User")) && runtime.GOOS != "darwin" {
+	if got := CursorUserRoot(); !strings.Contains(got, filepath.Join(".config", "Cursor", "User")) && runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
 		t.Fatalf("CursorUserRoot fallback=%q", got)
 	}
 

@@ -136,6 +136,11 @@
      "state": "blocked",
      "why": "the slash command set is built in; adding custom commands is an open feature request upstream, not something a third party can wire today",
      "source": "https://github.com/Aider-AI/aider/issues/894"
+    },
+    "resume": {
+     "state": "impossible",
+     "why": "aider has no notion of resuming one past session: `--chat-history-file` points at a transcript file it appends to, not a session it reopens, so there is no id to hand back. Restoring one conversation out of that file is not something the CLI offers.",
+     "source": "aider 0.86.2 --help"
     }
    }
   },
@@ -161,6 +166,13 @@
     "resume": false,
     "handoff": "exec",
     "prereq": ""
+   },
+   "gaps": {
+    "resume": {
+     "state": "todo",
+     "why": "`-r, --resume` exists but takes \"latest\" or a position in the list rather than a session id, and `--session-id` starts a new session under a chosen id instead of reopening one. Handing back a position is only correct until the next session is written, so this needs the index-to-id question settled before deja prints anything.",
+     "source": "gemini 0.55.1 --help"
+    }
    }
   },
   {
@@ -187,6 +199,13 @@
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (IDE chats)"
+   },
+   "gaps": {
+    "resume": {
+     "state": "todo",
+     "why": "`cursor-agent --resume [chatId]` reopens a chat by id. What is not settled is whether the id deja reads out of state.vscdb is that chatId; printing the wrong one sends the user to someone else's conversation or to an error.",
+     "source": "cursor-agent --help"
+    }
    }
   },
   {
@@ -234,6 +253,13 @@
     "resume": false,
     "handoff": "exec",
     "prereq": "sqlite3 (grok-dev store)"
+   },
+   "gaps": {
+    "resume": {
+     "state": "unknown",
+     "why": "unanswered on purpose: the `grok` on this machine is the community CLI, a different product that shares the name and the ~/.grok directory, and its help has no resume flag. That says nothing about xAI's Grok Build, which is what this row is about, and no second source was available to check.",
+     "source": "community grok 1.0.1 --help; not Grok Build"
+    }
    }
   },
   {
@@ -311,6 +337,13 @@
     "resume": false,
     "handoff": "exec",
     "prereq": ""
+   },
+   "gaps": {
+    "resume": {
+     "state": "todo",
+     "why": "`-r, --resume` takes a session id and `-c, --continue` reopens the most recent one for the project, so the mechanism is there. Unbuilt rather than absent.",
+     "source": "qwen --help"
+    }
    }
   },
   {
@@ -379,6 +412,13 @@
     "resume": false,
     "handoff": "paste",
     "prereq": ""
+   },
+   "gaps": {
+    "resume": {
+     "state": "todo",
+     "why": "`openclaw agent` takes `--session-id` and `--session-key`, and reusing a key continues that session — verified while driving it against a recording endpoint. What deja stores is the session file name, so the mapping to a key is the open part.",
+     "source": "openclaw agent --help, 2026.7.1-2"
+    }
    }
   },
   {
@@ -437,6 +477,11 @@
      "state": "blocked",
      "why": "Roo's hooks are in flight upstream, not shipped: PR #10785 implements a Claude Code-style hooks system, #11128 is Hooks beta and #11663 Hooks phase 1, all still open, and no release names lifecycle hooks. A user's bug report about PreToolUse coverage (#10834) shows they work on a branch build. Becomes work the day one of those merges",
      "source": "https://github.com/RooCodeInc/Roo-Code/pull/10785"
+    },
+    "resume": {
+     "state": "impossible",
+     "why": "Roo Code is a VS Code extension with no command line at all, so there is nothing for deja to print. Its transcripts are read from disk; reopening one is a thing the editor does, not a command.",
+     "source": "no CLI ships with the extension"
     }
    }
   }

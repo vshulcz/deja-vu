@@ -205,19 +205,25 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
-		text := clineContentText(m.Content)
-		if m.Role == "user" {
-			text = unwrapClineTask(text)
-		}
-		if text == "" {
-			continue
-		}
 		ts := s.Started
 		if m.TS > 0 {
 			ts = time.UnixMilli(m.TS)
 		}
-		s.Touch(ts)
-		s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
+		text := clineContentText(m.Content)
+		if m.Role == "user" {
+			text = unwrapClineTask(text)
+		}
+		if text != "" {
+			s.Touch(ts)
+			s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
+		}
+		// The work rides in the same content list, in blocks clineContentText
+		// drops because they are not type:"text" — so the file an assistant
+		// edited and the command it ran were reachable from nothing.
+		if recs := clineWorkRecords(m.Content, ts); len(recs) > 0 {
+			s.Touch(ts)
+			s.Messages = append(s.Messages, recs...)
+		}
 	}
 	if len(s.Messages) == 0 {
 		return nil, nil
@@ -293,6 +299,77 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+// clineDialect is Cline's tool vocabulary, read off the schemas its own CLI
+// declares. Three of them differ from every other harness: `run_commands`
+// takes a list under `commands` rather than one string, `read_files` takes a
+// list of read requests under `files`, and the editor names the replaced text
+// `old_text`.
+var clineDialect = toolDialect{
+	pathKey:     "path",
+	pathListKey: "files",
+	pathTools:   map[string]bool{"editor": true, "read_files": true},
+	shellTool:   "run_commands",
+	commandKey:  "commands",
+	editTools:   map[string]bool{"editor": true},
+	oldKey:      "old_text",
+}
+
+// clineWorkRecords turns the tool blocks of one message into work records.
+func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []model.Message
+	if IndexToolPaths() {
+		if p := toolPathsIn(blocks, clineDialect); p != "" {
+			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(blocks, clineDialect) {
+			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
+		}
+	}
+	if IndexCommands() {
+		for _, cmd := range commandsIn(blocks, clineDialect) {
+			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
+		}
+	}
+	if IndexToolOutput() {
+		for _, body := range clineToolResults(blocks) {
+			out = append(out, model.Message{Role: RoleToolOutput, Text: body, Time: ts})
+		}
+	}
+	return out
+}
+
+// clineToolResults reads what a call printed. The content is a string on the
+// shapes observed, and results are kept whether or not the call succeeded —
+// the error a command hit is what a later search reaches for.
+func clineToolResults(blocks []any) []string {
+	var out []string
+	for _, it := range blocks {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		if t, _ := m["type"].(string); t != "tool_result" {
+			continue
+		}
+		body := strings.TrimSpace(contentText(m["content"]))
+		if body == "" {
+			if s, _ := m["content"].(string); s != "" {
+				body = strings.TrimSpace(s)
+			}
+		}
+		if body != "" {
+			out = append(out, body)
+		}
+	}
+	return out
 }
 
 // clineContentText extracts plain text from either a string content or a

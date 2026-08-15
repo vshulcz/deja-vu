@@ -15,6 +15,9 @@ func TestSkipReasonNamesTheMissingToolOnlyWhenTheStoreIsThere(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
+	// Cursor's Windows root resolves through %APPDATA%; without this a
+	// developer machine with real Cursor chats fails the no-store premise.
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 	t.Setenv("PATH", home) // no sqlite3 on it
 	if SQLite3Available() {
 		t.Skip("sqlite3 still resolvable")
