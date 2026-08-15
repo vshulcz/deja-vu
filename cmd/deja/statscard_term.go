@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/mark"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
@@ -84,6 +85,43 @@ func termHeat(count, max int) int {
 	}
 }
 
+// cardMood picks what the cat is doing about this report. The moods exist for
+// the banner already and the card was drawing "ready" unconditionally, which is
+// a mascot with nothing to say.
+func cardMood(r stats.Report) catMood {
+	switch {
+	case r.TotalSessions == 0:
+		return moodAsleep
+	case r.WeekRecalls > 0 && r.Recall.Recalls > 0 && r.WeekRecalls*3 > r.Recall.Recalls:
+		// More than a third of every recall deja has ever served landed in the
+		// last seven days.
+		return moodSurprised
+	default:
+		return moodReady
+	}
+}
+
+// streakDays counts back from the most recent week for consecutive days with
+// anything in them. It is the one figure on the card that moves every day,
+// which is the only real reason to run it again.
+func streakDays(hm stats.HeatmapStats) int {
+	var days []int
+	for _, week := range hm.Weeks {
+		for d := 0; d < 7; d++ {
+			days = append(days, week[d])
+		}
+	}
+	// Trailing -1 cells are days the year window has not reached yet.
+	for len(days) > 0 && days[len(days)-1] < 0 {
+		days = days[:len(days)-1]
+	}
+	streak := 0
+	for i := len(days) - 1; i >= 0 && days[i] > 0; i-- {
+		streak++
+	}
+	return streak
+}
+
 // statsCardLines returns the finished card, border included. Lines rather than
 // output so a test can read what it drew without a terminal.
 func statsCardLines(r stats.Report) []string {
@@ -93,12 +131,21 @@ func statsCardLines(r stats.Report) []string {
 	dateSpanText = dateSpan(r)
 	add(headBlock(r)...)
 	add("")
-	add(sectionRule("ACTIVITY"))
+	activity := "ACTIVITY"
+	if n := streakDays(r.Heatmap); n > 1 {
+		activity += "  ·  " + formatStatNumber(n) + " day streak"
+	}
+	add(sectionRule(activity))
 	add(heatLines(r.Heatmap)...)
 	if agents := agentBlock(r); len(agents) > 0 {
 		add("")
 		add(sectionRule("WHERE IT CAME FROM"))
 		add(agents...)
+	}
+	if line := longestLine(r); line != "" {
+		add("")
+		add(sectionRule("THE LONGEST ONE"))
+		add(line)
 	}
 	return frame(body, footer())
 }
@@ -108,7 +155,7 @@ func statsCardLines(r stats.Report) []string {
 // band down the right — the same hole the demo had — so the figures live here
 // rather than under it.
 func headBlock(r stats.Report) []string {
-	art := renderCat(moodReady)
+	art := renderCat(cardMood(r))
 	value, caption := heroStat(r)
 	lines := wrapTo(caption, cardInner-26)
 
@@ -199,18 +246,19 @@ func dateSpan(r stats.Report) string {
 }
 
 func cardCells(r stats.Report) []struct{ value, label string } {
-	return []struct{ value, label string }{
+	cells := []struct{ value, label string }{
 		{formatStatNumber(r.TotalSessions), "sessions"},
 		{formatStatNumber(r.TotalMessages), "messages"},
 		{strconv.Itoa(len(r.Harnesses)), "agents"},
 	}
+	return cells
 }
 
 func cellWidth(value, label string) int {
-	if len(label) > len(value) {
-		return len(label)
+	if visibleLen(label) > visibleLen(value) {
+		return visibleLen(label)
 	}
-	return len(value)
+	return visibleLen(value)
 }
 
 func figures(r stats.Report) string {
@@ -237,7 +285,7 @@ func pad(s string, w int) string {
 }
 
 func leftPad(s string, w int) string {
-	if n := len(s); n < w {
+	if n := visibleLen(s); n < w {
 		return strings.Repeat(" ", w-n) + s
 	}
 	return s
@@ -246,7 +294,7 @@ func leftPad(s string, w int) string {
 // sectionRule is a heading with a hairline running out to the card's edge, so
 // the eye finds the blocks without either of them shouting.
 func sectionRule(title string) string {
-	rule := cardInner - len(title) - 1
+	rule := cardInner - visibleLen(title) - 1
 	if rule < 0 {
 		rule = 0
 	}
@@ -401,6 +449,42 @@ func agentBlock(r stats.Report) []string {
 // has no report.
 var dateSpanText string
 
+// longestLine is the one piece of the card that is not a count: the title of
+// the longest session, which is a sentence someone wrote on this machine. It is
+// what makes the card theirs rather than a shape two people with the same
+// totals would both get.
+//
+// The title comes from the index, so it is already redacted; SafeLine is what
+// stops a control character in it from moving the cursor out of the card.
+func longestLine(r stats.Report) string {
+	title := strings.TrimSpace(r.Longest.Title)
+	if title == "" || r.Longest.Messages == 0 {
+		return ""
+	}
+	count := formatStatNumber(r.Longest.Messages) + " messages"
+	room := cardInner - len(count) - 2
+	title = search.SafeLine(title)
+	// Runes, not bytes. This is the one string on the card that comes from a
+	// user, so it is the one that is not ASCII, and cutting a multi-byte
+	// character in half prints a replacement box in the middle of their own
+	// words.
+	if runes := []rune(title); len(runes) > room {
+		cut := room - 1
+		for i := cut; i > 0; i-- {
+			if runes[i] == ' ' {
+				cut = i
+				break
+			}
+		}
+		title = string(runes[:cut]) + "…"
+	}
+	gap := cardInner - visibleLen(title) - visibleLen(count)
+	if gap < 1 {
+		gap = 1
+	}
+	return paint(cardDim, title) + strings.Repeat(" ", gap) + paint(cardFaint, count)
+}
+
 // footer is what makes a screenshot say where it came from. Dim enough not to
 // compete with the figures, and the last thing inside the border.
 func footer() string {
@@ -419,10 +503,10 @@ func footer() string {
 	// overflows pushes the right border off the card, and the border is the
 	// thing that makes this a card at all.
 	if span := dateSpanText; span != "" &&
-		len(left)+len(span)+len(right)+6 <= cardInner {
+		visibleLen(left)+visibleLen(span)+visibleLen(right)+6 <= cardInner {
 		left += "  ·  " + span
 	}
-	gap := cardInner - len(left) - len(right)
+	gap := cardInner - visibleLen(left) - visibleLen(right)
 	if gap < 1 {
 		gap = 1
 	}
