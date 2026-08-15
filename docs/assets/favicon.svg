@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="deja-vu">
-  <path fill="#8787af" d="M1 1h1v1h-1ZM14 1h1v1h-1ZM1 2h2v1h-2ZM13 2h2v1h-2ZM1 3h3v1h-3ZM12 3h3v1h-3ZM1 4h14v1h-14ZM1 5h14v1h-14ZM1 6h3v1h-3ZM6 6h4v1h-4ZM12 6h3v1h-3ZM1 7h3v1h-3ZM6 7h4v1h-4ZM12 7h3v1h-3ZM1 8h3v1h-3ZM6 8h4v1h-4ZM12 8h3v1h-3ZM1 9h14v1h-14ZM1 10h6v1h-6ZM9 10h6v1h-6ZM1 11h14v1h-14ZM1 12h14v1h-14ZM2 13h12v1h-12ZM3 14h10v1h-10Z"/>
+  <path fill="#8787af" d="M1 1h2v1h-2ZM13 1h2v1h-2ZM1 2h3v1h-3ZM12 2h3v1h-3ZM1 3h4v1h-4ZM11 3h4v1h-4ZM1 4h14v1h-14ZM1 5h14v1h-14ZM1 6h3v1h-3ZM6 6h4v1h-4ZM12 6h3v1h-3ZM1 7h3v1h-3ZM6 7h4v1h-4ZM12 7h3v1h-3ZM1 8h3v1h-3ZM6 8h4v1h-4ZM12 8h3v1h-3ZM1 9h14v1h-14ZM1 10h6v1h-6ZM9 10h6v1h-6ZM1 11h14v1h-14ZM1 12h14v1h-14ZM2 13h12v1h-12ZM3 14h10v1h-10Z"/>
   <path fill="#1c1c1c" d="M4 6h2v1h-2ZM10 6h2v1h-2ZM4 7h2v1h-2ZM10 7h2v1h-2ZM4 8h2v1h-2ZM10 8h2v1h-2Z"/>
   <path fill="#ff8700" d="M7 10h2v1h-2Z"/>
 </svg>
