@@ -5,10 +5,10 @@ A terminal recording shows everything at once in six-point type. It is honest
 and it is unreadable, and a reader gives a GIF about four seconds before
 deciding. This draws the same story — the same sentences, quoted from the two
 real sessions in scripts/demo/agent.tape and agent-plain.tape — at a size
-someone can actually read, in the palette the site uses: phosphor green on
-near-black, scanlines, a vignette.
+someone can actually read, in the brand palette: the coat colour on near-black,
+amber for the one thing a reader should recognise, scanlines, a vignette.
 
-Four scenes, fifteen seconds:
+Four scenes, sixteen seconds:
 
   1. the question, typed
   2. the same agent answering it twice, without memory and with it

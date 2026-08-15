@@ -1,4 +1,5 @@
-// Command pinmanifests rewrites the scoop and winget manifests for a release.
+// Command pinmanifests rewrites the scoop, winget and Codex plugin manifests for a
+// release.
 //
 // These files carry a version and the SHA-256 of the two Windows zips, and they
 // used to be updated by hand after each release. That step is invisible when it
@@ -33,6 +34,11 @@ const (
 	versionPath = "packaging/winget/vshulcz.deja-vu.yaml"
 	localePath  = "packaging/winget/vshulcz.deja-vu.locale.en-US.yaml"
 	installer   = "packaging/winget/vshulcz.deja-vu.installer.yaml"
+	// The Codex plugin is installed from the default branch rather than from a
+	// release asset, so the version committed here is the one a user sees. It
+	// sat at 0.1.0 from July through 0.17.1 because nothing compared it to
+	// anything.
+	codexPlugin = "codex-plugin/.codex-plugin/plugin.json"
 	releaseAPI  = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
 	assetBase   = "https://github.com/vshulcz/deja-vu/releases/download"
 )
@@ -55,7 +61,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "pinmanifests:", err)
 			os.Exit(1)
 		}
-		fmt.Println("scoop and winget manifests match the newest release")
+		fmt.Println("scoop, winget and the codex plugin match the newest release")
 		return
 	}
 
@@ -74,7 +80,7 @@ func main() {
 	if err := write(*root, p); err != nil {
 		fail(err)
 	}
-	fmt.Printf("pinned scoop and winget to %s\n", p.version)
+	fmt.Printf("pinned scoop, winget and the codex plugin to %s\n", p.version)
 }
 
 // parse pulls the two Windows hashes out of a checksums file. Both must be
@@ -111,6 +117,7 @@ func write(root string, p pins) error {
 		versionPath: renderVersion,
 		localePath:  renderLocale,
 		installer:   renderInstaller,
+		codexPlugin: renderCodexPlugin,
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -168,10 +175,27 @@ func renderLocale(p pins) ([]byte, error) { return edit(localePath, p) }
 
 func renderInstaller(p pins) ([]byte, error) { return edit(installer, p) }
 
+// renderCodexPlugin rewrites only the version field. The manifest carries
+// descriptions, prompts and pointers that no release derives, so regenerating it
+// from a template here would drop whatever someone adds later — the same reason
+// the winget files are edited rather than rendered.
+func renderCodexPlugin(p pins) ([]byte, error) {
+	b, err := os.ReadFile(codexPlugin)
+	if err != nil {
+		return nil, err
+	}
+	s := jsonVersion.ReplaceAllString(string(b), `${1}"`+p.version+`"`)
+	if !jsonVersion.MatchString(string(b)) {
+		return nil, fmt.Errorf("%s has no version field to pin", codexPlugin)
+	}
+	return []byte(s), nil
+}
+
 var (
 	versionLine = regexp.MustCompile(`(?m)^PackageVersion: .*$`)
 	tagRefs     = regexp.MustCompile(`/v\d+\.\d+\.\d+(/|$)`)
 	fileRefs    = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_windows`)
+	jsonVersion = regexp.MustCompile(`(?m)^(\s*"version":\s*)"[^"]*"`)
 	amdSha      = regexp.MustCompile(`(?m)^(\s*InstallerSha256: )[0-9A-Fa-f]{64}(\s*)$`)
 )
 
@@ -228,6 +252,7 @@ func runCheck(root string) error {
 		versionPath: renderVersion,
 		localePath:  renderLocale,
 		installer:   renderInstaller,
+		codexPlugin: renderCodexPlugin,
 	} {
 		want, err := render(p)
 		if err != nil {
