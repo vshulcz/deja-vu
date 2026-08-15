@@ -28,44 +28,97 @@ func writeStatsCard(path string, report stats.Report) (string, error) {
 }
 
 func renderStatsCard(r stats.Report) string {
+	const (
+		w, h = 800, 486
+		pad  = 40
+	)
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
-	b.WriteString(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">` + "\n")
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">`+"\n", w, h, w, h)
 	b.WriteString(`<defs>` + "\n")
 	b.WriteString(`<pattern id="scan" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" y="2" fill="#000000" fill-opacity="0.16"/></pattern>` + "\n")
 	b.WriteString(`</defs>` + "\n")
-	b.WriteString(`<rect width="800" height="420" fill="#0b0f10"/>` + "\n")
-	b.WriteString(`<rect x="0.5" y="0.5" width="799" height="419" fill="none" stroke="#1e262a"/>` + "\n")
+	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="#0b0f10"/>`+"\n", w, h)
+	fmt.Fprintf(&b, `<rect x="0.5" y="0.5" width="%d" height="%d" fill="none" stroke="#1e262a"/>`+"\n", w-1, h-1)
 	b.WriteString(`<g font-family="` + statsCardFont + `" fill="#f4f7f7">` + "\n")
-	// the cat from assets/logo.svg, then the wordmark. Pixel rects rather than
-	// a scaled drawing: the mark is the same 24x22 grid wherever it appears.
-	b.WriteString(`<g transform="translate(34,20) scale(1.5)">` + markStill(0, 0, 1) + `</g>` + "\n")
-	cardText(&b, 84, 48, 15, "700", "deja-vu", "#8787af", "letter-spacing=\"0.5\"")
-	cardText(&b, 159, 48, 13, "400", "· agent history", "#55626a")
-	cardText(&b, 760, 48, 13, "400", valueOrDash(r.DateRange.Start)+" – "+valueOrDash(r.DateRange.End), "#55626a", "text-anchor=\"end\"")
-	// the punch line — one personal sentence, sized to fit the card width
-	head := cardPunchline(r)
-	headSize := 25
-	if n := len(head); n > 0 && 1150/n < headSize {
-		if headSize = 1150 / n; headSize < 14 {
-			headSize = 14
+
+	// The mark, at a size that reads as the brand rather than as a favicon
+	// someone left in the corner. Pixel rects: the same 24x22 grid everywhere.
+	b.WriteString(`<g transform="translate(40,26) scale(2.4)">` + markStill(0, 0, 1) + `</g>` + "\n")
+	cardText(&b, 116, 52, 17, "700", "deja-vu", "#8787af", "letter-spacing=\"0.5\"")
+	cardText(&b, 205, 52, 14, "400", "· agent history", "#55626a")
+	if span := valueOrDash(r.DateRange.Start) + " – " + valueOrDash(r.DateRange.End); span != "- – -" {
+		cardText(&b, w-pad, 52, 13, "400", span, "#55626a", "text-anchor=\"end\"")
+	}
+
+	// The hero: one figure in the accent, its sentence beneath. The card led
+	// with the whole sentence in white before, which is a headline with nothing
+	// in it to look at first.
+	value, caption := heroStat(r)
+	cardText(&b, pad, 152, 62, "800", value, "#ff8700")
+	cardText(&b, pad, 180, 15, "400", caption, "#8b989a")
+
+	activity := "ACTIVITY"
+	if n := streakDays(r.Heatmap); n > 1 {
+		activity += "   ·   " + formatStatNumber(n) + " DAY STREAK"
+	}
+	cardText(&b, pad, 296, 11, "700", activity, "#55626a", "letter-spacing=\"1.5\"")
+	renderHeatmap(&b, r.Heatmap, pad+4, 322)
+
+	// The counts, supporting the hero rather than competing with it.
+	for i, c := range cardCells(r) {
+		x := pad + i*152
+		cardText(&b, x, 234, 28, "700", c.value, "#f4f7f7")
+		cardText(&b, x, 253, 12, "400", c.label, "#55626a")
+	}
+
+	renderAgents(&b, r, 470, 120)
+
+	if title := strings.TrimSpace(r.Longest.Title); title != "" && r.Longest.Messages > 0 {
+		// The whole line stays in the left band. Anchoring the message count to
+		// the card's right edge put it through the agents block, which occupies
+		// that half of this row.
+		cardText(&b, pad, 442, 11, "700", "THE LONGEST ONE", "#55626a", "letter-spacing=\"1.5\"")
+		cardText(&b, pad+150, 442, 12, "400",
+			clipTitle(title, 24)+"  ·  "+formatStatNumber(r.Longest.Messages)+" messages", "#8b989a")
+	}
+
+	foot := "$ deja stats --card"
+	if version != "" && version != "dev" {
+		foot += " · v" + version
+	}
+	cardText(&b, pad, h-18, 11, "400", foot, "#55626a")
+	cardText(&b, w-pad, h-18, 12, "700", "vshulcz.github.io/deja-vu", "#8787af", "text-anchor=\"end\"")
+	b.WriteString("</g>\n")
+	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="url(#scan)"/>`+"\n", w, h)
+	b.WriteString("</svg>\n")
+	return b.String()
+}
+
+// clipTitle keeps a session title inside its column. Runes, not bytes: this is
+// the one string on the card that came from a user, so it is the one that is
+// not ASCII.
+func clipTitle(title string, max int) string {
+	runes := []rune(title)
+	if len(runes) <= max {
+		return title
+	}
+	cut := max - 1
+	for i := cut; i > 0; i-- {
+		if runes[i] == ' ' {
+			cut = i
+			break
 		}
 	}
-	renderPunchline(&b, 40, 90, headSize, head)
+	return string(runes[:cut]) + "…"
+}
 
-	// hero: a GitHub-style trailing-year activity grid
-	renderHeatmap(&b, r.Heatmap, 44, 128)
-
-	// supporting counts (sessions/messages kept as their own text nodes)
-	cardText(&b, 44, 300, 30, "800", formatStatNumber(r.TotalSessions), "#ffffff")
-	cardText(&b, 44, 320, 12, "400", "sessions", "#55626a")
-	cardText(&b, 196, 300, 30, "700", formatStatNumber(r.TotalMessages), "#f4f7f7")
-	cardText(&b, 196, 320, 12, "400", "messages", "#55626a")
-	cardText(&b, 348, 300, 30, "700", fmt.Sprintf("%d", len(r.Harnesses)), "#f4f7f7")
-	cardText(&b, 348, 320, 12, "400", "agents", "#55626a")
-
-	// top agents, right column
-	cardText(&b, 470, 276, 11, "700", "TOP AGENTS", "#55626a", "letter-spacing=\"1.5\"")
+// renderAgents draws where the history came from. The bar sits in a track, so a
+// short one reads as a small share rather than as a short row.
+func renderAgents(b *strings.Builder, r stats.Report, x, y int) {
+	if len(r.Harnesses) == 0 {
+		return
+	}
 	harnesses := append([]stats.HarnessStats(nil), r.Harnesses...)
 	sort.SliceStable(harnesses, func(i, j int) bool {
 		if harnesses[i].Sessions == harnesses[j].Sessions {
@@ -73,33 +126,42 @@ func renderStatsCard(r stats.Report) string {
 		}
 		return harnesses[i].Sessions > harnesses[j].Sessions
 	})
-	if len(harnesses) > 4 {
-		other := stats.HarnessStats{Harness: "other"}
-		for _, h := range harnesses[4:] {
-			other.Sessions += h.Sessions
+	rest := 0
+	if len(harnesses) > 3 {
+		for _, hh := range harnesses[3:] {
+			rest += hh.Sessions
 		}
-		harnesses = append(harnesses[:4], other)
+		harnesses = harnesses[:3:3]
 	}
-	maxHarness := 1
-	for _, h := range harnesses {
-		if h.Sessions > maxHarness {
-			maxHarness = h.Sessions
+	max := 1
+	for _, hh := range harnesses {
+		if hh.Sessions > max {
+			max = hh.Sessions
 		}
-	}
-	for i, h := range harnesses {
-		y := 290 + i*13
-		cardText(&b, 470, y+9, 10, "400", h.Harness, "#8b989a")
-		width := 90 * h.Sessions / maxHarness
-		fmt.Fprintf(&b, `<rect x="570" y="%d" width="%d" height="8" rx="4" fill="#8787af"/>`+"\n", y+1, width)
-		cardText(&b, 672, y+9, 10, "700", fmt.Sprintf("%d", h.Sessions), "#8b989a")
 	}
 
-	cardText(&b, 40, 402, 11, "400", "$ deja stats --card · v"+version, "#55626a")
-	cardText(&b, 760, 402, 12, "700", "vshulcz.github.io/deja-vu", "#8787af", "text-anchor=\"end\"")
-	b.WriteString("</g>\n")
-	b.WriteString(`<rect width="800" height="420" fill="url(#scan)"/>` + "\n")
-	b.WriteString("</svg>\n")
-	return b.String()
+	cardText(b, x, y, 11, "700", "WHERE IT CAME FROM", "#55626a", "letter-spacing=\"1.5\"")
+	// The bar runs from a fixed left edge to a fixed right one, and the count
+	// sits beyond it. The first version anchored the count at the end of the
+	// bar's own width, so a full bar and its number occupied the same pixels.
+	const (
+		barX  = 110
+		track = 110
+	)
+	for i, hh := range harnesses {
+		row := y + 22 + i*22
+		cardText(b, x, row, 12, "400", hh.Harness, "#8b989a")
+		fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="8" rx="4" fill="#161c1f"/>`+"\n",
+			x+barX, row-8, track)
+		fmt.Fprintf(b, `<rect x="%d" y="%d" width="%d" height="8" rx="4" fill="#8787af"/>`+"\n",
+			x+barX, row-8, track*hh.Sessions/max)
+		cardText(b, 760, row, 12, "700", formatStatNumber(hh.Sessions), "#f4f7f7",
+			"text-anchor=\"end\"")
+	}
+	if rest > 0 {
+		cardText(b, x, y+22+len(harnesses)*22, 11, "400",
+			"and "+formatStatNumber(rest)+" more across the rest", "#55626a")
+	}
 }
 
 // cardPunchline picks one personal, shareable sentence for the card hero.
@@ -117,20 +179,6 @@ func cardPunchline(r stats.Report) string {
 	default:
 		return "Your coding-agent memory, indexed and searchable."
 	}
-}
-
-// renderPunchline splits the headline on the em-dash so the "deja" clause
-// prints in the accent color, matching the site's two-tone tagline.
-func renderPunchline(b *strings.Builder, x, y, size int, head string) {
-	if i := strings.Index(head, " — "); i > 0 {
-		var main, tail strings.Builder
-		_ = xml.EscapeText(&main, []byte(head[:i]))
-		_ = xml.EscapeText(&tail, []byte(head[i:]))
-		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="%d" font-weight="800" fill="#ffffff">%s<tspan fill="#ff8700">%s</tspan></text>`+"\n",
-			x, y, size, main.String(), tail.String())
-		return
-	}
-	cardText(b, x, y, size, "800", head, "#ffffff")
 }
 
 // renderHeatmap draws a GitHub-style week-by-day grid with month ticks.

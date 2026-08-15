@@ -44,8 +44,14 @@ func TestRenderStatsCardDeterministicAndEscaped(t *testing.T) {
 			t.Fatalf("card is not XML: %v", err)
 		}
 	}
-	if !strings.Contains(one, `viewBox="0 0 800 420"`) || !strings.Contains(one, ">9</text>") || !strings.Contains(one, ">27</text>") {
+	if !strings.Contains(one, `viewBox="0 0 800 486"`) || !strings.Contains(one, ">9</text>") || !strings.Contains(one, ">27</text>") {
 		t.Fatalf("card missing fixed layout or hero values")
+	}
+	// The accent is what the card leads with, and a card that has lost it is
+	// a wash of one colour — which is what the terminal one looked like before
+	// the hero figure took it.
+	if !strings.Contains(one, `fill="#ff8700"`) {
+		t.Fatalf("card has no accent on its hero figure")
 	}
 }
 
@@ -55,7 +61,9 @@ func TestRenderStatsCardHarnessAggregation(t *testing.T) {
 		{Harness: "w", Sessions: 4}, {Harness: "v", Sessions: 5}, {Harness: "u", Sessions: 6}, {Harness: "t", Sessions: 7},
 	}}
 	card := renderStatsCard(r)
-	if !strings.Contains(card, ">other</text>") || !strings.Contains(card, `height="8"`) {
+	// Three agents and a count of the rest, rather than a row per harness: the
+	// tail is a single fact and it was taking a line each.
+	if !strings.Contains(card, "and 10 more across the rest") || !strings.Contains(card, `height="8"`) {
 		t.Fatalf("aggregated harness card = %s", card)
 	}
 }
