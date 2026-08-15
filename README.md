@@ -230,10 +230,15 @@ Point `deja embed` at a local Ollama, LM Studio or OpenAI-compatible endpoint wi
 `DEJA_EMBED_URL` and rephrased queries still hit. Without a reachable runtime, lexical
 search and MCP recall continue unchanged.
 
-The vector sidecar sits beside the index as `.vectors.bin`, not inside `index.db`.
-Float32 vectors cost roughly 4 MB per 1k messages for a 1,024 dimension model. Embedding
-is local, and it never sends raw source files, only the redacted indexed text truncated to
-about 2k characters.
+<details>
+<summary>Where the vectors live and what they cost</summary>
+
+The sidecar sits beside the index as `.vectors.bin`, not inside `index.db`. Float32 vectors
+cost roughly 4 MB per 1k messages for a 1,024 dimension model. Embedding is local, and it
+never sends raw source files, only the redacted indexed text truncated to about 2k
+characters.
+
+</details>
 
 ## Proof
 
