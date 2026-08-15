@@ -219,6 +219,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: go run ./scripts/pinmanifests -check
 
+      # The logo, the dark logo and the icon are drawn from the sprite in
+      # internal/mark. Editing the sprite without regenerating is silent: the
+      # terminal banner changes and the assets do not.
+      - name: SVG assets match the sprite
+        run: go run ./scripts/genlogo -check
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest
