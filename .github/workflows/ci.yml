@@ -21,48 +21,44 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Which platforms this run tests. Linux and macOS finish in about two minutes
-  # each; windows takes twenty, of which roughly sixteen are the runner
-  # compiling. Caching that and excluding it from Defender were both measured
-  # and neither helped (#1229), so windows comes off the per-commit path
-  # instead of being made faster.
-  #
-  # It still runs on every push to main, on the weekly canary, on demand, and
-  # on any pull request labelled `windows` — which is how a windows-specific
-  # fix like #1239 gets checked on the platform it is about.
-  platforms:
-    runs-on: ubuntu-latest
-    outputs:
-      os: ${{ steps.pick.outputs.os }}
-    steps:
-      - id: pick
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" != "pull_request" ] || \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'windows') }}" = "true" ]; then
-            echo 'os=["ubuntu-latest","macos-latest","windows-latest"]' >> "$GITHUB_OUTPUT"
-          else
-            echo 'os=["ubuntu-latest","macos-latest"]' >> "$GITHUB_OUTPUT"
-          fi
-
   test:
     name: test / ${{ matrix.os }}
-    needs: platforms
     runs-on: ${{ matrix.os }}
     # windows runs the suite about ten times slower than the others; the cap is
     # what turns a slow run into a cancellation that prints no test output.
     timeout-minutes: 30
+    env:
+      # Whether this leg does real work. The windows runner needs twenty-odd
+      # minutes for a job the others finish in two, and it varies by a third
+      # between identical runs, which is what tipped it over the cap and
+      # produced cancellations that looked like hangs. Caching the build and
+      # excluding it from Defender were both measured and neither helped
+      # (#1229), so it comes off the per-commit path instead.
+      #
+      # It still runs on every push to main, on the weekly canary, on demand,
+      # and on a pull request labelled `windows` — which is how a fix like
+      # #1239 gets checked on the platform it is about.
+      #
+      # The leg is skipped from the inside rather than dropped from the matrix,
+      # so `test / windows-latest` still reports and stays a required check.
+      # Dropping it from the matrix would leave every unlabelled PR waiting on
+      # a check that never arrives.
+      FULL: ${{ matrix.os != 'windows-latest' || github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'windows') }}
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.platforms.outputs.os) }}
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: env.FULL == 'true'
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        if: env.FULL == 'true'
         with:
           go-version: '1.25.x'
       - run: go mod verify
+        if: env.FULL == 'true'
       - run: go vet ./...
+        if: env.FULL == 'true'
       # -timeout below the job's own patience: a hung test then dies with every
       # goroutine's stack in the log, instead of the runner sitting on it until
       # the queue times out and the log says only "go test -race" (#838). Raised
@@ -91,9 +87,10 @@ jobs:
       # matrix for paths, file locking and case rules, and plain `go test`
       # exercises every one of those.
       - run: go test -timeout 12m ./...
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
       - run: go build ./cmd/deja
+        if: env.FULL == 'true'
       - name: Benchmark lexical recall floor
         if: matrix.os == 'ubuntu-latest'
         shell: bash
