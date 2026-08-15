@@ -3,62 +3,7 @@
   <!-- The cat is a 24x22 pixel sprite, the same grid cmd/deja/logo.go
      prints as half blocks. Coat, accent and features are the three
      colours xterm-256 holds exactly, so vector and terminal agree. -->
-    <g fill="#8787af">
-      <rect x="88" y="46" width="14" height="14"/>
-      <rect x="270" y="46" width="14" height="14"/>
-      <rect x="74" y="60" width="42" height="14"/>
-      <rect x="256" y="60" width="42" height="14"/>
-      <rect x="74" y="74" width="56" height="14"/>
-      <rect x="242" y="74" width="56" height="14"/>
-      <rect x="74" y="88" width="70" height="14"/>
-      <rect x="228" y="88" width="70" height="14"/>
-      <rect x="74" y="102" width="224" height="14"/>
-      <rect x="60" y="116" width="252" height="14"/>
-      <rect x="60" y="130" width="252" height="14"/>
-      <rect x="60" y="144" width="252" height="14"/>
-      <rect x="60" y="158" width="56" height="14"/>
-      <rect x="144" y="158" width="84" height="14"/>
-      <rect x="256" y="158" width="56" height="14"/>
-      <rect x="60" y="172" width="42" height="14"/>
-      <rect x="116" y="172" width="28" height="14"/>
-      <rect x="158" y="172" width="56" height="14"/>
-      <rect x="228" y="172" width="28" height="14"/>
-      <rect x="270" y="172" width="42" height="14"/>
-      <rect x="60" y="186" width="252" height="14"/>
-      <rect x="60" y="200" width="112" height="14"/>
-      <rect x="200" y="200" width="112" height="14"/>
-      <rect x="60" y="214" width="98" height="14"/>
-      <rect x="172" y="214" width="28" height="14"/>
-      <rect x="214" y="214" width="98" height="14"/>
-      <rect x="74" y="228" width="98" height="14"/>
-      <rect x="200" y="228" width="98" height="14"/>
-      <rect x="88" y="242" width="196" height="14"/>
-      <rect x="298" y="242" width="28" height="14"/>
-      <rect x="102" y="256" width="168" height="14"/>
-      <rect x="298" y="256" width="28" height="14"/>
-      <rect x="102" y="270" width="168" height="14"/>
-      <rect x="298" y="270" width="28" height="14"/>
-      <rect x="102" y="284" width="168" height="14"/>
-      <rect x="298" y="284" width="28" height="14"/>
-      <rect x="102" y="298" width="168" height="14"/>
-      <rect x="298" y="298" width="28" height="14"/>
-      <rect x="88" y="312" width="224" height="14"/>
-      <rect x="88" y="326" width="224" height="14"/>
-      <rect x="102" y="340" width="56" height="14"/>
-      <rect x="214" y="340" width="56" height="14"/>
-    </g>
-    <g fill="#1c1c1c">
-      <rect x="116" y="158" width="28" height="14"/>
-      <rect x="228" y="158" width="28" height="14"/>
-      <rect x="102" y="172" width="14" height="14"/>
-      <rect x="144" y="172" width="14" height="14"/>
-      <rect x="214" y="172" width="14" height="14"/>
-      <rect x="256" y="172" width="14" height="14"/>
-      <rect x="158" y="214" width="14" height="14"/>
-      <rect x="200" y="214" width="14" height="14"/>
-      <rect x="172" y="228" width="28" height="14"/>
-    </g>
-    <g fill="#ff8700">
-      <rect x="172" y="200" width="28" height="14"/>
-    </g>
+    <path fill="#8787af" d="M104 68h12v12h-12ZM260 68h12v12h-12ZM92 80h36v12h-36ZM248 80h36v12h-36ZM92 92h48v12h-48ZM236 92h48v12h-48ZM92 104h60v12h-60ZM224 104h60v12h-60ZM92 116h192v12h-192ZM80 128h216v12h-216ZM80 140h216v12h-216ZM80 152h36v12h-36ZM140 152h96v12h-96ZM260 152h36v12h-36ZM80 164h36v12h-36ZM140 164h96v12h-96ZM260 164h36v12h-36ZM80 176h36v12h-36ZM140 176h96v12h-96ZM260 176h36v12h-36ZM80 188h216v12h-216ZM80 200h96v12h-96ZM200 200h96v12h-96ZM80 212h216v12h-216ZM92 224h192v12h-192ZM104 236h168v12h-168ZM284 236h24v12h-24ZM116 248h144v12h-144ZM284 248h24v12h-24ZM116 260h144v12h-144ZM284 260h24v12h-24ZM116 272h144v12h-144ZM284 272h24v12h-24ZM116 284h144v12h-144ZM284 284h24v12h-24ZM104 296h192v12h-192ZM104 308h192v12h-192ZM116 320h48v12h-48ZM212 320h48v12h-48Z"/>
+    <path fill="#1c1c1c" d="M116 152h24v12h-24ZM236 152h24v12h-24ZM116 164h24v12h-24ZM236 164h24v12h-24ZM116 176h24v12h-24ZM236 176h24v12h-24Z"/>
+    <path fill="#ff8700" d="M176 200h24v12h-24Z"/>
 </svg>

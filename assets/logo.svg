@@ -2,67 +2,12 @@
   <!-- The cat is a 24x22 pixel sprite, the same grid cmd/deja/logo.go
      prints as half blocks. Coat, accent and features are the three
      colours xterm-256 holds exactly, so vector and terminal agree. -->
-    <g fill="#8787af">
-      <rect x="60" y="34" width="6" height="6"/>
-      <rect x="138" y="34" width="6" height="6"/>
-      <rect x="54" y="40" width="18" height="6"/>
-      <rect x="132" y="40" width="18" height="6"/>
-      <rect x="54" y="46" width="24" height="6"/>
-      <rect x="126" y="46" width="24" height="6"/>
-      <rect x="54" y="52" width="30" height="6"/>
-      <rect x="120" y="52" width="30" height="6"/>
-      <rect x="54" y="58" width="96" height="6"/>
-      <rect x="48" y="64" width="108" height="6"/>
-      <rect x="48" y="70" width="108" height="6"/>
-      <rect x="48" y="76" width="108" height="6"/>
-      <rect x="48" y="82" width="24" height="6"/>
-      <rect x="84" y="82" width="36" height="6"/>
-      <rect x="132" y="82" width="24" height="6"/>
-      <rect x="48" y="88" width="18" height="6"/>
-      <rect x="72" y="88" width="12" height="6"/>
-      <rect x="90" y="88" width="24" height="6"/>
-      <rect x="120" y="88" width="12" height="6"/>
-      <rect x="138" y="88" width="18" height="6"/>
-      <rect x="48" y="94" width="108" height="6"/>
-      <rect x="48" y="100" width="48" height="6"/>
-      <rect x="108" y="100" width="48" height="6"/>
-      <rect x="48" y="106" width="42" height="6"/>
-      <rect x="96" y="106" width="12" height="6"/>
-      <rect x="114" y="106" width="42" height="6"/>
-      <rect x="54" y="112" width="42" height="6"/>
-      <rect x="108" y="112" width="42" height="6"/>
-      <rect x="60" y="118" width="84" height="6"/>
-      <rect x="150" y="118" width="12" height="6"/>
-      <rect x="66" y="124" width="72" height="6"/>
-      <rect x="150" y="124" width="12" height="6"/>
-      <rect x="66" y="130" width="72" height="6"/>
-      <rect x="150" y="130" width="12" height="6"/>
-      <rect x="66" y="136" width="72" height="6"/>
-      <rect x="150" y="136" width="12" height="6"/>
-      <rect x="66" y="142" width="72" height="6"/>
-      <rect x="150" y="142" width="12" height="6"/>
-      <rect x="60" y="148" width="96" height="6"/>
-      <rect x="60" y="154" width="96" height="6"/>
-      <rect x="66" y="160" width="24" height="6"/>
-      <rect x="114" y="160" width="24" height="6"/>
-    </g>
-    <g fill="#1c1c1c">
-      <rect x="72" y="82" width="12" height="6"/>
-      <rect x="120" y="82" width="12" height="6"/>
-      <rect x="66" y="88" width="6" height="6"/>
-      <rect x="84" y="88" width="6" height="6"/>
-      <rect x="114" y="88" width="6" height="6"/>
-      <rect x="132" y="88" width="6" height="6"/>
-      <rect x="90" y="106" width="6" height="6"/>
-      <rect x="108" y="106" width="6" height="6"/>
-      <rect x="96" y="112" width="12" height="6"/>
-    </g>
-    <g fill="#ff8700">
-      <rect x="96" y="100" width="12" height="6"/>
-    </g>
+    <path fill="#8787af" d="M60 34h6v6h-6ZM138 34h6v6h-6ZM54 40h18v6h-18ZM132 40h18v6h-18ZM54 46h24v6h-24ZM126 46h24v6h-24ZM54 52h30v6h-30ZM120 52h30v6h-30ZM54 58h96v6h-96ZM48 64h108v6h-108ZM48 70h108v6h-108ZM48 76h18v6h-18ZM78 76h48v6h-48ZM138 76h18v6h-18ZM48 82h18v6h-18ZM78 82h48v6h-48ZM138 82h18v6h-18ZM48 88h18v6h-18ZM78 88h48v6h-48ZM138 88h18v6h-18ZM48 94h108v6h-108ZM48 100h48v6h-48ZM108 100h48v6h-48ZM48 106h108v6h-108ZM54 112h96v6h-96ZM60 118h84v6h-84ZM150 118h12v6h-12ZM66 124h72v6h-72ZM150 124h12v6h-12ZM66 130h72v6h-72ZM150 130h12v6h-12ZM66 136h72v6h-72ZM150 136h12v6h-12ZM66 142h72v6h-72ZM150 142h12v6h-12ZM60 148h96v6h-96ZM60 154h96v6h-96ZM66 160h24v6h-24ZM114 160h24v6h-24Z"/>
+    <path fill="#1c1c1c" d="M66 76h12v6h-12ZM126 76h12v6h-12ZM66 82h12v6h-12ZM126 82h12v6h-12ZM66 88h12v6h-12ZM126 88h12v6h-12Z"/>
+    <path fill="#ff8700" d="M96 100h12v6h-12Z"/>
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
     <text x="212" y="112" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>
-    <text x="215" y="152" font-size="20" fill="#8a87a0">your agents already solved this. deja finds it.</text>
+    <text x="212" y="150" font-size="18" fill="#8a87a0">your agents already solved this. deja finds it.</text>
   </g>
   <style>
     @media (prefers-color-scheme: light) {

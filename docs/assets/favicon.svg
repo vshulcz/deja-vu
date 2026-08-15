@@ -1,37 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="deja-vu">
   <!-- Drawn at 14x12 rather than scaled down from the mark: the squint and the
        sparkle are single pixels there, and a 16px tab strip eats them. -->
-    <g fill="#8787af">
-      <rect x="19" y="10" width="9" height="9"/>
-      <rect x="100" y="10" width="9" height="9"/>
-      <rect x="19" y="19" width="18" height="9"/>
-      <rect x="91" y="19" width="18" height="9"/>
-      <rect x="10" y="28" width="108" height="9"/>
-      <rect x="10" y="37" width="108" height="9"/>
-      <rect x="10" y="46" width="9" height="9"/>
-      <rect x="37" y="46" width="54" height="9"/>
-      <rect x="109" y="46" width="9" height="9"/>
-      <rect x="10" y="55" width="9" height="9"/>
-      <rect x="37" y="55" width="54" height="9"/>
-      <rect x="109" y="55" width="9" height="9"/>
-      <rect x="10" y="64" width="45" height="9"/>
-      <rect x="73" y="64" width="45" height="9"/>
-      <rect x="10" y="73" width="108" height="9"/>
-      <rect x="19" y="82" width="108" height="9"/>
-      <rect x="28" y="91" width="72" height="9"/>
-      <rect x="109" y="91" width="18" height="9"/>
-      <rect x="28" y="100" width="72" height="9"/>
-      <rect x="109" y="100" width="18" height="9"/>
-      <rect x="19" y="109" width="27" height="9"/>
-      <rect x="82" y="109" width="27" height="9"/>
-    </g>
-    <g fill="#1c1c1c">
-      <rect x="19" y="46" width="18" height="9"/>
-      <rect x="91" y="46" width="18" height="9"/>
-      <rect x="19" y="55" width="18" height="9"/>
-      <rect x="91" y="55" width="18" height="9"/>
-    </g>
-    <g fill="#ff8700">
-      <rect x="55" y="64" width="18" height="9"/>
-    </g>
+    <path fill="#8787af" d="M19 10h9v9h-9ZM100 10h9v9h-9ZM19 19h18v9h-18ZM91 19h18v9h-18ZM10 28h108v9h-108ZM10 37h108v9h-108ZM10 46h9v9h-9ZM37 46h54v9h-54ZM109 46h9v9h-9ZM10 55h9v9h-9ZM37 55h54v9h-54ZM109 55h9v9h-9ZM10 64h45v9h-45ZM73 64h45v9h-45ZM10 73h108v9h-108ZM19 82h108v9h-108ZM28 91h72v9h-72ZM109 91h18v9h-18ZM28 100h72v9h-72ZM109 100h18v9h-18ZM19 109h27v9h-27ZM82 109h27v9h-27Z"/>
+    <path fill="#1c1c1c" d="M19 46h18v9h-18ZM91 46h18v9h-18ZM19 55h18v9h-18ZM91 55h18v9h-18Z"/>
+    <path fill="#ff8700" d="M55 64h18v9h-18Z"/>
 </svg>
