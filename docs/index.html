@@ -14,20 +14,20 @@
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
-<meta name="theme-color" content="#050807">
+<meta name="theme-color" content="#0b0f10">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"A local memory layer for coding agents: retroactive search over agent session history, MCP recall, redaction, stats, share and SSH sync.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
 <style>
 :root{
-  --bg:#050807;
-  --ph:#4af08b;
-  --ph-hi:#8affc0;
-  --ph-dim:#2f9459;
-  --amber:#ffb454;
-  --body:#a9cbb6;
-  --faint:#5d8a6e;
-  --line:#12291c;
-  --panel:#070d0a;
+  --bg:#0b0f10;
+  --ph:#8787af;
+  --ph-hi:#afafd7;
+  --ph-dim:#5f5f87;
+  --amber:#ff8700;
+  --body:#c4cdcf;
+  --faint:#55626a;
+  --line:#1e262a;
+  --panel:#12171a;
   --mono:"Berkeley Mono","SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -40,7 +40,7 @@ body{
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
 }
-::selection{background:#1c5c38;color:#eafff2}
+::selection{background:#3a3a5c;color:#f4f7f7}
 
 /* ── CRT screen ─────────────────────────────────────────── */
 .crt::before{
@@ -94,19 +94,13 @@ mark{background:transparent;color:var(--amber);text-decoration:underline;text-un
 /* ── hero boot ──────────────────────────────────────────── */
 header{padding:56px 0 8px}
 .neofetch{display:flex;gap:40px;align-items:center}
-pre.mark{
-  flex:none;font-size:11.5px;line-height:1.08;user-select:none;
-  filter:drop-shadow(0 0 10px rgba(95,135,215,.35));
-}
-pre.mark .c104{color:#8787d7}
-pre.mark .c68{color:#5f87d7}
-pre.mark .c74{color:#5fafd7}
+.mark{display:block;width:150px;height:auto}
 @keyframes markwipe{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0% 0)}}
-.js pre.mark{animation:markwipe 1.4s steps(15) .5s both}
-@media (prefers-reduced-motion: reduce){.js pre.mark{animation:none}}
+.js .mark{animation:markwipe 1.4s steps(15) .5s both}
+@media (prefers-reduced-motion: reduce){.js .mark{animation:none}}
 @media(max-width:760px){
   .neofetch{flex-direction:column;align-items:flex-start;gap:18px}
-  pre.mark{font-size:8px}
+  .mark{width:110px}
 }
 .boot{font-size:.88rem;min-height:0}
 .boot .ln{white-space:pre-wrap}
@@ -114,7 +108,8 @@ pre.mark .c74{color:#5fafd7}
 .js .type-seq .ln{visibility:hidden}
 .js .type-seq .ln.on{visibility:visible}
 
-.logo-block{margin:34px 0 6px;overflow-x:auto;scrollbar-width:none}
+.logo-block{margin:34px 0 6px}
+.wordmark{display:block;width:min(430px,86vw);height:auto}
 .logo-block::-webkit-scrollbar{display:none}
 pre.ascii{
   font-size:clamp(6.4px,1.5vw,13px);line-height:1.18;color:var(--ph);
@@ -278,21 +273,7 @@ footer .spacer{flex:1}
 
 <header>
   <div class="neofetch">
-  <pre class="mark" aria-hidden="true">           <i class="c104">▗</i><i class="c104">▄</i><i class="c68">▄</i><i class="c68">▟</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i>
-        <i class="c104">▄</i><i class="c104">▟</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i>
-      <i class="c104">▄</i><i class="c104">█</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i><i class="c68">▀</i><i class="c68">▀</i><i class="c68">▘</i>
-    <i class="c104">▗</i><i class="c104">█</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▀</i>
-   <i class="c104">▗</i><i class="c104">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i><i class="c68">▘</i>
-   <i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▛</i>                    <i class="c74">▗</i><i class="c74">▄</i><i class="c74">▄</i><i class="c74">▟</i>
-  <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▘</i>        <i class="c68">▄</i><i class="c68">▄</i><i class="c68">▄</i><i class="c68">▄</i>       <i class="c74">▗</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>
-  <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i>        <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>    <i class="c74">▗</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>
-  <i class="c68">▐</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▖</i>        <i class="c74">▀</i><i class="c74">▀</i><i class="c74">▀</i><i class="c74">▀</i>        <i class="c74">▜</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▌</i>
-   <i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▙</i>                    <i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i>
-   <i class="c68">▝</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">▙</i><i class="c68">▖</i>                <i class="c74">▗</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▘</i>
-    <i class="c68">▝</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c68">█</i><i class="c74">▄</i>              <i class="c74">▄</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▘</i>
-      <i class="c68">▀</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▙</i><i class="c74">▄</i><i class="c74">▄</i><i class="c74">▖</i>    <i class="c74">▗</i><i class="c74">▄</i><i class="c74">▄</i><i class="c74">▟</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▀</i>
-        <i class="c74">▀</i><i class="c74">▜</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▛</i><i class="c74">▀</i>
-           <i class="c74">▝</i><i class="c74">▀</i><i class="c74">▀</i><i class="c74">▜</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">█</i><i class="c74">▛</i><i class="c74">▀</i><i class="c74">▀</i><i class="c74">▘</i></pre>
+  <img class="mark" src="assets/icon.svg" width="150" height="150" alt="" aria-hidden="true">
   <div class="boot type-seq" id="boot" aria-label="deja indexing existing agent history">
     <div class="ln"><span class="p">$</span> <span class="cmd">deja index</span></div>
     <div class="ln dim">scanning harness stores…</div>
@@ -306,13 +287,7 @@ footer .spacer{flex:1}
   </div>
 
   <div class="logo-block reveal" id="logoblk">
-<pre class="ascii" aria-hidden="true">
-██████╗ ███████╗     ██╗ █████╗       ██╗   ██╗██╗   ██╗
-██╔══██╗██╔════╝     ██║██╔══██╗      ██║   ██║██║   ██║
-██║  ██║█████╗       ██║███████║<b>█████╗</b>██║   ██║██║   ██║
-██║  ██║██╔══╝  ██   ██║██╔══██║<b>╚════╝</b>╚██╗ ██╔╝██║   ██║
-██████╔╝███████╗╚█████╔╝██║  ██║       ╚████╔╝ ╚██████╔╝
-╚═════╝ ╚══════╝ ╚════╝ ╚═╝  ╚═╝        ╚═══╝   ╚═════╝</pre>
+<img class="wordmark" src="assets/logo-dark.svg" width="430" height="118" alt="deja-vu">
     <h1 class="tagline">your agents already solved this. <span class="f2">deja finds it.</span></h1>
     <p class="tagline" style="margin-top:8px;font-size:clamp(.85rem,2vw,1.05rem)"><span class="f2">84.9% hit@1</span> on LongMemEval-S retrieval — no LLM, no embeddings, no API key. <a href="guide/benchmarks.html" style="color:inherit">measured, in-repo →</a></p>
     <p class="sub">Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; and serves them back to any agent over MCP. It ranks by what actually held rather than what merely matched, and once its hooks are wired it names the decision already reached on a file before your agent edits it. One zero-dependency binary, fully local.</p>

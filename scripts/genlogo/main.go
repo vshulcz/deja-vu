@@ -133,10 +133,18 @@ func main() {
 	static := flag.Bool("static", false, "draw the ready pose without the wag")
 	flag.Parse()
 
+	darkLogo := logo("#e8e6f0", !*static)
+	appIcon := icon()
 	assets := map[string]string{
 		"assets/logo.svg":      logo("#1d1b2e", !*static),
-		"assets/logo-dark.svg": logo("#e8e6f0", !*static),
-		"assets/icon.svg":      icon(),
+		"assets/logo-dark.svg": darkLogo,
+		"assets/icon.svg":      appIcon,
+		// The site serves docs/ as its root, so it cannot reach the files
+		// above. Written from the same sprite in the same run rather than
+		// copied, because a copy is what goes stale — this is the drift the
+		// whole command exists to stop.
+		"docs/assets/logo-dark.svg": darkLogo,
+		"docs/assets/icon.svg":      appIcon,
 	}
 	paths := make([]string, 0, len(assets))
 	for p := range assets {

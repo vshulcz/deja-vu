@@ -1,19 +1,19 @@
 :root{
-  --bg:#050807;
-  --ph:#4af08b;
-  --ph-hi:#8affc0;
-  --ph-dim:#2f9459;
-  --amber:#ffb454;
-  --body:#a9cbb6;
-  --faint:#5d8a6e;
-  --line:#12291c;
-  --panel:#070d0a;
+  --bg:#0b0f10;
+  --ph:#8787af;
+  --ph-hi:#afafd7;
+  --ph-dim:#5f5f87;
+  --amber:#ff8700;
+  --body:#c4cdcf;
+  --faint:#55626a;
+  --line:#1e262a;
+  --panel:#12171a;
   --mono:"Berkeley Mono","SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--body);font:15px/1.7 var(--mono);-webkit-font-smoothing:antialiased}
-::selection{background:#1c5c38;color:#eafff2}
+::selection{background:#3a3a5c;color:#f4f7f7}
 a{color:var(--ph);text-decoration:none}
 a:hover{color:var(--ph-hi);text-shadow:0 0 8px rgba(74,240,139,.45)}
 code{font-family:var(--mono);font-size:.92em}
