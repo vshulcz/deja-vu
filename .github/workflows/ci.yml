@@ -28,24 +28,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # The windows leg takes sixteen times the linux one — 30 minutes against
-      # under two — and hardware alone does not explain an order of magnitude.
-      # Compiling Go writes thousands of small object files, and Defender scans
-      # each one as it lands. Excluding the paths and the toolchain's own
-      # processes tests whether the runner is slow or merely being watched.
-      # Exclusions last only for the life of the runner, which is this job.
-      - name: Keep Defender off the build
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
-          Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\go-build"
-          Add-MpPreference -ExclusionPath "$env:USERPROFILE\go"
-          Add-MpPreference -ExclusionPath "$env:RUNNER_TOOL_CACHE"
-          Add-MpPreference -ExclusionPath "$env:TEMP"
-          foreach ($p in 'go.exe', 'compile.exe', 'link.exe', 'asm.exe', 'cgo.exe', 'vet.exe') {
-            Add-MpPreference -ExclusionProcess $p
-          }
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.25.x'
@@ -64,7 +46,22 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
       - run: go test -race -timeout 12m ./...
-        if: runner.os != 'Linux'
+        if: runner.os == 'macOS'
+        shell: bash
+      # Windows runs the suite without -race. Of that leg's 26m17s, the tests
+      # themselves were 5m16s and the other twenty minutes were compiling
+      # race-instrumented objects — measured, not assumed (#1229). Two things
+      # were tried first and neither moved it: rotating the build cache made it
+      # slower, and excluding the build from Defender bought about a minute,
+      # which is noise. The runner is simply that slow at this.
+      #
+      # Nothing is lost by dropping it here. Go's race detector finds races in
+      # the scheduler's memory model, not in the operating system, so the same
+      # race is caught on the linux and macOS legs above. Windows is in this
+      # matrix for paths, file locking and case rules, and plain `go test`
+      # exercises every one of those.
+      - run: go test -timeout 12m ./...
+        if: runner.os == 'Windows'
         shell: bash
       - run: go build ./cmd/deja
       - name: Benchmark lexical recall floor
