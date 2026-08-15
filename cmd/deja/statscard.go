@@ -34,15 +34,15 @@ func renderStatsCard(r stats.Report) string {
 	b.WriteString(`<defs>` + "\n")
 	b.WriteString(`<pattern id="scan" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" y="2" fill="#000000" fill-opacity="0.16"/></pattern>` + "\n")
 	b.WriteString(`</defs>` + "\n")
-	b.WriteString(`<rect width="800" height="420" fill="#050807"/>` + "\n")
-	b.WriteString(`<rect x="0.5" y="0.5" width="799" height="419" fill="none" stroke="#12291c"/>` + "\n")
-	b.WriteString(`<g font-family="` + statsCardFont + `" fill="#d7f5e2">` + "\n")
+	b.WriteString(`<rect width="800" height="420" fill="#0b0f10"/>` + "\n")
+	b.WriteString(`<rect x="0.5" y="0.5" width="799" height="419" fill="none" stroke="#1e262a"/>` + "\n")
+	b.WriteString(`<g font-family="` + statsCardFont + `" fill="#f4f7f7">` + "\n")
 	// the cat from assets/logo.svg, then the wordmark. Pixel rects rather than
 	// a scaled drawing: the mark is the same 24x22 grid wherever it appears.
 	b.WriteString(`<g transform="translate(34,20) scale(1.5)"><path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v1h-18ZM2 6h18v1h-18ZM2 7h3v1h-3ZM7 7h8v1h-8ZM17 7h3v1h-3ZM2 8h3v1h-3ZM7 8h8v1h-8ZM17 8h3v1h-3ZM2 9h3v1h-3ZM7 9h8v1h-8ZM17 9h3v1h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v1h-2ZM5 15h12v1h-12ZM19 15h2v1h-2ZM5 16h12v1h-12ZM19 16h2v1h-2ZM5 17h12v1h-12ZM19 17h2v1h-2ZM5 18h12v1h-12ZM19 18h2v1h-2ZM4 19h16v1h-16ZM4 20h16v1h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#1c1c1c" d="M5 7h2v1h-2ZM15 7h2v1h-2ZM5 8h2v1h-2ZM15 8h2v1h-2ZM5 9h2v1h-2ZM15 9h2v1h-2Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/></g>` + "\n")
-	cardText(&b, 84, 48, 15, "700", "deja-vu", "#4af08b", "letter-spacing=\"0.5\"")
-	cardText(&b, 159, 48, 13, "400", "· agent history", "#5d8a6e")
-	cardText(&b, 760, 48, 13, "400", valueOrDash(r.DateRange.Start)+" – "+valueOrDash(r.DateRange.End), "#5d8a6e", "text-anchor=\"end\"")
+	cardText(&b, 84, 48, 15, "700", "deja-vu", "#8787af", "letter-spacing=\"0.5\"")
+	cardText(&b, 159, 48, 13, "400", "· agent history", "#55626a")
+	cardText(&b, 760, 48, 13, "400", valueOrDash(r.DateRange.Start)+" – "+valueOrDash(r.DateRange.End), "#55626a", "text-anchor=\"end\"")
 	// the punch line — one personal sentence, sized to fit the card width
 	head := cardPunchline(r)
 	headSize := 25
@@ -57,15 +57,15 @@ func renderStatsCard(r stats.Report) string {
 	renderHeatmap(&b, r.Heatmap, 44, 128)
 
 	// supporting counts (sessions/messages kept as their own text nodes)
-	cardText(&b, 44, 300, 30, "800", formatStatNumber(r.TotalSessions), "#4af08b")
-	cardText(&b, 44, 320, 12, "400", "sessions", "#5d8a6e")
-	cardText(&b, 196, 300, 30, "700", formatStatNumber(r.TotalMessages), "#d7f5e2")
-	cardText(&b, 196, 320, 12, "400", "messages", "#5d8a6e")
-	cardText(&b, 348, 300, 30, "700", fmt.Sprintf("%d", len(r.Harnesses)), "#d7f5e2")
-	cardText(&b, 348, 320, 12, "400", "agents", "#5d8a6e")
+	cardText(&b, 44, 300, 30, "800", formatStatNumber(r.TotalSessions), "#ffffff")
+	cardText(&b, 44, 320, 12, "400", "sessions", "#55626a")
+	cardText(&b, 196, 300, 30, "700", formatStatNumber(r.TotalMessages), "#f4f7f7")
+	cardText(&b, 196, 320, 12, "400", "messages", "#55626a")
+	cardText(&b, 348, 300, 30, "700", fmt.Sprintf("%d", len(r.Harnesses)), "#f4f7f7")
+	cardText(&b, 348, 320, 12, "400", "agents", "#55626a")
 
 	// top agents, right column
-	cardText(&b, 470, 276, 11, "700", "TOP AGENTS", "#5d8a6e", "letter-spacing=\"1.5\"")
+	cardText(&b, 470, 276, 11, "700", "TOP AGENTS", "#55626a", "letter-spacing=\"1.5\"")
 	harnesses := append([]stats.HarnessStats(nil), r.Harnesses...)
 	sort.SliceStable(harnesses, func(i, j int) bool {
 		if harnesses[i].Sessions == harnesses[j].Sessions {
@@ -88,14 +88,14 @@ func renderStatsCard(r stats.Report) string {
 	}
 	for i, h := range harnesses {
 		y := 290 + i*13
-		cardText(&b, 470, y+9, 10, "400", h.Harness, "#a9cbb6")
+		cardText(&b, 470, y+9, 10, "400", h.Harness, "#8b989a")
 		width := 90 * h.Sessions / maxHarness
-		fmt.Fprintf(&b, `<rect x="570" y="%d" width="%d" height="8" rx="4" fill="#4af08b"/>`+"\n", y+1, width)
-		cardText(&b, 672, y+9, 10, "700", fmt.Sprintf("%d", h.Sessions), "#a9cbb6")
+		fmt.Fprintf(&b, `<rect x="570" y="%d" width="%d" height="8" rx="4" fill="#8787af"/>`+"\n", y+1, width)
+		cardText(&b, 672, y+9, 10, "700", fmt.Sprintf("%d", h.Sessions), "#8b989a")
 	}
 
-	cardText(&b, 40, 402, 11, "400", "$ deja stats --card · v"+version, "#5d8a6e")
-	cardText(&b, 760, 402, 12, "700", "vshulcz.github.io/deja-vu", "#4af08b", "text-anchor=\"end\"")
+	cardText(&b, 40, 402, 11, "400", "$ deja stats --card · v"+version, "#55626a")
+	cardText(&b, 760, 402, 12, "700", "vshulcz.github.io/deja-vu", "#8787af", "text-anchor=\"end\"")
 	b.WriteString("</g>\n")
 	b.WriteString(`<rect width="800" height="420" fill="url(#scan)"/>` + "\n")
 	b.WriteString("</svg>\n")
@@ -126,18 +126,18 @@ func renderPunchline(b *strings.Builder, x, y, size int, head string) {
 		var main, tail strings.Builder
 		_ = xml.EscapeText(&main, []byte(head[:i]))
 		_ = xml.EscapeText(&tail, []byte(head[i:]))
-		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="%d" font-weight="800" fill="#eafff2">%s<tspan fill="#ffb454">%s</tspan></text>`+"\n",
+		fmt.Fprintf(b, `<text x="%d" y="%d" font-size="%d" font-weight="800" fill="#ffffff">%s<tspan fill="#ff8700">%s</tspan></text>`+"\n",
 			x, y, size, main.String(), tail.String())
 		return
 	}
-	cardText(b, x, y, size, "800", head, "#eafff2")
+	cardText(b, x, y, size, "800", head, "#ffffff")
 }
 
 // renderHeatmap draws a GitHub-style week-by-day grid with month ticks.
 func renderHeatmap(b *strings.Builder, hm stats.HeatmapStats, x0, y0 int) {
 	const step = 13
 	for _, mt := range hm.Months {
-		cardText(b, x0+mt.Col*step, y0-6, 10, "400", mt.Label, "#5d8a6e")
+		cardText(b, x0+mt.Col*step, y0-6, 10, "400", mt.Label, "#55626a")
 	}
 	for col, week := range hm.Weeks {
 		for d := 0; d < 7; d++ {
@@ -154,7 +154,7 @@ func renderHeatmap(b *strings.Builder, hm stats.HeatmapStats, x0, y0 int) {
 
 func heatFill(c, max int) (string, float64) {
 	if c <= 0 {
-		return "#0b1410", 1
+		return "#141a1d", 1
 	}
 	ratio := 1.0
 	if max > 0 {
@@ -162,13 +162,13 @@ func heatFill(c, max int) (string, float64) {
 	}
 	switch {
 	case ratio <= 0.25:
-		return "#4af08b", 0.28
+		return "#8787af", 0.28
 	case ratio <= 0.5:
-		return "#4af08b", 0.5
+		return "#8787af", 0.5
 	case ratio <= 0.75:
-		return "#4af08b", 0.72
+		return "#8787af", 0.72
 	default:
-		return "#4af08b", 1
+		return "#8787af", 1
 	}
 }
 

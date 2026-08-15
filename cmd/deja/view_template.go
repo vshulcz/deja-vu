@@ -11,7 +11,7 @@ var viewTemplate = template.Must(template.New("view").Parse(`<!doctype html>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20fill%3D%22%238787af%22%20d%3D%22M1%201h2v1h-2ZM13%201h2v1h-2ZM1%202h3v1h-3ZM12%202h3v1h-3ZM1%203h4v1h-4ZM11%203h4v1h-4ZM1%204h14v1h-14ZM1%205h14v1h-14ZM1%206h3v1h-3ZM6%206h4v1h-4ZM12%206h3v1h-3ZM1%207h3v1h-3ZM6%207h4v1h-4ZM12%207h3v1h-3ZM1%208h3v1h-3ZM6%208h4v1h-4ZM12%208h3v1h-3ZM1%209h14v1h-14ZM1%2010h6v1h-6ZM9%2010h6v1h-6ZM1%2011h14v1h-14ZM1%2012h14v1h-14ZM2%2013h12v1h-12ZM3%2014h10v1h-10Z%22%2F%3E%3Cpath%20fill%3D%22%231c1c1c%22%20d%3D%22M4%206h2v1h-2ZM10%206h2v1h-2ZM4%207h2v1h-2ZM10%207h2v1h-2ZM4%208h2v1h-2ZM10%208h2v1h-2Z%22%2F%3E%3Cpath%20fill%3D%22%23ff8700%22%20d%3D%22M7%2010h2v1h-2Z%22%2F%3E%3C%2Fsvg%3E">
 <style>
 .mark{vertical-align:-3px;margin-right:7px;shape-rendering:crispEdges}
-:root{--bg:#050807;--ph:#4af08b;--hi:#8affc0;--amber:#ffb454;--body:#a9cbb6;--faint:#5d8a6e;--line:#12291c;--panel:#070d0a}
+:root{--bg:#0b0f10;--ph:#8787af;--hi:#f4f7f7;--amber:#ff8700;--body:#c3ccce;--faint:#55626a;--line:#1e262a;--panel:#12171a}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--body);font:14px/1.6 "SF Mono","JetBrains Mono",Menlo,Consolas,monospace;padding:0 0 60px}
 a{color:var(--ph);text-decoration:none}
@@ -30,7 +30,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 .row{border:1px solid var(--line);border-top:none;padding:9px 12px;cursor:pointer}
 .row:first-of-type{border-top:1px solid var(--line)}
 .row:hover{background:var(--panel)}
-.row .t{color:#d7f5e2}
+.row .t{color:#f4f7f7}
 .row .m{color:var(--faint);font-size:.78rem}
 .row .h{color:var(--amber)}
 .row pre{display:none;white-space:pre-wrap;color:var(--body);border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:.82rem;max-height:420px;overflow:auto}
