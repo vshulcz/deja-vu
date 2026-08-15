@@ -8,7 +8,9 @@ var viewTemplate = template.Must(template.New("view").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deja view</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20fill%3D%22%238787af%22%20d%3D%22M1%201h2v1h-2ZM13%201h2v1h-2ZM1%202h3v1h-3ZM12%202h3v1h-3ZM1%203h4v1h-4ZM11%203h4v1h-4ZM1%204h14v1h-14ZM1%205h14v1h-14ZM1%206h3v1h-3ZM6%206h4v1h-4ZM12%206h3v1h-3ZM1%207h3v1h-3ZM6%207h4v1h-4ZM12%207h3v1h-3ZM1%208h3v1h-3ZM6%208h4v1h-4ZM12%208h3v1h-3ZM1%209h14v1h-14ZM1%2010h6v1h-6ZM9%2010h6v1h-6ZM1%2011h14v1h-14ZM1%2012h14v1h-14ZM2%2013h12v1h-12ZM3%2014h10v1h-10Z%22%2F%3E%3Cpath%20fill%3D%22%231c1c1c%22%20d%3D%22M4%206h2v1h-2ZM10%206h2v1h-2ZM4%207h2v1h-2ZM10%207h2v1h-2ZM4%208h2v1h-2ZM10%208h2v1h-2Z%22%2F%3E%3Cpath%20fill%3D%22%23ff8700%22%20d%3D%22M7%2010h2v1h-2Z%22%2F%3E%3C%2Fsvg%3E">
 <style>
+.mark{vertical-align:-3px;margin-right:7px;shape-rendering:crispEdges}
 :root{--bg:#050807;--ph:#4af08b;--hi:#8affc0;--amber:#ffb454;--body:#a9cbb6;--faint:#5d8a6e;--line:#12291c;--panel:#070d0a}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--body);font:14px/1.6 "SF Mono","JetBrains Mono",Menlo,Consolas,monospace;padding:0 0 60px}
@@ -38,7 +40,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 .note{color:var(--faint);font-size:.78rem;margin:10px 0 30px}
 .empty{color:var(--faint);padding:24px 0}
 </style></head><body>
-<header><b>deja view</b><span class="meta">generated {{.GeneratedAt}} · local file, nothing leaves this machine</span></header>
+<header><b><svg class="mark" viewBox="0 0 24 22" width="22" height="20" aria-hidden="true"><path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v1h-18ZM2 6h18v1h-18ZM2 7h3v1h-3ZM7 7h8v1h-8ZM17 7h3v1h-3ZM2 8h3v1h-3ZM7 8h8v1h-8ZM17 8h3v1h-3ZM2 9h3v1h-3ZM7 9h8v1h-8ZM17 9h3v1h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v1h-2ZM5 15h12v1h-12ZM19 15h2v1h-2ZM5 16h12v1h-12ZM19 16h2v1h-2ZM5 17h12v1h-12ZM19 17h2v1h-2ZM5 18h12v1h-12ZM19 18h2v1h-2ZM4 19h16v1h-16ZM4 20h16v1h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#1c1c1c" d="M5 7h2v1h-2ZM15 7h2v1h-2ZM5 8h2v1h-2ZM15 8h2v1h-2ZM5 9h2v1h-2ZM15 9h2v1h-2Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/></svg>deja view</b><span class="meta">generated {{.GeneratedAt}} · local file, nothing leaves this machine</span></header>
 <div class="wrap">
 <div class="stats">
 <div class="stat"><b>{{.TotalSessions}}</b><span>sessions</span></div>
