@@ -221,10 +221,16 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		for _, d := range done {
 			info = append(info, fmt.Sprintf("%-*s  %s%-9s%s %s", nameW, d.target, logoBold, d.action, logoReset, logoDim+d.path+logoReset))
 		}
+		mood := moodReady
 		if hint := installIndexHint(dir); hint != "" {
 			info = append(info, "", hint)
+			// wired up with nothing to recall yet: the cat has no reason to be
+			// awake until some history exists
+			if strings.HasPrefix(hint, "no agent history found") {
+				mood = moodAsleep
+			}
 		}
-		printLogo(os.Stdout, info)
+		printLogoMood(os.Stdout, info, mood)
 	}
 	return nil
 }
