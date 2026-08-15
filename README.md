@@ -41,9 +41,9 @@ deja install --auto
 
 <p align="center"><img src="assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
 
-That is the whole setup. The second command wires MCP recall into every agent it finds and
-turns on session-start recall where the agent supports it, then builds the first index, so
-the next session starts instant rather than paying for the build.
+Ten seconds to install, about ten to index, and it is useful. The second command wires MCP
+recall into every agent it finds, turns on session-start recall where the agent supports
+it, and builds the first index so the next session does not pay for it.
 
 Start a new agent session and ask it something you worked on months ago:
 
@@ -83,14 +83,14 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 ## What you get
 
-Seventeen coding agents write every conversation to local files. deja turns those files
-into a memory layer that any of them can read.
+**Solve it in Codex. Claude remembers.** Seventeen coding agents write every conversation
+to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
 | --- | --- |
 | **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
-| **Cross-agent recall** | Solve it in Codex, Claude remembers. The MCP `recall` tool answers *"we fixed this three weeks ago"* instead of re-debugging it. |
-| **It survives compaction** | Measured over 43 compactions: 77% of decisions survive the summary, 0.2% of the commands. deja hands the session its own specifics back. |
+| **Cross-agent recall** | The MCP `recall` tool answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
+| **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8%. |
 | **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
 | **It knows what held** | `deja promote <id> --state rejected --note "why"` marks a decision you reverted. Every later hit for that session shows it was tried and rejected, with the reason. Nothing is deleted, and `--state accepted` takes the mark back. |
@@ -280,21 +280,28 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 **Does anything leave my machine?** No, unless you ask it to. See the
 [data flows](docs/SECURITY-MODEL.md#data-flows).
 
-**How is this different from cass?**
-[cass](https://github.com/Dicklesworthstone/coding_agent_session_search) is the
-kitchen-sink take on session search: 22 providers, Rust, optional embeddings, a TUI. deja
-is the opposite bet, one small Go binary with pure lexical search over seventeen harnesses
-and zero setup, plus the memory-layer pieces around it.
-
-**And from engram, MemPalace, Mem0, Letta?**
-Those record forward. [engram](https://github.com/Gentleman-Programming/engram) is the
-strongest of them, but it starts empty and only knows what an agent chose to save. The
-platforms add a Python runtime, embedding models and a vector store on top of the same
-limitation. deja has no capture step and no stack: the transcripts are the memory, so it
-knows your history from day one, including everything from before you installed it.
-
 **What about secrets already in my logs?** They stay in the original harness files, which
 are your agent's data. They do not enter deja's index, digests, shares or sync exports.
+
+**Will it slow my agent down?** A recall is a lexical lookup against a local index:
+~1.5 ms median. Nothing waits on a model.
+
+**Do I have to change how I work?** No. The agent calls recall itself, and with
+auto-recall it already knows the project's prior decisions when the session opens.
+
+**How is this different from the other memory tools?**
+
+| | deja | Memory platforms<br>(Mem0, Letta, memU) | Session search<br>(cass) |
+| --- | :-: | :-: | :-: |
+| Knows work from before you installed it | yes | no | yes |
+| Capture step | none, the transcripts are the memory | the agent or your code writes facts | none |
+| Needs an LLM or embedding key | no | yes | optional |
+| Recalls without being asked | at session start and before a tool runs | no | no |
+
+[engram](https://github.com/Gentleman-Programming/engram) is the strongest of the
+record-forward tools and worth your time if that model fits you; it still starts empty and
+knows only what an agent chose to save. The
+[full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers eleven of them.
 
 **What about Windows?** Builds exist and CI runs the suite there. macOS and Linux are the
 battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/deja-vu/issues/9).
