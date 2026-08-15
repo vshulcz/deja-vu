@@ -18,10 +18,16 @@ jobs:
   test:
     name: test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    # windows runs the suite about four times slower than the others and had
+    # Windows runs the suite about four times slower than the others and had
     # grown into the 20-minute cap: the run was cancelled a second after the
     # last package passed.
-    timeout-minutes: 30
+    #
+    # The cap is 45 rather than 30 because a cancelled job never runs its post
+    # steps, so the cache below is never written — the one job that needs a warm
+    # build cache was the one job that could not seed it, and the first cold run
+    # was cancelled at exactly 30m00s every time. One run has to be able to
+    # finish for any of the others to get faster.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -48,14 +54,19 @@ jobs:
       # spending nineteen of its twenty-eight minutes compiling, against a
       # thirty-minute cap, and a cancelled job there prints no test output at
       # all — the silence is the compiler, which reads exactly like a hang.
+      #
+      # The key hashes go.mod, not go.sum: this module has no dependencies and
+      # therefore no go.sum, and hashFiles of a file that does not exist returns
+      # an empty string, which produced `go-Windows--<run id>` carrying no
+      # toolchain identity at all.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ${{ steps.gocache.outputs.build }}
             ${{ steps.gocache.outputs.mod }}
-          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.run_id }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.run_id }}
           restore-keys: |
-            go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
+            go-${{ runner.os }}-${{ hashFiles('go.mod') }}-
             go-${{ runner.os }}-
       - run: go mod verify
       - run: go vet ./...
