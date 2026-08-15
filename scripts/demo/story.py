@@ -27,16 +27,60 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 W, H = 1200, 675
 FPS = 20
 
-BG = (5, 8, 7)
-PH = (74, 240, 139)
-PH_HI = (138, 255, 192)
-PH_DIM = (47, 148, 89)
-AMBER = (255, 180, 84)
-BODY = (169, 203, 182)
-FAINT = (93, 138, 110)
+# The three colours the banner and the SVGs use, plus the greys between them.
+# 103, 208 and 234 in the xterm palette; the same numbers are in cmd/deja/cat.go.
+BG = (11, 15, 16)
+PH = (135, 135, 175)        # coat: the colour the mark is drawn in
+PH_HI = (244, 247, 247)     # what the reader is meant to read
+PH_DIM = (94, 94, 124)      # the same coat, further back
+AMBER = (255, 135, 0)       # recognition, and nothing else
+BODY = (169, 178, 180)
+FAINT = (85, 98, 106)
 COLD = (96, 116, 132)
+FEATURE = (28, 28, 28)      # the cat's eyes
 
 MONO = "/System/Library/Fonts/Menlo.ttc"
+
+
+
+# The mark, drawn from the same 24x22 grid as everything else. Kept here as a
+# literal because scripts/demo has no import path to cmd/deja, and checked by
+# eye against the banner rather than by hand against the numbers.
+CAT_BODY = [
+    "....#............#......",
+    "...###..........###.....",
+    "...####........####.....",
+    "...#####......#####.....",
+    "...################.....",
+    "..##################....",
+    "..##################....",
+    "..###oo########oo###....",
+    "..###oo########oo###....",
+    "..###oo########oo###....",
+    "..##################....",
+    "..########nn########....",
+    "..##################....",
+    "...################.....",
+    "....##############......",
+    ".....############.......",
+    ".....############..##...",
+    ".....############..##...",
+    ".....############..##...",
+    "....##############.##...",
+    "....################....",
+    ".....####....####.......",
+]
+
+
+def draw_cat(d, x, y, px=4):
+    """One rectangle a pixel. At px=4 the sprite is 96x88, which is the size it
+    is shown at on the site."""
+    for r, row in enumerate(CAT_BODY):
+        for c, ch in enumerate(row):
+            fill = {"#": PH, "n": AMBER, "o": FEATURE}.get(ch)
+            if fill:
+                d.rectangle([x + c * px, y + r * px,
+                             x + c * px + px - 1, y + r * px + px - 1], fill=fill)
 
 
 def font(size: int) -> ImageFont.FreeTypeFont:
@@ -89,8 +133,9 @@ def frame() -> tuple[Image.Image, Image.Image, ImageDraw.ImageDraw]:
     d = ImageDraw.Draw(ink)
     # The wordmark sits on every frame: a demo people screenshot should say
     # whose it is without a caption.
-    d.text((56, 44), "deja", font=font(22), fill=PH)
-    d.text((110, 44), "-vu", font=font(22), fill=PH_DIM)
+    draw_cat(d, 52, 30, px=2)
+    d.text((110, 44), "deja", font=font(22), fill=PH_HI)
+    d.text((164, 44), "-vu", font=font(22), fill=PH_DIM)
     return base, ink, d
 
 
