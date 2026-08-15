@@ -819,20 +819,6 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	return metas, matched, anyMatched, termsKnown, matchedTotal, strong, readErr
 }
 
-// loadSessionRecords materializes one session's transcript from the index.
-func loadSessionRecords(dir string, m Manifest, meta SessionMeta) (model.Session, error) {
-	ss, err := scanRecords(dir, m, query.Options{All: true}, nil)
-	if err != nil {
-		return model.Session{}, err
-	}
-	for _, s := range ss {
-		if s.ID == meta.ID && (meta.Harness == "" || s.Harness == meta.Harness) {
-			return s, nil
-		}
-	}
-	return sessionFromMeta(meta), nil
-}
-
 // FirstMatch tries candidate queries in order under ONE lock and manifest
 // read, probes each via exact posting intersection (bucket reads only), and
 // materializes sessions for the first query that matches. Built for the

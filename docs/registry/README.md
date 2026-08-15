@@ -19,6 +19,12 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Goose](goose.md) | legacy JSONL and SQLite session store |
 | [Qwen Code](qwen.md) | JSONL transcript |
 | [pi](pi.md) | JSONL transcript |
+| [Cline](cline.md) | task JSON, two store generations |
+| [Kimi Code](kimi.md) | per-agent wire JSONL |
+| [OpenClaw](openclaw.md) | append-only pi-format JSONL |
+| [Copilot CLI](copilot.md) | session event JSONL |
+| [Roo Code](roo.md) | task JSON in VS Code globalStorage |
+| [Hermes](hermes.md) | SQLite state store |
 
 ## Reporting drift
 

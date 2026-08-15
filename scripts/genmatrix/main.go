@@ -54,13 +54,6 @@ type registry struct {
 	Harnesses []entry `json:"harnesses"`
 }
 
-func mark(b bool) string {
-	if b {
-		return "✅"
-	}
-	return "—"
-}
-
 func handoffMark(kind string) string {
 	switch kind {
 	case "exec":

@@ -7,6 +7,10 @@ linters:
     - govet
     - misspell
     - staticcheck
+    # ten dead symbols had accumulated with nothing to notice them: a mood the
+    # CLI never reaches, three retrieval helpers left by refactors, a regexp the
+    # entropy pass stopped using. Cheap to keep out, invisible to find by eye.
+    - unused
   settings:
     errcheck:
       exclude-functions:

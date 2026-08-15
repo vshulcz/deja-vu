@@ -279,8 +279,6 @@ func closingQuote(open, close string) string {
 // must also sit in a secret-shaped context: the value side of an assignment,
 // or alone on its own line.
 
-var entropyTokenRE = regexp.MustCompile(`[A-Za-z0-9+/_-]{20,}={0,2}`)
-
 // Marker is the prefix every replacement shares. Callers count it to report
 // how much of a document was already scrubbed at index time, since a later
 // pass over redacted text finds nothing left to replace.

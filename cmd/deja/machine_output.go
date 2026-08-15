@@ -29,10 +29,6 @@ type sessionJSON struct {
 	Window        sessionWindow `json:"window"`
 }
 
-func printRecentJSON(w io.Writer, sessions []model.Session, sourceInstance string) error {
-	return printRecentJSONWithheld(w, sessions, sourceInstance, 0)
-}
-
 func printRecentJSONWithheld(w io.Writer, sessions []model.Session, sourceInstance string, withheld int) error {
 	for i := range sessions {
 		sessions[i].Messages = nil

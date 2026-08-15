@@ -17,7 +17,6 @@ var (
 	moodReady     = mark.Ready
 	moodSurprised = mark.Surprised
 	moodAsleep    = mark.Asleep
-	moodNothing   = mark.Nothing
 )
 
 // renderCat prints the sprite as half blocks. A cell takes the colour of the

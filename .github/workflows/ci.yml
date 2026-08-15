@@ -225,6 +225,12 @@ jobs:
       - name: SVG assets match the sprite
         run: go run ./scripts/genlogo -check
 
+      # .gitignore is what stops `go build ./scripts/<name>` binaries riding
+      # along in a commit, and it had drifted seven names short of the packages
+      # it claimed to cover.
+      - name: Every scripts/ binary is ignored
+        run: go run ./scripts/ignorecheck
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest

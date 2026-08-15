@@ -324,10 +324,6 @@ func alreadyCalled(req request) bool {
 	return false
 }
 
-func (s *server) record(path string, msgs []message) {
-	s.recordWith(path, msgs, nil)
-}
-
 // recordWith also stores the tool names the request declared. Without them a
 // run that produced no tool call is unreadable: it looks the same whether the
 // harness offered nothing, offered something under a name the mock did not

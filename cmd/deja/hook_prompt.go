@@ -30,11 +30,6 @@ const promptHookBudget = 1024
 // rememberable episode. Marathon catch-all sessions rank into everything.
 const dejaVuMaxMessages = 300
 
-// dejaVuMinAge withholds work the user plausibly still remembers. Named so the
-// benchmark can apply the same rule; a benchmark that skips a gate reports a
-// recall nobody would see.
-const dejaVuMinAge = 15 * time.Minute
-
 type promptHookInput struct {
 	Prompt    hookPromptText `json:"prompt"`
 	SessionID string         `json:"session_id"`

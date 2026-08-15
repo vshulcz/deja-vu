@@ -1360,15 +1360,6 @@ func pluralS(n int) string {
 	return "s"
 }
 
-// derivedTitle is the title read out of the transcript, redacted and then cut.
-// The order matters: cutting first slices a secret in half, and half a pattern
-// matches nothing, so the plaintext prefix survives into sessions.gob and onto
-// every page that prints a title. The import path already redacts first.
-func derivedTitle(s model.Session) string {
-	t, _ := redact.Text(sessionTitle(s))
-	return truncateTitle(t, 60)
-}
-
 func sessionTitle(s model.Session) string {
 	t, _ := sessionTitleFrom(s)
 	return t
@@ -2255,10 +2246,6 @@ func pluralFiles(n int) string {
 }
 
 func currentFiles(h string) map[string]FileState {
-	return currentFilesWith(h, nil)
-}
-
-func currentFilesStat(h string) map[string]FileState {
 	return currentFilesWith(h, nil)
 }
 
