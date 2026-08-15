@@ -38,6 +38,11 @@ const cardInner = 56
 var heatRamp = [4]int{60, 103, 146, 189}
 
 const (
+	// Amber is the accent deja keeps for the one thing worth recognising. A
+	// card with none of it is a flat wash of coat blue, and a card with it
+	// everywhere is a fairground.
+	cardAccent = mark.Accent
+
 	heatEmpty  = 235
 	cardDim    = 244
 	cardFaint  = 240
@@ -85,6 +90,7 @@ func statsCardLines(r stats.Report) []string {
 	var body []string
 	add := func(lines ...string) { body = append(body, lines...) }
 
+	dateSpanText = dateSpan(r)
 	add(headBlock(r)...)
 	add("")
 	add(sectionRule("ACTIVITY"))
@@ -103,18 +109,22 @@ func statsCardLines(r stats.Report) []string {
 // rather than under it.
 func headBlock(r stats.Report) []string {
 	art := renderCat(moodReady)
-	punchLines := wrapTo(cardPunchline(r), cardInner-26)
+	value, caption := heroStat(r)
+	lines := wrapTo(caption, cardInner-26)
+
 	right := []string{
 		paint(cardBright, "deja-vu") + paint(cardFaint, "  ·  ") + paint(cardDim, "agent history"),
 		"",
-		punchLines[0],
-		punchLines[1],
+	}
+	right = append(right, bigNumber(value, cardAccent, cardInner-26)...)
+	right = append(right,
+		paint(cardDim, visibleText(lines[0])),
+		paint(cardDim, visibleText(lines[1])),
 		"",
 		figures(r),
 		figureLabels(r),
-		"",
-		paint(cardFaint, dateSpan(r)),
-	}
+	)
+
 	var out []string
 	for i, line := range art {
 		text := ""
@@ -155,6 +165,30 @@ func wrapTo(s string, width int) [2]string {
 	}
 	return [2]string{paint(cardBright, head), paint(cardBright, tail)}
 }
+
+// heroStat is the one figure the card is about, and the sentence that says what
+// it counts. Splitting them is what buys a hierarchy: the number takes the
+// accent and a line to itself, the sentence becomes its caption.
+//
+// cardPunchline keeps the whole sentence for the SVG, where type sizes do the
+// same job.
+func heroStat(r stats.Report) (string, string) {
+	switch {
+	case r.WeekRecalls > 0:
+		return formatStatNumber(r.WeekRecalls), "recalls handed to your agents this week"
+	case r.RepeatQuestions > 0:
+		return formatStatNumber(r.RepeatQuestions), "questions you asked more than once"
+	case r.Recall.Recalls+r.Recall.Injections > 0:
+		handed := r.Recall.Recalls + r.Recall.Injections
+		return formatStatNumber(handed), "recalls handed to your agents"
+	case r.TotalSessions > 0:
+		return formatStatNumber(r.TotalSessions), "sessions of agent history, all searchable"
+	default:
+		return "", "nothing indexed yet — run deja index"
+	}
+}
+
+func visibleText(s string) string { return ansiRE.ReplaceAllString(s, "") }
 
 func dateSpan(r stats.Report) string {
 	start, end := valueOrDash(r.DateRange.Start), valueOrDash(r.DateRange.End)
@@ -243,21 +277,20 @@ func heatLines(hm stats.HeatmapStats) []string {
 		return []string{paint(cardFaint, "no sessions in the last year")}
 	}
 
-	// Two columns per week when the history is short, one when it is long. A
-	// grid that filled a third of the card read as unfinished; this fills it
-	// either way, and a week is still a week — only its drawn width moves.
+	// Widen the cell to fill the card rather than extending the window: the
+	// first version walked the start back toward the beginning of the year,
+	// which put back exactly the empty weeks the trimming had just removed.
+	span := len(weeks) - first
 	cell := 1
-	if len(weeks)-first <= cardInner/2 {
-		cell = 2
-	}
-	// With the width settled, walk the start back toward the beginning of the
-	// year for as much real history as the card can hold.
-	if room := cardInner / cell; len(weeks)-first < room {
-		first = len(weeks) - room
-		if first < 0 {
-			first = 0
+	if span > 0 {
+		if cell = cardInner / span; cell > 3 {
+			cell = 3
 		}
-	} else {
+		if cell < 1 {
+			cell = 1
+		}
+	}
+	if room := cardInner / cell; span > room {
 		first = len(weeks) - room
 	}
 	weeks = weeks[first:]
@@ -274,8 +307,11 @@ func heatLines(hm stats.HeatmapStats) []string {
 	// Seven days is odd, so the last row carries one day over an empty one.
 	for d := 0; d < 7; d += 2 {
 		var b strings.Builder
+		// Plain spaces rather than empty cells: a drawn grey slab standing
+		// for the time before someone's history began is the same dead
+		// rectangle this trimming was meant to remove.
 		if lead > 0 {
-			b.WriteString(bgColour(heatEmpty) + strings.Repeat(" ", lead) + logoReset)
+			b.WriteString(strings.Repeat(" ", lead))
 		}
 		for _, week := range weeks {
 			top := termHeat(week[d], hm.Max)
@@ -316,12 +352,14 @@ func agentBlock(r stats.Report) []string {
 			ranked[j], ranked[j-1] = ranked[j-1], ranked[j]
 		}
 	}
-	if len(ranked) > 5 {
-		other := stats.HarnessStats{Harness: "other"}
-		for _, h := range ranked[5:] {
-			other.Sessions += h.Sessions
+	// Six rows where five carry a single cell of bar is one fact stretched
+	// down the card. Three, and a count of what is left.
+	rest := 0
+	if len(ranked) > 3 {
+		for _, h := range ranked[3:] {
+			rest += h.Sessions
 		}
-		ranked = append(ranked[:5:5], other)
+		ranked = ranked[:3:3]
 	}
 
 	name, count := 0, 0
@@ -351,19 +389,39 @@ func agentBlock(r stats.Report) []string {
 			strings.Repeat(" ", bar-width),
 			paint(cardBright, leftPad(formatStatNumber(h.Sessions), count))))
 	}
+	if rest > 0 {
+		out = append(out, paint(cardFaint, fmt.Sprintf("and %s more across the rest",
+			formatStatNumber(rest))))
+	}
 	return out
 }
+
+// dateSpanText is set by the card before the footer is drawn. A package-level
+// value rather than a parameter because footer() is called from frame(), which
+// has no report.
+var dateSpanText string
 
 // footer is what makes a screenshot say where it came from. Dim enough not to
 // compete with the figures, and the last thing inside the border.
 func footer() string {
+	const right = "vshulcz.github.io/deja-vu"
 	left := "deja stats --card"
 	// A build with no version stamped calls itself "dev", and "vdev" in a
 	// footer reads as a typo rather than as a local build.
 	if version != "" && version != "dev" {
 		left += " · v" + version
 	}
-	right := "vshulcz.github.io/deja-vu"
+	// The date range lives here rather than in the head: the head ran one line
+	// longer than the mark beside it and dropped its last entry with nothing to
+	// say so. It reads better next to the provenance anyway.
+	//
+	// It is the first thing to go when the line will not fit. A footer that
+	// overflows pushes the right border off the card, and the border is the
+	// thing that makes this a card at all.
+	if span := dateSpanText; span != "" &&
+		len(left)+len(span)+len(right)+6 <= cardInner {
+		left += "  ·  " + span
+	}
 	gap := cardInner - len(left) - len(right)
 	if gap < 1 {
 		gap = 1

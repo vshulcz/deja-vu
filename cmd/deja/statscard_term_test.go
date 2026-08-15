@@ -17,6 +17,12 @@ func sampleReport() stats.Report {
 			{Harness: "codex", Sessions: 32},
 		},
 	}
+	// A real report carries a date range, and the footer grows by it. Without
+	// one here the straight-border test passed while the shipped card pushed
+	// its right edge eight columns off the frame.
+	r.DateRange.Start = "2026-04-18"
+	r.DateRange.End = "2026-08-15"
+	r.WeekRecalls = 70
 	r.Heatmap.Max = 8
 	r.Heatmap.Weeks = make([][7]int, 53)
 	for w := 40; w < 53; w++ {
@@ -112,8 +118,6 @@ func TestCardPunchlineWrapsRatherThanTruncating(t *testing.T) {
 		t.Errorf("the end of the sentence was dropped: %q", joined)
 	}
 }
-
-func visibleText(s string) string { return ansiRE.ReplaceAllString(s, "") }
 
 // An empty report must still produce a card rather than a panic: a first run
 // with nothing indexed is exactly when someone tries this.
