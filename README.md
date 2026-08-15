@@ -9,12 +9,12 @@
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
-<p align="center"><em>The same question, the same agent, once without memory and once with deja. Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></p>
+<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></sub></p>
 
 <p align="center">
 <b>Every memory tool starts empty and records forward. deja starts full.</b><br>
-It indexes the sessions your coding agents already wrote to disk — months of history from
-before you installed it — and serves them back to any agent over MCP.
+It indexes the sessions your agents already wrote to disk, including everything from
+before you installed it, and serves them back over MCP.
 </p>
 
 <p align="center">

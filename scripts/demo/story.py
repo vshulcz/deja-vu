@@ -24,7 +24,7 @@ import math
 import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-W, H = 1200, 675
+W, H = 1200, 560
 FPS = 20
 
 # The three colours the banner and the SVGs use, plus the greys between them.
@@ -188,9 +188,9 @@ def column(d, x, w, title, colour, lines, t: float, start: float, body_font):
     head = ease((t - start) / 0.35)
     if head <= 0:
         return
-    d.text((x, 150), title, font=font(21), fill=dim(colour, head))
-    d.line([(x, 186), (x + w * head, 186)], fill=dim(colour, head), width=2)
-    y = 224
+    d.text((x, 168), title, font=font(21), fill=dim(colour, head))
+    d.line([(x, 204), (x + w * head, 204)], fill=dim(colour, head), width=2)
+    y = 242
     for i, (line, fill, size, accent) in enumerate(lines):
         a = ease((t - start - 0.45 - i * 0.42) / 0.4)
         if a <= 0:
@@ -246,7 +246,7 @@ def scene_split(t: float):
     # The divider sweeps down as the second column is about to answer.
     sweep = ease((t - 2.05) / 0.45)
     if sweep > 0:
-        d.line([(586, 150), (586, 150 + 300 * sweep)], fill=dim(PH_DIM, 0.8), width=1)
+        d.line([(586, 168), (586, 168 + 214 * sweep)], fill=dim(PH_DIM, 0.8), width=1)
 
     column(d, right_x, colw, "WITH DEJA", PH, [
         ("\u201cYes. Nov 29 2025, payments repo.", PH_HI, "body", "Nov 29 2025"),
@@ -263,7 +263,7 @@ def scene_split(t: float):
 def scene_decision(t: float):
     """What was handed back: not the symptom, the decision."""
     base, ink, d = frame()
-    centred(d, 118, "what deja handed back", font(20), FAINT)
+    centred(d, 96, "what deja handed back", font(20), FAINT)
     lines = [
         ("pgx v5.5 changed prepared-statement caching.", BODY, 26),
         ("pgbouncer cannot hold those across connections.", BODY, 26),
@@ -271,7 +271,7 @@ def scene_decision(t: float):
         ("we pinned pgx 5.4.3", AMBER, 34),
         ("revisit when pgbouncer 1.24 ships support", PH, 26),
     ]
-    y = 190
+    y = 162
     for i, (text, fill, size) in enumerate(lines):
         if t < 0.25 + i * 0.28:
             break
@@ -279,7 +279,7 @@ def scene_decision(t: float):
             centred(d, y, text, font(size), fill)
         y += size + 26
     if t > 1.9:
-        centred(d, 560, "a decision from eight months ago · reused, not re-derived", font(20), AMBER)
+        centred(d, 452, "a decision from eight months ago · reused, not re-derived", font(20), AMBER)
     return glow(base, ink)
 
 
@@ -287,22 +287,22 @@ def scene_cta(t: float):
     base, ink, d = frame()
     a = ease(min(1.0, t / 0.6))
     if a > 0:
-        centred(d, 176, "Your agents already solved this.", font(38), BODY)
-        centred(d, 228, "deja finds it.", font(38), PH_HI)
+        centred(d, 136, "Your agents already solved this.", font(38), BODY)
+        centred(d, 188, "deja finds it.", font(38), PH_HI)
     if t > 0.7:
         # No harness count here. Nothing rebuilds this GIF and no test reads it,
         # so a number that moves every release would go quietly wrong. What is
         # left is architecture, which does not.
-        centred(d, 330, "no LLM  ·  no embeddings  ·  nothing leaves your machine", font(20), FAINT)
-        centred(d, 366, "one binary  ·  nothing leaves your machine", font(20), FAINT)
+        centred(d, 274, "one binary  ·  no LLM  ·  no embeddings", font(20), FAINT)
+        centred(d, 310, "nothing leaves your machine", font(20), FAINT)
     if t > 1.1:
         cmd = "brew install vshulcz/tap/deja-vu"
         f = font(26)
         w = d.textlength(cmd, font=f)
-        d.rounded_rectangle([(W - w) / 2 - 28, 438, (W + w) / 2 + 28, 500], radius=10,
+        d.rounded_rectangle([(W - w) / 2 - 28, 368, (W + w) / 2 + 28, 430], radius=10,
                             outline=PH_DIM, width=2)
-        d.text(((W - w) / 2, 452), cmd, font=f, fill=PH_HI)
-        centred(d, 534, "github.com/vshulcz/deja-vu", font(20), FAINT)
+        d.text(((W - w) / 2, 382), cmd, font=f, fill=PH_HI)
+        centred(d, 466, "github.com/vshulcz/deja-vu", font(20), FAINT)
     return glow(base, ink)
 
 
