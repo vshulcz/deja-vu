@@ -5,13 +5,23 @@
   </picture>
 </p>
 
-<p align="center"><strong>Your agents already solved this. deja finds it.</strong></p>
+<p align="center"><strong>Your agent is about to re-debug something you fixed in March.</strong></p>
 
-<p align="center">Memory tools start empty and record forward. deja starts full. It indexes the sessions your coding agents already wrote to disk, including months of history from before you installed it, and serves them back to any agent over MCP.</p>
+<p align="center"><img src="assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
-<p align="center">One Go binary. No LLM, no embeddings, no API key, nothing leaves the machine.</p>
+<p align="center"><em>The same question, the same agent, once without memory and once with deja. Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a></p>
+<p align="center">
+<b>Every memory tool starts empty and records forward. deja starts full.</b><br>
+It indexes the sessions your coding agents already wrote to disk — months of history from
+before you installed it — and serves them back to any agent over MCP.
+</p>
+
+<p align="center">
+<b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>~1.5&nbsp;ms</b> median search over 3.5&nbsp;GB<br>
+<sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
+</p>
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -22,14 +32,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><img src="assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
-
-<p align="center"><em>Every line is quoted from two real Claude Code sessions: the same question, the same agent, once without memory and once with deja. Nobody searched anything. The agent called deja itself.</em></p>
-
-<p align="center">
-<b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>~1.5&nbsp;ms</b> median search over 3.5&nbsp;GB<br>
-<sub>Both harnesses ship in this repo and run on the public datasets in minutes. <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Check the numbers yourself.</a></sub>
-</p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a></p>
 
 ## Install
 
@@ -61,7 +64,14 @@ One bundle installs into six harnesses. The [agent setup guide](https://vshulcz.
 covers the rest: what each harness supports, aider's read-only context file, and the
 Windows `cmd /c deja mcp` wrapper.
 
+<details>
+<summary>What gets written into each agent's own guidance file</summary>
+
 Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes and Roo Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
+
+</details>
+
+<p align="center"><img src="assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
 
 That's it. Next session, ask your agent:
 
@@ -79,10 +89,10 @@ into a memory layer that any of them can read.
 | --- | --- |
 | **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
 | **Cross-agent recall** | Solve it in Codex, Claude remembers. The MCP `recall` tool answers *"we fixed this three weeks ago"* instead of re-debugging it. |
+| **It survives compaction** | Measured over 43 compactions: 77% of decisions survive the summary, 0.2% of the commands. deja hands the session its own specifics back. |
 | **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
 | **It knows what held** | `deja promote <id> --state rejected --note "why"` marks a decision you reverted. Every later hit for that session shows it was tried and rejected, with the reason. Nothing is deleted, and `--state accepted` takes the mark back. |
-| **It survives compaction** | Measured over 43 compactions: 77% of decisions survive the summary, 0.2% of the commands. deja hands the session its own specifics back. |
 | **It says when the ground moved** | A hit reports *4 files this session touched have changed since*, and says nothing when it cannot tell. It never claims anything is unchanged. |
 | **Sync and handoff** | `deja sync ssh laptop` moves memory between machines, append-only, no cloud in the middle. `deja handoff --to codex` packages the live context so you can continue in another agent. |
 | **Redaction** | Keys, tokens, JWTs and private key blocks are stripped at index time, so the cache is safe to keep. |

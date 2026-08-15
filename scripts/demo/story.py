@@ -279,7 +279,10 @@ def scene_cta(t: float):
         centred(d, 176, "Your agents already solved this.", font(38), BODY)
         centred(d, 228, "deja finds it.", font(38), PH_HI)
     if t > 0.7:
-        centred(d, 330, "seventeen coding agents  ·  84.9% hit@1  ·  no LLM, no embeddings", font(20), FAINT)
+        # No harness count here. Nothing rebuilds this GIF and no test reads it,
+        # so a number that moves every release would go quietly wrong. What is
+        # left is architecture, which does not.
+        centred(d, 330, "no LLM  ·  no embeddings  ·  nothing leaves your machine", font(20), FAINT)
         centred(d, 366, "one binary  ·  nothing leaves your machine", font(20), FAINT)
     if t > 1.1:
         cmd = "brew install vshulcz/tap/deja-vu"
