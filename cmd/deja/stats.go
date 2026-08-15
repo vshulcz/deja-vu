@@ -66,7 +66,9 @@ func runStats(dir string, args []string) error {
 				return fmt.Errorf("stats: --card specified twice")
 			}
 			card = true
-			cardPath = "deja-stats.svg"
+			// No path means the terminal. The SVG is for the places a
+			// terminal cannot reach — a profile README, a post — and asking
+			// for one of those is what naming a file is.
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				var note string
 				cardPath, note = cardFileName(args[i+1])
@@ -118,7 +120,9 @@ func runStats(dir string, args []string) error {
 	// indexing chatter off stdout/stderr and show one quiet status line instead.
 	progress := io.Writer(os.Stderr)
 	if cardPath != "" {
-		fmt.Fprintln(os.Stderr, "deja: preparing your stats card …")
+		if cardPath != "" {
+			fmt.Fprintln(os.Stderr, "deja: preparing your stats card …")
+		}
 		progress = io.Discard
 	}
 	if err := index.Ensure(dir, "", false, progress); err != nil {
@@ -165,6 +169,11 @@ func runStats(dir string, args []string) error {
 	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(dir)
 	if fi, e := os.Stat(embed.Path(dir)); e == nil {
 		report.SidecarSize = fi.Size()
+	}
+	if card && cardPath == "" {
+		printStatsCard(os.Stdout, report)
+		fmt.Fprintf(os.Stdout, "\n%s\n", "for a README or a post: deja stats --card deja-stats.svg")
+		return nil
 	}
 	if cardPath != "" {
 		path, err := writeStatsCard(cardPath, report)

@@ -160,7 +160,7 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja view` | Your whole memory as one local HTML file. No server, nothing leaves the machine. |
-| `deja stats` | Your agent work, wrapped. `--card` writes an SVG for a profile, `--html` a browsable timeline. |
+| `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
