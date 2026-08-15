@@ -22,7 +22,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><img src="assets/demo.gif" alt="The same question asked twice in Claude Code: without deja the agent has no record of it, with deja it answers with the decision from eight months earlier"></p>
+<p align="center"><img src="assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
 <p align="center"><em>Every line is quoted from two real Claude Code sessions: the same question, the same agent, once without memory and once with deja. Nobody searched anything. The agent called deja itself.</em></p>
 
