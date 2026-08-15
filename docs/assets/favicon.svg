@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="deja-vu">
-  <!-- Drawn at 14x12 rather than scaled down from the mark: the squint and the
-       sparkle are single pixels there, and a 16px tab strip eats them. -->
-    <path fill="#8787af" d="M19 10h9v9h-9ZM100 10h9v9h-9ZM19 19h18v9h-18ZM91 19h18v9h-18ZM10 28h108v9h-108ZM10 37h108v9h-108ZM10 46h9v9h-9ZM37 46h54v9h-54ZM109 46h9v9h-9ZM10 55h9v9h-9ZM37 55h54v9h-54ZM109 55h9v9h-9ZM10 64h45v9h-45ZM73 64h45v9h-45ZM10 73h108v9h-108ZM19 82h108v9h-108ZM28 91h72v9h-72ZM109 91h18v9h-18ZM28 100h72v9h-72ZM109 100h18v9h-18ZM19 109h27v9h-27ZM82 109h27v9h-27Z"/>
-    <path fill="#1c1c1c" d="M19 46h18v9h-18ZM91 46h18v9h-18ZM19 55h18v9h-18ZM91 55h18v9h-18Z"/>
-    <path fill="#ff8700" d="M55 64h18v9h-18Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="deja-vu">
+  <!-- Drawn at 14x12 rather than scaled down from the mark: the eyes and the
+       nose are single pixels there, and a 16px tab strip eats them. -->
+    <path fill="#8787af" d="M3 2h1v1h-1ZM12 2h1v1h-1ZM3 3h2v1h-2ZM11 3h2v1h-2ZM2 4h12v1h-12ZM2 5h12v1h-12ZM2 6h1v1h-1ZM5 6h6v1h-6ZM13 6h1v1h-1ZM2 7h1v1h-1ZM5 7h6v1h-6ZM13 7h1v1h-1ZM2 8h5v1h-5ZM9 8h5v1h-5ZM2 9h12v1h-12ZM3 10h12v1h-12ZM4 11h8v1h-8ZM13 11h2v1h-2ZM4 12h8v1h-8ZM13 12h2v1h-2ZM3 13h3v1h-3ZM10 13h3v1h-3Z"/>
+    <path fill="#1c1c1c" d="M3 6h2v1h-2ZM11 6h2v1h-2ZM3 7h2v1h-2ZM11 7h2v1h-2Z"/>
+    <path fill="#ff8700" d="M7 8h2v1h-2Z"/>
 </svg>
