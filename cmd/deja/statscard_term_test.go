@@ -31,9 +31,22 @@ func sampleReport() stats.Report {
 func TestCardDrawsTheFiguresAndTheAgents(t *testing.T) {
 	out := strings.Join(statsCardLines(sampleReport()), "\n")
 	for _, want := range []string{"deja-vu", "1,225", "139,970", "sessions", "messages",
-		"agents", "TOP AGENTS", "opencode", "1013"} {
+		"agents", "WHERE IT CAME FROM", "opencode", "1,013", "ACTIVITY"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the card never shows %q", want)
+		}
+	}
+}
+
+// Every line has to be the same width or the right border walks down the page,
+// and the bytes in a coloured string say nothing about how wide it prints.
+func TestCardBorderIsStraight(t *testing.T) {
+	lines := statsCardLines(sampleReport())
+	want := visibleLen(lines[0])
+	for i, line := range lines {
+		if got := visibleLen(line); got != want {
+			t.Errorf("line %d prints %d columns, the top border prints %d:\n%s",
+				i, got, want, line)
 		}
 	}
 }
@@ -41,9 +54,8 @@ func TestCardDrawsTheFiguresAndTheAgents(t *testing.T) {
 // The agents are ranked, not printed in whatever order the report held them:
 // a card that lists the smallest first says the wrong thing about the history.
 func TestCardRanksAgentsBySessions(t *testing.T) {
-	out := statsCardLines(sampleReport())
 	var order []string
-	for _, line := range out {
+	for _, line := range statsCardLines(sampleReport()) {
 		for _, name := range []string{"opencode", "claude", "codex"} {
 			if strings.Contains(line, name) {
 				order = append(order, name)
@@ -61,32 +73,60 @@ func TestCardRanksAgentsBySessions(t *testing.T) {
 	}
 }
 
-// The heatmap starts where the history does. Drawing the empty half of a year
-// spends most of the card on a grey rectangle standing for nothing.
-func TestCardHeatmapSkipsTheEmptyRunUpFront(t *testing.T) {
-	lines := heatLines(sampleReport().Heatmap)
-	if len(lines) == 0 {
-		t.Fatal("no heatmap drawn")
-	}
-	// four rows of half blocks for seven days, plus the month labels
-	if len(lines) != 5 {
-		t.Errorf("heatmap is %d lines, want 5", len(lines))
-	}
-	for _, line := range lines[1:] {
-		if n := strings.Count(line, "▀"); n > 20 {
-			t.Errorf("heatmap draws %d weeks; the report has 13 with anything in them", n)
+// The grid fills the card at either cell width. Sized to the data alone it took
+// a third of the width and read as unfinished; padded to the full year it was
+// mostly a grey rectangle standing for history that does not exist.
+func TestCardHeatmapFillsTheCard(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		weeks int
+	}{{"a short history", 13}, {"a full year", 53}} {
+		r := stats.Report{}
+		r.Heatmap.Max = 8
+		r.Heatmap.Weeks = make([][7]int, 53)
+		for w := 53 - tc.weeks; w < 53; w++ {
+			r.Heatmap.Weeks[w][0] = 3
+		}
+		lines := heatLines(r.Heatmap)
+		if len(lines) != 5 {
+			t.Fatalf("%s: heatmap is %d lines, want four rows and the labels", tc.name, len(lines))
+		}
+		for i, line := range lines[:4] {
+			if got := visibleLen(line); got != cardInner {
+				t.Errorf("%s: grid row %d prints %d columns, want %d", tc.name, i, got, cardInner)
+			}
 		}
 	}
 }
 
+// The punchline is the only sentence on the card. Cutting it at the width
+// produced "deja handed your agents", which is not a shorter sentence.
+func TestCardPunchlineWrapsRatherThanTruncating(t *testing.T) {
+	const line = "deja handed your agents memory 70 times this week."
+	got := wrapTo(line, cardInner-26)
+	joined := visibleText(got[0]) + " " + visibleText(got[1])
+	if !strings.HasPrefix(line, strings.TrimSpace(visibleText(got[0]))) {
+		t.Fatalf("first line %q is not the start of the sentence", got[0])
+	}
+	if !strings.Contains(joined, "this week") {
+		t.Errorf("the end of the sentence was dropped: %q", joined)
+	}
+}
+
+func visibleText(s string) string { return ansiRE.ReplaceAllString(s, "") }
+
 // An empty report must still produce a card rather than a panic: a first run
 // with nothing indexed is exactly when someone tries this.
 func TestCardSurvivesAnEmptyReport(t *testing.T) {
-	out := strings.Join(statsCardLines(stats.Report{}), "\n")
-	if out == "" {
-		t.Fatal("empty report produced no card at all")
-	}
+	lines := statsCardLines(stats.Report{})
+	out := strings.Join(lines, "\n")
 	if !strings.Contains(out, "deja-vu") {
 		t.Error("even an empty card should carry the mark")
+	}
+	want := visibleLen(lines[0])
+	for i, line := range lines {
+		if got := visibleLen(line); got != want {
+			t.Errorf("empty card line %d prints %d columns, want %d", i, got, want)
+		}
 	}
 }

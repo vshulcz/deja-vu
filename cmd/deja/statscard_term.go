@@ -16,6 +16,16 @@ import (
 // arrives as a file they have to go and open. The terminal is the surface the
 // rest of deja lives on, so that is where this belongs; the SVG stays for the
 // places a terminal cannot go, like a profile README.
+//
+// It is framed and fixed-width on purpose. Unframed output is a log; a border
+// and a footer are what make a screenshot read as one object that came from
+// somewhere, which is the whole point of a card.
+
+// cardInner is the width inside the border. Fifty-six holds a year of weeks
+// with room to breathe, and fixing it keeps the layout still: sized to the
+// data, the card jumped between a third of the width and all of it depending on
+// how much history someone had.
+const cardInner = 56
 
 // The heatmap ramp: four steps in the coat's own hue, because the terminal has
 // no opacity and fading a colour toward the background by hand is what makes a
@@ -27,7 +37,17 @@ import (
 // field and none of the four steps could be told from another.
 var heatRamp = [4]int{60, 103, 146, 189}
 
-const heatEmpty = 235
+const (
+	heatEmpty  = 235
+	cardDim    = 244
+	cardFaint  = 240
+	cardBright = 231
+	cardRule   = 238
+)
+
+func termFG(n int) string { return "\x1b[38;5;" + strconv.Itoa(n) + "m" }
+
+func paint(colour int, s string) string { return termFG(colour) + s + logoReset }
 
 func weekTotal(week [7]int) int {
 	total := 0
@@ -59,54 +79,81 @@ func termHeat(count, max int) int {
 	}
 }
 
-// dim and bright are the two text weights the card uses; the numbers get bright
-// and everything naming them gets dim, so the eye lands on the figures.
-const (
-	cardDim    = 244
-	cardBright = 231
-)
-
-func termFG(n int) string { return "\x1b[38;5;" + strconv.Itoa(n) + "m" }
-
-func paint(colour int, s string) string { return termFG(colour) + s + logoReset }
-
-// termCardWidth is the widest the card gets: a year of weeks is 53 columns, and
-// the rest is laid out around that rather than the other way round.
-const termCardWidth = 53
-
-// renderStatsCard writes the card as lines of text. It returns lines rather
-// than printing so the caller can frame or indent them, and so a test can read
-// what it drew without a terminal.
+// statsCardLines returns the finished card, border included. Lines rather than
+// output so a test can read what it drew without a terminal.
 func statsCardLines(r stats.Report) []string {
-	var out []string
-	art := renderCat(moodReady)
+	var body []string
+	add := func(lines ...string) { body = append(body, lines...) }
 
-	head := []string{
-		paint(cardBright, "deja-vu") + "  " + paint(cardDim, "agent history"),
-		"",
-		cardPunchline(r),
-		"",
-		paint(cardDim, dateSpan(r)),
+	add(headBlock(r)...)
+	add("")
+	add(sectionRule("ACTIVITY"))
+	add(heatLines(r.Heatmap)...)
+	if agents := agentBlock(r); len(agents) > 0 {
+		add("")
+		add(sectionRule("WHERE IT CAME FROM"))
+		add(agents...)
 	}
-	// The figures sit in the cat's lower half rather than under it: eleven
-	// lines of animal beside three lines of text left a blank band down the
-	// right, which is the same hole the demo had.
-	head = append(head, "", "")
-	head = append(head, strings.Split(statRow(r), "\n")...)
+	return frame(body, footer())
+}
+
+// headBlock is the mark with the identity, the one sentence, and the figures
+// beside it. Eleven lines of animal next to three lines of text left a blank
+// band down the right — the same hole the demo had — so the figures live here
+// rather than under it.
+func headBlock(r stats.Report) []string {
+	art := renderCat(moodReady)
+	punchLines := wrapTo(cardPunchline(r), cardInner-26)
+	right := []string{
+		paint(cardBright, "deja-vu") + paint(cardFaint, "  ·  ") + paint(cardDim, "agent history"),
+		"",
+		punchLines[0],
+		punchLines[1],
+		"",
+		figures(r),
+		figureLabels(r),
+		"",
+		paint(cardFaint, dateSpan(r)),
+	}
+	var out []string
 	for i, line := range art {
 		text := ""
-		if i < len(head) {
-			text = head[i]
+		if i < len(right) {
+			text = right[i]
 		}
 		out = append(out, strings.TrimRight(line+"  "+text, " "))
 	}
-	out = append(out, "")
-	out = append(out, heatLines(r.Heatmap)...)
-	if top := topAgents(r); len(top) > 0 {
-		out = append(out, "")
-		out = append(out, top...)
-	}
 	return out
+}
+
+// wrapTo folds the punchline to two lines. The first version cut it at the
+// width instead, which produced "deja handed your agents" — not a shorter
+// sentence but a different one, and the sentence is the part worth reading.
+func wrapTo(s string, width int) [2]string {
+	if visibleLen(s) <= width {
+		return [2]string{paint(cardBright, s), ""}
+	}
+	cut := strings.LastIndex(s[:width], " ")
+	if cut <= 0 {
+		cut = width
+	}
+	head, tail := s[:cut], strings.TrimSpace(s[cut:])
+	// If the tail overflows, take a word off the head first: the sentence
+	// ending is what carries the meaning, and losing it silently is what the
+	// truncating version did.
+	for visibleLen(tail) > width {
+		c := strings.LastIndex(head, " ")
+		if c <= 0 {
+			break
+		}
+		head, tail = head[:c], strings.TrimSpace(head[c:]+" "+tail)
+	}
+	if visibleLen(tail) > width {
+		if c := strings.LastIndex(tail[:width], " "); c > 0 {
+			tail = tail[:c] + "…"
+		}
+	}
+	return [2]string{paint(cardBright, head), paint(cardBright, tail)}
 }
 
 func dateSpan(r stats.Report) string {
@@ -114,34 +161,62 @@ func dateSpan(r stats.Report) string {
 	if start == "-" && end == "-" {
 		return ""
 	}
-	return start + " – " + end
+	return start + "  →  " + end
 }
 
-// statRow is the three figures, spaced across the heatmap's own width so the
-// card reads as one column rather than two things that happen to be stacked.
-func statRow(r stats.Report) string {
-	cells := []struct{ value, label string }{
+func cardCells(r stats.Report) []struct{ value, label string } {
+	return []struct{ value, label string }{
 		{formatStatNumber(r.TotalSessions), "sessions"},
 		{formatStatNumber(r.TotalMessages), "messages"},
 		{strconv.Itoa(len(r.Harnesses)), "agents"},
 	}
-	var values, labels []string
-	for _, c := range cells {
-		w := len(c.value)
-		if len(c.label) > w {
-			w = len(c.label)
-		}
-		values = append(values, paint(cardBright, pad(c.value, w)))
-		labels = append(labels, paint(cardDim, pad(c.label, w)))
+}
+
+func cellWidth(value, label string) int {
+	if len(label) > len(value) {
+		return len(label)
 	}
-	return strings.Join(values, "   ") + "\n" + strings.Join(labels, "   ")
+	return len(value)
+}
+
+func figures(r stats.Report) string {
+	var parts []string
+	for _, c := range cardCells(r) {
+		parts = append(parts, paint(cardBright, pad(c.value, cellWidth(c.value, c.label))))
+	}
+	return strings.Join(parts, "  ")
+}
+
+func figureLabels(r stats.Report) string {
+	var parts []string
+	for _, c := range cardCells(r) {
+		parts = append(parts, paint(cardFaint, pad(c.label, cellWidth(c.value, c.label))))
+	}
+	return strings.Join(parts, "  ")
 }
 
 func pad(s string, w int) string {
-	if len(s) >= w {
-		return s
+	if n := visibleLen(s); n < w {
+		return s + strings.Repeat(" ", w-n)
 	}
-	return s + strings.Repeat(" ", w-len(s))
+	return s
+}
+
+func leftPad(s string, w int) string {
+	if n := len(s); n < w {
+		return strings.Repeat(" ", w-n) + s
+	}
+	return s
+}
+
+// sectionRule is a heading with a hairline running out to the card's edge, so
+// the eye finds the blocks without either of them shouting.
+func sectionRule(title string) string {
+	rule := cardInner - len(title) - 1
+	if rule < 0 {
+		rule = 0
+	}
+	return paint(cardDim, title) + " " + paint(cardRule, strings.Repeat("─", rule))
 }
 
 // heatLines draws the year as four rows of half blocks: one cell carries two
@@ -154,58 +229,84 @@ func pad(s string, w int) string {
 // warn you. A full block is the one shape every monospace font agrees on.
 func heatLines(hm stats.HeatmapStats) []string {
 	if len(hm.Weeks) == 0 {
-		return nil
+		return []string{paint(cardFaint, "nothing indexed yet — run deja index")}
 	}
 	// Drawing the whole year when the index covers three months of it spends
 	// two thirds of the card on a grey rectangle standing for history that
-	// does not exist. Start at the first week with anything in it.
+	// does not exist. Start at the first week with anything in it, keeping a
+	// couple of empty ones so the first activity has an edge to sit against.
 	weeks, first := hm.Weeks, 0
 	for first < len(weeks) && weekTotal(weeks[first]) == 0 {
 		first++
 	}
 	if first == len(weeks) {
-		return nil
+		return []string{paint(cardFaint, "no sessions in the last year")}
 	}
-	// A couple of empty weeks in front give the first activity an edge to sit
-	// against rather than starting hard at the margin.
-	if first > 2 {
-		first -= 2
+
+	// Two columns per week when the history is short, one when it is long. A
+	// grid that filled a third of the card read as unfinished; this fills it
+	// either way, and a week is still a week — only its drawn width moves.
+	cell := 1
+	if len(weeks)-first <= cardInner/2 {
+		cell = 2
+	}
+	// With the width settled, walk the start back toward the beginning of the
+	// year for as much real history as the card can hold.
+	if room := cardInner / cell; len(weeks)-first < room {
+		first = len(weeks) - room
+		if first < 0 {
+			first = 0
+		}
 	} else {
-		first = 0
+		first = len(weeks) - room
 	}
 	weeks = weeks[first:]
 
-	months := make([]byte, len(weeks)+8)
-	for i := range months {
-		months[i] = ' '
+	// A year is 53 weeks and the card is 56 columns, so even a full history
+	// leaves a remainder. Pad on the left: the right edge is today, which is
+	// the end worth anchoring, and the gap lands before the history began.
+	lead := cardInner - len(weeks)*cell
+	if lead < 0 {
+		lead = 0
 	}
-	for _, mt := range hm.Months {
-		col := mt.Col - first
-		if col >= 0 && col+len(mt.Label) < len(months) {
-			copy(months[col:], mt.Label)
-		}
-	}
-	lines := []string{paint(cardDim, strings.TrimRight(string(months), " "))}
+
+	var grid []string
 	// Seven days is odd, so the last row carries one day over an empty one.
 	for d := 0; d < 7; d += 2 {
 		var b strings.Builder
+		if lead > 0 {
+			b.WriteString(bgColour(heatEmpty) + strings.Repeat(" ", lead) + logoReset)
+		}
 		for _, week := range weeks {
 			top := termHeat(week[d], hm.Max)
 			bottom := heatEmpty
 			if d+1 < 7 {
 				bottom = termHeat(week[d+1], hm.Max)
 			}
-			b.WriteString(fgColour(top) + bgColour(bottom) + "\u2580" + logoReset)
+			b.WriteString(fgColour(top) + bgColour(bottom) + strings.Repeat("▀", cell) + logoReset)
 		}
-		lines = append(lines, b.String())
+		grid = append(grid, b.String())
 	}
-	return lines
+
+	months := make([]byte, cardInner+8)
+	for i := range months {
+		months[i] = ' '
+	}
+	for _, mt := range hm.Months {
+		col := lead + (mt.Col-first)*cell
+		if col >= 0 && col+len(mt.Label) < len(months) {
+			copy(months[col:], mt.Label)
+		}
+	}
+	// The labels go under the grid: above it they sat between the heading and
+	// the data and read as part of the heading.
+	return append(grid, paint(cardFaint, strings.TrimRight(string(months), " ")))
 }
 
-// topAgents lists where the history came from, longest first, with a bar drawn
-// to the widest entry rather than to the total: the shape of the split is the
-// readable part, not each share of a whole.
-func topAgents(r stats.Report) []string {
+// agentBlock lists where the history came from, longest first. The bar is drawn
+// against the largest entry rather than the total: one agent usually holds most
+// of it, and shares of a whole would print every other one as nothing.
+func agentBlock(r stats.Report) []string {
 	if len(r.Harnesses) == 0 {
 		return nil
 	}
@@ -222,28 +323,71 @@ func topAgents(r stats.Report) []string {
 		}
 		ranked = append(ranked[:5:5], other)
 	}
-	name := 0
+
+	name, count := 0, 0
 	for _, h := range ranked {
 		if len(h.Harness) > name {
 			name = len(h.Harness)
 		}
+		if n := len(formatStatNumber(h.Sessions)); n > count {
+			count = n
+		}
 	}
+	bar := cardInner - name - count - 3
 	max := ranked[0].Sessions
-	lines := []string{paint(cardDim, "TOP AGENTS")}
+
+	var out []string
 	for _, h := range ranked {
 		width := 0
 		if max > 0 {
-			width = h.Sessions * (termCardWidth - name - 8) / max
+			width = h.Sessions * bar / max
 		}
 		if width < 1 && h.Sessions > 0 {
 			width = 1
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %s",
+		out = append(out, fmt.Sprintf("%s %s%s %s",
 			paint(cardDim, pad(h.Harness, name)),
-			paint(mark.Coat, strings.Repeat("▬", width)),
-			paint(cardBright, strconv.Itoa(h.Sessions))))
+			paint(mark.Coat, strings.Repeat("▄", width)),
+			strings.Repeat(" ", bar-width),
+			paint(cardBright, leftPad(formatStatNumber(h.Sessions), count))))
 	}
-	return lines
+	return out
+}
+
+// footer is what makes a screenshot say where it came from. Dim enough not to
+// compete with the figures, and the last thing inside the border.
+func footer() string {
+	left := "deja stats --card"
+	// A build with no version stamped calls itself "dev", and "vdev" in a
+	// footer reads as a typo rather than as a local build.
+	if version != "" && version != "dev" {
+		left += " · v" + version
+	}
+	right := "vshulcz.github.io/deja-vu"
+	gap := cardInner - len(left) - len(right)
+	if gap < 1 {
+		gap = 1
+	}
+	return paint(cardFaint, left) + strings.Repeat(" ", gap) + paint(mark.Coat, right)
+}
+
+// frame wraps the body in a rounded border, padding every line to one width.
+// The padding is why visibleWidth exists: measuring a coloured string by its
+// bytes puts the right border somewhere different on every line.
+func frame(body []string, foot string) []string {
+	top := paint(cardRule, "╭"+strings.Repeat("─", cardInner+2)+"╮")
+	bottom := paint(cardRule, "╰"+strings.Repeat("─", cardInner+2)+"╯")
+	edge := paint(cardRule, "│")
+
+	out := []string{top, edge + strings.Repeat(" ", cardInner+2) + edge}
+	for _, line := range body {
+		out = append(out, edge+" "+pad(line, cardInner)+" "+edge)
+	}
+	out = append(out,
+		edge+strings.Repeat(" ", cardInner+2)+edge,
+		edge+" "+pad(foot, cardInner)+" "+edge,
+		bottom)
+	return out
 }
 
 func printStatsCard(w io.Writer, r stats.Report) {
