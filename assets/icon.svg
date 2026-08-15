@@ -27,11 +27,11 @@
       <rect x="60" y="186" width="252" height="14"/>
       <rect x="60" y="200" width="112" height="14"/>
       <rect x="200" y="200" width="112" height="14"/>
-      <rect x="60" y="214" width="112" height="14"/>
-      <rect x="200" y="214" width="112" height="14"/>
-      <rect x="74" y="228" width="84" height="14"/>
-      <rect x="172" y="228" width="28" height="14"/>
-      <rect x="214" y="228" width="84" height="14"/>
+      <rect x="60" y="214" width="98" height="14"/>
+      <rect x="172" y="214" width="28" height="14"/>
+      <rect x="214" y="214" width="98" height="14"/>
+      <rect x="74" y="228" width="98" height="14"/>
+      <rect x="200" y="228" width="98" height="14"/>
       <rect x="88" y="242" width="196" height="14"/>
       <rect x="298" y="242" width="28" height="14"/>
       <rect x="102" y="256" width="168" height="14"/>
@@ -54,9 +54,9 @@
       <rect x="144" y="172" width="14" height="14"/>
       <rect x="214" y="172" width="14" height="14"/>
       <rect x="256" y="172" width="14" height="14"/>
-      <rect x="172" y="214" width="28" height="14"/>
-      <rect x="158" y="228" width="14" height="14"/>
-      <rect x="200" y="228" width="14" height="14"/>
+      <rect x="158" y="214" width="14" height="14"/>
+      <rect x="200" y="214" width="14" height="14"/>
+      <rect x="172" y="228" width="28" height="14"/>
     </g>
     <g fill="#ff8700">
       <rect x="172" y="200" width="28" height="14"/>
