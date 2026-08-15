@@ -3,7 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # `labeled` is here because the windows leg is opt-in per pull request below,
+  # and the default trigger set does not include it: labelling a PR would have
+  # done nothing until someone happened to push another commit, which is the
+  # worst kind of switch — one that looks connected.
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
   schedule:
     - cron: '17 5 * * 1'   # weekly canary against fresh runner images
