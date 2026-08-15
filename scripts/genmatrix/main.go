@@ -92,7 +92,7 @@ func markdownTable(r registry) string {
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 			e.DisplayName, store, gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
 			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
-			mark(e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
+			gapMark(e, "resume", e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
 	b.WriteString("\n✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated\n")
 	b.WriteString(notes(r, func(s string) string { return "`" + s + "`" }, func(s string) string { return s }))
@@ -143,7 +143,7 @@ func htmlTable(r registry) string {
 			e.DisplayName, strings.Join(e.StorePaths, "</code><br><code>"),
 			gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
 			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
-			mark(e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
+			gapMark(e, "resume", e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
 	b.WriteString("</table>\n")
 	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated</p>")
