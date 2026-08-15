@@ -17,9 +17,11 @@
       <rect x="10" y="64" width="45" height="9"/>
       <rect x="73" y="64" width="45" height="9"/>
       <rect x="10" y="73" width="108" height="9"/>
-      <rect x="19" y="82" width="90" height="9"/>
+      <rect x="19" y="82" width="108" height="9"/>
       <rect x="28" y="91" width="72" height="9"/>
+      <rect x="109" y="91" width="18" height="9"/>
       <rect x="28" y="100" width="72" height="9"/>
+      <rect x="109" y="100" width="18" height="9"/>
       <rect x="19" y="109" width="27" height="9"/>
       <rect x="82" y="109" width="27" height="9"/>
     </g>
@@ -31,8 +33,5 @@
     </g>
     <g fill="#ff8700">
       <rect x="55" y="64" width="18" height="9"/>
-      <rect x="109" y="82" width="18" height="9"/>
-      <rect x="109" y="91" width="18" height="9"/>
-      <rect x="109" y="100" width="18" height="9"/>
     </g>
 </svg>

@@ -32,12 +32,17 @@
       <rect x="96" y="112" width="12" height="6"/>
       <rect x="114" y="112" width="36" height="6"/>
       <rect x="60" y="118" width="84" height="6"/>
+      <rect x="150" y="118" width="12" height="6"/>
       <rect x="66" y="124" width="72" height="6"/>
+      <rect x="150" y="124" width="12" height="6"/>
       <rect x="66" y="130" width="72" height="6"/>
+      <rect x="150" y="130" width="12" height="6"/>
       <rect x="66" y="136" width="72" height="6"/>
+      <rect x="150" y="136" width="12" height="6"/>
       <rect x="66" y="142" width="72" height="6"/>
-      <rect x="60" y="148" width="84" height="6"/>
-      <rect x="60" y="154" width="84" height="6"/>
+      <rect x="150" y="142" width="12" height="6"/>
+      <rect x="60" y="148" width="96" height="6"/>
+      <rect x="60" y="154" width="96" height="6"/>
       <rect x="66" y="160" width="24" height="6"/>
       <rect x="114" y="160" width="24" height="6"/>
     </g>
@@ -54,13 +59,6 @@
     </g>
     <g fill="#ff8700">
       <rect x="96" y="100" width="12" height="6"/>
-      <rect x="150" y="118" width="12" height="6"/>
-      <rect x="150" y="124" width="12" height="6"/>
-      <rect x="150" y="130" width="12" height="6"/>
-      <rect x="150" y="136" width="12" height="6"/>
-      <rect x="150" y="142" width="12" height="6"/>
-      <rect x="144" y="148" width="12" height="6"/>
-      <rect x="144" y="154" width="12" height="6"/>
     </g>
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
     <text x="212" y="112" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>

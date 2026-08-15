@@ -33,12 +33,17 @@
       <rect x="172" y="228" width="28" height="14"/>
       <rect x="214" y="228" width="84" height="14"/>
       <rect x="88" y="242" width="196" height="14"/>
+      <rect x="298" y="242" width="28" height="14"/>
       <rect x="102" y="256" width="168" height="14"/>
+      <rect x="298" y="256" width="28" height="14"/>
       <rect x="102" y="270" width="168" height="14"/>
+      <rect x="298" y="270" width="28" height="14"/>
       <rect x="102" y="284" width="168" height="14"/>
+      <rect x="298" y="284" width="28" height="14"/>
       <rect x="102" y="298" width="168" height="14"/>
-      <rect x="88" y="312" width="196" height="14"/>
-      <rect x="88" y="326" width="196" height="14"/>
+      <rect x="298" y="298" width="28" height="14"/>
+      <rect x="88" y="312" width="224" height="14"/>
+      <rect x="88" y="326" width="224" height="14"/>
       <rect x="102" y="340" width="56" height="14"/>
       <rect x="214" y="340" width="56" height="14"/>
     </g>
@@ -55,12 +60,5 @@
     </g>
     <g fill="#ff8700">
       <rect x="172" y="200" width="28" height="14"/>
-      <rect x="298" y="242" width="28" height="14"/>
-      <rect x="298" y="256" width="28" height="14"/>
-      <rect x="298" y="270" width="28" height="14"/>
-      <rect x="298" y="284" width="28" height="14"/>
-      <rect x="298" y="298" width="28" height="14"/>
-      <rect x="284" y="312" width="28" height="14"/>
-      <rect x="284" y="326" width="28" height="14"/>
     </g>
 </svg>
