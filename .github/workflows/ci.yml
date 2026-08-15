@@ -18,56 +18,37 @@ jobs:
   test:
     name: test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    # Windows runs the suite about four times slower than the others and had
+    # windows runs the suite about four times slower than the others and had
     # grown into the 20-minute cap: the run was cancelled a second after the
     # last package passed.
-    #
-    # The cap is 45 rather than 30 because a cancelled job never runs its post
-    # steps, so the cache below is never written — the one job that needs a warm
-    # build cache was the one job that could not seed it, and the first cold run
-    # was cancelled at exactly 30m00s every time. One run has to be able to
-    # finish for any of the others to get faster.
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # The windows leg takes sixteen times the linux one — 30 minutes against
+      # under two — and hardware alone does not explain an order of magnitude.
+      # Compiling Go writes thousands of small object files, and Defender scans
+      # each one as it lands. Excluding the paths and the toolchain's own
+      # processes tests whether the runner is slow or merely being watched.
+      # Exclusions last only for the life of the runner, which is this job.
+      - name: Keep Defender off the build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\go-build"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\go"
+          Add-MpPreference -ExclusionPath "$env:RUNNER_TOOL_CACHE"
+          Add-MpPreference -ExclusionPath "$env:TEMP"
+          foreach ($p in 'go.exe', 'compile.exe', 'link.exe', 'asm.exe', 'cgo.exe', 'vet.exe') {
+            Add-MpPreference -ExclusionProcess $p
+          }
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.25.x'
-          # setup-go's own cache is keyed on go.sum alone, and a GitHub cache
-          # entry is immutable — written once under that key and never
-          # refreshed. So it held the standard library and dependencies from
-          # whenever it was first saved, and none of this repository's own
-          # packages, which change every commit and are the expensive half to
-          # instrument with -race. The cache below rotates instead (#1229).
-          cache: false
-      - id: gocache
-        shell: bash
-        run: |
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-      # Saved under a key carrying the run id and restored by prefix, so every
-      # run starts from the previous run's compiled objects. Windows was
-      # spending nineteen of its twenty-eight minutes compiling, against a
-      # thirty-minute cap, and a cancelled job there prints no test output at
-      # all — the silence is the compiler, which reads exactly like a hang.
-      #
-      # The key hashes go.mod, not go.sum: this module has no dependencies and
-      # therefore no go.sum, and hashFiles of a file that does not exist returns
-      # an empty string, which produced `go-Windows--<run id>` carrying no
-      # toolchain identity at all.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.gocache.outputs.build }}
-            ${{ steps.gocache.outputs.mod }}
-          key: go-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.run_id }}
-          restore-keys: |
-            go-${{ runner.os }}-${{ hashFiles('go.mod') }}-
-            go-${{ runner.os }}-
       - run: go mod verify
       - run: go vet ./...
       # -timeout below the job's own patience: a hung test then dies with every
