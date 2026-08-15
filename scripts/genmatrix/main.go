@@ -74,23 +74,22 @@ func handoffMark(kind string) string {
 
 func markdownTable(r registry) string {
 	var b strings.Builder
-	b.WriteString("| Harness | Store | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |\n")
-	b.WriteString("| --- | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |\n")
+	// No Store column here. The glob paths are four lines deep for some
+	// harnesses and they turned the widest table on the front page into one
+	// that scrolls sideways. They are reference material, so they live on the
+	// reference page, which is the HTML table below.
+	b.WriteString("| Harness | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |\n")
+	b.WriteString("| --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |\n")
 	for _, e := range r.Harnesses {
 		if e.ID == "deja" {
 			continue
 		}
-		quoted := make([]string, 0, len(e.StorePaths))
-		for _, sp := range e.StorePaths {
-			quoted = append(quoted, "`"+sp+"`")
-		}
-		store := strings.Join(quoted, "<br>")
 		prereq := e.Capabilities.Prereq
 		if prereq == "" {
 			prereq = "—"
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-			e.DisplayName, store, gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
+		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s | %s |\n",
+			e.DisplayName, gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
 			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
 			gapMark(e, "resume", e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
