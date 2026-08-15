@@ -110,24 +110,36 @@ $ deja "jwt refresh token"
   refresh token cookie needed SameSite=Lax in local callback flow
 ```
 
+**Ask your history**
+
 | Command | What it does |
 | --- | --- |
-| `deja <query>` | Search every history. Multi-word is AND, quoted phrases require contiguous text, and a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). `--harness`, `--project`, `--since 30d`, `--limit`, `--json`. |
+| `deja <query>` | Search every history. Multi-word is AND and quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). |
 | `deja` | With an index and a terminal: today's sessions, recalls served, a question you asked in more than one session, and a wall your agents keep hitting. |
-| `deja ctx <query>` | Markdown digest of the best match, ready to pipe into a prompt. |
 | `deja blame <path>` | Which sessions discussed a file, what was decided, and why. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
-| `deja how "<tool>"` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
-| `deja fix "<error>"` | What this machine ran after that same error before, when the error did not come back. |
+| `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
+| `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. |
 | `deja friction` | Errors that hit three or more separate sessions, with the harnesses named. |
+
+**Use what it finds**
+
+| Command | What it does |
+| --- | --- |
+| `deja ctx <query>` | Markdown digest of the best match, ready to pipe into a prompt. |
+| `deja resume <id>` | Reopen a found session in its native harness. |
 | `deja restore <path>` | Hand back a span an agent replaced, from the `old_string` its edit recorded. Never writes over the original. |
 | `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state. Notes outrank raw transcripts. |
-| `deja resume <id>` | Reopen a found session in its native harness. |
 | `deja share <id>` | A sanitized session digest for a colleague, with secrets already scrubbed. |
+
+**Move it and check it**
+
+| Command | What it does |
+| --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja view` | Your whole memory as one local HTML file. No server, nothing leaves the machine. |
-| `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja stats` | Your agent work, wrapped. `--card` writes an SVG for a profile, `--html` a browsable timeline. |
+| `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
 Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html) and
