@@ -55,16 +55,6 @@ func termFG(n int) string { return "\x1b[38;5;" + strconv.Itoa(n) + "m" }
 
 func paint(colour int, s string) string { return termFG(colour) + s + logoReset }
 
-func weekTotal(week [7]int) int {
-	total := 0
-	for _, c := range week {
-		if c > 0 {
-			total += c
-		}
-	}
-	return total
-}
-
 func termHeat(count, max int) int {
 	if count <= 0 {
 		return heatEmpty
@@ -144,7 +134,7 @@ func statsCardLines(r stats.Report) []string {
 	}
 	if line := longestLine(r); line != "" {
 		add("")
-		add(sectionRule("THE LONGEST ONE"))
+		add(paint(cardFaint, "THE LONGEST ONE"))
 		add(line)
 	}
 	return frame(body, footer())
@@ -313,32 +303,15 @@ func heatLines(hm stats.HeatmapStats) []string {
 	if len(hm.Weeks) == 0 {
 		return []string{paint(cardFaint, "nothing indexed yet — run deja index")}
 	}
-	// Drawing the whole year when the index covers three months of it spends
-	// two thirds of the card on a grey rectangle standing for history that
-	// does not exist. Start at the first week with anything in it, keeping a
-	// couple of empty ones so the first activity has an edge to sit against.
+	// Always the last twenty-eight weeks, ending today. The earlier version
+	// trimmed the empty run at the front because it drew as one grey slab —
+	// but that was the missing gaps, not the empty days. With a column of air
+	// after each week an empty cell reads as a quiet day, the way it does in
+	// any contribution grid, and a fixed window keeps the card the same shape
+	// for everyone.
+	const cell = 2
 	weeks, first := hm.Weeks, 0
-	for first < len(weeks) && weekTotal(weeks[first]) == 0 {
-		first++
-	}
-	if first == len(weeks) {
-		return []string{paint(cardFaint, "no sessions in the last year")}
-	}
-
-	// Widen the cell to fill the card rather than extending the window: the
-	// first version walked the start back toward the beginning of the year,
-	// which put back exactly the empty weeks the trimming had just removed.
-	span := len(weeks) - first
-	cell := 1
-	if span > 0 {
-		if cell = cardInner / span; cell > 3 {
-			cell = 3
-		}
-		if cell < 1 {
-			cell = 1
-		}
-	}
-	if room := cardInner / cell; span > room {
+	if room := cardInner / cell; len(weeks) > room {
 		first = len(weeks) - room
 	}
 	weeks = weeks[first:]
@@ -367,7 +340,7 @@ func heatLines(hm stats.HeatmapStats) []string {
 			if d+1 < 7 {
 				bottom = termHeat(week[d+1], hm.Max)
 			}
-			b.WriteString(fgColour(top) + bgColour(bottom) + strings.Repeat("▀", cell) + logoReset)
+			b.WriteString(fgColour(top) + bgColour(bottom) + "▀" + logoReset + " ")
 		}
 		grid = append(grid, b.String())
 	}
@@ -431,10 +404,13 @@ func agentBlock(r stats.Report) []string {
 		if width < 1 && h.Sessions > 0 {
 			width = 1
 		}
+		// The unfilled part is drawn rather than left blank: without it the
+		// rows have no common length, so a short bar reads as a short row and
+		// not as a small share.
 		out = append(out, fmt.Sprintf("%s %s%s %s",
 			paint(cardDim, pad(h.Harness, name)),
 			paint(mark.Coat, strings.Repeat("▄", width)),
-			strings.Repeat(" ", bar-width),
+			paint(heatEmpty, strings.Repeat("▄", bar-width)),
 			paint(cardBright, leftPad(formatStatNumber(h.Sessions), count))))
 	}
 	if rest > 0 {
