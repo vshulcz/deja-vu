@@ -6,6 +6,6 @@
     <path fill="#1c1c1c" d="M66 61h12v6h-12ZM126 61h12v6h-12ZM66 67h12v6h-12ZM126 67h12v6h-12ZM66 73h12v6h-12ZM126 73h12v6h-12Z"/>
     <path fill="#ff8700" d="M96 85h12v6h-12Z"/>
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
-    <text x="208" y="105" font-size="72" font-weight="700" fill="#1d1b2e">deja-vu</text>
+    <text x="208" y="105" font-size="72" font-weight="700" fill="#e8e6f0">deja-vu</text>
   </g>
 </svg>

@@ -1,4 +1,9 @@
-<p align="center"><img src="assets/logo.svg" width="340" alt="deja-vu"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" width="330" alt="deja-vu">
+  </picture>
+</p>
 
 <p align="center"><strong>Your agents already solved this. deja finds it.</strong></p>
 
