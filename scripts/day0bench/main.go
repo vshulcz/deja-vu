@@ -141,6 +141,28 @@ type runResult struct {
 	// which separates the two ways a query fails: ranked badly, or never
 	// retrieved at all. Only the second one is fixed by ranking work.
 	hit1, hit5, found, n int
+	// ranks is where the answer actually landed, one per question that found it
+	// at all, counting from one.
+	//
+	// The three counters above are thresholds, and thresholds go quiet exactly
+	// when the work turns to ranking: once every answer is inside the window,
+	// found stops moving and hit@1 only reports the top of the pile. A change
+	// that lifts eight answers from rank 30 to rank 7 shows up in none of them.
+	ranks []int
+}
+
+// mrr is the mean reciprocal rank: one over where the answer landed, averaged
+// over every question, counting a question that never found it as zero. It
+// moves whenever anything moves, which is what the threshold counters cannot do.
+func (r runResult) mrr() float64 {
+	if r.n == 0 {
+		return 0
+	}
+	var sum float64
+	for _, rank := range r.ranks {
+		sum += 1 / float64(rank)
+	}
+	return sum / float64(r.n)
 }
 
 // depthK bounds both sides' result list, so found means the same thing in
@@ -154,6 +176,7 @@ func main() {
 	ctxBin := flag.String("ctx", "", "path to a ctx binary to run over the same corpus, scored the same way")
 	cpuprofile := flag.String("cpuprofile", "", "write a CPU profile of the whole run here")
 	misses := flag.Bool("misses", false, "print the questions whose answer session never came back, for triage")
+	ranks := flag.Bool("ranks", false, "print where each answer landed, for triage of ranking rather than retrieval")
 	corpus := flag.Int("corpus", 0, "lay down history from this many questions while scoring -limit of them; holds the questions fixed so only the pile grows")
 	flag.Parse()
 	if *data == "" {
@@ -199,7 +222,7 @@ func main() {
 	}
 
 	for _, w := range writers() {
-		r, err := run(w, all, qs, *control, *misses)
+		r, err := run(w, all, qs, *control, *misses, *ranks)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "day0bench %s: %v\n", w.harness, err)
 			os.Exit(1)
@@ -232,11 +255,11 @@ func report(name string, r runResult) {
 		reach = float64(r.indexed) / float64(r.written) * 100
 	}
 	p50, p95 := percentiles(r.lat)
-	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first %s  p50 %s  p95 %s  hit@1 %d/%d  hit@5 %d/%d  found@%d %d/%d\n",
+	fmt.Printf("%-8s reach %d/%d (%.1f%%)  build %s  first %s  p50 %s  p95 %s  hit@1 %d/%d  hit@5 %d/%d  found@%d %d/%d  mrr %.3f\n",
 		name, r.indexed, r.written, reach,
 		r.build.Round(time.Millisecond), r.first.Round(time.Millisecond),
 		p50.Round(time.Microsecond), p95.Round(time.Microsecond),
-		r.hit1, r.n, r.hit5, r.n, depthK, r.found, r.n)
+		r.hit1, r.n, r.hit5, r.n, depthK, r.found, r.n, r.mrr())
 }
 
 // percentiles reports the median and the tail of a query-latency sample. The
@@ -254,7 +277,7 @@ func percentiles(ds []time.Duration) (time.Duration, time.Duration) {
 	return at(0.5), at(0.95)
 }
 
-func run(w writer, all, qs []question, control bool, misses bool) (runResult, error) {
+func run(w writer, all, qs []question, control, misses, ranks bool) (runResult, error) {
 	var out runResult
 	tmp, err := os.MkdirTemp("", "day0")
 	if err != nil {
@@ -358,8 +381,12 @@ func run(w writer, all, qs []question, control bool, misses bool) (runResult, er
 				out.hit5++
 			}
 			out.found++
+			out.ranks = append(out.ranks, rank+1)
 			hit = true
 			break
+		}
+		if hit && ranks {
+			fmt.Printf("  rank %2d  %s: %s\n", out.ranks[len(out.ranks)-1], q.ID, q.Question)
 		}
 		// A question whose answer session never came back at all is a retrieval
 		// miss, not a ranking one, and no amount of reordering reaches it.
