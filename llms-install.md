@@ -26,10 +26,14 @@ Claude Code, etc.) add:
 
 If `deja` is not on PATH, use the npx form: `"command": "npx", "args": ["-y", "@vshulcz/deja-vu", "mcp"]`.
 
-For Claude Code, Codex and opencode there is a one-command setup instead:
+For the seventeen harnesses deja knows — Claude Code, Codex, Cursor, opencode,
+Gemini CLI, Cline, Copilot CLI, Roo Code, aider, Goose, Qwen Code, Kimi Code,
+Antigravity, Grok Build, OpenClaw, pi and Hermes — there is a one-command setup
+instead:
 
 ```sh
-deja install --all    # MCP everywhere; add --auto for session-start auto-recall
+deja install --auto   # MCP recall everywhere it finds, plus session-start recall
+deja install --all    # the same without the session-start hook
 ```
 
 ## Verify
@@ -39,6 +43,13 @@ deja warmup           # builds the local index (~10s for a few GB of history)
 deja "test query"     # CLI search works
 ```
 
-The MCP tools are `recall` (dense results under ~4KB) and `recall_context`
-(markdown digest of the best-matching session). No API keys, no network
-access, no configuration required.
+The MCP tools:
+
+- `recall` — dense results under ~4KB for a query.
+- `recall_context` — markdown digest of the best-matching session.
+- `blame` — which sessions discussed a file, and what was decided.
+- `fix` — what this machine ran after the same error last time.
+- `how` — the real invocation for a tool here, with its real flags.
+- `remember` — store one durable decision for a later session to recall.
+
+No API keys, no network access, no configuration required.

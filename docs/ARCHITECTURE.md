@@ -4,7 +4,10 @@ This document is for people changing `deja` internals.
 
 ## Source parsers
 
-Parsers live in `internal/sources` and return `[]model.Session`.
+Parsers live in `internal/sources` and return `[]model.Session`. The table is
+the seventeen the loader registers; `docs/registry/` describes each store's
+layout in detail, and `internal/sources/registry_test.go` checks that index
+against the loader list.
 
 | Source | Code | Input |
 | --- | --- | --- |
@@ -19,6 +22,12 @@ Parsers live in `internal/sources` and return `[]model.Session`.
 | Qwen Code | `qwen.go` | JSONL chats under `~/.qwen/projects/*/chats` |
 | pi | `pi.go` | JSONL transcripts under `~/.pi/agent/sessions` |
 | Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state` |
+| Cline | `cline.go` | task JSON under the VS Code extension's storage, both store generations |
+| Roo Code | `roo.go` | task JSON under `rooveterinaryinc.roo-cline` in VS Code globalStorage |
+| Goose | `goose.go` | legacy JSONL sessions and the newer SQLite session store |
+| Kimi Code | `kimi.go` | per-agent `wire.jsonl` under `~/.kimi-code/sessions` |
+| OpenClaw | `openclaw.go` | append-only pi-format JSONL under `~/.openclaw/agents` |
+| Hermes | `hermes.go`, `hermes_pg.go` | SQLite state per profile, or Postgres when `DEJA_HERMES_PG_DSN` is set |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
@@ -107,7 +116,7 @@ The export watermark is per source path (falling back to session key for synthet
 
 `currentFiles` records path, size, and mtime for known stores.
 
-`EnsureForSearch` compares the current file set with `manifest.json`:
+`EnsureForSearch` compares the current file set with `manifest.gob`:
 
 - fresh manifest: do nothing;
 - version or scope mismatch: rebuild;
@@ -128,8 +137,15 @@ Supported methods:
 
 Tools:
 
-- `recall`: returns compact snippets for matching sessions.
-- `recall_context`: returns the markdown digest used by `deja ctx`.
+- `recall`: compact snippets for matching sessions.
+- `recall_context`: the markdown digest `deja ctx` prints.
+- `blame`: the sessions that discussed a file, and what was decided.
+- `fix`: what this machine ran after the same error last time.
+- `how`: the real invocation for a tool here, from what agents ran.
+- `remember`: stores one durable decision for later recall.
+
+Each carries an annotation naming what it is for, so an agent can choose between
+them without reading the descriptions in full.
 
 The MCP server calls the same index/search code as the CLI. It writes protocol responses to stdout and keeps logs/progress off stdout so agents receive valid JSON-RPC.
 

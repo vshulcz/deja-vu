@@ -27,6 +27,26 @@ func TestReadmeListsEveryMCPToolTheServerRegisters(t *testing.T) {
 		t.Fatalf("tools is %T", payload["tools"])
 	}
 
+	// Four places listed these, and every one of them had drifted to the two
+	// the server started with: the README, the bundle manifest, the
+	// architecture note, and the file an agent reads to install deja — which
+	// is the worst of them, since an agent that reads it learns that four of
+	// the six do not exist.
+	for _, doc := range []string{"README.md", "llms-install.md",
+		filepath.Join("docs", "ARCHITECTURE.md")} {
+		b, err := os.ReadFile(filepath.Join("..", "..", doc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(b)
+		for _, tool := range tools {
+			name, _ := tool["name"].(string)
+			if !strings.Contains(text, "`"+name+"`") {
+				t.Errorf("%s never mentions the %q tool", doc, name)
+			}
+		}
+	}
+
 	b, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
 	if err != nil {
 		t.Fatal(err)
