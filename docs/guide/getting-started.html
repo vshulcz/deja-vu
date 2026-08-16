@@ -50,12 +50,12 @@
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
-<a href="../registry/README.md">Format registry</a></aside>
+<a href="../registry/README.md">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="34" height="34" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
 <h1>Getting started</h1>
 <p>deja is a single zero-dependency binary. It reads the session logs your coding agents already write, builds a local search index, and serves that memory back to the agents over MCP. Nothing leaves your machine.</p>
-<div class="term-shot"><img src="../assets/demo.gif" alt="deja demo: searching indexed coding-agent history — exact match, natural-language fallback, and blame on a file" loading="lazy"><p class="cap">real output: search, natural-language fallback, blame — retroactive over sessions from before install</p></div>
+<div class="term-shot"><img src="../assets/demo.gif" alt="deja demo: one question put to the same agent twice — without memory it has no record, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">the same question, the same agent, once without memory and once with deja — every line quoted from two real sessions</p></div>
 <h2>Install</h2>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 # or

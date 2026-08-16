@@ -37,8 +37,10 @@
   if(i>=0){
     var nav=document.createElement('div');nav.className='pn';
     var prev=i>0?ORDER[i-1]:null,next=i<ORDER.length-1?ORDER[i+1]:null;
-    nav.innerHTML=(prev?'<a class="pv" href="'+prev[0]+'">&larr; '+prev[1]+'</a>':'<span></span>')+
-                  (next?'<a class="nx" href="'+next[0]+'">'+next[1]+' &rarr;</a>':'<span></span>');
+    /* the name alone does not say which way it goes, and an arrow alone does
+       not say where. Both, with the direction as the quiet half. */
+    nav.innerHTML=(prev?'<a class="pv" href="'+prev[0]+'"><small>Previous</small>'+prev[1]+'</a>':'<span></span>')+
+                  (next?'<a class="nx" href="'+next[0]+'"><small>Next</small>'+next[1]+'</a>':'<span></span>');
     art.appendChild(nav);
   }
 })();
