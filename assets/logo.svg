@@ -3,26 +3,16 @@
      sprite is the source, and the terminal banner draws from the same grid.
      Coat, accent and features are the three colours xterm-256 holds exactly,
      so vector and terminal agree. -->
-  <g class="breathe">
-  <path fill="#8787af" d="M54 43h96v6h-96ZM48 49h108v6h-108ZM48 55h108v6h-108ZM48 61h108v6h-108ZM48 67h108v6h-108ZM48 73h108v6h-108ZM48 79h108v6h-108ZM48 85h48v6h-48ZM108 85h48v6h-48ZM48 91h108v6h-108ZM54 97h96v6h-96ZM60 103h84v6h-84ZM66 109h72v6h-72ZM66 115h72v6h-72ZM66 121h72v6h-72ZM66 127h72v6h-72ZM60 133h84v6h-84ZM60 139h84v6h-84ZM66 145h24v6h-24ZM114 145h24v6h-24Z"/>
-  <path fill="#ff8700" d="M96 85h12v6h-12Z"/>
-  <g class="t0"><path fill="#8787af" d="M150 103h12v6h-12ZM150 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
-  <g class="t1"><path fill="#8787af" d="M156 103h12v6h-12ZM150 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
-  <g class="t2"><path fill="#8787af" d="M162 103h12v6h-12ZM156 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
-  <g class="eyes">
-    <g class="eyes-open"><path fill="#1c1c1c" d="M66 61h12v6h-12ZM126 61h12v6h-12ZM66 67h12v6h-12ZM126 67h12v6h-12ZM66 73h12v6h-12ZM126 73h12v6h-12Z"/></g>
-    <g class="eyes-half"><path fill="#1c1c1c" d="M66 67h12v6h-12ZM126 67h12v6h-12ZM66 73h12v6h-12ZM126 73h12v6h-12Z"/></g>
-    <g class="eyes-shut"><path fill="#1c1c1c" d="M60 73h24v6h-24ZM120 73h24v6h-24Z"/></g>
-  </g>
-  <g class="ear-up"><path fill="#8787af" d="M60 19h6v6h-6ZM138 19h6v6h-6ZM54 25h18v6h-18ZM132 25h18v6h-18ZM54 31h24v6h-24ZM126 31h24v6h-24ZM54 37h30v6h-30ZM120 37h30v6h-30Z"/></g>
-  <g class="ear-flick"><path fill="#8787af" d="M60 19h6v6h-6ZM54 25h18v6h-18ZM54 31h24v6h-24ZM132 31h18v6h-18ZM54 37h30v6h-30ZM120 37h30v6h-30Z"/></g>
   <style>
     .t1, .t2, .eyes-half, .eyes-shut, .ear-flick { opacity: 0 }
     @media (prefers-reduced-motion: no-preference) {
       /* The one continuous motion on the mark. Everything else cuts between
          poses; this eases, and a creature that is never perfectly still is the
-         difference between an animal and a diagram. */
-      .breathe { animation: dv-breathe 4.3s cubic-bezier(.45,0,.55,1) infinite }
+         difference between an animal and a diagram. It moves the chest and the
+         head only: moving the paws too was the first version, and a cat whose
+         feet leave the ground is not breathing, it is floating. */
+      .breathe { animation: dv-breathe 4.3s cubic-bezier(.37,0,.4,1) infinite }
+      .settle  { animation: dv-settle 17.9s cubic-bezier(.3,0,.3,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
@@ -33,7 +23,14 @@
       .ear-up    { animation: dv-ear-up 11.3s steps(1, end) infinite }
       .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+    /* Draw in, hold at the top a moment, let it out. A symmetric rise and fall
+       is a pendulum; the pause at the top is the part that reads as a breath. */
+    @keyframes dv-breathe { 0% { transform: translateY(0) } 40%, 56% { transform: translateY(-6px) } 100% { transform: translateY(0) } }
+    /* Every fifteen seconds or so the cat sinks and shrugs itself back up, twice,
+       the way one shifts its weight without getting up. It only ever goes down:
+       the chest is drawn from the same row the haunches start at, so anything
+       upward past one cell would open a gap between the two. */
+    @keyframes dv-settle { 0%, 84% { transform: translateY(0) } 87%, 88.5% { transform: translateY(6px) } 91% { transform: translateY(0) } 93%, 94% { transform: translateY(6px) } 97%, 100% { transform: translateY(0) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
@@ -49,6 +46,22 @@
     @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
     @keyframes dv-ear-up { 0%, 96.9% { opacity: 1 } 97%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
   </style>
+  <g class="t0"><path fill="#8787af" d="M150 103h12v6h-12ZM150 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
+  <g class="t1"><path fill="#8787af" d="M156 103h12v6h-12ZM150 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
+  <g class="t2"><path fill="#8787af" d="M162 103h12v6h-12ZM156 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
+  <path fill="#8787af" d="M48 73h108v6h-108ZM48 79h108v6h-108ZM48 85h48v6h-48ZM108 85h48v6h-48ZM48 91h108v6h-108ZM54 97h96v6h-96ZM60 103h84v6h-84ZM66 109h72v6h-72ZM66 115h72v6h-72ZM66 121h72v6h-72ZM66 127h72v6h-72ZM60 133h84v6h-84ZM60 139h84v6h-84ZM66 145h24v6h-24ZM114 145h24v6h-24Z"/>
+  <path fill="#ff8700" d="M96 85h12v6h-12Z"/>
+  <g class="settle">
+   <g class="breathe">
+    <path fill="#8787af" d="M60 19h6v6h-6ZM138 19h6v6h-6ZM54 25h18v6h-18ZM132 25h18v6h-18ZM54 31h24v6h-24ZM126 31h24v6h-24ZM54 37h30v6h-30ZM120 37h30v6h-30ZM54 43h96v6h-96ZM48 49h108v6h-108ZM48 55h108v6h-108ZM48 61h108v6h-108ZM48 67h108v6h-108ZM48 73h108v6h-108Z"/>
+  <g class="eyes">
+    <g class="eyes-open"><path fill="#1c1c1c" d="M66 61h12v6h-12ZM126 61h12v6h-12ZM66 67h12v6h-12ZM126 67h12v6h-12ZM66 73h12v6h-12ZM126 73h12v6h-12Z"/></g>
+    <g class="eyes-half"><path fill="#1c1c1c" d="M66 67h12v6h-12ZM126 67h12v6h-12ZM66 73h12v6h-12ZM126 73h12v6h-12Z"/></g>
+    <g class="eyes-shut"><path fill="#1c1c1c" d="M60 73h24v6h-24ZM120 73h24v6h-24Z"/></g>
+  </g>
+  <g class="ear-up"><path fill="#8787af" d="M60 19h6v6h-6ZM138 19h6v6h-6ZM54 25h18v6h-18ZM132 25h18v6h-18ZM54 31h24v6h-24ZM126 31h24v6h-24ZM54 37h30v6h-30ZM120 37h30v6h-30Z"/></g>
+  <g class="ear-flick"><path fill="#8787af" d="M60 19h6v6h-6ZM54 25h18v6h-18ZM54 31h24v6h-24ZM132 31h18v6h-18ZM54 37h30v6h-30ZM120 37h30v6h-30Z"/></g>
+   </g>
   </g>
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
     <text x="208" y="105" font-size="72" font-weight="700" fill="#1d1b2e">deja-vu</text>

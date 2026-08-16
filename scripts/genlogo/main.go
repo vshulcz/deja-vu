@@ -72,13 +72,13 @@ func movingTail() map[mark.Cell]bool {
 //
 // The timings match the ones deja stats already uses, so the two pages animate
 // the same animal at the same rate rather than at two guesses.
-func alive(x0, y0, size int) string {
+func alive(x0, y0, size int) (planted, breathing string) {
 	// Both motions travel exactly one cell — one pixel of the sprite. A fraction
 	// of a cell is what the first version moved, and at the sizes these are
 	// actually shown that came to half a screen pixel on the wordmark: real in
 	// the markup and invisible on the page.
 	breath, glance := size, size
-	var b strings.Builder
+	var p, b strings.Builder
 	seen := map[string]bool{}
 	poses := []string{}
 	for _, p := range mark.WagCycle {
@@ -87,8 +87,10 @@ func alive(x0, y0, size int) string {
 			poses = append(poses, p)
 		}
 	}
+	// The tail hangs off the haunches, which are part of what stays put, so it
+	// wags outside the breathing group.
 	for i, pose := range poses {
-		fmt.Fprintf(&b, "  <g class=\"t%d\"><path fill=\"%s\" d=\"%s\"/></g>\n",
+		fmt.Fprintf(&p, "  <g class=\"t%d\"><path fill=\"%s\" d=\"%s\"/></g>\n",
 			i, mark.Hex[mark.Coat], mark.CellsD(mark.Tails[pose], x0, y0, size))
 	}
 	// Every eye state as its own group, all of them inside one that can move.
@@ -119,8 +121,11 @@ func alive(x0, y0, size int) string {
     @media (prefers-reduced-motion: no-preference) {
       /* The one continuous motion on the mark. Everything else cuts between
          poses; this eases, and a creature that is never perfectly still is the
-         difference between an animal and a diagram. */
-      .breathe { animation: dv-breathe 4.3s cubic-bezier(.45,0,.55,1) infinite }
+         difference between an animal and a diagram. It moves the chest and the
+         head only: moving the paws too was the first version, and a cat whose
+         feet leave the ground is not breathing, it is floating. */
+      .breathe { animation: dv-breathe 4.3s cubic-bezier(.37,0,.4,1) infinite }
+      .settle  { animation: dv-settle 17.9s cubic-bezier(.3,0,.3,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
@@ -131,7 +136,14 @@ func alive(x0, y0, size int) string {
       .ear-up    { animation: dv-ear-up 11.3s steps(1, end) infinite }
       .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-SIZEpx) } }
+    /* Draw in, hold at the top a moment, let it out. A symmetric rise and fall
+       is a pendulum; the pause at the top is the part that reads as a breath. */
+    @keyframes dv-breathe { 0% { transform: translateY(0) } 40%, 56% { transform: translateY(-SIZEpx) } 100% { transform: translateY(0) } }
+    /* Every fifteen seconds or so the cat sinks and shrugs itself back up, twice,
+       the way one shifts its weight without getting up. It only ever goes down:
+       the chest is drawn from the same row the haunches start at, so anything
+       upward past one cell would open a gap between the two. */
+    @keyframes dv-settle { 0%, 84% { transform: translateY(0) } 87%, 88.5% { transform: translateY(SIZEpx) } 91% { transform: translateY(0) } 93%, 94% { transform: translateY(SIZEpx) } 97%, 100% { transform: translateY(0) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
@@ -150,8 +162,7 @@ func alive(x0, y0, size int) string {
 `
 	css = strings.ReplaceAll(css, "SIZEpx", fmt.Sprintf("%dpx", breath))
 	css = strings.ReplaceAll(css, "GLANCEpx", fmt.Sprintf("%dpx", glance))
-	b.WriteString(css)
-	return b.String()
+	return css + p.String(), b.String()
 }
 
 // earCells turns an ear pose's rows into the set of cells it paints.
@@ -189,23 +200,40 @@ func sortCells(in []mark.Cell) []mark.Cell {
 	return in
 }
 
+// chestRow splits the animal into the part that breathes and the part that
+// stays put. Rows 9 and 10 of the sprite are the same full-width row, so the
+// lower half is drawn from row 9 upwards: at rest the chest covers that row,
+// and when the chest rises it is what shows through rather than a gap.
+const chestRow = 9
+
+// livingCat is the whole animal with everything that moves on it. The haunches,
+// the paws and the tail are drawn outside the breathing group and never move —
+// an animal that breathes with its feet is not breathing, it is hovering, which
+// is what the first version of this did.
+func livingCat(x0, y0, size int) string {
+	tail := movingTail()
+	still := mark.Ready
+	still.EyeSet = "none"
+	lower := mark.Paths(still, x0, y0, size, func(c mark.Cell) bool {
+		return c.Row < chestRow || tail[c]
+	})
+	chest := mark.Paths(still, x0, y0, size, func(c mark.Cell) bool {
+		return c.Row > chestRow
+	})
+	planted, breathing := alive(x0, y0, size)
+	// Two nested groups rather than one, because two animations on one element
+	// would each be setting transform and the last one would win. The settle sits
+	// outside the breath, so the cat goes on breathing while it shifts.
+	return planted + fills(lower, 2) +
+		"  <g class=\"settle\">\n   <g class=\"breathe\">\n" +
+		fills(chest, 4) + breathing + "   </g>\n  </g>\n"
+}
+
 func logo(ink string, animate bool) string {
 	const x0, y0, size = 36, 19, 6
-	still := mark.Ready
-	var skip func(mark.Cell) bool
-	var parts string
+	cat := fills(mark.Paths(mark.Ready, x0, y0, size, nil), 2)
 	if animate {
-		tail := movingTail()
-		skip = func(c mark.Cell) bool { return tail[c] }
-		still.EyeSet = "none"
-		parts = alive(x0, y0, size)
-	}
-	// The whole animal breathes, so the group wraps the still body and every
-	// moving part alike — a breath that moved only the body would tear the cat
-	// away from its own tail.
-	cat := fills(mark.Paths(still, x0, y0, size, skip), 2) + parts
-	if animate {
-		cat = "  <g class=\"breathe\">\n" + cat + "  </g>\n"
+		cat = livingCat(x0, y0, size)
 	}
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="620" height="170" viewBox="0 0 620 170" role="img" aria-label="deja-vu">
 ` + note + cat +
@@ -231,14 +259,9 @@ func icon() string {
 // header mark moves without the page owning a second copy of the sprite.
 func liveIcon() string {
 	const x0, y0, size = 56, 68, 12
-	tail := movingTail()
-	still := mark.Ready
-	still.EyeSet = "none"
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" role="img" aria-label="deja-vu">
   <rect width="400" height="400" rx="88" fill="#1d1b2e"/>
-` + note + "  <g class=\"breathe\">\n" +
-		fills(mark.Paths(still, x0, y0, size, func(c mark.Cell) bool { return tail[c] }), 2) +
-		alive(x0, y0, size) + "  </g>\n</svg>\n"
+` + note + livingCat(x0, y0, size) + "</svg>\n"
 }
 
 // stillIcon is the app icon in a named mood, for the moments the site wants the

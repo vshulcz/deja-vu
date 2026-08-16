@@ -37,3 +37,19 @@ func TestWagPositionsAreTheSameCellCount(t *testing.T) {
 		}
 	}
 }
+
+// The animated mark and the demo film both split the cat in two: the chest and
+// the head breathe, the haunches and the paws stay on the ground. That split
+// only holds because rows 8, 9 and 10 are the same full-width row — the planted
+// half is drawn from row 8, so a rising chest reveals a spare row rather than
+// the background. Reshape the body through here and the mark tears open across
+// its middle on every inhale, which is not something a test of the finished SVG
+// would notice.
+func TestTheRowsTheBreathSplitsOnAreInterchangeable(t *testing.T) {
+	for _, r := range []int{9, 10} {
+		if Body[r] != Body[8] {
+			t.Errorf("row %d is %q but row 8 is %q: the chest can no longer rise without tearing",
+				r, Body[r], Body[8])
+		}
+	}
+}

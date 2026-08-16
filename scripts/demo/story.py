@@ -112,17 +112,28 @@ def cat_state(t: float) -> tuple[int, str]:
     return bob, eyes
 
 
+# The chest and everything above it are what breathe; the haunches, the paws and
+# the tail stay on the ground. Rows 8, 9 and 10 of the sprite are the same
+# full-width row, so the planted half is drawn from row 8 and the chest from row
+# 9: at rest the chest covers it, and when the chest rises what shows through is
+# that spare row rather than a gap. Two cells of rise is what row 8 buys.
+CHEST_ROW = 9
+PLANTED_ROW = 8
+
+
 def draw_cat(d, x, y, px=4, t=0.0):
     """One rectangle a pixel. At px=4 the sprite is 96x88, which is the size it
     is shown at on the site."""
     bob, eyes = cat_state(t)
     rows = list(CAT_BODY)
     rows[7:10] = EYES[eyes]
-    for r, row in enumerate(rows):
+    plan = [(r, row, 0) for r, row in enumerate(rows) if r >= PLANTED_ROW]
+    plan += [(r, row, bob) for r, row in enumerate(rows) if r <= CHEST_ROW]
+    for r, row, dy in plan:
         for c, ch in enumerate(row):
             fill = {"#": PH, "n": AMBER, "o": FEATURE}.get(ch)
             if fill:
-                top = y + (r + bob) * px
+                top = y + (r + dy) * px
                 d.rectangle([x + c * px, top, x + c * px + px - 1, top + px - 1], fill=fill)
 
 
