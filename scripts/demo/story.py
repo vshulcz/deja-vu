@@ -89,17 +89,37 @@ EYES = {
 }
 
 
-def cat_state(t: float) -> tuple[int, str]:
-    """How the cat sits at film time t: how far it has risen, and its eyes.
+def between(stops: list[tuple[float, float]], u: float) -> float:
+    """Read a value off a list of (position, value) stops, eased between them."""
+    for i in range(len(stops) - 1):
+        (p0, v0), (p1, v1) = stops[i], stops[i + 1]
+        if p0 <= u <= p1:
+            k = 0.0 if p1 == p0 else (u - p0) / (p1 - p0)
+            return v0 + (v1 - v0) * (k * k * (3 - 2 * k))
+    return stops[-1][1]
 
-    The breath is continuous and the blinks are not on the beat, for the same
-    reason the mark's are not — a creature that moves on a metronome reads as a
-    mechanism."""
-    # Two pixels of travel through three positions rather than one pixel through
-    # two: this cat is drawn at two screen pixels a sprite pixel and the film is
-    # shown scaled down, so a single-pixel rise arrives as about one pixel of
-    # movement and nobody sees it.
-    bob = -round((math.sin(t / 4.3 * math.tau) + 1) / 2 * 2)
+
+# What the body does over one breath and over one perk, as height multipliers.
+# The perk squashes before it stretches and rocks to a stop afterwards: the dip
+# before a movement is what makes it read as intent rather than as a jolt, and
+# the shrinking bounces after are what make it read as weight.
+BREATH = [(0.0, 1.0), (0.40, 1.045), (0.56, 1.045), (1.0, 1.0)]
+PERK = [(0.0, 1.0), (0.86, 1.0), (0.884, 0.945), (0.908, 1.068),
+        (0.932, 0.975), (0.954, 1.014), (0.974, 1.0), (1.0, 1.0)]
+
+
+def cat_state(t: float) -> tuple[float, str]:
+    """How the cat sits at film time t: how tall it is, and what its eyes do.
+
+    Height carries the whole of it. Squash and stretch keep the volume, so the
+    width follows from the height — a body that grows taller without growing
+    narrower is inflating, not breathing. Earlier versions slid a slab of the
+    sprite up and down instead, which took the paws off the ground in one and
+    stretched the face away from the nose in the next: a slice of a body moving
+    is a cut, not a deformation, and it reads as one.
+
+    The cycles do not divide each other, so the combination never repeats."""
+    tall = between(BREATH, (t % 4.9) / 4.9) * between(PERK, (t % 18.7) / 18.7)
     eyes = "open"
     # One blink, lid down and back up, a fifth of a second shut. At twenty frames
     # a second the first version's ninety-millisecond steps lasted under two
@@ -109,32 +129,31 @@ def cat_state(t: float) -> tuple[int, str]:
             eyes = "low"
         elif at + 0.15 <= t < at + 0.35:
             eyes = "shut"
-    return bob, eyes
-
-
-# The chest and everything above it are what breathe; the haunches, the paws and
-# the tail stay on the ground. Rows 8, 9 and 10 of the sprite are the same
-# full-width row, so the planted half is drawn from row 8 and the chest from row
-# 9: at rest the chest covers it, and when the chest rises what shows through is
-# that spare row rather than a gap. Two cells of rise is what row 8 buys.
-CHEST_ROW = 9
-PLANTED_ROW = 8
+    return tall, eyes
 
 
 def draw_cat(d, x, y, px=4, t=0.0):
     """One rectangle a pixel. At px=4 the sprite is 96x88, which is the size it
-    is shown at on the site."""
-    bob, eyes = cat_state(t)
+    is shown at on the site.
+
+    Every edge is rounded to a whole screen pixel, so a cat halfway through a
+    breath is still made of square pixels rather than of blurred ones. The film
+    has no transforms to lean on the way the SVG mark does; this is the same
+    deformation done by hand."""
+    tall, eyes = cat_state(t)
+    wide = 1 / tall
     rows = list(CAT_BODY)
     rows[7:10] = EYES[eyes]
-    plan = [(r, row, 0) for r, row in enumerate(rows) if r >= PLANTED_ROW]
-    plan += [(r, row, bob) for r, row in enumerate(rows) if r <= CHEST_ROW]
-    for r, row, dy in plan:
+    feet, middle = y + len(rows) * px, x + len(rows[0]) * px / 2
+    for r, row in enumerate(rows):
+        top = feet + round((r - len(rows)) * px * tall)
+        bottom = feet + round((r + 1 - len(rows)) * px * tall) - 1
         for c, ch in enumerate(row):
             fill = {"#": PH, "n": AMBER, "o": FEATURE}.get(ch)
             if fill:
-                top = y + (r + dy) * px
-                d.rectangle([x + c * px, top, x + c * px + px - 1, top + px - 1], fill=fill)
+                left = middle + round((c - len(row) / 2) * px * wide)
+                right = middle + round((c + 1 - len(row) / 2) * px * wide) - 1
+                d.rectangle([left, top, right, bottom], fill=fill)
 
 
 def font(size: int) -> ImageFont.FreeTypeFont:

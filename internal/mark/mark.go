@@ -165,10 +165,19 @@ type Path struct {
 	D    string
 }
 
-// cellsPath writes cells as path data, merging horizontally adjacent ones into a
-// single rectangle. One path per colour rather than one rect per pixel: at
-// fractional scale a per-row fill leaves a hairline of background between rows,
-// which is the seam the first hand-drawn assets had.
+// run is one horizontal stretch of cells of a single colour within a row.
+type run struct{ c0, c1 int }
+
+// cellsPath writes cells as path data as few rectangles as it can: adjacent
+// cells merge across a row, and a row's stretch merges downwards for as long as
+// the rows below hold exactly the same one.
+//
+// One path per colour rather than one rect per pixel, and one rect per block
+// rather than one per row, because every edge between two rectangles is a place
+// the renderer can leave a hairline of background. At whole-number scale it
+// never showed; the mark is animated with a scale transform now, so the sprite
+// spends most of its time at a fractional size and every seam it has is visible
+// as a bright line across the animal.
 func cellsPath(cells []Cell, x0, y0, size int) string {
 	byRow := map[int][]int{}
 	rows := []int{}
@@ -179,7 +188,8 @@ func cellsPath(cells []Cell, x0, y0, size int) string {
 		byRow[c.Row] = append(byRow[c.Row], c.Col)
 	}
 	sort.Ints(rows)
-	var b strings.Builder
+
+	runs := map[int][]run{}
 	for _, r := range rows {
 		cols := byRow[r]
 		sort.Ints(cols)
@@ -188,9 +198,37 @@ func cellsPath(cells []Cell, x0, y0, size int) string {
 			for j+1 < len(cols) && cols[j+1] == cols[j]+1 {
 				j++
 			}
-			w := (j - i + 1) * size
-			fmt.Fprintf(&b, "M%d %dh%dv%dh-%dZ", x0+cols[i]*size, y0+r*size, w, size, w)
+			runs[r] = append(runs[r], run{cols[i], cols[j]})
 			i = j + 1
+		}
+	}
+
+	taken := map[int]map[run]bool{}
+	has := func(r int, want run) bool {
+		for _, got := range runs[r] {
+			if got == want && !taken[r][got] {
+				return true
+			}
+		}
+		return false
+	}
+
+	var b strings.Builder
+	for _, r := range rows {
+		for _, rn := range runs[r] {
+			if taken[r][rn] {
+				continue
+			}
+			h := 1
+			for has(r+h, rn) {
+				if taken[r+h] == nil {
+					taken[r+h] = map[run]bool{}
+				}
+				taken[r+h][rn] = true
+				h++
+			}
+			w := (rn.c1 - rn.c0 + 1) * size
+			fmt.Fprintf(&b, "M%d %dh%dv%dh-%dZ", x0+rn.c0*size, y0+r*size, w, h*size, w)
 		}
 	}
 	return b.String()

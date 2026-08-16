@@ -6,16 +6,20 @@ import (
 )
 
 // The stats page, the viewer and the card each carried their own pasted copy of
-// the mark. These pin what those copies held, so replacing them with generated
-// markup is a move rather than a redraw — and so a later change to the sprite
-// that reaches the assets but not these pages fails here.
+// the mark. These pin the generated markup that replaced them, so a later change
+// to the sprite that reaches the assets but not these pages fails here.
+//
+// The rectangles are fewer than the hand-drawn copies held: those were one per
+// row, and a stretch now merges downwards through the rows that repeat it. Same
+// drawing, fewer edges — and an edge is where a renderer can leave a hairline of
+// background once the mark is scaled.
 const (
-	handDrawnStill = `<path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v1h-18ZM2 6h18v1h-18ZM2 7h3v1h-3ZM7 7h8v1h-8ZM17 7h3v1h-3ZM2 8h3v1h-3ZM7 8h8v1h-8ZM17 8h3v1h-3ZM2 9h3v1h-3ZM7 9h8v1h-8ZM17 9h3v1h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v1h-2ZM5 15h12v1h-12ZM19 15h2v1h-2ZM5 16h12v1h-12ZM19 16h2v1h-2ZM5 17h12v1h-12ZM19 17h2v1h-2ZM5 18h12v1h-12ZM19 18h2v1h-2ZM4 19h16v1h-16ZM4 20h16v1h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#1c1c1c" d="M5 7h2v1h-2ZM15 7h2v1h-2ZM5 8h2v1h-2ZM15 8h2v1h-2ZM5 9h2v1h-2ZM15 9h2v1h-2Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/>`
+	handDrawnStill = `<path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v2h-18ZM2 7h3v3h-3ZM7 7h8v3h-8ZM17 7h3v3h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v5h-2ZM5 15h12v4h-12ZM4 19h16v2h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#1c1c1c" d="M5 7h2v3h-2ZM15 7h2v3h-2Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/>`
 
 	// The still layer of the animated version: no eyes cut out of it, so a blink
 	// does not punch two holes in the head, and no tail, since the tail hangs
 	// clear of the body and each wag position draws its own.
-	handDrawnAliveBody = `<path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v1h-18ZM2 6h18v1h-18ZM2 7h18v1h-18ZM2 8h18v1h-18ZM2 9h18v1h-18ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM5 15h12v1h-12ZM5 16h12v1h-12ZM5 17h12v1h-12ZM5 18h12v1h-12ZM4 19h14v1h-14ZM4 20h14v1h-14ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/>`
+	handDrawnAliveBody = `<path fill="#8787af" d="M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v6h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM5 15h12v4h-12ZM4 19h14v2h-14ZM5 21h4v1h-4ZM13 21h4v1h-4Z"/><path fill="#ff8700" d="M10 11h2v1h-2Z"/>`
 )
 
 func TestStillMarkMatchesTheCopyItReplaced(t *testing.T) {

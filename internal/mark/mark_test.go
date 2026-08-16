@@ -1,15 +1,25 @@
 package mark
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 // The mark was hand-drawn into four places before this package existed: the SVG
 // assets, the stats card, the stats page and the local viewer. Those literals
-// are being replaced by Paths, and this pins the unit-scale output to what they
-// held — so the change is a move, not a redraw.
+// were replaced by Paths, and this pins the unit-scale output.
+//
+// The rectangles are not the ones the hand-drawn literals held: they were one
+// per row, and cellsPath merges a stretch downwards through the rows that repeat
+// it. The drawing is identical — what changed is how few edges it is made of,
+// and every edge is somewhere a hairline of background can show through once the
+// mark is scaled. TestPathsCoverEveryCellExactlyOnce is the check that survives
+// the next change to how they are packed; this one is the exact expected string.
 func TestPathsMatchTheHandDrawnLiterals(t *testing.T) {
 	want := []Path{
-		{Fill: "#8787af", D: "M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v1h-18ZM2 6h18v1h-18ZM2 7h3v1h-3ZM7 7h8v1h-8ZM17 7h3v1h-3ZM2 8h3v1h-3ZM7 8h8v1h-8ZM17 8h3v1h-3ZM2 9h3v1h-3ZM7 9h8v1h-8ZM17 9h3v1h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v1h-2ZM5 15h12v1h-12ZM19 15h2v1h-2ZM5 16h12v1h-12ZM19 16h2v1h-2ZM5 17h12v1h-12ZM19 17h2v1h-2ZM5 18h12v1h-12ZM19 18h2v1h-2ZM4 19h16v1h-16ZM4 20h16v1h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"},
-		{Fill: "#1c1c1c", D: "M5 7h2v1h-2ZM15 7h2v1h-2ZM5 8h2v1h-2ZM15 8h2v1h-2ZM5 9h2v1h-2ZM15 9h2v1h-2Z"},
+		{Fill: "#8787af", D: "M4 0h1v1h-1ZM17 0h1v1h-1ZM3 1h3v1h-3ZM16 1h3v1h-3ZM3 2h4v1h-4ZM15 2h4v1h-4ZM3 3h5v1h-5ZM14 3h5v1h-5ZM3 4h16v1h-16ZM2 5h18v2h-18ZM2 7h3v3h-3ZM7 7h8v3h-8ZM17 7h3v3h-3ZM2 10h18v1h-18ZM2 11h8v1h-8ZM12 11h8v1h-8ZM2 12h18v1h-18ZM3 13h16v1h-16ZM4 14h14v1h-14ZM19 14h2v5h-2ZM5 15h12v4h-12ZM4 19h16v2h-16ZM5 21h4v1h-4ZM13 21h4v1h-4Z"},
+		{Fill: "#1c1c1c", D: "M5 7h2v3h-2ZM15 7h2v3h-2Z"},
 		{Fill: "#ff8700", D: "M10 11h2v1h-2Z"},
 	}
 	got := Paths(Ready, 0, 0, 1, nil)
@@ -38,18 +48,36 @@ func TestWagPositionsAreTheSameCellCount(t *testing.T) {
 	}
 }
 
-// The animated mark and the demo film both split the cat in two: the chest and
-// the head breathe, the haunches and the paws stay on the ground. That split
-// only holds because rows 8, 9 and 10 are the same full-width row — the planted
-// half is drawn from row 8, so a rising chest reveals a spare row rather than
-// the background. Reshape the body through here and the mark tears open across
-// its middle on every inhale, which is not something a test of the finished SVG
-// would notice.
-func TestTheRowsTheBreathSplitsOnAreInterchangeable(t *testing.T) {
-	for _, r := range []int{9, 10} {
-		if Body[r] != Body[8] {
-			t.Errorf("row %d is %q but row 8 is %q: the chest can no longer rise without tearing",
-				r, Body[r], Body[8])
+// cellsPath packs cells into as few rectangles as it can, and a packing bug is
+// invisible in the finished asset until it is not: an overlap costs nothing to
+// look at, and a hole is a single missing pixel somewhere in a body of eight
+// hundred. Area is the invariant that catches both, and it does not care how the
+// rectangles are arranged, so it outlives the exact-string test above.
+func TestPathsCoverEveryCellExactlyOnce(t *testing.T) {
+	for _, m := range []Mood{Ready, Surprised, Asleep, Nothing} {
+		want := map[string]int{}
+		for _, row := range Grid(m) {
+			for _, ch := range row {
+				if col, ok := Colour(byte(ch), m.CoatColour); ok {
+					want[Hex[col]]++
+				}
+			}
+		}
+		for _, p := range Paths(m, 0, 0, 1, nil) {
+			area := 0
+			for _, rect := range strings.Split(strings.TrimSuffix(p.D, "Z"), "Z") {
+				var x, y, w, h, back int
+				if _, err := fmt.Sscanf(rect, "M%d %dh%dv%dh-%d", &x, &y, &w, &h, &back); err != nil {
+					t.Fatalf("%s: cannot read rectangle %q: %v", p.Fill, rect, err)
+				}
+				if back != w {
+					t.Errorf("%s: rectangle %q does not close: goes out %d and back %d", p.Fill, rect, w, back)
+				}
+				area += w * h
+			}
+			if area != want[p.Fill] {
+				t.Errorf("%v %s: rectangles cover %d cells, the grid has %d", m, p.Fill, area, want[p.Fill])
+			}
 		}
 	}
 }

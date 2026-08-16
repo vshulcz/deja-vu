@@ -6,14 +6,16 @@
      so vector and terminal agree. -->
   <style>
     .t1, .t2, .eyes-half, .eyes-shut, .ear-flick { opacity: 0 }
+    /* Everything that deforms turns about the point between the front paws, so
+       the cat is pressed into the ground rather than moved around above it. */
+    .sway, .perk, .breathe { transform-origin: 200px 332px }
     @media (prefers-reduced-motion: no-preference) {
       /* The one continuous motion on the mark. Everything else cuts between
          poses; this eases, and a creature that is never perfectly still is the
-         difference between an animal and a diagram. It moves the chest and the
-         head only: moving the paws too was the first version, and a cat whose
-         feet leave the ground is not breathing, it is floating. */
-      .breathe { animation: dv-breathe 4.3s cubic-bezier(.37,0,.4,1) infinite }
-      .settle  { animation: dv-settle 17.9s cubic-bezier(.3,0,.3,1) infinite }
+         difference between an animal and a diagram. */
+      .breathe { animation: dv-breathe 4.9s cubic-bezier(.4,0,.5,1) infinite }
+      .perk    { animation: dv-perk 18.7s cubic-bezier(.33,0,.3,1) infinite }
+      .sway    { animation: dv-sway 13.7s cubic-bezier(.45,0,.55,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
@@ -24,14 +26,25 @@
       .ear-up    { animation: dv-ear-up 11.3s steps(1, end) infinite }
       .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    /* Draw in, hold at the top a moment, let it out. A symmetric rise and fall
-       is a pendulum; the pause at the top is the part that reads as a breath. */
-    @keyframes dv-breathe { 0% { transform: translateY(0) } 40%, 56% { transform: translateY(-12px) } 100% { transform: translateY(0) } }
-    /* Every fifteen seconds or so the cat sinks and shrugs itself back up, twice,
-       the way one shifts its weight without getting up. It only ever goes down:
-       the chest is drawn from the same row the haunches start at, so anything
-       upward past one cell would open a gap between the two. */
-    @keyframes dv-settle { 0%, 84% { transform: translateY(0) } 87%, 88.5% { transform: translateY(12px) } 91% { transform: translateY(0) } 93%, 94% { transform: translateY(12px) } 97%, 100% { transform: translateY(0) } }
+    /* Draw in, hold at the top a moment, let it out. Taller is narrower: a body
+       that gains height without losing width is inflating, not breathing. The
+       pause at the top is what separates a breath from a pendulum. */
+    @keyframes dv-breathe { 0% { transform: scale(1, 1) } 40%, 56% { transform: scale(.978, 1.026) } 100% { transform: scale(1, 1) } }
+    /* Once every eighteen seconds or so it gathers itself and pops up, then
+       rocks to a stop. Squash first, stretch second: the dip before a movement
+       is what makes it read as intent rather than as a jolt, and the two
+       shrinking bounces afterwards are what makes it read as weight. */
+    @keyframes dv-perk {
+      0%, 86% { transform: scale(1, 1) }
+      88.4%   { transform: scale(1.055, .945) }
+      90.8%   { transform: scale(.955, 1.068) }
+      93.2%   { transform: scale(1.028, .975) }
+      95.4%   { transform: scale(.988, 1.014) }
+      97.4%, 100% { transform: scale(1, 1) }
+    }
+    /* And now and then it leans, once each way. The whole animal tips about its
+       paws; there is no neck on this sprite to turn a head on. */
+    @keyframes dv-sway { 0%, 26% { transform: rotate(0) } 38%, 47% { transform: rotate(2.1deg) } 58%, 66% { transform: rotate(0) } 76%, 85% { transform: rotate(-2.1deg) } 96%, 100% { transform: rotate(0) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
@@ -47,21 +60,22 @@
     @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
     @keyframes dv-ear-up { 0%, 96.9% { opacity: 1 } 97%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
   </style>
-  <g class="t0"><path fill="#8787af" d="M284 236h24v12h-24ZM284 248h24v12h-24ZM284 260h24v12h-24ZM284 272h24v12h-24ZM284 284h24v12h-24ZM272 296h24v12h-24ZM272 308h24v12h-24Z"/></g>
-  <g class="t1"><path fill="#8787af" d="M296 236h24v12h-24ZM284 248h24v12h-24ZM284 260h24v12h-24ZM284 272h24v12h-24ZM284 284h24v12h-24ZM272 296h24v12h-24ZM272 308h24v12h-24Z"/></g>
-  <g class="t2"><path fill="#8787af" d="M308 236h24v12h-24ZM296 248h24v12h-24ZM284 260h24v12h-24ZM284 272h24v12h-24ZM284 284h24v12h-24ZM272 296h24v12h-24ZM272 308h24v12h-24Z"/></g>
-  <path fill="#8787af" d="M80 176h216v12h-216ZM80 188h216v12h-216ZM80 200h96v12h-96ZM200 200h96v12h-96ZM80 212h216v12h-216ZM92 224h192v12h-192ZM104 236h168v12h-168ZM116 248h144v12h-144ZM116 260h144v12h-144ZM116 272h144v12h-144ZM116 284h144v12h-144ZM104 296h168v12h-168ZM104 308h168v12h-168ZM116 320h48v12h-48ZM212 320h48v12h-48Z"/>
-  <path fill="#ff8700" d="M176 200h24v12h-24Z"/>
-  <g class="settle">
-   <g class="breathe">
-    <path fill="#8787af" d="M104 68h12v12h-12ZM260 68h12v12h-12ZM92 80h36v12h-36ZM248 80h36v12h-36ZM92 92h48v12h-48ZM236 92h48v12h-48ZM92 104h60v12h-60ZM224 104h60v12h-60ZM92 116h192v12h-192ZM80 128h216v12h-216ZM80 140h216v12h-216ZM80 152h216v12h-216ZM80 164h216v12h-216ZM80 176h216v12h-216Z"/>
+  <g class="sway">
+   <g class="perk">
+    <g class="breathe">
+     <path fill="#8787af" stroke="#8787af" stroke-width="1" d="M92 116h192v12h-192ZM80 128h216v72h-216ZM80 200h96v12h-96ZM200 200h96v12h-96ZM80 212h216v12h-216ZM92 224h192v12h-192ZM104 236h168v12h-168ZM116 248h144v48h-144ZM104 296h168v24h-168ZM116 320h48v12h-48ZM212 320h48v12h-48Z"/>
+     <path fill="#ff8700" stroke="#ff8700" stroke-width="1" d="M176 200h24v12h-24Z"/>
+  <g class="t0"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M284 236h24v60h-24ZM272 296h24v24h-24Z"/></g>
+  <g class="t1"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M296 236h24v12h-24ZM284 248h24v48h-24ZM272 296h24v24h-24Z"/></g>
+  <g class="t2"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M308 236h24v12h-24ZM296 248h24v12h-24ZM284 260h24v36h-24ZM272 296h24v24h-24Z"/></g>
   <g class="eyes">
-    <g class="eyes-open"><path fill="#1c1c1c" d="M116 152h24v12h-24ZM236 152h24v12h-24ZM116 164h24v12h-24ZM236 164h24v12h-24ZM116 176h24v12h-24ZM236 176h24v12h-24Z"/></g>
-    <g class="eyes-half"><path fill="#1c1c1c" d="M116 164h24v12h-24ZM236 164h24v12h-24ZM116 176h24v12h-24ZM236 176h24v12h-24Z"/></g>
+    <g class="eyes-open"><path fill="#1c1c1c" d="M116 152h24v36h-24ZM236 152h24v36h-24Z"/></g>
+    <g class="eyes-half"><path fill="#1c1c1c" d="M116 164h24v24h-24ZM236 164h24v24h-24Z"/></g>
     <g class="eyes-shut"><path fill="#1c1c1c" d="M104 176h48v12h-48ZM224 176h48v12h-48Z"/></g>
   </g>
-  <g class="ear-up"><path fill="#8787af" d="M104 68h12v12h-12ZM260 68h12v12h-12ZM92 80h36v12h-36ZM248 80h36v12h-36ZM92 92h48v12h-48ZM236 92h48v12h-48ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
-  <g class="ear-flick"><path fill="#8787af" d="M104 68h12v12h-12ZM92 80h36v12h-36ZM92 92h48v12h-48ZM248 92h36v12h-36ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
+  <g class="ear-up"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M104 68h12v12h-12ZM260 68h12v12h-12ZM92 80h36v12h-36ZM248 80h36v12h-36ZM92 92h48v12h-48ZM236 92h48v12h-48ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
+  <g class="ear-flick"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M104 68h12v12h-12ZM92 80h36v12h-36ZM92 92h48v12h-48ZM248 92h36v12h-36ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
+    </g>
    </g>
   </g>
 </svg>
