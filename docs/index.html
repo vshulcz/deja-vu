@@ -136,6 +136,38 @@ footer .sp{flex:1}
   --coat:#4af08b;--coat-hi:#8affc0;--coat-dim:#2f9459;--amber:#ffb454;
   --body:#a9cbb6;--faint:#5d8a6e}
 
+
+/* the exchange: the product itself, at the top of the page */
+.exchange{border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  background:var(--panel);margin-bottom:52px}
+.xhead{display:flex;align-items:center;gap:7px;padding:11px 15px;
+  border-bottom:1px solid var(--line);background:var(--panel-2)}
+.xhead .dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.xtitle{margin-left:8px;font:11.5px var(--mono);color:var(--faint)}
+.xbody{padding:20px 22px;font:13.5px/1.7 var(--mono)}
+.xbody p{margin:0 0 10px}
+.xbody .who{color:var(--faint)}
+.you{color:var(--ink)}
+.them{color:var(--body)}
+.tool{color:var(--coat-hi)}
+.hit{margin-top:14px !important;color:var(--faint);font-size:12.5px}
+.hit .when{color:var(--amber)}
+.hit .ms{color:var(--coat-hi)}
+.hit .nolm{margin-left:8px}
+.xbody .said{color:var(--body);border-left:2px solid var(--coat-dim);padding-left:12px;
+  margin-bottom:16px !important}
+.xbody .said b{color:var(--amber);font-weight:400}
+.them.last{color:var(--ink);border-top:1px solid var(--line);padding-top:14px;margin-bottom:0 !important}
+
+.cardshot{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.cardshot img{display:block;width:100%;height:auto}
+.note b{color:var(--coat-hi);font-weight:400;font-family:var(--mono);font-size:14px}
+
+
+/* the browser's default <mark> is a highlighter yellow that belongs to no
+   palette; the match takes the accent instead */
+.res mark{background:rgba(255,135,0,.16);color:var(--amber);border-radius:3px;padding:0 2px}
+
 #recall-line{color:var(--amber);font:12.5px var(--mono);margin-bottom:14px}
 
 @media (prefers-reduced-motion: reduce){
@@ -186,9 +218,25 @@ footer .sp{flex:1}
   </div>
 </header>
 
+
+<div class="exchange reveal">
+  <div class="xhead"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="xtitle">claude code — payments</span></div>
+  <div class="xbody">
+    <p class="you"><span class="who">you ›</span> prepared statement errors behind pgbouncer. again.</p>
+    <p class="them"><span class="who">claude ›</span> <span class="tool">recall("prepared statement pgbouncer")</span></p>
+    <p class="hit"><span class="when">Nov 29 2025</span> · payments · <span class="ms">20 ms</span>
+      <span class="nolm">no model, no network</span></p>
+    <p class="said">pgx v5.5 changed prepared-statement caching; pgbouncer cannot hold those
+      across connections. <b>we pinned pgx 5.4.3</b> — revisit when 1.24 ships support.</p>
+    <p class="them last"><span class="who">claude ›</span> You hit this in November and pinned
+      pgx 5.4.3. Same cause here — the pin was lost in the last dependency bump.</p>
+  </div>
+</div>
+
 <div class="proof reveal">
-  <div><b>84.9<i>%</i></b><span class="lab">hit@1 · LongMemEval-S</span></div>
-  <div><b>1.5<i>ms</i></b><span class="lab">median search over 3.5 GB</span></div>
+  <div><b data-count="84.9" data-dp="1">0<i>%</i></b><span class="lab">hit@1 · LongMemEval-S</span></div>
+  <div><b data-count="1.5" data-dp="1">0<i>ms</i></b><span class="lab">median search over 3.5 GB</span></div>
   <div><b>0</b><span class="lab">models, keys or cloud accounts</span></div>
 </div>
 
@@ -248,6 +296,15 @@ footer .sp{flex:1}
     <span>Antigravity</span><span>Grok Build</span><span>OpenClaw</span><span>pi</span>
     <span>Hermes</span><span class="more">one memory, all of them</span>
   </div>
+</section>
+
+
+<section class="reveal">
+  <h2>What a year of it looks like</h2>
+  <p class="big" style="margin-bottom:26px">Your own work, <em>wrapped.</em></p>
+  <div class="cardshot"><img src="assets/stats-card-demo.svg" alt="deja stats card: a year of agent sessions, the agents they came from, and the longest one" loading="lazy"></div>
+  <p class="note"><b>deja stats --card</b> draws it in your terminal; give it a filename and
+    it writes the SVG for a profile README.</p>
 </section>
 
 <section class="reveal">
@@ -423,6 +480,49 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
 })();
 
+
+/* ── the figures run ──────────────────────────────────────────────────────
+   Printed, they are a claim. Counted, they are a measurement being taken. */
+(function(){
+  var els=[].slice.call(document.querySelectorAll('[data-count]'));
+  if(!els.length)return;
+  if(reduced){els.forEach(function(el){el.firstChild.nodeValue=el.dataset.count});return}
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(!e.isIntersecting)return;
+    io.unobserve(e.target);
+    var el=e.target,target=parseFloat(el.dataset.count),dp=+(el.dataset.dp||0),t0=null;
+    requestAnimationFrame(function step(t){
+      t0=t0||t;
+      var k=Math.min(1,(t-t0)/900);
+      /* ease out: a counter that lands hard reads as a jump, not an arrival */
+      el.firstChild.nodeValue=(target*(1-Math.pow(1-k,3))).toFixed(dp);
+      if(k<1)requestAnimationFrame(step);
+    });
+  })},{threshold:.6});
+  els.forEach(function(el){io.observe(el)});
+})();
+
+/* ── the demo answers its own first question ──────────────────────────────
+   An empty box reads as a form. One that already found something reads as a
+   thing that works. */
+(function(){
+  var q=document.getElementById('dq');
+  if(!q)return;
+  q.value='connection pool';
+  q.dispatchEvent(new Event('input'));
+})();
+
+/* ── the cat walks down the page ──────────────────────────────────────────
+   Awake through the pitch, startled where the numbers are, dozing by the
+   section whose whole point is that nothing is happening. */
+(function(){
+  if(reduced||!HERO)return;
+  var proof=document.querySelector('.proof');
+  if(!proof)return;
+  new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting)cat('wow',1500);
+  })},{threshold:.8}).observe(proof);
+})();
 
 /* ── easter eggs ──────────────────────────────────────────────────────────
    Typed, not clicked: this is a tool people reach through a keyboard. */

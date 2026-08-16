@@ -236,12 +236,22 @@ func dateSpan(r stats.Report) string {
 }
 
 func cardCells(r stats.Report) []struct{ value, label string } {
+	// The hero falls back to the session count when nothing has been recalled
+	// yet, and then the row underneath repeated it — the same number twice,
+	// once as the headline and once as its own supporting figure.
+	hero, _ := heroStat(r)
 	cells := []struct{ value, label string }{
 		{formatStatNumber(r.TotalSessions), "sessions"},
 		{formatStatNumber(r.TotalMessages), "messages"},
 		{strconv.Itoa(len(r.Harnesses)), "agents"},
 	}
-	return cells
+	out := cells[:0]
+	for _, c := range cells {
+		if c.value != hero {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func cellWidth(value, label string) int {
