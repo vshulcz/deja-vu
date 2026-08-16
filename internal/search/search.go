@@ -613,13 +613,56 @@ func freshnessDecay(updated, now time.Time) float64 {
 	return 1 / (1 + age)
 }
 
-// tokenWindow returns the tightest character span of a message that contains
-// every query token at least once (first occurrences — an approximation that
-// costs nothing extra at scan time). 0 when some token is missing.
+// windowOccurrenceCap bounds how many places of one token are weighed when
+// measuring how close the query's words come together, and windowScanLimit
+// bounds how many are looked at to choose them. Without either, a long
+// transcript message full of a common word makes this quadratic.
+//
+// The places kept are spread across the whole text rather than taken from the
+// front. Taking the first N was the first version, and it moved the defect
+// rather than removing it: a message repeating one query word sixty times
+// before the phrase that actually answers the question was still measured
+// against the sixtieth repetition instead of the phrase.
+const (
+	windowOccurrenceCap = 32
+	windowScanLimit     = 4096
+)
+
+// spread picks at most cap of the places, evenly across them, always keeping
+// the first and the last — the tightest cluster is as often at the end of a
+// message as at the start.
+func spread(at []int, cap int) []int {
+	if len(at) <= cap {
+		return at
+	}
+	out := make([]int, 0, cap)
+	step := float64(len(at)-1) / float64(cap-1)
+	for i := 0; i < cap; i++ {
+		out = append(out, at[int(float64(i)*step+0.5)])
+	}
+	return out
+}
+
+// tokenWindow is the tightest character span in this text that contains every
+// query token.
+//
+// It used to measure between the FIRST place each token appears, which is not a
+// window at all: a message that mentions "connection" in its opening line and
+// then discusses "connection pool exhausted" as one phrase four paragraphs down
+// was scored on the four paragraphs. Proximity is the signal that the words
+// belong to one thought, and first-occurrence spacing is nearly the opposite of
+// measuring it.
 func tokenWindow(low string, qtoks []string) int {
 	if len(qtoks) < 2 {
 		return 0
 	}
+	// The span between first occurrences is an upper bound on the real window —
+	// it is one way of picking one place per token, and the real answer is the
+	// best of all of them. When that bound already reads as one thought, the
+	// exact figure cannot change the verdict, only sharpen a boost that is
+	// nearly at its ceiling. Enumerating occurrences costs about a fifth of
+	// search latency, so it is spent only where the cheap answer says the words
+	// are scattered, which is the case it gets wrong.
 	first, last := -1, -1
 	for _, tok := range qtoks {
 		i := strings.Index(low, tok)
@@ -633,18 +676,71 @@ func tokenWindow(low string, qtoks []string) int {
 			last = end
 		}
 	}
-	return last - first
+	if cheap := last - first; cheap <= proximityNear {
+		return cheap
+	}
+
+	type occurrence struct{ at, tok int }
+	var occs []occurrence
+	var at []int
+	for ti, tok := range qtoks {
+		at = at[:0]
+		for i := 0; i < len(low) && len(at) < windowScanLimit; {
+			j := strings.Index(low[i:], tok)
+			if j < 0 {
+				break
+			}
+			at = append(at, i+j)
+			i += j + 1
+		}
+		if len(at) == 0 {
+			return 0
+		}
+		for _, p := range spread(at, windowOccurrenceCap) {
+			occs = append(occs, occurrence{p, ti})
+		}
+	}
+	sort.Slice(occs, func(a, b int) bool { return occs[a].at < occs[b].at })
+
+	// Slide a window along the occurrences, shrinking it from the left for as
+	// long as it still holds every token.
+	seen := make([]int, len(qtoks))
+	have, best, left := 0, -1, 0
+	for right := range occs {
+		if seen[occs[right].tok] == 0 {
+			have++
+		}
+		seen[occs[right].tok]++
+		for have == len(qtoks) {
+			span := occs[right].at + len(qtoks[occs[right].tok]) - occs[left].at
+			if best < 0 || span < best {
+				best = span
+			}
+			seen[occs[left].tok]--
+			if seen[occs[left].tok] == 0 {
+				have--
+			}
+			left++
+		}
+	}
+	if best < 0 {
+		return 0
+	}
+	return best
 }
 
+// proximityNear is the width at which a window stops reading as one thought.
+const proximityNear = 200
+
 // proximityBoost rewards documents where the query terms sit together: a
-// window under ~200 chars reads as one thought, a spread across kilobytes is
-// coincidence. Bounded at +35%.
+// window under proximityNear chars reads as one thought, a spread across
+// kilobytes is coincidence. Bounded at +35%.
 func proximityBoost(window, queryTokenCount int) float64 {
 	if window <= 0 || queryTokenCount < 2 {
 		return 1
 	}
 	span := float64(window)
-	boost := 1 + 0.35*(200/(200+span))
+	boost := 1 + 0.35*(proximityNear/(proximityNear+span))
 	return boost
 }
 
