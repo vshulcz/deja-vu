@@ -1431,11 +1431,62 @@ func ErrorHits(ss []model.Session) []Hit {
 	return hits
 }
 
+// sessionHolds says whether a term appears anywhere in a session, stopping at
+// the first message that has it. Joining a session's text into one string to
+// ask this is quadratic in the number of messages, and these are transcripts.
+func sessionHolds(s model.Session, t string) bool {
+	folded := ""
+	for _, m := range s.Messages {
+		low := strings.ToLower(m.Text)
+		if strings.Contains(low, t) {
+			return true
+		}
+		if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
+			if folded = cjkfold.String(low); strings.Contains(folded, ft) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// termWeights says what each query term is worth for picking an excerpt, from
+// how much of the answer set holds it.
+//
+// The index knows the real idf and this layer does not, but it does not need
+// to: the question here is only which of two messages in one session to show,
+// and a term carried by every session that came back cannot be what separates
+// them. A word in one result of fifty is what names that result; a word in all
+// fifty is the shape of the question.
+//
+// Bounded below so a term the whole set shares still counts for something — it
+// is weak evidence, not none — and so a message holding two common words can
+// still beat one holding a single common word.
+func termWeights(ss []model.Session, terms []string) map[string]float64 {
+	if len(ss) == 0 {
+		return nil
+	}
+	df := make(map[string]int, len(terms))
+	for _, s := range ss {
+		for _, t := range terms {
+			if sessionHolds(s, t) {
+				df[t]++
+			}
+		}
+	}
+	out := make(map[string]float64, len(terms))
+	for _, t := range terms {
+		out[t] = 0.2 + math.Log(float64(len(ss)+1)/float64(df[t]+1))
+	}
+	return out
+}
+
 // RelevanceHits wraps relevance-ranked sessions as hits WITHOUT re-scoring:
 // the index already ordered them by IDF overlap, and exact-match BM25 (which
 // just failed) must not reshuffle the ranking. Count and snippets come from
 // term occurrences so output still shows why each session surfaced.
 func RelevanceHits(ss []model.Session, terms []string) []Hit {
+	weight := termWeights(ss, terms)
 	hits := make([]Hit, 0, len(ss))
 	for rank, s := range ss {
 		hit := Hit{Session: s, Tier: TierRelevance}
@@ -1443,45 +1494,57 @@ func RelevanceHits(ss []model.Session, terms []string) []Hit {
 		// message that contains any one of them. The passage that answers a
 		// question is where its words come together — a session about a gift
 		// from a sister used to be shown for "what did my dad give me" because
-		// "gift" matched first. Score each message by distinct terms hit; the
-		// best two become the excerpts an agent reads to decide.
+		// "gift" matched first.
+		//
+		// Terms are worth what they distinguish, not one each. The ranker picks
+		// a session by the idf mass of its best message and then discards which
+		// message that was; counting terms equally here picked a different one
+		// whenever a single rare word carried the session. "How many bikes do I
+		// own?" ranked a session on "three bikes" and displayed "many people own
+		// one", which is the passage an agent reads before deciding whether the
+		// result is worth anything.
 		type msgScore struct {
-			idx, distinct int
-			center        string
+			idx      int
+			distinct int
+			weighted float64
+			center   string
 		}
 		best := make([]msgScore, 0, 8)
 		for mi, m := range s.Messages {
 			low := strings.ToLower(m.Text)
 			var foldedLow string
 			distinct := 0
+			weighted := 0.0
 			center := ""
+			// The rarest term a message holds is what names it, so it is what
+			// the excerpt gets centred on.
+			heaviest := 0.0
 			for _, t := range terms {
-				if strings.Contains(low, t) {
-					distinct++
-					if center == "" {
-						center = t
+				found := strings.Contains(low, t)
+				if !found {
+					if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
+						if foldedLow == "" {
+							foldedLow = cjkfold.String(low)
+						}
+						found = strings.Contains(foldedLow, ft)
 					}
+				}
+				if !found {
 					continue
 				}
-				if ft := cjkfold.String(t); ft != t || cjkfold.HasCJK(t) {
-					if foldedLow == "" {
-						foldedLow = cjkfold.String(low)
-					}
-					if strings.Contains(foldedLow, ft) {
-						distinct++
-						if center == "" {
-							center = t
-						}
-					}
+				distinct++
+				weighted += weight[t]
+				if center == "" || weight[t] > heaviest {
+					center, heaviest = t, weight[t]
 				}
 			}
 			if distinct > 0 {
 				hit.Count++
-				best = append(best, msgScore{mi, distinct, center})
+				best = append(best, msgScore{mi, distinct, weighted, center})
 			}
 		}
-		// Most distinct terms first; a stable sort keeps message order among ties.
-		sort.SliceStable(best, func(i, j int) bool { return best[i].distinct > best[j].distinct })
+		// Heaviest first; a stable sort keeps message order among ties.
+		sort.SliceStable(best, func(i, j int) bool { return best[i].weighted > best[j].weighted })
 		for i := 0; i < len(best) && i < 2; i++ {
 			hit.Snippets = append(hit.Snippets, snippet(s.Messages[best[i].idx].Text, best[i].center, nil))
 		}
