@@ -212,26 +212,33 @@ func doctorCodexHook(w io.Writer) {
 		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", hooksPath)
 		return
 	}
-	cfg, err := os.ReadFile(filepath.Join(sources.CodexHome(), "config.toml"))
-	status := "wired"
-	if err == nil {
-		if i := strings.Index(string(cfg), "hooks.json:session_start"); i >= 0 {
-			rest := string(cfg[i:])
-			off, on := strings.Index(rest, "enabled = false"), strings.Index(rest, "enabled = true")
-			if off >= 0 && (on == -1 || on > off) {
-				status = "disabled"
-			} else if !codexHookTrusted(hooksPath, rest) {
-				// Codex pins the hook file's hash when the user trusts it.
-				// Any reinstall that rewrites hooks.json invalidates that,
-				// and the hook stops running while enabled stays true — so
-				// this is the state that looks healthiest and works least.
-				status = "untrusted"
-			}
+	cfgPath := filepath.Join(sources.CodexHome(), "config.toml")
+	cfg, err := os.ReadFile(cfgPath)
+	if err != nil {
+		// Codex's trust store is its config. Without it there is nothing to
+		// read, and guessing either way is worse than saying so.
+		fmt.Fprintf(w, "  %-12s %-11s %s  (cannot read %s, so whether codex trusts the hook is unknown)\n",
+			"codex-hook", "wired", hooksPath, cfgPath)
+		return
+	}
+	// Untrusted until the config says otherwise. An entry that codex has never
+	// been shown is the state where it silently runs nothing: measured on codex
+	// 0.142.4, a home with hooks.json and no trust entry produced no hook at
+	// all under `codex exec`, and the same run with
+	// --dangerously-bypass-hook-trust ran it. That state used to read "wired".
+	status := "untrusted"
+	if section := codexHookTrustSection(string(cfg)); section != "" {
+		off, on := strings.Index(section, "enabled = false"), strings.Index(section, "enabled = true")
+		switch {
+		case off >= 0 && (on == -1 || on > off):
+			status = "disabled"
+		case strings.Contains(section, "trusted_hash = \"sha256:"):
+			status = "wired"
 		}
 	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
 	if status == "untrusted" {
-		line += "  (codex will not run it until you review it — press t in codex, or run /hooks)"
+		line += "  (codex has not been shown it — open codex once and approve it, or run /hooks; until then `codex exec` runs no hook at all)"
 	}
 	if status == "disabled" {
 		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"

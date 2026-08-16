@@ -559,6 +559,33 @@ func TestDoctorCodexHookStates(t *testing.T) {
 	if !strings.Contains(out.String(), "codex-hook   disabled") || !strings.Contains(out.String(), "re-enable") {
 		t.Fatalf("disabled state wrong:\n%s", out.String())
 	}
+
+	// A config codex has written but which says nothing about our hook. That is
+	// a fresh install, and it is the state where codex silently runs nothing:
+	// measured on 0.142.4, `codex exec` produced no hook here, and the same run
+	// with --dangerously-bypass-hook-trust produced it. deja used to call this
+	// "wired", which is the report that leaves someone believing memory is on.
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("model = \"gpt-5\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	doctorHooks(&out)
+	if !strings.Contains(out.String(), "codex-hook   untrusted") {
+		t.Fatalf("a hook codex has never been shown must not read as wired:\n%s", out.String())
+	}
+
+	// And once codex has recorded an opinion, it is wired. deja cannot check the
+	// pin — its value is not the hook file's sha256 — and comparing the two
+	// reported every working install as untrusted.
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"),
+		[]byte("[hooks.state.\"/x/hooks.json:session_start:0:0\"]\ntrusted_hash = \"sha256:aa\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	doctorHooks(&out)
+	if !strings.Contains(out.String(), "codex-hook   wired") {
+		t.Fatalf("a trusted hook must read as wired:\n%s", out.String())
+	}
 }
 
 func TestHookContextDoesNotBlockOnSilentStdin(t *testing.T) {

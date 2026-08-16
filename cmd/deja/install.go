@@ -610,7 +610,15 @@ func installCodexAuto(exe string, uninstall bool) (installResult, error) {
 	if _, err := installCodex(exe, uninstall); err != nil {
 		return installResult{}, err
 	}
-	return installCodexHooks(exe, uninstall)
+	res, err := installCodexHooks(exe, uninstall)
+	// Writing the file is not the same as codex agreeing to run it. Said here
+	// because this is the moment someone is watching, and because the state it
+	// warns about is invisible: everything on disk looks right and no memory
+	// arrives.
+	if err == nil && !uninstall && !codexHasSeenItsHook() {
+		fmt.Println("codex: open codex once and approve the hook (/hooks) — until then it runs nothing, `codex exec` included")
+	}
+	return res, err
 }
 
 func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {

@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -102,29 +100,33 @@ func TestCompletionListsEveryInstallTarget(t *testing.T) {
 	}
 }
 
-// Codex pins the hook file's hash when the user trusts it, and any reinstall
-// that rewrites hooks.json invalidates the pin. The hook then stops running
-// while `enabled = true` stays in the config — the state that looks healthiest
-// and works least, and the one doctor used to call "wired".
-func TestCodexHookTrustDetectsARewrittenFile(t *testing.T) {
-	dir := t.TempDir()
-	hooks := filepath.Join(dir, "hooks.json")
-	if err := os.WriteFile(hooks, []byte(`{"hooks":{"session_start":[]}}`), 0o644); err != nil {
-		t.Fatal(err)
+// Codex gates hooks behind a trust store of its own, keyed per hook in
+// config.toml. Measured on codex 0.142.4: a home whose hooks.json is perfectly
+// wired but which codex has never been shown runs no hook at all under
+// `codex exec` — no marker — while the same run with
+// --dangerously-bypass-hook-trust runs it. That is the state that looks
+// healthiest and works least, and deja used to call it "wired".
+//
+// The pin itself is not checkable from here. Codex's trusted_hash is not the
+// sha256 of the hook file, and deja comparing the two called every working
+// install untrusted — on the machine this was written on, doctor said untrusted
+// while codex was demonstrably delivering deja's recall to the model.
+func TestCodexHookTrustSectionStopsAtTheNextTable(t *testing.T) {
+	cfg := `[hooks.state."/h/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:abc"
+
+[projects."/some/other"]
+enabled = false
+`
+	got := codexHookTrustSection(cfg)
+	if !strings.Contains(got, "trusted_hash") {
+		t.Fatalf("the hook's own pin is missing from its section: %q", got)
 	}
-	sum := sha256.Sum256([]byte(`{"hooks":{"session_start":[]}}`))
-	matching := "\ntrusted_hash = \"sha256:" + hex.EncodeToString(sum[:]) + "\"\nenabled = true\n"
-	if !codexHookTrusted(hooks, matching) {
-		t.Fatal("an untouched hook file is reported untrusted")
+	if strings.Contains(got, "enabled = false") {
+		t.Errorf("the section ran on into an unrelated table, whose enabled flag would decide our status: %q", got)
 	}
-	stale := "\ntrusted_hash = \"sha256:0000000000000000000000000000000000000000000000000000000000000000\"\nenabled = true\n"
-	if codexHookTrusted(hooks, stale) {
-		t.Fatal("a rewritten hook file is reported trusted")
-	}
-	// A config with no pin at all is a codex that never asked; saying
-	// "untrusted" there would be a false alarm on every fresh install.
-	if !codexHookTrusted(hooks, "\nenabled = true\n") {
-		t.Fatal("absence of a pin reported as untrusted")
+	if codexHookTrustSection("[projects.\"/x\"]\nenabled = true\n") != "" {
+		t.Error("a config that never mentions the hook reported a section for it")
 	}
 }
 

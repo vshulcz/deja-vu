@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -101,24 +99,46 @@ func yamlHasKey(path, key string) bool {
 	return false
 }
 
-// codexHookTrusted compares the hook file against the hash codex recorded
-// when the user last trusted it. A mismatch means codex is holding the hook
-// for review, however enabled it looks in the config.
-func codexHookTrusted(hooksPath, stateSection string) bool {
-	i := strings.Index(stateSection, "trusted_hash = \"sha256:")
-	if i < 0 {
-		return true // no pin recorded: nothing to contradict
-	}
-	rest := stateSection[i+len("trusted_hash = \"sha256:"):]
-	end := strings.IndexByte(rest, '"')
-	if end < 0 {
-		return true
-	}
-	want := rest[:end]
-	b, err := os.ReadFile(hooksPath)
+// codexHasSeenItsHook reports whether codex has recorded any opinion about the
+// session-start hook. Until it has, codex runs nothing — and in `codex exec`
+// there is no interface in which to approve it, which is how scripted runs end
+// up with no memory while every file on disk looks correctly installed.
+func codexHasSeenItsHook() bool {
+	cfg, err := os.ReadFile(filepath.Join(sources.CodexHome(), "config.toml"))
 	if err != nil {
-		return true
+		return true // nothing to read: do not raise an alarm we cannot support
 	}
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:]) == want
+	return codexHookTrustSection(string(cfg)) != ""
+}
+
+// codexHookTrustSection returns the block of codex's config that records what
+// it thinks of our session-start hook, or "" when there is none.
+//
+// Codex keys its trust store per hook rather than per file —
+// `[hooks.state."<path>/hooks.json:session_start:0:0"]` — and the block ends at
+// the next table header. Reading to the end of the file instead, which is what
+// this did, lets an `enabled = false` belonging to some unrelated table decide
+// what deja reports about ours.
+//
+// It deliberately does not check the recorded hash. deja cannot reproduce it:
+// on codex 0.142.4 the pin for a hook whose command is one line long is not the
+// sha256 of the hook file, of the command, of the handler object in any
+// serialisation, or of any combination of the two with the matcher, the event
+// or the key — checked. Comparing the file's own sha256 against it, which is
+// what this did, therefore called every working install untrusted. Presence of
+// a pin is what deja can honestly read: it means codex has been shown this hook
+// and kept an opinion about it.
+func codexHookTrustSection(cfg string) string {
+	i := strings.Index(cfg, "hooks.json:session_start")
+	if i < 0 {
+		return ""
+	}
+	rest := cfg[i:]
+	// Past the key's own line, so the header we stop at is the next one.
+	if nl := strings.IndexByte(rest, '\n'); nl >= 0 {
+		if end := strings.Index(rest[nl:], "\n["); end >= 0 {
+			return rest[:nl+end]
+		}
+	}
+	return rest
 }
