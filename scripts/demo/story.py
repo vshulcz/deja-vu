@@ -43,9 +43,10 @@ MONO = "/System/Library/Fonts/Menlo.ttc"
 
 
 
-# The mark, drawn from the same 24x22 grid as everything else. Kept here as a
-# literal because scripts/demo has no import path to cmd/deja, and checked by
-# eye against the banner rather than by hand against the numbers.
+# The mark, drawn from the same 24x22 grid as everything else. A literal
+# because this script is Python and internal/mark is Go — but no longer checked
+# by eye: internal/mark/demo_sprite_test.go compares these rows against the
+# sprite, and found the tail here three rows short of the real one.
 CAT_BODY = [
     "....#............#......",
     "...###..........###.....",
@@ -61,26 +62,61 @@ CAT_BODY = [
     "..########nn########....",
     "..##################....",
     "...################.....",
-    "....##############......",
-    ".....############.......",
-    ".....############..##...",
-    ".....############..##...",
-    ".....############..##...",
     "....##############.##...",
+    ".....############..##...",
+    ".....############..##...",
+    ".....############..##...",
+    ".....############..##...",
+    "....################....",
     "....################....",
     ".....####....####.......",
 ]
 
 
-def draw_cat(d, x, y, px=4):
+# The eye rows, in the three states an eyelid passes through. Rows 7-9 of the
+# sprite; a blink that cuts from open to shut skips the part that makes it read
+# as an eyelid rather than as a light switch.
+EYES = {
+    "open": ["..###oo########oo###....",
+             "..###oo########oo###....",
+             "..###oo########oo###...."],
+    "low":  ["..##################....",
+             "..###oo########oo###....",
+             "..###oo########oo###...."],
+    "shut": ["..##################....",
+             "..##################....",
+             "..##oooo######oooo##...."],
+}
+
+
+def cat_state(t: float) -> tuple[int, str]:
+    """How the cat sits at film time t: how far it has risen, and its eyes.
+
+    The breath is continuous and the blinks are not on the beat, for the same
+    reason the mark's are not — a creature that moves on a metronome reads as a
+    mechanism."""
+    bob = -1 if math.sin(t / 4.3 * math.tau) > 0.35 else 0
+    eyes = "open"
+    for at in (3.1, 3.28, 9.6, 9.82):
+        if at <= t < at + 0.09:
+            eyes = "shut"
+        elif at - 0.09 <= t < at or at + 0.09 <= t < at + 0.18:
+            eyes = "low"
+    return bob, eyes
+
+
+def draw_cat(d, x, y, px=4, t=0.0):
     """One rectangle a pixel. At px=4 the sprite is 96x88, which is the size it
     is shown at on the site."""
-    for r, row in enumerate(CAT_BODY):
+    bob, eyes = cat_state(t)
+    rows = list(CAT_BODY)
+    rows[7:10] = EYES[eyes]
+    for r, row in enumerate(rows):
         for c, ch in enumerate(row):
             fill = {"#": PH, "n": AMBER, "o": FEATURE}.get(ch)
             if fill:
-                d.rectangle([x + c * px, y + r * px,
-                             x + c * px + px - 1, y + r * px + px - 1], fill=fill)
+                top = y + (r + bob) * px
+                d.rectangle([x + c * px, top, x + c * px + px - 1, top + px - 1], fill=fill)
 
 
 def font(size: int) -> ImageFont.FreeTypeFont:
@@ -127,13 +163,19 @@ def scanlines_and_vignette() -> Image.Image:
     return Image.alpha_composite(overlay, shade)
 
 
-def frame() -> tuple[Image.Image, Image.Image, ImageDraw.ImageDraw]:
+# Where we are in the whole film, not in the current scene. The breath has to
+# carry across a cut: a creature that restarts its breathing every scene is back
+# to being a drawing.
+FILM_T = 0.0
+
+
+def frame(t: float = None) -> tuple[Image.Image, Image.Image, ImageDraw.ImageDraw]:
     base = Image.new("RGBA", (W, H), BG + (255,))
     ink = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(ink)
     # The wordmark sits on every frame: a demo people screenshot should say
     # whose it is without a caption.
-    draw_cat(d, 52, 30, px=2)
+    draw_cat(d, 52, 30, px=2, t=FILM_T if t is None else t)
     d.text((110, 44), "deja", font=font(22), fill=PH_HI)
     d.text((164, 44), "-vu", font=font(22), fill=PH_DIM)
     return base, ink, d
@@ -321,9 +363,11 @@ def main() -> None:
     os.makedirs(a.out, exist_ok=True)
     screen = scanlines_and_vignette()
 
+    global FILM_T
     n = 0
     for render, seconds in SCENES:
         for i in range(int(seconds * FPS)):
+            FILM_T = n / FPS
             img = render(i / FPS)
             img = Image.alpha_composite(img, screen)
             # A short cross-fade out of every scene, so cuts do not snap.
