@@ -562,6 +562,67 @@ func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n in
 	return metas, informative, strong, err
 }
 
+// relevanceScored is one session's standing after the ranking pass: its score
+// over the whole query, and its score over only the words that distinguish.
+type relevanceScored struct {
+	meta    SessionMeta
+	score   float64
+	matched int
+	any     int
+	strong  int
+	focus   float64
+}
+
+// focusPrice is what a session pays for being convincing only on the rare part
+// of the query rather than on all of it. Counted in places, like the strict
+// promotion above: a session the focused view puts first and the whole-query
+// view puts thirtieth ends up fourth, not first.
+const focusPrice = 3
+
+// fuseFocus reorders a ranking by the better of two views of the same query.
+//
+// A question asked in plain speech carries words that are filler to a reader
+// and content to the index: "how many bikes do I own" ranks on many, bikes and
+// own, and the session that answers it holds only the rare one while sessions
+// about how many people own things hold two of them. Scored on the whole query
+// the answer loses. Scored on the rare part alone it wins — and that view is
+// wrong on other queries, where the common words are the question.
+//
+// So both are kept and each session takes its better place, the focused one at
+// a price. Ordering by the fused place rather than by a blended score keeps the
+// two views from having to be on the same scale, which they are not.
+func fuseFocus(ranked []relevanceScored) []relevanceScored {
+	if len(ranked) < 2 {
+		return ranked
+	}
+	order := make([]int, len(ranked))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return ranked[order[a]].focus > ranked[order[b]].focus })
+	byFocus := make([]int, len(ranked))
+	for place, idx := range order {
+		byFocus[idx] = place
+	}
+	// The place travels with the row. Sorting the rows while indexing a
+	// parallel slice by the comparator's arguments reads the place of whatever
+	// has been swapped into that position, not of the row being compared.
+	type placed struct {
+		row   relevanceScored
+		place int
+	}
+	rows := make([]placed, len(ranked))
+	for i, r := range ranked {
+		rows[i] = placed{r, min(i, byFocus[i]+focusPrice)}
+	}
+	sort.SliceStable(rows, func(a, b int) bool { return rows[a].place < rows[b].place })
+	out := make([]relevanceScored, len(rows))
+	for i, r := range rows {
+		out[i] = r.row
+	}
+	return out
+}
+
 // relevantMetasCounts additionally reports how many terms of ANY frequency
 // each session matched — the noise gate for full-index relevance search,
 // where demanding two rare terms also rejects real answers that pair one
@@ -608,6 +669,14 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	defer br.close()
 	totalDocs := float64(len(m.Sessions)) + 1
 	score := map[uint32]float64{}
+	// focus is the same scoring restricted to the words that distinguish. A
+	// question asked in plain speech carries filler that is a content word to
+	// the index — "how many bikes do I own" ranks on many, bikes and own — and
+	// the session that answers it often holds only the rare one. Scored on the
+	// whole query it loses to sessions carrying more of the filler; scored on
+	// the rare part alone it wins. Neither view is right on its own, so both are
+	// kept and the better place of the two is used, at a price.
+	focus := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
 	strongTerms := map[uint32]int{}
 	anyTerms := map[uint32]int{}
@@ -789,7 +858,11 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			// Saturated term frequency: repeated mentions add confidence
 			// with quickly diminishing returns, so a marathon session cannot
 			// bury a focused one through sheer repetition.
-			score[ord] += idf * (1 + 0.25*math.Log2(float64(tf[ord])))
+			weighted := idf * (1 + 0.25*math.Log2(float64(tf[ord])))
+			score[ord] += weighted
+			if informative {
+				focus[ord] += weighted
+			}
 			anyTerms[ord]++
 			if informative {
 				matchedTerms[ord]++
@@ -799,14 +872,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 		}
 	}
-	type scored struct {
-		meta    SessionMeta
-		score   float64
-		matched int
-		any     int
-		strong  int
-	}
-	ranked := make([]scored, 0, len(score))
+	ranked := make([]relevanceScored, 0, len(score))
 	for ord, sc := range score {
 		if sc <= 0 {
 			continue
@@ -838,7 +904,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if matchedTerms[ord] > 1 {
 			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
 		}
-		ranked = append(ranked, scored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord]})
+		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], focus[ord]})
 	}
 	if len(ranked) == 0 {
 		return nil, nil, nil, termsKnown, 0, nil, readErr
@@ -854,6 +920,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// what the user sees first.
 		return ranked[i].meta.ID < ranked[j].meta.ID
 	})
+	ranked = fuseFocus(ranked)
 	// Counted here, one line above the truncation, because this is the last
 	// moment the pool exists.
 	matchedTotal := len(ranked)
