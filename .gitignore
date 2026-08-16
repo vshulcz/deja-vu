@@ -56,3 +56,9 @@ deja-stats.svg
 # Where story.py drops the film's frames when it is run without --out. Three
 # hundred and twenty PNGs, one run.
 /scripts/demo/frames/
+
+# Python leaves these beside every script it runs, and there is Python in
+# scripts/ and tools/. Nothing ignored them, so they were committable as
+# binaries by anyone who ran one.
+__pycache__/
+*.pyc
