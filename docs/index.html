@@ -168,6 +168,57 @@ footer .sp{flex:1}
    palette; the match takes the accent instead */
 .res mark{background:rgba(255,135,0,.16);color:var(--amber);border-radius:3px;padding:0 2px}
 
+
+/* the headline arrives a word at a time */
+.js h1 .w{display:inline-block;opacity:0;transform:translateY(.35em);
+  animation:wordin .5s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes wordin{to{opacity:1;transform:none}}
+
+/* the exchange plays rather than sits */
+.js .xbody p{opacity:0}
+.js .xbody p.on{opacity:1;transition:opacity .35s}
+.xbody .caret{display:inline-block;width:.55em;height:1em;vertical-align:-.15em;
+  background:var(--amber);animation:blink 1.05s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.thinking{color:var(--faint)}
+.thinking i{font-style:normal;animation:dots 1.2s steps(4) infinite;display:inline-block;width:1.4em;text-align:left}
+@keyframes dots{0%{content:""}}
+
+/* the cat answers back */
+.catwrap{cursor:pointer;-webkit-user-select:none;user-select:none}
+.catwrap .bubble{position:absolute;left:50%;transform:translate(-50%,6px);bottom:-6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  padding:7px 11px;font:11.5px var(--mono);color:var(--body);white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+.catwrap .bubble.on{opacity:1;transform:translate(-50%,0)}
+
+/* the agent list lands one at a time */
+.js .agents span{opacity:0;transform:translateY(6px)}
+.js .agents.in span{animation:chipin .4s ease forwards}
+@keyframes chipin{to{opacity:1;transform:none}}
+
+/* the shortcuts card, behind ? */
+#keys{position:fixed;inset:0;z-index:60;display:none;place-items:center;
+  background:rgba(11,15,16,.72);backdrop-filter:blur(3px)}
+#keys.on{display:grid}
+#keys .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:26px 30px;min-width:330px;font:13px/1.9 var(--mono)}
+#keys h3{font:600 15px var(--sans);color:var(--ink);margin-bottom:14px}
+#keys .row{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center;color:var(--faint)}
+/* a fixed first column, because the konami row is four times the width of
+   the others and was pushing its own label out of line */
+#keys kbd{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+  padding:2px 7px;color:var(--coat-hi);text-align:center;font-size:11.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#keys .row span{color:var(--body)}
+#keys .hint{margin-top:16px;color:var(--faint);font-size:11.5px}
+
+@media (prefers-reduced-motion: reduce){
+  .js h1 .w,.js .agents span{opacity:1;transform:none;animation:none}
+  .js .xbody p{opacity:1}
+  .xbody .caret{animation:none}
+}
+
 #recall-line{color:var(--amber);font:12.5px var(--mono);margin-bottom:14px}
 
 @media (prefers-reduced-motion: reduce){
@@ -214,7 +265,7 @@ footer .sp{flex:1}
   </div>
   <div class="catwrap">
     <img id="hero-cat" src="assets/icon-live.svg" width="240" height="240" alt="">
-    <span class="say">try the konami code</span>
+    <span class="bubble" id="bubble"></span>
   </div>
 </header>
 
@@ -322,6 +373,18 @@ footer .sp{flex:1}
   <a href="guide/commands.html">CLI</a>
   <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
 </footer>
+
+<div id="keys" aria-hidden="true">
+  <div class="box">
+    <h3>Things this page does</h3>
+    <div class="row"><kbd>/</kbd><span>search the demo history</span></div>
+    <div class="row"><kbd>deja</kbd><span>run a search from anywhere</span></div>
+    <div class="row"><kbd>deja vu</kbd><span>you have been here before</span></div>
+    <div class="row"><kbd>↑↑↓↓←→←→ba</kbd><span>the colours it wore before</span></div>
+    <div class="row"><kbd>click</kbd><span>the cat has opinions</span></div>
+    <p class="hint">esc to close · it remembers you came back, in your browser only</p>
+  </div>
+</div>
 
 </div>
 <script>
@@ -522,6 +585,112 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   new IntersectionObserver(function(es){es.forEach(function(e){
     if(e.isIntersecting)cat('wow',1500);
   })},{threshold:.8}).observe(proof);
+})();
+
+/* ── the headline arrives ─────────────────────────────────────────────────
+   Split on the way in rather than in the markup, so the sentence a reader
+   without scripting gets is still one sentence. */
+(function(){
+  var h=document.querySelector('h1');
+  if(!h||reduced)return;
+  var i=0;
+  h.innerHTML=h.innerHTML.replace(/(<em>.*?<\/em>|[^\s<]+)/g,function(m){
+    return '<span class="w" style="animation-delay:'+(i++*52)+'ms">'+m+'</span>';
+  });
+})();
+
+/* ── the exchange plays ───────────────────────────────────────────────────
+   A still of a conversation says the same as a paragraph. Typed out, with the
+   pause where recall actually runs, it is the product happening. */
+(function(){
+  var box=document.querySelector('.xbody');
+  if(!box)return;
+  var rows=[].slice.call(box.querySelectorAll('p'));
+  if(reduced){rows.forEach(function(r){r.classList.add('on')});return}
+
+  var typed=rows[0],full=typed.innerHTML,label=full.slice(0,full.indexOf('</span>')+7);
+  var body=full.slice(label.length);
+  function play(){
+    typed.innerHTML=label+'<span class="caret"></span>';
+    typed.classList.add('on');
+    var n=0;
+    (function tick(){
+      n++;
+      typed.innerHTML=label+body.slice(0,n)+'<span class="caret"></span>';
+      if(n<body.length)return setTimeout(tick,26);
+      typed.innerHTML=full;
+      /* the beat where the tool is working is the point of the beat */
+      setTimeout(function(){rows[1].classList.add('on')},380);
+      setTimeout(function(){rows[2].classList.add('on');rows[3].classList.add('on');
+        cat('wow',900)},1150);
+      setTimeout(function(){rows[4].classList.add('on')},1750);
+    })();
+  }
+  /* A low threshold on purpose. At .4 the panel had to be 40% on screen, which
+     on a laptop is the boundary it lands on exactly — the replay would sit
+     there unplayed until someone scrolled past it. */
+  new IntersectionObserver(function(es,o){es.forEach(function(e){
+    if(e.isIntersecting){o.unobserve(e.target);play()}
+  })},{threshold:.15}).observe(box);
+})();
+
+/* ── the cat has opinions ─────────────────────────────────────────────────
+   A mascot you can poke is the cheapest affection a page can offer. */
+(function(){
+  var wrap=document.querySelector('.catwrap'),bubble=document.getElementById('bubble');
+  if(!wrap||!bubble)return;
+  var lines=['i remember that','you asked this in March','still indexed','no models were harmed',
+             'it was in codex, actually','purr','check your memory'],i=0,hide=null;
+  wrap.addEventListener('click',function(){
+    bubble.textContent=lines[i++%lines.length];
+    bubble.classList.add('on');
+    cat(i%3===0?'sleep':'wow',1400);
+    clearTimeout(hide);
+    hide=setTimeout(function(){bubble.classList.remove('on')},2200);
+  });
+})();
+
+/* ── it dozes off ─────────────────────────────────────────────────────────
+   Half a minute of nothing and the cat sleeps, the way the tool is asleep
+   until something asks it for a memory. */
+(function(){
+  if(reduced)return;
+  var idle=null;
+  function doze(){cat('sleep')}
+  function poke(){clearTimeout(idle);
+    if(HERO&&/icon-sleep/.test(HERO.src)&&!document.hidden)cat('live');
+    idle=setTimeout(doze,30000)}
+  ['mousemove','keydown','scroll','click','touchstart'].forEach(function(ev){
+    addEventListener(ev,poke,{passive:true})});
+  poke();
+})();
+
+/* ── the chips land one at a time ─────────────────────────────────────── */
+(function(){
+  var box=document.querySelector('.agents');
+  if(!box||reduced)return;
+  [].slice.call(box.children).forEach(function(el,i){
+    el.style.animationDelay=(i*45)+'ms';
+  });
+  new IntersectionObserver(function(es,o){es.forEach(function(e){
+    if(e.isIntersecting){o.unobserve(e.target);e.target.classList.add('in')}
+  })},{threshold:.3}).observe(box);
+})();
+
+/* ── ? shows what is hidden ───────────────────────────────────────────────
+   Eggs nobody finds are decoration. */
+(function(){
+  var card=document.getElementById('keys');
+  if(!card)return;
+  function close(){card.classList.remove('on');card.setAttribute('aria-hidden','true')}
+  card.addEventListener('click',close);
+  addEventListener('keydown',function(e){
+    var tag=(e.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea')return;
+    if(e.key==='?'){card.classList.toggle('on');
+      card.setAttribute('aria-hidden',card.classList.contains('on')?'false':'true')}
+    else if(e.key==='Escape')close();
+  });
 })();
 
 /* ── easter eggs ──────────────────────────────────────────────────────────
