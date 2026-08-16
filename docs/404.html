@@ -10,10 +10,23 @@
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
 <link rel="stylesheet" href="/deja-vu/assets/site.css">
+
+<style>
+.notfound{padding:14vh 32px;font-family:var(--mono);display:grid;
+  grid-template-columns:120px 1fr;gap:8px 34px;align-items:start;max-width:760px}
+.notfound img{grid-row:1 / span 6;border-radius:22px;opacity:.9}
+.notfound p{margin:0 0 4px}
+.notfound pre{margin-top:10px}
+@media(max-width:680px){
+  .notfound{grid-template-columns:1fr;gap:18px}
+  .notfound img{grid-row:auto;width:88px;height:88px}
+}
+</style>
 </head>
 <body>
 <div class="glow"></div>
-<main class="wrap" style="padding-top:16vh;padding-bottom:16vh;font-family:var(--mono)">
+<main class="wrap notfound">
+  <img src="/deja-vu/assets/icon-sleep.svg" width="120" height="120" alt="" aria-hidden="true">
   <p style="color:var(--faint)">$ deja show <span id="path404" style="color:var(--amber)">404</span></p>
   <p style="margin:10px 0 4px;color:var(--ink)">deja: no session matches this path</p>
   <p style="color:var(--faint);margin-bottom:26px">it was never indexed — or you already solved it and forgot.</p>

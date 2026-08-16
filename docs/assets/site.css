@@ -141,13 +141,20 @@ h2:hover .hlink{opacity:1}
   text-transform:uppercase;letter-spacing:.12em;margin-bottom:4px}
 
 /* the cat, at the foot of the sidebar. A documentation page is exactly where a
-   project can afford to be liked. */
-.sidecat{display:flex;align-items:center;gap:10px;margin-top:30px;padding:10px;
-  border-top:1px solid var(--line);color:var(--faint);font:11px/1.4 var(--mono)}
-.sidecat img{flex:none;border-radius:8px}
-.sidecat span{opacity:.75}
-.sidecat:hover{color:var(--ph-hi)}
-.sidecat:hover span{opacity:1}
+   project can afford to be liked.
+
+   Selected as `.doc aside a.sidecat`, not `.sidecat`: the sidebar's own link
+   rule is two classes deep and won on specificity, so the layout stayed block
+   and the caption ran across the animal. */
+.doc aside a.sidecat{display:flex;flex-direction:column;align-items:center;
+  gap:10px;margin-top:32px;padding:18px 12px;border-top:1px solid var(--line);
+  border-left:0;border-radius:0;color:var(--faint);font:11px/1.5 var(--mono);
+  text-align:center}
+.doc aside a.sidecat img{flex:none;border-radius:10px;opacity:.9;transition:opacity .2s}
+.doc aside a.sidecat span{opacity:.7;max-width:19ch}
+.doc aside a.sidecat:hover{background:none;color:var(--ph-hi)}
+.doc aside a.sidecat:hover img{opacity:1}
+.doc aside a.sidecat:hover span{opacity:1}
 
 /* the pair at the foot of a page: an empty first slot keeps the second one
    right-aligned on the first page, where there is nothing before it */
