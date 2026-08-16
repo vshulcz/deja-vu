@@ -73,6 +73,14 @@ func movingTail() map[mark.Cell]bool {
 // The timings match the ones deja stats already uses, so the two pages animate
 // the same animal at the same rate rather than at two guesses.
 func alive(x0, y0, size int) string {
+	breath := size / 6
+	if breath < 1 {
+		breath = 1
+	}
+	glance := size / 2
+	if glance < 1 {
+		glance = 1
+	}
 	var b strings.Builder
 	seen := map[string]bool{}
 	poses := []string{}
@@ -86,10 +94,19 @@ func alive(x0, y0, size int) string {
 		fmt.Fprintf(&b, "  <g class=\"t%d\"><path fill=\"%s\" d=\"%s\"/></g>\n",
 			i, mark.Hex[mark.Coat], mark.CellsD(mark.Tails[pose], x0, y0, size))
 	}
-	fmt.Fprintf(&b, "  <g class=\"eyes-open\"><path fill=\"%s\" d=\"%s\"/></g>\n",
-		mark.Hex[mark.Feature], mark.CellsD(mark.Eyes["tall"], x0, y0, size))
-	fmt.Fprintf(&b, "  <g class=\"eyes-shut\"><path fill=\"%s\" d=\"%s\"/></g>\n",
-		mark.Hex[mark.Feature], mark.CellsD(mark.Eyes["closed"], x0, y0, size))
+	// Every eye state as its own group, all of them inside one that can move.
+	// The blink passes through the half-lid rather than cutting from open to
+	// shut, which is what an eyelid does; the glance slides the whole group
+	// sideways, which is what an eye does.
+	b.WriteString("  <g class=\"eyes\">\n")
+	for _, eye := range []struct{ class, set string }{
+		{"eyes-open", "tall"}, {"eyes-low", "low"}, {"eyes-shut", "closed"},
+	} {
+		fmt.Fprintf(&b, "    <g class=\"%s\"><path fill=\"%s\" d=\"%s\"/></g>\n",
+			eye.class, mark.Hex[mark.Feature],
+			mark.CellsD(mark.Eyes[eye.set], x0, y0, size))
+	}
+	b.WriteString("  </g>\n")
 
 	// Both ear poses, each as its own group, swapped by the flick.
 	for _, ear := range []struct {
@@ -100,31 +117,41 @@ func alive(x0, y0, size int) string {
 			mark.CellsD(sortCells(cellList(earCells(mark.Ears[ear.pose]))), x0, y0, size))
 	}
 
-	b.WriteString(`  <style>
-    .t1, .t2, .eyes-shut, .ear-flick { opacity: 0 }
+	css := `  <style>
+    .t1, .t2, .eyes-low, .eyes-shut, .ear-flick { opacity: 0 }
     @media (prefers-reduced-motion: no-preference) {
+      /* The one continuous motion on the mark. Everything else cuts between
+         poses; this eases, and a creature that is never perfectly still is the
+         difference between an animal and a diagram. */
+      .breathe { animation: dv-breathe 4.3s cubic-bezier(.45,0,.55,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
       .eyes-open { animation: dv-open 7.3s steps(1, end) infinite }
+      .eyes-low  { animation: dv-low 7.3s steps(1, end) infinite }
       .eyes-shut { animation: dv-shut 7.3s steps(1, end) infinite }
-      .ear-up { animation: dv-ear-up 11.3s steps(1, end) infinite }
+      .eyes { animation: dv-glance 9.7s cubic-bezier(.4,0,.5,1) infinite }
+      .ear-up    { animation: dv-ear-up 11.3s steps(1, end) infinite }
       .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    /* The tail rests for four fifths of its cycle, then sweeps out and back:
-       up, mid, out, mid, and still again. */
+    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(SIZEpx) } }
+    /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
     @keyframes dv-t2 { 0%, 84.9% { opacity: 0 } 85%, 91.9% { opacity: 1 } 92%, 100% { opacity: 0 } }
-    /* Two blinks, not one: a quick one, then a slower one a beat later, which
-       is what a cat does and what a metronome does not. */
-    @keyframes dv-open { 0%, 87.9% { opacity: 1 } 88%, 90.4% { opacity: 0 } 90.5%, 95.9% { opacity: 1 } 96%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
-    @keyframes dv-shut { 0%, 87.9% { opacity: 0 } 88%, 90.4% { opacity: 1 } 90.5%, 95.9% { opacity: 0 } 96%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
-    /* One flick, and it is over before you are sure you saw it. */
+    /* A blink through the half-lid and back, then a slower one a beat later. */
+    @keyframes dv-open { 0%, 87.4% { opacity: 1 } 87.5%, 91.4% { opacity: 0 } 91.5%, 95.4% { opacity: 1 } 95.5%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
+    @keyframes dv-low  { 0%, 87.4% { opacity: 0 } 87.5%, 88.4% { opacity: 1 } 88.5%, 90.4% { opacity: 0 } 90.5%, 91.4% { opacity: 1 } 91.5%, 95.4% { opacity: 0 } 95.5%, 96.9% { opacity: 1 } 97%, 98.4% { opacity: 0 } 98.5%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
+    @keyframes dv-shut { 0%, 88.4% { opacity: 0 } 88.5%, 90.4% { opacity: 1 } 90.5%, 96.9% { opacity: 0 } 97%, 98.4% { opacity: 1 } 98.5%, 100% { opacity: 0 } }
+    /* Looks aside, holds it a moment, looks back. */
+    @keyframes dv-glance { 0%, 70% { transform: translateX(0) } 74%, 84% { transform: translateX(GLANCEpx) } 88%, 100% { transform: translateX(0) } }
     @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
     @keyframes dv-ear-up { 0%, 96.9% { opacity: 1 } 97%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
   </style>
-`)
+`
+	css = strings.ReplaceAll(css, "SIZEpx", fmt.Sprintf("%dpx", breath))
+	css = strings.ReplaceAll(css, "GLANCEpx", fmt.Sprintf("%dpx", glance))
+	b.WriteString(css)
 	return b.String()
 }
 
@@ -174,8 +201,15 @@ func logo(ink string, animate bool) string {
 		still.EyeSet = "none"
 		parts = alive(x0, y0, size)
 	}
+	// The whole animal breathes, so the group wraps the still body and every
+	// moving part alike — a breath that moved only the body would tear the cat
+	// away from its own tail.
+	cat := fills(mark.Paths(still, x0, y0, size, skip), 2) + parts
+	if animate {
+		cat = "  <g class=\"breathe\">\n" + cat + "  </g>\n"
+	}
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="620" height="170" viewBox="0 0 620 170" role="img" aria-label="deja-vu">
-` + note + fills(mark.Paths(still, x0, y0, size, skip), 2) + parts +
+` + note + cat +
 		`  <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
     <text x="208" y="105" font-size="72" font-weight="700" fill="` + ink + `">deja-vu</text>
   </g>
@@ -203,9 +237,9 @@ func liveIcon() string {
 	still.EyeSet = "none"
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" role="img" aria-label="deja-vu">
   <rect width="400" height="400" rx="88" fill="#1d1b2e"/>
-` + note +
+` + note + "  <g class=\"breathe\">\n" +
 		fills(mark.Paths(still, x0, y0, size, func(c mark.Cell) bool { return tail[c] }), 2) +
-		alive(x0, y0, size) + "</svg>\n"
+		alive(x0, y0, size) + "  </g>\n</svg>\n"
 }
 
 // stillIcon is the app icon in a named mood, for the moments the site wants the
