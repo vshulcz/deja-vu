@@ -645,6 +645,37 @@ func fuseFocus(ranked []relevanceScored) []relevanceScored {
 	return out
 }
 
+// projectInScope says whether a session belongs to the project a caller is
+// working in, given one of the name forms that project is known by.
+//
+// Harnesses record the same project under different forms — on the machine this
+// was written on, the same repository appears as "deja-vu" in 69 sessions and
+// "goprojects/deja-vu" in 25 — so the caller supplies several and any of them
+// matching is the project. What decides is whole path segments.
+//
+// It used to be any substring, which joined 41 pairs of names on that machine
+// and was wrong about a third of them: "deja" pulled in both deja-push and
+// deja-vu, two different repositories, and a session whose project had parsed
+// as "-" matched every hyphenated project on the disk — deja-vu, pin-manifests,
+// mpc-autoscaler, telegram-mtproxy-forwarder. Recall in one project then ranks
+// against another's history, which is the one thing project scoping exists to
+// prevent.
+//
+// The explicit --project filter is left as a substring on purpose: that one is
+// documented as a substring and is the user asking, not deja guessing.
+func projectInScope(project, want string) bool {
+	if want == "" {
+		return false
+	}
+	p, w := strings.ToLower(project), strings.ToLower(want)
+	if rest, ok := strings.CutPrefix(p, "imported:"); ok {
+		// A synced session carries the peer's prefix and is otherwise the same
+		// project under the same name.
+		p = rest
+	}
+	return p == w || strings.HasSuffix(p, "/"+w)
+}
+
 // relevantMetasCounts additionally reports how many terms of ANY frequency
 // each session matched — the noise gate for full-index relevance search,
 // where demanding two rare terms also rejects real answers that pair one
@@ -675,10 +706,8 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			inProject[meta.Ord] = meta
 			continue
 		}
-		lp := strings.ToLower(meta.Project)
 		for _, want := range projects {
-			w := strings.ToLower(want)
-			if w != "" && (lp == w || strings.Contains(lp, w)) {
+			if projectInScope(meta.Project, want) {
 				inProject[meta.Ord] = meta
 				break
 			}
