@@ -17,6 +17,13 @@ type autoWiring struct {
 	name   string
 	path   func() string
 	marker string
+	// kind is what the file actually is, when it is not a hook. Every row in
+	// this table used to read "wired" under a heading that says Hooks, and two
+	// of them are not hooks: aider's is a context file that only a wrapper
+	// command refreshes, and roo's is guidance that asks the agent to call
+	// recall rather than handing it anything. Reporting all three the same way
+	// tells someone their memory arrives on its own when it does not.
+	kind string
 }
 
 // autoWirings is the single list doctor and the coverage test both read.
@@ -27,30 +34,32 @@ func autoWirings() []autoWiring {
 	return []autoWiring{
 		{"opencode", func() string {
 			return filepath.Join(opencodeConfigHome(), "opencode", "plugins", "deja.js")
-		}, "hook-context"},
-		{"cursor", func() string { return filepath.Join(sources.CursorCLIHome(), "hooks.json") }, "hook-context"},
+		}, "hook-context", ""},
+		{"cursor", func() string { return filepath.Join(sources.CursorCLIHome(), "hooks.json") }, "hook-context", ""},
 		{"gemini", func() string {
 			return filepath.Join(sources.GeminiHome(), "extensions", "deja", "hooks", "hooks.json")
-		}, "hook-context"},
-		{"qwen", func() string { return filepath.Join(sources.QwenConfigDir(), "settings.json") }, "hook-prompt"},
-		{"kimi", func() string { return filepath.Join(sources.KimiConfigDir(), "config.toml") }, "hook-prompt"},
+		}, "hook-context", ""},
+		{"qwen", func() string { return filepath.Join(sources.QwenConfigDir(), "settings.json") }, "hook-prompt", ""},
+		{"kimi", func() string { return filepath.Join(sources.KimiConfigDir(), "config.toml") }, "hook-prompt", ""},
 		{"antigravity", func() string {
 			return filepath.Join(antigravityConfigHome(), "plugins", "deja", "hooks.json")
-		}, "hook-antigravity"},
-		{"pi", func() string { return filepath.Join(sources.PiConfigDir(), "extensions", "deja.ts") }, "hook-context"},
+		}, "hook-antigravity", ""},
+		{"pi", func() string { return filepath.Join(sources.PiConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
 		{"hermes", func() string {
 			return filepath.Join(sources.HermesHome(), "plugins", "deja", "__init__.py")
-		}, "hook-context"},
+		}, "hook-context", ""},
 		{"openclaw", func() string {
 			return filepath.Join(sources.OpenClawStateDir(), "hooks", openclawHookName, "handler.js")
-		}, "hook-context"},
-		{"cline", func() string { return filepath.Join(sources.ClinePluginsDir(), "deja", "index.js") }, "hook-context"},
-		{"goose", func() string { return gooseHookPath() }, "hook-goose"},
-		{"grok", func() string { return grokHooksPath() }, "hook-context"},
-		{"aider", func() string { return aiderContextPath() }, ""},
+		}, "hook-context", ""},
+		{"cline", func() string { return filepath.Join(sources.ClinePluginsDir(), "deja", "index.js") }, "hook-context", ""},
+		{"goose", func() string { return gooseHookPath() }, "hook-goose", ""},
+		{"grok", func() string { return grokHooksPath() }, "hook-context", ""},
+		{"aider", func() string { return aiderContextPath() }, "",
+			"context file — refreshed by `deja aider`, not by aider itself"},
 		// Roo's guidance moved out of the always-on rules file into a skill;
 		// checking the old path reported a correctly wired machine as missing.
-		{"roo", func() string { return guidancePath("roo") }, ""},
+		{"roo", func() string { return guidancePath("roo") }, "",
+			"guidance — the agent is told to call recall, not handed it"},
 	}
 }
 
@@ -61,13 +70,17 @@ func doctorAutoRecall(w io.Writer) {
 	for _, a := range autoWirings() {
 		path := a.path()
 		b, err := os.ReadFile(path)
+		note := ""
+		if a.kind != "" {
+			note = "  (" + a.kind + ")"
+		}
 		switch {
 		case err != nil:
-			fmt.Fprintf(w, "  %-12s %-11s %s\n", a.name, "missing", path)
+			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "missing", path, note)
 		case a.marker != "" && !strings.Contains(string(b), a.marker):
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — reinstall)\n", a.name, "stale", path, a.marker)
 		default:
-			fmt.Fprintf(w, "  %-12s %-11s %s\n", a.name, "wired", path)
+			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", path, note)
 		}
 	}
 }
