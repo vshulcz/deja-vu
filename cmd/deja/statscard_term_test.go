@@ -23,6 +23,9 @@ func sampleReport() stats.Report {
 	r.DateRange.Start = "2026-04-18"
 	r.DateRange.End = "2026-08-15"
 	r.WeekRecalls = 70
+	// Twice now a line has overflowed the border because the sample lacked the
+	// field that makes it long. This is the third such field.
+	r.RepeatQuestions = 21
 	// A Cyrillic title is the case that broke the width maths: 22 printed
 	// columns and 40 bytes. Without one here the border test measured only
 	// ASCII and passed while the shipped card came out short.

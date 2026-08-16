@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/mark"
-	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
 )
 
@@ -132,10 +131,9 @@ func statsCardLines(r stats.Report) []string {
 		add(sectionRule("WHERE IT CAME FROM"))
 		add(agents...)
 	}
-	if line := longestLine(r); line != "" {
+	if lines := longestLine(r); len(lines) > 0 {
 		add("")
-		add(paint(cardFaint, "THE LONGEST ONE"))
-		add(line)
+		add(lines...)
 	}
 	return frame(body, footer())
 }
@@ -435,40 +433,29 @@ func agentBlock(r stats.Report) []string {
 // has no report.
 var dateSpanText string
 
-// longestLine is the one piece of the card that is not a count: the title of
-// the longest session, which is a sentence someone wrote on this machine. It is
-// what makes the card theirs rather than a shape two people with the same
-// totals would both get.
-//
-// The title comes from the index, so it is already redacted; SafeLine is what
-// stops a control character in it from moving the cursor out of the card.
-func longestLine(r stats.Report) string {
-	title := strings.TrimSpace(r.Longest.Title)
-	if title == "" || r.Longest.Messages == 0 {
-		return ""
+// longestLine is the longest session, by its size alone. It carried the title
+// too, until #1180 pointed out what the card is for: it prints an embed snippet
+// and invites you to paste it somewhere public, and what makes that safe is
+// that it holds counts and nothing else — no project, no path, no content. A
+// title is content, and it came out of the reader's own history.
+func longestLine(r stats.Report) []string {
+	if r.Longest.Messages == 0 {
+		return nil
 	}
-	count := formatStatNumber(r.Longest.Messages) + " messages"
-	room := cardInner - len(count) - 2
-	title = search.SafeLine(title)
-	// Runes, not bytes. This is the one string on the card that comes from a
-	// user, so it is the one that is not ASCII, and cutting a multi-byte
-	// character in half prints a replacement box in the middle of their own
-	// words.
-	if runes := []rune(title); len(runes) > room {
-		cut := room - 1
-		for i := cut; i > 0; i-- {
-			if runes[i] == ' ' {
-				cut = i
-				break
-			}
-		}
-		title = string(runes[:cut]) + "…"
+	left := "the longest session ran " + formatStatNumber(r.Longest.Messages) + " messages"
+	if r.RepeatQuestions <= 0 {
+		return []string{paint(cardDim, left)}
 	}
-	gap := cardInner - visibleLen(title) - visibleLen(count)
-	if gap < 1 {
-		gap = 1
+	// The number that is evidence rather than volume: a question asked twice is
+	// the reader having re-solved something.
+	right := formatStatNumber(r.RepeatQuestions) + " questions asked more than once"
+	if gap := cardInner - visibleLen(left) - visibleLen(right); gap >= 2 {
+		return []string{paint(cardDim, left) + strings.Repeat(" ", gap) + paint(cardBright, right)}
 	}
-	return paint(cardDim, title) + strings.Repeat(" ", gap) + paint(cardFaint, count)
+	// Together they are wider than the card, and a line that does not fit walks
+	// the border down the page. Two lines rather than one string with a newline
+	// in it: the frame pads what it is given, so an embedded break escapes it.
+	return []string{paint(cardDim, left), paint(cardBright, right)}
 }
 
 // footer is what makes a screenshot say where it came from. Dim enough not to

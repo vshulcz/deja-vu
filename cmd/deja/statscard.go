@@ -74,13 +74,16 @@ func renderStatsCard(r stats.Report) string {
 
 	renderAgents(&b, r, 470, 120)
 
-	if title := strings.TrimSpace(r.Longest.Title); title != "" && r.Longest.Messages > 0 {
-		// The whole line stays in the left band. Anchoring the message count to
-		// the card's right edge put it through the agents block, which occupies
-		// that half of this row.
-		cardText(&b, pad, 442, 11, "700", "THE LONGEST ONE", "#55626a", "letter-spacing=\"1.5\"")
-		cardText(&b, pad+150, 442, 12, "400",
-			clipTitle(title, 24)+"  ·  "+formatStatNumber(r.Longest.Messages)+" messages", "#8b989a")
+	// Counts only, no content: see longestLine in statscard_term.go and #1180.
+	if r.Longest.Messages > 0 {
+		cardText(&b, pad, 472, 11, "700", "THE LONGEST SESSION", "#55626a", "letter-spacing=\"1.5\"")
+		cardText(&b, pad+170, 472, 12, "400",
+			formatStatNumber(r.Longest.Messages)+" messages", "#8b989a")
+	}
+	if n := r.RepeatQuestions; n > 0 {
+		cardText(&b, w-pad, 472, 12, "400",
+			formatStatNumber(n)+" questions asked more than once", "#8b989a",
+			"text-anchor=\"end\"")
 	}
 
 	foot := "$ deja stats --card"
@@ -93,24 +96,6 @@ func renderStatsCard(r stats.Report) string {
 	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="url(#scan)"/>`+"\n", w, h)
 	b.WriteString("</svg>\n")
 	return b.String()
-}
-
-// clipTitle keeps a session title inside its column. Runes, not bytes: this is
-// the one string on the card that came from a user, so it is the one that is
-// not ASCII.
-func clipTitle(title string, max int) string {
-	runes := []rune(title)
-	if len(runes) <= max {
-		return title
-	}
-	cut := max - 1
-	for i := cut; i > 0; i-- {
-		if runes[i] == ' ' {
-			cut = i
-			break
-		}
-	}
-	return string(runes[:cut]) + "…"
 }
 
 // renderAgents draws where the history came from. The bar sits in a track, so a
