@@ -1486,7 +1486,22 @@ func termWeights(ss []model.Session, terms []string) map[string]float64 {
 // just failed) must not reshuffle the ranking. Count and snippets come from
 // term occurrences so output still shows why each session surfaced.
 func RelevanceHits(ss []model.Session, terms []string) []Hit {
-	weight := termWeights(ss, terms)
+	return RelevanceHitsWeighted(ss, terms, nil)
+}
+
+// RelevanceHitsWeighted is RelevanceHits told what the ranking judged each term
+// to be worth.
+//
+// The ranking picks a session by the idf mass of its best single message and
+// then discards which message that was, so the excerpt has to work out the same
+// answer again. Given the ranking's own weights it works out the same one;
+// given nothing it estimates them from how much of the answer set holds each
+// term, which is close but is an estimate.
+func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]float64) []Hit {
+	weight := idf
+	if weight == nil {
+		weight = termWeights(ss, terms)
+	}
 	hits := make([]Hit, 0, len(ss))
 	for rank, s := range ss {
 		hit := Hit{Session: s, Tier: TierRelevance}

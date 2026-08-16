@@ -585,7 +585,7 @@ func cmdCtx(dir string, rest []string) error {
 		hits = search.ErrorHits(ss)
 	} else if result.Tier == search.TierRelevance {
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
-		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
+		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return err
 	}
@@ -833,7 +833,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		}
 	case search.TierRelevance:
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
-		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(o.Query))
+		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF)
 		// This tier ranks and truncates inside retrieval, so counting the
 		// sessions it handed back measures its window, not the match: every
 		// query deeper than the window reported the window's own size and

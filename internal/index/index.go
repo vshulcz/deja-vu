@@ -292,6 +292,12 @@ type SearchResult struct {
 	// figure of its own and the caller's count stands.
 	Total  int
 	Capped bool
+	// TermIDF is what the relevance ranking judged each query term to be worth.
+	// It travels with the answer so the caller choosing which message to show
+	// can weigh the words the same way the ranking weighed the session. Without
+	// it that choice was made by counting terms, one each, and the two disagreed
+	// exactly when one rare word carried the session. Empty on every other tier.
+	TermIDF map[string]float64 `json:",omitempty"`
 }
 
 func DefaultDir() string {

@@ -551,7 +551,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	if result.Tier == search.TierError {
 		hits = search.ErrorHits(ss)
 	} else if result.Tier == search.TierRelevance {
-		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(q))
+		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
 	}
@@ -749,7 +749,7 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	if result.Tier == search.TierError {
 		hits = search.ErrorHits(ss)
 	} else if result.Tier == search.TierRelevance {
-		hits = search.RelevanceHits(ss, index.RelevanceMatchTerms(q))
+		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, err
 	}

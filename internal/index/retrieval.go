@@ -138,7 +138,7 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 							// which is still the only thing that withheld
 							// anything here.
 							tail := len(merged) - len(rel.Sessions)
-							return relevanceResult(merged, rel.Total+tail), nil
+							return relevanceResult(merged, rel.Total+tail, rel.TermIDF), nil
 						}
 					}
 				}
@@ -327,7 +327,7 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 	// a term the ranking derives rather than reads, a date from a relative
 	// word, which the AND never had to match; the floor keeps the total from
 	// claiming fewer sessions than were handed back.
-	out := relevanceResult(merged, max(rel.Total, len(merged)))
+	out := relevanceResult(merged, max(rel.Total, len(merged)), rel.TermIDF)
 	// Keep the word-form annotations the ladder earned: the caller still tells
 	// the user it fell back to stems or close spellings, even though the order
 	// is now this tier's to keep.
@@ -416,9 +416,11 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched, termsKnown, matched, strong, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
+	rank, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
 		return sessionMetaMatches(meta, o)
 	})
+	metas, anyMatched, strong := rank.metas, rank.any, rank.strong
+	termsKnown, matched := rank.termsKnown, rank.total
 	if rerr != nil {
 		// A corrupt or unreadable bucket: surface it so the recovery path
 		// rebuilds, rather than serving a silently short-ranked answer.
@@ -466,7 +468,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		if err != nil {
 			return SearchResult{}, err
 		}
-		return relevanceResult(ss, matched), nil
+		return relevanceResult(ss, matched, rank.idf), nil
 	}
 	// Single-term sessions ride BEHIND every strong candidate: they widen
 	// deep recall without letting a lucky word outrank a real match.
@@ -478,7 +480,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if err != nil {
 		return SearchResult{}, err
 	}
-	return relevanceResult(ss, matched), nil
+	return relevanceResult(ss, matched, rank.idf), nil
 }
 
 // relevanceResult labels a relevance answer with the pool it was drawn from:
@@ -486,12 +488,13 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 // trimmed it, so capped can say plainly whether the caller is holding all of
 // them. Reporting len(ss) as the total was the bug in #497 — the window is
 // exactly the thing the number was supposed to see past.
-func relevanceResult(ss []model.Session, matched int) SearchResult {
+func relevanceResult(ss []model.Session, matched int, idf map[string]float64) SearchResult {
 	return SearchResult{
 		Sessions: ss,
 		Tier:     query.TierRelevance,
 		Total:    matched,
 		Capped:   matched > len(ss),
+		TermIDF:  idf,
 	}
 }
 
@@ -558,8 +561,27 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, error) {
-	metas, informative, _, _, _, strong, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
-	return metas, informative, strong, err
+	rank, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
+	return rank.metas, rank.informative, rank.strong, err
+}
+
+// relevanceRanking is what one ranking pass produced. It was seven return
+// values and a naked error, which is how the idf it computes came to be thrown
+// away at both call sites — there was nowhere to put it that did not make the
+// signature worse.
+type relevanceRanking struct {
+	metas []SessionMeta
+	// informative, any and strong count, per session, the query terms it holds
+	// that clear the idf floor, that it holds at all, and that are rare enough
+	// to identify something on their own.
+	informative, any, strong []int
+	// termsKnown is how many of the query's terms the corpus contains at all,
+	// and total how many sessions the ranking scored before n truncated it.
+	termsKnown, total int
+	// idf is what each query term was worth, so a caller choosing which message
+	// to show can weigh it the same way the ranking weighed the session rather
+	// than approximating it.
+	idf map[string]float64
 }
 
 // relevanceScored is one session's standing after the ranking pass: its score
@@ -638,7 +660,7 @@ func fuseFocus(ranked []relevanceScored) []relevanceScored {
 // Returns, in order: the ranked metas, their informative-term counts, their
 // any-frequency term counts, how many query terms the corpus knows at all,
 // and that pre-truncation total.
-func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) ([]SessionMeta, []int, []int, int, int, []int, error) {
+func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) (relevanceRanking, error) {
 	// A real bucket read error (a corrupt or unreadable postings file) must not
 	// pass as "the term is absent": that silently drops the term from the
 	// ranking. Remember the first one and hand it back so the caller triggers
@@ -663,11 +685,12 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	if len(inProject) == 0 {
-		return nil, nil, nil, 0, 0, nil, readErr
+		return relevanceRanking{}, readErr
 	}
 	br := newBucketReader(dir)
 	defer br.close()
 	totalDocs := float64(len(m.Sessions)) + 1
+	idfOf := map[string]float64{}
 	score := map[uint32]float64{}
 	// focus is the same scoring restricted to the words that distinguish. A
 	// question asked in plain speech carries filler that is a content word to
@@ -826,6 +849,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			termsKnown++
 		}
 		idf := math.Log(totalDocs / float64(minDF+1))
+		idfOf[term] = idf
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
 			// in only a couple of sessions still identifies them.
@@ -907,7 +931,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], focus[ord]})
 	}
 	if len(ranked) == 0 {
-		return nil, nil, nil, termsKnown, 0, nil, readErr
+		return relevanceRanking{termsKnown: termsKnown}, readErr
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].score != ranked[j].score {
@@ -937,7 +961,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		anyMatched = append(anyMatched, r.any)
 		strong = append(strong, r.strong)
 	}
-	return metas, matched, anyMatched, termsKnown, matchedTotal, strong, readErr
+	return relevanceRanking{
+		metas:       metas,
+		informative: matched,
+		any:         anyMatched,
+		strong:      strong,
+		termsKnown:  termsKnown,
+		total:       matchedTotal,
+		idf:         idfOf,
+	}, readErr
 }
 
 // FirstMatch tries candidate queries in order under ONE lock and manifest
