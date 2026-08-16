@@ -374,7 +374,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	metas, _, anyMatched, termsKnown, matched, _, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
+	metas, _, anyMatched, termsKnown, matched, strong, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
 		return sessionMetaMatches(meta, o)
 	})
 	if rerr != nil {
@@ -387,8 +387,20 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	}
 	keep := make([]SessionMeta, 0, len(metas))
 	var weak []SessionMeta
+	// A lone rare term is only trustworthy when the words it is alone against
+	// are real words the corpus knows and the session simply does not use. On
+	// "zzqx wwvv limiter" the others are typos, and one surviving anchor is
+	// noise however rare it is — which is the silence the tier owes a query it
+	// cannot honestly answer.
+	decisive := len(terms) >= 3 && termsKnown >= 2
 	for i, meta := range metas {
-		if anyMatched[i] >= 2 {
+		// Two ordinary words, or one word rare enough to identify something on
+		// its own. Counting terms alone was the whole of it, and it is the wrong
+		// question on a spoken sentence: "How many bikes do I own?" carries
+		// `many` and `own` alongside `bikes`, so every session holding the two
+		// filler words counted as a real match and the one session that says
+		// bikes — twenty of nineteen hundred do — rode behind all of them.
+		if anyMatched[i] >= 2 || (decisive && strong[i] > 0) {
 			keep = append(keep, meta)
 		} else {
 			weak = append(weak, meta)
