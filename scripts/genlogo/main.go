@@ -144,6 +144,17 @@ func liveIcon() string {
 		alive(x0, y0, size) + "</svg>\n"
 }
 
+// stillIcon is the app icon in a named mood, for the moments the site wants the
+// cat to react: asleep while the tab is in the background, surprised when the
+// demo search lands a hit. The page swaps the file rather than reaching into
+// the drawing, which keeps the sprite in one place.
+func stillIcon(m mark.Mood) string {
+	const x0, y0, size = 56, 68, 12
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" role="img" aria-label="deja-vu">
+  <rect width="400" height="400" rx="88" fill="#1d1b2e"/>
+` + note + fills(mark.Paths(m, x0, y0, size, nil), 2) + "</svg>\n"
+}
+
 func main() {
 	check := flag.Bool("check", false, "fail if the committed assets differ from the sprite")
 	static := flag.Bool("static", false, "draw the ready pose without the wag")
@@ -159,9 +170,11 @@ func main() {
 		// above. Written from the same sprite in the same run rather than
 		// copied, because a copy is what goes stale — this is the drift the
 		// whole command exists to stop.
-		"docs/assets/logo-dark.svg": darkLogo,
-		"docs/assets/icon.svg":      appIcon,
-		"docs/assets/icon-live.svg": liveIcon(),
+		"docs/assets/logo-dark.svg":  darkLogo,
+		"docs/assets/icon.svg":       appIcon,
+		"docs/assets/icon-live.svg":  liveIcon(),
+		"docs/assets/icon-sleep.svg": stillIcon(mark.Asleep),
+		"docs/assets/icon-wow.svg":   stillIcon(mark.Surprised),
 	}
 	paths := make([]string, 0, len(assets))
 	for p := range assets {

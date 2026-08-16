@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="no-js">
 <head>
-<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>deja — search your Claude Code, Codex and Cursor history</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<title>deja-vu — memory for coding agents</title>
+<meta name="theme-color" content="#0b0f10">
 <meta name="description" content="Persistent memory for coding agents, built from the history they already wrote — including everything from before you installed it. Claude Code, Codex and 15 more.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <meta property="og:type" content="website">
@@ -18,316 +19,196 @@
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"A local memory layer for coding agents: retroactive search over agent session history, MCP recall, redaction, stats, share and SSH sync.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
+<link rel="apple-touch-icon" href="assets/icon.svg">
 <style>
 :root{
-  --bg:#0b0f10;
-  --ph:#8787af;
-  --ph-hi:#afafd7;
-  --ph-dim:#5f5f87;
-  --amber:#ff8700;
-  --body:#c4cdcf;
-  --faint:#55626a;
-  --line:#1e262a;
-  --panel:#12171a;
-  --mono:"Berkeley Mono","SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
+  --bg:#0b0f10; --panel:#12171a; --panel-2:#161c1f; --line:#1e262a;
+  --coat:#8787af; --coat-hi:#afafd7; --coat-dim:#5f5f87;
+  --amber:#ff8700; --ink:#f4f7f7; --body:#c4cdcf; --faint:#6b7a80;
+  --mono:"Berkeley Mono","SF Mono","JetBrains Mono","Fira Code",Menlo,monospace;
+  --sans:"Inter","SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{
-  background:var(--bg);
-  overflow-x:hidden;
-  color:var(--body);
-  font:15px/1.7 var(--mono);
-  -webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
-}
-::selection{background:#3a3a5c;color:#f4f7f7}
+body{background:var(--bg);color:var(--body);font:16px/1.65 var(--sans);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--coat-hi);text-decoration:none}
+a:hover{color:var(--ink)}
+::selection{background:#3a3a5c;color:var(--ink)}
 
-/* ── CRT screen ─────────────────────────────────────────── */
-.crt::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
-  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.16) 2px 3px);
-}
-.crt::after{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:61;
-  background:radial-gradient(ellipse 130% 100% at 50% 45%,transparent 55%,rgba(0,0,0,.42) 100%);
-}
-@keyframes flicker{0%,100%{opacity:1}96%{opacity:1}97%{opacity:.96}98%{opacity:1}99%{opacity:.98}}
-.js .screen{animation:flicker 7s infinite}
-@keyframes poweron{0%{transform:scaleY(.004);filter:brightness(6)}55%{transform:scaleY(.004);filter:brightness(6)}70%{transform:scaleY(1);filter:brightness(2.2)}100%{transform:scaleY(1);filter:brightness(1)}}
-.js .screen{transform-origin:50% 42vh;animation:poweron .6s ease-out,flicker 7s .6s infinite}
-@media (prefers-reduced-motion: reduce){
-  .js .screen{animation:none}
-  .crt::before{background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.09) 2px 3px)}
-}
+/* The texture is our own grid — the one the sprite is drawn on, blown up until
+   it is nearly not there. Ours rather than borrowed. */
+.grid{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:48px 48px;opacity:.4;
+  -webkit-mask-image:radial-gradient(ellipse 90% 55% at 50% 0%,#000 15%,transparent 70%);
+  mask-image:radial-gradient(ellipse 90% 55% at 50% 0%,#000 15%,transparent 70%)}
 
-.wrap{max-width:900px;margin:0 auto;padding:0 20px;position:relative}
+.wrap{position:relative;z-index:1;max-width:1060px;margin:0 auto;padding:0 32px}
 
-a{color:var(--ph);text-decoration:none}
-a:hover{color:var(--ph-hi);text-shadow:0 0 8px rgba(74,240,139,.45)}
+nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;
+  padding:16px 32px;font:13px/1 var(--mono);max-width:1060px;margin:0 auto;
+  backdrop-filter:blur(8px);background:rgba(11,15,16,.72)}
+nav .brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:600}
+nav .brand img{width:26px;height:26px}
+nav .sp{flex:1}
+nav .lnk{color:var(--faint);padding:7px 10px;border-radius:6px}
+nav .lnk:hover{color:var(--ink);background:var(--panel)}
+nav .cta{color:var(--bg);background:var(--coat);padding:8px 14px;border-radius:7px;font-weight:600}
+nav .cta:hover{background:var(--coat-hi);color:var(--bg)}
 
-/* ── status bar ─────────────────────────────────────────── */
-.tty{
-  position:sticky;top:0;z-index:50;background:rgba(5,8,7,.92);backdrop-filter:blur(3px);
-  border-bottom:1px solid var(--line);
-}
-.tty .wrap{display:flex;align-items:center;gap:14px;padding:10px 20px;font-size:.82rem}
-.tty .host{color:var(--ph);font-weight:700;letter-spacing:.02em;text-shadow:0 0 10px rgba(74,240,139,.35)}
-.tty .host .blink{margin-left:2px}
-.tty .spacer{flex:1}
-.tty a{color:var(--faint)}
-.tty a:hover{color:var(--ph)}
-.tty .k{color:#2c4a39;margin-right:4px}
+header{padding:72px 0 96px;display:grid;grid-template-columns:1fr 290px;gap:56px;align-items:center}
+h1{font:700 clamp(36px,5.1vw,58px)/1.06 var(--sans);letter-spacing:-.028em;color:var(--ink);margin-bottom:22px}
+h1 em{font-style:normal;color:var(--amber)}
+.lede{font-size:19px;line-height:1.55;max-width:40ch;margin-bottom:32px}
+.catwrap{justify-self:center;position:relative}
+.catwrap img{width:240px;height:240px;display:block}
+.catwrap .say{position:absolute;left:50%;transform:translateX(-50%);bottom:-14px;
+  font:11px var(--mono);color:var(--faint);white-space:nowrap;opacity:0;transition:opacity .3s}
+.catwrap:hover .say{opacity:1}
 
-/* ── shared terminal text bits ──────────────────────────── */
-.p{color:var(--faint);user-select:none}
-.cmd{color:var(--ph);text-shadow:0 0 7px rgba(74,240,139,.3)}
-.q{color:var(--amber)}
-.dim{color:var(--faint)}
-.hi{color:var(--ph-hi)}
-.ok{color:var(--ph)}
-mark{background:transparent;color:var(--amber);text-decoration:underline;text-underline-offset:3px}
-@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
-.blink{display:inline-block;width:.62em;height:1.05em;vertical-align:-.18em;background:var(--ph);box-shadow:0 0 9px rgba(74,240,139,.7)}
-.js .blink{animation:blink 1.06s step-end infinite}
-@media (prefers-reduced-motion: reduce){.js .blink{animation:none}}
+.cmdline{display:flex;align-items:center;gap:10px;background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:13px 15px;font:13.5px var(--mono);max-width:560px}
+.cmdline .p{color:var(--amber)}
+.cmdline code{color:var(--ink);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdline button{background:none;border:1px solid var(--line);color:var(--faint);
+  border-radius:6px;padding:5px 10px;font:11px var(--mono);cursor:pointer}
+.cmdline button:hover{color:var(--ink);border-color:var(--coat-dim)}
+.under{margin-top:12px;font:12.5px var(--mono);color:var(--faint)}
+.under b{color:var(--coat-hi);font-weight:400}
 
-/* ── hero boot ──────────────────────────────────────────── */
-header{padding:56px 0 8px}
-.neofetch{display:flex;gap:40px;align-items:center}
-.mark{display:block;width:150px;height:auto}
-@keyframes markwipe{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0% 0)}}
-.js .mark{animation:markwipe 1.4s steps(15) .5s both}
-@media (prefers-reduced-motion: reduce){.js .mark{animation:none}}
-@media(max-width:760px){
-  .neofetch{flex-direction:column;align-items:flex-start;gap:18px}
-  .mark{width:110px}
-}
-.boot{font-size:.88rem;min-height:0}
-.boot .ln{white-space:pre-wrap}
-.boot .bar-h{color:var(--ph-dim)}
-.js .type-seq .ln{visibility:hidden}
-.js .type-seq .ln.on{visibility:visible}
+.proof{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:104px}
+.proof div{background:var(--bg);padding:26px 24px}
+.proof b{display:block;font:700 31px/1 var(--sans);color:var(--ink);letter-spacing:-.02em}
+.proof b i{font-style:normal;font-size:16px;color:var(--faint);font-weight:500}
+.proof .lab{display:block;margin-top:9px;font:12.5px var(--mono);color:var(--faint)}
 
-.logo-block{margin:34px 0 6px}
-.wordmark{display:block;width:min(430px,86vw);height:auto}
-.logo-block::-webkit-scrollbar{display:none}
-pre.ascii{
-  font-size:clamp(6.4px,1.5vw,13px);line-height:1.18;color:var(--ph);
-  text-shadow:0 0 12px rgba(74,240,139,.4),0 0 2px rgba(74,240,139,.8);
-  user-select:none;
-}
-pre.ascii b{color:var(--amber);font-weight:400;text-shadow:0 0 12px rgba(255,180,84,.4)}
-.tagline{margin-top:18px;font-size:clamp(.95rem,2.4vw,1.25rem);color:#d7f5e2}
-.tagline .f2{color:var(--amber)}
-.sub{margin-top:14px;max-width:70ch;color:var(--body);font-size:.92rem}
-.sub code{color:var(--ph)}
+section{margin-bottom:104px}
+h2{font:700 12px/1 var(--mono);letter-spacing:.18em;color:var(--faint);
+  text-transform:uppercase;margin-bottom:18px}
+.big{font:400 clamp(23px,3vw,33px)/1.35 var(--sans);color:var(--ink);letter-spacing:-.02em;max-width:26ch}
+.big em{font-style:normal;color:var(--coat-hi)}
+.note{margin-top:16px;max-width:62ch;color:var(--body)}
 
-.heroline{
-  margin-top:30px;display:flex;align-items:center;gap:10px;
-  border:1px solid var(--line);background:var(--panel);padding:13px 16px;
-  box-shadow:inset 0 0 30px rgba(74,240,139,.03);
-}
-.heroline code{color:var(--ph);font-size:.85rem;white-space:nowrap;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
-.copy{
-  flex:none;background:transparent;border:1px solid var(--line);color:var(--faint);
-  padding:4px 12px;cursor:pointer;font:inherit;font-size:.76rem;
-}
-.copy:hover{color:var(--ph);border-color:var(--ph-dim)}
-.hero-links{margin-top:14px;font-size:.85rem;color:var(--faint)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:26px}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
+.step .n{font:700 11px var(--mono);color:var(--amber);letter-spacing:.12em}
+.step h3{margin:12px 0 8px;font:600 17px var(--sans);color:var(--ink)}
+.step p{font-size:14.5px;color:var(--faint);line-height:1.55}
 
-/* ── section chrome: every section is a command ─────────── */
-section{margin-top:96px}
-.shead{font-size:.95rem;margin-bottom:6px;white-space:pre-wrap}
-.shead .out{color:var(--faint)}
-.slead{color:var(--faint);font-size:.9rem;max-width:70ch;margin-bottom:24px}
-.slead code,.slead .cmd{font-size:.95em}
-.js .reveal{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
-.js .reveal.in{opacity:1;transform:none}
-@media (prefers-reduced-motion: reduce){.js .reveal{opacity:1;transform:none;transition:none}}
-
-/* ── live demo ──────────────────────────────────────────── */
-.demo{
-  border:1px solid var(--line);background:var(--panel);padding:20px;
-  box-shadow:inset 0 0 40px rgba(74,240,139,.03);
-}
-.demo .in-ln{display:flex;align-items:center;gap:0;font-size:.95rem}
-.demo .in-ln .p{margin-right:8px}
-.demo input{
-  flex:1;background:transparent;border:none;outline:none;color:var(--amber);
-  font:inherit;caret-color:var(--ph);min-width:0;
-}
-.demo input::placeholder{color:#47705a}
-.demo .res{margin-top:16px;font-size:.86rem}
-.demo .res .r{margin-bottom:14px}
-.demo .res .meta{color:var(--faint)}
-.demo .res .meta .h{color:var(--ph)}
-.demo .res .t{color:#d7f5e2}
-.demo .res .s{color:var(--body);display:block;padding-left:2ch}
-.demo .res .none{color:var(--faint);white-space:pre-line}
-.demo .res .stat{color:#47705a;font-size:.78rem;margin-top:4px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.in-ln{display:flex;align-items:center;gap:8px;font:14px var(--mono);color:var(--ink)}
+.in-ln .p{color:var(--amber)}
+.in-ln input{flex:1;background:none;border:0;outline:0;color:var(--ink);font:inherit}
+.in-ln input::placeholder{color:var(--faint)}
+.res{margin-top:14px;font:13px/1.6 var(--mono)}
 .chips{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
-.chip{
-  background:transparent;border:1px solid var(--line);color:var(--faint);
-  font:inherit;font-size:.78rem;padding:3px 10px;cursor:pointer;
-}
+.chip{background:none;border:1px solid var(--line);color:var(--faint);border-radius:999px;
+  padding:5px 12px;font:12px var(--mono);cursor:pointer}
 .chip:hover{color:var(--amber);border-color:#3d3320}
-.demo-note{margin-top:12px;color:#47705a;font-size:.78rem}
+.demo-note{margin-top:14px;font:12px var(--mono);color:var(--faint)}
 
-/* ── the recall chat ────────────────────────────────────── */
-.replay{border:1px solid var(--line);background:var(--panel);padding:20px}
-.replay .u{color:#d7f5e2}
-.replay .u .who{color:var(--amber)}
-.replay .tool{color:var(--faint);font-size:.82rem;margin:12px 0 4px}
-.replay .a{color:var(--body)}
-.replay .a .who{color:var(--ph)}
-.replay .a code{color:var(--ph)}
-.replay p{margin-top:10px}
+.agents{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.agents span{border:1px solid var(--line);border-radius:8px;padding:7px 12px;
+  font:12.5px var(--mono);color:var(--body);background:var(--panel)}
+.agents span.more{color:var(--faint);border-style:dashed}
 
-/* ── measured numbers ───────────────────────────────────── */
-.bench{border:1px solid var(--line);background:var(--panel);padding:20px;font-size:.9rem;overflow-x:auto}
-.bench table{border-collapse:collapse;width:100%;min-width:520px}
-.bench td{padding:7px 14px 7px 0;vertical-align:top}
-.bench .n{color:var(--ph);font-size:1.5rem;text-shadow:0 0 12px rgba(74,240,139,.35);white-space:nowrap}
-.bench .c{color:var(--faint)}
-.bench .foot{margin-top:14px;color:#3d5c4a;font-size:.8rem}
+footer{border-top:1px solid var(--line);padding:34px 0 60px;font:12.5px var(--mono);
+  color:var(--faint);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+footer .sp{flex:1}
 
-/* ── features as help output ────────────────────────────── */
-.help{border:1px solid var(--line);background:var(--panel);padding:20px;font-size:.88rem;overflow-x:auto}
-.help dl{display:grid;grid-template-columns:auto 1fr;gap:10px 26px;min-width:560px}
-.help dt{color:var(--ph);white-space:nowrap}
-.help dd{color:var(--body)}
-.help dd .dim{font-size:.92em}
-
-/* ── sources ────────────────────────────────────────────── */
-.sources{border:1px solid var(--line);background:var(--panel);padding:20px;font-size:.86rem;overflow-x:auto}
-.sources table{border-collapse:collapse;min-width:540px;width:100%}
-.sources td{padding:4px 18px 4px 0;white-space:nowrap}
-.sources .nm{color:#d7f5e2}
-.sources .st{color:var(--ph)}
-.sources .pa{color:var(--faint)}
-.sources .mx th{color:#47705a;text-align:left;font-weight:400;text-transform:uppercase;font-size:.7rem;letter-spacing:.1em;padding:4px 18px 10px 0}
-.sources .mx .y{color:var(--ph)}
-.sources .mx .n{color:#31503f}
-.sources .mx .am{color:var(--amber)}
-.sources .mx-foot{margin-top:14px;color:#47705a;font-size:.78rem}
-
-/* ── stats strip ────────────────────────────────────────── */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
-.stat{background:var(--bg);padding:20px 16px;text-align:center}
-.stat b{display:block;font-size:1.5rem;font-weight:400;color:var(--ph);text-shadow:0 0 12px rgba(74,240,139,.35)}
-.stat span{color:var(--faint);font-size:.78rem}
-
-.cardbox{border:1px solid var(--line);background:var(--panel);padding:10px}
-.cardbox img{display:block;width:100%;max-width:880px}
-
-/* ── install ────────────────────────────────────────────── */
-.installs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:720px){.installs{grid-template-columns:1fr}}
-.inst{border:1px solid var(--line);background:var(--panel);padding:14px 16px;min-width:0}
-.inst .k{color:#3d5c4a;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
-.inst .row{display:flex;align-items:center;gap:8px;margin-top:6px}
-.inst pre{font-family:inherit;font-size:.8rem;color:var(--ph);overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
-
-/* ── docs ls ────────────────────────────────────────────── */
-.docs-ls{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
-@media(max-width:640px){.docs-ls{grid-template-columns:1fr}}
-.docs-ls a{display:block;background:var(--bg);padding:14px 18px;color:var(--ph)}
-.docs-ls a span{display:block;color:var(--faint);font-size:.8rem}
-.docs-ls a:hover{background:var(--panel);text-shadow:0 0 8px rgba(74,240,139,.4)}
-
-.how{color:var(--faint);max-width:70ch;font-size:.9rem}
-.how code,.how a{font-size:.95em}
-.how code{color:var(--body)}
-
-footer{margin:110px 0 40px;padding-top:22px;border-top:1px solid var(--line);font-size:.82rem;color:var(--faint);display:flex;gap:16px;flex-wrap:wrap}
-footer .spacer{flex:1}
-
-@media(max-width:600px){
-  body{font-size:13.5px}
-  .help dl,.bench table,.sources table{min-width:0}
-  .help dl{grid-template-columns:1fr}
-  .help dt{margin-top:8px}
-  .tty .wrap{gap:10px;font-size:.76rem}
-  .tty .k{display:none}
-  .tty .host{white-space:nowrap}
-  .sources td{white-space:normal}
-}
+.js .reveal{opacity:0;transform:translateY(12px);transition:opacity .6s ease,transform .6s ease}
+.js .reveal.in{opacity:1;transform:none}
 
 /* the ghost of the page, for the déjà vu */
-#vu{position:fixed;inset:0;z-index:99;pointer-events:none;
-  background:var(--ph);opacity:0;mix-blend-mode:overlay;
-  animation:vu .9s ease-out}
-@keyframes vu{0%{opacity:0}12%{opacity:.22}100%{opacity:0}}
+#vu{position:fixed;inset:0;z-index:99;pointer-events:none;background:var(--coat);
+  opacity:0;mix-blend-mode:overlay;animation:vu .9s ease-out}
+@keyframes vu{0%{opacity:0}12%{opacity:.24}100%{opacity:0}}
 
 /* what the site wore before the rebrand. A memory tool is allowed to keep a
-   copy of its own past. */
-.phosphor{
-  --bg:#050807; --ph:#4af08b; --ph-hi:#8affc0; --ph-dim:#2f9459;
-  --amber:#ffb454; --body:#a9cbb6; --faint:#5d8a6e; --line:#12291c; --panel:#070d0a;
-}
-/* The mark is not recoloured with the rest. A filter takes the nose with it —
-   amber lands on magenta — and the better reading is that the cat is the thing
-   that survived the rebrand. */
+   copy of its own past. The mark is left out of the recolour: the cat is the
+   thing that survived. */
+.phosphor{--bg:#050807;--panel:#070d0a;--panel-2:#0a1410;--line:#12291c;
+  --coat:#4af08b;--coat-hi:#8affc0;--coat-dim:#2f9459;--amber:#ffb454;
+  --body:#a9cbb6;--faint:#5d8a6e}
 
-#recall-line{color:var(--amber)}
+#recall-line{color:var(--amber);font:12.5px var(--mono);margin-bottom:14px}
+
+@media (prefers-reduced-motion: reduce){
+  .js .reveal{opacity:1;transform:none;transition:none}
+  #vu{display:none}
+}
+@media(max-width:860px){
+  header{grid-template-columns:1fr;gap:32px}
+  .catwrap{order:-1;justify-self:start}
+  .catwrap img{width:150px;height:150px}
+  .proof,.steps{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-<div class="crt"></div>
-<div class="screen">
 
-<nav class="tty" aria-label="site">
-  <div class="wrap">
-    <span class="host">deja-vu<span class="dim">@local</span>:~ <span class="blink" aria-hidden="true"></span></span>
-    <span class="spacer"></span>
-    <a href="#demo"><span class="k">[F2]</span>try</a>
-    <a href="#install"><span class="k">[F3]</span>install</a>
-    <a href="guide/getting-started.html"><span class="k">[F4]</span>docs</a>
-    <a href="https://github.com/vshulcz/deja-vu"><span class="k">[F5]</span>github</a>
-  </div>
+<div class="grid"></div>
+
+<nav>
+  <a class="brand" href="./"><img id="navcat" src="assets/icon.svg" alt="">deja-vu</a>
+  <span class="sp"></span>
+  <a class="lnk" href="guide/getting-started.html">Docs</a>
+  <a class="lnk" href="guide/benchmarks.html">Benchmarks</a>
+  <a class="lnk" href="guide/compare.html">Compare</a>
+  <a class="cta" href="https://github.com/vshulcz/deja-vu">GitHub</a>
 </nav>
 
 <div class="wrap">
 
 <header>
-  <div class="neofetch">
-  <img class="mark" src="assets/icon-live.svg" width="150" height="150" alt="" aria-hidden="true">
-  <div class="boot type-seq" id="boot" aria-label="deja indexing existing agent history">
-    <div class="ln"><span class="p">$</span> <span class="cmd">deja index</span></div>
-    <div class="ln dim">scanning harness stores…</div>
-    <div class="ln" id="recall-line" hidden></div>
-    <div class="ln bar-h">  claude       ▓▓▓▓▓▓▓▓▓▓▓▓▓▓  812 sessions</div>
-    <div class="ln bar-h">  codex        ▓▓▓▓▓░░░░░░░░░   96 sessions</div>
-    <div class="ln bar-h">  opencode     ▓▓▓░░░░░░░░░░░   57 sessions</div>
-    <div class="ln bar-h">  8 more…      ▓▓░░░░░░░░░░░░   54 sessions</div>
-    <div class="ln"><span class="ok">✓</span> <span data-count="1019">1,019</span> sessions · 3.3 GB · indexed in <span data-count="10">10</span> s</div>
-    <div class="ln dim">months of history from before you installed it — already searchable</div>
-  </div>
-  </div>
-
-  <div class="logo-block reveal" id="logoblk">
-<img class="wordmark" src="assets/logo-dark.svg" width="430" height="118" alt="deja-vu">
-    <h1 class="tagline">your agents already solved this. <span class="f2">deja finds it.</span></h1>
-    <p class="tagline" style="margin-top:8px;font-size:clamp(.85rem,2vw,1.05rem)"><span class="f2">84.9% hit@1</span> on LongMemEval-S retrieval — no LLM, no embeddings, no API key. <a href="guide/benchmarks.html" style="color:inherit">measured, in-repo →</a></p>
-    <p class="sub">Memory tools start empty and record forward. deja starts full: it indexes the sessions your coding agents already wrote to disk &mdash; months of history from before you installed it &mdash; and serves them back to any agent over MCP. It ranks by what actually held rather than what merely matched, and once its hooks are wired it names the decision already reached on a file before your agent edits it. One zero-dependency binary, fully local.</p>
-    <div class="heroline">
+  <div>
+    <p id="recall-line" hidden></p>
+    <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
+    <p class="lede">deja indexes the sessions your coding agents already wrote to disk —
+      months of history from before you installed it — and hands the right one back
+      before you ask.</p>
+    <div class="cmdline">
       <span class="p">$</span>
-      <code id="cmd">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
-      <button class="copy" data-copy="cmd">copy</button>
+      <code id="i1">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
+      <button class="copy" data-copy="i1">copy</button>
     </div>
-    <p class="hero-links">or <a href="#install">brew · go · npm</a> — then <span class="cmd">deja install --all</span> wires up your agents</p>
+    <p class="under">then <b>deja install --auto</b> — ten seconds to install, ten to index,
+      and the next session already knows</p>
+  </div>
+  <div class="catwrap">
+    <img id="hero-cat" src="assets/icon-live.svg" width="240" height="240" alt="">
+    <span class="say">try the konami code</span>
   </div>
 </header>
 
-<section id="demo" class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja</span> <span class="out"># try it — a live search over a fake history, right here</span></p>
-  <p class="slead">This is the whole product in one motion: type what you half-remember, get the session where it was solved.</p>
-  <div class="demo">
+<div class="proof reveal">
+  <div><b>84.9<i>%</i></b><span class="lab">hit@1 · LongMemEval-S</span></div>
+  <div><b>1.5<i>ms</i></b><span class="lab">median search over 3.5 GB</span></div>
+  <div><b>0</b><span class="lab">models, keys or cloud accounts</span></div>
+</div>
+
+<section class="reveal">
+  <h2>The difference</h2>
+  <p class="big">Every memory tool starts empty and records forward.
+    <em>deja starts full.</em></p>
+  <p class="note">The transcripts are the memory. There is no capture step to remember to
+    run and no stack to stand up — your agents have been writing this to disk all along.</p>
+</section>
+
+<section class="reveal" id="demo">
+  <h2>Try it — a live search over a fake history</h2>
+  <p class="big" style="margin-bottom:26px">Type what you half-remember.
+    <em>Get the session where it was solved.</em></p>
+  <div class="panel">
     <div class="in-ln">
       <span class="p">$ deja</span>
-      <input id="dq" type="search" autocomplete="off" spellcheck="false" placeholder='"connection pool exhausted"' aria-label="search the demo history">
-      <span class="blink" aria-hidden="true"></span>
+      <input id="dq" type="search" autocomplete="off" spellcheck="false"
+             placeholder='"connection pool exhausted"' aria-label="search the demo history">
     </div>
     <div class="res" id="dres" aria-live="polite"></div>
     <div class="chips" aria-label="example queries">
@@ -337,200 +218,105 @@ footer .spacer{flex:1}
       <button class="chip" data-q="cors">cors</button>
       <button class="chip" data-q="migration rollback">migration rollback</button>
     </div>
-    <p class="demo-note">demo corpus: 16 synthetic sessions — press / anywhere to search. The real thing searches your actual history, retroactively.</p>
+    <p class="demo-note">demo corpus: 16 synthetic sessions — press <b>/</b> anywhere to search.
+      The real thing searches your own history, retroactively.</p>
   </div>
 </section>
 
 <section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja mcp</span> <span class="out"># what your agent does with it</span></p>
-  <p class="slead">After <span class="cmd">deja install --all</span>, every agent with an MCP client gets a <span class="cmd">recall</span> tool (aider's CLI has none — its history is still indexed). Add <span class="cmd">--auto</span> for session-start auto-recall where the agent supports it — memory before you ask, the project's settled decisions up front, and before the agent edits a file or runs a command it names the prior decision on that exact file or command. When a prompt matches work your history already answered, deja says so out loud: <span class="q">deja-vu: you have been here</span>.</p>
-  <div class="replay">
-    <p class="u"><span class="who">you ›</span> have we dealt with jwt refresh rotation before? check your memory</p>
-    <p class="tool">→ recall("jwt refresh rotation") · 1 match · 3.2 KB</p>
-    <p class="a"><span class="who">agent ›</span> Yes — three weeks ago in the <code>api-gateway</code> project (a Codex session). Login broke after key rotation: the jwks cache wasn't reloaded after <code>rotateKey</code>. You fixed it by reloading the cache and adding a clock-skew test. Want me to apply the same pattern here?</p>
-  </div>
-</section>
-
-<section id="proof" class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja bench context</span> <span class="out"># measured, not claimed</span></p>
-  <p class="slead">Reaching the context a task needs, with deja recall vs replaying the whole history — a seeded benchmark anyone can run.</p>
-  <div class="bench">
-    <table>
-      <tr><td class="n">~200×</td><td class="c">fewer tokens to working context than grepping the raw logs, at equal fact coverage</td></tr>
-      <tr><td class="n">~1.5 ms</td><td class="c">median warm search over gigabytes of history; ~14 ms on the most common word</td></tr>
-      <tr><td class="n">~50 ms</td><td class="c">session-start hook on a 1000-session index — memory lands before you type</td></tr>
-      <tr><td class="n">84.9%</td><td class="c">hit@1 on LongMemEval-S session retrieval (94.3% hit@5) — no LLM, no embeddings, harness in-repo</td></tr>
-      <tr><td class="n">17</td><td class="c">coding agents indexed into one retroactive memory</td></tr>
-    </table>
-    <p class="foot"><a href="guide/benchmarks.html">how it's measured →</a></p>
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step"><span class="n">01</span><h3>It reads what is already there</h3>
+      <p>Every coding agent writes its sessions to disk. deja parses those stores in place —
+        nothing is copied, nothing is uploaded.</p></div>
+    <div class="step"><span class="n">02</span><h3>It builds a local index</h3>
+      <p>Credentials are stripped on the way in. About ten seconds for a few gigabytes,
+        and the index is 2% of the corpus.</p></div>
+    <div class="step"><span class="n">03</span><h3>Your agents recall from it</h3>
+      <p>An MCP tool every agent can call, and a session-start hook where the agent
+        supports one, so it already knows.</p></div>
   </div>
 </section>
 
 <section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja --help</span></p>
-  <div class="help">
-    <dl>
-      <dt>deja "query"</dt><dd>search everything your agents ever wrote — phrases, fuzzy, semantic tiers. <span class="dim">Retroactive: months of logs from before you installed it.</span></dd>
-      <dt>recall / recall_context</dt><dd>MCP tools, answers under ~4 KB. A fix found in Codex is recalled inside Claude Code.</dd>
-      <dt>deja blame &lt;path&gt;</dt><dd>which sessions touched this file, what was decided and why. <span class="dim">git blame, but for the discussions behind the code.</span></dd>
-      <dt>deja restore &lt;path&gt;</dt><dd>a span an agent replaced, handed back from the edit that replaced it. <span class="dim">Never writes over the original.</span></dd>
-      <dt>deja files &lt;topic&gt;</dt><dd>which files the work on a subject actually touched — the other direction from blame.</dd>
-      <dt>deja handoff --to codex</dt><dd>stuck in one agent? package the live context and continue in another.</dd>
-      <dt>deja remember "text"</dt><dd>keep durable decisions next to the recalled history — same index, same redaction.</dd>
-      <dt>deja sync ssh laptop</dt><dd>memory follows you between machines. Watermarked, idempotent, no cloud in the middle.</dd>
-      <dt>deja share &lt;id&gt;</dt><dd>hand a colleague a sanitized digest — problem, key conclusions, secrets already scrubbed.</dd>
-      <dt>deja view</dt><dd>your whole memory in one local HTML — sessions, recalls, notes. <span class="dim">No server; nothing leaves the machine.</span></dd>
-      <dt>deja stats</dt><dd>sessions, top projects, activity sparkline. <span class="dim">Totals per harness, per project, per month.</span></dd>
-      <dt>deja log</dt><dd>audit trail: what was recalled or injected, when, into which agent — <span class="dim">--last prints the exact digest an agent received.</span></dd>
-      <dt>deja</dt><dd>bare, on a terminal: the living brief — today's sessions, recalls served, déjà vu moments, a question asked in more than one session, an error several sessions hit, a suggested search from your own history.</dd>
-    </dl>
-  </div>
-  <p class="slead" style="margin-top:16px">Secrets never reach the index: API keys, JWTs, private-key blocks and bare high-entropy values in secret-shaped spots are stripped at ingest — the cache is safe to keep, shares and exports are safe to send.</p>
-</section>
-
-<section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja doctor</span> <span class="out"># seventeen harnesses, one memory</span></p>
-  <div class="sources">
-    <table class="mx">
-      <tr><th></th><th>mcp recall</th><th>auto-recall</th><th>resume</th><th>handoff</th><th>needs</th></tr>
-      <tr><td class="nm">claude code</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">codex cli</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">opencode</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="pa">sqlite3</td></tr>
-      <tr><td class="nm">cursor</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">sqlite3 (IDE)</td></tr>
-      <tr><td class="nm">gemini cli</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">antigravity</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
-      <tr><td class="nm">grok build</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">qwen code</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">kimi code</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
-      <tr><td class="nm">cline</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">—</td></tr>
-      <tr><td class="nm">roo code</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="am">paste</td><td class="pa">history still indexed</td></tr>
-      <tr><td class="nm">openclaw</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="am">paste</td><td class="pa">—</td></tr>
-      <tr><td class="nm">goose</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="am">paste</td><td class="pa">sqlite3 (new store)</td></tr>
-      <tr><td class="nm">pi</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">copilot cli</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="pa">—</td></tr>
-      <tr><td class="nm">aider</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="pa">no MCP client — history still indexed</td></tr>
-    </table>
-    <p class="mx-foot">full matrix with store paths and formats: <a href="guide/harnesses.html">guide/harnesses</a> · generated from the <a href="registry/README.md">format registry</a>, pinned by a conformance test</p>
+  <h2>Works with</h2>
+  <p class="big">Solve it in Codex. <em>Claude remembers.</em></p>
+  <div class="agents">
+    <span>Claude Code</span><span>Codex CLI</span><span>Cursor</span><span>opencode</span>
+    <span>Gemini CLI</span><span>Cline</span><span>Copilot CLI</span><span>Roo Code</span>
+    <span>aider</span><span>Goose</span><span>Qwen Code</span><span>Kimi Code</span>
+    <span>Antigravity</span><span>Grok Build</span><span>OpenClaw</span><span>pi</span>
+    <span>Hermes</span><span class="more">one memory, all of them</span>
   </div>
 </section>
 
 <section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja stats --card</span> <span class="out"># your agent year, one image</span></p>
-  <p class="slead">One command renders your indexed history into a shareable SVG — heatmap, counts, top agents. Paste it into a README or a post. This one is from the demo corpus:</p>
-  <div class="cardbox"><img src="assets/stats-card-demo.svg" alt="deja stats card: a year heatmap of agent sessions with totals per agent" loading="lazy"></div>
-</section>
-
-<section class="reveal">
-  <div class="stats">
-    <div class="stat"><b>~1.5 ms</b><span>median warm search over ~3.5 GB</span></div>
-    <div class="stat"><b>~10 s</b><span>cold index, once</span></div>
-    <div class="stat"><b>~2.3%</b><span>index size vs corpus</span></div>
-    <div class="stat"><b>0</b><span>runtime dependencies</span></div>
-  </div>
-</section>
-
-<section id="install" class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja install --all</span> <span class="out"># pick a package first</span></p>
-  <div class="installs">
-    <div class="inst"><span class="k">curl</span><div class="row"><pre id="i1">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre><button class="copy" data-copy="i1">copy</button></div></div>
-    <div class="inst"><span class="k">Homebrew</span><div class="row"><pre id="i2">brew install vshulcz/tap/deja-vu</pre><button class="copy" data-copy="i2">copy</button></div></div>
-    <div class="inst"><span class="k">Go</span><div class="row"><pre id="i3">go install github.com/vshulcz/deja-vu/cmd/deja@latest</pre><button class="copy" data-copy="i3">copy</button></div></div>
-    <div class="inst"><span class="k">npm</span><div class="row"><pre id="i4">npx @vshulcz/deja-vu "your query"</pre><button class="copy" data-copy="i4">copy</button></div></div>
-  </div>
-  <p class="shead"><span class="p">$</span> <span class="cmd">or from your agent's own registry</span> <span class="out"># one bundle, six harnesses</span></p>
-  <div class="installs">
-    <div class="inst"><span class="k">Claude Code</span><div class="row"><pre id="i5">claude plugin marketplace add vshulcz/deja-vu</pre><button class="copy" data-copy="i5">copy</button></div></div>
-    <div class="inst"><span class="k">Codex</span><div class="row"><pre id="i6">codex plugin marketplace add vshulcz/deja-vu</pre><button class="copy" data-copy="i6">copy</button></div></div>
-    <div class="inst"><span class="k">Cursor</span><div class="row"><pre id="i7">cursor-agent plugin marketplace add https://github.com/vshulcz/deja-vu</pre><button class="copy" data-copy="i7">copy</button></div></div>
-    <div class="inst"><span class="k">Qwen Code</span><div class="row"><pre id="i8">qwen extensions install https://github.com/vshulcz/deja-vu</pre><button class="copy" data-copy="i8">copy</button></div></div>
-    <div class="inst"><span class="k">OpenClaw</span><div class="row"><pre id="i9">openclaw plugins install ./deja-vu/claude-plugin</pre><button class="copy" data-copy="i9">copy</button></div></div>
-    <div class="inst"><span class="k">Copilot CLI</span><div class="row"><pre id="i10">copilot plugin marketplace add vshulcz/deja-vu</pre><button class="copy" data-copy="i10">copy</button></div></div>
-  </div>
-</section>
-
-<section id="docs" class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">ls docs/</span> <span class="out"># a real guide, install to internals</span></p>
-  <div class="docs-ls">
-    <a href="guide/getting-started.html">getting-started<span>install, index, first search</span></a>
-    <a href="guide/agents.html">agents-and-mcp<span>recall, blame, remember, auto-recall</span></a>
-    <a href="guide/search.html">search<span>phrases, fuzzy, semantic, tiers</span></a>
-    <a href="guide/commands.html">cli-reference<span>every subcommand and flag</span></a>
-    <a href="guide/harnesses.html">harnesses<span>seventeen agents, and adding one</span></a>
-    <a href="guide/privacy.html">privacy<span>redaction, forget, exclude</span></a>
-    <a href="guide/benchmarks.html">benchmarks<span>the ~200× number, reproducible</span></a>
-    <a href="guide/compare.html">compare<span>deja next to Mem0, Letta, memU…</span></a>
-    <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">architecture<span>index format, internals</span></a>
-  </div>
-</section>
-
-<section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">deja vs</span> <span class="out"># honest positioning</span></p>
-  <div class="sources">
-    <table class="mx">
-      <tr><th></th><th>engram &amp; record-forward</th><th>cass<br>(session search)</th><th>deja</th></tr>
-      <tr><td class="nm">starts with your history</td><td class="n">starts empty — agent must call mem_save</td><td class="y">✓</td><td class="y">✓ retroactive</td></tr>
-      <tr><td class="nm">serves memory to agents</td><td class="y">✓ MCP</td><td class="n">—</td><td class="y">✓ MCP + auto-recall</td></tr>
-      <tr><td class="nm">redaction at ingest</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td></tr>
-      <tr><td class="nm">cross-machine sync</td><td class="am">git / cloud</td><td class="n">—</td><td class="y">✓ ssh, local</td></tr>
-      <tr><td class="nm">setup</td><td class="am">wire MCP + teach agents to save</td><td class="am">Rust toolchain / TUI</td><td class="y">one binary, works on the past</td></tr>
-    </table>
-    <p class="mx-foot"><a href="https://github.com/Gentleman-Programming/engram">engram</a> curates what an agent chooses to save — good conflict detection, empty past. <a href="https://github.com/Dicklesworthstone/coding_agent_session_search">cass</a> is the kitchen-sink search take. deja's bet: the transcripts are the memory — retroactive, redacted, synced over your own ssh. Full table against Mem0, Letta, memU, Memori, claude-mem: <a href="guide/compare.html">guide/compare</a>.</p>
-  </div>
-</section>
-
-<section class="reveal">
-  <p class="shead"><span class="p">$</span> <span class="cmd">man deja</span> <span class="out"># how it works</span></p>
-  <p class="how">
-  deja parses the local history stores each harness already writes (<code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, opencode's SQLite db) into an incremental inverted index in <code>~/.cache/deja</code>. Only changed files are re-read on each run. The MCP server exposes the same index to agents. Secrets are redacted at ingest. Details in <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> — adding a harness is one parser file.
-  </p>
+  <h2>Private by construction</h2>
+  <p class="big">Nothing leaves your machine <em>unless you ask it to.</em></p>
+  <p class="note">Indexing and search are local. Keys, tokens and private key blocks are
+    stripped at index time, so the cache is safe to keep. No account, no telemetry —
+    even this page keeps what it remembers about you in your own browser.</p>
 </section>
 
 <footer>
-  <span>MIT © <a href="https://github.com/vshulcz">Vladislav Shulcz</a></span>
-  <span class="spacer"></span>
-  <a href="https://github.com/vshulcz/deja-vu">github</a>
-  <a href="https://github.com/vshulcz/deja-vu/releases">releases</a>
-  <a href="https://www.npmjs.com/package/@vshulcz/deja-vu">npm</a>
-  <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md">json api</a>
+  <span>MIT © vshulcz</span>
+  <span class="sp"></span>
+  <a href="guide/privacy.html">Privacy</a>
+  <a href="guide/commands.html">CLI</a>
+  <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
 </footer>
 
-</div><!-- /wrap -->
-</div><!-- /screen -->
-
+</div>
 <script>
-/* copy buttons */
-document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click',function(){
-  navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent.trim());
-  var t=b.textContent;b.textContent='copied';setTimeout(function(){b.textContent=t},1200);
-})});
 
 var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* boot typewriter: reveal lines one by one, then the logo block */
+/* copy buttons */
+document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click',function(){
+  navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent.trim());
+  var t=b.textContent;b.textContent='copied';cat('wow',1200);
+  setTimeout(function(){b.textContent=t},1200);
+})});
+
+/* ── the cat reacts ───────────────────────────────────────────────────────
+   The moods are generated files, so the page swaps a src rather than reaching
+   into the drawing — which keeps the sprite in one place. */
+var HERO=document.getElementById('hero-cat'),POSE={live:'assets/icon-live.svg',
+  sleep:'assets/icon-sleep.svg',wow:'assets/icon-wow.svg'},back=null;
+function cat(pose,ms){
+  if(!HERO||reduced)return;
+  HERO.src=POSE[pose]||POSE.live;
+  clearTimeout(back);
+  if(ms)back=setTimeout(function(){HERO.src=POSE.live},ms);
+}
+/* it dozes off when you leave the tab, and is awake when you come back */
+document.addEventListener('visibilitychange',function(){
+  cat(document.hidden?'sleep':'live');
+});
+
+/* ── the site remembers you ───────────────────────────────────────────────
+   The product hands back what you already did. A site for it that greets
+   every visit as the first is arguing against itself. localStorage only:
+   nothing about a visit leaves this browser. */
 (function(){
-  var boot=document.getElementById('boot'),lines=[].slice.call(boot.querySelectorAll('.ln')),logo=document.getElementById('logoblk');
-  if(reduced){lines.forEach(function(l){l.classList.add('on')});logo.classList.add('in');return}
-  logo.classList.remove('in');
-  var i=0;
-  function next(){
-    if(i<lines.length){
-      lines[i].classList.add('on');
-      var d=lines[i].classList.contains('bar-h')?130:(i===0?380:300);
-      i++;setTimeout(next,d);
-    }else{
-      setTimeout(function(){logo.classList.add('in')},220);
-    }
-    boot.querySelectorAll('[data-count]').forEach(function(c){
-      c.dispatchEvent(new Event('deja:run'));
-    });
-  }
-  setTimeout(next,650);
+  var KEY='deja.visits',prior=null;
+  try{prior=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  var now=Date.now(),state={n:(prior&&prior.n||0)+1,last:now,page:prior&&prior.page||''};
+  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+  if(!prior||!prior.last)return;
+  var days=Math.floor((now-prior.last)/86400000);
+  var when=days<1?'earlier today':days===1?'yesterday':days+' days ago';
+  var line=document.getElementById('recall-line');
+  if(!line)return;
+  line.textContent='welcome back — you were here '+when+
+    (prior.page?' · last time you were reading '+prior.page:'');
+  line.hidden=false;
 })();
 
 /* scroll reveal */
 var io=new IntersectionObserver(function(es){es.forEach(function(e){
   if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}
-})},{threshold:.1});
+})},{threshold:.12});
 document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
 
 /* live demo search */
@@ -636,88 +422,44 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
     },6000);
   }
 })();
-/* ── the site remembers you ───────────────────────────────────────────────
-   The product indexes what you already did and hands it back. A site for it
-   that greets every visit as the first one is arguing against itself.
-   localStorage only: nothing about a visit leaves this browser, which is the
-   claim the tool makes about your history. */
-(function(){
-  var KEY='deja.visits';
-  var prior=null;
-  try{prior=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
-  var now=Date.now();
-  var state={n:(prior&&prior.n||0)+1,last:now,page:prior&&prior.page||''};
-  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 
-  if(!prior||!prior.last)return;
-  var days=Math.floor((now-prior.last)/86400000);
-  var when=days<1?'earlier today':days===1?'yesterday':days+' days ago';
-  var line=document.getElementById('recall-line');
-  if(!line)return;
-  var read=prior.page?' · last time you were reading '+prior.page:'';
-  line.textContent='welcome back — you were here '+when+read;
-  line.hidden=false;
-})();
-
-/* ── the boot counts up ───────────────────────────────────────────────────
-   The figures were printed and the bars were drawn full. Running them makes
-   the first thing on the page a run rather than a picture of one. */
-(function(){
-  if(reduced)return;
-  var els=[].slice.call(document.querySelectorAll('[data-count]'));
-  els.forEach(function(el){
-    var target=parseInt(el.dataset.count,10),started=false;
-    el.textContent='0';
-    el.addEventListener('deja:run',function(){
-      if(started)return;started=true;
-      var t0=performance.now(),ms=900;
-      (function step(t){
-        var k=Math.min(1,(t-t0)/ms);
-        /* ease out: a counter that lands hard reads as a jump */
-        var v=Math.round(target*(1-Math.pow(1-k,3)));
-        el.textContent=v.toLocaleString('en-US');
-        if(k<1)requestAnimationFrame(step);
-      })(t0);
-    });
-  });
-})();
 
 /* ── easter eggs ──────────────────────────────────────────────────────────
    Typed, not clicked: this is a tool people reach through a keyboard. */
 (function(){
-  var buf='';
-  var konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
-  var k=0;
-
-  function dejaVu(){
-    /* the page, once more, for a beat */
+  var buf='',k=0,pending=null;
+  var konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight',
+              'ArrowLeft','ArrowRight','b','a'];
+  function ghost(){
     if(reduced||document.getElementById('vu'))return;
-    var ghost=document.createElement('div');
-    ghost.id='vu';
-    ghost.setAttribute('aria-hidden','true');
-    document.body.appendChild(ghost);
-    setTimeout(function(){ghost.remove()},900);
+    var g=document.createElement('div');g.id='vu';g.setAttribute('aria-hidden','true');
+    document.body.appendChild(g);setTimeout(function(){g.remove()},900);
   }
-
   document.addEventListener('keydown',function(e){
-    if(e.key===konami[k]){if(++k===konami.length){k=0;document.documentElement.classList.toggle('phosphor')}}
+    if(e.key===konami[k]){if(++k===konami.length){k=0;
+      document.documentElement.classList.toggle('phosphor');cat('wow',1600)}}
     else k=(e.key===konami[0])?1:0;
 
-    if(e.metaKey||e.ctrlKey||e.altKey)return;
     var tag=(e.target.tagName||'').toLowerCase();
     if(tag==='input'||tag==='textarea')return;
-    if(e.key.length!==1)return;
+    if(e.metaKey||e.ctrlKey||e.altKey||e.key.length!==1)return;
 
     buf=(buf+e.key.toLowerCase()).slice(-8);
-    if(buf.slice(-7)==='deja vu'){dejaVu();buf=''}
+    /* `deja` waits a beat before firing. It completes four letters into
+       `deja vu`, so running straight away meant the longer one could never be
+       typed — the search would open and eat the rest. */
+    if(buf.slice(-7)==='deja vu'){clearTimeout(pending);ghost();cat('wow',1400);buf=''}
     else if(buf.slice(-4)==='deja'){
-      var q=document.getElementById('q');
-      if(q){q.focus();q.value='connection pool exhausted';q.dispatchEvent(new Event('input'))}
-      buf='';
+      clearTimeout(pending);
+      pending=setTimeout(function(){
+        var q2=document.getElementById('dq');
+        if(q2){q2.focus();q2.value='connection pool exhausted';
+          q2.dispatchEvent(new Event('input'));cat('wow',1200)}
+        buf='';
+      },420);
     }
   });
 })();
 
 </script>
-</body>
-</html>
+</body></html>
