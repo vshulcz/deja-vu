@@ -3,7 +3,7 @@
   "name": "deja-vu",
   "display_name": "deja-vu",
   "version": "0.0.0",
-  "description": "Local searchable memory over your coding-agent session histories, served back over MCP.",
+  "description": "Local searchable memory over the session histories of seventeen coding agents, served back over MCP.",
   "long_description": "deja indexes the session transcripts your coding agents already write to disk — Claude Code, Codex, Cursor, opencode, aider, cline, roo, goose and others — and serves them back over MCP. It starts full rather than empty: history from before you installed it is searchable immediately. Retrieval is lexical, with no LLM, no embedding model and no API key. Secrets are redacted before anything is indexed. Nothing leaves the machine.",
   "author": {
     "name": "vshulcz",
@@ -48,6 +48,14 @@
     {
       "name": "blame",
       "description": "Before editing or deleting a file, find the prior sessions that discussed it and why it is shaped the way it is."
+    },
+    {
+      "name": "fix",
+      "description": "You just hit an error — ask what this machine ran the last time that same error appeared, before diagnosing it again."
+    },
+    {
+      "name": "how",
+      "description": "How this user actually runs a thing on this machine: the real command with the real flags, from what their agents ran."
     },
     {
       "name": "remember",

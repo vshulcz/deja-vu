@@ -5,23 +5,29 @@
   </picture>
 </p>
 
-<p align="center"><strong>Your agents already solved this. deja finds it.</strong></p>
+<p align="center"><strong>Your agent is about to re-debug something you fixed in March.</strong></p>
 
-Memory tools start empty and record forward. deja starts full. It indexes the
-sessions your coding agents already wrote to disk, including months of history
-from before you installed it, and serves them back to any agent over MCP.
+Every memory tool starts empty and records forward. **deja starts full.** It
+indexes the sessions your coding agents already wrote to disk — months of
+history from before you installed it — and serves them back over MCP.
+
+Seventeen coding agents write every conversation to local files: Claude Code,
+Codex, Cursor, opencode, Gemini CLI, Cline, Copilot CLI, Roo Code, aider,
+Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, OpenClaw, pi and Hermes.
+deja turns those files into one memory layer that all of them can read.
 
 One Go binary. No LLM, no embeddings, no API key, nothing leaves the machine.
+**84.9% hit@1** on LongMemEval-S, **~1.5 ms** median search over 3.5 GB.
 
 ```sh
 npx @vshulcz/deja-vu "connection pool exhausted"   # search, no install
-npm install -g @vshulcz/deja-vu                    # then: deja install --all
+npm install -g @vshulcz/deja-vu                    # then: deja install --auto
 ```
 
-`deja install --all` wires MCP recall into every coding agent it finds on the
-machine; `--auto` adds session-start recall where the agent supports it. After
-that, ask your agent *"have we dealt with this before?"* — or don't, and it will
-start each session already knowing.
+`deja install --auto` wires MCP recall into every coding agent it finds on the
+machine and turns on session-start recall where the agent supports it. Ten
+seconds to install, about ten to index, and the next session already knows.
+Use `--all` for the MCP tools without the session-start hook.
 
 Full documentation, the harness matrix and the benchmarks:
 [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu) ·
