@@ -215,10 +215,39 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 // is describing a real cluster and needs no help.
 const thinAND = 10
 
+// strictPromotion is what satisfying the strict AND is worth, counted in places
+// on the relevance ranking.
+//
+// It used to be worth everything: the strict head was concatenated in front of
+// the ranked tail, so one session that happened to carry every query word led
+// an answer even when the ranking put it fortieth. That is the case this tail
+// exists for — a thin AND on a large store — so the head is usually one or two
+// incidental sessions.
+//
+// Worth nothing is no better: the AND is real evidence, and #1226 measured that
+// keeping strict matches first is why hit@1 is what it is.
+const strictPromotion = 10
+
+// fusedPlace is where a session sits once both tiers have had their say: its
+// place in the relevance ranking, moved up by strictPromotion if it also
+// satisfied the strict AND.
+//
+// The result is deliberately allowed to go negative. Clamping it at zero was
+// the first version, and it collapsed every promoted session onto the same
+// place, where the tie-break was posting order — so the strict head kept its
+// absolute lead and lost the ranking it did have. day0bench read that as hit@1
+// 21/40 -> 17/40.
+func fusedPlace(relevanceRank int, strict bool) int {
+	if strict {
+		return relevanceRank - strictPromotion
+	}
+	return relevanceRank
+}
+
 // withRelevanceTail keeps a thin AND result and hangs the relevance ranking
 // underneath it, so a question whose wording excluded the answer can still
-// reach it. The strict sessions stay in front: they are why hit@1 is what it
-// is, and relevance ranked alone scores worse at the first position.
+// reach it. Strict sessions keep a bounded lead rather than an absolute one —
+// see strictPromotion.
 //
 // Order is the contract here. RelevanceHits scores by arrival (len-rank), so
 // the merged order survives to the caller untouched; anything that re-sorts
@@ -258,16 +287,21 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 	for i, r := range rel.Sessions {
 		relRank[r.Harness+":"+r.ID] = i
 	}
-	head := append([]model.Session(nil), ss...)
-	sort.SliceStable(head, func(i, j int) bool {
-		ri, oki := relRank[head[i].Harness+":"+head[i].ID]
-		rj, okj := relRank[head[j].Harness+":"+head[j].ID]
-		if oki != okj {
-			return oki
+	// Both lists, ordered by one rule. The strict head used to sit in front of
+	// everything whatever the ranking thought of it, which made a thin AND —
+	// often one incidental session — the whole top of the answer. Satisfying the
+	// AND is strong evidence and stays worth something definite: a fixed number
+	// of places, not an unconditional lead. A strict session the ranking scored
+	// badly can now be passed by a relevance session it scored well.
+	unranked := len(rel.Sessions)
+	place := func(s model.Session, strict bool) int {
+		r, ok := relRank[s.Harness+":"+s.ID]
+		if !ok {
+			r = unranked
 		}
-		return oki && ri < rj
-	})
-	merged := head
+		return fusedPlace(r, strict)
+	}
+	merged := append([]model.Session(nil), ss...)
 	added := 0
 	for _, r := range rel.Sessions {
 		if seen[r.Harness+":"+r.ID] {
@@ -276,6 +310,14 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 		merged = append(merged, r)
 		added++
 	}
+	at := make(map[string]int, len(merged))
+	for _, s := range merged {
+		key := s.Harness + ":" + s.ID
+		at[key] = place(s, seen[key])
+	}
+	sort.SliceStable(merged, func(i, j int) bool {
+		return at[merged[i].Harness+":"+merged[i].ID] < at[merged[j].Harness+":"+merged[j].ID]
+	})
 	if added == 0 {
 		return res, nil
 	}
