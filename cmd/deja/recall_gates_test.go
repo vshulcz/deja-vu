@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/vshulcz/deja-vu/internal/prompt"
 	"strings"
 	"testing"
 
@@ -90,12 +91,12 @@ func TestSingleTermNeedsAnIdentifier(t *testing.T) {
 // The filler list exists because the four-character floor lets these through;
 // without it "what about that thing" reads as three search terms.
 func TestPromptFillerIsDropped(t *testing.T) {
-	got := promptSearchTerms("what about that thing we were going to make")
+	got := prompt.Terms("what about that thing we were going to make")
 	if len(got) > 0 {
 		t.Fatalf("pure filler produced terms: %v", got)
 	}
 	// And a real question still keeps its words.
-	if terms := promptSearchTerms("what about the etag reuse"); len(terms) == 0 {
+	if terms := prompt.Terms("what about the etag reuse"); len(terms) == 0 {
 		t.Fatal("filtering took the real terms with it")
 	}
 }

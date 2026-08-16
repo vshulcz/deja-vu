@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 	"strings"
 	"testing"
 )
@@ -59,15 +60,15 @@ func TestSearchTermsComeFromTheUserNotTheLastRecall(t *testing.T) {
 	raw := "<hook_context>&lt;deja-recall&gt;\n  - User: have a look at internal/index/retrieval.go\n" +
 		"  - Assistant: the AND across query words is why plain questions come back empty\n" +
 		"&lt;/deja-recall&gt;</hook_context>\n\nHow often does the pgbouncer certificate rotate?"
-	var prompt hookPromptText
+	var typed hookPromptText
 	payload, err := json.Marshal(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := prompt.UnmarshalJSON(payload); err != nil {
+	if err := typed.UnmarshalJSON(payload); err != nil {
 		t.Fatal(err)
 	}
-	terms := promptSearchTerms(string(prompt))
+	terms := prompt.Terms(string(typed))
 	if len(terms) == 0 {
 		t.Fatal("the user's own question produced no search terms")
 	}

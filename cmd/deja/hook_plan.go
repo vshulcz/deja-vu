@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 )
 
 // planHookBudget is the complete framed payload budget. Findings receive the
@@ -272,7 +273,7 @@ func stripPlanCheckbox(s string) string {
 func planSearchSteps(plan string) [][]string {
 	var out [][]string
 	for _, step := range extractPlanSteps(plan) {
-		terms := promptSearchTerms(step)
+		terms := prompt.Terms(step)
 		if len(terms) > planTermLimit {
 			terms = terms[:planTermLimit]
 		}

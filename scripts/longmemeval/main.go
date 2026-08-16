@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -524,8 +525,11 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 			cleanup()
 			fatal(err)
 		}
-		terms := index.RelevanceTerms(questions[i].Question)
-		_, matched, strong, err := index.ProjectRelevant(dir, nil, terms, 8)
+		// The hook's own extraction, not the ranking's. They differ by the
+		// identifier test and a six-term cap, so measuring the gate on
+		// relevance terms measured a rule that never runs.
+		terms := prompt.Terms(questions[i].Question)
+		_, matched, strong, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
 		if err != nil {
 			cleanup()
 			fatal(err)

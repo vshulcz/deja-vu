@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/bench"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -118,7 +119,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 		if chain.Negative {
 			continue
 		}
-		terms := promptSearchTerms(chain.Question)
+		terms := prompt.Terms(chain.Question)
 		fired, correct := promptBenchProbe(indexDir, chain.Project, chain.ID, terms)
 		arm := &report.Real
 		switch chain.Kind {
@@ -140,7 +141,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	// Negative questions are asked against every project in turn: firing
 	// anywhere is a false fire.
 	for _, q := range negativeQuestions() {
-		terms := promptSearchTerms(q)
+		terms := prompt.Terms(q)
 		negTerms = append(negTerms, len(terms))
 		report.Negative.Cases++
 		for _, chain := range corpus.Chains {

@@ -1,9 +1,14 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/prompt"
+)
 
 // A CJK prompt is one field to FieldsFunc (no spaces) and techTerm rejects
-// every rune above 127, so promptSearchTerms returned nothing at all and
+// every rune above 127, so prompt.Terms returned nothing at all and
 // runHookPrompt bailed at the "fewer than two terms" guard: auto-recall could
 // never fire for a Chinese, Japanese or Korean user.
 func TestPromptSearchTermsCJK(t *testing.T) {
@@ -17,7 +22,7 @@ func TestPromptSearchTermsCJK(t *testing.T) {
 		{"полное совпадение по-русски", nil}, // Cyrillic path unchanged
 	}
 	for _, c := range cases {
-		got := promptSearchTerms(c.prompt)
+		got := prompt.Terms(c.prompt)
 		if c.wantAny == nil {
 			continue
 		}
@@ -43,7 +48,7 @@ func TestPromptSearchTermsCJK(t *testing.T) {
 // counterpart of a stop word, and RelevanceTerms already drops them, so the
 // hook inherits that filtering for free.
 func TestPromptSearchTermsCJKDropsGrammar(t *testing.T) {
-	got := promptSearchTerms("我为什么不用 postgres 的索引")
+	got := prompt.Terms("我为什么不用 postgres 的索引")
 	for _, junk := range []string{"什么", "在哪", "怎么"} {
 		for _, g := range got {
 			if g == junk {
@@ -64,9 +69,9 @@ func TestPromptSearchTermsCJKDropsGrammar(t *testing.T) {
 
 // An ASCII prompt must behave exactly as before: the CJK branch is skipped.
 func TestPromptSearchTermsASCIIUnchanged(t *testing.T) {
-	got := promptSearchTerms("fix the authentication middleware timeout")
+	got := prompt.Terms("fix the authentication middleware timeout")
 	for _, g := range got {
-		if hasCJKRune(g) {
+		if strings.ContainsFunc(g, func(r rune) bool { return r > 0x2E80 }) {
 			t.Errorf("ASCII prompt produced a CJK term: %v", got)
 		}
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -219,7 +220,7 @@ func commandHookLine(dir, cmd string) string {
 // cheaper lookup, and this hook fires on a build or a deploy rather than on
 // every message — the prompt hook already pays a search per keystroke.
 func commandDecisionLine(dir, cmd string) string {
-	terms := promptSearchTerms(normalizedCommandText(cmd))
+	terms := prompt.Terms(normalizedCommandText(cmd))
 	if len(terms) == 0 {
 		return ""
 	}

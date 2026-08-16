@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 	"io"
 	"os"
 	"path/filepath"
@@ -81,7 +82,7 @@ func TestHookPromptSilentPaths(t *testing.T) {
 }
 
 func TestPromptSearchTerms(t *testing.T) {
-	got := promptSearchTerms("Why is the connection pool exhausted again in the gateway???")
+	got := prompt.Terms("Why is the connection pool exhausted again in the gateway???")
 	joined := strings.Join(got, " ")
 	if !strings.Contains(joined, "connection") || !strings.Contains(joined, "gateway") {
 		t.Fatalf("terms = %v", got)
@@ -95,18 +96,8 @@ func TestPromptSearchTerms(t *testing.T) {
 	if !strings.Contains(joined, "pool") {
 		t.Fatalf("short identifier dropped: %v", got)
 	}
-	if len(promptSearchTerms("a of to")) != 0 {
+	if len(prompt.Terms("a of to")) != 0 {
 		t.Fatal("stop words must not produce terms")
-	}
-	for term, want := range map[string]bool{
-		"auth.go": true, "e404": true, "npm_token": true, "singleflight": true,
-		// Four characters is the floor `deja bench prompt` settled on: "brew"
-		// is a real command name, and words this short are what people type.
-		"brew": true, "ttl": false, "пост": false, "готовь": false,
-	} {
-		if techTerm(term) != want {
-			t.Fatalf("techTerm(%q) = %v, want %v", term, !want, want)
-		}
 	}
 }
 
@@ -308,7 +299,7 @@ func TestDejaVuLineCooldown(t *testing.T) {
 // identifier used to yield no terms and auto-recall could never fire for it —
 // the same hole CJK had, in the language this project is written from.
 func TestPromptSearchTermsCyrillic(t *testing.T) {
-	got := promptSearchTerms("почему падает индексация кириллицы")
+	got := prompt.Terms("почему падает индексация кириллицы")
 	if len(got) < 2 {
 		t.Fatalf("Russian prompt yielded %v, recall cannot fire", got)
 	}
@@ -320,11 +311,11 @@ func TestPromptSearchTermsCyrillic(t *testing.T) {
 		}
 	}
 	// Short words carry no signal.
-	if terms := promptSearchTerms("а он там был"); len(terms) != 0 {
+	if terms := prompt.Terms("а он там был"); len(terms) != 0 {
 		t.Errorf("short Russian words became terms: %v", terms)
 	}
 	// A prompt mixing Russian prose with an identifier keeps both.
-	mixed := promptSearchTerms("почему падает openBucketDir на кириллице")
+	mixed := prompt.Terms("почему падает openBucketDir на кириллице")
 	var hasIdent, hasWord bool
 	for _, g := range mixed {
 		if g == "openbucketdir" {
