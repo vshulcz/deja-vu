@@ -128,6 +128,22 @@ func icon() string {
 ` + note + fills(mark.Paths(mark.Ready, x0, y0, size, nil), 2) + "</svg>\n"
 }
 
+// liveIcon is the app icon with the cat alive in it: the same wag and blink the
+// wordmark carries. The site needs a file rather than inline markup, because an
+// SVG referenced by <img> still runs its own CSS animations — which is how the
+// header mark moves without the page owning a second copy of the sprite.
+func liveIcon() string {
+	const x0, y0, size = 56, 68, 12
+	tail := movingTail()
+	still := mark.Ready
+	still.EyeSet = "none"
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" role="img" aria-label="deja-vu">
+  <rect width="400" height="400" rx="88" fill="#1d1b2e"/>
+` + note +
+		fills(mark.Paths(still, x0, y0, size, func(c mark.Cell) bool { return tail[c] }), 2) +
+		alive(x0, y0, size) + "</svg>\n"
+}
+
 func main() {
 	check := flag.Bool("check", false, "fail if the committed assets differ from the sprite")
 	static := flag.Bool("static", false, "draw the ready pose without the wag")
@@ -145,6 +161,7 @@ func main() {
 		// whole command exists to stop.
 		"docs/assets/logo-dark.svg": darkLogo,
 		"docs/assets/icon.svg":      appIcon,
+		"docs/assets/icon-live.svg": liveIcon(),
 	}
 	paths := make([]string, 0, len(assets))
 	for p := range assets {

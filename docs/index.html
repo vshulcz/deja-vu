@@ -253,6 +253,24 @@ footer .spacer{flex:1}
   .tty .host{white-space:nowrap}
   .sources td{white-space:normal}
 }
+
+/* the ghost of the page, for the déjà vu */
+#vu{position:fixed;inset:0;z-index:99;pointer-events:none;
+  background:var(--ph);opacity:0;mix-blend-mode:overlay;
+  animation:vu .9s ease-out}
+@keyframes vu{0%{opacity:0}12%{opacity:.22}100%{opacity:0}}
+
+/* what the site wore before the rebrand. A memory tool is allowed to keep a
+   copy of its own past. */
+.phosphor{
+  --bg:#050807; --ph:#4af08b; --ph-hi:#8affc0; --ph-dim:#2f9459;
+  --amber:#ffb454; --body:#a9cbb6; --faint:#5d8a6e; --line:#12291c; --panel:#070d0a;
+}
+/* The mark is not recoloured with the rest. A filter takes the nose with it —
+   amber lands on magenta — and the better reading is that the cat is the thing
+   that survived the rebrand. */
+
+#recall-line{color:var(--amber)}
 </style>
 </head>
 <body>
@@ -274,15 +292,16 @@ footer .spacer{flex:1}
 
 <header>
   <div class="neofetch">
-  <img class="mark" src="assets/icon.svg" width="150" height="150" alt="" aria-hidden="true">
+  <img class="mark" src="assets/icon-live.svg" width="150" height="150" alt="" aria-hidden="true">
   <div class="boot type-seq" id="boot" aria-label="deja indexing existing agent history">
     <div class="ln"><span class="p">$</span> <span class="cmd">deja index</span></div>
     <div class="ln dim">scanning harness stores…</div>
+    <div class="ln" id="recall-line" hidden></div>
     <div class="ln bar-h">  claude       ▓▓▓▓▓▓▓▓▓▓▓▓▓▓  812 sessions</div>
     <div class="ln bar-h">  codex        ▓▓▓▓▓░░░░░░░░░   96 sessions</div>
     <div class="ln bar-h">  opencode     ▓▓▓░░░░░░░░░░░   57 sessions</div>
     <div class="ln bar-h">  8 more…      ▓▓░░░░░░░░░░░░   54 sessions</div>
-    <div class="ln"><span class="ok">✓</span> 1,019 sessions · 3.3 GB · indexed in 9.6 s</div>
+    <div class="ln"><span class="ok">✓</span> <span data-count="1019">1,019</span> sessions · 3.3 GB · indexed in <span data-count="10">10</span> s</div>
     <div class="ln dim">months of history from before you installed it — already searchable</div>
   </div>
   </div>
@@ -501,6 +520,9 @@ var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     }else{
       setTimeout(function(){logo.classList.add('in')},220);
     }
+    boot.querySelectorAll('[data-count]').forEach(function(c){
+      c.dispatchEvent(new Event('deja:run'));
+    });
   }
   setTimeout(next,650);
 })();
@@ -614,6 +636,88 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
     },6000);
   }
 })();
+/* ── the site remembers you ───────────────────────────────────────────────
+   The product indexes what you already did and hands it back. A site for it
+   that greets every visit as the first one is arguing against itself.
+   localStorage only: nothing about a visit leaves this browser, which is the
+   claim the tool makes about your history. */
+(function(){
+  var KEY='deja.visits';
+  var prior=null;
+  try{prior=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  var now=Date.now();
+  var state={n:(prior&&prior.n||0)+1,last:now,page:prior&&prior.page||''};
+  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+
+  if(!prior||!prior.last)return;
+  var days=Math.floor((now-prior.last)/86400000);
+  var when=days<1?'earlier today':days===1?'yesterday':days+' days ago';
+  var line=document.getElementById('recall-line');
+  if(!line)return;
+  var read=prior.page?' · last time you were reading '+prior.page:'';
+  line.textContent='welcome back — you were here '+when+read;
+  line.hidden=false;
+})();
+
+/* ── the boot counts up ───────────────────────────────────────────────────
+   The figures were printed and the bars were drawn full. Running them makes
+   the first thing on the page a run rather than a picture of one. */
+(function(){
+  if(reduced)return;
+  var els=[].slice.call(document.querySelectorAll('[data-count]'));
+  els.forEach(function(el){
+    var target=parseInt(el.dataset.count,10),started=false;
+    el.textContent='0';
+    el.addEventListener('deja:run',function(){
+      if(started)return;started=true;
+      var t0=performance.now(),ms=900;
+      (function step(t){
+        var k=Math.min(1,(t-t0)/ms);
+        /* ease out: a counter that lands hard reads as a jump */
+        var v=Math.round(target*(1-Math.pow(1-k,3)));
+        el.textContent=v.toLocaleString('en-US');
+        if(k<1)requestAnimationFrame(step);
+      })(t0);
+    });
+  });
+})();
+
+/* ── easter eggs ──────────────────────────────────────────────────────────
+   Typed, not clicked: this is a tool people reach through a keyboard. */
+(function(){
+  var buf='';
+  var konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+  var k=0;
+
+  function dejaVu(){
+    /* the page, once more, for a beat */
+    if(reduced||document.getElementById('vu'))return;
+    var ghost=document.createElement('div');
+    ghost.id='vu';
+    ghost.setAttribute('aria-hidden','true');
+    document.body.appendChild(ghost);
+    setTimeout(function(){ghost.remove()},900);
+  }
+
+  document.addEventListener('keydown',function(e){
+    if(e.key===konami[k]){if(++k===konami.length){k=0;document.documentElement.classList.toggle('phosphor')}}
+    else k=(e.key===konami[0])?1:0;
+
+    if(e.metaKey||e.ctrlKey||e.altKey)return;
+    var tag=(e.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea')return;
+    if(e.key.length!==1)return;
+
+    buf=(buf+e.key.toLowerCase()).slice(-8);
+    if(buf.slice(-7)==='deja vu'){dejaVu();buf=''}
+    else if(buf.slice(-4)==='deja'){
+      var q=document.getElementById('q');
+      if(q){q.focus();q.value='connection pool exhausted';q.dispatchEvent(new Event('input'))}
+      buf='';
+    }
+  });
+})();
+
 </script>
 </body>
 </html>

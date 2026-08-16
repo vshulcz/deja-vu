@@ -42,3 +42,17 @@
     art.appendChild(nav);
   }
 })();
+
+/* Record the page for the home page's greeting. Same store, same rule as the
+   tool itself: it stays in this browser. */
+(function(){
+  var title=(document.querySelector('h1')||{}).textContent||'';
+  title=title.replace(/^[$#\s]+/,'').trim();
+  if(!title)return;
+  try{
+    var KEY='deja.visits';
+    var s=JSON.parse(localStorage.getItem(KEY)||'null')||{n:0};
+    s.page=title;
+    localStorage.setItem(KEY,JSON.stringify(s));
+  }catch(e){}
+})();
