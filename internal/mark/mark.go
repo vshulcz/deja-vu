@@ -76,8 +76,13 @@ var Eyes = map[string][]Cell{
 	"tall":   {{7, 5}, {7, 6}, {8, 5}, {8, 6}, {9, 5}, {9, 6}, {7, 15}, {7, 16}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
 	"wide":   {{6, 5}, {6, 6}, {7, 5}, {7, 6}, {8, 5}, {8, 6}, {9, 5}, {9, 6}, {6, 15}, {6, 16}, {7, 15}, {7, 16}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
 	"closed": {{9, 4}, {9, 5}, {9, 6}, {9, 7}, {9, 14}, {9, 15}, {9, 16}, {9, 17}},
-	"low":    {{10, 5}, {10, 6}, {11, 5}, {11, 6}, {10, 15}, {10, 16}, {11, 15}, {11, 16}},
-	"wink":   {{9, 4}, {9, 5}, {9, 6}, {9, 7}, {7, 15}, {7, 16}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
+	// "half" is "tall" with the top row covered, which is where a lid closing
+	// from above would be halfway. It is not "low": that one sits two rows
+	// further down, so animating a blink through it slides the eyes down the
+	// face instead of closing them.
+	"half": {{8, 5}, {8, 6}, {9, 5}, {9, 6}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
+	"low":  {{10, 5}, {10, 6}, {11, 5}, {11, 6}, {10, 15}, {10, 16}, {11, 15}, {11, 16}},
+	"wink": {{9, 4}, {9, 5}, {9, 6}, {9, 7}, {7, 15}, {7, 16}, {8, 15}, {8, 16}, {9, 15}, {9, 16}},
 }
 
 // Ears are the other half of the expression, and the only part of the outline

@@ -73,14 +73,11 @@ func movingTail() map[mark.Cell]bool {
 // The timings match the ones deja stats already uses, so the two pages animate
 // the same animal at the same rate rather than at two guesses.
 func alive(x0, y0, size int) string {
-	breath := size / 6
-	if breath < 1 {
-		breath = 1
-	}
-	glance := size / 2
-	if glance < 1 {
-		glance = 1
-	}
+	// Both motions travel exactly one cell — one pixel of the sprite. A fraction
+	// of a cell is what the first version moved, and at the sizes these are
+	// actually shown that came to half a screen pixel on the wordmark: real in
+	// the markup and invisible on the page.
+	breath, glance := size, size
 	var b strings.Builder
 	seen := map[string]bool{}
 	poses := []string{}
@@ -100,7 +97,7 @@ func alive(x0, y0, size int) string {
 	// sideways, which is what an eye does.
 	b.WriteString("  <g class=\"eyes\">\n")
 	for _, eye := range []struct{ class, set string }{
-		{"eyes-open", "tall"}, {"eyes-low", "low"}, {"eyes-shut", "closed"},
+		{"eyes-open", "tall"}, {"eyes-half", "half"}, {"eyes-shut", "closed"},
 	} {
 		fmt.Fprintf(&b, "    <g class=\"%s\"><path fill=\"%s\" d=\"%s\"/></g>\n",
 			eye.class, mark.Hex[mark.Feature],
@@ -118,7 +115,7 @@ func alive(x0, y0, size int) string {
 	}
 
 	css := `  <style>
-    .t1, .t2, .eyes-low, .eyes-shut, .ear-flick { opacity: 0 }
+    .t1, .t2, .eyes-half, .eyes-shut, .ear-flick { opacity: 0 }
     @media (prefers-reduced-motion: no-preference) {
       /* The one continuous motion on the mark. Everything else cuts between
          poses; this eases, and a creature that is never perfectly still is the
@@ -128,21 +125,23 @@ func alive(x0, y0, size int) string {
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
       .eyes-open { animation: dv-open 7.3s steps(1, end) infinite }
-      .eyes-low  { animation: dv-low 7.3s steps(1, end) infinite }
+      .eyes-half { animation: dv-half 7.3s steps(1, end) infinite }
       .eyes-shut { animation: dv-shut 7.3s steps(1, end) infinite }
       .eyes { animation: dv-glance 9.7s cubic-bezier(.4,0,.5,1) infinite }
       .ear-up    { animation: dv-ear-up 11.3s steps(1, end) infinite }
       .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(SIZEpx) } }
+    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-SIZEpx) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
     @keyframes dv-t2 { 0%, 84.9% { opacity: 0 } 85%, 91.9% { opacity: 1 } 92%, 100% { opacity: 0 } }
-    /* A blink through the half-lid and back, then a slower one a beat later. */
-    @keyframes dv-open { 0%, 87.4% { opacity: 1 } 87.5%, 91.4% { opacity: 0 } 91.5%, 95.4% { opacity: 1 } 95.5%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
-    @keyframes dv-low  { 0%, 87.4% { opacity: 0 } 87.5%, 88.4% { opacity: 1 } 88.5%, 90.4% { opacity: 0 } 90.5%, 91.4% { opacity: 1 } 91.5%, 95.4% { opacity: 0 } 95.5%, 96.9% { opacity: 1 } 97%, 98.4% { opacity: 0 } 98.5%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
-    @keyframes dv-shut { 0%, 88.4% { opacity: 0 } 88.5%, 90.4% { opacity: 1 } 90.5%, 96.9% { opacity: 0 } 97%, 98.4% { opacity: 1 } 98.5%, 100% { opacity: 0 } }
+    /* One blink a cycle, down through the half-lid and back up: about a tenth
+       of a second on each lid position and a sixth shut. Two blinks half a
+       second apart, which is what this was, reads as a flutter. */
+    @keyframes dv-open { 0%, 89.9% { opacity: 1 } 90%, 95.7% { opacity: 0 } 95.8%, 100% { opacity: 1 } }
+    @keyframes dv-half { 0%, 89.9% { opacity: 0 } 90%, 91.6% { opacity: 1 } 91.7%, 94.1% { opacity: 0 } 94.2%, 95.7% { opacity: 1 } 95.8%, 100% { opacity: 0 } }
+    @keyframes dv-shut { 0%, 91.6% { opacity: 0 } 91.7%, 94.1% { opacity: 1 } 94.2%, 100% { opacity: 0 } }
     /* Looks aside, holds it a moment, looks back. */
     @keyframes dv-glance { 0%, 70% { transform: translateX(0) } 74%, 84% { transform: translateX(GLANCEpx) } 88%, 100% { transform: translateX(0) } }
     @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }

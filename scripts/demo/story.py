@@ -95,13 +95,20 @@ def cat_state(t: float) -> tuple[int, str]:
     The breath is continuous and the blinks are not on the beat, for the same
     reason the mark's are not — a creature that moves on a metronome reads as a
     mechanism."""
-    bob = -1 if math.sin(t / 4.3 * math.tau) > 0.35 else 0
+    # Two pixels of travel through three positions rather than one pixel through
+    # two: this cat is drawn at two screen pixels a sprite pixel and the film is
+    # shown scaled down, so a single-pixel rise arrives as about one pixel of
+    # movement and nobody sees it.
+    bob = -round((math.sin(t / 4.3 * math.tau) + 1) / 2 * 2)
     eyes = "open"
-    for at in (3.1, 3.28, 9.6, 9.82):
-        if at <= t < at + 0.09:
-            eyes = "shut"
-        elif at - 0.09 <= t < at or at + 0.09 <= t < at + 0.18:
+    # One blink, lid down and back up, a fifth of a second shut. At twenty frames
+    # a second the first version's ninety-millisecond steps lasted under two
+    # frames, and it came in pairs, which reads as a flutter rather than a blink.
+    for at in (3.1, 9.6):
+        if at <= t < at + 0.15 or at + 0.35 <= t < at + 0.5:
             eyes = "low"
+        elif at + 0.15 <= t < at + 0.35:
+            eyes = "shut"
     return bob, eyes
 
 

@@ -52,3 +52,7 @@ deja-stats.svg
 /rankdiff
 /reusebench
 /searchbench
+
+# Where story.py drops the film's frames when it is run without --out. Three
+# hundred and twenty PNGs, one run.
+/scripts/demo/frames/

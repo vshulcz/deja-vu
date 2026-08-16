@@ -12,13 +12,13 @@
   <g class="t2"><path fill="#8787af" d="M308 236h24v12h-24ZM296 248h24v12h-24ZM284 260h24v12h-24ZM284 272h24v12h-24ZM284 284h24v12h-24ZM272 296h24v12h-24ZM272 308h24v12h-24Z"/></g>
   <g class="eyes">
     <g class="eyes-open"><path fill="#1c1c1c" d="M116 152h24v12h-24ZM236 152h24v12h-24ZM116 164h24v12h-24ZM236 164h24v12h-24ZM116 176h24v12h-24ZM236 176h24v12h-24Z"/></g>
-    <g class="eyes-low"><path fill="#1c1c1c" d="M116 188h24v12h-24ZM236 188h24v12h-24ZM116 200h24v12h-24ZM236 200h24v12h-24Z"/></g>
+    <g class="eyes-half"><path fill="#1c1c1c" d="M116 164h24v12h-24ZM236 164h24v12h-24ZM116 176h24v12h-24ZM236 176h24v12h-24Z"/></g>
     <g class="eyes-shut"><path fill="#1c1c1c" d="M104 176h48v12h-48ZM224 176h48v12h-48Z"/></g>
   </g>
   <g class="ear-up"><path fill="#8787af" d="M104 68h12v12h-12ZM260 68h12v12h-12ZM92 80h36v12h-36ZM248 80h36v12h-36ZM92 92h48v12h-48ZM236 92h48v12h-48ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
   <g class="ear-flick"><path fill="#8787af" d="M104 68h12v12h-12ZM92 80h36v12h-36ZM92 92h48v12h-48ZM248 92h36v12h-36ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
   <style>
-    .t1, .t2, .eyes-low, .eyes-shut, .ear-flick { opacity: 0 }
+    .t1, .t2, .eyes-half, .eyes-shut, .ear-flick { opacity: 0 }
     @media (prefers-reduced-motion: no-preference) {
       /* The one continuous motion on the mark. Everything else cuts between
          poses; this eases, and a creature that is never perfectly still is the
@@ -28,23 +28,25 @@
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
       .eyes-open { animation: dv-open 7.3s steps(1, end) infinite }
-      .eyes-low  { animation: dv-low 7.3s steps(1, end) infinite }
+      .eyes-half { animation: dv-half 7.3s steps(1, end) infinite }
       .eyes-shut { animation: dv-shut 7.3s steps(1, end) infinite }
       .eyes { animation: dv-glance 9.7s cubic-bezier(.4,0,.5,1) infinite }
       .ear-up    { animation: dv-ear-up 11.3s steps(1, end) infinite }
       .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(2px) } }
+    @keyframes dv-breathe { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
     @keyframes dv-t2 { 0%, 84.9% { opacity: 0 } 85%, 91.9% { opacity: 1 } 92%, 100% { opacity: 0 } }
-    /* A blink through the half-lid and back, then a slower one a beat later. */
-    @keyframes dv-open { 0%, 87.4% { opacity: 1 } 87.5%, 91.4% { opacity: 0 } 91.5%, 95.4% { opacity: 1 } 95.5%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
-    @keyframes dv-low  { 0%, 87.4% { opacity: 0 } 87.5%, 88.4% { opacity: 1 } 88.5%, 90.4% { opacity: 0 } 90.5%, 91.4% { opacity: 1 } 91.5%, 95.4% { opacity: 0 } 95.5%, 96.9% { opacity: 1 } 97%, 98.4% { opacity: 0 } 98.5%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
-    @keyframes dv-shut { 0%, 88.4% { opacity: 0 } 88.5%, 90.4% { opacity: 1 } 90.5%, 96.9% { opacity: 0 } 97%, 98.4% { opacity: 1 } 98.5%, 100% { opacity: 0 } }
+    /* One blink a cycle, down through the half-lid and back up: about a tenth
+       of a second on each lid position and a sixth shut. Two blinks half a
+       second apart, which is what this was, reads as a flutter. */
+    @keyframes dv-open { 0%, 89.9% { opacity: 1 } 90%, 95.7% { opacity: 0 } 95.8%, 100% { opacity: 1 } }
+    @keyframes dv-half { 0%, 89.9% { opacity: 0 } 90%, 91.6% { opacity: 1 } 91.7%, 94.1% { opacity: 0 } 94.2%, 95.7% { opacity: 1 } 95.8%, 100% { opacity: 0 } }
+    @keyframes dv-shut { 0%, 91.6% { opacity: 0 } 91.7%, 94.1% { opacity: 1 } 94.2%, 100% { opacity: 0 } }
     /* Looks aside, holds it a moment, looks back. */
-    @keyframes dv-glance { 0%, 70% { transform: translateX(0) } 74%, 84% { transform: translateX(6px) } 88%, 100% { transform: translateX(0) } }
+    @keyframes dv-glance { 0%, 70% { transform: translateX(0) } 74%, 84% { transform: translateX(12px) } 88%, 100% { transform: translateX(0) } }
     @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
     @keyframes dv-ear-up { 0%, 96.9% { opacity: 1 } 97%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
   </style>
