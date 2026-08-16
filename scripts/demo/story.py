@@ -99,27 +99,40 @@ def between(stops: list[tuple[float, float]], u: float) -> float:
     return stops[-1][1]
 
 
-# What the body does over one breath and over one perk, as height multipliers.
-# The perk squashes before it stretches and rocks to a stop afterwards: the dip
-# before a movement is what makes it read as intent rather than as a jolt, and
-# the shrinking bounces after are what make it read as weight.
+# What the body does over one breath, as a height multiplier.
 BREATH = [(0.0, 1.0), (0.40, 1.045), (0.56, 1.045), (1.0, 1.0)]
-PERK = [(0.0, 1.0), (0.86, 1.0), (0.884, 0.945), (0.908, 1.068),
-        (0.932, 0.975), (0.954, 1.014), (0.974, 1.0), (1.0, 1.0)]
+
+# And over one hop: gather, spring, come down, take the landing in the legs,
+# rock to a stop. Height first, then how far off the ground in sprite pixels.
+#
+# The rise is only allowed because of the two squashes around it — one to push
+# off from, one to land in. That is the difference between a jump and a hover,
+# and an earlier version of this cat hovered because it had the rise and neither
+# squash.
+HOP_TALL = [(0.0, 1.0), (0.86, 1.0), (0.88, 0.93), (0.899, 1.09), (0.914, 1.035),
+            (0.927, 1.06), (0.94, 0.925), (0.958, 1.022), (0.974, 1.0), (1.0, 1.0)]
+HOP_LIFT = [(0.0, 0.0), (0.86, 0.0), (0.88, 0.0), (0.899, 0.7), (0.914, 1.5),
+            (0.927, 0.7), (0.94, 0.0), (1.0, 0.0)]
 
 
-def cat_state(t: float) -> tuple[float, str]:
-    """How the cat sits at film time t: how tall it is, and what its eyes do.
+def cat_state(t: float) -> tuple[float, float, str]:
+    """How the cat sits at film time t: how tall, how far off the ground, and
+    what its eyes do.
 
-    Height carries the whole of it. Squash and stretch keep the volume, so the
-    width follows from the height — a body that grows taller without growing
-    narrower is inflating, not breathing. Earlier versions slid a slab of the
-    sprite up and down instead, which took the paws off the ground in one and
-    stretched the face away from the nose in the next: a slice of a body moving
-    is a cut, not a deformation, and it reads as one.
+    Height carries most of it. Squash and stretch keep the volume, so the width
+    follows from the height — a body that grows taller without growing narrower
+    is inflating, not breathing. Earlier versions slid a slab of the sprite up
+    and down instead, which took the paws off the ground in one and stretched
+    the face away from the nose in the next: a slice of a body moving is a cut,
+    not a deformation, and it reads as one.
 
     The cycles do not divide each other, so the combination never repeats."""
-    tall = between(BREATH, (t % 4.9) / 4.9) * between(PERK, (t % 18.7) / 18.7)
+    # The hop sits at the end of its cycle, and the cycle is longer than the
+    # film — left alone the cat would never once jump in sixteen seconds. Offset
+    # so it lands about six seconds in, while there is still film to watch it.
+    hop = ((t + 10.1) % 18.7) / 18.7
+    tall = between(BREATH, (t % 4.9) / 4.9) * between(HOP_TALL, hop)
+    lift = between(HOP_LIFT, hop)
     eyes = "open"
     # One blink, lid down and back up, a fifth of a second shut. At twenty frames
     # a second the first version's ninety-millisecond steps lasted under two
@@ -129,7 +142,7 @@ def cat_state(t: float) -> tuple[float, str]:
             eyes = "low"
         elif at + 0.15 <= t < at + 0.35:
             eyes = "shut"
-    return tall, eyes
+    return tall, lift, eyes
 
 
 def draw_cat(d, x, y, px=4, t=0.0):
@@ -140,11 +153,12 @@ def draw_cat(d, x, y, px=4, t=0.0):
     breath is still made of square pixels rather than of blurred ones. The film
     has no transforms to lean on the way the SVG mark does; this is the same
     deformation done by hand."""
-    tall, eyes = cat_state(t)
+    tall, lift, eyes = cat_state(t)
     wide = 1 / tall
     rows = list(CAT_BODY)
     rows[7:10] = EYES[eyes]
-    feet, middle = y + len(rows) * px, x + len(rows[0]) * px / 2
+    feet = y + len(rows) * px - round(lift * px)
+    middle = x + len(rows[0]) * px / 2
     for r, row in enumerate(rows):
         top = feet + round((r - len(rows)) * px * tall)
         bottom = feet + round((r + 1 - len(rows)) * px * tall) - 1

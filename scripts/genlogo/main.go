@@ -137,14 +137,13 @@ func alive(x0, y0, size int) (css, parts string) {
     .t1, .t2, .eyes-half, .eyes-shut, .ear-flick { opacity: 0 }
     /* Everything that deforms turns about the point between the front paws, so
        the cat is pressed into the ground rather than moved around above it. */
-    .sway, .perk, .breathe { transform-origin: ORIGIN }
+    .hop, .breathe { transform-origin: ORIGIN }
     @media (prefers-reduced-motion: no-preference) {
       /* The one continuous motion on the mark. Everything else cuts between
          poses; this eases, and a creature that is never perfectly still is the
          difference between an animal and a diagram. */
       .breathe { animation: dv-breathe 4.9s cubic-bezier(.4,0,.5,1) infinite }
-      .perk    { animation: dv-perk 18.7s cubic-bezier(.33,0,.3,1) infinite }
-      .sway    { animation: dv-sway 13.7s cubic-bezier(.45,0,.55,1) infinite }
+      .hop     { animation: dv-hop 18.7s cubic-bezier(.4,0,.45,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
@@ -159,21 +158,24 @@ func alive(x0, y0, size int) (css, parts string) {
        that gains height without losing width is inflating, not breathing. The
        pause at the top is what separates a breath from a pendulum. */
     @keyframes dv-breathe { 0% { transform: scale(1, 1) } 40%, 56% { transform: scale(.978, 1.026) } 100% { transform: scale(1, 1) } }
-    /* Once every eighteen seconds or so it gathers itself and pops up, then
-       rocks to a stop. Squash first, stretch second: the dip before a movement
-       is what makes it read as intent rather than as a jolt, and the two
-       shrinking bounces afterwards are what makes it read as weight. */
-    @keyframes dv-perk {
-      0%, 86% { transform: scale(1, 1) }
-      88.4%   { transform: scale(1.055, .945) }
-      90.8%   { transform: scale(.955, 1.068) }
-      93.2%   { transform: scale(1.028, .975) }
-      95.4%   { transform: scale(.988, 1.014) }
-      97.4%, 100% { transform: scale(1, 1) }
+    /* Once every eighteen seconds it hops. Gathers itself, springs, comes down,
+       takes the landing in the legs, rocks to a stop.
+       Leaving the ground is only allowed because of what surrounds it: a squash
+       to push off from and a squash to land in. That is the whole difference
+       between a jump and a hover, and an earlier version of this mark hovered
+       because it had the rise without either.
+       Stretched going up and squashed at both ends, volume held throughout — a
+       shape that keeps its width through a jump reads as a lift, not a leap. */
+    @keyframes dv-hop {
+      0%, 86%  { transform: translateY(0) scale(1, 1) }
+      88%      { transform: translateY(0) scale(1.07, .93) }
+      89.9%    { transform: translateY(RISEpx) scale(.93, 1.09) }
+      91.4%    { transform: translateY(APEXpx) scale(.97, 1.035) }
+      92.7%    { transform: translateY(RISEpx) scale(.95, 1.06) }
+      94%      { transform: translateY(0) scale(1.075, .925) }
+      95.8%    { transform: translateY(0) scale(.98, 1.022) }
+      97.4%, 100% { transform: translateY(0) scale(1, 1) }
     }
-    /* And now and then it leans, once each way. The whole animal tips about its
-       paws; there is no neck on this sprite to turn a head on. */
-    @keyframes dv-sway { 0%, 26% { transform: rotate(0) } 38%, 47% { transform: rotate(2.1deg) } 58%, 66% { transform: rotate(0) } 76%, 85% { transform: rotate(-2.1deg) } 96%, 100% { transform: rotate(0) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
@@ -193,6 +195,9 @@ func alive(x0, y0, size int) (css, parts string) {
 	// Between the front paws: half the sprite across, all of it down.
 	origin := fmt.Sprintf("%dpx %dpx", x0+12*size, y0+22*size)
 	css = strings.ReplaceAll(css, "ORIGIN", origin)
+	// The hop clears a pixel and a half of the sprite at its apex.
+	css = strings.ReplaceAll(css, "APEXpx", fmt.Sprintf("-%dpx", size*3/2))
+	css = strings.ReplaceAll(css, "RISEpx", fmt.Sprintf("-%dpx", size*2/3))
 	css = strings.ReplaceAll(css, "GLANCEpx", fmt.Sprintf("%dpx", glance))
 	return css, b.String()
 }
@@ -253,8 +258,8 @@ func livingCat(x0, y0, size int) string {
 	// One group per animation: two animations on one element would each be
 	// setting transform, and only the last one declared would survive.
 	return moving +
-		"  <g class=\"sway\">\n   <g class=\"perk\">\n    <g class=\"breathe\">\n" +
-		fills(body, 5) + breathing + "    </g>\n   </g>\n  </g>\n"
+		"  <g class=\"hop\">\n   <g class=\"breathe\">\n" +
+		fills(body, 4) + breathing + "   </g>\n  </g>\n"
 }
 
 func logo(ink string, animate bool) string {
