@@ -48,6 +48,27 @@ func TestWagPositionsAreTheSameCellCount(t *testing.T) {
 	}
 }
 
+// The paws move a cell either way, and what makes that look like paws moving
+// rather than the sprite coming apart is that the haunches above them cover both
+// extremes: wherever a paw lands it is still joined to the body. Narrow that row
+// and a paw walks out from under the animal and stands beside it.
+func TestTheHaunchesCoverThePawsWhereverTheyStep(t *testing.T) {
+	above := Body[20]
+	for name, paw := range Paws {
+		for _, c := range paw {
+			if c.Row != 21 {
+				t.Fatalf("%s paw has a cell on row %d; this only reasons about the bottom row", name, c.Row)
+			}
+			for _, step := range []int{-1, 0, 1} {
+				if col := c.Col + step; col < 0 || col >= len(above) || above[col] != '#' {
+					t.Errorf("%s paw cell %d stepping %+d lands on column %d, which row 20 does not cover",
+						name, c.Col, step, c.Col+step)
+				}
+			}
+		}
+	}
+}
+
 // cellsPath packs cells into as few rectangles as it can, and a packing bug is
 // invisible in the finished asset until it is not: an overlap costs nothing to
 // look at, and a hole is a single missing pixel somewhere in a body of eight

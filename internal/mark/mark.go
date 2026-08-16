@@ -116,6 +116,18 @@ var Tails = map[string][]Cell{
 	"down": {{20, 18}, {20, 19}, {21, 19}, {21, 20}, {21, 21}},
 }
 
+// Paws are the two front paws, the bottom row of the sprite. They are named
+// separately so an animation can move them apart from the body: a cat tucks
+// them under itself in the air and spreads them on landing.
+//
+// Sideways is all they can do. They are one row tall and sit on the floor of the
+// sprite, so lifting one by the only amount there is — a whole cell — hides it
+// inside the haunches and leaves a notch where it was.
+var Paws = map[string][]Cell{
+	"left":  {{21, 5}, {21, 6}, {21, 7}, {21, 8}},
+	"right": {{21, 13}, {21, 14}, {21, 15}, {21, 16}},
+}
+
 // WagCycle is the wag: three positions of the same cells, ping-ponged, so the
 // tip travels out and comes back rather than snapping between two poses. Two
 // poses alternating reads as a twitch — the middle one is what makes it a

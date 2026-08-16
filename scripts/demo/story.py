@@ -114,10 +114,19 @@ HOP_TALL = [(0.0, 1.0), (0.86, 1.0), (0.88, 0.93), (0.899, 1.09), (0.914, 1.035)
 HOP_LIFT = [(0.0, 0.0), (0.86, 0.0), (0.88, 0.0), (0.899, 0.7), (0.914, 1.5),
             (0.927, 0.7), (0.94, 0.0), (1.0, 0.0)]
 
+# And what the front paws do, in sprite pixels, positive meaning tucked in under
+# the animal. They pull together in the air and spread as it takes the landing.
+# Sideways is the only travel they have: they are one row tall and sit on the
+# floor of the sprite, so lifting one by the only amount there is hides it in the
+# haunches. A cell either way is enough because the row above covers both ends.
+HOP_PAW = [(0.0, 0.0), (0.88, 0.0), (0.899, 1.0), (0.927, 1.0),
+           (0.94, -1.0), (0.954, -1.0), (0.974, 0.0), (1.0, 0.0)]
+PAW_COLS = {"left": range(5, 9), "right": range(13, 17)}
 
-def cat_state(t: float) -> tuple[float, float, str]:
-    """How the cat sits at film time t: how tall, how far off the ground, and
-    what its eyes do.
+
+def cat_state(t: float) -> tuple[float, float, int, str]:
+    """How the cat sits at film time t: how tall, how far off the ground, what
+    its front paws are doing, and what its eyes do.
 
     Height carries most of it. Squash and stretch keep the volume, so the width
     follows from the height — a body that grows taller without growing narrower
@@ -133,6 +142,7 @@ def cat_state(t: float) -> tuple[float, float, str]:
     hop = ((t + 10.1) % 18.7) / 18.7
     tall = between(BREATH, (t % 4.9) / 4.9) * between(HOP_TALL, hop)
     lift = between(HOP_LIFT, hop)
+    paw = round(between(HOP_PAW, hop))
     eyes = "open"
     # One blink, lid down and back up, a fifth of a second shut. At twenty frames
     # a second the first version's ninety-millisecond steps lasted under two
@@ -142,7 +152,7 @@ def cat_state(t: float) -> tuple[float, float, str]:
             eyes = "low"
         elif at + 0.15 <= t < at + 0.35:
             eyes = "shut"
-    return tall, lift, eyes
+    return tall, lift, paw, eyes
 
 
 def draw_cat(d, x, y, px=4, t=0.0):
@@ -153,7 +163,7 @@ def draw_cat(d, x, y, px=4, t=0.0):
     breath is still made of square pixels rather than of blurred ones. The film
     has no transforms to lean on the way the SVG mark does; this is the same
     deformation done by hand."""
-    tall, lift, eyes = cat_state(t)
+    tall, lift, paw, eyes = cat_state(t)
     wide = 1 / tall
     rows = list(CAT_BODY)
     rows[7:10] = EYES[eyes]
@@ -163,10 +173,13 @@ def draw_cat(d, x, y, px=4, t=0.0):
         top = feet + round((r - len(rows)) * px * tall)
         bottom = feet + round((r + 1 - len(rows)) * px * tall) - 1
         for c, ch in enumerate(row):
+            step = 0
+            if r == len(rows) - 1:
+                step = paw if c in PAW_COLS["left"] else -paw if c in PAW_COLS["right"] else 0
             fill = {"#": PH, "n": AMBER, "o": FEATURE}.get(ch)
             if fill:
-                left = middle + round((c - len(row) / 2) * px * wide)
-                right = middle + round((c + 1 - len(row) / 2) * px * wide) - 1
+                left = middle + round((c + step - len(row) / 2) * px * wide)
+                right = middle + round((c + step + 1 - len(row) / 2) * px * wide) - 1
                 d.rectangle([left, top, right, bottom], fill=fill)
 
 

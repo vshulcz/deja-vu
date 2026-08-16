@@ -124,6 +124,14 @@ func alive(x0, y0, size int) (css, parts string) {
 	}
 	b.WriteString("  </g>\n")
 
+	// Each front paw as its own group, so they can tuck under in the air and
+	// spread on landing. Sideways only — see mark.Paws.
+	for _, paw := range []struct{ class, side string }{{"paw-l", "left"}, {"paw-r", "right"}} {
+		fmt.Fprintf(&b, "  <g class=\"%s\"><path fill=\"%s\"%s d=\"%s\"/></g>\n",
+			paw.class, mark.Hex[mark.Coat], seal(mark.Hex[mark.Coat]),
+			mark.CellsD(mark.Paws[paw.side], x0, y0, size))
+	}
+
 	// Both ear poses, each as its own group, swapped by the flick.
 	for _, ear := range []struct {
 		class, pose string
@@ -144,6 +152,8 @@ func alive(x0, y0, size int) (css, parts string) {
          difference between an animal and a diagram. */
       .breathe { animation: dv-breathe 4.9s cubic-bezier(.4,0,.5,1) infinite }
       .hop     { animation: dv-hop 18.7s cubic-bezier(.4,0,.45,1) infinite }
+      .paw-l   { animation: dv-paw-l 18.7s cubic-bezier(.4,0,.45,1) infinite }
+      .paw-r   { animation: dv-paw-r 18.7s cubic-bezier(.4,0,.45,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
@@ -176,6 +186,13 @@ func alive(x0, y0, size int) (css, parts string) {
       95.8%    { transform: translateY(0) scale(.98, 1.022) }
       97.4%, 100% { transform: translateY(0) scale(1, 1) }
     }
+    /* The paws, on the hop's own clock. They tuck under the animal while it is
+       off the ground and spread as it takes the landing, which is what a cat
+       does and what stops the jump reading as the whole shape being lifted.
+       A cell either way is the only travel there is, and it is enough because
+       the haunches cover both ends of it — see TestTheHaunchesCoverThePaws. */
+    @keyframes dv-paw-l { 0%, 88% { transform: translateX(0) } 89.9%, 92.7% { transform: translateX(PAWpx) } 94%, 95.4% { transform: translateX(-PAWpx) } 97.4%, 100% { transform: translateX(0) } }
+    @keyframes dv-paw-r { 0%, 88% { transform: translateX(0) } 89.9%, 92.7% { transform: translateX(-PAWpx) } 94%, 95.4% { transform: translateX(PAWpx) } 97.4%, 100% { transform: translateX(0) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
@@ -198,6 +215,7 @@ func alive(x0, y0, size int) (css, parts string) {
 	// The hop clears a pixel and a half of the sprite at its apex.
 	css = strings.ReplaceAll(css, "APEXpx", fmt.Sprintf("-%dpx", size*3/2))
 	css = strings.ReplaceAll(css, "RISEpx", fmt.Sprintf("-%dpx", size*2/3))
+	css = strings.ReplaceAll(css, "PAWpx", fmt.Sprintf("%dpx", size))
 	css = strings.ReplaceAll(css, "GLANCEpx", fmt.Sprintf("%dpx", glance))
 	return css, b.String()
 }
@@ -253,7 +271,13 @@ func livingCat(x0, y0, size int) string {
 	tail := movingTail()
 	still := mark.Ready
 	still.EyeSet = "none"
-	body := mark.Paths(still, x0, y0, size, func(c mark.Cell) bool { return tail[c] })
+	paws := map[mark.Cell]bool{}
+	for _, side := range mark.Paws {
+		for _, c := range side {
+			paws[c] = true
+		}
+	}
+	body := mark.Paths(still, x0, y0, size, func(c mark.Cell) bool { return tail[c] || paws[c] })
 	moving, breathing := alive(x0, y0, size)
 	// One group per animation: two animations on one element would each be
 	// setting transform, and only the last one declared would survive.

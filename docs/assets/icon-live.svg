@@ -15,6 +15,8 @@
          difference between an animal and a diagram. */
       .breathe { animation: dv-breathe 4.9s cubic-bezier(.4,0,.5,1) infinite }
       .hop     { animation: dv-hop 18.7s cubic-bezier(.4,0,.45,1) infinite }
+      .paw-l   { animation: dv-paw-l 18.7s cubic-bezier(.4,0,.45,1) infinite }
+      .paw-r   { animation: dv-paw-r 18.7s cubic-bezier(.4,0,.45,1) infinite }
       .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
       .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
       .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
@@ -47,6 +49,13 @@
       95.8%    { transform: translateY(0) scale(.98, 1.022) }
       97.4%, 100% { transform: translateY(0) scale(1, 1) }
     }
+    /* The paws, on the hop's own clock. They tuck under the animal while it is
+       off the ground and spread as it takes the landing, which is what a cat
+       does and what stops the jump reading as the whole shape being lifted.
+       A cell either way is the only travel there is, and it is enough because
+       the haunches cover both ends of it — see TestTheHaunchesCoverThePaws. */
+    @keyframes dv-paw-l { 0%, 88% { transform: translateX(0) } 89.9%, 92.7% { transform: translateX(12px) } 94%, 95.4% { transform: translateX(-12px) } 97.4%, 100% { transform: translateX(0) } }
+    @keyframes dv-paw-r { 0%, 88% { transform: translateX(0) } 89.9%, 92.7% { transform: translateX(-12px) } 94%, 95.4% { transform: translateX(12px) } 97.4%, 100% { transform: translateX(0) } }
     /* The tail rests for four fifths of its cycle, then sweeps out and back. */
     @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
     @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
@@ -64,7 +73,7 @@
   </style>
   <g class="hop">
    <g class="breathe">
-    <path fill="#8787af" stroke="#8787af" stroke-width="1" d="M92 116h192v12h-192ZM80 128h216v72h-216ZM80 200h96v12h-96ZM200 200h96v12h-96ZM80 212h216v12h-216ZM92 224h192v12h-192ZM104 236h168v12h-168ZM116 248h144v48h-144ZM104 296h168v24h-168ZM116 320h48v12h-48ZM212 320h48v12h-48Z"/>
+    <path fill="#8787af" stroke="#8787af" stroke-width="1" d="M92 116h192v12h-192ZM80 128h216v72h-216ZM80 200h96v12h-96ZM200 200h96v12h-96ZM80 212h216v12h-216ZM92 224h192v12h-192ZM104 236h168v12h-168ZM116 248h144v48h-144ZM104 296h168v24h-168Z"/>
     <path fill="#ff8700" stroke="#ff8700" stroke-width="1" d="M176 200h24v12h-24Z"/>
   <g class="t0"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M284 236h24v60h-24ZM272 296h24v24h-24Z"/></g>
   <g class="t1"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M296 236h24v12h-24ZM284 248h24v48h-24ZM272 296h24v24h-24Z"/></g>
@@ -74,6 +83,8 @@
     <g class="eyes-half"><path fill="#1c1c1c" d="M116 164h24v24h-24ZM236 164h24v24h-24Z"/></g>
     <g class="eyes-shut"><path fill="#1c1c1c" d="M104 176h48v12h-48ZM224 176h48v12h-48Z"/></g>
   </g>
+  <g class="paw-l"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M116 320h48v12h-48Z"/></g>
+  <g class="paw-r"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M212 320h48v12h-48Z"/></g>
   <g class="ear-up"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M104 68h12v12h-12ZM260 68h12v12h-12ZM92 80h36v12h-36ZM248 80h36v12h-36ZM92 92h48v12h-48ZM236 92h48v12h-48ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
   <g class="ear-flick"><path fill="#8787af" stroke="#8787af" stroke-width="1" d="M104 68h12v12h-12ZM92 80h36v12h-36ZM92 92h48v12h-48ZM248 92h36v12h-36ZM92 104h60v12h-60ZM224 104h60v12h-60Z"/></g>
    </g>
