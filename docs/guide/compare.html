@@ -35,15 +35,31 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Compare","item":"https://vshulcz.github.io/deja-vu/guide/compare.html"}]}</script>
 <style>
 /* Full-width page: the matrix needs every pixel, so the sidebar folds into a top strip. */
-.doc{display:block}
-.doc aside{display:none}
-.cmpwrap{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line)}
-.cmpwrap table{table-layout:fixed;border-collapse:collapse;margin:0;font-size:.8rem;min-width:820px;width:100%}
-.cmpwrap th,.cmpwrap td{padding:7px 9px;vertical-align:top;overflow-wrap:break-word;border:1px solid var(--line)}
-.cmpwrap td:first-child,.cmpwrap th:first-child{position:sticky;left:0;z-index:1;background:var(--bg);width:118px;color:var(--faint);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
-.cmpwrap th{background:var(--panel)}
-.cmpwrap th.us,.cmpwrap td.us{background:rgba(135,135,175,.10);color:var(--ph-hi)}
-.cmpwrap .y{color:#7ee2a0}
+/* The table takes the width the contents column would have had. Dropping the
+   sidebar was the old answer and it cost the reader their place in the guide;
+   dropping the three-item contents list on this one page costs nothing.
+
+   Removing the article's max-width alone was not enough — the grid still held
+   the middle column, so four of the seven columns stayed off-screen. */
+.doc{grid-template-columns:224px minmax(0,1fr)}
+.doc .toc{display:none}
+.doc article{max-width:none}
+.cmpwrap{overflow-x:auto;margin:0 0 20px;border:1px solid var(--line);border-radius:10px}
+.cmpwrap table{table-layout:fixed;border-collapse:collapse;margin:0;
+  font:12.5px var(--mono);min-width:1040px;width:100%}
+.cmpwrap th,.cmpwrap td{padding:11px 13px;vertical-align:top;overflow-wrap:break-word;
+  border:1px solid var(--line);line-height:1.5}
+.cmpwrap td:first-child,.cmpwrap th:first-child{position:sticky;left:0;z-index:1;
+  background:var(--bg);width:142px;color:var(--faint);font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.1em}
+.cmpwrap thead th{position:sticky;top:0;z-index:2;background:var(--panel);
+  color:var(--faint);text-transform:uppercase;font-size:10.5px;letter-spacing:.12em}
+/* the subject of the page, marked as the subject */
+.cmpwrap th.us,.cmpwrap td.us{background:rgba(135,135,175,.13);color:var(--ink)}
+.cmpwrap thead th.us{color:var(--ph-hi);box-shadow:inset 0 2px 0 var(--amber)}
+.cmpwrap tbody tr:hover td{background:rgba(255,255,255,.02)}
+.cmpwrap tbody tr:hover td.us{background:rgba(135,135,175,.18)}
+.cmpwrap .y{color:var(--ph-hi)}
 .cmpwrap .n{color:var(--faint)}
 </style>
 </head>
