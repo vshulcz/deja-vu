@@ -3,27 +3,38 @@
      sprite is the source, and the terminal banner draws from the same grid.
      Coat, accent and features are the three colours xterm-256 holds exactly,
      so vector and terminal agree. -->
-  <path fill="#8787af" d="M60 19h6v6h-6ZM138 19h6v6h-6ZM54 25h18v6h-18ZM132 25h18v6h-18ZM54 31h24v6h-24ZM126 31h24v6h-24ZM54 37h30v6h-30ZM120 37h30v6h-30ZM54 43h96v6h-96ZM48 49h108v6h-108ZM48 55h108v6h-108ZM48 61h108v6h-108ZM48 67h108v6h-108ZM48 73h108v6h-108ZM48 79h108v6h-108ZM48 85h48v6h-48ZM108 85h48v6h-48ZM48 91h108v6h-108ZM54 97h96v6h-96ZM60 103h84v6h-84ZM66 109h72v6h-72ZM66 115h72v6h-72ZM66 121h72v6h-72ZM66 127h72v6h-72ZM60 133h84v6h-84ZM60 139h84v6h-84ZM66 145h24v6h-24ZM114 145h24v6h-24Z"/>
+  <path fill="#8787af" d="M54 43h96v6h-96ZM48 49h108v6h-108ZM48 55h108v6h-108ZM48 61h108v6h-108ZM48 67h108v6h-108ZM48 73h108v6h-108ZM48 79h108v6h-108ZM48 85h48v6h-48ZM108 85h48v6h-48ZM48 91h108v6h-108ZM54 97h96v6h-96ZM60 103h84v6h-84ZM66 109h72v6h-72ZM66 115h72v6h-72ZM66 121h72v6h-72ZM66 127h72v6h-72ZM60 133h84v6h-84ZM60 139h84v6h-84ZM66 145h24v6h-24ZM114 145h24v6h-24Z"/>
   <path fill="#ff8700" d="M96 85h12v6h-12Z"/>
   <g class="t0"><path fill="#8787af" d="M150 103h12v6h-12ZM150 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
   <g class="t1"><path fill="#8787af" d="M156 103h12v6h-12ZM150 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
   <g class="t2"><path fill="#8787af" d="M162 103h12v6h-12ZM156 109h12v6h-12ZM150 115h12v6h-12ZM150 121h12v6h-12ZM150 127h12v6h-12ZM144 133h12v6h-12ZM144 139h12v6h-12Z"/></g>
   <g class="eyes-open"><path fill="#1c1c1c" d="M66 61h12v6h-12ZM126 61h12v6h-12ZM66 67h12v6h-12ZM126 67h12v6h-12ZM66 73h12v6h-12ZM126 73h12v6h-12Z"/></g>
   <g class="eyes-shut"><path fill="#1c1c1c" d="M60 73h24v6h-24ZM120 73h24v6h-24Z"/></g>
+  <g class="ear-up"><path fill="#8787af" d="M60 19h6v6h-6ZM138 19h6v6h-6ZM54 25h18v6h-18ZM132 25h18v6h-18ZM54 31h24v6h-24ZM126 31h24v6h-24ZM54 37h30v6h-30ZM120 37h30v6h-30Z"/></g>
+  <g class="ear-flick"><path fill="#8787af" d="M60 19h6v6h-6ZM54 25h18v6h-18ZM54 31h24v6h-24ZM132 31h18v6h-18ZM54 37h30v6h-30ZM120 37h30v6h-30Z"/></g>
   <style>
-    .t1, .t2, .eyes-shut { opacity: 0 }
+    .t1, .t2, .eyes-shut, .ear-flick { opacity: 0 }
     @media (prefers-reduced-motion: no-preference) {
-      .t0 { animation: dv-t0 1.15s steps(1, end) infinite }
-      .t1 { animation: dv-t1 1.15s steps(1, end) infinite }
-      .t2 { animation: dv-t2 1.15s steps(1, end) infinite }
-      .eyes-open { animation: dv-open 6.5s steps(1, end) infinite }
-      .eyes-shut { animation: dv-shut 6.5s steps(1, end) infinite }
+      .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
+      .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
+      .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
+      .eyes-open { animation: dv-open 7.3s steps(1, end) infinite }
+      .eyes-shut { animation: dv-shut 7.3s steps(1, end) infinite }
+      .ear-up { animation: dv-ear-up 11.3s steps(1, end) infinite }
+      .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    @keyframes dv-t0 { 0%, 24.9% { opacity: 1 } 25%, 100% { opacity: 0 } }
-    @keyframes dv-t1 { 0%, 24.9% { opacity: 0 } 25%, 49.9% { opacity: 1 } 50%, 74.9% { opacity: 0 } 75%, 100% { opacity: 1 } }
-    @keyframes dv-t2 { 0%, 49.9% { opacity: 0 } 50%, 74.9% { opacity: 1 } 75%, 100% { opacity: 0 } }
-    @keyframes dv-open { 0%, 92% { opacity: 1 } 93%, 97% { opacity: 0 } 98%, 100% { opacity: 1 } }
-    @keyframes dv-shut { 0%, 92% { opacity: 0 } 93%, 97% { opacity: 1 } 98%, 100% { opacity: 0 } }
+    /* The tail rests for four fifths of its cycle, then sweeps out and back:
+       up, mid, out, mid, and still again. */
+    @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
+    @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
+    @keyframes dv-t2 { 0%, 84.9% { opacity: 0 } 85%, 91.9% { opacity: 1 } 92%, 100% { opacity: 0 } }
+    /* Two blinks, not one: a quick one, then a slower one a beat later, which
+       is what a cat does and what a metronome does not. */
+    @keyframes dv-open { 0%, 87.9% { opacity: 1 } 88%, 90.4% { opacity: 0 } 90.5%, 95.9% { opacity: 1 } 96%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
+    @keyframes dv-shut { 0%, 87.9% { opacity: 0 } 88%, 90.4% { opacity: 1 } 90.5%, 95.9% { opacity: 0 } 96%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
+    /* One flick, and it is over before you are sure you saw it. */
+    @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
+    @keyframes dv-ear-up { 0%, 96.9% { opacity: 1 } 97%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
   </style>
   <g font-family="SF Mono, JetBrains Mono, Fira Code, Menlo, monospace">
     <text x="208" y="105" font-size="72" font-weight="700" fill="#1d1b2e">deja-vu</text>

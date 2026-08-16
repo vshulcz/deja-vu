@@ -50,6 +50,16 @@ func movingTail() map[mark.Cell]bool {
 			out[c] = true
 		}
 	}
+	// The ears too. Every cell either pose paints comes out of the still layer,
+	// so each pose can be drawn as its own group. Filling the dropped ones with
+	// the background colour instead worked on the dark icon and put a black
+	// notch on the light logo, where the background is neither dark nor there.
+	for c := range earCells(mark.Ears["up"]) {
+		out[c] = true
+	}
+	for c := range earCells(mark.Ears["flick"]) {
+		out[c] = true
+	}
 	return out
 }
 
@@ -80,23 +90,77 @@ func alive(x0, y0, size int) string {
 		mark.Hex[mark.Feature], mark.CellsD(mark.Eyes["tall"], x0, y0, size))
 	fmt.Fprintf(&b, "  <g class=\"eyes-shut\"><path fill=\"%s\" d=\"%s\"/></g>\n",
 		mark.Hex[mark.Feature], mark.CellsD(mark.Eyes["closed"], x0, y0, size))
+
+	// Both ear poses, each as its own group, swapped by the flick.
+	for _, ear := range []struct {
+		class, pose string
+	}{{"ear-up", "up"}, {"ear-flick", "flick"}} {
+		fmt.Fprintf(&b, "  <g class=\"%s\"><path fill=\"%s\" d=\"%s\"/></g>\n",
+			ear.class, mark.Hex[mark.Coat],
+			mark.CellsD(sortCells(cellList(earCells(mark.Ears[ear.pose]))), x0, y0, size))
+	}
+
 	b.WriteString(`  <style>
-    .t1, .t2, .eyes-shut { opacity: 0 }
+    .t1, .t2, .eyes-shut, .ear-flick { opacity: 0 }
     @media (prefers-reduced-motion: no-preference) {
-      .t0 { animation: dv-t0 1.15s steps(1, end) infinite }
-      .t1 { animation: dv-t1 1.15s steps(1, end) infinite }
-      .t2 { animation: dv-t2 1.15s steps(1, end) infinite }
-      .eyes-open { animation: dv-open 6.5s steps(1, end) infinite }
-      .eyes-shut { animation: dv-shut 6.5s steps(1, end) infinite }
+      .t0  { animation: dv-t0 4.7s steps(1, end) infinite }
+      .t1  { animation: dv-t1 4.7s steps(1, end) infinite }
+      .t2  { animation: dv-t2 4.7s steps(1, end) infinite }
+      .eyes-open { animation: dv-open 7.3s steps(1, end) infinite }
+      .eyes-shut { animation: dv-shut 7.3s steps(1, end) infinite }
+      .ear-up { animation: dv-ear-up 11.3s steps(1, end) infinite }
+      .ear-flick { animation: dv-ear 11.3s steps(1, end) infinite }
     }
-    @keyframes dv-t0 { 0%, 24.9% { opacity: 1 } 25%, 100% { opacity: 0 } }
-    @keyframes dv-t1 { 0%, 24.9% { opacity: 0 } 25%, 49.9% { opacity: 1 } 50%, 74.9% { opacity: 0 } 75%, 100% { opacity: 1 } }
-    @keyframes dv-t2 { 0%, 49.9% { opacity: 0 } 50%, 74.9% { opacity: 1 } 75%, 100% { opacity: 0 } }
-    @keyframes dv-open { 0%, 92% { opacity: 1 } 93%, 97% { opacity: 0 } 98%, 100% { opacity: 1 } }
-    @keyframes dv-shut { 0%, 92% { opacity: 0 } 93%, 97% { opacity: 1 } 98%, 100% { opacity: 0 } }
+    /* The tail rests for four fifths of its cycle, then sweeps out and back:
+       up, mid, out, mid, and still again. */
+    @keyframes dv-t0 { 0%, 79.9% { opacity: 1 } 80%, 96.9% { opacity: 0 } 97%, 100% { opacity: 1 } }
+    @keyframes dv-t1 { 0%, 79.9% { opacity: 0 } 80%, 84.9% { opacity: 1 } 85%, 91.9% { opacity: 0 } 92%, 96.9% { opacity: 1 } 97%, 100% { opacity: 0 } }
+    @keyframes dv-t2 { 0%, 84.9% { opacity: 0 } 85%, 91.9% { opacity: 1 } 92%, 100% { opacity: 0 } }
+    /* Two blinks, not one: a quick one, then a slower one a beat later, which
+       is what a cat does and what a metronome does not. */
+    @keyframes dv-open { 0%, 87.9% { opacity: 1 } 88%, 90.4% { opacity: 0 } 90.5%, 95.9% { opacity: 1 } 96%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
+    @keyframes dv-shut { 0%, 87.9% { opacity: 0 } 88%, 90.4% { opacity: 1 } 90.5%, 95.9% { opacity: 0 } 96%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
+    /* One flick, and it is over before you are sure you saw it. */
+    @keyframes dv-ear { 0%, 96.9% { opacity: 0 } 97%, 99.4% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
+    @keyframes dv-ear-up { 0%, 96.9% { opacity: 1 } 97%, 99.4% { opacity: 0 } 99.5%, 100% { opacity: 1 } }
   </style>
 `)
 	return b.String()
+}
+
+// earCells turns an ear pose's rows into the set of cells it paints.
+func earCells(rows []string) map[mark.Cell]bool {
+	out := map[mark.Cell]bool{}
+	src := rows
+	if src == nil {
+		src = mark.Body[:4]
+	}
+	for r, row := range src {
+		for c, ch := range row {
+			if ch == '#' {
+				out[mark.Cell{Row: r, Col: c}] = true
+			}
+		}
+	}
+	return out
+}
+
+func cellList(set map[mark.Cell]bool) []mark.Cell {
+	out := make([]mark.Cell, 0, len(set))
+	for c := range set {
+		out = append(out, c)
+	}
+	return out
+}
+
+func sortCells(in []mark.Cell) []mark.Cell {
+	sort.Slice(in, func(i, j int) bool {
+		if in[i].Row != in[j].Row {
+			return in[i].Row < in[j].Row
+		}
+		return in[i].Col < in[j].Col
+	})
+	return in
 }
 
 func logo(ink string, animate bool) string {
