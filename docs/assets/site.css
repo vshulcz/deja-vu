@@ -199,3 +199,36 @@ h2:hover .hlink{opacity:1}
   color:var(--faint);font:11px var(--mono);background:var(--panel-2)}
 .pfoot kbd{border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ph-hi)}
 .plocal{color:var(--ph-dim)}
+
+/* ── what the page answers ───────────────────────────────────────────── */
+.pagelede{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  margin:0 0 26px;color:var(--amber);font:13px var(--mono)}
+.pagelede .mins{color:var(--faint)}
+.pagelede .mins::before{content:"· "}
+
+/* ── the sidebar keeps count ─────────────────────────────────────────── */
+.doc aside .grp{display:flex;align-items:baseline;gap:8px}
+.doc aside .grp .count{color:var(--ph-dim);letter-spacing:0}
+.doc aside a.read::after{content:"·";float:right;color:var(--ph);opacity:.85}
+.doc aside a[aria-current].read::after{content:""}
+
+/* ── code with a lid ─────────────────────────────────────────────────── */
+.pre-wrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.pre-wrap pre{border:0;border-radius:0;margin:0;background:none}
+.pre-lid{display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-bottom:1px solid var(--line);background:var(--panel-2);
+  font:11px var(--mono);color:var(--faint)}
+.pre-lid .what{flex:1;letter-spacing:.08em;text-transform:uppercase;opacity:.8}
+.pre-copy{position:static;opacity:1;padding:3px 9px}
+
+/* ── the long grid keeps its header ──────────────────────────────────── */
+.doc article table thead th{position:sticky;top:0;z-index:2}
+.doc article table tbody tr:nth-child(2n){background:rgba(255,255,255,.014)}
+.doc article table tbody tr:hover{background:var(--panel)}
+
+.searchhint{display:flex;align-items:center;gap:9px;background:var(--panel);
+  border:1px solid var(--line);border-radius:7px;padding:6px 10px;cursor:pointer;
+  color:var(--faint);font:12px var(--mono)}
+.searchhint:hover{border-color:var(--ph-dim);color:var(--ink)}
+.searchhint kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--ph-hi)}
+@media(max-width:700px){.searchhint span{display:none}}

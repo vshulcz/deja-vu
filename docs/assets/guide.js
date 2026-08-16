@@ -20,8 +20,17 @@
       navigator.clipboard.writeText(pre.textContent.trim());
       b.textContent='copied';setTimeout(function(){b.textContent='copy'},1200);
     });
+    /* a lid rather than a button floating over the code: a control that only
+       appears on hover is a control most readers never learn about */
+    var text=pre.textContent.trim();
+    var what=/^[$#]|\bdeja\b|^curl|^brew|^go /.test(text)?'shell':
+             /^[{[]/.test(text)?'json':'text';
+    var lid=document.createElement('div');lid.className='pre-lid';
+    lid.innerHTML='<span class="what">'+what+'</span>';
+    lid.appendChild(b);
     var wrapEl=document.createElement('div');wrapEl.className='pre-wrap';
-    pre.parentNode.insertBefore(wrapEl,pre);wrapEl.appendChild(pre);wrapEl.appendChild(b);
+    pre.parentNode.insertBefore(wrapEl,pre);
+    wrapEl.appendChild(lid);wrapEl.appendChild(pre);
   });
 
   /* anchors on h2 */
@@ -44,6 +53,56 @@
                   (next?'<a class="nx" href="'+next[0]+'"><small>Next</small>'+next[1]+'</a>':'<span></span>');
     art.appendChild(nav);
   }
+
+  /* ── how long the page takes ───────────────────────────────────────── */
+  (function(){
+    var slot=art.querySelector('[data-mins]');
+    if(!slot)return;
+    var words=art.textContent.trim().split(/\s+/).length;
+    slot.textContent=Math.max(1,Math.round(words/220))+' min read';
+  })();
+
+  /* ── the sidebar remembers what you have read ──────────────────────────
+     The same idea the home page greets you with. Of every documentation site
+     that could do this, one about a memory tool has the most right to. */
+  (function(){
+    var KEY='deja.read';
+    var here=location.pathname.split('/').pop()||ORDER[0][0];
+    var read={};
+    try{read=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+    read[here]=1;
+    try{localStorage.setItem(KEY,JSON.stringify(read))}catch(e){}
+
+    var side=document.querySelector('.doc aside');
+    if(!side)return;
+    var n=0;
+    ORDER.forEach(function(pair){
+      var a=side.querySelector('a[href="'+pair[0]+'"]');
+      if(!a)return;
+      if(read[pair[0]]){a.classList.add('read');a.title='read';n++}
+    });
+    var grp=side.querySelector('.grp');
+    if(grp&&n){
+      var c=document.createElement('span');
+      c.className='count';c.textContent=n+'/'+ORDER.length;
+      grp.appendChild(c);
+    }
+  })();
+
+  /* ── say that the guide can be searched ────────────────────────────── */
+  (function(){
+    var nav=document.querySelector('nav .spacer');
+    if(!nav)return;
+    var hint=document.createElement('button');
+    hint.className='searchhint';hint.type='button';
+    hint.innerHTML='<span>search the guide</span><kbd>/</kbd>';
+    hint.addEventListener('click',function(){
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'/',bubbles:true}));
+    });
+    nav.parentNode.insertBefore(hint,nav.nextSibling);
+  })();
+
+  /* new page behaviour goes above this line, inside this closure */
 
   /* ── a hairline that fills as you read ─────────────────────────────── */
   (function(){
@@ -198,4 +257,6 @@
     s.page=title;
     localStorage.setItem(KEY,JSON.stringify(s));
   }catch(e){}
+
+
 })();
