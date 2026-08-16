@@ -82,7 +82,9 @@ footer a:hover{color:var(--ph-hi)}
   border-left:2px solid transparent}
 .doc aside a:hover{color:var(--ink);background:var(--panel)}
 .doc aside a[aria-current]{color:var(--ph-hi);border-left-color:var(--ph);background:var(--panel)}
-.doc article{min-width:0;max-width:74ch}
+/* long words break rather than push the column: on a 360px phone an italic
+   phrase was hanging nine pixels off the edge */
+.doc article{min-width:0;max-width:74ch;overflow-wrap:break-word}
 
 /* The prompt before the title stays: it is a terminal tool, and the mark of one
    costs a heading nothing. The ## before every h2 did not — at one per section
@@ -232,3 +234,27 @@ h2:hover .hlink{opacity:1}
 .searchhint:hover{border-color:var(--ph-dim);color:var(--ink)}
 .searchhint kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--ph-hi)}
 @media(max-width:700px){.searchhint span{display:none}}
+
+@media(max-width:620px){
+  /* The header did not fit: the GitHub button ran off the right edge and the
+     brand broke across two lines. Wrapping keeps every link reachable, which
+     matters more on a phone than keeping the row to one line. */
+  nav{flex-wrap:wrap;row-gap:6px;padding:12px 20px}
+  nav .spacer{display:none}
+  nav .brand{white-space:nowrap;width:100%}
+  nav .lnk{padding:6px 8px}
+}
+
+@media(max-width:860px){
+  .sidefold{border:1px solid var(--line);border-radius:10px;background:var(--panel);
+    margin-bottom:8px}
+  .sidefold summary{display:flex;align-items:baseline;gap:10px;cursor:pointer;
+    padding:12px 14px;font:12px var(--mono);color:var(--faint);list-style:none}
+  .sidefold summary::-webkit-details-marker{display:none}
+  .sidefold summary::after{content:"▾";margin-left:auto;color:var(--ph-dim)}
+  .sidefold[open] summary::after{content:"▴"}
+  .sidefold summary b{color:var(--ph-hi);font-weight:400}
+  .sidefold > a,.sidefold > .grp{margin-left:6px;margin-right:6px}
+  .sidefold > a:last-of-type{margin-bottom:10px}
+  .doc aside a.sidecat{margin-top:14px}
+}

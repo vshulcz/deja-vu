@@ -60,7 +60,7 @@ nav .lnk:hover{color:var(--ink);background:var(--panel)}
 nav .cta{color:var(--bg);background:var(--coat);padding:8px 14px;border-radius:7px;font-weight:600}
 nav .cta:hover{background:var(--coat-hi);color:var(--bg)}
 
-header{padding:72px 0 96px;display:grid;grid-template-columns:1fr 290px;gap:56px;align-items:center}
+header{padding:72px 0 96px;display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:56px;align-items:center}
 h1{font:700 clamp(36px,5.1vw,58px)/1.06 var(--sans);letter-spacing:-.028em;color:var(--ink);margin-bottom:22px}
 h1 em{font-style:normal;color:var(--amber)}
 .lede{font-size:19px;line-height:1.55;max-width:40ch;margin-bottom:32px}
@@ -73,7 +73,10 @@ h1 em{font-style:normal;color:var(--amber)}
 .cmdline{display:flex;align-items:center;gap:10px;background:var(--panel);
   border:1px solid var(--line);border-radius:10px;padding:13px 15px;font:13.5px var(--mono);max-width:560px}
 .cmdline .p{color:var(--amber)}
-.cmdline code{color:var(--ink);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* min-width:0 or the flex item refuses to shrink below the width of the
+   command, which on a phone pushed the whole hero column to 560px and cut
+   the headline, the lede and everything under them off the screen */
+.cmdline code{color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmdline button{background:none;border:1px solid var(--line);color:var(--faint);
   border-radius:6px;padding:5px 10px;font:11px var(--mono);cursor:pointer}
 .cmdline button:hover{color:var(--ink);border-color:var(--coat-dim)}
@@ -225,8 +228,18 @@ footer .sp{flex:1}
   .js .reveal{opacity:1;transform:none;transition:none}
   #vu{display:none}
 }
+
+@media(max-width:620px){
+  /* The header did not fit: the GitHub button ran off the right edge and the
+     brand broke across two lines. Wrapping keeps every link reachable, which
+     matters more on a phone than keeping the row to one line. */
+  nav{flex-wrap:wrap;row-gap:6px;padding:12px 20px}
+  nav .sp,nav .spacer{display:none}
+  nav .brand{white-space:nowrap;width:100%}
+  nav .lnk{padding:6px 8px}
+}
 @media(max-width:860px){
-  header{grid-template-columns:1fr;gap:32px}
+  header{grid-template-columns:minmax(0,1fr);gap:32px}
   .catwrap{order:-1;justify-self:start}
   .catwrap img{width:150px;height:150px}
   .proof,.steps{grid-template-columns:1fr}

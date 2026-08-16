@@ -102,6 +102,29 @@
     nav.parentNode.insertBefore(hint,nav.nextSibling);
   })();
 
+
+  /* ── the sidebar folds on a phone ───────────────────────────────────────
+     Eleven links and a cat above the article means scrolling past the whole
+     guide to reach the page you opened. */
+  (function(){
+    var side=document.querySelector('.doc aside');
+    if(!side||!matchMedia('(max-width:860px)').matches)return;
+
+    var here=side.querySelector('a[aria-current]');
+    var box=document.createElement('details');
+    box.className='sidefold';
+    var head=document.createElement('summary');
+    head.innerHTML='<span>Guide</span><b>'+(here?here.textContent.trim():'contents')+'</b>';
+    box.appendChild(head);
+    while(side.firstChild)box.appendChild(side.firstChild);
+    side.appendChild(box);
+
+    /* opening it should not leave the reader somewhere else when it closes */
+    box.addEventListener('toggle',function(){
+      if(!box.open)side.scrollIntoView({block:'nearest'});
+    });
+  })();
+
   /* new page behaviour goes above this line, inside this closure */
 
   /* ── a hairline that fills as you read ─────────────────────────────── */
