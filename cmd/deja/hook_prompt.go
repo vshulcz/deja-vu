@@ -145,9 +145,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
-	// prompts are full of filler that poisons an AND. n=8 to leave room after
-	// excluding the current/too-fresh sessions.
-	ranked, matched, strong, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, 8)
+	// prompts are full of filler that poisons an AND.
+	ranked, matched, strong, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, promptCandidates)
 	if err != nil || len(ranked) == 0 {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
@@ -500,6 +499,25 @@ func citationLine(s model.Session, terms []string) string {
 	return fmt.Sprintf("\nIf it helped, say: \"deja-vu recalled: %s (%s%s, deja:%s) — reusing it.\"",
 		title, s.Harness, date, shortID(s.ID))
 }
+
+// promptCandidates is how many ranked sessions the hook asks for before
+// filtering, against the two it will ever inject.
+//
+// It was eight, sized against two exclusions — the session being written and
+// anything too fresh — and its comment said so. Three more arrived afterwards:
+// the trust policy withholds a project, a weak match is dropped, and a session
+// already injected in this conversation is skipped. Any of them can fill the
+// window, and when they do the answer sitting below is never looked at and the
+// hook says nothing at all.
+//
+// Already-injected is the one that makes this ordinary rather than contrived:
+// it accumulates as a conversation goes on, so the failure arrives after a
+// handful of prompts, on the sessions the user asks about most.
+//
+// The cost of a wider window is a longer list to walk, not a longer search: the
+// ranking already scored every session in the project, and this only takes more
+// of what it produced.
+const promptCandidates = 32
 
 // alreadyInjected returns the session ids this hook already injected into the
 // given agent session, so follow-up prompts do not repeat the same memory.
