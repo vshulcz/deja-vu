@@ -78,6 +78,16 @@ func runBrief(dir string, w io.Writer) error {
 		bold, reset, version, bold, ov.Sessions, reset, pluralS(ov.Sessions),
 		bold, ov.Harnesses, reset, pluralS(ov.Harnesses))
 
+	// An index and no agent reading it is the state a fresh install lands in,
+	// and nothing said so: install.sh drops a binary, `deja` builds the memory
+	// and reports it, and the part that makes any of it arrive on its own is a
+	// second command nobody has been told about. It sits directly under the
+	// header because that is the only line a first-time reader is certain to
+	// read.
+	if nothingWired() {
+		fmt.Fprintf(w, "wire       %sno agent is wired to this yet%s — `deja install --auto`\n", bold, reset)
+	}
+
 	recalls, bytes, _ := usage.TodayWithInjections(dir)
 	weekRecalls, _, _, _ := usage.Week(dir)
 	dejaVu := usage.DejaVuWeek(dir)

@@ -114,3 +114,9 @@ case ":$PATH:" in
     fi
     ;;
 esac
+
+# What actually makes memory arrive. Everything above this line puts a binary on
+# the disk; nothing has been wired into an agent yet, and a reader who stops
+# here has installed a search tool by accident.
+printf '\nnext: %s install --auto\n' "$dest_dir/$bin"
+printf '      wires deja into every coding agent found on this machine\n'

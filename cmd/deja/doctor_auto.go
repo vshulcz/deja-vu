@@ -63,6 +63,22 @@ func autoWirings() []autoWiring {
 	}
 }
 
+// nothingWired reports whether no harness on this machine has an auto-recall
+// file. It is a stat per harness and no index read, which is what the brief can
+// afford — that screen has to feel instant.
+//
+// Auto-recall alone is the question worth asking here. An MCP server is a tool
+// the agent may call; these files are what make memory arrive without anyone
+// asking, which is the thing someone thinks they installed.
+func nothingWired() bool {
+	for _, a := range autoWirings() {
+		if _, err := os.Stat(a.path()); err == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // doctorAutoRecall prints one line per harness. "stale" is the interesting
 // state: the file is there, so an install looks done, but nothing in it calls
 // deja any more — which is exactly how a silently dead integration looks.
