@@ -152,3 +152,43 @@ h2:hover .hlink{opacity:1}
 /* the pair at the foot of a page: an empty first slot keeps the second one
    right-aligned on the first page, where there is nothing before it */
 .pn span{display:block}
+
+/* ── a hairline that fills as you read ───────────────────────────────── */
+.progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:40;
+  background:linear-gradient(90deg,var(--ph),var(--amber));
+  transform:scaleX(0);transform-origin:0 50%;transition:transform .1s linear}
+
+/* ── contents ────────────────────────────────────────────────────────── */
+.toc{position:sticky;top:76px;align-self:start;font:12.5px var(--mono);
+  border-left:1px solid var(--line);padding-left:16px}
+.toc .grp{color:var(--faint);text-transform:uppercase;letter-spacing:.14em;
+  font-size:10.5px;margin-bottom:10px;opacity:.75}
+.toc a{display:block;color:var(--faint);padding:4px 0;line-height:1.45}
+.toc a:hover{color:var(--ink)}
+.toc a.on{color:var(--ph-hi)}
+@media(min-width:1240px){
+  .doc{grid-template-columns:224px minmax(0,1fr) 200px;gap:48px}
+}
+@media(max-width:1239px){.toc{display:none}}
+
+/* ── the palette ─────────────────────────────────────────────────────── */
+.palette{position:fixed;inset:0;z-index:60;display:none;
+  background:rgba(11,15,16,.72);backdrop-filter:blur(4px);padding-top:12vh}
+.palette.on{display:block}
+.pbox{max-width:620px;margin:0 auto;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.pbox input{width:100%;background:none;border:0;outline:0;color:var(--ink);
+  font:15px var(--mono);padding:18px 20px;border-bottom:1px solid var(--line)}
+.pbox input::placeholder{color:var(--faint)}
+.phits{max-height:52vh;overflow:auto}
+.phit{display:flex;align-items:baseline;gap:12px;padding:12px 20px;color:var(--body);
+  border-bottom:1px solid var(--line)}
+.phit b{font:600 14px var(--sans);color:var(--ink);flex:1}
+.phit span{font:11.5px var(--mono);color:var(--faint)}
+.phit.on,.phit:hover{background:var(--panel-2)}
+.phit.on b{color:var(--ph-hi)}
+.pnone{padding:16px 20px;color:var(--faint);font:12.5px var(--mono)}
+.pfoot{display:flex;justify-content:space-between;gap:12px;padding:11px 20px;
+  color:var(--faint);font:11px var(--mono);background:var(--panel-2)}
+.pfoot kbd{border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ph-hi)}
+.plocal{color:var(--ph-dim)}
