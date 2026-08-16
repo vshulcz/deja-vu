@@ -420,7 +420,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		if len(weak) > relevanceWindow {
 			weak = weak[:relevanceWindow]
 		}
-		ss, err := sessionsForMetas(dir, weak)
+		ss, err := sessionsServable(dir, weak, o)
 		if err != nil {
 			return SearchResult{}, err
 		}
@@ -432,7 +432,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		weak = weak[:relevanceWindow-len(keep)]
 	}
 	keep = append(keep, weak...)
-	ss, err := sessionsForMetas(dir, keep)
+	ss, err := sessionsServable(dir, keep, o)
 	if err != nil {
 		return SearchResult{}, err
 	}
@@ -508,7 +508,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	if len(metas) == 0 {
 		return nil, nil, nil, nil
 	}
-	out, err := sessionsForMetas(dir, metas)
+	out, err := sessionsServable(dir, metas, query.Options{})
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -1004,6 +1004,59 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 	return sessionsForMetas(dir, metas)
 }
 
+// recordServable says whether a record may be served for a query.
+//
+// Both retrieval paths have to ask this and only one of them did. Exact search
+// asked it per record while scanning; the relevance tier never scans, so it
+// served every record of every session it ranked — a --role=user recall could
+// come back holding assistant text, and an ordinary one could be carried by a
+// file list or a command that exact search hides on purpose.
+//
+// Work records are why the question is not simply o.Role. A file list is a
+// record of what a turn touched, not something said; an invocation is an
+// action, not an answer; a replaced span is the file's old contents. All three
+// are indexed and searchable, and served only when asked for by name.
+func recordServable(role string, o query.Options) bool {
+	if o.Role != "" && !roleMatches(role, o.Role) {
+		return false
+	}
+	for _, work := range []string{roleFiles, roleCommand, roleEdit} {
+		if role == work && o.Role != work {
+			return false
+		}
+	}
+	return true
+}
+
+// sessionsServable loads the sessions and keeps only the records this query is
+// allowed to be served, dropping any session left holding nothing.
+//
+// A session that emptied here was ranked entirely on records the caller is not
+// allowed to see — a file list, a command, or, under --role, the other side of
+// the conversation. Returning it with no messages would be worse than dropping
+// it: the count would say a match exists and the result would show nothing.
+func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model.Session, error) {
+	all, err := sessionsForMetas(dir, metas)
+	if err != nil {
+		return nil, err
+	}
+	out := all[:0]
+	for _, s := range all {
+		kept := s.Messages[:0]
+		for _, m := range s.Messages {
+			if recordServable(m.Role, o) {
+				kept = append(kept, m)
+			}
+		}
+		if len(kept) == 0 {
+			continue
+		}
+		s.Messages = kept
+		out = append(out, s)
+	}
+	return out, nil
+}
+
 // sessionsForMetas loads full sessions for the given metas in ONE pass over
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
@@ -1423,24 +1476,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
 			return
 		}
-		if o.Role != "" && !roleMatches(r.Role, o.Role) {
-			return
-		}
-		// A file list is a record of what a turn touched, not something said.
-		// Left in ordinary ranking it lifts a session because a path happened
-		// to contain the words of a question, so it is indexed and searchable
-		// but served only when asked for by role.
-		if r.Role == roleFiles && o.Role != roleFiles {
-			return
-		}
-		// Same rule for commands: an invocation is an action, not an answer.
-		if r.Role == roleCommand && o.Role != roleCommand {
-			return
-		}
-		// A replaced span is the file's old contents, not a statement about
-		// anything. It is stored so `deja restore` can find it and served only
-		// when asked for by role.
-		if r.Role == roleEdit && o.Role != roleEdit {
+		if !recordServable(r.Role, o) {
 			return
 		}
 		s := by[r.Key]
