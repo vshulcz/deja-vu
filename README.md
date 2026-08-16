@@ -93,10 +93,25 @@ to local files, and deja turns those files into one memory layer all of them rea
 | **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8%. |
 | **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
+
+<details>
+<summary>Four more: rejected decisions, staleness, sync and handoff, redaction</summary>
+
+| | |
+| --- | --- |
 | **It knows what held** | `deja promote <id> --state rejected --note "why"` marks a decision you reverted. Every later hit for that session shows it was tried and rejected, with the reason. Nothing is deleted, and `--state accepted` takes the mark back. |
 | **It says when the ground moved** | A hit reports *4 files this session touched have changed since*, and says nothing when it cannot tell. It never claims anything is unchanged. |
 | **Sync and handoff** | `deja sync ssh laptop` moves memory between machines, append-only, no cloud in the middle. `deja handoff --to codex` packages the live context so you can continue in another agent. |
 | **Redaction** | Keys, tokens, JWTs and private key blocks are stripped at index time, so the cache is safe to keep. |
+
+</details>
+
+### Your own work, wrapped
+
+`deja stats --card` draws it in the terminal; give it a filename and it writes an
+SVG for a profile README.
+
+<p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
 
 The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu/).
 
@@ -319,6 +334,17 @@ battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/de
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+## Try it on your own history
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+Ten seconds to install, about ten to index. The next session your agent opens, it
+already knows what you solved in that project — including everything from before
+you installed this.
 
 ## Contributing
 
