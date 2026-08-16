@@ -229,6 +229,48 @@ footer .sp{flex:1}
   #vu{display:none}
 }
 
+
+/* ── chapters ────────────────────────────────────────────────────────────
+   A full-bleed panel behind a section, so the page reads as chapters rather
+   than as one long scroll of the same tone. */
+.band{position:relative;padding:80px 0;margin-bottom:104px}
+.band::before{content:"";position:absolute;inset:0 calc(50% - 50vw);
+  background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  z-index:-1}
+.band > :last-child{margin-bottom:0}
+
+/* ── two columns, so the page is not five left-aligned blocks ─────────── */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:start}
+.split .right{align-self:center}
+
+/* a number on the heading, where the section has one worth naming */
+h2 .fig{color:var(--amber);letter-spacing:0;margin-left:10px}
+
+/* ── the closing band ────────────────────────────────────────────────── */
+.closer{position:relative;padding:88px 0 96px;text-align:center;margin-top:104px}
+.closer::before{content:"";position:absolute;inset:0 calc(50% - 50vw);
+  background:var(--panel);border-top:1px solid var(--line);z-index:-1}
+.closer img{width:110px;height:110px;margin:0 auto 26px;display:block}
+.closer h2{font:700 clamp(26px,3.4vw,38px)/1.2 var(--sans);letter-spacing:-.022em;
+  color:var(--ink);text-transform:none;margin-bottom:14px}
+.closer p{color:var(--faint);font:13px var(--mono);margin-bottom:26px}
+.closer .cmdline{margin:0 auto}
+
+/* ── the footer ──────────────────────────────────────────────────────── */
+footer{border-top:1px solid var(--line);margin-top:0;padding:44px 0 64px;
+  display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px;
+  font:12.5px/1.9 var(--mono);color:var(--faint)}
+footer .who{display:flex;flex-direction:column;gap:10px}
+footer .who img{width:34px;height:34px;border-radius:9px}
+footer .col b{display:block;color:var(--body);font-weight:400;text-transform:uppercase;
+  letter-spacing:.14em;font-size:10.5px;margin-bottom:8px;opacity:.75}
+footer a{display:block;color:var(--faint)}
+footer a:hover{color:var(--ph-hi)}
+@media(max-width:860px){
+  .split{grid-template-columns:minmax(0,1fr);gap:26px}
+  .band{padding:56px 0;margin-bottom:72px}
+  footer{grid-template-columns:1fr 1fr;gap:26px}
+}
 @media(max-width:620px){
   /* The header did not fit: the GitHub button ran off the right edge and the
      brand broke across two lines. Wrapping keeps every link reachable, which
@@ -306,13 +348,20 @@ footer .sp{flex:1}
 
 <section class="reveal">
   <h2>The difference</h2>
-  <p class="big">Every memory tool starts empty and records forward.
-    <em>deja starts full.</em></p>
-  <p class="note">The transcripts are the memory. There is no capture step to remember to
-    run and no stack to stand up — your agents have been writing this to disk all along.</p>
+  <div class="split">
+    <div>
+      <p class="big">Every memory tool starts empty and records forward.
+        <em>deja starts full.</em></p>
+    </div>
+    <div class="right">
+      <p class="note" style="margin:0">The transcripts are the memory. There is no capture
+        step to remember to run and no stack to stand up — your agents have been writing
+        this to disk all along.</p>
+    </div>
+  </div>
 </section>
 
-<section class="reveal" id="demo">
+<section class="reveal band" id="demo">
   <h2>Try it — a live search over a fake history</h2>
   <p class="big" style="margin-bottom:26px">Type what you half-remember.
     <em>Get the session where it was solved.</em></p>
@@ -336,7 +385,7 @@ footer .sp{flex:1}
 </section>
 
 <section class="reveal">
-  <h2>How it works</h2>
+  <h2>How it works <span class="fig">3 steps</span></h2>
   <div class="steps">
     <div class="step"><span class="n">01</span><h3>It reads what is already there</h3>
       <p>Every coding agent writes its sessions to disk. deja parses those stores in place —
@@ -351,9 +400,10 @@ footer .sp{flex:1}
 </section>
 
 <section class="reveal">
-  <h2>Works with</h2>
-  <p class="big">Solve it in Codex. <em>Claude remembers.</em></p>
-  <div class="agents">
+  <h2>Works with <span class="fig">17</span></h2>
+  <div class="split">
+    <div><p class="big" style="margin:0">Solve it in Codex. <em>Claude remembers.</em></p></div>
+    <div class="right"><div class="agents" style="margin:0">
     <span>Claude Code</span><span>Codex CLI</span><span>Cursor</span><span>opencode</span>
     <span>Gemini CLI</span><span>Cline</span><span>Copilot CLI</span><span>Roo Code</span>
     <span>aider</span><span>Goose</span><span>Qwen Code</span><span>Kimi Code</span>
@@ -363,7 +413,7 @@ footer .sp{flex:1}
 </section>
 
 
-<section class="reveal">
+<section class="reveal band">
   <h2>What a year of it looks like</h2>
   <p class="big" style="margin-bottom:26px">Your own work, <em>wrapped.</em></p>
   <div class="cardshot"><img src="assets/stats-card-demo.svg" alt="deja stats card: a year of agent sessions, the agents they came from, and the longest one" loading="lazy"></div>
@@ -372,19 +422,53 @@ footer .sp{flex:1}
 </section>
 
 <section class="reveal">
-  <h2>Private by construction</h2>
-  <p class="big">Nothing leaves your machine <em>unless you ask it to.</em></p>
-  <p class="note">Indexing and search are local. Keys, tokens and private key blocks are
-    stripped at index time, so the cache is safe to keep. No account, no telemetry —
-    even this page keeps what it remembers about you in your own browser.</p>
+  <h2>Private by construction <span class="fig">0 accounts</span></h2>
+  <div class="split">
+    <div><p class="big" style="margin:0">Nothing leaves your machine
+      <em>unless you ask it to.</em></p></div>
+    <div class="right">
+      <p class="note" style="margin:0">Indexing and search are local. Keys, tokens and
+        private key blocks are stripped at index time, so the cache is safe to keep.
+        No account, no telemetry — even this page keeps what it remembers about you in
+        your own browser.</p>
+    </div>
+  </div>
+</section>
+
+<section class="closer reveal">
+  <img src="assets/icon-live.svg" width="110" height="110" alt="">
+  <h2>Your history is already on this machine.</h2>
+  <p>ten seconds to install, about ten to index — then the next session already knows</p>
+  <div class="cmdline">
+    <span class="p">$</span>
+    <code id="i2">curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</code>
+    <button class="copy" data-copy="i2">copy</button>
+  </div>
 </section>
 
 <footer>
-  <span>MIT © vshulcz</span>
-  <span class="sp"></span>
-  <a href="guide/privacy.html">Privacy</a>
-  <a href="guide/commands.html">CLI</a>
-  <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
+  <div class="who">
+    <img src="assets/icon.svg" alt="">
+    <span>deja-vu — memory for coding agents.<br>MIT © vshulcz</span>
+  </div>
+  <div class="col"><b>Guide</b>
+    <a href="guide/getting-started.html">Getting started</a>
+    <a href="guide/agents.html">Agents &amp; MCP</a>
+    <a href="guide/search.html">Search</a>
+    <a href="guide/commands.html">CLI reference</a>
+  </div>
+  <div class="col"><b>Reference</b>
+    <a href="guide/harnesses.html">Harnesses</a>
+    <a href="guide/benchmarks.html">Benchmarks</a>
+    <a href="guide/compare.html">How it compares</a>
+    <a href="guide/privacy.html">Privacy</a>
+  </div>
+  <div class="col"><b>Project</b>
+    <a href="https://github.com/vshulcz/deja-vu">GitHub</a>
+    <a href="https://github.com/vshulcz/deja-vu/releases">Releases</a>
+    <a href="https://www.npmjs.com/package/@vshulcz/deja-vu">npm</a>
+    <a href="https://github.com/vshulcz/deja-vu/issues">Issues</a>
+  </div>
 </footer>
 
 <div id="keys" aria-hidden="true">
