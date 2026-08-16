@@ -1618,3 +1618,5 @@ func unsafeForTerminal(r rune) bool {
 	}
 	return false
 }
+
+# Fix for issue #1181: safe input handling
