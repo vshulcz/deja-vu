@@ -1845,6 +1845,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	carrySidecars(dir, tmp)
+	// After carrying, not instead of it: mergeFixes writes only when it has
+	// something to say, and the carried file is what a quiet update leaves.
+	mergeFixes(dir, tmp, replacements, replaceKeys)
 	return swapIndexDir(dir, tmp)
 }
 

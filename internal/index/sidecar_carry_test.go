@@ -72,4 +72,32 @@ func TestIncrementalUpdateKeepsTheMinedSidecars(t *testing.T) {
 	if len(FixesFor(dir, "undefined: renderInvoice in vendor/billing/api.go", 3, nil)) == 0 {
 		t.Error("fix went silent after an incremental update")
 	}
+
+	// Keeping the old pairs is half of it. A new session is a new file, and a
+	// new file never takes the append path, so sessions arriving after the
+	// first build are the only source of new pairs and all of them come
+	// through here. Carrying alone left fix frozen at whatever the full build
+	// had seen — which this assertion, and not the one above, is what catches.
+	settled := func(name, ts string) {
+		body := `{"type":"user","sessionId":"` + name + `","cwd":"/w","timestamp":"` + ts + `","message":{"role":"user","content":"migration broke"}}
+{"type":"user","sessionId":"` + name + `","cwd":"/w","timestamp":"` + ts + `","message":{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"connection refused: flimbardb:5432"}]}]}}
+{"type":"assistant","sessionId":"` + name + `","cwd":"/w","timestamp":"` + ts + `","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"docker compose restart flimbardb"}}]}}
+{"type":"assistant","sessionId":"` + name + `","cwd":"/w","timestamp":"` + ts + `","message":{"role":"assistant","content":"restarting it cleared the migration"}}
+`
+		if err := os.WriteFile(filepath.Join(proj, name+".jsonl"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	settled("d", "2026-02-01T03:04:05Z")
+	settled("e", "2026-02-02T03:04:05Z")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(FixesFor(dir, "connection refused: flimbardb:5432", 3, nil)) == 0 {
+		t.Error("a pair from a session that arrived after the full build was never mined")
+	}
+	// And the old one is still there: learning must not cost what was carried.
+	if len(FixesFor(dir, "undefined: renderInvoice in vendor/billing/api.go", 3, nil)) == 0 {
+		t.Error("mining the new sessions dropped the carried pairs")
+	}
 }

@@ -270,6 +270,70 @@ func LooksLikeError(text string) bool {
 	return false
 }
 
+// mergeFixes updates the carried pairs with what the sessions in this
+// incremental update contain.
+//
+// Carrying alone was not enough. A new session is a new file, and a new file
+// never takes the append path, so every session a user starts goes through the
+// incremental rebuild — which is exactly where new pairs come from. Carrying
+// them meant `fix` answered only what the last full build had mined, and on a
+// machine whose stores are append-only that build happens when the index
+// version changes and not otherwise.
+//
+// The pairs already carried keep their place unconditionally: they earned it
+// against the whole corpus, and re-judging them here — where most of that
+// corpus is not in hand — would drop the ones whose evidence was a repeat in a
+// session this update did not touch. Fresh candidates are judged the way a full
+// build judges them, counting a match against a carried pair as the repeat it
+// is.
+func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[string]bool) {
+	carried := ReadFixes(dir)
+	kept := make([]FixPair, 0, len(carried))
+	for _, p := range carried {
+		// Whatever this update re-read, it re-mines below; keeping the old rows
+		// too would duplicate a session's pairs on every edit to its file.
+		if !replaced[p.Key] {
+			kept = append(kept, p)
+		}
+	}
+	var fresh []FixPair
+	for _, s := range replacements {
+		fresh = append(fresh, fixPairsIn(s.Messages, s.Harness+":"+s.ID, s.Project)...)
+	}
+	if len(fresh) == 0 && len(kept) == len(carried) {
+		return
+	}
+	seen := map[string]int{}
+	for _, p := range kept {
+		seen[fixKey(p)]++
+	}
+	repeats := map[string]int{}
+	for _, p := range fresh {
+		repeats[fixKey(p)]++
+	}
+	for _, p := range fresh {
+		k := fixKey(p)
+		if sharesTerm(p.Error, p.Command) || repeats[k]+seen[k] >= 2 {
+			kept = append(kept, p)
+		}
+	}
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].When.After(kept[j].When) })
+	written := map[string]bool{}
+	out := kept[:0]
+	for _, p := range kept {
+		k := fixKey(p)
+		if written[k] {
+			continue
+		}
+		written[k] = true
+		out = append(out, p)
+		if len(out) >= fixesMax {
+			break
+		}
+	}
+	_ = writeGob(fixesPath(tmp), out)
+}
+
 // ReadFixes loads the mined pairs. An index built before they existed simply
 // has none.
 func ReadFixes(dir string) []FixPair {
