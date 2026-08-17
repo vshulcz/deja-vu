@@ -37,7 +37,6 @@ func writeSyncBatch(t *testing.T, dir string, recs []SyncRecord) {
 // deja-sync-import path that the next update classified as a removed source,
 // purging every imported record.
 func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
-	skipWindowsPortability(t)
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-tmp-local")
@@ -48,7 +47,7 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "local1.jsonl"), []byte(local), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -169,7 +168,7 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 // survive import, and re-import must stay a no-op.
 func TestImportKeepsSameTimestampMessages(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -198,7 +197,7 @@ func TestImportKeepsSameTimestampMessages(t *testing.T) {
 // conversation arrived (#670).
 func TestImportGivesSessionsATitle(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -255,7 +254,7 @@ func TestImportGivesSessionsATitle(t *testing.T) {
 // a typo for a directory that is right there with records in it (#678).
 func TestImportRejectsAPathThatIsNotADirectoryOfRecords(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))

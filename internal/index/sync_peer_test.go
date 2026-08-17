@@ -44,7 +44,6 @@ func msgLine(ts, text string) string {
 // What one peer has already received says nothing about what another peer
 // has: a global watermark silently partitions history across machines.
 func TestExportWatermarksAreScopedPerPeer(t *testing.T) {
-	skipWindowsPortability(t)
 	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "shared history"))
 	n, commit, err := ExportDeferred(dir, filepath.Join(tmp, "toLaptop"), "laptop")
 	if err != nil || n != 1 {
@@ -65,7 +64,6 @@ func TestExportWatermarksAreScopedPerPeer(t *testing.T) {
 // Harnesses that stamp every message of a session with one timestamp (aider,
 // Cursor) must not lose the messages appended after the first push.
 func TestExportKeepsMessagesSharingTheWatermarkTimestamp(t *testing.T) {
-	skipWindowsPortability(t)
 	const ts = "2026-01-02T03:04:05Z"
 	dir, tmp := syncPeerIndex(t, msgLine(ts, "first message"))
 	n, commit, err := ExportDeferred(dir, filepath.Join(tmp, "out1"), "peer")
@@ -143,7 +141,6 @@ func TestImportHonorsTombstonesAfterCacheWipe(t *testing.T) {
 // The exclude list keeps a project out of this machine's memory; a sync from
 // another machine must not put it back.
 func TestImportHonorsExcludeList(t *testing.T) {
-	skipWindowsPortability(t)
 	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "nda project notes"))
 	batch := filepath.Join(tmp, "batch")
 	if _, err := Export(dir, batch); err != nil {

@@ -12,7 +12,7 @@ import (
 func TestLadderFallsBackToRelevance(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
@@ -114,7 +114,7 @@ func relevancePoolFixture(t *testing.T, n int) string {
 	t.Helper()
 	tmp := t.TempDir()
 	home := filepath.Join(tmp, "home")
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claudeRoot := filepath.Join(tmp, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)

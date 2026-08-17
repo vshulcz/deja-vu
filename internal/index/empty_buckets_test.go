@@ -20,7 +20,7 @@ func TestAnEmptyBucketDirectoryCountsAsDamage(t *testing.T) {
 	}
 	// Every root the build consults, or another package's store leaks in and
 	// this index is not the one the test wrote.
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))

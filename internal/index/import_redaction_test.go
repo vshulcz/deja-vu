@@ -13,7 +13,7 @@ import (
 // way local ingest does, and rolls the count back with a refused file.
 func TestImportCountsItsRedactions(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	in := filepath.Join(home, "export")
 	if err := os.MkdirAll(in, 0o755); err != nil {
@@ -62,7 +62,7 @@ func TestImportCountsItsRedactions(t *testing.T) {
 // before the break does not inflate the total for records that never landed.
 func TestImportRedactionRollsBackWithARefusedFile(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	in := filepath.Join(home, "export")
 	if err := os.MkdirAll(in, 0o755); err != nil {

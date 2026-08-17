@@ -21,7 +21,7 @@ import (
 func hermeticIndexEnv(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "default-index"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))

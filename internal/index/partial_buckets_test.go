@@ -14,7 +14,7 @@ import (
 // interrupted sync leaves exactly this — some files, not none.
 func TestOneMissingBucketFileCountsAsDamage(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
@@ -58,7 +58,7 @@ func TestOneMissingBucketFileCountsAsDamage(t *testing.T) {
 // not send every store built by an older deja into a rebuild loop.
 func TestAnUncountedManifestIsNotDamaged(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)

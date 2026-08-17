@@ -11,7 +11,7 @@ import (
 // that could not return a single result (#735).
 func TestDamaged(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))

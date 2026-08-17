@@ -15,7 +15,7 @@ import (
 // answers "the thing next to the thing you remember".
 func TestCooccurTierSubstitutesANeighbouringTerm(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)

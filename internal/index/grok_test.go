@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", tmp)
+	setHome(t, tmp)
 	t.Setenv("USERPROFILE", tmp)
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))

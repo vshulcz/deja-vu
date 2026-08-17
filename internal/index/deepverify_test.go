@@ -12,7 +12,7 @@ import (
 func deepFixture(t *testing.T) (dir, src string) {
 	t.Helper()
 	tmp := t.TempDir()
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	claudeRoot := filepath.Join(tmp, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 	dir = filepath.Join(tmp, "index.db")

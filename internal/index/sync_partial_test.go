@@ -15,7 +15,7 @@ import (
 // (#891).
 func TestImportKeepsGoingPastAFileItCannotRead(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	in := filepath.Join(home, "export")
 	if err := os.MkdirAll(in, 0o755); err != nil {
@@ -79,7 +79,7 @@ func TestImportKeepsGoingPastAFileItCannotRead(t *testing.T) {
 // every counter (#896).
 func TestImportDropsRecordsWithNothingInThem(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	in := filepath.Join(home, "export")
 	if err := os.MkdirAll(in, 0o755); err != nil {
@@ -135,7 +135,7 @@ func TestImportDropsRecordsWithNothingInThem(t *testing.T) {
 // brought nothing and they were lost for good (#897).
 func TestRetryAfterAFixedFileBringsExactlyWhatWasMissing(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	in := filepath.Join(home, "export")
 	if err := os.MkdirAll(in, 0o755); err != nil {

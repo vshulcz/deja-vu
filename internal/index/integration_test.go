@@ -17,7 +17,7 @@ import (
 func allHarnessEnv(t *testing.T) (root, dir string) {
 	t.Helper()
 	root = t.TempDir()
-	t.Setenv("HOME", filepath.Join(root, "home"))
+	setHome(t, filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(root, "home"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(root, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(root, "codex"))

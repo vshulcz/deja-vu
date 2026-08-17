@@ -15,7 +15,7 @@ import (
 // file of the index: records, manifest title, or postings.
 func TestImportLeavesNoRawSecretOnDisk(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	in := filepath.Join(home, "export")
 	if err := os.MkdirAll(in, 0o755); err != nil {

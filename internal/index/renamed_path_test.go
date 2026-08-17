@@ -14,7 +14,7 @@ import (
 // take a second conversation with it (#1086).
 func TestARenamedTranscriptIsNotASecondCopyOfItself(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
@@ -55,7 +55,7 @@ func TestARenamedTranscriptIsNotASecondCopyOfItself(t *testing.T) {
 // even when some unrelated file went away in the same pass.
 func TestTwoLiveTranscriptsSharingAnIdStillCollide(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)

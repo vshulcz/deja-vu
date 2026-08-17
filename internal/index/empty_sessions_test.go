@@ -12,7 +12,7 @@ import (
 // records (1159 against 1157 on my store) (#868).
 func TestSessionsWithNothingToIndexAreNotCounted(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	root := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", root)

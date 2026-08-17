@@ -11,7 +11,7 @@ import (
 // the single one walked the whole record log per session (#1069).
 func TestFindManyByIdentity(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", tmp)
+	setHome(t, tmp)
 	t.Setenv("USERPROFILE", tmp)
 	idx := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", idx)

@@ -9,7 +9,6 @@ import (
 // HarnessSharedCounts is what lets doctor tell a parse failure from an id
 // collision (#1101); it had no test of its own, and the package floor noticed.
 func TestHarnessSharedCounts(t *testing.T) {
-	skipWindowsPortability(t)
 	dir := filepath.Join(t.TempDir(), "index.db")
 	store := t.TempDir()
 	// Two transcripts writing one id: the manifest keeps a single row for them

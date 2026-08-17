@@ -13,7 +13,7 @@ import (
 
 func TestForgetTombstoneLifecycle(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(home, "index"))
@@ -105,7 +105,7 @@ func TestPrivacyHelpers(t *testing.T) {
 
 func TestTombstonePersistenceAndForgetNoop(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	if err := writeTombstones(map[string]bool{"z:last": true, "a:first": true}); err != nil {
@@ -200,7 +200,7 @@ func TestRebuildHonorsTombstonedLoadedSession(t *testing.T) {
 
 func TestUnforgetDoesNotOverMatchHarness(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	if err := writeTombstones(map[string]bool{"claude:abc": true, "codex:abc": true, "cursor:xyz": true}); err != nil {
@@ -232,7 +232,7 @@ func TestUnforgetDoesNotOverMatchHarness(t *testing.T) {
 // The command printed nothing at all, so "restored one session" and "that
 // prefix matched nothing" looked the same to the person running it (#672).
 func TestUnforgetReportsHowManyItLifted(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("XDG_CONFIG_HOME", "")
 	if err := writeTombstones(map[string]bool{"claude:a1": true, "claude:a2": true, "cursor:b1": true}); err != nil {

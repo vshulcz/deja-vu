@@ -15,7 +15,7 @@ import (
 // start on a full rebuild or serves an index that is missing the answer.
 func TestEnsureForSearchStaleDecidesWhatToServe(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
@@ -64,7 +64,7 @@ func TestEnsureForSearchStaleDecidesWhatToServe(t *testing.T) {
 // serves an index holding text the transcript no longer has.
 func TestEnsureForSearchStaleRefusesToAppendOntoARewind(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
@@ -93,7 +93,7 @@ func TestEnsureForSearchStaleRefusesToAppendOntoARewind(t *testing.T) {
 // a session must never be listed twice when two names both match it.
 func TestRecentProjectsRanksAndDeduplicates(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)

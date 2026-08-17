@@ -18,7 +18,7 @@ import (
 // (#R11).
 func TestPromotedNoteTitleTracksTheCorrection(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	dir := filepath.Join(tmp, "index.db")
 	when := time.Date(2026, 6, 22, 12, 0, 0, 0, time.UTC)

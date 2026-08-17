@@ -8,7 +8,7 @@ import (
 
 func TestQwenChangedAndAppendedFiles(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("HOME", filepath.Join(root, "home"))
+	setHome(t, filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(root, "qwen"))
 	path := filepath.Join(root, "qwen", "projects", "-tmp-index", "chats", "session.jsonl")

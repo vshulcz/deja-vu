@@ -13,7 +13,7 @@ import (
 // into "nothing was imported from 1 file".
 func TestImportIgnoresUnknownRecordFields(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", filepath.Join(tmp, "home"))
+	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))

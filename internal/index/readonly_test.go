@@ -22,7 +22,7 @@ func TestReadOnlyIndexStillAnswers(t *testing.T) {
 		t.Skip("root ignores the permission bits this test relies on")
 	}
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
@@ -70,7 +70,7 @@ func TestReadOnlyIndexStillAnswers(t *testing.T) {
 // still has to surface, or a broken index reads as an empty one.
 func TestLockFailuresOtherThanPermissionStillSurface(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	// A path whose parent is a file, not a directory: MkdirAll fails with
 	// something that is not a permission problem.
 	blocker := filepath.Join(home, "blocker")

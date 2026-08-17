@@ -58,7 +58,7 @@ func TestStripSelfRecallKeepsWhatTheUserWrote(t *testing.T) {
 // The whole point: what deja injects must not come back as what deja knows.
 func TestIndexDoesNotSwallowItsOwnRecall(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("USERPROFILE", home)
 	claude := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)

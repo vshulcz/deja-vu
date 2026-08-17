@@ -126,7 +126,7 @@ func frictionStore(t *testing.T, sessions int) string {
 	tmp := t.TempDir()
 	claude := filepath.Join(tmp, "claude")
 	writeFrictionSessions(t, claude, sessions)
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))

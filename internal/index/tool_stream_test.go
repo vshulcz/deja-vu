@@ -21,7 +21,7 @@ func TestEachToolOutputStreamsOnlyToolRecords(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "s1.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -79,7 +79,7 @@ func TestRecordsForKeyMatchesAFullScan(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -145,7 +145,7 @@ func TestSpanInventoryCountsWhatRestoreCanHandBack(t *testing.T) {
 			edit("s2", "/w/pool.go", "another old pool")), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -206,7 +206,7 @@ func TestSpanInventorySkipsSpansWithNoPath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "b1.jsonl"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
@@ -229,7 +229,6 @@ func TestSpanInventorySkipsSpansWithNoPath(t *testing.T) {
 // empty slice on every session and no error — silence, which is how it cost a
 // wrong measurement before it was noticed (#633).
 func TestRecentCarriesTouched(t *testing.T) {
-	skipWindowsPortability(t)
 	tmp := t.TempDir()
 	proj := filepath.Join(tmp, "claude", "-tmp-touch")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
@@ -240,7 +239,7 @@ func TestRecentCarriesTouched(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, "t1.jsonl"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
