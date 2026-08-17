@@ -381,12 +381,16 @@ var repoCheck sync.Map
 // and "b7/repo/internal/y.go", which read as relative paths starting in
 // different places rather than as one tree with its head removed (#727).
 func trimPath(p string) string {
-	parts := strings.Split(filepath.Clean(p), string(filepath.Separator))
-	// Clean leaves an empty first element for an absolute path. Dropping it is
-	// not a truncation, so it must not draw an ellipsis.
-	if len(parts) > 0 && parts[0] == "" {
-		parts = parts[1:]
-	}
+	// Both separators, for the reason CrossBase gives: a store synced from
+	// Windows holds paths like C:\src\app\x.go, and on a Unix host those
+	// split into one segment, so the head is never removed and a long path
+	// runs past the column it is printed in while its Unix twin is trimmed.
+	parts := strings.FieldsFunc(filepath.Clean(p), func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
+	// FieldsFunc drops the empty leading field an absolute path produces, which
+	// is what the old explicit trim did: losing the root is not a truncation and
+	// must not draw an ellipsis.
 	if len(parts) > 4 {
 		return "…/" + strings.Join(parts[len(parts)-4:], "/")
 	}
