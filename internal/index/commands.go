@@ -134,6 +134,107 @@ func buildCommands(tmp string, ss []model.Session) {
 	_ = writeGob(commandsPath(tmp), out)
 }
 
+// buildCommandsFromIndex rebuilds the table from the records an index already
+// holds, rather than from sessions in memory.
+//
+// The incremental path has only the sessions this update touched, and these
+// counters are aggregates — how many distinct sessions ran a command, in which
+// projects, last when. A subset cannot be merged into an aggregate: for a
+// session being re-read there is no way to subtract what it contributed before.
+// So carrying the table forward was the only option, and it meant hook-tool
+// stayed silent about every command that became a habit after the last full
+// build — which is every habit, since a new session is a new file and that is
+// the path this runs on.
+//
+// Reading it back out of the records is exact, because by this point the
+// records in tmp are the whole corpus: the ones carried over plus the ones this
+// update wrote. It is the same source `deja how` already answers from.
+func buildCommandsFromIndex(tmp string) {
+	type acc struct {
+		use       CommandUse
+		sessions  map[string]bool
+		byProject map[string]*projAcc
+	}
+	by := map[string]*acc{}
+	// Identity is harness:id and nothing guarantees it is unique: two transcripts
+	// named session-1.jsonl in different projects share one manifest row, and the
+	// row carries the winner's project. A full build files each conversation's
+	// commands under its own project, because it reads the session rather than
+	// the row — and the trust policy, --project and the exclude patterns all key
+	// on that. Recomputing from records here would file the loser's commands
+	// under the winner's project, which is the leak ByProject exists to prevent.
+	// A record whose source path is not the row's path is exactly that case;
+	// leave the carried table alone rather than publish a wrong attribution.
+	collided := false
+	err := EachRecordOfRole(tmp, roleCommand, func(meta SessionMeta, r Record) {
+		if collided {
+			return
+		}
+		if r.SourcePath != "" && meta.Path != "" && r.SourcePath != meta.Path {
+			collided = true
+			return
+		}
+		cmd := strings.TrimSpace(firstTextLine(r.Text))
+		if cmd == "" || len(cmd) > commandTextMax {
+			return
+		}
+		low := normalizeCommand(cmd)
+		if low == "" {
+			return
+		}
+		a := by[low]
+		if a == nil {
+			a = &acc{use: CommandUse{Command: cmd}, sessions: map[string]bool{}, byProject: map[string]*projAcc{}}
+			by[low] = a
+		}
+		a.use.Runs++
+		a.sessions[r.Key] = true
+		pa := a.byProject[meta.Project]
+		if pa == nil {
+			pa = &projAcc{sessions: map[string]bool{}}
+			a.byProject[meta.Project] = pa
+		}
+		pa.sessions[r.Key] = true
+		if r.Time.After(pa.last) {
+			pa.last = r.Time
+		}
+		if r.Time.After(a.use.Last) {
+			a.use.Last = r.Time
+		}
+	})
+	if err != nil || collided {
+		// An extra, never a reason to fail an update: the carried table stays.
+		return
+	}
+	out := make([]CommandUse, 0, len(by))
+	for _, a := range by {
+		if len(a.sessions) < commandMinSessions {
+			continue
+		}
+		a.use.Sessions = len(a.sessions)
+		a.use.ByProject = cappedProjects(a.byProject)
+		out = append(out, a.use)
+	}
+	if len(out) == 0 {
+		return
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Sessions != out[j].Sessions {
+			return out[i].Sessions > out[j].Sessions
+		}
+		return out[i].Command < out[j].Command
+	})
+	if len(out) > commandsMax {
+		out = out[:commandsMax]
+	}
+	// Atomic, unlike the full build's write: there the file does not exist yet,
+	// here a good carried table is already sitting in tmp. A truncating write
+	// that fails partway would ship an undecodable file, and ReadCommands
+	// answers nothing at all for that — hook-tool would go silent until the
+	// next full rebuild, which is worse than the staleness this replaces.
+	_ = writeGobAtomic(commandsPath(tmp), out)
+}
+
 // cappedProjects keeps at most commandProjectCap projects for a command,
 // choosing the ones with the most sessions (ties broken by name) so the choice
 // is deterministic across rebuilds — a map-order cap could silence a different

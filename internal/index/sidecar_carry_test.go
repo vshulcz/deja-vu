@@ -100,4 +100,18 @@ func TestIncrementalUpdateKeepsTheMinedSidecars(t *testing.T) {
 	if len(FixesFor(dir, "undefined: renderInvoice in vendor/billing/api.go", 3, nil)) == 0 {
 		t.Error("mining the new sessions dropped the carried pairs")
 	}
+
+	// The command table has the same shape of problem and needed a different
+	// answer. Its counters are aggregates — distinct sessions, per project —
+	// and a subset cannot be merged into one, so it is recomputed from the
+	// records the index already holds. hook-tool is its only reader, and it
+	// stayed silent about every command that became a habit after the last full
+	// build, which is every habit: the sessions that make one arrive through
+	// this path. Both new sessions above ran the same command.
+	use, ok := CommandHistory(dir, "docker compose restart flimbardb")
+	if !ok {
+		t.Error("a command that became a habit after the full build is missing from the table")
+	} else if use.Sessions != 2 {
+		t.Errorf("command counted in %d sessions, want 2", use.Sessions)
+	}
 }
