@@ -1698,6 +1698,14 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		skipRedactions[p] = true
 	}
 	carryRedactions(&m, old, skipRedactions)
+	// Scrub once, up front, the way both full builds do — everything below reads
+	// these sessions. Redacting per message inside the record loop instead left
+	// the sessions themselves raw, so whatever was mined from them afterwards
+	// was raw too: a credential in an error line reached fixes.gob whole while a
+	// rebuild of the same corpus produced a clean one. It also left
+	// metaForSession hashing unredacted text, so the friction signatures a
+	// session carried depended on which build path had touched it last.
+	preRedactSessions(&m, replacements)
 	buckets := bucketPostings{}
 	addRec := func(r Record) error {
 		if r.SourcePath == "" {
@@ -1826,7 +1834,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			if seenMsgs.dup(key, msg.Role, msg.Time, msg.Text) {
 				continue
 			}
-			text := redactForIngest(&m, s.Path, msg.Text)
+			// Already redacted (and length-capped) by preRedactSessions above.
+			text := msg.Text
 			if err := addRec(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time}); err != nil {
 				_ = rw.Close()
 				return err

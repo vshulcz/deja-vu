@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
 // Fix pairs: the error a session hit, and the command that came next and made
@@ -289,18 +290,30 @@ func LooksLikeError(text string) bool {
 func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[string]bool) {
 	carried := ReadFixes(dir)
 	kept := make([]FixPair, 0, len(carried))
+	dirty := false
 	for _, p := range carried {
 		// Whatever this update re-read, it re-mines below; keeping the old rows
 		// too would duplicate a session's pairs on every edit to its file.
-		if !replaced[p.Key] {
-			kept = append(kept, p)
+		if replaced[p.Key] {
+			continue
 		}
+		// An index built before this path scrubbed its sessions holds pairs with
+		// the credential still in them, and carrying is all that ever happens to
+		// a pair whose session is not re-read — so without this the leak outlives
+		// the fix for it, indefinitely, on the machine that already has it.
+		if e, counts := redact.Text(p.Error); len(counts) > 0 {
+			p.Error, dirty = e, true
+		}
+		if c, counts := redact.Text(p.Command); len(counts) > 0 {
+			p.Command, dirty = c, true
+		}
+		kept = append(kept, p)
 	}
 	var fresh []FixPair
 	for _, s := range replacements {
 		fresh = append(fresh, fixPairsIn(s.Messages, s.Harness+":"+s.ID, s.Project)...)
 	}
-	if len(fresh) == 0 && len(kept) == len(carried) {
+	if len(fresh) == 0 && len(kept) == len(carried) && !dirty {
 		return
 	}
 	seen := map[string]int{}
