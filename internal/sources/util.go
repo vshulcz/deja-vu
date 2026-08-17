@@ -198,6 +198,16 @@ func textFromContent(v any) string {
 	return ""
 }
 
+// projectSegments joins the last two path segments into the name a project is
+// known by. Always with "/", because that name is an identifier rather than a
+// path on this disk: built with the OS separator it reads goprojects\deja-vu on
+// windows and goprojects/deja-vu everywhere else, which is two names for one
+// project. Scoping then misses on windows, and a project synced from a windows
+// machine never matches itself on any other.
+func projectSegments(parent, base string) string {
+	return parent + "/" + base
+}
+
 func projectName(path string) string {
 	if path == "" {
 		return "-"

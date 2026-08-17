@@ -226,7 +226,7 @@ func ProjectNameCandidates(cwd string) []string {
 		names = append(names, name)
 	}
 	if base := filepath.Base(cwd); base != "" {
-		add(filepath.Join(filepath.Base(filepath.Dir(cwd)), base))
+		add(filepath.Base(filepath.Dir(cwd)) + "/" + base)
 		add(base)
 	}
 	// The same repo appears under every worktree's path; sessions recorded in
@@ -237,7 +237,7 @@ func ProjectNameCandidates(cwd string) []string {
 	for _, root := range gitWorktreeRoots(cwd) {
 		add(sources.ClaudeProjectName(root))
 		if base := filepath.Base(root); base != "" {
-			add(filepath.Join(filepath.Base(filepath.Dir(root)), base))
+			add(filepath.Base(filepath.Dir(root)) + "/" + base)
 			add(base)
 		}
 	}

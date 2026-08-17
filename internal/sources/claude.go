@@ -167,7 +167,7 @@ func decodeProjectBase(base string) string {
 	if resolved := resolveEncodedPath(base); resolved != "" {
 		segs := strings.Split(strings.Trim(resolved, string(filepath.Separator)), string(filepath.Separator))
 		if len(segs) >= 2 {
-			return filepath.Join(segs[len(segs)-2], segs[len(segs)-1])
+			return projectSegments(segs[len(segs)-2], segs[len(segs)-1])
 		}
 		if len(segs) == 1 {
 			return segs[0]
@@ -186,7 +186,7 @@ func decodeProjectBase(base string) string {
 	if len(clean) == 1 {
 		return clean[0]
 	}
-	return filepath.Join(clean[len(clean)-2], clean[len(clean)-1])
+	return projectSegments(clean[len(clean)-2], clean[len(clean)-1])
 }
 
 // resolveEncodedPath finds the real directory an encoded project name points

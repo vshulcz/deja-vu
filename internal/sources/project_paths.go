@@ -63,7 +63,7 @@ func projectFromPaths(ms []model.Message) string {
 	}
 	segs := strings.Split(strings.Trim(best, string(filepath.Separator)), string(filepath.Separator))
 	if len(segs) >= 2 {
-		return filepath.Join(segs[len(segs)-2], segs[len(segs)-1])
+		return projectSegments(segs[len(segs)-2], segs[len(segs)-1])
 	}
 	return filepath.Base(best)
 }
