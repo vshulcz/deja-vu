@@ -299,10 +299,16 @@ func Import(dir, inDir string) (int, error) {
 	// quiet zero.
 	fi, err := os.Stat(inDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		// Anything but a permission problem reads as "it is not there" to the
+		// person who typed it, and windows says a great deal more than that: a
+		// path holding control characters is an invalid name rather than a
+		// missing one, so IsNotExist is false and the raw syscall error went
+		// back — carrying the unsanitised path with it, which is the escape
+		// sequence this wording exists to defuse.
+		if !os.IsPermission(err) {
 			return 0, fmt.Errorf("no such directory: %s", search.SafeLine(inDir))
 		}
-		return 0, err
+		return 0, fmt.Errorf("cannot read %s: %s", search.SafeLine(inDir), search.SafeLine(err.Error()))
 	}
 	if !fi.IsDir() {
 		return 0, fmt.Errorf("%s is a file; sync import wants the directory a `sync export` wrote", inDir)
