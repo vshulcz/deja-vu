@@ -17,7 +17,6 @@ import (
 // A local session and the imported records must both be reachable after a
 // plain import-then-index.
 func TestImportBeforeFirstIndexKeepsLocalSessions(t *testing.T) {
-	skipWindowsPortability(t)
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
 	proj := filepath.Join(claudeRoot, "-tmp-local")

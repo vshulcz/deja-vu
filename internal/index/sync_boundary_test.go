@@ -14,7 +14,6 @@ import (
 // watermark instant. Every rebuild of the manifest must carry it, or ordinary
 // ingest between two pushes silently turns it back into a resend.
 func TestBoundarySurvivesIncrementalIngest(t *testing.T) {
-	skipWindowsPortability(t)
 	const ts = "2026-01-02T03:04:05Z"
 	dir, tmp := syncPeerIndex(t, msgLine(ts, "only message"))
 	n, commit, err := ExportDeferred(dir, filepath.Join(tmp, "out1"), "laptop")
@@ -58,7 +57,6 @@ func TestBoundarySurvivesIncrementalIngest(t *testing.T) {
 // Watermarks are per source. A push that touches project B must not disturb
 // what project A has already delivered.
 func TestUnrelatedPushDoesNotWipeOtherBoundaries(t *testing.T) {
-	skipWindowsPortability(t)
 	const ts = "2026-01-02T03:04:05Z"
 	dir, tmp := syncPeerIndex(t, msgLine(ts, "project a message"))
 	if _, commit, err := ExportDeferred(dir, filepath.Join(tmp, "a1"), "laptop"); err != nil {
@@ -104,7 +102,6 @@ func TestUnrelatedPushDoesNotWipeOtherBoundaries(t *testing.T) {
 // what arrives next: the exclude list is a privacy control, not a filter on
 // new traffic.
 func TestExcludeAppliesToAlreadyImportedSessions(t *testing.T) {
-	skipWindowsPortability(t)
 	dir, tmp := syncPeerIndex(t, msgLine("2026-01-02T03:04:05Z", "nda project notes"))
 	batch := filepath.Join(tmp, "batch")
 	if _, err := Export(dir, batch); err != nil {
