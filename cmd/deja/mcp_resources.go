@@ -74,7 +74,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if i := strings.IndexByte(ref, ':'); i >= 0 {
 		id = ref[i+1:]
 	}
-	s, found, err := findByPrefix(dir, id)
+	s, found, err := index.FindByPrefix(dir, id)
 	if err != nil {
 		return nil, -32603, err.Error()
 	}

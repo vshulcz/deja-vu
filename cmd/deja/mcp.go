@@ -517,6 +517,25 @@ func recallText(dir, q, harness string, limit, budget int) (string, error) {
 	return text, err
 }
 
+// wholeSessionForMCP reads one session for a caller that must not wait.
+//
+// `findByPrefix` is the CLI helper and opens with a blocking `index.Ensure` —
+// right for a command someone typed, wrong here. Every caller below has already
+// been through `EnsureForSearchStale`, which deliberately refuses to wait: it
+// serves the snapshot on disk and hands the rebuild to a detached warmup,
+// because rebuilding inline blows the client's tool timeout. Calling the
+// blocking version afterwards undid exactly that — and if the lock happened to
+// be free it would run the whole rebuild on the server's thread rather than
+// merely wait for it.
+//
+// By identity rather than by prefix, too: `FindByPrefix` matches the id across
+// every harness and answers with the newest match, so the "full story" printed
+// for a hit could be a different session that shares its id — a real case, not
+// a theoretical one (#719). The hit knows its own harness; use it.
+func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error) {
+	return index.FindByIdentity(dir, s.Harness, s.ID)
+}
+
 func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
 	if limit <= 0 {
 		limit = 5
@@ -664,7 +683,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 				// whole session for the best hit alone, the same upgrade
 				// recall_context makes for the same reason (#1011).
 				whole := h.Session
-				if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
+				if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
 					whole = full
 				}
 				if cs := digest.Conclusions(whole, left, 3); len(cs) > 0 {
@@ -774,7 +793,7 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	// an answer worded nothing like the question (the decision itself) never
 	// reached the agent, the same gap CLI ctx closed (#1011).
 	whole := hits[0].Session
-	if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
+	if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
 		whole = full
 	}
 	var b bytes.Buffer
