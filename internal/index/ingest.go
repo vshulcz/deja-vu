@@ -1844,7 +1844,32 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}
+	carrySidecars(dir, tmp)
 	return swapIndexDir(dir, tmp)
+}
+
+// carrySidecars copies the mined sidecars from the live index into the
+// incremental build, because the swap replaces the whole directory and this
+// path does not mine them again — it deliberately never holds the whole corpus.
+//
+// Without this, one incremental update deleted all three. `fix` went silent
+// outright, since it has no other source; ranking lost its query expansion;
+// commands survived only because they have a fallback path. And an incremental
+// update is not a rare event — it is what a new session in any store triggers,
+// so the sidecars were being destroyed during ordinary use and only came back
+// on the next full rebuild.
+//
+// They are carried, not rebuilt: pairs mined from sessions that arrived in this
+// update are missing until a full build, which is the ordinary staleness of a
+// derived file and not the same thing as having none.
+func carrySidecars(dir, tmp string) {
+	for _, name := range []string{fixesFile, commandsFile, cooccurFile} {
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		_ = os.WriteFile(filepath.Join(tmp, name), b, 0o600)
+	}
 }
 
 func canAppendIncremental(changed map[string]FileState, old map[string]FileState) bool {
