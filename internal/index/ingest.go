@@ -1048,6 +1048,78 @@ func metaForSession(s model.Session) SessionMeta {
 		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
+// extendDerived folds messages appended to an already-indexed session into the
+// fields derived from its text.
+//
+// The append path used to update only what it could read off the new messages
+// directly — timestamps, project, title — and left everything derived frozen at
+// whatever the session held when it was first seen. A transcript is written to
+// while the work happens, so that is the ordinary case, not an edge one: an
+// error hit later in a session never entered Hit and so `deja error` could not
+// match it by signature; files touched later never entered Touched, so blame
+// did not know about them; a session that gave up after its first pass was
+// still ranked as one that had not.
+//
+// Merged rather than recomputed, because this path only ever holds the new
+// messages: the file is read from the last watermark, not from the start.
+func extendDerived(meta *SessionMeta, ms []model.Message) {
+	if len(ms) == 0 {
+		return
+	}
+	meta.Words += sessionWords(ms)
+	meta.Asked = unionHashes(meta.Asked, askedHashes(ms))
+	meta.Hit = unionHashes(meta.Hit, frictionHashes(ms))
+	// Giving up is a state a session reaches, never one it leaves: the phrases
+	// that set it are reversals of work already done.
+	if gaveUp(ms) {
+		meta.GaveUp = true
+	}
+	// topTouchedFiles ranks and caps, so the union has to be re-ranked rather
+	// than concatenated — otherwise a file touched once in the tail could
+	// outrank one touched throughout, and the cap would keep the wrong ones.
+	if touched := topTouchedFiles(ms); len(touched) > 0 {
+		meta.Touched = mergeTouched(meta.Touched, touched)
+	}
+}
+
+// unionHashes appends what is new, keeping order stable so two builds of the
+// same session compare equal.
+func unionHashes(have, add []uint64) []uint64 {
+	if len(add) == 0 {
+		return have
+	}
+	seen := make(map[uint64]bool, len(have)+len(add))
+	for _, h := range have {
+		seen[h] = true
+	}
+	for _, h := range add {
+		if !seen[h] {
+			seen[h] = true
+			have = append(have, h)
+		}
+	}
+	return have
+}
+
+// mergeTouched keeps the earlier order — the ranking a full pass produced — and
+// adds paths the tail introduced, bounded the same way topTouchedFiles bounds.
+func mergeTouched(have, add []string) []string {
+	seen := make(map[string]bool, len(have)+len(add))
+	for _, p := range have {
+		seen[p] = true
+	}
+	for _, p := range add {
+		if !seen[p] {
+			seen[p] = true
+			have = append(have, p)
+		}
+	}
+	if len(have) > touchedFileCap {
+		have = have[:touchedFileCap]
+	}
+	return have
+}
+
 // agentOwnedFile drops the agent's own working files. They are touched
 // constantly while a subject is being worked on, so left in they take the top
 // slots from the source that was actually being changed — measured: the six
@@ -1976,6 +2048,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			continue
 		}
 		ss = sources.FilterSessions(filterTombstoned(ss))
+		// Scrub before anything is derived from the text, as the other two paths
+		// do. Redacting per message inside the write loop below left the derived
+		// fields — the friction signatures especially — hashed from the raw
+		// text, so the same session got different signatures depending on which
+		// path had touched it last.
+		preRedactSessions(&m, ss)
 		filesTouched++
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -2019,9 +2097,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					meta.Title, meta.AgentTitle = t, s.AgentTitle
 				}
 			}
+			extendDerived(&meta, s.Messages)
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
-				text := redactForIngest(&m, s.Path, msg.Text)
+				// Already redacted (and length-capped) by preRedactSessions above.
+				text := msg.Text
 				// A message that is nothing but harness plumbing strips to empty
 				// (#551). Writing it would store a record with no content and give
 				// it a posting.
