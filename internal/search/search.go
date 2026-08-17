@@ -1127,7 +1127,17 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	// `deja show`, `deja ctx` and the MCP context tools printed it raw (#1090).
 	fmt.Fprintf(w, "# deja context: %s · %s · %s", s.Harness, SafeLine(s.Project), SafeLine(s.ID))
 	if !s.Updated.IsZero() {
-		fmt.Fprintf(w, " · updated %s", s.Updated.Format("2006-01-02"))
+		// The reader's zone, as `deja last`, resources/list and the MCP recall
+		// listing already do. This header formatted the timestamp as it came —
+		// UTC for every source but aider — so a reader far enough from it saw
+		// ctx name one day and those surfaces name the next for one session.
+		// ctx is the briefing written to be handed to another agent, which
+		// makes its header a date that gets repeated back (#856).
+		//
+		// Not everything is local yet: `deja show` prints per-message stamps in
+		// the timestamp's own zone, and the superseded marker is minted in UTC
+		// because lifecycle.go compares against it. Those want their own change.
+		fmt.Fprintf(w, " · updated %s", s.Updated.Local().Format("2006-01-02"))
 	}
 	fmt.Fprintln(w)
 	qlow := strings.ToLower(query)

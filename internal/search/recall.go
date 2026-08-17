@@ -308,7 +308,11 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 	} else {
 		date := ""
 		if !s.Updated.IsZero() {
-			date = " · " + s.Updated.Format("2006-01-02")
+			// The reader's zone, like the provenance line above and the ctx
+			// header: this digest is injected on every prompt, so it is the
+			// date an agent is most likely to repeat back, and it must not
+			// name a different day from the one on the user's screen (#856).
+			date = " · " + s.Updated.Local().Format("2006-01-02")
 		}
 		fmt.Fprintf(&b, "- **%s** `%s`%s\n", digestLine(s.Project), digestLine(short(s.ID)), date)
 	}
