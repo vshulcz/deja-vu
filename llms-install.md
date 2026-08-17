@@ -26,7 +26,7 @@ Claude Code, etc.) add:
 
 If `deja` is not on PATH, use the npx form: `"command": "npx", "args": ["-y", "@vshulcz/deja-vu", "mcp"]`.
 
-For the seventeen harnesses deja installs into — Claude Code, Codex, Cursor, opencode,
+For the eighteen harnesses deja installs into — Claude Code, Codex, Cursor, opencode,
 Gemini CLI, Cline, Copilot CLI, Roo Code, aider, Goose, Qwen Code, Kimi Code,
 Antigravity, Grok Build, OpenClaw, pi and Hermes — there is a one-command setup
 instead:
