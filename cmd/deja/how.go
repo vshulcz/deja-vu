@@ -67,7 +67,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	entries, hidden, err := howEntries(dir, terms, project)
+	entries, hidden, err := howEntries(dir, terms, project, policy.ActivationSearch)
 	if err != nil {
 		return err
 	}
@@ -96,12 +96,23 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 
 // howEntries groups the commands that mention every term, so the same
 // invocation run on twenty days counts as one answer with a weight.
-func howEntries(dir string, terms []string, project string) ([]howEntry, int, error) {
+//
+// The activation is the caller's, not a constant: the same command table is
+// served to the person at their own terminal and to an agent over MCP, and the
+// trust policy keys on which of those it is. Hardcoding the search activation
+// here meant a machine that allows imported memory in its owner's searches and
+// denies it over MCP handed the imported command to the agent anyway — while
+// recall, asked the same thing, correctly said it was withholding something.
+//
+// The count of what was withheld travels with it, because filtering alone turns
+// a leak into a confident "no command mentions that" over records the policy
+// hid, and an agent told nothing exists invents something.
+func howEntries(dir string, terms []string, project, activation string) ([]howEntry, int, error) {
 	pol := policy.Load()
 	hidden := 0
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
-		if !pol.Allows(policy.ActivationSearch, meta.Project) {
+		if !pol.Allows(activation, meta.Project) {
 			hidden++
 			return
 		}

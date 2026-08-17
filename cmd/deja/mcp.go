@@ -313,11 +313,18 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
 			return "", err
 		}
-		entries, _, err := howEntries(dir, strings.Fields(a.What), a.Project)
+		entries, hidden, err := howEntries(dir, strings.Fields(a.What), a.Project, policy.ActivationMCP)
 		if err != nil {
 			return "", err
 		}
 		if len(entries) == 0 {
+			// Not a flat negative when the policy is what emptied the answer:
+			// an agent told nothing exists invents one, and here something does
+			// exist. The CLI has said so since the note was written; this
+			// surface was returning the negative regardless.
+			if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
+				return strings.TrimSpace(note), nil
+			}
 			return fmt.Sprintf("No command on this machine mentions %q.", a.What), nil
 		}
 		limit := int(a.Limit)
