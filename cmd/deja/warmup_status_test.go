@@ -153,9 +153,9 @@ func TestWarmupStatusCommandIsSilentWithoutABuild(t *testing.T) {
 	}
 }
 
-// Thirteen of the sixteen harnesses have no hook and reach deja only over
-// MCP. A recall during the first build must not answer with a confident
-// negative, or the agent tells the user they have no history at all.
+// A harness with no auto-recall wiring reaches deja only over MCP. A recall
+// during the first build must not answer with a confident negative, or the
+// agent tells the user they have no history at all.
 func TestMCPRecallDistinguishesEmptyFromStillBuilding(t *testing.T) {
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "index.db")

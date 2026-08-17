@@ -128,8 +128,8 @@ func logoLinesArt(art, info []string) []string {
 		out = append(out, line)
 	}
 	// An info column taller than the mark keeps going underneath it rather
-	// than being cut off: sixteen harnesses plus a header already overflow,
-	// so the last stores were silently dropped from the greeting.
+	// than being cut off: the harness list plus a header outgrew the mark long
+	// ago, so the last stores were silently dropped from the greeting.
 	for j := len(art) - top; j < len(info); j++ {
 		if j < 0 {
 			continue

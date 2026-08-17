@@ -19,9 +19,9 @@ func mcpInstructions(dir string) string {
 		b.WriteString(s.progress())
 		b.WriteString("); recall works now but covers more history as it finishes.")
 	} else if warmupJustRequested(dir) && index.HasManifest(dir) {
-		// Thirteen of the sixteen harnesses have no hook and read this and
-		// nothing else. A rebuild that has not reported yet left them with the
-		// ordinary instructions and an index this build cannot read (#879).
+		// A harness with no auto-recall wiring reads this and nothing else. A
+		// rebuild that has not reported yet left it with the ordinary
+		// instructions and an index this build cannot read (#879).
 		b.WriteString(" The index is being rebuilt right now; recall covers more history once it finishes.")
 	}
 	return b.String()
