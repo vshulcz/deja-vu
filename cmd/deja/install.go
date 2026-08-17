@@ -35,6 +35,12 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			noIndex = true
 			continue
 		}
+		// Take deja's version of a skill back, over one that has been edited.
+		// Without it an edited skill is kept and named rather than replaced.
+		if arg == "--force" {
+			forceGuidance = true
+			continue
+		}
 		targetArgs = append(targetArgs, arg)
 	}
 	verb := "install"
@@ -47,7 +53,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	if len(targetArgs) > 1 {
 		for _, a := range targetArgs {
 			if strings.HasPrefix(a, "--") && a != "--all" && a != "--auto" {
-				return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance or --no-index", verb, a)
+				return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index or --force", verb, a)
 			}
 		}
 	}
@@ -683,6 +689,10 @@ func backupOnce(path string) (bool, error) {
 // exist, is an empty config it then creates (#676). The flag is process-wide
 // because the command is: one run, one direction.
 var removingWiring bool
+
+// forceGuidance is set by `deja install --force`: replace a skill deja can see
+// has been edited since it wrote it.
+var forceGuidance bool
 
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
 // The markers are what every generator writes: the subcommands the hooks call,

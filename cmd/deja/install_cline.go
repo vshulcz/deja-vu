@@ -53,7 +53,7 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	oldSkill, _ := os.ReadFile(filepath.Join(skill, "SKILL.md"))
-	if _, err := writeIfChanged(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(skillFile(skillBody))); err != nil {
+	if _, err := writeGuidanceFile(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(skillFile(skillBody))); err != nil {
 		return installResult{}, err
 	}
 	return installResult{Path: path, Action: a}, nil

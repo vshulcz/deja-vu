@@ -274,7 +274,34 @@ func writeSharedSkill(harness string, uninstall bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	_, err = writeIfChanged(path, old, []byte(skillFile(skillBody)))
+	return writeSkillOfOurs(path, old, []byte(skillFile(skillBody)))
+}
+
+// writeGuidanceFile writes guidance, refusing to replace a skill someone has
+// edited. A block inside the user's own AGENTS.md is edited surgically and is
+// not at risk; a SKILL.md is a whole file deja owns and replaces.
+func writeGuidanceFile(path string, old, next []byte) (string, error) {
+	if !strings.HasSuffix(path, "SKILL.md") {
+		return writeIfChanged(path, old, next)
+	}
+	if !forceGuidance && skillWasEdited(path, old) {
+		fmt.Printf("skill: kept your edited %s — `deja install --force` to take deja's version\n", shortHome(path))
+		return "kept", nil
+	}
+	action, err := writeIfChanged(path, old, next)
+	if err != nil {
+		return action, err
+	}
+	rememberSkill(path, next)
+	return action, nil
+}
+
+// writeSkillOfOurs writes a skill unless the copy on disk is not the one deja
+// left there. An edited skill is kept and reported rather than blocking the
+// install: the person who tuned the wording keeps it, the rest of the install
+// still happens, and --force is how to ask for deja's version back.
+func writeSkillOfOurs(path string, old, next []byte) error {
+	_, err := writeGuidanceFile(path, old, next)
 	return err
 }
 
@@ -331,9 +358,12 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	} else {
 		next = []byte(updateGuidanceBlock(string(old), uninstall))
 	}
-	a, err := writeIfChanged(path, old, next)
+	a, err := writeGuidanceFile(path, old, next)
 	if err != nil {
 		return installResult{}, err
+	}
+	if a == "kept" {
+		return installResult{Path: path, Action: a}, nil
 	}
 	// grok is three CLIs sharing one directory: the one that still reads
 	// GROK.md is not the one being maintained, and grok-dev reads AGENTS.md
