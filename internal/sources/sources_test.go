@@ -184,7 +184,7 @@ func TestParseClaudeProjectFromEncodedDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0].Project != filepath.Join("deja", "vu") {
+	if len(ss) != 1 || ss[0].Project != "deja/vu" {
 		t.Fatalf("project came from wrong source: %#v", ss)
 	}
 }
@@ -209,7 +209,7 @@ func TestParseClaudeProjectFromNestedSubagentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0].Project != filepath.Join("deja", "vu") {
+	if len(ss) != 1 || ss[0].Project != "deja/vu" {
 		t.Fatalf("project came from id path segment: %#v", ss)
 	}
 }

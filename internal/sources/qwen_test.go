@@ -28,7 +28,7 @@ func TestParseQwenFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0].Project != filepath.Join("deja", "vu") || len(ss[0].Messages) != 3 {
+	if len(ss) != 1 || ss[0].Project != "deja/vu" || len(ss[0].Messages) != 3 {
 		t.Fatalf("parsed sessions = %#v", ss)
 	}
 	if ss[0].Messages[0].Text != "first\n question" || ss[0].Messages[1].Text != "surface\n answer" || ss[0].Messages[2].Role != "assistant" {

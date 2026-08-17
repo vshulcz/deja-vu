@@ -21,11 +21,11 @@ func TestClaudeProjectNameResolvesHyphenatedDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := strings.ReplaceAll(real, string(filepath.Separator), "-")
-	if got := claudeProjectName(filepath.Join("/claude/projects", encoded)); got != filepath.Join("projects", "deja-vu") {
+	if got := claudeProjectName(filepath.Join("/claude/projects", encoded)); got != "projects/deja-vu" {
 		t.Fatalf("resolved name = %q, want projects/deja-vu", got)
 	}
 	// Non-existent paths keep the old heuristic.
-	if got := claudeProjectName("/claude/projects/-no-such-root-deja-vu"); got != filepath.Join("deja", "vu") {
+	if got := claudeProjectName("/claude/projects/-no-such-root-deja-vu"); got != "deja/vu" {
 		t.Fatalf("fallback name = %q, want deja/vu", got)
 	}
 }

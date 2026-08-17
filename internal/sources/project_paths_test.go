@@ -44,7 +44,9 @@ func TestProjectFromPathsTakesTheMajorityRepo(t *testing.T) {
 		filesMsg(filepath.Join(b, "main.go")),
 	}
 	got := projectFromPaths(ms)
-	want := filepath.Join(filepath.Base(filepath.Dir(a)), "alpha")
+	// "/" rather than filepath.Join: a project name is an identifier and is
+	// spelled the same on every platform.
+	want := filepath.Base(filepath.Dir(a)) + "/alpha"
 	if got != want {
 		t.Fatalf("project = %q, want %q", got, want)
 	}

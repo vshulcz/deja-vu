@@ -46,7 +46,7 @@ func TestIndexIngestSkipAndSearch(t *testing.T) {
 	if !HasManifest(dir) {
 		t.Fatal("manifest missing after build")
 	}
-	projectSessions, err := RecentProject(dir, filepath.Join("deja", "vu"), 2)
+	projectSessions, err := RecentProject(dir, "deja/vu", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.Sessions["claude:unposted"] = SessionMeta{ID: "unposted", Harness: "claude", Project: filepath.Join("deja", "vu"), Path: "manual", Updated: time.Now()}
+	m.Sessions["claude:unposted"] = SessionMeta{ID: "unposted", Harness: "claude", Project: "deja/vu", Path: "manual", Updated: time.Now()}
 	rec, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)

@@ -473,7 +473,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if byHarness["claude"].Sessions != 3 || byHarness["claude"].Messages != 6 || byHarness["codex"].Sessions != 1 || byHarness["codex"].Messages != 2 {
 		t.Fatalf("harnesses = %#v", report.Harnesses)
 	}
-	if len(report.TopProjects) == 0 || report.TopProjects[0].Project != filepath.Join("tmp", "alpha") || report.TopProjects[0].Sessions != 2 {
+	if len(report.TopProjects) == 0 || report.TopProjects[0].Project != "tmp/alpha" || report.TopProjects[0].Sessions != 2 {
 		t.Fatalf("top projects = %#v", report.TopProjects)
 	}
 

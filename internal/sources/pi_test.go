@@ -41,7 +41,7 @@ func TestParsePiFile(t *testing.T) {
 	if s.ID != "abc-123" {
 		t.Fatalf("id = %q, want abc-123", s.ID)
 	}
-	if s.Project != filepath.Join("deja", "vu") {
+	if s.Project != "deja/vu" {
 		t.Fatalf("project = %q, want deja/vu", s.Project)
 	}
 	if len(s.Messages) != 4 {
