@@ -31,9 +31,12 @@ func TestAFailedGobWriteKeepsOrLosesWhatWasThere(t *testing.T) {
 		if err := writeGob(p, fail); err == nil {
 			t.Fatal("the encode was expected to fail; this test no longer proves anything")
 		}
+		// Asserted, not skipped: the loss is the hazard this documents, and if
+		// writeGob ever stops truncating first, whoever changes it should be the
+		// one to retire this — not have it quietly pass.
 		var back string
 		if err := readGob(p, &back); err == nil && back == good {
-			t.Skip("writeGob no longer truncates before encoding — the hazard is gone")
+			t.Error("writeGob preserved the previous content; the reason for the atomic call site is gone and this test should go with it")
 		}
 	})
 
