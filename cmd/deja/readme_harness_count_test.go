@@ -49,9 +49,19 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 	// re-reads when the main one changes — it was still leading with the
 	// previous tagline months later, on a page that gets five hundred installs
 	// a week. Third-party write-ups were quoting a count from before July.
-	// Four files spell the count and only two were checked, so when Zed made it
-	// eighteen the other two stayed on seventeen.
-	for _, name := range []string{"README.md", "npm/README.md", "llms-install.md", "docs/ARCHITECTURE.md"} {
+	// Seven files spell the count and only two were checked, so when Zed made it
+	// eighteen the other five stayed on seventeen — including the two manifest
+	// descriptions, which is the line the MCP registry shows next to the name,
+	// and the harnesses page, which says it in the lede and in three meta tags.
+	for _, name := range []string{
+		"README.md",
+		"npm/README.md",
+		"llms-install.md",
+		"docs/ARCHITECTURE.md",
+		"server.json",
+		"packaging/mcpb/manifest.json",
+		"docs/guide/harnesses.html",
+	} {
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
