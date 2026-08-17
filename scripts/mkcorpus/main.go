@@ -62,6 +62,38 @@ var files = [][2]string{
 	{"cmd/deja/install.go", "install writes through a symlink, so dotfiles repos keep their file"},
 }
 
+// The errors above are shaped like the ones deja drops on purpose: isFriction
+// rejects anything starting with "Error: " or "--- FAIL", because every Python
+// failure prints a traceback and every Go failure prints FAIL, and clustering
+// those puts an empty line at the top of the report. So a corpus built only
+// from them produced no friction report and no fix pairs at all — the two
+// features were unreachable from the one corpus meant to exercise everything.
+//
+// These two are shaped the way isFriction keeps, and they clear the evidence
+// bars: recurring appears in three sessions, which is where deja will call
+// something recurring rather than a bad afternoon; settled appears in two,
+// because a pair is only kept when the command shares a term with the error or
+// the same remedy followed the same error twice.
+var recurring = [3]string{
+	"connection refused: cache-a1:6379",
+	"kubectl rollout restart deploy/cache-a1",
+	"restarting the cache cleared it",
+}
+
+var settled = [3]string{
+	"undefined: renderInvoice in vendor/billing/api.go",
+	"go mod vendor && go build ./...",
+	"vendoring again fixed it",
+}
+
+// A span worth recovering. The edits above replace the string "before", which
+// restores to nothing anyone wanted back; this is the one thing a transcript
+// holds that cannot be reconstructed from anywhere else.
+const removedSpan = "func legacyRate(cents int) int {\n" +
+	"\t// the 2019 table, kept for old invoices\n" +
+	"\treturn cents * 7 / 100\n" +
+	"}"
+
 type writer struct {
 	dir   string
 	clock time.Time
@@ -185,6 +217,58 @@ func main() {
 		}
 	}
 
-	fmt.Printf("%d sessions in %s\n", w.n, dir)
+	// An error that keeps coming back, and the same remedy each time.
+	for rep := range 3 {
+		id := fmt.Sprintf("friction-%d", rep)
+		toolID := fmt.Sprintf("fr%d", rep)
+		fail(w.session(id, []turn{
+			say("user", "deploy failed again"),
+			{role: "user", toolID: toolID, result: recurring[0]},
+			{role: "assistant", text: "restarting it", toolID: toolID,
+				tool: map[string]any{"type": "tool_use", "id": toolID, "name": "Bash",
+					"input": map[string]any{"command": recurring[1]}}},
+			say("assistant", recurring[2]),
+		}))
+	}
+
+	// An error that was settled, twice, so the pair carries its evidence.
+	for rep := range 2 {
+		id := fmt.Sprintf("settled-%d", rep)
+		toolID := fmt.Sprintf("st%d", rep)
+		fail(w.session(id, []turn{
+			say("user", "the build is broken"),
+			{role: "user", toolID: toolID, result: settled[0]},
+			{role: "assistant", text: "vendoring", toolID: toolID,
+				tool: map[string]any{"type": "tool_use", "id": toolID, "name": "Bash",
+					"input": map[string]any{"command": settled[1]}}},
+			say("assistant", settled[2]),
+		}))
+	}
+
+	// Something deleted, kept only as the bytes that stopped existing.
+	fail(w.session("removed-0", []turn{
+		say("user", "drop the legacy rate table"),
+		{role: "assistant", text: "removing it", toolID: "rm0",
+			tool: map[string]any{"type": "tool_use", "id": "rm0", "name": "Edit",
+				"input": map[string]any{
+					"file_path":  "/Users/you/code/deja-vu/internal/billing/legacy.go",
+					"old_string": removedSpan, "new_string": ""}}},
+		{role: "user", toolID: "rm0", result: "edited"},
+		say("assistant", "removed legacyRate; the 2019 invoices are archived anyway"),
+	}))
+
+	// A second project, so anything that scopes by project has two to tell
+	// apart rather than one that always matches.
+	other := filepath.Join(*out, "projects", *project+"-tools")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		fail(err)
+	}
+	w2 := &writer{dir: other, clock: w.clock}
+	fail(w2.session("other-0", []turn{
+		say("user", "what did we decide about the ingest backpressure"),
+		say("assistant", "ingest sheds load at the queue, not the handler, so a slow consumer cannot stall accepts"),
+	}))
+
+	fmt.Printf("%d sessions in %s (+%d in %s)\n", w.n, dir, w2.n, other)
 	fmt.Printf("ask it: %q — the answer is only in there\n", answerQuestion)
 }
