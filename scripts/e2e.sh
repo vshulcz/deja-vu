@@ -58,4 +58,22 @@ HOME="$H" USERPROFILE="$H" $D install codex | grep -q "unchanged" || fail "insta
 grep -q 'model = "gpt"' "$H/.codex/config.toml" || fail "install clobbered config"
 HOME="$H" USERPROFILE="$H" $D uninstall codex | grep -q "updated" || fail "uninstall"
 
+# the per-prompt hook, from a directory named like the fixture's project so
+# auto-recall is in scope. This is the path that carries memory without anyone
+# asking, and nothing here exercised it: the MCP handshake above proves the
+# tool answers when called, not that anything calls it.
+WORK="$(mktemp -d)/project"
+mkdir -p "$WORK"
+( cd "$WORK" && printf '%s\n' '{"prompt":"the frobnicator parser bug again","session_id":"e2e-1"}' | $D hook-prompt ) \
+  | grep -q 'frobnicator' || fail "hook-prompt returned no recall for a prompt about indexed work"
+
+# --auto wires whatever it finds, and doctor agrees with it afterwards. The two
+# disagreeing is the failure a user cannot see: doctor is the command they run
+# when memory is not working.
+A="$(mktemp -d)"
+mkdir -p "$A/.claude"
+printf '{}\n' > "$A/.claude/settings.json"
+HOME="$A" USERPROFILE="$A" $D install --auto >/dev/null 2>&1 || fail "install --auto"
+HOME="$A" USERPROFILE="$A" $D doctor | grep -q "precompact   wired" || fail "doctor disagrees with install --auto"
+
 echo "e2e OK"
