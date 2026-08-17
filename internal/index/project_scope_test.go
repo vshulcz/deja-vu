@@ -16,6 +16,11 @@ func TestProjectScopeMatchesSegmentsNotSubstrings(t *testing.T) {
 		{"scratchpad/demo", "demo"},
 		{"imported:deja-vu", "deja-vu"},
 		{"imported:goprojects/deja-vu", "deja-vu"},
+		// windows builds the same name with its own separator. Matching only
+		// "/" made every scoped ranking there return nothing, which the CI leg
+		// only reports when a pull request asks for it.
+		{`goprojects\deja-vu`, "deja-vu"},
+		{`imported:goprojects\deja-vu`, "deja-vu"},
 	}
 	for _, c := range joined {
 		if !projectInScope(c.project, c.want) {
@@ -28,6 +33,7 @@ func TestProjectScopeMatchesSegmentsNotSubstrings(t *testing.T) {
 		{"deja-push", "deja"},
 		{"deja-vu", "deja"},
 		{"goprojects/d3fvxl-redirect", "d3fvxl"},
+		{`goprojects\d3fvxl-redirect`, "d3fvxl"},
 		{"shulcz/coding", "shulcz"},
 		{"pin-manifests", "-"},
 		{"telegram-mtproxy-forwarder", "-"},

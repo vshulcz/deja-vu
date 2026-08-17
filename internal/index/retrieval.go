@@ -673,7 +673,15 @@ func projectInScope(project, want string) bool {
 		// project under the same name.
 		p = rest
 	}
-	return p == w || strings.HasSuffix(p, "/"+w)
+	if p == w {
+		return true
+	}
+	// Both separators, because a project name is built from a path and windows
+	// builds it with backslashes. Matching only "/" made every scoped ranking on
+	// windows return nothing — the substring rule this replaced happened not to
+	// care which separator it was, and taking the loose rule out took the
+	// platform's separator with it.
+	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
 }
 
 // relevantMetasCounts additionally reports how many terms of ANY frequency
