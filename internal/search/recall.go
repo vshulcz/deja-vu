@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -239,6 +240,16 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 	matched := false
 	if len(terms) > 0 {
 		problem, conclusions = matchedLines(s, terms)
+		matched = len(conclusions) > 0
+	} else {
+		// No question yet — this is the block handed over at session start.
+		// Nothing can be matched, and walking the transcript from the top takes
+		// the first two things the agent said, which are "let me look" and "I
+		// have found the file". What the session decided is at the end of it.
+		//
+		// digest.Conclusions already picks the decision-carrying lines, newest
+		// first, and is what `deja share` prints under the same heading.
+		conclusions = digest.Conclusions(s, 400, 2)
 		matched = len(conclusions) > 0
 	}
 	for _, m := range s.Messages {
