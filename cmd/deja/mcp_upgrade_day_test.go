@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -148,6 +149,12 @@ func TestNoAskAgainWhenTheIndexCannotBeRebuilt(t *testing.T) {
 	// The parent, not the index directory: a rebuild writes index.db.tmp
 	// beside it and renames, so that is the directory whose permissions decide
 	// whether it can happen at all.
+	// Windows ignores the permission bits chmod sets here, and root ignores the
+	// permissions themselves, so on either the directory stays writable and the
+	// state this test is about cannot be built.
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop a rebuild here")
+	}
 	parent := filepath.Dir(dir)
 	if err := os.Chmod(parent, 0o500); err != nil {
 		t.Skip("cannot make the index directory read-only here")
