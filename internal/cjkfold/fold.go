@@ -65,14 +65,33 @@ func String(s string) string {
 	return string(runes)
 }
 
+// IsCJK reports whether r is a Han, Hiragana, Katakana or Hangul rune — the
+// scripts this package folds, and the ones written without spaces between words.
+func IsCJK(r rune) bool {
+	return unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
+		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r)
+}
+
 // HasCJK reports whether s contains any Han, Hiragana, Katakana or Hangul
 // rune, i.e. whether folding could make any difference to it.
 func HasCJK(s string) bool {
 	for _, r := range s {
-		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
-			unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) {
+		if IsCJK(r) {
 			return true
 		}
 	}
 	return false
+}
+
+// CountCJK is HasCJK by the number: how many of s's runes are written in those
+// scripts. A caller deciding whether a line is prose in one of them needs the
+// share, not the presence — a JSON blob with Chinese values has both.
+func CountCJK(s string) int {
+	n := 0
+	for _, r := range s {
+		if IsCJK(r) {
+			n++
+		}
+	}
+	return n
 }

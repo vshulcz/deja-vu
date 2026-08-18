@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -112,7 +113,7 @@ func looksLikeProse(line string) bool {
 	if len(line) < 80 {
 		return true
 	}
-	letters, total, wordish := 0, 0, 0
+	letters, total, wordish, spaceless := 0, 0, 0, 0
 	for _, f := range strings.Fields(line) {
 		hasLetter := false
 		for _, r := range f {
@@ -129,11 +130,23 @@ func looksLikeProse(line string) bool {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x80 {
 			letters++
 		}
+		if cjkfold.IsCJK(r) {
+			spaceless++
+		}
 	}
 	if total == 0 {
 		return false
 	}
-	// enough real words, and letters are a real share of the characters
+	// enough real words, and letters are a real share of the characters.
+	// Chinese, Japanese and Korean prose is written without spaces, so Fields
+	// sees one long token and the word count reads a paragraph of it as a
+	// pasted dump: every assistant answer over 80 bytes in those scripts was
+	// dropped from digests, and a session written in them recalled nothing
+	// (#1340). Their characters are the words — but a share of the line, not a
+	// handful of them, or a JSON blob with Chinese values reads as a sentence.
+	if spaceless >= 8 && spaceless*100/total >= 50 {
+		return true
+	}
 	return wordish >= 4 && letters*100/total >= 45
 }
 
