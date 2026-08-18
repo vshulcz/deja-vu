@@ -134,8 +134,10 @@ func TestMCPToolContract(t *testing.T) {
 	t.Run("limit caps results", func(t *testing.T) {
 		resp := driveMCP(t, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator","harness":"claude","limit":1}}}`)
 		text := callText(t, resp[0])
-		if !strings.Contains(text, "1 match(es)") || strings.Contains(text, "2 match(es)") {
-			t.Fatalf("limit=1 should cap to one match, got %q", text)
+		// One served out of two that matched: the count line names both
+		// numbers now, because "1 match(es)" read as "one exists" (#1308).
+		if !strings.Contains(text, "(1 of 2 matched)") {
+			t.Fatalf("limit=1 should serve one of the two matches, got %q", text)
 		}
 	})
 
@@ -147,7 +149,7 @@ func TestMCPToolContract(t *testing.T) {
 			t.Fatalf("fractional limit errored: %#v", e)
 		}
 		text := callText(t, resp[0])
-		if !strings.Contains(text, "1 match(es)") {
+		if !strings.Contains(text, "(1 of 2 matched)") {
 			t.Fatalf("limit 1.0 should cap to one match, got %q", text)
 		}
 	})

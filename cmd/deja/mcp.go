@@ -543,6 +543,13 @@ func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error
 	return index.FindByIdentity(dir, s.Harness, s.ID)
 }
 
+// recallCountLineReserve is what the two lines around the hits cost — the
+// count above them and the "N more, call again with offset=N" below — kept out
+// of the budget the hits spend. Both are written after the loop, and the final
+// trim cut the navigation line off the end, which is the one line an agent
+// needs precisely when the answer was too big to fit.
+const recallCountLineReserve = 160
+
 func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
 	if limit <= 0 {
 		limit = 5
@@ -611,9 +618,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		}
 		hits = hits[offset:]
 	}
-	remaining := 0
 	if len(hits) > limit {
-		remaining = len(hits) - limit
 		hits = hits[:limit]
 	}
 	attachAnswers(dir, hits)
@@ -634,29 +639,30 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
 	}
-	if offset > 0 {
-		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+len(hits), total)
-	} else {
-		fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, len(hits))
-	}
+	// The hits are built first so the line above them can count what actually
+	// went out. It used to be written ahead of the loop, which also stops on
+	// the token budget: the header promised fifteen while nine arrived, and the
+	// follow-up line was trimmed off the end (#1308).
+	var hb strings.Builder
+	headerRoom := b.Len() + recallCountLineReserve
 	for i, h := range hits {
-		fmt.Fprintf(&b, "\n%d. [%s] %s · %s · %d matches", i+1,
+		fmt.Fprintf(&hb, "\n%d. [%s] %s · %s · %d matches", i+1,
 			recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project), recallListingLine(h.Session.ID), h.Count)
 		// A session with no user turn is the agent's own words, and the lines
 		// below carry no role — so an assertion a model made arrived as a fact
 		// from the store (#1107, the shape #1100 fixed for the listing).
 		if h.Session.AgentTitle {
-			fmt.Fprint(&b, " · agent-opened, no human turn")
+			fmt.Fprint(&hb, " · agent-opened, no human turn")
 		}
 		if !h.Session.Updated.IsZero() {
-			fmt.Fprintf(&b, " · updated %s (%s)", h.Session.Updated.Local().Format("2006-01-02"), search.RelativeDate(h.Session.Updated))
+			fmt.Fprintf(&hb, " · updated %s (%s)", h.Session.Updated.Local().Format("2006-01-02"), search.RelativeDate(h.Session.Updated))
 		}
 		if h.Reused > 1 {
-			fmt.Fprintf(&b, " · reused %d×", h.Reused)
+			fmt.Fprintf(&hb, " · reused %d×", h.Reused)
 		}
-		fmt.Fprintln(&b)
+		fmt.Fprintln(&hb)
 		if line := lifecycleLine(h); line != "" {
-			fmt.Fprintf(&b, "%s\n", line)
+			fmt.Fprintf(&hb, "%s\n", line)
 		}
 		// A session that says it backed an approach out carries a signal the
 		// lifecycle states would carry if anyone set them by hand — on a real
@@ -665,16 +671,16 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// end: the tried-then-fixed session is the most useful one, and the
 		// excerpts show which path was dropped.
 		if h.Session.GaveUp && h.Lifecycle == "" {
-			fmt.Fprintln(&b, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
+			fmt.Fprintln(&hb, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
 		}
 		if h.Superseded != "" {
-			fmt.Fprintf(&b, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
+			fmt.Fprintf(&hb, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
 		}
 		if h.Tier != search.TierExact {
-			fmt.Fprintf(&b, "[%s]\n", h.Tier)
+			fmt.Fprintf(&hb, "[%s]\n", h.Tier)
 		}
 		for _, sn := range h.Snippets {
-			fmt.Fprintf(&b, "- %s\n", recallListingLine(sn))
+			fmt.Fprintf(&hb, "- %s\n", recallListingLine(sn))
 		}
 		// Under the best hit only, and only when there is budget left: the
 		// excerpts say where the query words appear, which is not the same as
@@ -684,7 +690,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// recall itself. Later hits stay excerpt-only; they are candidates to
 		// choose between, not answers.
 		if i == 0 {
-			if left := budget - b.Len() - recallConclusionsReserve; left > recallConclusionsMin {
+			if left := budget - headerRoom + hb.Len() - recallConclusionsReserve; left > recallConclusionsMin {
 				// The hit carries only the matching messages, so the decision —
 				// usually worded nothing like the query — is not in it. Read the
 				// whole session for the best hit alone, the same upgrade
@@ -694,9 +700,9 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 					whole = full
 				}
 				if cs := digest.Conclusions(whole, left, 3); len(cs) > 0 {
-					fmt.Fprintln(&b, "  what this session concluded:")
+					fmt.Fprintln(&hb, "  what this session concluded:")
 					for _, c := range cs {
-						fmt.Fprintf(&b, "  → %s\n", recallListingLine(c))
+						fmt.Fprintf(&hb, "  → %s\n", recallListingLine(c))
 					}
 				}
 				// The files that work touched, for a few dozen bytes. Without
@@ -704,17 +710,41 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 				// still has to search the tree for where — and that search
 				// costs far more context than naming the paths here does.
 				if paths := recallTouchedLine(dir, h.Session); paths != "" {
-					fmt.Fprintf(&b, "  files it touched: %s\n", paths)
+					fmt.Fprintf(&hb, "  files it touched: %s\n", paths)
 				}
 			}
 		}
 		served++
-		if b.Len() >= budget {
+		if headerRoom+hb.Len() >= budget {
 			break
 		}
 	}
-	if remaining > 0 {
-		fmt.Fprintf(&b, "\n%d more match(es) — call recall again with offset=%d.\n", remaining, offset+served)
+	// From what was served, not from the limit: the loop also stops on the
+	// token budget, and then this said "2 more" while five were left — the
+	// agent asks for offset=served and the arithmetic has to hold.
+	switch {
+	case offset > 0:
+		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+served, total)
+	case served < total && result.Tier == search.TierRelevance:
+		// The tier line above already says nothing matched; these are the
+		// nearest sessions, so calling them matches here would contradict it.
+		fmt.Fprintf(&b, "deja recall for %q (%d of %d ranked)\n", q, served, total)
+	case served < total:
+		// How many came back is not how many matched, and the agent is the
+		// reader that cannot ask a human. "(5 match(es))" reads as five exist,
+		// which is a different answer from sixteen thousand matched and here
+		// are five — one is worth acting on, the other is a sample that will
+		// fill a context window with whatever ranked highest (#1308).
+		fmt.Fprintf(&b, "deja recall for %q (%d of %d matched)\n", q, served, total)
+	default:
+		fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, served)
+	}
+	b.WriteString(hb.String())
+	// From what was served, not from the limit: the loop also stops on the
+	// token budget, and then this said "2 more" while five were left — the
+	// agent asks for offset=served and the arithmetic has to hold.
+	if left := total - offset - served; left > 0 {
+		fmt.Fprintf(&b, "\n%d more match(es) — call recall again with offset=%d.\n", left, offset+served)
 	}
 	out := b.String()
 	if len(out) > budget {
