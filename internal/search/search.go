@@ -1515,7 +1515,7 @@ func snippet(s, q string, re *regexp.Regexp) string {
 		}
 	} else {
 		low := strings.ToLower(s)
-		b := strings.Index(low, strings.ToLower(q))
+		b := densestMention(low, strings.ToLower(q))
 		if b < 0 {
 			toks := query.Tokens(q)
 			// Centre on where the query's words meet, not on the first one to
@@ -1564,6 +1564,64 @@ func snippet(s, q string, re *regexp.Regexp) string {
 	}
 	return out
 }
+
+// densestMention is where in low the query is discussed rather than mentioned:
+// the occurrence with the most others inside the part of an excerpt that
+// follows it.
+//
+// #1329 fixed the same shape one level up — blame quoted the first message to
+// name a file rather than the one that said the most about it. Inside the
+// message the excerpt still started at the first occurrence, so a session that
+// noticed a file in passing at the top and took it apart four paragraphs down
+// was excerpted on the passing line, with the discussion out of view. Returns
+// -1 when the query does not appear, which is the caller's signal to fall back
+// to its own token handling.
+func densestMention(low, q string) int {
+	if q == "" {
+		return -1
+	}
+	first := strings.Index(low, q)
+	if first < 0 {
+		return -1
+	}
+	// Positions in bytes, bounded: a term repeated thousands of times in one
+	// message is a log dump, and the first few hundred say as much about where
+	// the discussion is as all of them.
+	const scanCap = 256
+	at := make([]int, 0, 8)
+	for p := first; p >= 0 && len(at) < scanCap; {
+		at = append(at, p)
+		next := strings.Index(low[p+len(q):], q)
+		if next < 0 {
+			break
+		}
+		p += len(q) + next
+	}
+	if len(at) == 1 {
+		return first
+	}
+	// The window is what the excerpt shows after its centre — 200 of its 300
+	// runes — measured in runes, because a byte window is four times too wide
+	// on CJK and then every occurrence looks like it sits with every other.
+	best, bestCount := first, 0
+	for i, p := range at {
+		n := 0
+		for _, other := range at[i:] {
+			if utf8.RuneCountInString(low[p:other]) > snippetForwardRunes {
+				break
+			}
+			n++
+		}
+		if n > bestCount {
+			best, bestCount = p, n
+		}
+	}
+	return best
+}
+
+// snippetForwardRunes is how much of an excerpt follows the point it centres
+// on: start is idx-100 and the excerpt is 300 runes long.
+const snippetForwardRunes = 200
 
 // Snippet formats a message for search results, including semantic matches.
 func Snippet(s, q string) string { return snippet(s, q, nil) }
