@@ -685,8 +685,16 @@ func spread(at []int, cap int) []int {
 // belong to one thought, and first-occurrence spacing is nearly the opposite of
 // measuring it.
 func tokenWindow(low string, qtoks []string) int {
+	span, _ := tokenSpan(low, qtoks)
+	return span
+}
+
+// tokenSpan is tokenWindow plus where that span starts, which is what an
+// excerpt has to be centred on to show the words meeting rather than the first
+// one to appear.
+func tokenSpan(low string, qtoks []string) (span, start int) {
 	if len(qtoks) < 2 {
-		return 0
+		return 0, 0
 	}
 	// The span between first occurrences is an upper bound on the real window —
 	// it is one way of picking one place per token, and the real answer is the
@@ -699,7 +707,7 @@ func tokenWindow(low string, qtoks []string) int {
 	for _, tok := range qtoks {
 		i := strings.Index(low, tok)
 		if i < 0 {
-			return 0
+			return 0, 0
 		}
 		if first < 0 || i < first {
 			first = i
@@ -709,7 +717,7 @@ func tokenWindow(low string, qtoks []string) int {
 		}
 	}
 	if cheap := last - first; cheap <= proximityNear {
-		return cheap
+		return cheap, first
 	}
 
 	type occurrence struct{ at, tok int }
@@ -735,7 +743,7 @@ func tokenWindow(low string, qtoks []string) int {
 			i += j + 1
 		}
 		if len(buf) == 0 {
-			return 0
+			return 0, 0
 		}
 		// Counting the places is the same walk as finding them, and the walk is
 		// already capped, so the rarest token costs nothing extra to identify.
@@ -790,6 +798,7 @@ func tokenWindow(low string, qtoks []string) int {
 	// long as it still holds every token.
 	seen := make([]int, len(qtoks))
 	have, best, left := 0, -1, 0
+	bestAt := 0
 	for right := range occs {
 		if seen[occs[right].tok] == 0 {
 			have++
@@ -798,7 +807,7 @@ func tokenWindow(low string, qtoks []string) int {
 		for have == len(qtoks) {
 			span := occs[right].at + len(qtoks[occs[right].tok]) - occs[left].at
 			if best < 0 || span < best {
-				best = span
+				best, bestAt = span, occs[left].at
 			}
 			seen[occs[left].tok]--
 			if seen[occs[left].tok] == 0 {
@@ -808,9 +817,9 @@ func tokenWindow(low string, qtoks []string) int {
 		}
 	}
 	if best < 0 {
-		return 0
+		return 0, 0
 	}
-	return best
+	return best, bestAt
 }
 
 // proximityNear is the width at which a window stops reading as one thought.
@@ -1362,9 +1371,22 @@ func snippet(s, q string, re *regexp.Regexp) string {
 		low := strings.ToLower(s)
 		b := strings.Index(low, strings.ToLower(q))
 		if b < 0 {
-			for _, tok := range query.Tokens(q) {
-				if p := strings.Index(low, tok); p >= 0 && (b < 0 || p < b) {
-					b = p
+			toks := query.Tokens(q)
+			// Centre on where the query's words meet, not on the first one to
+			// appear. A message that says a word once at the top and answers the
+			// question four paragraphs down was excerpted at the top, so the
+			// excerpt held none of the words the reader searched for together
+			// (#1327). Only when they meet inside what an excerpt can show —
+			// past that there is no meeting to point at, and the first mention is
+			// as good a place to start as any.
+			if span, at := tokenSpan(low, toks); span > 0 && span <= proximityNear {
+				b = at
+			}
+			if b < 0 {
+				for _, tok := range toks {
+					if p := strings.Index(low, tok); p >= 0 && (b < 0 || p < b) {
+						b = p
+					}
 				}
 			}
 		}
