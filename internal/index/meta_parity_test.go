@@ -126,17 +126,13 @@ func TestSessionMetadataIsTheSameWhicheverWayTheIndexGotThere(t *testing.T) {
 		// differ; Path holds a temp directory unique to each build.
 		a.Ord, b.Ord = 0, 0
 		a.Path, b.Path = "", ""
-		// Known divergence, tracked separately: a session that grows after being
-		// indexed never updates what is derived from its text, because the append
-		// path holds only the new messages and these fields cannot simply be
-		// added up — see the issue for why the obvious merge is wrong. Excluded
-		// explicitly so the rest of the row is still guarded, rather than the
-		// whole comparison being dropped.
-		a.Words, b.Words = 0, 0
-		a.Asked, b.Asked = nil, nil
-		a.Hit, b.Hit = nil, nil
-		a.Touched, b.Touched = nil, nil
-		a.GaveUp, b.GaveUp = false, false
+		// Words, Asked, Hit, Touched and GaveUp were excluded here while a
+		// session that grew never updated them (#1304). They are compared now:
+		// the append path carries enough state to fold only what it has not
+		// seen, so growing a session one message at a time reaches the same row
+		// as building the whole thing at once. LastMsg fingerprints the newest
+		// message either way and is part of that guarantee, so it is compared
+		// too.
 		if reflect.DeepEqual(a, b) {
 			continue
 		}

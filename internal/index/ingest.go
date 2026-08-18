@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1052,7 +1053,15 @@ func metaForSession(s model.Session) SessionMeta {
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
 	// the row from scratch dropped what only the import knew — the note's state
 	// and the id it had on the machine it came from (#1049).
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: topTouchedFiles(s.Messages), Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages),
+	touched, touchHits := topTouchedCounted(s.Messages)
+	// Counted, so an append that arrives in the same pass folds only what this
+	// did not already see. Without it a session new to the index was derived
+	// from here and merged again below, doubling its Words (#1304).
+	last := uint64(0)
+	if len(s.Messages) > 0 {
+		last = messageFingerprint(s.Messages[len(s.Messages)-1])
+	}
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages),
 		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
@@ -1070,24 +1079,94 @@ func metaForSession(s model.Session) SessionMeta {
 //
 // Merged rather than recomputed, because this path only ever holds the new
 // messages: the file is read from the last watermark, not from the start.
+// extendDerived folds a session's new messages into the fields derived from its
+// text. ms is the whole session as the source hands it over; meta.Counted says
+// how much of it is already in, so re-delivering a live session — which goose
+// does on every pass, and which is how a session new to this file arrives — is
+// idempotent rather than additive (#1304).
 func extendDerived(meta *SessionMeta, ms []model.Message) {
-	if len(ms) == 0 {
+	tail := newMessages(meta, ms)
+	if len(tail) == 0 {
 		return
 	}
-	meta.Words += sessionWords(ms)
-	meta.Asked = unionHashes(meta.Asked, askedHashes(ms))
-	meta.Hit = unionHashes(meta.Hit, frictionHashes(ms))
+	meta.Counted += len(tail)
+	meta.LastMsg = messageFingerprint(ms[len(ms)-1])
+	meta.Words += sessionWords(tail)
+	// Capped like the full build caps: a plain union grows on every append,
+	// and the manifest holding it is read on every search.
+	meta.Asked = mergeCappedU64(meta.Asked, askedHashes(tail), askedQuestionCap)
+	meta.Hit = mergeCappedU64(meta.Hit, frictionHashes(tail), frictionSessionCap)
 	// Giving up is a state a session reaches, never one it leaves: the phrases
 	// that set it are reversals of work already done.
-	if gaveUp(ms) {
+	if gaveUp(tail) {
 		meta.GaveUp = true
 	}
-	// topTouchedFiles ranks and caps, so the union has to be re-ranked rather
-	// than concatenated — otherwise a file touched once in the tail could
-	// outrank one touched throughout, and the cap would keep the wrong ones.
-	if touched := topTouchedFiles(ms); len(touched) > 0 {
-		meta.Touched = mergeTouched(meta.Touched, touched)
+	if paths, hits := topTouchedCounted(tail); len(paths) > 0 {
+		meta.Touched, meta.TouchHits = mergeTouchedCounted(meta.Touched, meta.TouchHits, paths, hits)
 	}
+}
+
+// newMessages is the part of a delivery the derived fields have not seen. The
+// fingerprint is matched from the end: a session that repeats a line verbatim
+// would otherwise resume from the first copy and fold the rest twice.
+func newMessages(meta *SessionMeta, ms []model.Message) []model.Message {
+	if len(ms) == 0 {
+		return nil
+	}
+	if meta.LastMsg == 0 {
+		return ms
+	}
+	for i := len(ms) - 1; i >= 0; i-- {
+		if messageFingerprint(ms[i]) == meta.LastMsg {
+			return ms[i+1:]
+		}
+	}
+	return ms
+}
+
+// messageFingerprint identifies one message well enough to find it again in a
+// later delivery of the same session. Role, time and text: two adjacent
+// messages with the same text differ by time, and a store that rewrites times
+// re-folds a tail, which costs a little accuracy and no correctness.
+func messageFingerprint(m model.Message) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(m.Role))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(strconv.FormatInt(m.Time.UnixNano(), 10)))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(m.Text))
+	// Zero means "nothing counted yet", so a message that hashes to it takes
+	// the neighbouring value rather than resetting the session's state.
+	if sum := h.Sum64(); sum != 0 {
+		return sum
+	}
+	return 1
+}
+
+// mergeTouchedCounted adds the tail's touches to the counts already held and
+// re-ranks. Position alone was all the old merge had: six paths touched once in
+// an early batch filled the list, and the file the session actually worked on
+// hardest never appeared (#1333, and its real cause #1304).
+// A path with no count behind it — the import path derives Touched from records
+// and carries none — counts as one, so it keeps its place without outranking a
+// file this session actually worked on repeatedly.
+func mergeTouchedCounted(have []string, hits []int, add []string, addHits []int) ([]string, []int) {
+	count := map[string]int{}
+	for i, p := range have {
+		n := 1
+		if i < len(hits) {
+			n = hits[i]
+		}
+		count[p] += n
+	}
+	for i, p := range add {
+		n := 1
+		if i < len(addHits) {
+			n = addHits[i]
+		}
+		count[p] += n
+	}
+	return rankTouchedCounted(count)
 }
 
 // unionHashes appends what is new, keeping order stable so two builds of the
@@ -1332,6 +1411,30 @@ func countTouchedPaths(count map[string]int, text string) {
 			count[p]++
 		}
 	}
+}
+
+// rankTouchedCounted returns the counts behind the ranking, which the
+// incremental merge needs: two ranked lists cannot be fused into a correct one
+// from position alone (#1304).
+func rankTouchedCounted(count map[string]int) ([]string, []int) {
+	paths := rankTouched(count)
+	hits := make([]int, len(paths))
+	for i, p := range paths {
+		hits[i] = count[p]
+	}
+	return paths, hits
+}
+
+// topTouchedCounted is topTouchedFiles with those counts.
+func topTouchedCounted(ms []model.Message) ([]string, []int) {
+	count := map[string]int{}
+	for _, m := range ms {
+		if m.Role != roleFiles {
+			continue
+		}
+		countTouchedPaths(count, m.Text)
+	}
+	return rankTouchedCounted(count)
 }
 
 // rankTouched orders touched paths by recurrence and caps the list, the shape
@@ -2132,7 +2235,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					meta.Title, meta.AgentTitle = t, s.AgentTitle
 				}
 			}
-			extendDerived(&meta, s.Messages)
+			// Only the session that owns this row. The full build writes these
+			// fields under the same condition; here the merge ran regardless,
+			// so growing the loser of an id collision moved the owner's Words,
+			// flipped its GaveUp and put the loser's files in its Touched —
+			// the wrong conversation's files surfacing in blame (#1304).
+			if owns {
+				extendDerived(&meta, s.Messages)
+			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {
 				// Already redacted (and length-capped) by preRedactSessions above.

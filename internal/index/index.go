@@ -162,6 +162,31 @@ type SessionMeta struct {
 	// before it existed decodes with it zero and ranking falls back to what it
 	// can see.
 	Words int `json:",omitempty"`
+	// Counted is how many of this session's messages the derived fields above
+	// already include, and LastMsg fingerprints the newest of them.
+	//
+	// A transcript grows after being indexed — the ordinary case, not an edge
+	// one — and the append path folded whatever it was handed. What it is
+	// handed differs by store: a file yields only the region appended since
+	// last time, while goose re-delivers a live session whole on every pass. A
+	// count alone cannot tell those apart, so it either lost the tail or
+	// counted the same messages again, and a session new to the index was
+	// derived twice at once (#1304). Finding LastMsg in what arrived answers
+	// it: what follows is new, and if it is not there at all, all of it is.
+	//
+	// A row written before this existed carries neither, which reads as
+	// "nothing counted" — so the first delivery after an upgrade is folded
+	// whole. That is right for the file stores, where a delivery is the
+	// appended region; a store that re-delivers a live session counts it once
+	// more and then settles, which is cheaper than a format bump that would
+	// make every user rebuild.
+	Counted int    `json:",omitempty"`
+	LastMsg uint64 `json:",omitempty"`
+	// TouchHits is how often each path in Touched was touched, in the same
+	// order. Touched is a ranking, and a ranking cannot be merged without the
+	// numbers behind it: a file touched once in a tail outranked one touched
+	// throughout, because position was all the merge had to go on.
+	TouchHits []int `json:",omitempty"`
 	// Hit holds hashes of the specific errors this session tripped over, so
 	// the first screen can name a wall the machine keeps running into without
 	// reading a single session. Same trade as Asked: the text is recovered
