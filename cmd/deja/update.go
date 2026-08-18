@@ -518,5 +518,37 @@ func installUpdateBinary(destination string, binary []byte) (err error) {
 	if err := staged.Close(); err != nil {
 		return err
 	}
-	return replaceExecutable(stagedPath, destination)
+	if err := replaceExecutable(stagedPath, destination); err != nil {
+		return err
+	}
+	sweepStrandedStagings(filepath.Dir(destination))
+	return nil
+}
+
+// stagingGracePeriod is how long a staging file is left alone. Writing one takes
+// seconds; anything older belonged to a run that did not finish, and anything
+// newer may belong to an update running right now.
+const stagingGracePeriod = time.Hour
+
+// sweepStrandedStagings clears staging files an interrupted update left beside
+// the binary. A crash between staging and rename strands a whole binary's worth
+// of bytes under a name deja itself wrote, and every later update added another
+// one rather than clearing the first (#1109). Failures are ignored: this is
+// tidying after a successful update, not part of it.
+func sweepStrandedStagings(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-stagingGracePeriod)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), ".deja-update-") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, e.Name()))
+	}
 }
