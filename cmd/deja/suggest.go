@@ -8,6 +8,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
@@ -22,11 +23,23 @@ import (
 // actually wrote (#625).
 func suggestFirstQuery(dir string) string {
 	ss, err := index.SearchWithRecovery(dir, query.Options{All: true, Role: "user"}, nil)
-	if err != nil || len(ss) < 3 {
+	if err != nil {
 		return ""
 	}
-	// Document frequency over what was typed across the whole store; candidate
-	// phrases only from the recent part of it.
+	// "Your own three-week-old problem" has to be yours. On a machine whose
+	// history arrived by sync, an unfiltered pick printed a phrase out of a
+	// peer's session on the first screen — while search, the recent block and
+	// the status line all refuse those sessions (#1352, the shape #1026 and
+	// #1350 fixed elsewhere). Browsing gate, as on those surfaces.
+	ss, _ = policyFilterSessionsCounted(policy.ActivationSearch, ss)
+	if len(ss) < 3 {
+		return ""
+	}
+	// Document frequency over what was typed in the sessions above — the ones a
+	// rule lets this reader see — and candidate phrases only from the recent
+	// part of them. Counting frequency over the whole store instead would let
+	// how often a word appears in withheld sessions decide which of the
+	// reader's own phrases gets shown.
 	df := map[string]int{}
 	for _, s := range ss {
 		seen := map[string]bool{}
