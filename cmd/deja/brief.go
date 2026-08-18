@@ -156,7 +156,24 @@ func runBrief(dir string, w io.Writer) error {
 
 	// Read the index as-is: the brief must never trigger a rebuild or let
 	// indexing narration tear through its layout.
-	if recent, err := index.RecentMatching(dir, 3, search.Options{}); err == nil && len(recent) > 0 {
+	// Filtered like every other browsing surface: `last`, search and the status
+	// line all refuse a session a rule withholds, and this screen named the
+	// project and the first line of it three times over (#1350, the shape #1026
+	// fixed on the status line). Asked for more than three so the block still
+	// fills when some are withheld.
+	//
+	// The search activation, while the asked-twice line below uses auto: the two
+	// serve different readers. This block is what the person is looking at, and
+	// browsing is what the search rule governs; that line is about what an agent
+	// would be handed, which is the auto rule's business.
+	recent, err := index.RecentMatching(dir, briefRecentLines*8, search.Options{})
+	if err == nil {
+		recent, _ = policyFilterSessionsCounted(policy.ActivationSearch, recent)
+		if len(recent) > briefRecentLines {
+			recent = recent[:briefRecentLines]
+		}
+	}
+	if err == nil && len(recent) > 0 {
 		label := "recent    "
 		for _, s := range recent {
 			title := s.Title
@@ -304,6 +321,9 @@ func trimBriefTitleTo(t string, max int) string {
 	}
 	return t
 }
+
+// briefRecentLines is how many recent sessions the brief names.
+const briefRecentLines = 3
 
 // briefTitleBudget is how much title fits after a prefix of prefixLen columns.
 //
