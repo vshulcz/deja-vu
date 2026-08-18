@@ -70,7 +70,32 @@ func String(s string) string {
 // scripts this package folds, and the ones written without spaces between words.
 func IsCJK(r rune) bool {
 	return unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
-		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r)
+		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) ||
+		isKanaMark(r)
+}
+
+// isKanaMark covers the two marks Japanese writes inside a word that no script
+// table claims: the prolonged sound mark and its halfwidth twin. The iteration
+// marks look like the same case and are not — Go files 々 and 〻 under Han and
+// ヽヾゝゞ under their kana scripts, so adding them here changed nothing and
+// they are left to the tables that already have them.
+//
+// ー is not decoration: it appears in most loanwords — サーバー, エラー,
+// ステージング — and leaving it out of the script test split every such word
+// into two runs. The bigrams then came out of the pieces, and since the token
+// was no longer a single CJK run the query kept the whole word as a term the
+// index can never hold: searching ステージング for a session that says
+// ステージング answered on the close tier instead of the exact one (#1319).
+func isKanaMark(r rune) bool {
+	switch r {
+	case 0x30FC, // ー prolonged sound mark
+		0xFF70, // ｰ its halfwidth form
+		0xFF9E, // ﾞ halfwidth voiced sound mark, written after the kana it voices
+		0xFF9F, // ﾟ halfwidth semi-voiced
+		0x3006: // 〆, as in 〆切
+		return true
+	}
+	return false
 }
 
 // HasCJK reports whether s contains any Han, Hiragana, Katakana or Hangul
@@ -87,12 +112,23 @@ func HasCJK(s string) bool {
 // CountCJK is HasCJK by the number: how many of s's runes are written in those
 // scripts. A caller deciding whether a line is prose in one of them needs the
 // share, not the presence — a JSON blob with Chinese values has both.
+//
+// A mark counts only where there is a word for it to be part of: "ーーーー" is
+// a rule drawn with dashes, and counting it as four Japanese runes made the
+// digest read a table border as prose.
 func CountCJK(s string) int {
-	n := 0
+	n, words := 0, 0
 	for _, r := range s {
-		if IsCJK(r) {
-			n++
+		if !IsCJK(r) {
+			continue
 		}
+		n++
+		if !isKanaMark(r) {
+			words++
+		}
+	}
+	if words == 0 {
+		return 0
 	}
 	return n
 }
@@ -124,6 +160,19 @@ func Bigrams(s string) []string {
 	seen := map[string]bool{}
 	var run []rune
 	flush := func() {
+		// A run of nothing but marks is not a word: "ー" alone would take a
+		// posting and match nothing anyone means to search for.
+		allMarks := len(run) > 0
+		for _, r := range run {
+			if !isKanaMark(r) {
+				allMarks = false
+				break
+			}
+		}
+		if allMarks {
+			run = run[:0]
+			return
+		}
 		switch {
 		case len(run) == 1:
 			t := string(run)

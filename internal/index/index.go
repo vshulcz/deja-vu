@@ -48,7 +48,12 @@ import (
 // line below (#790). Titles are part of this version for the reason 22 gives:
 // incremental ingest reuses the row it already has, so nothing re-derives them
 // without a bump.
-const version = 26
+// 27: the marks Japanese writes inside a word — ー above all, which appears in
+// most loanwords — were not counted as CJK, so every such word was indexed as
+// two runs and the bigrams came out of the pieces. A store built before this
+// holds the split keys and a query built after it asks for the joined ones, so
+// the bump is what makes the one rebuild that re-derives them happen (#1319).
+const version = 27
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
