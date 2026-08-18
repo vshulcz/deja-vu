@@ -54,8 +54,7 @@ func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.Fil
 	if err != nil {
 		return hits
 	}
-	gen, err := index.Generation(dir)
-	if err != nil || gen != sidecar.Generation {
+	if embed.Stale(dir, sidecar) {
 		return hits
 	}
 	client, err := embed.New()
@@ -79,8 +78,7 @@ func maybeSemantic(dir string, hits []search.Hit, o search.Options, notice *os.F
 	if err != nil {
 		return hits, false
 	}
-	gen, err := index.Generation(dir)
-	if err != nil || gen != sidecar.Generation {
+	if embed.Stale(dir, sidecar) {
 		return hits, false
 	}
 	client, err := embed.New()

@@ -24,6 +24,9 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 	if len(query) != 1 {
 		return nil, errBadQueryVector
 	}
+	if Stale(dir, sidecar) {
+		return nil, nil
+	}
 	records, err := index.ReadRecords(dir)
 	if err != nil {
 		return nil, err

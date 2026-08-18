@@ -28,6 +28,24 @@ type Sidecar struct {
 	Covered           int
 }
 
+// Stale reports whether a sidecar was built for a different index than the one
+// in dir. Vectors point at records by byte offset, and a rebuild moves them: a
+// `deja forget` that dropped one session left every later offset shifted, so a
+// vector still keyed to a session that survived resolved to a record belonging
+// to another one and semantic search quoted text the named session never said
+// (#1355). The generation was recorded for exactly this and only checked when
+// re-embedding.
+func Stale(dir string, s Sidecar) bool {
+	if len(s.Vectors) == 0 {
+		return false
+	}
+	gen, err := index.Generation(dir)
+	if err != nil {
+		return true
+	}
+	return s.Generation != gen
+}
+
 func Path(dir string) string {
 	return strings.TrimSuffix(dir, string(os.PathSeparator)) + ".vectors.bin"
 }
