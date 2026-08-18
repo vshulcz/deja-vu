@@ -393,9 +393,6 @@ func buildForFirstRun(dir string) (bool, error) {
 	return before.Initial && before.Messages > 0 && logoWanted(os.Stdout), nil
 }
 
-// printNoHistory is the honest empty state: the index built and found nothing.
-// It names where deja looked, because the usual cause is that the agent stores
-// live somewhere this machine does not have.
 // staleEmptyIndex reports whether the empty index is out of date — the stores
 // have changed since it was written.
 //
@@ -418,6 +415,10 @@ func staleEmptyIndex(dir string) bool {
 	return !fresh
 }
 
+// printNoHistory is the empty state, in its two honest forms: the index built
+// and found nothing, or it found nothing because it has not looked since the
+// stores changed. The first names where deja looked, because the usual cause is
+// that the agent stores live somewhere this machine does not have.
 func printNoHistory(w io.Writer, stale bool) {
 	if stale {
 		fmt.Fprintln(w, "deja-vu "+version+" · history found, not indexed yet")
