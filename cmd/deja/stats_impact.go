@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -24,6 +25,13 @@ func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
 	// Only pay for the session scan when there is activity to explain.
 	if r.Recalls > 0 || r.Injections > 0 {
 		if ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard); err == nil {
+			// Filtered like `deja stats` filters its own report: this count is
+			// derived from session text, and every other surface that reads
+			// sessions consults the policy first. The lines above it come from
+			// this machine's usage log and stay as they are — those are events
+			// that happened here, not content from a session the reader is told
+			// they cannot see (#1354).
+			ss, _ = policyFilterSessionsCounted(policy.ActivationSearch, ss)
 			credits, _ = stats.AgentCredits(ss, time.Now())
 		}
 	}
