@@ -654,40 +654,22 @@ func freshnessDecay(updated, now time.Time) float64 {
 	return 1 / (1 + age)
 }
 
-// windowOccurrenceCap bounds how many places of one token are weighed when
-// measuring how close the query's words come together; windowScanLimit bounds
-// how many are walked to choose them, and windowSegments how many are sampled
-// when even the rarest query word runs past that. Without either, a long
+// windowScanLimit bounds how many places of one token are enumerated when
+// measuring how close the query's words come together. Without it, a long
 // transcript message full of a common word makes this quadratic.
 //
-// The places kept are spread across the whole text rather than taken from the
-// front. Taking the first N was the first version, and it moved the defect
-// rather than removing it: a message repeating one query word sixty times
-// before the phrase that actually answers the question was still measured
-// against the sixtieth repetition instead of the phrase.
+// Every place inside that bound is weighed. Sampling a subset was the earlier
+// shape and it lost the tight cluster whenever all the query's words were
+// common: the sample is chosen without knowing where the meeting is (#1319).
 const (
-	windowOccurrenceCap = 32
-	windowScanLimit     = 4096
+	windowScanLimit = 4096
 	// windowSegments is how many equal slices of a message get one sampled
-	// place each. Twice the cap, so spread still has more places than it keeps
-	// and can choose them.
-	windowSegments = windowOccurrenceCap * 2
+	// place each, for a word that runs past the scan limit. A word that common
+	// has a place near everything, so which ones are looked at stops mattering
+	// — what matters is that the sample covers the whole text rather than its
+	// first few kilobytes.
+	windowSegments = 64
 )
-
-// spread picks at most cap of the places, evenly across them, always keeping
-// the first and the last — the tightest cluster is as often at the end of a
-// message as at the start.
-func spread(at []int, cap int) []int {
-	if len(at) <= cap {
-		return at
-	}
-	out := make([]int, 0, cap)
-	step := float64(len(at)-1) / float64(cap-1)
-	for i := 0; i < cap; i++ {
-		out = append(out, at[int(float64(i)*step+0.5)])
-	}
-	return out
-}
 
 // tokenWindow is the tightest character span in this text that contains every
 // query token.
@@ -737,75 +719,60 @@ func tokenSpan(low string, qtoks []string) (span, start int) {
 	type occurrence struct{ at, tok int }
 	var occs []occurrence
 
-	// Anchor on the rarest token. Sampling each token's places independently
-	// cannot find a tight cluster it did not happen to sample: a message that
-	// repeats one query word thousands of times and says the phrase once, in the
-	// middle, was measured against whichever repetition the sampling kept —
-	// hundreds of characters from the phrase (#1318). Anchoring instead asks the
-	// question that proximity actually is: for this place of the rare word,
-	// where is the nearest place of every other one?
-	anchor := -1
-	var at, buf []int
+	// Every place of every token, not a sample of one token's places.
+	//
+	// The sampled version anchored on the rarest token and asked, for each of 32
+	// of its places, where the nearest other tokens were (#1318). That is exact
+	// when one query word is rare and blind when they are all common: in a 33 KB
+	// message where three query words each appear about eighty times and meet
+	// once, in one sentence, it measured 229 against a true 19 — across the
+	// boundary where the proximity boost and the excerpt centring live, so the
+	// passage that actually answered the question lost both (#1319).
+	//
+	// Collecting them all is the same walk the sampling already did to find the
+	// rarest token, and the sliding window below is linear in what it is handed.
 	for ti, tok := range qtoks {
-		buf = buf[:0]
-		for i := 0; i < len(low) && len(buf) < windowScanLimit; {
+		n := 0
+		for i := 0; i < len(low) && n < windowScanLimit; {
 			j := strings.Index(low[i:], tok)
 			if j < 0 {
 				break
 			}
-			buf = append(buf, i+j)
+			occs = append(occs, occurrence{i + j, ti})
+			n++
 			i += j + 1
 		}
-		if len(buf) == 0 {
+		if n == 0 {
 			return 0, 0
 		}
-		// Counting the places is the same walk as finding them, and the walk is
-		// already capped, so the rarest token costs nothing extra to identify.
-		if anchor < 0 || len(buf) < len(at) {
-			anchor = ti
-			at = append(at[:0], buf...)
+		if n < windowScanLimit {
+			continue
 		}
-	}
-	atok := qtoks[anchor]
-	if len(at) == windowScanLimit {
-		// The rare token is itself everywhere, so every place has a neighbour
-		// close by and which places are looked at stops mattering. Take one per
-		// segment of the text, which costs one pass instead of tens of thousands
-		// of searches, and keep the last — the tightest cluster is as often at
-		// the very end as anywhere.
-		at = at[:0]
+		// The word runs past the scan limit, so the walk above stopped part way
+		// through the message and everything after it is unseen. Replace those
+		// places with a sample spread across the whole text plus the last one:
+		// the phrase that answers the question sits at the end of a long output
+		// as often as anywhere (#1318).
+		occs = occs[:len(occs)-n]
 		for i, seg := 0, 0; i < len(low) && seg < windowSegments; {
-			j := strings.Index(low[i:], atok)
+			j := strings.Index(low[i:], tok)
 			if j < 0 {
 				break
 			}
-			p := i + j
-			at = append(at, p)
-			seg = p*windowSegments/len(low) + 1
-			if next := len(low) * seg / windowSegments; next > p {
+			at := i + j
+			occs = append(occs, occurrence{at, ti})
+			seg = at*windowSegments/len(low) + 1
+			if next := len(low) * seg / windowSegments; next > at {
 				i = next
 			} else {
-				i = p + 1
+				i = at + 1
 			}
 		}
-		if last := strings.LastIndex(low, atok); len(at) > 0 && last > at[len(at)-1] {
-			at = append(at, last)
-		}
-	}
-	for _, p := range spread(at, windowOccurrenceCap) {
-		occs = append(occs, occurrence{p, anchor})
-		for ti, tok := range qtoks {
-			if ti == anchor {
-				continue
-			}
-			if l := strings.LastIndex(low[:min(p+len(tok), len(low))], tok); l >= 0 {
-				occs = append(occs, occurrence{l, ti})
-			}
-			if r := strings.Index(low[p:], tok); r >= 0 {
-				occs = append(occs, occurrence{p + r, ti})
-			}
+		if last := strings.LastIndex(low, tok); last >= 0 {
+			occs = append(occs, occurrence{last, ti})
 		}
 	}
+
 	sort.Slice(occs, func(a, b int) bool { return occs[a].at < occs[b].at })
 
 	// Slide a window along the occurrences, shrinking it from the left for as

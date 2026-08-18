@@ -35,10 +35,10 @@ func TestAMissingTokenHasNoWindow(t *testing.T) {
 }
 
 // The tightest cluster can be anywhere, including behind a long run of one of
-// the words — the case the occurrence cap has to survive.
+// the words — the case the scan has to survive.
 func TestTheCapDoesNotHideTheTightestCluster(t *testing.T) {
 	text := strings.ToLower(
-		strings.Repeat("pool ", windowOccurrenceCap*2) + "connection pool exhausted")
+		strings.Repeat("pool ", 64) + "connection pool exhausted")
 	got := tokenWindow(text, []string{"connection", "pool", "exhausted"})
 	if got > 40 {
 		t.Errorf("window is %d characters: the cap stopped before the cluster", got)
