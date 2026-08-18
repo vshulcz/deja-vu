@@ -582,3 +582,16 @@ func commandStrings(in map[string]any, d toolDialect) []string {
 func HarnessAuthored(role string) bool {
 	return role == "developer" || role == "system"
 }
+
+// truncateRunes cuts a string to at most n bytes without splitting a character.
+// Callers store or display the result, so a broken byte survives far past the
+// cut that made it.
+func truncateRunes(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.ValidString(s[:n]) {
+		n--
+	}
+	return s[:n]
+}

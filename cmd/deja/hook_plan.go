@@ -392,7 +392,10 @@ func truncatePlanBytes(text string, limit int) string {
 	if len(text) <= limit {
 		return text
 	}
-	const ellipsis = "窶ｦ"
+	// The character, not what a mis-decoded copy of it turns into: this held
+	// the Shift_JIS reading of "…" and the plan hook appended that to every
+	// truncated finding an agent was shown (#1319).
+	const ellipsis = "…"
 	if limit <= len(ellipsis) {
 		return ""
 	}

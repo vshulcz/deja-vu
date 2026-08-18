@@ -84,9 +84,8 @@ func conventionLine(n sources.PromotedNote) string {
 			return strings.TrimSpace(text[:i+1])
 		}
 	}
-	const cap = 200
-	if len(text) > cap {
-		return strings.TrimSpace(text[:cap])
-	}
-	return text
+	// Rune-safe: a 200-byte cut lands mid-character on anything but ASCII, and
+	// the line goes to an agent as invalid UTF-8 — reproduced on a Russian note
+	// and on a Chinese one (#1319).
+	return truncatePlanBytes(text, 200)
 }

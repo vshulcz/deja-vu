@@ -72,9 +72,9 @@ func environmentBlock(dir, activation string) string {
 	b.WriteString("This machine, from deja's index of past sessions across every agent used here:\n")
 	for _, w := range walls {
 		text := w.Text
-		if len(text) > environmentMax {
-			text = text[:environmentMax] + "…"
-		}
+		// Same cut, same reason as the conventions line: bytes, not runes, so a
+		// wall recorded in Russian or Chinese reached the model in pieces.
+		text = truncatePlanBytes(text, environmentMax)
 		fmt.Fprintf(&b, "- %d separate sessions hit `%s`\n", len(w.Sessions), text)
 	}
 	// Without this line the block reads as trivia. With it the model has

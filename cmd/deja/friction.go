@@ -150,8 +150,8 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 }
 
 func trimFriction(l string) string {
-	if len(l) > 76 {
-		return l[:76] + "…"
-	}
-	return l
+	// Rune-safe: a wall recorded in Russian or Chinese was cut mid-character
+	// and printed as a broken byte (#1319). The bound includes the mark, so a
+	// line loses one character rather than gaining one.
+	return truncatePlanBytes(l, 79)
 }

@@ -438,10 +438,10 @@ func firstLineTrim(s string) string {
 	if i := strings.IndexByte(s, '\n'); i > 0 {
 		s = s[:i]
 	}
-	if len(s) > 120 {
-		s = s[:120]
-	}
-	return s
+	// Rune-safe: a prompt in any non-ASCII language was cut mid-character and
+	// the broken byte went into the stored title, which every surface shows
+	// (#1319).
+	return truncateRunes(s, 120)
 }
 
 // ClinePluginsDir is where the CLI looks for plugins. Note it is not under

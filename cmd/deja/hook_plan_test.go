@@ -233,7 +233,7 @@ func TestPlanHookBudgetIncludesRecallFrame(t *testing.T) {
 	if len(framed) > planHookBudget {
 		t.Fatalf("framed payload = %d bytes, budget = %d", len(framed), planHookBudget)
 	}
-	if !strings.Contains(payload, "窶ｦ") {
+	if !strings.Contains(payload, "…") {
 		t.Fatalf("oversized finding was not visibly truncated: %q", payload)
 	}
 }

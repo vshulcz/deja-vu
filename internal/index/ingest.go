@@ -917,11 +917,19 @@ func signalLines(text string) string {
 		// output, and the head alone is the least informative part of exactly
 		// the records that matched nothing.
 		if len(text) > signalFloor {
-			head := text[:signalFloor]
+			// Rune-safe: this text is indexed and served back through recall,
+			// so a character split here is a broken byte in an answer (#1319).
+			head := text[:runeBoundary(text, signalFloor)]
 			if len(text) <= signalFloor+signalTail {
 				return text
 			}
-			return head + "\n" + text[len(text)-signalTail:]
+			// Both ends: the tail is cut from the other side, and a character
+			// split there is the same broken byte in the same answer.
+			tail := text[len(text)-signalTail:]
+			for len(tail) > 0 && !utf8.ValidString(tail) {
+				tail = tail[1:]
+			}
+			return head + "\n" + tail
 		}
 		return text
 	}
@@ -935,6 +943,18 @@ func signalLines(text string) string {
 // store, outputs above this threshold are 7% of the records and 74% of the
 // bytes, and they are where the posting explosion comes from.
 const signalFloor = 8192
+
+// runeBoundary is n, or the largest offset below it that does not split a
+// character.
+func runeBoundary(s string, n int) int {
+	if n >= len(s) {
+		return len(s)
+	}
+	for n > 0 && !utf8.ValidString(s[:n]) {
+		n--
+	}
+	return n
+}
 
 func signalLine(l string) bool {
 	for _, p := range []string{"FAIL", "fail", "Error", "error", "panic:", "fatal",
