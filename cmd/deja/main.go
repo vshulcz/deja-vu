@@ -929,6 +929,11 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		// this one too.
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
 	}
+	// The window this is being printed into, so the lines can be budgeted
+	// rather than assumed 80 wide. Only for a terminal: a pipe gets the whole
+	// line, since a script reading deja wants the text and not the layout
+	// (#604).
+	o.Width = printableWidth(os.Stdout)
 	search.Print(os.Stdout, hits, o)
 	return nil
 }

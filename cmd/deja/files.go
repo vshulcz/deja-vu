@@ -245,8 +245,18 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		rows = rows[:limit]
 	}
 	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s%s\n", q, scanned, plural(scanned), filesReadNote(matched))
+	// The path column was a fixed 56, which on a 60-column pane leaves nothing
+	// for the count and wraps every row (#604). Budgeted against the window
+	// instead, with the same 56 when the window is wide enough or unknown.
+	col := 56
+	if w := printableWidth(stdout); w > 0 && w-6 < col {
+		col = w - 6
+		if col < 16 {
+			col = 16
+		}
+	}
 	for _, r := range rows {
-		fmt.Fprintf(stdout, "  %-56s %d\n", trimPath(r.path), r.n)
+		fmt.Fprintf(stdout, "  %-*s %d\n", col, trimPathTo(trimPath(r.path), col), r.n)
 	}
 	return nil
 }
@@ -373,6 +383,20 @@ func inRepositoryUncached(p string) bool {
 }
 
 var repoCheck sync.Map
+
+// trimPathTo bounds a path to a column width, cutting from the left so the
+// file name survives: the tail is what identifies it, and a head-first cut
+// leaves rows that all read "…/src/".
+func trimPathTo(p string, width int) string {
+	r := []rune(p)
+	if width <= 0 || len(r) <= width {
+		return p
+	}
+	if width < 4 {
+		return string(r[len(r)-width:])
+	}
+	return "…" + string(r[len(r)-(width-1):])
+}
 
 // trimPath keeps the tail that identifies a file without the home directory in
 // front of it.

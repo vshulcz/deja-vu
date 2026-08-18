@@ -61,7 +61,12 @@ type Options struct {
 	// WithAnswer carries the assistant reply next to a matched user turn.
 	// Agent-facing recall sets it; human CLI output does not, because a person
 	// reading results can open the session.
-	WithAnswer                bool
+	WithAnswer bool
+	// Width is the terminal the answer is being printed into, so lines can be
+	// budgeted rather than assumed 80 columns wide. A 60-column pane is what a
+	// split editor gives you, and there every hit wrapped mid-word (#604).
+	// Zero means "not a terminal, or unknown": nothing is cut.
+	Width                     int
 	All, JSON, Fuzzy, Stemmed bool
 	NoEmbed                   bool
 	Semantic                  bool                `json:"-"`

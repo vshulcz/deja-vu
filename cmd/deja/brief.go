@@ -350,6 +350,20 @@ func briefTitleBudget(prefixLen int) int {
 	return room
 }
 
+// printableWidth is briefWidth for a writer that may not be a terminal at all.
+// A pipe gets zero, which every caller reads as "do not cut": a script wants
+// the text, not the layout (#604).
+//
+// COLUMNS still counts on a pipe, because bash and zsh set it without
+// exporting it — a child process only sees it when someone exported it on
+// purpose, which is the same override briefWidth already honours.
+func printableWidth(w io.Writer) int {
+	if os.Getenv("COLUMNS") == "" && !statColorOK(w) {
+		return 0
+	}
+	return briefWidth()
+}
+
 func briefWidth() int {
 	// COLUMNS first: a reader who exports it is overriding the terminal on
 	// purpose, and scripts set it to pin the layout.

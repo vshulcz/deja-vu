@@ -87,9 +87,22 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 	}
 	if want == 0 {
 		fmt.Fprintf(stdout, "%d replaced spans recorded for %s\n", len(spans), path)
+		// The row carries a date, a harness, a session id and a size, and on a
+		// narrow pane it wrapped between them (#604). The id is what the reader
+		// copies into the next command, so the harness gives way first.
+		width := printableWidth(stdout)
 		for i, s := range spans {
+			harness := s.harness
+			if width > 0 {
+				fixed := len(fmt.Sprintf("  %d  %s   %s  %d B replaced%s", i+1, s.when.Format("Jan 02 15:04"), shortID(s.session), len(s.body), redactionNote(s.body)))
+				// Runes, not bytes: a harness name is ASCII today and a
+				// byte cut would produce invalid UTF-8 the day one is not.
+				if r := []rune(harness); width-fixed < len(r) && width-fixed >= 3 {
+					harness = string(r[:width-fixed-1]) + "…"
+				}
+			}
 			fmt.Fprintf(stdout, "  %d  %s  %s %s  %d B replaced%s\n",
-				i+1, s.when.Format("Jan 02 15:04"), s.harness, shortID(s.session),
+				i+1, s.when.Format("Jan 02 15:04"), harness, shortID(s.session),
 				len(s.body), redactionNote(s.body))
 		}
 		fmt.Fprintf(stdout, "\ndeja restore %s --span 1 -o recovered.txt\n", path)

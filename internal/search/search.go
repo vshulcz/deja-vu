@@ -1126,6 +1126,11 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// line the way it would in blame. Snippets below are already SafeText'd.
 		project := SafeLine(h.Session.Project)
 		id := SafeLine(short(h.Session.ID))
+		// The project column gives way first. Cutting the line at its end takes
+		// the match count and half the word "matches" with it, and those are
+		// what a reader scans; the project is the one field that is long
+		// because a directory was named at length (#604).
+		project = fitProject(project, o.Width, h.Session.Harness, d, id, h.Count, tierLabel(h))
 		if color {
 			fmt.Fprintf(w, "%s%s %-10s %s %s %s %s %s%s%d matches%s%s\n", cBold, harnessTag(h.Session.Harness, true), project, cDim+"·"+cReset+cBold, d, cDim+"·"+cReset+cBold, id, cDim+"— "+cReset, cBold, h.Count, cReset, tierLabel(h))
 		} else {
@@ -1177,9 +1182,109 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintln(w, note)
 		}
 		for _, sn := range h.Snippets {
-			fmt.Fprintf(w, "  %s\n", highlight(SafeText(sn), o.Query, o.Regex, color))
+			// Cut before the highlight, not after: the colour codes are not
+			// characters the terminal counts, so trimming the rendered string
+			// would cut a different number of visible runes on every line.
+			fmt.Fprintf(w, "  %s\n", highlight(SafeText(fitLine(sn, o.Width-2)), o.Query, o.Regex, color))
 		}
 	}
+}
+
+// fitProject bounds the one variable-width field on a hit header so the rest of
+// the line survives a narrow terminal. Six runes is the floor: below that the
+// name says nothing and the reader is better served by the ellipsis alone.
+//
+// Narrower than the rest of the line needs, the line is left to wrap. What is
+// left is the harness, the date, the session id and the count, and the id is
+// the field a reader copies into `deja show` — cutting it further would hand
+// them a prefix that matches nothing, which is the trap #859 already worded a
+// message for.
+func fitProject(project string, width int, harness, date, id string, count int, tier string) string {
+	if width <= 0 {
+		return project
+	}
+	// The column is padded to ten, so a name shorter than that costs ten either
+	// way and the budget has to say so.
+	fixed := columns(fmt.Sprintf("[%s]  · %s · %s — %d matches%s", harness, date, id, count, tier))
+	room := width - fixed
+	if room < 10 {
+		room = 10
+	}
+	if columns(project) <= room {
+		return project
+	}
+	if room < 6 {
+		room = 6
+	}
+	return cutToColumns(project, room-1) + "…"
+}
+
+// fitLine cuts a line to the width it is being printed into, counting runes
+// rather than bytes. Width zero — piped output, or a terminal that would not
+// say — leaves the line alone: a script reading deja's output wants the whole
+// thing, and truncating there would lose data rather than layout.
+func fitLine(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	if width < 8 {
+		width = 8
+	}
+	if columns(s) <= width {
+		return s
+	}
+	// One column short of the width, for the ellipsis.
+	return strings.TrimRight(cutToColumns(s, width-1), " ") + "…"
+}
+
+// columns is how wide a string prints. A CJK character is one rune and two
+// columns, so counting runes cut a Chinese or Japanese line to twice the
+// terminal's width — worse than the wrapping this exists to prevent, since the
+// text is lost rather than reflowed.
+func columns(s string) int {
+	n := 0
+	for _, r := range s {
+		n += runeColumns(r)
+	}
+	return n
+}
+
+// runeColumns is the East Asian Wide and Fullwidth ranges, plus the emoji
+// blocks terminals render double. Everything else counts as one: this is a
+// layout budget, not a Unicode implementation, and being wrong by a column on
+// an unusual rune costs a wrap rather than data.
+func runeColumns(r rune) int {
+	switch {
+	case r >= 0x1100 && r <= 0x115F, // Hangul Jamo
+		r >= 0x2E80 && r <= 0x303E, // CJK radicals, Kangxi
+		r >= 0x3041 && r <= 0x33FF, // kana, Hangul compatibility, CJK symbols
+		r >= 0x3400 && r <= 0x4DBF, // CJK extension A
+		r >= 0x4E00 && r <= 0x9FFF, // CJK unified ideographs
+		r >= 0xA000 && r <= 0xA4CF, // Yi
+		r >= 0xAC00 && r <= 0xD7A3, // Hangul syllables
+		r >= 0xF900 && r <= 0xFAFF, // CJK compatibility ideographs
+		r >= 0xFE30 && r <= 0xFE6F, // CJK compatibility forms
+		r >= 0xFF00 && r <= 0xFF60, // fullwidth forms
+		r >= 0xFFE0 && r <= 0xFFE6,
+		r >= 0x1F300 && r <= 0x1F64F, // emoji
+		r >= 0x1F900 && r <= 0x1F9FF,
+		r >= 0x20000 && r <= 0x3FFFD: // CJK extensions B and beyond
+		return 2
+	}
+	return 1
+}
+
+// cutToColumns keeps as much of s as fits in width columns.
+func cutToColumns(s string, width int) string {
+	n := 0
+	for i, r := range s {
+		w := runeColumns(r)
+		if n+w > width {
+			return s[:i]
+		}
+		n += w
+	}
+	return s
 }
 
 func tierLabel(h Hit) string {
