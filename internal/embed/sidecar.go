@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -43,7 +44,41 @@ func Stale(dir string, s Sidecar) bool {
 	if err != nil {
 		return true
 	}
-	return s.Generation != gen
+	return !sameLayout(s.Generation, gen)
+}
+
+// sameLayout reports whether two generations describe an index where the
+// offsets a vector holds still point at the same records.
+//
+// A generation is the build's stamp and the size records.bin had then. The
+// stamp alone cannot answer this — the incremental path carries it forward on
+// purpose, and two rebuilds inside one tick of a coarse clock share one — but
+// the size alone is too strict: appending a session grows the file without
+// moving a single existing record, and treating that as a new index threw away
+// every vector and re-embedded the whole store on each `deja index` (#1357).
+// So: same stamp and a file that only grew is the same layout.
+func sameLayout(was, now string) bool {
+	if was == now {
+		return true
+	}
+	wasStamp, wasSize, ok := splitGeneration(was)
+	nowStamp, nowSize, ok2 := splitGeneration(now)
+	if !ok || !ok2 || wasStamp != nowStamp {
+		return false
+	}
+	return nowSize >= wasSize
+}
+
+func splitGeneration(gen string) (stamp string, size int64, ok bool) {
+	i := strings.LastIndexByte(gen, '+')
+	if i < 0 {
+		return "", 0, false
+	}
+	n, err := strconv.ParseInt(gen[i+1:], 10, 64)
+	if err != nil || i == 0 || n < 0 {
+		return "", 0, false
+	}
+	return gen[:i], n, true
 }
 
 func Path(dir string) string {
@@ -73,7 +108,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 		return Sidecar{}, err
 	}
 	old, _ := Read(dir)
-	if old.Model != client.Model || old.Generation != gen || old.Dim == 0 {
+	if old.Model != client.Model || !sameLayout(old.Generation, gen) || old.Dim == 0 {
 		old = Sidecar{}
 	}
 	seen := make(map[int64]bool, len(old.Vectors))

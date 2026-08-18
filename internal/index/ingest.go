@@ -1777,7 +1777,14 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		_ = rf.Close()
 		return err
 	}
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: old.Generation, Scope: scope,
+	// A new generation, not the old one: this path opens records.bin with
+	// O_TRUNC and writes every surviving record again, so an offset from before
+	// it means nothing afterwards. Carrying the stamp forward told anything
+	// keyed on it — the embedding sidecar — that the file it measured was still
+	// there (#1357). Only appendIncremental, which appends in place, may keep a
+	// generation.
+	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(),
+		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
