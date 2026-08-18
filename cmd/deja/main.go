@@ -1263,6 +1263,9 @@ func activeFilters(o search.Options, sinceRaw string) string {
 	if o.Role != "" {
 		parts = append(parts, fmt.Sprintf("role %q", o.Role))
 	}
+	if o.Session != "" {
+		parts = append(parts, fmt.Sprintf("session %q", o.Session))
+	}
 	// The same predicate filterRecentSources uses. parseDur accepts a negative
 	// duration, and a negative Since filters nothing — naming it would report a
 	// filter that was never applied and hide the empty-store advice, which is
@@ -1562,7 +1565,7 @@ func parseSearch(args []string) (search.Options, error) {
 			o.All = true
 		case "--no-embed":
 			o.NoEmbed = true
-		case "--harness", "--project", "--since", "--role", "--limit":
+		case "--harness", "--project", "--since", "--role", "--limit", "--session":
 			if i+1 >= len(args) {
 				return o, fmt.Errorf("%s needs value", a)
 			}
@@ -1575,6 +1578,8 @@ func parseSearch(args []string) (search.Options, error) {
 				o.Project = v
 			case "--role":
 				o.Role = v
+			case "--session":
+				o.Session = v
 			case "--limit":
 				n, err := strconv.Atoi(v)
 				if err != nil || n < 1 || n > 100 {
@@ -1614,7 +1619,7 @@ func parseSearch(args []string) (search.Options, error) {
 // searchFlags is every flag the bare search form accepts, for the typo check.
 var searchFlags = []string{
 	"--json", "--re", "--all", "--no-embed", "--rebuild",
-	"--harness", "--project", "--since", "--role", "--limit",
+	"--harness", "--project", "--since", "--role", "--limit", "--session",
 }
 
 // nearestSearchFlag names the flag a token was probably meant to be. It stays
@@ -2440,6 +2445,7 @@ Search flags (the bare "deja [flags] <query>" form above):
   --since <duration>            only sessions newer than e.g. 30d, 12h
   --role <name>                 only match turns from one role: user, assistant,
                                 tool (tool output), files, command, edit
+  --session <id>                only one session, by the id a hit prints
   --limit <1-100>               max sessions to return (default 15)
   --all                         return every match, no cap
   --re                          treat the query as a regular expression
@@ -2455,6 +2461,7 @@ Examples:
   deja last 20 --harness codex
   deja last --project api-gateway
   deja last --since 7d --role user
+  deja --session 01a00feb --role tool "go build"   (what ran inside one session)
   deja --re "timeout|deadline exceeded"
   deja ctx "schema migration rollback" > deja-context.md
   deja install --all

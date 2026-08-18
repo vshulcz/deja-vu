@@ -186,6 +186,12 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		if o.Project != "" && !strings.Contains(strings.ToLower(s.Project), strings.ToLower(o.Project)) {
 			continue
 		}
+		// By the id prefix a hit prints, and by the id a session was synced
+		// under, so "find the session, then search inside it" can use the id
+		// from the first step whichever machine it came from (#1321, #1316).
+		if o.Session != "" && !strings.HasPrefix(s.ID, o.Session) && !strings.HasPrefix(s.OrigID, o.Session) {
+			continue
+		}
 		if !cut.IsZero() && s.Updated.Before(cut) {
 			continue
 		}

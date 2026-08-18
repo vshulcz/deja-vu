@@ -43,8 +43,12 @@ type Options struct {
 	Query                  string
 	Regex                  bool
 	Harness, Project, Role string
-	Since                  time.Duration
-	Limit                  int
+	// Session narrows a search to one session, by the id prefix a hit prints.
+	// Finding the session by what was said and then searching inside it — for a
+	// command, a file, an error — took reopening the transcript by hand (#1321).
+	Session string
+	Since   time.Duration
+	Limit   int
 	// Total and Capped travel from RunDetailed to Print so the JSON envelope
 	// can report how many sessions matched before the cap, not merely how many
 	// survived it. Counting the survivors measures the cap.

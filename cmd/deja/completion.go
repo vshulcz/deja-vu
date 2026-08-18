@@ -44,7 +44,7 @@ _deja_completion() {
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
     if (( COMP_CWORD == 1 )); then
-        COMPREPLY=( $(compgen -W "$commands --version -version --json --re --all --no-embed --harness --project --since --role --rebuild" -- "$cur") )
+        COMPREPLY=( $(compgen -W "$commands --version -version --json --re --all --no-embed --harness --project --since --role --session --rebuild" -- "$cur") )
         return
     fi
 
@@ -132,7 +132,7 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             else
-                COMPREPLY=( $(compgen -W "--json --re --all --no-embed --harness --project --since --role --rebuild" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--json --re --all --no-embed --harness --project --since --role --session --rebuild" -- "$cur") )
             fi
             ;;
     esac
@@ -250,7 +250,7 @@ _deja() {
     check|ctx|embed|hook-precompact|hook-prompt|mcp|share|show|sources|statusline|update|version|warmup)
       ;;
     *)
-      _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)' '--rebuild[force a full rebuild]'
+      _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]'
       ;;
   esac
 }
@@ -271,6 +271,7 @@ complete -c deja -n '__deja_needs_command' -l harness -r -a 'claude codex openco
 complete -c deja -n '__deja_needs_command' -l project -r
 complete -c deja -n '__deja_needs_command' -l since -r
 complete -c deja -n '__deja_needs_command' -l role -r -a 'user assistant tool'
+complete -c deja -n '__deja_needs_command' -l session -r
 complete -c deja -n '__deja_needs_command' -l rebuild
 
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
