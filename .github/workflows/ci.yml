@@ -273,11 +273,17 @@ jobs:
   scripts:
     name: shellcheck + actionlint
     runs-on: ubuntu-latest
+    # Without this the job's ceiling is six hours. Installing shellcheck through
+    # apt hung twice in a row on 2026-08-18 and each hang blocked every merge
+    # until someone cancelled the run by hand.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: shellcheck
         run: |
-          sudo apt-get update -q && sudo apt-get install -y -q shellcheck
+          # Preinstalled on the ubuntu runner image; installing it again bought
+          # nothing and was the step that hung.
+          shellcheck --version
           shellcheck install.sh scripts/e2e.sh
       - name: actionlint
         run: |
