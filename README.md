@@ -67,6 +67,17 @@ their own marketplaces instead:
 claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
 ```
 
+On Windows the install script exits with `unsupported OS` — it is a shell script. Take
+`deja-vu_<version>_windows_amd64.zip` from the
+[latest release](https://github.com/vshulcz/deja-vu/releases/latest) and put `deja.exe` on
+your `PATH`, e.g. in `%USERPROFILE%\.local\bin`.
+
+The binary alone is a complete install for searching: index, search, `show`, `ctx`, `blame`,
+`--json` and redaction need nothing else. `deja install` is what wires MCP into your agents
+and turns on session-start recall — worth having, and optional. On a binary-only setup
+`deja doctor` reports every MCP target as `not-wired`, which is that setup working as
+intended.
+
 `deja install --all` is `--auto` without the session-start recall: agents answer from memory
 when they decide to call it, rather than starting each session with it. The
 [agent setup guide](https://vshulcz.github.io/deja-vu/guide/agents.html) covers what each
