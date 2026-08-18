@@ -111,6 +111,22 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	if old.Model != client.Model || !sameLayout(old.Generation, gen) || old.Dim == 0 {
 		old = Sidecar{}
 	}
+	// Vectors the caller no longer allows go, rather than being carried forward
+	// because the layout matched. A policy that tightens has to reach the
+	// sidecar too: the vectors are already off the machine, but SemanticSearch
+	// reads this file directly, so keeping them means the withheld sessions
+	// keep coming back as answers (#1311).
+	allowed := make(map[int64]bool, len(recs))
+	for _, r := range recs {
+		allowed[r.Offset] = true
+	}
+	kept := old.Vectors[:0:0]
+	for _, v := range old.Vectors {
+		if allowed[v.Offset] {
+			kept = append(kept, v)
+		}
+	}
+	old.Vectors = kept
 	seen := make(map[int64]bool, len(old.Vectors))
 	for _, v := range old.Vectors {
 		seen[v.Offset] = true

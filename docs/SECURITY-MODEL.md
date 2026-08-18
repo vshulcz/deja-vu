@@ -72,7 +72,11 @@ of these commands is run:
   it. No session data is sent.
 - `deja embed` and hybrid search talk to the embedding endpoint you configured
   (an Ollama or LM Studio address, normally on localhost). Without that
-  configuration the semantic path is off and nothing is sent anywhere.
+  configuration the semantic path is off and nothing is sent anywhere. It is
+  the only command that puts session text in front of a third party, so the
+  trust policy gates it on every activation at once rather than on `search`:
+  content withheld from any read path is not embedded, and the command says how
+  many records stayed behind.
 
 `deja sync export <dir>` and `deja share <id>` write data to a path or output
 chosen by the user. They do not transmit it themselves. Exported batches and

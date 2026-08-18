@@ -22,18 +22,34 @@ func runEmbed(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = embed.EmbedIndex(dir, client, embedPolicyKeep(dir))
+	keep, held, err := embedPolicyKeep(dir)
+	if err != nil {
+		return err
+	}
+	_, err = embed.EmbedIndex(dir, client, keep)
+	// Said out loud, because the alternative is a sidecar that quietly covers
+	// less than the index and semantic search that quietly answers from less.
+	if n := held(); n > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d record%s stayed here — the trust policy withholds them on at least one path, and embedding sends text off the machine (`deja doctor`)\n", n, pluralS(n))
+	}
 	return err
 }
 
-// embedPolicyKeep skips records the trust policy withholds from search, so
-// embed does not ship a peer's imported content to the external endpoint under
-// a deny that every read path already honours. A record whose session is not in
-// the manifest is kept: unknown origin should not silently drop from search.
-func embedPolicyKeep(dir string) func(index.Record) bool {
+// embedPolicyKeep skips records the trust policy withholds on any activation.
+// Embedding is the one operation that puts session text in front of a third
+// party, and no activation describes it, so it takes the agreement of all three
+// rather than borrowing `search` — which is usually the loosest of them, and
+// under which a machine shipped text it refused to show its own agent (#1311).
+// A record whose session is not in the manifest is kept: unknown origin should
+// not silently drop from search.
+func embedPolicyKeep(dir string) (func(index.Record) bool, func() int, error) {
+	held := 0
 	metas, err := index.AllMeta(dir)
 	if err != nil {
-		return nil
+		// A nil filter means "embed everything", so an unreadable manifest used
+		// to open the gate wide at the one moment nothing could be checked. An
+		// egress gate fails closed: no origins known, nothing leaves.
+		return nil, nil, fmt.Errorf("embed: cannot read which sessions are local before sending text off the machine: %w", err)
 	}
 	project := make(map[string]string, len(metas))
 	for _, m := range metas {
@@ -41,12 +57,18 @@ func embedPolicyKeep(dir string) func(index.Record) bool {
 	}
 	pol := policy.Load()
 	return func(r index.Record) bool {
-		p, ok := project[r.Key]
-		if !ok {
-			return true
-		}
-		return pol.Allows(policy.ActivationSearch, p)
-	}
+			p, ok := project[r.Key]
+			if !ok {
+				return true
+			}
+			if pol.AllowsEgress(p) {
+				return true
+			}
+			held++
+			return false
+		}, func() int {
+			return held
+		}, nil
 }
 
 func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.File) []search.Hit {

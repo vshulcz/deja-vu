@@ -102,6 +102,23 @@ func (p Policy) Allows(activation, project string) bool {
 	return true
 }
 
+// AllowsEgress reports whether a project's content may leave the machine.
+//
+// Every activation is a read path on this box; sending text to an embedding
+// endpoint is not, and no rule describes it. Borrowing the loosest of the three
+// let a machine refuse to show a session to its own agent and ship the same text
+// to a third party in the same breath (#1311) — `search` is usually the most
+// permissive rule there is, because a person's own terminal is theirs. So egress
+// needs agreement: content the owner withholds on any path stays here.
+func (p Policy) AllowsEgress(project string) bool {
+	for _, a := range []string{ActivationSearch, ActivationMCP, ActivationAuto} {
+		if !p.Allows(a, project) {
+			return false
+		}
+	}
+	return true
+}
+
 // consultedOrigin reports whether a rule key is one Origin can produce. Rules
 // are keyed by origin; a project name looks like a rule and is not one.
 func consultedOrigin(origin string) bool {
