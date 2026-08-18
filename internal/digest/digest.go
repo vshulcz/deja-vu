@@ -46,10 +46,17 @@ func Share(s model.Session, budget int) string {
 				continue
 			}
 			chunk := fmt.Sprintf("%s\n\n", text)
-			if b.Len()+len(chunk) > budget {
-				chunk = UTF8SafeCut(chunk, budget-b.Len())
+			cut := b.Len()+len(chunk) > budget
+			if cut {
+				chunk = cutMarked(chunk, budget-b.Len())
 			}
 			b.WriteString(chunk)
+			// A marker says the passage before it was cut. Anything written
+			// after it reads as continuing text and makes the marker a lie, and
+			// trimming can leave enough room for another message to fit.
+			if cut {
+				break
+			}
 		}
 	}
 	var users, assistants []model.Message
@@ -200,6 +207,29 @@ func looksLikeDataDump(t string) bool {
 		}
 	}
 	return longestRun > 200
+}
+
+// cutMarker is how this package says a passage was cut. It ends the block, so
+// it carries the paragraph break with it.
+const cutMarker = "…\n\n"
+
+// cutMarked trims a passage to n bytes and says that it was cut. A block handed
+// to a person or an agent that simply stops reads as a finished thought, and the
+// end of a message is where a session says it changed its mind — the same defect
+// #1336 fixed for conclusions. The marker is paid for out of the budget rather
+// than added to it.
+func cutMarked(s string, n int) string {
+	if n <= len(cutMarker) {
+		return ""
+	}
+	t := strings.TrimRight(UTF8SafeCut(s, n-len(cutMarker)), " \t\n")
+	if t == "" {
+		return ""
+	}
+	if strings.HasSuffix(t, "…") {
+		return t + "\n\n"
+	}
+	return t + cutMarker
 }
 
 func UTF8SafeCut(s string, n int) string {
@@ -397,11 +427,13 @@ func tailSection(s model.Session, budget int) string {
 	for i := len(picked) - 1; i >= 0; i-- {
 		m := picked[i]
 		chunk := fmt.Sprintf("**%s:** %s\n\n", m.Role, MessageText(m.Text))
-		if b.Len()+len(chunk) > budget {
-			chunk = UTF8SafeCut(chunk, budget-b.Len())
+		cut := b.Len()+len(chunk) > budget
+		if cut {
+			chunk = cutMarked(chunk, budget-b.Len())
 		}
 		b.WriteString(chunk)
-		if b.Len() >= budget {
+		// Same reason as in Share: nothing follows a marked cut.
+		if cut || b.Len() >= budget {
 			break
 		}
 	}
