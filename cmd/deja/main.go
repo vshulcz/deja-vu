@@ -897,6 +897,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 			fmt.Fprint(os.Stderr, note)
 		case activeFilters(o, sinceRaw) != "":
 			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw))
+			fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 		default:
 			printNoMatches(os.Stderr, dir, o.Query)
@@ -1247,6 +1248,28 @@ func checkRole(role string) error {
 		}
 	}
 	return fmt.Errorf("%q is not a role deja knows — one of: %s", role, strings.Join(knownRoles, ", "))
+}
+
+// emptyRoleNote says when a role found nothing because the store holds none of
+// that kind, rather than because the query missed.
+//
+// deja advertises that it indexes the work and not only the talk, and a harness
+// that records no tool calls gives a transcript that looks complete: `--role
+// tool` came back the same way a bad query does, and the reader had no way to
+// tell "not found" from "not recorded" (#1321). Only asked when a role-filtered
+// search already returned nothing.
+func emptyRoleNote(dir, role string) string {
+	if role == "" {
+		return ""
+	}
+	stored := role
+	if role == "tool" {
+		stored = sources.RoleToolOutput
+	}
+	if index.HasRecordOfRole(dir, stored) {
+		return ""
+	}
+	return fmt.Sprintf("deja: this index holds no %s records at all — the harnesses it read do not write them, or wrote none yet\n", role)
 }
 
 // activeFilters names the filters a caller set, so an empty result can say

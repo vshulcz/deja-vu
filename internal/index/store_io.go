@@ -187,6 +187,30 @@ const readAheadSize = 8 * 1024
 
 var readAheadPool = sync.Pool{New: func() any { b := make([]byte, readAheadSize); return &b }}
 
+// eachRecordUntil is eachRecord with a stop: fn returns false when it has seen
+// enough, which is how an existence question avoids reading a log it has already
+// answered.
+func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, 1024*1024)
+	for {
+		rec, err := readRecord(r, t)
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if !fn(rec) {
+			return nil
+		}
+	}
+}
+
 func eachRecord(path string, t *recordTables, fn func(Record)) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -977,6 +1001,35 @@ func decodeRecordIn(b []byte, rel int, t *recordTables) (Record, bool) {
 // by the manifest, is the same data in a single scan.
 func EachToolOutput(dir string, fn func(SessionMeta, Record)) error {
 	return EachRecordOfRole(dir, roleToolOutput, fn)
+}
+
+// HasRecordOfRole reports whether the store holds any record of one role.
+//
+// An empty result under `--role tool` reads as "your query missed" when the
+// truth can be "nothing here records that": a harness that writes only the talk
+// gives a transcript that looks complete, and the reader has no way to tell the
+// two apart (#1321). Called only when a role-filtered search came back empty, so
+// it walks the records once on a path that has already returned nothing.
+func HasRecordOfRole(dir, role string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return true // unknown is not the same as absent; say nothing extra
+	}
+	found := false
+	// Stops at the first one. The note this feeds only prints when the answer is
+	// no, and that case has to read the whole log either way — but the case that
+	// prints nothing is the common one, and paying a full scan of a multi-gigabyte
+	// log to stay silent is not a cost an empty search should carry.
+	_ = eachRecordUntil(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) bool {
+		if r.Role == role {
+			found = true
+		}
+		return !found
+	})
+	return found
 }
 
 // EachRecordOfRole streams every record of one role with the session it came
