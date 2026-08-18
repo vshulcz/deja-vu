@@ -35,7 +35,11 @@ type reusedMemory struct {
 
 // findReusedMemory picks the session agents recalled most, ignoring the ones
 // still being worked on. Usage log plus manifest: no record read.
-func findReusedMemory(dir string) (reusedMemory, bool) {
+//
+// allow is the trust rule of whichever screen is asking — the reader's own is
+// not the agent's. Without one this printed the title of a session the policy
+// withholds, on a screen that had just said every session was withheld (#1312).
+func findReusedMemory(dir string, allow func(string) bool) (reusedMemory, bool) {
 	worn := usage.WornSessions(dir)
 	if len(worn) == 0 {
 		return reusedMemory{}, false
@@ -69,6 +73,9 @@ func findReusedMemory(dir string) (reusedMemory, bool) {
 		}
 		m := found[0]
 		if strings.TrimSpace(m.Title) == "" {
+			continue
+		}
+		if allow != nil && !allow(m.Project) {
 			continue
 		}
 		// A session with no parseable timestamp is not old, it is undated —

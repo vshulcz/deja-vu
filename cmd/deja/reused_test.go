@@ -59,7 +59,7 @@ func TestFindReusedMemoryNamesTheMostRecalled(t *testing.T) {
 		"r2": {"readme wording pass", 72 * time.Hour, 2},
 		"r3": {"one off question", 72 * time.Hour, 1},
 	})
-	got, ok := findReusedMemory(dir)
+	got, ok := findReusedMemory(dir, nil)
 	if !ok {
 		t.Fatal("nothing named, though one session was recalled four times")
 	}
@@ -80,7 +80,7 @@ func TestFindReusedMemoryIgnoresTodaysWork(t *testing.T) {
 		"live": {"the session happening right now", time.Minute, 40},
 		"old":  {"pgbouncer prepared statements", 72 * time.Hour, 3},
 	})
-	got, ok := findReusedMemory(dir)
+	got, ok := findReusedMemory(dir, nil)
 	if !ok {
 		t.Fatal("nothing named")
 	}
@@ -98,7 +98,7 @@ func TestFindReusedMemorySilentBelowTwo(t *testing.T) {
 	dir := seedReuse(t, map[string]seedSession{
 		"r1": {"asked once", 72 * time.Hour, 1},
 	})
-	if got, ok := findReusedMemory(dir); ok {
+	if got, ok := findReusedMemory(dir, nil); ok {
 		t.Fatalf("named %q at %d×, floor is %d", got.Title, got.Times, reusedMinTimes)
 	}
 }
@@ -107,11 +107,11 @@ func TestFindReusedMemorySilentWithoutUsage(t *testing.T) {
 	dir := seedReuse(t, map[string]seedSession{
 		"r1": {"never recalled", 72 * time.Hour, 0},
 	})
-	if _, ok := findReusedMemory(dir); ok {
+	if _, ok := findReusedMemory(dir, nil); ok {
 		t.Fatal("nothing was ever served, so nothing can be re-used")
 	}
 	hermeticEnv(t)
-	if _, ok := findReusedMemory(filepath.Join(t.TempDir(), "missing")); ok {
+	if _, ok := findReusedMemory(filepath.Join(t.TempDir(), "missing"), nil); ok {
 		t.Fatal("no index, nothing to name")
 	}
 }
@@ -126,7 +126,7 @@ func TestFindReusedMemorySkipsUntitledSessions(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"ghost-session"})
 	}
-	got, ok := findReusedMemory(dir)
+	got, ok := findReusedMemory(dir, nil)
 	if !ok {
 		t.Fatal("nothing named")
 	}
@@ -143,7 +143,7 @@ func TestFindReusedMemorySkipsBlankTitles(t *testing.T) {
 		"blank": {"   ", 72 * time.Hour, 9},
 		"named": {"pgbouncer prepared statements", 72 * time.Hour, 2},
 	})
-	got, ok := findReusedMemory(dir)
+	got, ok := findReusedMemory(dir, nil)
 	if !ok {
 		t.Fatal("nothing named, though a titled session was re-used twice")
 	}
@@ -186,7 +186,7 @@ func TestFindReusedMemorySkipsAmbiguousIDs(t *testing.T) {
 	}
 	// Repeatedly, because the defect is non-determinism: a map decides.
 	for i := 0; i < 50; i++ {
-		if got, ok := findReusedMemory(dir); ok {
+		if got, ok := findReusedMemory(dir, nil); ok {
 			t.Fatalf("named %q on an id two harnesses share; the count belongs to both", got.Title)
 		}
 	}
@@ -241,7 +241,7 @@ func TestFindReusedMemorySkipsUndatedSessions(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"dated"})
 	}
-	got, ok := findReusedMemory(dir)
+	got, ok := findReusedMemory(dir, nil)
 	if !ok {
 		t.Fatal("nothing named, though a dated session was re-used twice")
 	}

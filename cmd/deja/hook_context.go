@@ -355,7 +355,10 @@ func runHookContext(dir string, plain bool) error {
 		// earned its keep more than once, it is named here rather than only
 		// on a screen someone has to decide to open (#579).
 		earned := ""
-		if r, ok := findReusedMemory(dir); ok {
+		hookPol := policy.Load()
+		if r, ok := findReusedMemory(dir, func(project string) bool {
+			return hookPol.Allows(policy.ActivationAuto, project)
+		}); ok {
 			earned = fmt.Sprintf(" · most re-used recently: %q, %d×", trimBriefTitle(r.Title), r.Times)
 		}
 		// The receipt is read at a glance, and several hosts show it in a

@@ -30,11 +30,13 @@ func briefWithholdingReach(activation string) string {
 }
 
 // briefWithholdingRule names the activation whose rule withholds the whole
-// store, preferring auto because that is the path the reader never sees fail.
-// Returns auto when nothing withholds everything, so the caller's comparison
-// simply fails and the line stays off.
+// store, preferring search: that is the rule this screen itself obeys, so when
+// two rules withhold everything the reader is told the one that emptied what
+// they are looking at (#1312). Auto comes next — the path they never see fail —
+// and is also the fallback when nothing withholds everything, so the caller's
+// comparison simply fails and the line stays off.
 func briefWithholdingRule(withheld map[string]int, total int) string {
-	for _, a := range []string{policy.ActivationAuto, policy.ActivationSearch, policy.ActivationMCP} {
+	for _, a := range []string{policy.ActivationSearch, policy.ActivationAuto, policy.ActivationMCP} {
 		if withheld[a] == total {
 			return a
 		}
@@ -202,9 +204,15 @@ func runBrief(dir string, w io.Writer) error {
 	// noticed themselves: a question they asked in more than one session. A
 	// count of sessions is reporting; this is the thing the tool is for.
 	briefPol := policy.Load()
-	asked, haveAsked := index.FindAskedTwice(dir, func(project string) bool {
-		return briefPol.Allows(policy.ActivationAuto, project)
-	})
+	// The search rule, like `recent` above and every other terminal surface.
+	// These lines print the reader's own session text on the reader's own
+	// screen; filtering them by auto meant a policy that keeps work out of
+	// casual greps printed "all N sessions are withheld from your own
+	// searches" and quoted three of them underneath (#1312).
+	briefAllows := func(project string) bool {
+		return briefPol.Allows(policy.ActivationSearch, project)
+	}
+	asked, haveAsked := index.FindAskedTwice(dir, briefAllows)
 	askedText := ""
 	if haveAsked {
 		askedText = trimBriefTitle(asked.Text)
@@ -213,7 +221,7 @@ func runBrief(dir string, w io.Writer) error {
 	// What the counters above cannot say: which memory kept being worth
 	// recalling. "63 recalls" is a rate; a named piece of work is the thing a
 	// person repeats to a colleague (#579).
-	r, haveReused := findReusedMemory(dir)
+	r, haveReused := findReusedMemory(dir, briefAllows)
 
 	// What you keep asking is what keeps getting recalled, so these two land on
 	// the same work more often than not — and then the screen printed one title
@@ -250,9 +258,7 @@ func runBrief(dir string, w io.Writer) error {
 	// counter: a wall this machine keeps running into. Manifest-only, like the
 	// asked line above it — the command that reports the full list reads the
 	// record log, which is a hundred times this screen's budget.
-	if f, ok := index.FindFriction(dir, func(project string) bool {
-		return briefPol.Allows(policy.ActivationAuto, project)
-	}); ok {
+	if f, ok := index.FindFriction(dir, briefAllows); ok {
 		fmt.Fprintf(w, "hit        %s%s%s\n", bold, trimBriefTitle(f.Text), reset)
 		fmt.Fprintf(w, "again      %s%d sessions · last %s · deja friction%s\n",
 			dim, len(f.Sessions), search.RelativeDate(f.Last), reset)

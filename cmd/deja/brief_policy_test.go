@@ -150,8 +150,10 @@ func askedLine(out string) string {
 // still the same question asked twice — the one line the brief exists to show.
 // Imported sessions used to carry no asked hashes, so the repeat crossed a sync
 // boundary unseen; stats' RepeatQuestions (from records) counted it and the two
-// screens disagreed. It stays gated on the auto rule: a machine that withholds
-// imported memory must not surface an all-imported repeat.
+// screens disagreed. It stays gated: a machine that withholds imported memory
+// from this screen must not surface an all-imported repeat. The rule is the
+// reader's own — `search`, like the rest of the brief — since a rule aimed at
+// agents leaves work the reader can still grep for themselves (#1312).
 func TestBriefAskedTwiceCountsImportedAndHonoursPolicy(t *testing.T) {
 	q := "how do I configure the retry queue for delivery?"
 
@@ -192,15 +194,26 @@ func TestBriefAskedTwiceCountsImportedAndHonoursPolicy(t *testing.T) {
 		t.Fatalf("asked-twice did not count the imported repeat; asked line = %q\n%s", ln, buf.String())
 	}
 
-	// A rule that withholds imported memory from agents must drop the line: the
-	// only thing keeping the count at two is a session the reader chose to hide.
-	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
+	// A rule that keeps imported memory off the reader's own screen must drop
+	// the line: the only thing keeping the count at two is a session they chose
+	// to hide. The whole brief reads `search` — a rule aimed at agents alone
+	// leaves this screen intact, since the reader can still grep the same
+	// session (#1312).
+	writePolicy(t, `{"activations":{"search":{"local":true,"imported":false}}}`)
 	buf.Reset()
 	if err := runBrief(dir, &buf); err != nil {
 		t.Fatal(err)
 	}
 	if ln := askedLine(buf.String()); ln != "" {
-		t.Errorf("asked-twice surfaced an all-imported repeat under auto:local-only:\n%s", ln)
+		t.Errorf("asked-twice surfaced an all-imported repeat under search:local-only:\n%s", ln)
+	}
+	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
+	buf.Reset()
+	if err := runBrief(dir, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if ln := askedLine(buf.String()); ln == "" {
+		t.Errorf("a rule aimed at agents emptied the reader's own screen:\n%s", buf.String())
 	}
 }
 
@@ -217,8 +230,8 @@ func hitLine(out string) string {
 // A wall a peer kept hitting, arriving by sync, is a wall — `deja friction` and
 // stats both count it, and the brief's one friction line used to be the lone
 // holdout because imported sessions carried no Hit hashes. Populate meta.Hit on
-// import and gate the brief's lookup on the auto rule, the same shape as the
-// asked-twice fix above.
+// import and gate the brief's lookup on the search rule, the same shape as the
+// asked-twice test above.
 func TestBriefFrictionCountsImportedAndHonoursPolicy(t *testing.T) {
 	tmp := hermeticEnv(t)
 	exp := filepath.Join(tmp, "transfer")
@@ -246,12 +259,21 @@ func TestBriefFrictionCountsImportedAndHonoursPolicy(t *testing.T) {
 		t.Fatalf("friction line did not count the imported wall; hit line = %q\n%s", ln, buf.String())
 	}
 
-	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
+	writePolicy(t, `{"activations":{"search":{"local":true,"imported":false}}}`)
 	buf.Reset()
 	if err := runBrief(dir, &buf); err != nil {
 		t.Fatal(err)
 	}
 	if ln := hitLine(buf.String()); ln != "" {
-		t.Errorf("friction surfaced an all-imported wall under auto:local-only:\n%s", ln)
+		t.Errorf("friction surfaced an all-imported wall under search:local-only:\n%s", ln)
+	}
+	// And a rule that only stops agents leaves the reader's own screen alone.
+	writePolicy(t, `{"activations":{"auto":{"local":true,"imported":false}}}`)
+	buf.Reset()
+	if err := runBrief(dir, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if ln := hitLine(buf.String()); ln == "" {
+		t.Errorf("a rule aimed at agents emptied the reader's own screen:\n%s", buf.String())
 	}
 }
