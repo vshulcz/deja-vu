@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -255,6 +256,13 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 				return "", err
 			}
 		}
+		// blame reaches index.EnsureForSearch through findBlameHits, which
+		// blocks and can run the whole build inside this call. The CLI keeps
+		// that — someone typed it and watches the progress — but an agent gets
+		// the same sentence as every other tool (#1306).
+		if line := buildingNowForAgent(dir); line != "" {
+			return line, nil
+		}
 		text, hits, err := blameTextResult(dir, search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
 		if err == nil {
 			// blame answers the agent the way recall does, and hands over more
@@ -276,7 +284,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Error) == "" {
 			return "", fmt.Errorf("error text required")
 		}
-		if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
+		// Before the read, not after: the rebuild used to happen first and the
+		// guard ran when there was nothing left to report (#1306, #1309).
+		if line := buildingNowForAgent(dir); line != "" {
+			return line, nil
+		}
+		if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
 			return "", err
 		}
 		pol := policy.Load()
@@ -310,7 +323,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.What) == "" {
 			return "", fmt.Errorf("what required")
 		}
-		if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
+		if line := buildingNowForAgent(dir); line != "" {
+			return line, nil
+		}
+		if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
 			return "", err
 		}
 		entries, hidden, err := howEntries(dir, strings.Fields(a.What), a.Project, policy.ActivationMCP)
@@ -360,6 +376,13 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		if err := notesWriteError(sources.AppendNoteTagged(a.Project, a.Text, a.Tags, time.Now())); err != nil {
 			return "", err
+		}
+		// The note is on disk either way; what is left is making it findable.
+		// On upgrade day that meant rebuilding the whole index inside the call
+		// (#1309), so the agent is told instead — the detached warmup picks it
+		// up with everything else.
+		if line := buildingNowForAgent(dir); line != "" {
+			return "Saved. " + line, nil
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, mcpProgress()); err != nil {
 			return "", err
@@ -869,14 +892,29 @@ func (n *mcpNumber) UnmarshalJSON(b []byte) error {
 // — an internal path and an errno, handed to a model as a broken tool (#972).
 // Every other surface says the same thing in words.
 func buildingNowForAgent(dir string) string {
-	if index.HasManifest(dir) {
-		return ""
-	}
 	if st := readWarmupStatus(dir); st != nil {
 		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
 	}
 	if index.RebuildInProgress(dir) || warmupJustRequested(dir) {
 		return "deja is indexing this machine's history. Recall comes online in a few seconds; ask again then."
 	}
+	// An index this build cannot read is not one it can answer from, and that
+	// is the state a version bump leaves behind. HasManifest called it present,
+	// so the first agent call after an upgrade rebuilt 16000 sessions inside
+	// the tool call — 2.86s against 0.22s steady state, nothing said, and MCP
+	// clients have timeouts (#1309). Hand it to the detached warmup, the way
+	// every other surface repairs this, and say so.
+	if index.HasManifest(dir) && indexNeedsRebuild(dir) {
+		// "Ask again then" has to be true. A read-only index directory is the
+		// one state that never repairs itself, and telling an agent to come
+		// back would loop it forever (the shape #1048 fixed at session start).
+		if !indexDirWritable(dir) {
+			return "deja's index was written by another version of deja and " + filepath.Dir(dir) + " is not writable, so it cannot be rebuilt. Tell the user to run `deja index`, which says what to change."
+		}
+		requestWarmup(dir)
+		return "deja is rebuilding its index for this version of deja. Recall comes online shortly; ask again then."
+	}
+	// Nothing indexed yet and nothing building: this is a first run, and
+	// building it here is how an install with no hooks ever gets an index.
 	return ""
 }

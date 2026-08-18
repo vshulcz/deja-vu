@@ -21,7 +21,16 @@ const mcpResourceNameMax = 80
 // mcpResourcesList exposes recent sessions as browsable MCP resources, so an
 // agent can look around without guessing search terms first.
 func mcpResourcesList(dir string) (any, int, string) {
-	if err := index.Ensure(dir, "", false, mcpProgress()); err != nil {
+	// A browse is not worth a rebuild inside the handler: on a stale store
+	// index.Ensure ran the whole build here, and on a cold one the answer was
+	// a raw errno carrying an internal manifest path (#1306).
+	if line := buildingNowForAgent(dir); line != "" {
+		// An empty list, in the shape the protocol defines — the browse has
+		// nothing to show yet, and the sentence belongs on the tools an agent
+		// calls rather than in a result schema clients validate.
+		return map[string]any{"resources": []map[string]any{}}, 0, ""
+	}
+	if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
 		return nil, -32603, err.Error()
 	}
 	ss, err := index.Recent(dir, mcpResourceLimit*2)
