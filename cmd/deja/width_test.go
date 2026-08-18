@@ -28,7 +28,9 @@ func TestBriefWidthPrefersColumns(t *testing.T) {
 func TestBriefWidthFallsBackTo80(t *testing.T) {
 	for _, v := range []string{"", "wide", "0", "5", "100000"} {
 		if v == "" {
-			os.Unsetenv("COLUMNS")
+			if err := os.Unsetenv("COLUMNS"); err != nil {
+				t.Fatal(err)
+			}
 		} else {
 			t.Setenv("COLUMNS", v)
 		}
