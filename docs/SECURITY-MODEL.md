@@ -43,7 +43,10 @@ location. The directory contains:
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being
 re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
-ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A full `forget`
+ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. Patterns also
+apply at `sync export`, so a project excluded after the index was built does not
+leave the machine; what is already indexed stays searchable locally until
+`deja index --rebuild`, and `deja index` says so when the list has changed. A full `forget`
 rebuild replaces the index atomically before the tombstone list is used by the
 next index pass.
 

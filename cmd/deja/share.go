@@ -8,6 +8,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func runShare(dir string, args []string, w io.Writer) error {
@@ -33,6 +34,13 @@ func runShare(dir string, args []string, w io.Writer) error {
 	}
 	if err := denyPolicyHidden(args[0], s, os.Stderr); err != nil {
 		return err
+	}
+	// The exclude list is a privacy control, and share is the command whose
+	// whole purpose is handing a session to someone else. It only ran at
+	// ingest, so a project excluded after the index was built was still
+	// shareable by id (#1307).
+	if sources.ExcludedProject(s.Project) {
+		return fmt.Errorf("%s is in a project your exclude list covers — `deja index --rebuild` drops it from the index, or remove the pattern to share it", args[0])
 	}
 	printSanitized(w, digest.Share(s, digest.ShareBudget))
 	return nil

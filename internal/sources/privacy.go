@@ -2,9 +2,12 @@ package sources
 
 import (
 	"bufio"
+	"hash/fnv"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -77,6 +80,33 @@ func (e Excluder) Match(project string) bool {
 }
 
 func ExcludedProject(project string) bool { return NewExcluder().Match(project) }
+
+// ExclusionFingerprint identifies the pattern set in force, so an index can
+// record which one it was built under.
+//
+// The patterns only ever ran at ingest, and nothing noticed when they changed:
+// setting one and running `deja index` applied nothing and said nothing, while
+// the project stayed searchable and kept going out over sync (#1307). Order and
+// case do not matter — the same set written differently is the same set, and a
+// reshuffled exclude file is not a reason to tell someone to rebuild.
+func ExclusionFingerprint() string {
+	patterns := ExclusionPatterns()
+	// "none" rather than an empty string: an index built with no exclusions has
+	// recorded that fact, and a manifest written before this existed has not.
+	// Collapsing the two would have kept the note silent in the ordinary case —
+	// index first, decide a project is private afterwards.
+	if len(patterns) == 0 {
+		return "none"
+	}
+	sorted := append([]string(nil), patterns...)
+	sort.Strings(sorted)
+	h := fnv.New64a()
+	for _, p := range sorted {
+		_, _ = h.Write([]byte(p))
+		_, _ = h.Write([]byte{0})
+	}
+	return strconv.FormatUint(h.Sum64(), 16)
+}
 
 // CountSessions reports how many conversations a slice of parsed transcripts
 // amounts to. The index keys a session on harness+id, so two transcripts that

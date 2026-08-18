@@ -322,8 +322,14 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
 	ss = filterTombstonedSet(ss, dead)
+	// A full build passes every session through the exclusion patterns, so
+	// this is the one place the current set can be claimed as applied. An
+	// incremental build carries the old stamp forward: it keeps records it
+	// wrote under the previous patterns, which is why `deja index` has to ask
+	// for a rebuild rather than quietly declaring the new list in force (#1307).
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
-		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe}
+		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
+		ExcludeFingerprint: sources.ExclusionFingerprint()}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -648,7 +654,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	writtenMessages := 0
 	lastIngestFiles = len(files)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
-		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe}
+		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
+		ExcludeFingerprint: sources.ExclusionFingerprint()}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -1785,7 +1792,11 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// generation.
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
-		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords}
+		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
+		// Kept from the old index: this build reuses records written under
+		// those patterns, so claiming today's set would be a lie the reader
+		// cannot check.
+		ExcludeFingerprint: old.ExcludeFingerprint}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true

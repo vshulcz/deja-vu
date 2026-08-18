@@ -216,6 +216,13 @@ type Manifest struct {
 	// that last touched it: malformed JSONL lines and files that failed to
 	// parse. Silent loss must be diagnosable (`deja doctor --json`).
 	IngestHealth map[string]HarnessIngest `json:"ingest_health,omitempty"`
+	// ExcludeFingerprint identifies the exclusion patterns in force when this
+	// index was built. They apply at ingest, so a pattern added later leaves
+	// what is already indexed searchable and exportable — silently, until this
+	// told `deja index` to say so (#1307). Additive: a manifest written before
+	// it decodes with it empty, and an empty one means "not recorded", which
+	// says nothing rather than guessing.
+	ExcludeFingerprint string `json:"exclude_fingerprint,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -245,6 +252,8 @@ type manifestCore struct {
 	RecordsSize      int64
 	BucketFiles      int
 	IngestHealth     map[string]HarnessIngest
+	// ExcludeFingerprint: see Manifest.
+	ExcludeFingerprint string
 }
 
 type RedactionStats struct {

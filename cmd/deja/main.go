@@ -280,6 +280,12 @@ func cmdIndex(dir string, rest []string) error {
 		// agent memory is on its way (#839).
 		clearWarmupSentinel()
 		fmt.Fprintf(os.Stderr, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
+		// "Up to date" is the most misleading place to stay quiet about it:
+		// nothing changed on disk, so this is exactly where an exclusion set
+		// after the build looks applied and is not.
+		if index.ExclusionsChanged(dir) {
+			fmt.Fprintln(os.Stderr, "deja: the exclude list changed since this index was built — `deja index --rebuild` applies it to sessions already indexed")
+		}
 		return nil
 	}
 	stopProgress()
@@ -316,6 +322,13 @@ func cmdIndex(dir string, rest []string) error {
 		}
 		fmt.Fprintf(os.Stderr, "deja: %s: %d path%s could not be read — `deja doctor` names %s\n",
 			name, e.FailedFiles, pluralS(e.FailedFiles), pluralWhich(e.FailedFiles))
+	}
+	// An exclusion applies at ingest, so it covers nothing already indexed —
+	// and the sequence someone actually performs is to set the pattern, run
+	// this command, and sync. That used to return silently having applied
+	// nothing, and the export that followed still carried the project (#1307).
+	if index.ExclusionsChanged(dir) {
+		fmt.Fprintln(os.Stderr, "deja: the exclude list changed since this index was built — `deja index --rebuild` applies it to sessions already indexed")
 	}
 	// The parse count and the indexed count differ by exactly these, and this
 	// is where both are on screen (#868).

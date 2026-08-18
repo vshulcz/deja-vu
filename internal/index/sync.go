@@ -132,6 +132,18 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	// Only sources this export actually touched may have their watermark or
 	// boundary rewritten; pushing project B must leave project A's alone.
 	touched := map[string]bool{}
+	// The exclude list is a privacy control, and it only ran at ingest — so
+	// setting it and syncing, which is exactly what someone does the moment
+	// they realise a project should not be shared, was the sequence that
+	// shipped it to another machine (#1307). Applied here too: the export is
+	// where data leaves, and a pattern set after the index was built has to
+	// hold at that boundary whether or not the index has been rebuilt.
+	ex := sources.NewExcluder()
+	// The oldest instant held back per source. A watermark that ran past an
+	// excluded record would settle it forever: remove the pattern later and
+	// that work never syncs again, because the source resumes from a point
+	// beyond it. Held records are not sent, and they are not settled either.
+	heldFrom := map[string]int64{}
 	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		if r.SourcePath == syncImportPath {
 			return
@@ -157,6 +169,14 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		if !ok {
 			return
 		}
+		if !ex.Empty() && ex.Match(meta.Project) {
+			if tn := r.Time.UnixNano(); !r.Time.IsZero() {
+				if cur, seen := heldFrom[wk]; !seen || tn < cur {
+					heldFrom[wk] = tn
+				}
+			}
+			return
+		}
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time}
 		bySource[source] = append(bySource[source], rec)
@@ -178,6 +198,13 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	})
 	if err != nil {
 		return 0, nil, err
+	}
+	// Clamp each source's next watermark below the oldest record it held back.
+	for wk, held := range heldFrom {
+		if nextWatermarks[wk] >= held {
+			nextWatermarks[wk] = held - 1
+			delete(nextBoundary, wk)
+		}
 	}
 	total := 0
 	for source, recs := range bySource {
@@ -679,7 +706,11 @@ func initEmptyIndex(dir string) error {
 	// history invisible until a full rebuild. An empty file set makes the next
 	// index treat every local file as new and ingest it, next to the imported
 	// records this manifest carries.
-	m := Manifest{Version: version, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{}}
+	// An empty index holds nothing, so whatever the patterns are now, they are
+	// applied to all of it. Leaving this blank would read as "written before
+	// deja recorded this" and keep `deja index` quiet forever after (#1307).
+	m := Manifest{Version: version, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
+		ExcludeFingerprint: sources.ExclusionFingerprint()}
 	return writeManifest(dir, m)
 }
 
