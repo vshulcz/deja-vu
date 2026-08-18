@@ -33,21 +33,21 @@ func openIndexFile(path string) (*os.File, error) {
 	if err == nil || !errors.Is(err, fs.ErrNotExist) {
 		return f, err
 	}
-	if !swapInFlight(path) {
-		return nil, err
-	}
+	// Observe the state first, then try the file. Both orders were wrong the
+	// other way round: checking after a failed open gave up on a swap that had
+	// just finished, so the reader was handed the very ENOENT this exists to
+	// absorb. Reading the state first makes the miss decidable — if no swap was
+	// in flight when we looked and the file is still not there, it is not
+	// coming.
 	for i := 0; i < swapWindowTries; i++ {
-		time.Sleep(swapWindowWait)
+		inFlight := swapInFlight(path)
 		if f, oerr := os.Open(path); oerr == nil {
 			return f, nil
 		}
-		// The swap finished between that open and this check, so the file is
-		// there now and the open above just missed it. Giving up here handed
-		// back the ENOENT this function exists to avoid — caught by CI, where
-		// the slower runner landed in that gap most times.
-		if !swapInFlight(path) {
-			return os.Open(path)
+		if !inFlight {
+			return nil, err
 		}
+		time.Sleep(swapWindowWait)
 	}
 	return nil, err
 }
