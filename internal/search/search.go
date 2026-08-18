@@ -171,6 +171,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	type snipCand struct {
 		text   string
 		weight int
+		// window is how tightly the query's words meet in this message; 0 means
+		// they never do.
+		window int
 	}
 	snipCands := make([]snipCand, 0, 16)
 	df := make([]int, len(qtoks))
@@ -210,6 +213,11 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			}
 			low := strings.ToLower(m.Text)
 			c := 0
+			// windowText and windowToks are the pair proximity is measured on: the
+			// surface text and the query's own words, except where the match came from
+			// folding — measuring the unfolded pair there finds nothing and reports a
+			// genuine match as words that never meet.
+			windowText, windowToks := low, qtoks
 			if re != nil {
 				c = len(re.FindAllStringIndex(m.Text, -1))
 			} else {
@@ -223,6 +231,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 					foldedLow := cjkfold.String(low)
 					c = countIn(cjkfold.String(m.Text), foldedLow, qtoksFolded,
 						phrasesFolded, qlowFolded, o.FuzzyVariants)
+					if c > 0 {
+						windowText, windowToks = foldedLow, qtoksFolded
+					}
 				}
 			}
 			if c > 0 {
@@ -234,8 +245,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				// strongest few become the excerpts after the scan. Taking the
 				// first three showed wherever a word happened to appear early
 				// rather than the passage that carries the answer.
-				snipCands = append(snipCands, snipCand{text: m.Text, weight: c})
-				if w := tokenWindow(low, qtoks); w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
+				w := tokenWindow(windowText, windowToks)
+				snipCands = append(snipCands, snipCand{text: m.Text, weight: c, window: w})
+				if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
 					doc.minWindow = w
 				}
 			}
@@ -248,8 +260,23 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				}
 			}
 		}
-		// Strongest matches first, original order among equals, top three shown.
-		sort.SliceStable(snipCands, func(i, j int) bool { return snipCands[i].weight > snipCands[j].weight })
+		// The passage that answers a question is where its words come together, so
+		// a message that says them together outranks one that repeats a single word:
+		// a search for "what did my dad give me" led with six "gift"s and put the
+		// line naming the dad second (#1325). The relevance tier already picks its
+		// excerpt this way; the exact tier ranked on the raw count alone. Count
+		// still decides between passages that are equally tight, and among equals
+		// the order they were said in stands. Top three shown.
+		sort.SliceStable(snipCands, func(i, j int) bool {
+			a, b := snipCands[i], snipCands[j]
+			if (a.window > 0) != (b.window > 0) {
+				return a.window > 0
+			}
+			if a.window > 0 && a.window != b.window {
+				return a.window < b.window
+			}
+			return a.weight > b.weight
+		})
 		for i := 0; i < len(snipCands) && i < 3; i++ {
 			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[i].text, o.Query, re))
 		}
