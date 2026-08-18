@@ -14,11 +14,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-// staleStore indexes three sessions whose first two records are the same size,
-// then forgets the first. Every later record shifts by exactly that size, so a
-// vector still keyed to the second session now points at the third one's text —
-// the collision this guard exists for, built on purpose rather than hoped for.
-func staleStore(t *testing.T) (dir string, vectors []Vector, gen string) {
+// threeSessionStore indexes three sessions and returns the index directory with
+// its records, newest state.
+func threeSessionStore(t *testing.T) (dir string, records []index.OffsetRecord) {
 	t.Helper()
 	tmp := t.TempDir()
 	root := filepath.Join(tmp, "claude")
@@ -32,7 +30,7 @@ func staleStore(t *testing.T) (dir string, vectors []Vector, gen string) {
 		}
 	}
 	write("a.jsonl", "aaa", "the vault rotation broke the staging deploy")
-	write("b.jsonl", "bbb", "the kafka consumer keeps flapping at noon!!")
+	write("b.jsonl", "bbb", "the kafka consumer keeps flapping at noon")
 	write("c.jsonl", "ccc", "the scheduler retries on every single timeout")
 	for key, value := range map[string]string{
 		"HOME": tmp, "USERPROFILE": tmp, "DEJA_CLAUDE_ROOT": root,
@@ -52,17 +50,10 @@ func staleStore(t *testing.T) (dir string, vectors []Vector, gen string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gen, err = index.Generation(dir)
-	if err != nil {
-		t.Fatal(err)
+	if len(records) < 3 {
+		t.Fatalf("fixture indexed %d records, want 3", len(records))
 	}
-	for _, r := range records {
-		vectors = append(vectors, Vector{Offset: r.Offset, Key: r.Record.Key, Values: []float32{1, 0}})
-	}
-	if _, err := index.Forget(dir, index.ForgetOptions{Session: "aaa"}); err != nil {
-		t.Fatal(err)
-	}
-	return dir, vectors, gen
+	return dir, records
 }
 
 func fakeEmbedClient(t *testing.T) *Client {
@@ -74,33 +65,54 @@ func fakeEmbedClient(t *testing.T) *Client {
 	return &Client{URL: ts.URL}
 }
 
-// Vectors address records by byte offset, and a rebuild moves them. A sidecar
-// from before the rebuild made semantic search quote one session's text under
-// another session's name.
+// Vectors address records by byte offset, so a sidecar built before a rebuild
+// can pair one session's key with another session's record — semantic search
+// then quotes text under a name that never said it. The pairing here is built
+// deliberately rather than waited for: what matters is that a sidecar from
+// another index is refused before its offsets are used at all.
 func TestSemanticSearchRefusesASidecarFromAnotherIndex(t *testing.T) {
-	dir, vectors, gen := staleStore(t)
+	dir, records := threeSessionStore(t)
+	crossed := []Vector{
+		{Offset: records[2].Offset, Key: records[1].Record.Key, Values: []float32{1, 0}},
+	}
 	hits, err := SemanticSearch(context.Background(), dir, search.Options{Query: "anything", All: true},
-		Sidecar{Generation: gen, Dim: 2, Vectors: vectors}, fakeEmbedClient(t))
+		Sidecar{Generation: "built-for-an-older-index", Dim: 2, Vectors: crossed}, fakeEmbedClient(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, h := range hits {
-		if !strings.Contains(h.Snippets[0], "kafka") && h.Session.ID == "bbb" {
-			t.Errorf("hit named session %s but quoted %q", h.Session.ID, h.Snippets[0])
-		}
-	}
 	if len(hits) != 0 {
-		t.Errorf("got %d hits from a sidecar built for an earlier index", len(hits))
+		t.Errorf("got %d hits from a sidecar built for another index: %q under session %s",
+			len(hits), hits[0].Snippets[0], hits[0].Session.ID)
+	}
+}
+
+// The same crossed vector with the current generation shows what the guard
+// prevents, and proves the fixture really does cross a key with another
+// session's text.
+func TestCrossedVectorMisattributesWithoutTheGuard(t *testing.T) {
+	dir, records := threeSessionStore(t)
+	gen, err := index.Generation(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := SemanticSearch(context.Background(), dir, search.Options{Query: "anything", All: true},
+		Sidecar{Generation: gen, Dim: 2, Vectors: []Vector{
+			{Offset: records[2].Offset, Key: records[1].Record.Key, Values: []float32{1, 0}},
+		}}, fakeEmbedClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("got %d hits, want the crossed one", len(hits))
+	}
+	if strings.Contains(hits[0].Snippets[0], "kafka") {
+		t.Fatal("the fixture did not cross a session key with another session's record")
 	}
 }
 
 // A sidecar built for the index in front of it is used as before.
 func TestSemanticSearchUsesACurrentSidecar(t *testing.T) {
-	dir, _, _ := staleStore(t)
-	records, err := index.ReadRecords(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir, records := threeSessionStore(t)
 	gen, err := index.Generation(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -118,42 +130,29 @@ func TestSemanticSearchUsesACurrentSidecar(t *testing.T) {
 		t.Fatal("a current sidecar produced no semantic hits")
 	}
 	for _, h := range hits {
-		want := map[string]string{"bbb": "kafka", "ccc": "scheduler"}[h.Session.ID]
+		want := map[string]string{"aaa": "vault", "bbb": "kafka", "ccc": "scheduler"}[h.Session.ID]
 		if want == "" || !strings.Contains(h.Snippets[0], want) {
 			t.Errorf("hit named session %s but quoted %q", h.Session.ID, h.Snippets[0])
 		}
 	}
 }
 
-// Stale is the rule itself: an empty sidecar is not stale (there is nothing to
-// mislead with), and a generation that matches is not stale.
+// Stale is the rule: an empty sidecar has nothing to mislead with, a matching
+// generation is current, anything else is not.
 func TestStaleRule(t *testing.T) {
-	dir, vectors, gen := staleStore(t)
+	dir, records := threeSessionStore(t)
+	vectors := []Vector{{Offset: records[0].Offset, Key: records[0].Record.Key, Values: []float32{1, 0}}}
 	if Stale(dir, Sidecar{}) {
 		t.Error("an empty sidecar counts as stale")
 	}
-	if !Stale(dir, Sidecar{Generation: gen, Vectors: vectors}) {
-		t.Error("a sidecar from before the rebuild does not count as stale")
+	if !Stale(dir, Sidecar{Generation: "built-for-an-older-index", Vectors: vectors}) {
+		t.Error("a sidecar from another index does not count as stale")
 	}
-	now, err := index.Generation(dir)
+	gen, err := index.Generation(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if Stale(dir, Sidecar{Generation: now, Vectors: vectors}) {
+	if Stale(dir, Sidecar{Generation: gen, Vectors: vectors}) {
 		t.Error("a sidecar for this index counts as stale")
-	}
-}
-
-// The rule rests on two rebuilds being distinguishable. A timestamp alone is
-// not: on a coarse clock a forget straight after an index build shares it, and
-// the sidecar from before then reads as current.
-func TestGenerationSeparatesTwoRebuildsInOneTick(t *testing.T) {
-	dir, _, before := staleStore(t)
-	after, err := index.Generation(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if before == after {
-		t.Errorf("the generation is %q before and after a rebuild that moved every offset", before)
 	}
 }

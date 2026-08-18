@@ -115,13 +115,14 @@ func TestReadRecordsAndGeneration(t *testing.T) {
 	if err := writeManifest(dir, Manifest{Version: version, BuiltAt: time.Unix(20, 0), Generation: "gen-1", Sessions: map[string]SessionMeta{}}); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := Generation(dir); err != nil || got != "gen-1" {
+	// The stamp plus what decides whether offsets moved: records.bin's length.
+	if got, err := Generation(dir); err != nil || !strings.HasPrefix(got, "gen-1+") {
 		t.Fatalf("explicit generation=%q err=%v", got, err)
 	}
 	if err := writeManifest(dir, Manifest{Version: version, BuiltAt: time.Unix(30, 0), Sessions: map[string]SessionMeta{}}); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := Generation(dir); err != nil || got != "1970-01-01T00:00:30Z" {
+	if got, err := Generation(dir); err != nil || !strings.HasPrefix(got, "1970-01-01T00:00:30Z+") {
 		t.Fatalf("built-at generation=%q err=%v", got, err)
 	}
 	if _, err := ReadRecords(filepath.Join(dir, "missing")); err == nil {
