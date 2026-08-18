@@ -62,9 +62,18 @@ func TestBuildFixesDropsTheUnrelatedNextCommand(t *testing.T) {
 	}
 	dir := t.TempDir()
 	buildFixes(dir, []model.Session{unrelated, related}, func(s model.Session) string { return s.Harness + ":" + s.ID })
-	got := ReadFixes(dir)
+	// The unrelated one is kept as a candidate — a second session doing the
+	// same thing after the same error is the other half of the evidence, and
+	// sessions arrive one at a time (#1301). It is never served; that is what
+	// the lookup below checks.
+	var got []FixPair
+	for _, p := range ReadFixes(dir) {
+		if !p.Candidate {
+			got = append(got, p)
+		}
+	}
 	if len(got) != 1 {
-		t.Fatalf("want only the related pair, got %d: %+v", len(got), got)
+		t.Fatalf("want only the related pair served, got %d: %+v", len(got), ReadFixes(dir))
 	}
 	if got[0].Key != "claude:s2" {
 		t.Errorf("kept the wrong pair: %+v", got[0])

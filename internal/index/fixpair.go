@@ -36,6 +36,10 @@ const (
 	fixCommandMax = 200
 	// fixesMax bounds the whole file. Newest wins.
 	fixesMax = 2000
+	// fixesCandidateMax bounds the sightings held for a second confirmation.
+	// Newest first, like the pairs themselves, so a candidate ages out rather
+	// than displacing one that just arrived.
+	fixesCandidateMax = 2000
 )
 
 // FixPair is one error and the command that followed it without the error
@@ -56,6 +60,14 @@ type FixPair struct {
 	// Empty on a pair mined before this field existed; the version bump that
 	// ships it forces the rebuild that fills it.
 	Project string
+	// Candidate marks a sighting that is not a pair yet: the remedy named
+	// nothing the error named, and no other session has done the same thing
+	// after the same error. Evidence of the second kind accumulates across
+	// sessions, and sessions arrive one at a time — so judging a candidate
+	// against the update it arrived in threw it away before the session that
+	// would have confirmed it existed, and the pair was lost for good (#1301).
+	// Kept, and promoted on the second sighting; never served to a caller.
+	Candidate bool `json:",omitempty"`
 }
 
 func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
@@ -85,7 +97,15 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	for _, p := range all {
 		if sharesTerm(p.Error, p.Command) || repeats[fixKey(p)] >= 2 {
 			out = append(out, p)
+			continue
 		}
+		// Not a pair, and not nothing: the second kind of evidence accumulates
+		// across sessions, and sessions arrive one at a time. Dropping a
+		// sighting here meant the session that would have confirmed it found
+		// nothing to confirm, so a full build reached pairs the same corpus
+		// grown one session at a time never did (#1301).
+		p.Candidate = true
+		out = append(out, p)
 	}
 	if len(out) == 0 {
 		return
@@ -97,15 +117,29 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	// and dropping all but its newest occurrence deleted the pair for every
 	// other signature it settled.
 	seen := map[string]bool{}
+	candidates, pairs := 0, 0
 	kept := out[:0]
 	for _, p := range out {
+		if p.Candidate {
+			if candidates >= fixesCandidateMax {
+				continue
+			}
+			candidates++
+		} else {
+			if pairs >= fixesMax {
+				continue
+			}
+			pairs++
+		}
 		k := fixKey(p)
 		if seen[k] {
 			continue
 		}
 		seen[k] = true
 		kept = append(kept, p)
-		if len(kept) >= fixesMax {
+		// Candidates have their own budget above, so the pair cap is what it
+		// was and this one bounds the file as a whole.
+		if len(kept) >= fixesMax+fixesCandidateMax {
 			break
 		}
 	}
@@ -324,23 +358,50 @@ func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[stri
 	for _, p := range fresh {
 		repeats[fixKey(p)]++
 	}
+	// A candidate already on file is the evidence a later session needs, so it
+	// counts towards the second sighting — and once something is promoted, the
+	// candidate copy of it goes. Not redundant with the deduplication below:
+	// two sessions carrying the same timestamp sort either way, and when the
+	// candidate copy sorts first it is the one that survives, so the pair the
+	// second sighting just earned is never served.
+	promoted := map[string]bool{}
 	for _, p := range fresh {
 		k := fixKey(p)
 		if sharesTerm(p.Error, p.Command) || repeats[k]+seen[k] >= 2 {
+			p.Candidate = false
 			kept = append(kept, p)
+			promoted[k] = true
+			continue
+		}
+		p.Candidate = true
+		kept = append(kept, p)
+	}
+	for i := range kept {
+		if promoted[fixKey(kept[i])] {
+			kept[i].Candidate = false
 		}
 	}
 	sort.SliceStable(kept, func(i, j int) bool { return kept[i].When.After(kept[j].When) })
 	written := map[string]bool{}
 	out := kept[:0]
+	candidates := 0
 	for _, p := range kept {
 		k := fixKey(p)
 		if written[k] {
 			continue
 		}
+		// Candidates are bounded on their own. They serve nobody until a second
+		// session confirms them, so letting them share the pair budget would
+		// push real answers out of a table that is read whole.
+		if p.Candidate {
+			if candidates >= fixesCandidateMax {
+				continue
+			}
+			candidates++
+		}
 		written[k] = true
 		out = append(out, p)
-		if len(out) >= fixesMax {
+		if len(out) >= fixesMax+fixesCandidateMax {
 			break
 		}
 	}
@@ -384,6 +445,11 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	var out []FixPair
 	for _, p := range ReadFixes(dir) {
 		if !sigs[p.Sig] {
+			continue
+		}
+		// One session doing something after an error is not evidence that it
+		// worked; it is half of it.
+		if p.Candidate {
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
