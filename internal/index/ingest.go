@@ -17,6 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -1278,7 +1279,12 @@ func questionStem(text string) string {
 		}
 	}
 	fields := strings.Fields(b.String())
-	if len(fields) < 5 {
+	if len(fields) < 5 && cjkfold.CountCJK(text) < 5 {
+		// Chinese, Japanese and Korean write no separator between words, so a
+		// question in those scripts is a single field however much it asks, and
+		// the five-word bar dropped every one of them: a person could ask the
+		// same thing weekly and deja never noticed (#1346). Their characters are
+		// the words.
 		return ""
 	}
 	return strings.Join(fields, " ")
