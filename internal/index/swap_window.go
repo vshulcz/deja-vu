@@ -41,8 +41,12 @@ func openIndexFile(path string) (*os.File, error) {
 		if f, oerr := os.Open(path); oerr == nil {
 			return f, nil
 		}
+		// The swap finished between that open and this check, so the file is
+		// there now and the open above just missed it. Giving up here handed
+		// back the ENOENT this function exists to avoid — caught by CI, where
+		// the slower runner landed in that gap most times.
 		if !swapInFlight(path) {
-			break
+			return os.Open(path)
 		}
 	}
 	return nil, err
