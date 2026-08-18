@@ -135,8 +135,9 @@ func TestParseGrokFileFallbacksAndDefaultKind(t *testing.T) {
 	if s.Project != "needle-project" {
 		t.Fatalf("fallback cwd/project = %q", s.Project)
 	}
-	if len(s.Messages) != 2 {
-		t.Fatalf("messages = %#v, want 2 (tool_call and empty-text filtered)", s.Messages)
+	// Speech plus the tool call; only the empty-text event is filtered (#1321).
+	if len(s.Messages) != 3 {
+		t.Fatalf("messages = %#v, want 3 (only empty text filtered)", s.Messages)
 	}
 }
 

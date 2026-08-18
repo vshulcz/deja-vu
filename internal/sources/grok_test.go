@@ -45,14 +45,20 @@ func TestParseGrokFile(t *testing.T) {
 	if ss[0].Project != "cool-app" || ss[0].Title != "Fix the parser" {
 		t.Fatalf("bad metadata: %#v", ss[0])
 	}
-	if len(ss[0].Messages) != 2 {
-		t.Fatalf("messages = %d, want 2: %#v", len(ss[0].Messages), ss[0].Messages)
+	// Speech and the tool call between the two spoken chunks: the run is what
+	// `--role tool` searches, and dropping it left Grok users with a transcript
+	// that read as complete (#1321).
+	if len(ss[0].Messages) != 3 {
+		t.Fatalf("messages = %d, want 3: %#v", len(ss[0].Messages), ss[0].Messages)
 	}
 	if ss[0].Messages[0].Role != "user" || ss[0].Messages[0].Text != "find grokneedle" {
 		t.Fatalf("bad user message: %#v", ss[0].Messages[0])
 	}
 	if ss[0].Messages[1].Role != "assistant" || ss[0].Messages[1].Text != "first answer" {
 		t.Fatalf("assistant chunks not merged: %#v", ss[0].Messages[1])
+	}
+	if ss[0].Messages[2].Role != RoleToolOutput || ss[0].Messages[2].Text != "tool noise" {
+		t.Fatalf("tool call not indexed: %#v", ss[0].Messages[2])
 	}
 }
 

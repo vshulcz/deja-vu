@@ -76,7 +76,10 @@ func ParseGrokFile(path string) ([]model.Session, error) {
 		s.Touch(t)
 	}
 
-	lastKey := ""
+	// A streamed reply arrives in chunks that share a key and get joined. Tool
+	// records now land between those chunks, so the join remembers where the
+	// speech was rather than assuming it was the message just added.
+	lastKey, lastSpeech := "", -1
 	err := scanGrokUpdates(path, func(event grokUpdateEvent) {
 		role := ""
 		switch event.Params.Update.Kind {
@@ -84,10 +87,25 @@ func ParseGrokFile(path string) ([]model.Session, error) {
 			role = "user"
 		case "agent_message_chunk":
 			role = "assistant"
+		case "tool_call", "tool_call_update":
+			// What the agent did, which deja indexes for every other harness
+			// that records it: `--role tool`, friction and the fix pairs all
+			// read this. Grok kept the whole run in the transcript and the
+			// parser took only the talk, so a Grok user searching `--role tool`
+			// got nothing and `show` returned a conversation that looked
+			// complete (#1321). Same shape as the pi parser before #1240.
+			role = RoleToolOutput
 		default:
 			return
 		}
 		text := grokContentText(event.Params.Update.Content)
+		if text == "" && role == RoleToolOutput {
+			text = grokToolText(event.Params.Update.Content)
+		}
+		if text == "" && role == RoleToolOutput {
+			// A call with no output yet still says what ran.
+			text = grokToolTitle(event)
+		}
 		if text == "" {
 			return
 		}
@@ -97,13 +115,17 @@ func ParseGrokFile(path string) ([]model.Session, error) {
 		}
 		s.Touch(t)
 
+		if role == RoleToolOutput {
+			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
+			return
+		}
 		key := grokMessageKey(role, event)
-		if key != "" && key == lastKey && len(s.Messages) > 0 {
-			s.Messages[len(s.Messages)-1].Text += text
+		if key != "" && key == lastKey && lastSpeech >= 0 {
+			s.Messages[lastSpeech].Text += text
 			return
 		}
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
-		lastKey = key
+		lastKey, lastSpeech = key, len(s.Messages)-1
 	})
 	if len(s.Messages) == 0 {
 		return nil, err
@@ -115,9 +137,11 @@ type grokUpdateEvent struct {
 	Timestamp json.Number `json:"timestamp"`
 	Params    struct {
 		Update struct {
-			Kind    string          `json:"sessionUpdate"`
-			Content json.RawMessage `json:"content"`
-			Meta    struct {
+			Kind     string          `json:"sessionUpdate"`
+			Content  json.RawMessage `json:"content"`
+			Title    string          `json:"title"`
+			ToolKind string          `json:"kind"`
+			Meta     struct {
 				PromptIndex *int `json:"promptIndex"`
 			} `json:"_meta"`
 		} `json:"update"`
@@ -141,6 +165,59 @@ func grokMessageKey(role string, event grokUpdateEvent) string {
 	return ""
 }
 
+// grokToolTitle names the call when it carried no output: "bash" reads as work
+// done, an empty record reads as nothing happening.
+func grokToolTitle(event grokUpdateEvent) string {
+	title := strings.TrimSpace(event.Params.Update.Title)
+	kind := strings.TrimSpace(event.Params.Update.ToolKind)
+	switch {
+	case title != "" && kind != "":
+		return kind + ": " + title
+	case title != "":
+		return title
+	default:
+		return kind
+	}
+}
+
+// grokToolText reads the shape ACP uses for a tool call's output, which wraps
+// each block one level deeper than a spoken message:
+//
+//	[{"type":"content","content":{"type":"text","text":"..."}}]
+//
+// Kept next to the Grok parser rather than folded into the shared extractors:
+// those are read by every other harness, and this nesting is this protocol's.
+func grokToolText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var blocks []struct {
+		Text    string `json:"text"`
+		Content struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if json.Unmarshal(raw, &blocks) != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, block := range blocks {
+		txt := block.Text
+		if txt == "" && (block.Content.Type == "" || block.Content.Type == "text") {
+			txt = block.Content.Text
+		}
+		if txt == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(txt)
+	}
+	return b.String()
+}
+
 func grokContentText(raw json.RawMessage) string {
 	var block struct {
 		Type string `json:"type"`
@@ -161,6 +238,8 @@ func grokContentText(raw json.RawMessage) string {
 
 var grokUserChunk = []byte(`"user_message_chunk"`)
 var grokAgentChunk = []byte(`"agent_message_chunk"`)
+var grokToolCall = []byte(`"sessionUpdate":"tool_call"`)
+var grokToolUpdate = []byte(`"sessionUpdate":"tool_call_update"`)
 
 // Most update lines are large tool events. Filter them before JSON decoding so
 // indexing cost is dominated by reading the log rather than materializing tool
@@ -174,7 +253,7 @@ func scanGrokUpdates(path string, fn func(grokUpdateEvent)) error {
 	r := bufio.NewReaderSize(f, 1024*1024)
 	for {
 		line, err := r.ReadBytes('\n')
-		if bytes.Contains(line, grokUserChunk) || bytes.Contains(line, grokAgentChunk) {
+		if bytes.Contains(line, grokUserChunk) || bytes.Contains(line, grokAgentChunk) || bytes.Contains(line, grokToolCall) || bytes.Contains(line, grokToolUpdate) {
 			var event grokUpdateEvent
 			if json.Unmarshal(line, &event) == nil {
 				fn(event)
