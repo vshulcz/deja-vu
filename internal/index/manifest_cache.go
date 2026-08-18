@@ -28,6 +28,8 @@ var manifestCache struct {
 }
 
 func readManifestCached(dir string) (Manifest, error) {
+	// Plain stat: a failure here falls through to readManifest, which waits the
+	// swap out itself, so a wait added here cannot be made to fail (#1319).
 	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))
 	if err != nil {
 		return readManifest(dir)

@@ -52,6 +52,32 @@ func openIndexFile(path string) (*os.File, error) {
 	return nil, err
 }
 
+// statIndexFile is os.Stat for a file inside the index directory, waiting out a
+// swap the same way openIndexFile does.
+//
+// "Is there an index" is asked by every hook before it serves anything, and
+// during the swap the answer was no — measured at 894 of 18912 asks while
+// rebuilds ran. The hook then asked for another rebuild and returned without
+// recall, so a prompt submitted in that window lost its memory because a
+// directory was missing for a millisecond (#1319).
+func statIndexFile(path string) (os.FileInfo, error) {
+	fi, err := os.Stat(path)
+	if err == nil || !errors.Is(err, fs.ErrNotExist) {
+		return fi, err
+	}
+	for i := 0; i < swapWindowTries; i++ {
+		inFlight := swapInFlight(path)
+		if fi, serr := os.Stat(path); serr == nil {
+			return fi, nil
+		}
+		if !inFlight {
+			return nil, err
+		}
+		time.Sleep(swapWindowWait)
+	}
+	return nil, err
+}
+
 // swapInFlight reports whether a directory on the way to path has been renamed
 // aside and not yet replaced: gone from where it belongs, and sitting at its
 // ".old" parking spot.

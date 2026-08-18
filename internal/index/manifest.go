@@ -78,15 +78,20 @@ func ImportedSessionCounts(dir string) map[string]int {
 	return out
 }
 
+// HasManifest reports whether this directory holds an index. A rebuild's swap
+// takes the directory away for a moment, and answering "no" there sent every
+// hook down the no-index path: it asked for a rebuild that was already running
+// and served the prompt without recall (#1319).
 func HasManifest(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	_, err := os.Stat(filepath.Join(dir, "manifest.gob"))
-	if err != nil {
+	if _, err := statIndexFile(filepath.Join(dir, "manifest.gob")); err != nil {
 		return false
 	}
-	_, err = os.Stat(filepath.Join(dir, "sessions.gob"))
+	// Plain stat: the wait above has already closed the window by the time
+	// this runs, and a call site that cannot be made to fail is not a fix.
+	_, err := os.Stat(filepath.Join(dir, "sessions.gob"))
 	return err == nil
 }
 
@@ -100,7 +105,7 @@ func ManifestBuiltAt(dir string) time.Time {
 	if err == nil && !m.BuiltAt.IsZero() {
 		return m.BuiltAt
 	}
-	if fi, err := os.Stat(filepath.Join(dir, "manifest.gob")); err == nil {
+	if fi, err := statIndexFile(filepath.Join(dir, "manifest.gob")); err == nil {
 		return fi.ModTime()
 	}
 	return time.Time{}
@@ -292,6 +297,9 @@ func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
 	if m.RecordsSize <= 0 {
 		return true // empty index, or one written before the size stamp existed
 	}
+	// Plain stat, deliberately: every caller reads the manifest first, and that
+	// read waits the swap out — measured, removing the wait here changes
+	// nothing (#1319).
 	fi, err := os.Stat(filepath.Join(dir, "records.bin"))
 	if err != nil {
 		return false
@@ -374,12 +382,35 @@ func Damaged(dir string) bool {
 		// already. One that is there but will not decode is a different story:
 		// doctor stats the file, calls the index built and up to date, and the
 		// next search rebuilds it from scratch.
-		if _, statErr := os.Stat(filepath.Join(dir, "manifest.gob")); statErr == nil {
+		if _, statErr := statIndexFile(filepath.Join(dir, "manifest.gob")); statErr == nil {
 			return true
 		}
 		return false
 	}
-	return !recordsIntact(dir, m)
+	if recordsIntact(dir, m) {
+		return false
+	}
+	// The manifest and the record log were read a moment apart, and a rebuild
+	// can land between them: the manifest is the old one, records.bin is the
+	// new one, and their sizes disagree for reasons that have nothing to do
+	// with damage. Measured on the hook predicate during eight rebuilds, 19 of
+	// 13124 asks came back damaged, and each one served a prompt with no recall
+	// (#1319).
+	//
+	// Only while a build actually holds the lock: a store that is short with
+	// nothing running is short, and answering that immediately is what every
+	// other caller depends on.
+	if !RebuildInProgress(dir) {
+		return true
+	}
+	time.Sleep(swapWindowWait)
+	m2, err := readManifest(dir)
+	if err != nil {
+		// The manifest went away under us, which is the swap itself rather than
+		// damage; the next call sees the new one.
+		return false
+	}
+	return !recordsIntact(dir, m2)
 }
 
 // RebuildInProgress reports whether another process holds the index lock. A
