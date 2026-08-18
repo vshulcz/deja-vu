@@ -1830,6 +1830,67 @@ func durationError(s string) error {
 	return fmt.Errorf("%q is not a duration deja understands — try 30d, 12h, or 90m", s)
 }
 
+// presentFiles is one path if it exists, nothing otherwise: a store deja names
+// but does not have should weigh nothing rather than the directory around it.
+func presentFiles(paths ...string) []string {
+	var out []string
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func cursorReadFiles() []string {
+	return append(sources.CursorTranscripts(), sources.CursorDBs()...)
+}
+
+// filesSize sums what the parser would open, counting each path once: cursor
+// and hermes list a file under more than one discovery rule.
+func filesSize(paths []string) int64 {
+	seen := map[string]bool{}
+	var total int64
+	for _, p := range paths {
+		if p == "" || seen[p] {
+			continue
+		}
+		seen[p] = true
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			total += fi.Size()
+		}
+	}
+	return total
+}
+
+// commonDir is the deepest directory holding every path, which is the answer to
+// "where is my history" — the configured root can be a parent of it, or, when a
+// harness keeps its store somewhere else entirely, not contain it at all.
+func commonDir(paths []string) string {
+	dir := ""
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		d := filepath.Dir(p)
+		if dir == "" {
+			dir = d
+			continue
+		}
+		for dir != d && !strings.HasPrefix(d+string(filepath.Separator), dir+string(filepath.Separator)) {
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				return dir
+			}
+			dir = parent
+		}
+	}
+	return dir
+}
+
 func printSources(dir string) {
 	redactions := map[string]int{}
 	if red, err := index.Redactions(dir); err == nil {
@@ -1840,35 +1901,48 @@ func printSources(dir string) {
 	if antigravityLocation == "" {
 		antigravityLocation = filepath.Join(sources.Home(), ".gemini", "antigravity*")
 	}
+	// files names what the parser opens. The screen answers "where is my history
+	// and how much of it is there", and roots are where deja looks rather than
+	// what it reads: a codex root reported 108 MB of plugins, caches and sqlite
+	// WALs around 1.3 MB of transcripts, and hermes named a directory holding
+	// one crash log while the store it reads sat elsewhere (#654).
 	items := []struct {
 		name, location string
 		roots          []string
+		files          func() []string
 		load           func() []model.Session
 	}{
-		{"claude", sources.ClaudeRoot(), []string{sources.ClaudeRoot()}, sources.LoadClaude},
-		{"codex", sources.CodexRoot(), []string{sources.CodexRoot()}, sources.LoadCodex},
-		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.LoadGemini},
-		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, sources.LoadCursor},
-		{"antigravity", antigravityLocation, antigravityRoots, sources.LoadAntigravity},
-		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.LoadGrok},
-		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.LoadQwen},
-		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.LoadKimi},
-		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.LoadGoose},
-		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.LoadHermes},
-		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.LoadCopilot},
-		{"cline", sources.ClineSessionsDir(), append([]string{sources.ClineSessionsDir()}, sources.ClineLegacyRoots()...), sources.LoadCline},
-		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.LoadRoo},
-		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.LoadPi},
-		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.LoadOpenClaw},
-		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, sources.LoadZed},
-		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, sources.LoadNotes},
+		{"claude", sources.ClaudeRoot(), []string{sources.ClaudeRoot()}, sources.ClaudeFiles, sources.LoadClaude},
+		{"codex", sources.CodexRoot(), []string{sources.CodexRoot()}, sources.CodexFiles, sources.LoadCodex},
+		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.GeminiChatFiles, sources.LoadGemini},
+		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorReadFiles, sources.LoadCursor},
+		{"antigravity", antigravityLocation, antigravityRoots, sources.AntigravityTranscripts, sources.LoadAntigravity},
+		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.GrokSessionFiles, sources.LoadGrok},
+		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.LoadQwen},
+		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},
+		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles, sources.LoadGoose},
+		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.HermesSessionFiles, sources.LoadHermes},
+		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.CopilotSessionFiles, sources.LoadCopilot},
+		{"cline", sources.ClineSessionsDir(), append([]string{sources.ClineSessionsDir()}, sources.ClineLegacyRoots()...), sources.ClineSessionFiles, sources.LoadCline},
+		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.RooTaskFiles, sources.LoadRoo},
+		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},
+		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles, sources.LoadOpenClaw},
+		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},
+		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, func() []string { return presentFiles(sources.NotesFile()) }, sources.LoadNotes},
 	}
 	for _, it := range items {
-		var size int64
 		redacted := 0
 		for _, root := range it.roots {
-			size += pathSize(root)
 			redacted += redactionsUnder(redactions, root)
+		}
+		// Only paths that are files on this machine: a discovery rule can name
+		// something that is not one — hermes returns a token for a Postgres
+		// store — and neither a size nor a directory can be read off that.
+		read := presentFiles(it.files()...)
+		size := filesSize(read)
+		location := it.location
+		if where := commonDir(read); where != "" {
+			location = where
 		}
 		raw := it.load()
 		ss := sources.FilterSessions(raw)
@@ -1903,7 +1977,7 @@ func printSources(dir string) {
 		if excluded > 0 {
 			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 		}
-		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, it.location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
+		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
 	aiderFiles := sources.AiderFiles()
 	var aiderSize int64
