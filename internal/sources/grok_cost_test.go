@@ -37,18 +37,12 @@ func bigGrokUpdates(t *testing.T, lines int) string {
 	if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if fi, err := os.Stat(p); err == nil {
-		t.Logf("fixture: %d lines, %.1f MB", lines, float64(fi.Size())/(1<<20))
-	}
 	return p
 }
 
-// The session shape from #1321: 2955 ACP lines, ~11 MB, mostly tool events.
-// Indexing the run is the point; the parser filtered tool lines out before
-// decoding them precisely because they are most of the file, so the cost of
-// keeping them is worth stating and worth watching.
-func TestGrokIndexesTheRunAtAKnownCost(t *testing.T) {
-	p := bigGrokUpdates(t, 2955)
+func parseGrokTiming(t *testing.T, lines int) (time.Duration, map[string]int) {
+	t.Helper()
+	p := bigGrokUpdates(t, lines)
 	started := time.Now()
 	ss, err := ParseGrokFile(p)
 	took := time.Since(started)
@@ -61,15 +55,28 @@ func TestGrokIndexesTheRunAtAKnownCost(t *testing.T) {
 			roles[m.Role]++
 		}
 	}
-	t.Logf("parsed 11 MB in %v; roles=%v", took, roles)
+	return took, roles
+}
+
+// The session shape from #1321 is mostly tool events, and the parser used to
+// skip those lines before decoding them — which is why it was cheap and why it
+// found nothing. Indexing the run costs reading the run.
+//
+// The bar is linearity rather than a stopwatch reading: this suite runs under
+// `-race` on CI, where the same parse takes 6 s instead of 0.17 s, so an
+// absolute bound measures the machine. Four times the lines should cost about
+// four times as much; sixteen would mean something has gone quadratic.
+func TestGrokIndexesTheRunWithoutGoingQuadratic(t *testing.T) {
+	small, _ := parseGrokTiming(t, 500)
+	large, roles := parseGrokTiming(t, 2000)
+	t.Logf("500 lines in %v, 2000 lines in %v; roles=%v", small, large, roles)
 	if roles[RoleToolOutput] == 0 {
-		t.Error("the run is not indexed: no tool records from a session that is mostly tool events")
+		t.Fatal("the run is not indexed: no tool records from a session that is mostly tool events")
 	}
-	// Measured at ~170 ms on this fixture against ~10 ms when the tool stream was
-	// skipped: reading and decoding 11 MB instead of stepping over most of it.
-	// Half a second leaves room for a slower machine while still catching a
-	// parser that has started doing something per-line-squared.
-	if took > 500*time.Millisecond {
-		t.Errorf("parsing took %v, which is more than reading 11 MB costs", took)
+	if small <= 0 {
+		t.Skip("timer resolution too coarse to compare")
+	}
+	if ratio := float64(large) / float64(small); ratio > 8 {
+		t.Errorf("4x the lines cost %.1fx the time, which is not linear", ratio)
 	}
 }
