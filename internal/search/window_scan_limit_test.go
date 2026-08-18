@@ -46,6 +46,24 @@ func TestTokenWindowSeesPhraseInTheMiddle(t *testing.T) {
 	}
 }
 
+// Both query words run past the cap, so there is no rare token to anchor on and
+// places get sampled across the text instead. Every place then has a neighbour
+// close by, and the window must still come out as that neighbour rather than as
+// the distance to whichever place the sampling kept.
+func TestTokenWindowWhenEveryQueryWordIsEverywhere(t *testing.T) {
+	// Both words appear five thousand times, always a few words apart, and the
+	// one place they sit together is at the very end. The lone leading "alpha"
+	// puts the first occurrences far enough apart that the cheap
+	// first-occurrence bound cannot answer, so the sampling runs.
+	low := "alpha " + strings.Repeat("gap ", 100) +
+		strings.Repeat("alpha gap gap gap gap beta gap gap gap gap ", 5000) +
+		"alpha beta"
+	got := tokenWindow(low, []string{"alpha", "beta"})
+	if want := len("alpha beta"); got != want {
+		t.Errorf("window %d, want %d: the pair at the end was outside the sampled places", got, want)
+	}
+}
+
 // The phrase at the start has always worked, and must keep working — otherwise
 // a fix could pass the tests above by only ever looking at the tail.
 func TestTokenWindowStillSeesPhraseAtTheStart(t *testing.T) {
