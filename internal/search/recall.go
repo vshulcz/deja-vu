@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -192,6 +193,14 @@ func wordSet(s string) map[string]bool {
 		if utf8.RuneCountInString(word) >= 3 {
 			set[word] = true
 		}
+	}
+	// Chinese, Japanese and Korean put no separator between words, so the split
+	// above returns whole sentences: a session written in them counted two or
+	// three "words" and fell under the bar auto-recall sets for having anything
+	// to say (#1342). The index already reads those scripts as overlapping
+	// bigrams; this counts them the same way.
+	for _, b := range cjkfold.Bigrams(s) {
+		set[b] = true
 	}
 	return set
 }

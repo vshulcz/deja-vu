@@ -1,6 +1,7 @@
 package index
 
 import (
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,7 +78,7 @@ func TestCJKBigramSearch(t *testing.T) {
 }
 
 func TestCJKBigramsUnit(t *testing.T) {
-	got := cjkBigrams("装订计数")
+	got := cjkfold.Bigrams("装订计数")
 	want := []string{"装订", "订计", "计数"}
 	if len(got) != len(want) {
 		t.Fatalf("bigrams = %v", got)
@@ -87,10 +88,10 @@ func TestCJKBigramsUnit(t *testing.T) {
 			t.Fatalf("bigrams = %v, want %v", got, want)
 		}
 	}
-	if got := cjkBigrams("茶"); len(got) != 1 || got[0] != "茶" {
+	if got := cjkfold.Bigrams("茶"); len(got) != 1 || got[0] != "茶" {
 		t.Fatalf("unigram run = %v", got)
 	}
-	if got := cjkBigrams("plain ascii"); len(got) != 0 {
+	if got := cjkfold.Bigrams("plain ascii"); len(got) != 0 {
 		t.Fatalf("ascii leaked = %v", got)
 	}
 }

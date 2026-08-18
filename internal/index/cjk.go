@@ -1,8 +1,7 @@
 package index
 
 import (
-	"unicode"
-	"unicode/utf8"
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
 
 // CJK text carries no spaces, so the base tokenizer collapses whole phrases
@@ -12,67 +11,6 @@ import (
 // A single-rune run keeps its unigram. Runs never cross a non-CJK boundary,
 // so ASCII and Cyrillic paths are untouched, and bigrams are ordinary tokens
 // downstream — postings, ranking and the ladder apply unchanged.
-
-func isCJK(r rune) bool {
-	return unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
-		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r)
-}
-
-// cjkBigrams emits the bigram set for every CJK run in s.
-//
-// Bigrams keep the script they were written in. Folding happens where postings
-// keys are built (indexKeys and queryKeys), not here, so the query-time
-// function-word filter still sees the runes the user actually typed: 係 folds
-// to 系, which is a content character in 系統 and 關係, so a filter applied
-// after folding could not tell the two apart.
-func cjkBigrams(s string) []string {
-	// indexKeys hands this the whole message body, so a transcript with no CJK in
-	// it would otherwise decode every rune and run all four unicode.Is searches
-	// to build nothing. A CJK rune is never a single UTF-8 byte, so one byte scan
-	// answers the question before any decoding starts.
-	ascii := true
-	for i := 0; i < len(s); i++ {
-		if s[i] >= utf8.RuneSelf {
-			ascii = false
-			break
-		}
-	}
-	if ascii {
-		return nil
-	}
-
-	var out []string
-	seen := map[string]bool{}
-	var run []rune
-	flush := func() {
-		switch {
-		case len(run) == 1:
-			t := string(run)
-			if !seen[t] {
-				seen[t] = true
-				out = append(out, t)
-			}
-		case len(run) >= 2:
-			for i := 0; i+1 < len(run); i++ {
-				t := string(run[i : i+2])
-				if !seen[t] {
-					seen[t] = true
-					out = append(out, t)
-				}
-			}
-		}
-		run = run[:0]
-	}
-	for _, r := range s {
-		if isCJK(r) {
-			run = append(run, r)
-			continue
-		}
-		flush()
-	}
-	flush()
-	return out
-}
 
 // expandCJKTokens maps each token to itself plus, for every CJK run of 2+
 // runes inside it, that run's bigram set — the query-side mirror of the index
@@ -87,7 +25,7 @@ func expandCJKTokens(toks []string) []string {
 		hasCJK := false
 		allCJK := true
 		for _, r := range runes {
-			if isCJK(r) {
+			if cjkfold.IsCJK(r) {
 				hasCJK = true
 			} else {
 				allCJK = false
@@ -104,15 +42,15 @@ func expandCJKTokens(toks []string) []string {
 		}
 		i := 0
 		for i < len(runes) {
-			if !isCJK(runes[i]) {
+			if !cjkfold.IsCJK(runes[i]) {
 				i++
 				continue
 			}
 			j := i
-			for j < len(runes) && isCJK(runes[j]) {
+			for j < len(runes) && cjkfold.IsCJK(runes[j]) {
 				j++
 			}
-			out = append(out, cjkBigrams(string(runes[i:j]))...)
+			out = append(out, cjkfold.Bigrams(string(runes[i:j]))...)
 			i = j
 		}
 	}
@@ -169,7 +107,7 @@ func cjkFunctionBigram(tok string) bool {
 		return false
 	}
 	for _, r := range runes {
-		if !isCJK(r) || !cjkFunctionRunes[r] {
+		if !cjkfold.IsCJK(r) || !cjkFunctionRunes[r] {
 			return false
 		}
 	}

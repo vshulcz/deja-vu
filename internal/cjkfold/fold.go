@@ -17,6 +17,7 @@ package cjkfold
 import (
 	"sync"
 	"unicode"
+	"unicode/utf8"
 )
 
 // foldTrad and foldSimp are parallel rune sequences: foldTrad[i] folds to
@@ -94,4 +95,60 @@ func CountCJK(s string) int {
 		}
 	}
 	return n
+}
+
+// Bigrams emits the bigram set for every CJK run in s.
+//
+// Bigrams keep the script they were written in. Folding happens where postings
+// keys are built (indexKeys and queryKeys), not here, so the query-time
+// function-word filter still sees the runes the user actually typed: 係 folds
+// to 系, which is a content character in 系統 and 關係, so a filter applied
+// after folding could not tell the two apart.
+func Bigrams(s string) []string {
+	// The index hands this the whole message body, so a transcript with no CJK in
+	// it would otherwise decode every rune and run all four unicode.Is searches
+	// to build nothing. A CJK rune is never a single UTF-8 byte, so one byte scan
+	// answers the question before any decoding starts.
+	ascii := true
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return nil
+	}
+
+	var out []string
+	seen := map[string]bool{}
+	var run []rune
+	flush := func() {
+		switch {
+		case len(run) == 1:
+			t := string(run)
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+		case len(run) >= 2:
+			for i := 0; i+1 < len(run); i++ {
+				t := string(run[i : i+2])
+				if !seen[t] {
+					seen[t] = true
+					out = append(out, t)
+				}
+			}
+		}
+		run = run[:0]
+	}
+	for _, r := range s {
+		if IsCJK(r) {
+			run = append(run, r)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return out
 }

@@ -87,7 +87,7 @@ func TestCJKFoldUnit(t *testing.T) {
 	}
 	// Bigrams keep the script they were written in — the function-word filter
 	// depends on that, because 係 folds to 系 which is content in 系統.
-	if got := cjkBigrams("韓國簽證"); got[0] != "韓國" {
+	if got := cjkfold.Bigrams("韓國簽證"); got[0] != "韓國" {
 		t.Errorf("bigrams should stay unfolded, got %v", got)
 	}
 	// The keys built from them are what must agree across scripts.

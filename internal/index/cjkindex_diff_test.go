@@ -25,7 +25,7 @@ func legacyBucket(tok string) string {
 
 func legacyCJKKeys(s string) []string {
 	var out []string
-	for _, bg := range cjkBigrams(s) {
+	for _, bg := range cjkfold.Bigrams(s) {
 		out = append(out, "t"+cjkfold.String(bg))
 	}
 	return out

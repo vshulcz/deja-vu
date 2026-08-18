@@ -1,6 +1,7 @@
 package index
 
 import (
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"strings"
 	"testing"
 )
@@ -37,13 +38,13 @@ func TestCJKBigramsOnlyFiresOnCJK(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := cjkBigrams(tc.in)
+			got := cjkfold.Bigrams(tc.in)
 			if len(got) != len(tc.want) {
-				t.Fatalf("cjkBigrams(%q) = %q, want %q", tc.in, got, tc.want)
+				t.Fatalf("cjkfold.Bigrams(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 			for i := range got {
 				if got[i] != tc.want[i] {
-					t.Fatalf("cjkBigrams(%q) = %q, want %q", tc.in, got, tc.want)
+					t.Fatalf("cjkfold.Bigrams(%q) = %q, want %q", tc.in, got, tc.want)
 				}
 			}
 		})
@@ -56,7 +57,7 @@ func TestCJKBigramsOnlyFiresOnCJK(t *testing.T) {
 // what changed is the work done to arrive at it.
 func TestCJKBigramsDoesNotAllocateOnNonCJK(t *testing.T) {
 	body := strings.Repeat("the ingest worker leaks goroutines after a reload. ", 200)
-	if allocs := testing.AllocsPerRun(50, func() { cjkBigrams(body) }); allocs != 0 {
+	if allocs := testing.AllocsPerRun(50, func() { cjkfold.Bigrams(body) }); allocs != 0 {
 		t.Errorf("cjkBigrams on a %d-byte ASCII body made %v allocations, want 0", len(body), allocs)
 	}
 }
@@ -66,7 +67,7 @@ func BenchmarkCJKBigramsASCII(b *testing.B) {
 	b.SetBytes(int64(len(body)))
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		cjkBigrams(body)
+		cjkfold.Bigrams(body)
 	}
 }
 
@@ -75,6 +76,6 @@ func BenchmarkCJKBigramsCJK(b *testing.B) {
 	b.SetBytes(int64(len(body)))
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		cjkBigrams(body)
+		cjkfold.Bigrams(body)
 	}
 }
