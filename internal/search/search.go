@@ -614,8 +614,9 @@ func freshnessDecay(updated, now time.Time) float64 {
 }
 
 // windowOccurrenceCap bounds how many places of one token are weighed when
-// measuring how close the query's words come together, and windowScanLimit
-// bounds how many are looked at to choose them. Without either, a long
+// measuring how close the query's words come together; windowScanLimit bounds
+// how many are walked to choose them, and windowSegments how many are sampled
+// when even the rarest query word runs past that. Without either, a long
 // transcript message full of a common word makes this quadratic.
 //
 // The places kept are spread across the whole text rather than taken from the
@@ -626,6 +627,10 @@ func freshnessDecay(updated, now time.Time) float64 {
 const (
 	windowOccurrenceCap = 32
 	windowScanLimit     = 4096
+	// windowSegments is how many equal slices of a message get one sampled
+	// place each. Twice the cap, so spread still has more places than it keeps
+	// and can choose them.
+	windowSegments = windowOccurrenceCap * 2
 )
 
 // spread picks at most cap of the places, evenly across them, always keeping
@@ -682,22 +687,74 @@ func tokenWindow(low string, qtoks []string) int {
 
 	type occurrence struct{ at, tok int }
 	var occs []occurrence
-	var at []int
+
+	// Anchor on the rarest token. Sampling each token's places independently
+	// cannot find a tight cluster it did not happen to sample: a message that
+	// repeats one query word thousands of times and says the phrase once, in the
+	// middle, was measured against whichever repetition the sampling kept —
+	// hundreds of characters from the phrase (#1318). Anchoring instead asks the
+	// question that proximity actually is: for this place of the rare word,
+	// where is the nearest place of every other one?
+	anchor := -1
+	var at, buf []int
 	for ti, tok := range qtoks {
-		at = at[:0]
-		for i := 0; i < len(low) && len(at) < windowScanLimit; {
+		buf = buf[:0]
+		for i := 0; i < len(low) && len(buf) < windowScanLimit; {
 			j := strings.Index(low[i:], tok)
 			if j < 0 {
 				break
 			}
-			at = append(at, i+j)
+			buf = append(buf, i+j)
 			i += j + 1
 		}
-		if len(at) == 0 {
+		if len(buf) == 0 {
 			return 0
 		}
-		for _, p := range spread(at, windowOccurrenceCap) {
-			occs = append(occs, occurrence{p, ti})
+		// Counting the places is the same walk as finding them, and the walk is
+		// already capped, so the rarest token costs nothing extra to identify.
+		if anchor < 0 || len(buf) < len(at) {
+			anchor = ti
+			at = append(at[:0], buf...)
+		}
+	}
+	atok := qtoks[anchor]
+	if len(at) == windowScanLimit {
+		// The rare token is itself everywhere, so every place has a neighbour
+		// close by and which places are looked at stops mattering. Take one per
+		// segment of the text, which costs one pass instead of tens of thousands
+		// of searches, and keep the last — the tightest cluster is as often at
+		// the very end as anywhere.
+		at = at[:0]
+		for i, seg := 0, 0; i < len(low) && seg < windowSegments; {
+			j := strings.Index(low[i:], atok)
+			if j < 0 {
+				break
+			}
+			p := i + j
+			at = append(at, p)
+			seg = p*windowSegments/len(low) + 1
+			if next := len(low) * seg / windowSegments; next > p {
+				i = next
+			} else {
+				i = p + 1
+			}
+		}
+		if last := strings.LastIndex(low, atok); len(at) > 0 && last > at[len(at)-1] {
+			at = append(at, last)
+		}
+	}
+	for _, p := range spread(at, windowOccurrenceCap) {
+		occs = append(occs, occurrence{p, anchor})
+		for ti, tok := range qtoks {
+			if ti == anchor {
+				continue
+			}
+			if l := strings.LastIndex(low[:min(p+len(tok), len(low))], tok); l >= 0 {
+				occs = append(occs, occurrence{l, ti})
+			}
+			if r := strings.Index(low[p:], tok); r >= 0 {
+				occs = append(occs, occurrence{p + r, ti})
+			}
 		}
 	}
 	sort.Slice(occs, func(a, b int) bool { return occs[a].at < occs[b].at })
