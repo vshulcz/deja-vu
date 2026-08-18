@@ -327,12 +327,12 @@ const briefRecentLines = 3
 
 // briefTitleBudget is how much title fits after a prefix of prefixLen columns.
 //
-// briefWidth is the target, not a measurement: reading the real terminal size
-// means a per-OS TIOCGWINSZ, and this module has no dependencies and builds for
-// Windows. 80 is the width that is wrong least often, COLUMNS is honoured for
-// the readers who export it, and the 44 cap keeps a wide terminal looking as it
-// always has. The floor stops a deep project path from cutting titles to
-// nothing — a line that overflows by a little beats one that says nothing.
+// The width is the terminal's when it can be read, COLUMNS when the reader
+// exports it, and 80 otherwise — a 60-column split pane wrapped every line of
+// the first screen a new user sees, and 80 was a guess that is wrong there
+// (#604). The 44 cap keeps a wide terminal looking as it always has, and the
+// floor stops a deep project path from cutting titles to nothing: a line that
+// overflows by a little beats one that says nothing.
 func briefTitleBudget(prefixLen int) int {
 	room := briefWidth() - prefixLen - 1 // the ellipsis
 	if room > briefTitleMax {
@@ -345,7 +345,12 @@ func briefTitleBudget(prefixLen int) int {
 }
 
 func briefWidth() int {
+	// COLUMNS first: a reader who exports it is overriding the terminal on
+	// purpose, and scripts set it to pin the layout.
 	if n, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && n >= 20 && n <= 400 {
+		return n
+	}
+	if n, ok := terminalWidth(); ok && n >= 20 && n <= 400 {
 		return n
 	}
 	return 80
