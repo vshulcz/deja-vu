@@ -1696,7 +1696,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}
 	if len(offsets) > 0 {
-		f, err := os.Open(filepath.Join(dir, "records.bin"))
+		f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 		if err != nil {
 			return nil, err
 		}

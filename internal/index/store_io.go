@@ -36,7 +36,7 @@ func ReadRecords(dir string) ([]OffsetRecord, error) {
 		return nil, err
 	}
 	var out []OffsetRecord
-	f, err := os.Open(filepath.Join(dir, "records.bin"))
+	f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ var readAheadPool = sync.Pool{New: func() any { b := make([]byte, readAheadSize)
 // enough, which is how an existence question avoids reading a log it has already
 // answered.
 func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
-	f, err := os.Open(path)
+	f, err := openIndexFile(path)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
 }
 
 func eachRecord(path string, t *recordTables, fn func(Record)) error {
-	f, err := os.Open(path)
+	f, err := openIndexFile(path)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func readRecord(r io.Reader, t *recordTables) (Record, error) {
 // this trades a full decode of every record for a few length reads.
 func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn func(Record)) error {
 	atomic.AddInt64(&recordLogScans, 1)
-	f, err := os.Open(path)
+	f, err := openIndexFile(path)
 	if err != nil {
 		return err
 	}
@@ -682,7 +682,7 @@ func readBucketToken(p, tok string) ([]posting, error) {
 }
 
 func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
-	f, err := os.Open(p)
+	f, err := openIndexFile(p)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -848,7 +848,7 @@ func writeGobAtomic(p string, v any) error {
 }
 
 func readGob(p string, v any) error {
-	f, err := os.Open(p)
+	f, err := openIndexFile(p)
 	if err != nil {
 		return err
 	}
@@ -898,7 +898,7 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 		if e.tok != tok {
 			continue
 		}
-		f, err := os.Open(p)
+		f, err := openIndexFile(p)
 		if err != nil {
 			return nil, err
 		}
