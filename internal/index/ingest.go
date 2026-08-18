@@ -1472,6 +1472,18 @@ func sessionTitle(s model.Session) string {
 // `stats`; it is named after its first output instead.
 func sessionTitleFrom(s model.Session) (title string, fromAgent bool) {
 	if t := earliestTitle(s.Messages, "user"); t != "" {
+		if thinTitle(t) {
+			// A session that opens with a greeting was named after it: on a real
+			// 800-session store, 17 rows read "hi" and 3 "привет", with the turn
+			// that says what the work was one line below (#790). No word list —
+			// any of those is language-bound, and this store has two languages
+			// in the sample already. A turn too short to name anything gives way
+			// to the next one that can, and stands on its own when there is
+			// none.
+			if next := nextSubstantialTitle(s.Messages, t); next != "" {
+				return next, false
+			}
+		}
 		return t, false
 	}
 	if t := earliestTitle(s.Messages, "assistant"); t != "" {
@@ -1514,6 +1526,42 @@ func earliestTitle(ms []model.Message, role string) string {
 		case best == "":
 		case bestAt.IsZero(), msg.Time.IsZero():
 			// Nothing to compare: the first one found stands.
+			continue
+		case !msg.Time.Before(bestAt):
+			continue
+		}
+		best, bestAt = t, msg.Time
+	}
+	return best
+}
+
+// thinTitle reports that a turn is too short to name a session by.
+//
+// Two words and twelve runes: "hi", "привет", "say ok", "reply ok" are inside
+// it, and the short instructions worth keeping — "fix the build", "run the
+// tests" — are not. A length rule rather than a vocabulary is the only version
+// of this that works in every language the store holds.
+func thinTitle(t string) bool {
+	return len(strings.Fields(t)) <= 2 && len([]rune(t)) <= 12
+}
+
+// nextSubstantialTitle is the first later user turn that can name the session.
+// Ordered by the clock like earliestTitle, so a store titled locally and the
+// same store imported elsewhere agree.
+func nextSubstantialTitle(ms []model.Message, skip string) string {
+	best := ""
+	var bestAt time.Time
+	for _, msg := range ms {
+		if msg.Role != "user" {
+			continue
+		}
+		t := strings.TrimSpace(msg.Text)
+		if t == skip || !titleWorthy(t) || thinTitle(t) {
+			continue
+		}
+		switch {
+		case best == "":
+		case bestAt.IsZero(), msg.Time.IsZero():
 			continue
 		case !msg.Time.Before(bestAt):
 			continue

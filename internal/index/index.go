@@ -43,7 +43,12 @@ import (
 // line with nothing — or, once the field was added, without the per-project
 // session counts the trust policy needs. The bump forces the one rebuild that
 // mines them both.
-const version = 25
+// 26: a session that opens with a greeting was titled "hi" — 17 rows of one
+// real 800-session store, and the turn that says what the work was sits one
+// line below (#790). Titles are part of this version for the reason 22 gives:
+// incremental ingest reuses the row it already has, so nothing re-derives them
+// without a bump.
+const version = 26
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
