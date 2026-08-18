@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -429,8 +430,15 @@ func RepeatQuestions(ss []model.Session) int {
 			}
 			stem := questionStemFor(m.Text)
 			// Short acknowledgements ("ok", "continue") repeat across every
-			// session; only substantial messages count as questions.
-			if stem == "" || len(strings.Fields(stem)) < 4 || seen[stem] {
+			// session; only substantial messages count as questions. Chinese,
+			// Japanese and Korean write no separator between words, so such a
+			// question is one field however much it asks and this figure read
+			// zero for anyone working in them (#1348) — their characters are the
+			// words, as the index counts them for the same purpose.
+			if stem == "" || seen[stem] {
+				continue
+			}
+			if len(strings.Fields(stem)) < 4 && cjkfold.CountCJK(stem) < 4 {
 				continue
 			}
 			seen[stem] = true

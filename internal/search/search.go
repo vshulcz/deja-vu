@@ -391,6 +391,14 @@ func markEarlierAttempts(hits []Hit) {
 					set[w] = true
 				}
 			}
+			// Overlap is what marks one session as an earlier pass over another's
+			// problem. Chinese, Japanese and Korean write no separator between
+			// words, so a whole excerpt was one token and two sessions about the
+			// same thing overlapped in nothing (#1348) — the index reads those
+			// scripts as bigrams and so does this.
+			for _, b := range cjkfold.Bigrams(sn) {
+				set[b] = true
+			}
 		}
 		sets[i] = set
 	}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -497,6 +498,12 @@ func noteWordSet(s string) map[string]bool {
 		if len(w) >= 5 {
 			out[w] = true
 		}
+	}
+	// Two notes are related when they share words. Chinese, Japanese and Korean
+	// write no separator between them, so a whole note was one word and no two
+	// such notes could ever share the three the bar asks for (#1348).
+	for _, b := range cjkfold.Bigrams(s) {
+		out[b] = true
 	}
 	return out
 }
