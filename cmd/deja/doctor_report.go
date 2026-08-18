@@ -224,6 +224,14 @@ func collectDoctorEmbed(dir string) *doctorEmbedReport {
 		return r
 	}
 	r.Model, r.Dim = s.Model, s.Dim
+	// Coverage the search will not use is not coverage. Vectors address records
+	// by offset, so search refuses a sidecar built for an earlier index (#1355)
+	// — and doctor is the screen someone opens to find out why semantic results
+	// stopped, which is the worst place to report 50% of a file nothing reads
+	// (#1359).
+	if embed.Stale(dir, s) {
+		return r
+	}
 	if records, err := index.ReadRecords(dir); err == nil && len(records) > 0 {
 		r.Coverage = float64(s.Covered) / float64(len(records)) * 100
 	}
