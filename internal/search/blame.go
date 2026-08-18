@@ -89,6 +89,16 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		}
 		hit := BlameHit{Session: session, Title: sessionTitle(session), Tier: TierExact}
 		specificity := 0.0
+		// Quote the messages that say the most about the file, not the first two
+		// to name it. A session that mentions a file in passing and discusses it
+		// properly further down was quoted on the passing line, which is the
+		// evidence a reader judges the hit by (#1329).
+		type mention struct {
+			text  string
+			count int
+			level float64
+		}
+		var mentions []mention
 		for _, message := range session.Messages {
 			count, level := mentionScore(message.Text, base, forms)
 			if count == 0 {
@@ -98,9 +108,19 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			if level > specificity {
 				specificity = level
 			}
-			if len(hit.Snippets) < 2 {
-				hit.Snippets = append(hit.Snippets, snippet(message.Text, target.Base, nil))
+			mentions = append(mentions, mention{message.Text, count, level})
+		}
+		// A path-shaped mention outranks a bare filename however often the bare
+		// name is repeated; among equally specific ones, the message that keeps
+		// returning to the file wins; among equals, the order they were said in.
+		sort.SliceStable(mentions, func(i, j int) bool {
+			if mentions[i].level != mentions[j].level {
+				return mentions[i].level > mentions[j].level
 			}
+			return mentions[i].count > mentions[j].count
+		})
+		for i := 0; i < len(mentions) && i < 2; i++ {
+			hit.Snippets = append(hit.Snippets, snippet(mentions[i].text, target.Base, nil))
 		}
 		if hit.Count == 0 {
 			continue
