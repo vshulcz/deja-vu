@@ -1391,7 +1391,13 @@ func snippet(s, q string, re *regexp.Regexp) string {
 			}
 		}
 		if b > 0 {
-			idx = utf8.RuneCountInString(s[:b])
+			// Count runes in the lowercased string, which is where b came from.
+			// Lowercasing maps rune to rune, so the count carries over to s —
+			// the byte offsets do not: "İ" is two bytes and lowercases to one,
+			// so a Turkish message put the excerpt a rune earlier for every
+			// capital İ before the match, and enough of them moved the window
+			// off the match entirely (#1331).
+			idx = utf8.RuneCountInString(low[:b])
 		}
 	}
 	start := idx - 100
