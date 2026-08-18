@@ -766,29 +766,8 @@ func fileEndsWithNewline(f *os.File) bool {
 	return buf[0] == '\n'
 }
 
-// mergeCappedStrings unions a and b, keeping a's order first and dropping
-// duplicates, then caps the result. Used to carry an imported session's earlier
-// Touched files across a re-import instead of overwriting them.
-func mergeCappedStrings(a, b []string, limit int) []string {
-	if len(b) == 0 {
-		return a
-	}
-	seen := make(map[string]bool, len(a)+len(b))
-	out := make([]string, 0, len(a)+len(b))
-	for _, s := range append(append([]string(nil), a...), b...) {
-		if s == "" || seen[s] {
-			continue
-		}
-		seen[s] = true
-		out = append(out, s)
-		if len(out) >= limit {
-			break
-		}
-	}
-	return out
-}
-
-// mergeCappedU64 is mergeCappedStrings for the hash lists (Asked, Hit).
+// mergeCappedU64 unions two hash lists, keeping the first list's order and
+// dropping whatever does not fit under the cap.
 func mergeCappedU64(a, b []uint64, limit int) []uint64 {
 	if len(b) == 0 {
 		return a
@@ -881,9 +860,14 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// A re-import carries only the records new since last time; the ones
 			// behind the earlier Touched/Asked/Hit are in the ledger and skipped,
 			// so recomputing from this batch alone would drop them. Union with what
-			// the session already had — earlier entries first — so a file a peer
-			// edited in an earlier batch stays blamable (#1024 follow-up).
-			meta.Touched = mergeCappedStrings(old.Touched, meta.Touched, touchedFileCap)
+			// the session already had, so a file a peer edited in an earlier batch
+			// stays blamable (#1024 follow-up). Both sides are ranked lists, so the
+			// union is by rank: taking the older list first and cutting the newer
+			// off at the cap kept six earlier paths over the file this batch worked
+			// on hardest (#1333). Six slots mean some earlier path does lose its
+			// place — to a path the session worked on more, which is what the field
+			// holds.
+			meta.Touched = mergeTouched(old.Touched, meta.Touched)
 			meta.Asked = mergeCappedU64(old.Asked, meta.Asked, askedQuestionCap)
 			meta.Hit = mergeCappedU64(old.Hit, meta.Hit, frictionSessionCap)
 			// Same reason: a reversal reported in an earlier batch is not in

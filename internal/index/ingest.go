@@ -1103,21 +1103,32 @@ func unionHashes(have, add []uint64) []uint64 {
 
 // mergeTouched keeps the earlier order — the ranking a full pass produced — and
 // adds paths the tail introduced, bounded the same way topTouchedFiles bounds.
+// mergeTouched fuses two ranked lists of touched paths. Both sides come out of
+// rankTouched, where position is the ranking and nothing else carries it, so the
+// merge takes one from each side in turn. Appending the new list after the old
+// one and cutting at the cap ignored the ranking it was handed: six paths from
+// an earlier batch filled the list and the file this batch worked on hardest
+// never appeared, though Touched is the files a session worked on most (#1333).
 func mergeTouched(have, add []string) []string {
 	seen := make(map[string]bool, len(have)+len(add))
-	for _, p := range have {
+	out := make([]string, 0, touchedFileCap)
+	keep := func(p string) bool {
+		if p == "" || seen[p] {
+			return true
+		}
 		seen[p] = true
+		out = append(out, p)
+		return len(out) < touchedFileCap
 	}
-	for _, p := range add {
-		if !seen[p] {
-			seen[p] = true
-			have = append(have, p)
+	for i := 0; i < len(have) || i < len(add); i++ {
+		if i < len(have) && !keep(have[i]) {
+			return out
+		}
+		if i < len(add) && !keep(add[i]) {
+			return out
 		}
 	}
-	if len(have) > touchedFileCap {
-		have = have[:touchedFileCap]
-	}
-	return have
+	return out
 }
 
 // agentOwnedFile drops the agent's own working files. They are touched
