@@ -143,3 +143,17 @@ func TestStaleRule(t *testing.T) {
 		t.Error("a sidecar for this index counts as stale")
 	}
 }
+
+// The rule rests on two rebuilds being distinguishable. A timestamp alone is
+// not: on a coarse clock a forget straight after an index build shares it, and
+// the sidecar from before then reads as current.
+func TestGenerationSeparatesTwoRebuildsInOneTick(t *testing.T) {
+	dir, _, before := staleStore(t)
+	after, err := index.Generation(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Errorf("the generation is %q before and after a rebuild that moved every offset", before)
+	}
+}

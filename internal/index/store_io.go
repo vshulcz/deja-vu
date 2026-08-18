@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -62,10 +63,17 @@ func Generation(dir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if m.Generation != "" {
-		return m.Generation, nil
+	gen := m.Generation
+	if gen == "" {
+		gen = m.BuiltAt.UTC().Format(time.RFC3339Nano)
 	}
-	return m.BuiltAt.UTC().Format(time.RFC3339Nano), nil
+	// The stamp alone is a moment, and two rebuilds inside one tick of a coarse
+	// clock share it — a forget straight after an embed did, on Linux CI. What a
+	// caller actually asks this is whether record offsets still mean what they
+	// meant, so records.bin's length goes in the answer: same length and same
+	// stamp is the one case where a sidecar built earlier is still correct
+	// (#1355).
+	return gen + "+" + strconv.FormatInt(m.RecordsSize, 10), nil
 }
 
 func newRecordWriter(f *os.File, t *recordTables) (*recordWriter, error) {
