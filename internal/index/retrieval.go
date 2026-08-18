@@ -1334,6 +1334,18 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 			matches = append(matches, meta)
 		}
 	}
+	// The id the session came with, before the loose pass: import rewrites the
+	// id and OrigID keeps the old one (#1049), and a reader who typed that id in
+	// full should not be handed a local session that merely contains it as a
+	// substring. Nothing consulted OrigID at all, so `show`/`resume`/`ctx` said
+	// no session matches about a session deja holds and prints that id for.
+	if len(matches) == 0 {
+		for _, meta := range m.Sessions {
+			if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
+				matches = append(matches, meta)
+			}
+		}
+	}
 	if len(matches) == 0 {
 		for _, meta := range m.Sessions {
 			if idLooselyMatches(meta.ID, p) {
@@ -1341,6 +1353,12 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 			}
 		}
 	}
+	// The id the session had on the machine it came from. Import rewrites the
+	// id, and OrigID is kept precisely so that fact is not lost (#1049) — but
+	// nothing looked at it, so someone who read an id on one machine and typed
+	// it on another was told no session matches, about a session deja holds and
+	// prints that very id for under `--json`. After the local forms, so a local
+	// id always wins over an imported one that happens to collide.
 	// Last: the `harness:id` shape deja prints in `forget --list` and in
 	// promote's receipts, which every reading command refused (#921).
 	if len(matches) == 0 {
@@ -1375,8 +1393,16 @@ func PrefixMatches(dir, p string) int {
 	if err != nil {
 		return 0
 	}
+	// Counted the same way FindByPrefix resolves, including the id a session was
+	// imported under: #853 requires the count and the resolver to agree, and a
+	// selector that opens a session while the count says zero is that failure
+	// with the sign flipped.
 	n := 0
 	for _, meta := range m.Sessions {
+		if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
+			n++
+			continue
+		}
 		if strings.HasPrefix(meta.ID, p) {
 			n++
 		}
@@ -1436,6 +1462,10 @@ func PrefixHarnesses(dir, id string) []string {
 	}
 	var out []string
 	for _, meta := range m.Sessions {
+		if meta.OrigID == id {
+			out = append(out, meta.Harness)
+			continue
+		}
 		if meta.ID == id {
 			out = append(out, meta.Harness)
 		}
