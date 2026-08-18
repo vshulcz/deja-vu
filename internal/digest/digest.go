@@ -512,8 +512,12 @@ func Conclusions(s model.Session, budget int, max int) []string {
 			continue
 		}
 		if spent+len(line) > budget {
-			line = UTF8SafeCut(line, budget-spent)
-			if strings.TrimSpace(line) == "" {
+			// Whole sentences or nothing. Cutting here left a conclusion that
+			// reads as a finished thought while the part that fell off was the
+			// end of it — "we decided to cap retries at three after weighing the
+			// options" arrived without the "and then reverted that" it ended on,
+			// which is the opposite of what the session concluded (#1336).
+			if line = firstSentences(line, 1); spent+len(line) > budget {
 				break
 			}
 		}
