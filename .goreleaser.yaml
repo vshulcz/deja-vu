@@ -41,6 +41,10 @@ archives:
     files:
       - LICENSE
       - README.md
+      # The CLI-only install unpacks this archive and runs nothing else. warmup
+      # writes the skill too; shipping it here means it can be read, or copied
+      # by hand on a machine where deja cannot write ~/.agents (#1320).
+      - skills/deja-search/SKILL.md
 
 checksum:
   name_template: checksums.txt

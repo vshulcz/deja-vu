@@ -236,6 +236,12 @@ func cmdWarmup(dir string, _ []string) error {
 		return ensureError(dir, err)
 	}
 	maybeFirstIndexGreeting(dir)
+	// The CLI-only path ends here: binary, warmup, search. Without this the
+	// agent on such a machine has a working index and no instruction to reach
+	// for it, because the skill deja shipped described MCP tools that were
+	// never installed (#1320). A failure is not the warmup's failure — the
+	// index is built and search works either way.
+	_ = writeCLISkill()
 	return nil
 }
 

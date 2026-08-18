@@ -200,6 +200,23 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			hookCount++
 		}
 	}
+	// The CLI skill rides with guidance, like the command file: both are text
+	// telling the agent deja exists, and --no-guidance is the switch for
+	// someone who wants the plumbing without either. It goes in beside the MCP
+	// skill rather than instead of it — a session holding the tools uses them,
+	// one that does not still knows the shell path (#1320).
+	if guidance {
+		var err error
+		switch {
+		case !uninstall:
+			err = writeCLISkill()
+		case !cliSkillStillWanted(targets):
+			err = removeCLISkill()
+		}
+		if err != nil {
+			note(cliSkillName, err)
+		}
+	}
 	if len(refused) > 0 {
 		verb := "install"
 		if uninstall {
