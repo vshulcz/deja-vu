@@ -21,6 +21,10 @@ const (
 	cooccurNeighbors   = 6  // kept per token
 	cooccurMinPair     = 3  // sessions two tokens must share
 	cooccurMaxSessions = 20000
+	// cooccurShards is how many passes the pair count is split into. Eight holds
+	// an eighth of the pairs at a time for eight walks of the capped id lists,
+	// which are two orders of magnitude cheaper than the map they feed.
+	cooccurShards = 8
 )
 
 func cooccurPath(dir string) string { return filepath.Join(dir, cooccurFile) }
@@ -79,19 +83,18 @@ func buildCooccur(tmp string, ss []model.Session) {
 	}
 	band := func(v uint32) bool { return df[v] >= cooccurMinDF && df[v] <= maxDF }
 
-	// One packed key per unordered pair, canonical by id. The neighbour pass
-	// below expands it back to both sides, so which side is canonical never
-	// reaches the output.
-	pairs := map[uint64]int{}
-	kept := make([]uint32, 0, cooccurTokensPerSn)
+	// The tokens each session contributes pairs from: rarest first, capped, so a
+	// ubiquitous session cannot explode the map. Computed once and kept — at
+	// most cooccurTokensPerSn ids per session — while the full token sets go, so
+	// the pair passes below walk something small.
+	keptPerSession := make([][]uint32, 0, len(ss))
 	for _, list := range perSession {
-		kept = kept[:0]
+		kept := make([]uint32, 0, cooccurTokensPerSn)
 		for _, v := range list {
 			if band(v) {
 				kept = append(kept, v)
 			}
 		}
-		// rarest first, capped: ubiquitous sessions must not explode the map
 		sort.Slice(kept, func(i, j int) bool {
 			if df[kept[i]] == df[kept[j]] {
 				return toks[kept[i]] < toks[kept[j]]
@@ -101,31 +104,52 @@ func buildCooccur(tmp string, ss []model.Session) {
 		if len(kept) > cooccurTokensPerSn {
 			kept = kept[:cooccurTokensPerSn]
 		}
-		for i := 0; i < len(kept); i++ {
-			for j := i + 1; j < len(kept); j++ {
-				a, b := kept[i], kept[j]
-				if a > b {
-					a, b = b, a
-				}
-				pairs[uint64(a)<<32|uint64(b)]++
-			}
-		}
+		keptPerSession = append(keptPerSession, kept)
 	}
+	perSession = nil
+
 	type nc struct {
 		t string
 		c int
 	}
-	// Each canonical pair (a,b) is a neighbor of both a and b, so one pass over
-	// the half-map rebuilds the full candidate lists. Filtering at threshold
-	// here keeps the transient cand map to the pairs that can actually survive.
 	cand := map[string][]nc{}
-	for key, c := range pairs {
-		if c < cooccurMinPair {
-			continue
+	// One packed key per unordered pair, canonical by id, counted a shard at a
+	// time. Holding every pair at once was the larger half of a build's peak
+	// footprint on a store of a few thousand sessions (#1137): the map is one
+	// entry per distinct pair of co-occurring tokens, which grows far faster
+	// than the corpus does. A shard costs one more walk of the capped id lists,
+	// which is cheap, and the counts are exact either way — each pair lands in
+	// exactly one shard.
+	//
+	// Each canonical pair (a,b) is a neighbour of both a and b, so expanding it
+	// to both sides here rebuilds the same candidate lists the single-map
+	// version produced; the final sort is by count then token, so the order
+	// shards are visited in cannot reach the output.
+	for shard := uint64(0); shard < cooccurShards; shard++ {
+		pairs := map[uint64]int{}
+		for _, kept := range keptPerSession {
+			for i := 0; i < len(kept); i++ {
+				for j := i + 1; j < len(kept); j++ {
+					a, b := kept[i], kept[j]
+					if a > b {
+						a, b = b, a
+					}
+					key := uint64(a)<<32 | uint64(b)
+					if key%cooccurShards != shard {
+						continue
+					}
+					pairs[key]++
+				}
+			}
 		}
-		a, b := toks[uint32(key>>32)], toks[uint32(key)]
-		cand[a] = append(cand[a], nc{b, c})
-		cand[b] = append(cand[b], nc{a, c})
+		for key, c := range pairs {
+			if c < cooccurMinPair {
+				continue
+			}
+			a, b := toks[uint32(key>>32)], toks[uint32(key)]
+			cand[a] = append(cand[a], nc{b, c})
+			cand[b] = append(cand[b], nc{a, c})
+		}
 	}
 	neighbors := map[string][]string{}
 	for tok, list := range cand {
