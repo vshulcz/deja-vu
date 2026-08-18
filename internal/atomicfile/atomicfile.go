@@ -22,6 +22,26 @@ import (
 	"time"
 )
 
+// publish renames the temp file into place, retrying briefly.
+//
+// Windows refuses a rename onto a file another handle has open, and a reader is
+// exactly what these files have — the warmup status is polled by every surface
+// while a build writes it. Measured on windows CI: three of four concurrent
+// writers were denied. Unix succeeds on the first attempt and pays nothing.
+func publish(tmp, path string) error {
+	err := os.Rename(tmp, path)
+	for i := 0; err != nil && i < renameTries; i++ {
+		time.Sleep(renameWait)
+		err = os.Rename(tmp, path)
+	}
+	return err
+}
+
+const (
+	renameTries = 20
+	renameWait  = 5 * time.Millisecond
+)
+
 // sweptDirs remembers the directories this process has already tidied, so the
 // sweep below costs one listing per directory per run rather than one per
 // write — the warmup status is written four times a second.
@@ -72,7 +92,7 @@ func WriteStream(path string, perm os.FileMode, fn func(io.Writer) error) error 
 		_ = os.Remove(tmp)
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := publish(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
@@ -104,7 +124,7 @@ func Write(path string, b []byte, perm os.FileMode) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := publish(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}

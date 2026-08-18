@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -95,6 +96,11 @@ func TestWriteLeavesNoTempAndKeepsTheMode(t *testing.T) {
 	fi, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Windows has no permission bits to keep — chmod there toggles read-only
+	// and nothing else, so the mode a caller asks for is a unix promise.
+	if runtime.GOOS == "windows" {
+		return
 	}
 	if fi.Mode().Perm() != 0o600 {
 		t.Errorf("mode is %v, want 0600 — these files hold the user's own history", fi.Mode().Perm())
