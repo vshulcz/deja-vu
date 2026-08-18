@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 const sidecarVersion uint16 = 1
@@ -227,59 +229,46 @@ func Read(dir string) (Sidecar, error) {
 	return out, nil
 }
 
+// write publishes the sidecar in one step. The temp name used to be the
+// destination plus ".tmp", and EmbedIndex takes no lock — two embeds at once
+// shared that name, so one could rename a file the other was still writing and
+// leave a sidecar that decodes as nothing (#1319).
 func write(dir string, s Sidecar) error {
-	tmp := Path(dir) + ".tmp"
-	f, err := os.Create(tmp)
-	if err != nil {
-		return err
-	}
-	good := false
-	defer func() {
-		if !good {
-			_ = os.Remove(tmp)
+	return atomicfile.WriteStream(Path(dir), 0o600, func(w io.Writer) error {
+		if _, err := w.Write(magic[:]); err != nil {
+			return err
 		}
-	}()
-	if _, err = f.Write(magic[:]); err == nil {
-		err = binary.Write(f, binary.LittleEndian, sidecarVersion)
-	}
-	if err == nil {
-		err = binary.Write(f, binary.LittleEndian, uint16(s.Dim))
-	}
-	if err == nil {
-		err = writeString(f, s.Model)
-	}
-	if err == nil {
-		err = writeString(f, s.Generation)
-	}
-	if err == nil {
-		err = binary.Write(f, binary.LittleEndian, uint64(len(s.Vectors)))
-	}
-	if err == nil {
-		err = binary.Write(f, binary.LittleEndian, uint64(s.Covered))
-	}
-	for _, v := range s.Vectors {
-		if err == nil {
-			err = binary.Write(f, binary.LittleEndian, v.Offset)
+		for _, v := range []any{sidecarVersion, uint16(s.Dim)} {
+			if err := binary.Write(w, binary.LittleEndian, v); err != nil {
+				return err
+			}
 		}
-		if err == nil {
-			err = writeString(f, v.Key)
+		if err := writeString(w, s.Model); err != nil {
+			return err
 		}
-		if err == nil {
-			err = binary.Write(f, binary.LittleEndian, v.Values)
+		if err := writeString(w, s.Generation); err != nil {
+			return err
 		}
-	}
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		return err
-	}
-	if err = os.Rename(tmp, Path(dir)); err != nil {
-		return err
-	}
-	good = true
-	return nil
+		for _, n := range []uint64{uint64(len(s.Vectors)), uint64(s.Covered)} {
+			if err := binary.Write(w, binary.LittleEndian, n); err != nil {
+				return err
+			}
+		}
+		for _, v := range s.Vectors {
+			if err := binary.Write(w, binary.LittleEndian, v.Offset); err != nil {
+				return err
+			}
+			if err := writeString(w, v.Key); err != nil {
+				return err
+			}
+			if err := binary.Write(w, binary.LittleEndian, v.Values); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
+
 func writeString(w interface{ Write([]byte) (int, error) }, s string) error {
 	if err := binary.Write(w, binary.LittleEndian, uint32(len(s))); err != nil {
 		return err

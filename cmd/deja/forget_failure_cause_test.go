@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -43,10 +44,17 @@ func TestForgetPromotedTitlesKeepsTheNotesFileOnFailure(t *testing.T) {
 	if err := os.WriteFile(notes, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A directory in the temp file's place: the write cannot succeed.
-	if err := os.Mkdir(notes+".tmp", 0o755); err != nil {
+	// A read-only directory: the rewrite cannot create its temp file at all.
+	// This used to put a directory where the temp file would go, which worked
+	// while the temp name was derived from the destination — it is unique per
+	// writer now, so two `deja remember` calls cannot land on one name (#1319).
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop a write here")
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 	if _, err := sources.ForgetPromotedTitles(func(src string) bool { return src == "claude:s1" }); err == nil {
 		t.Fatal("the rewrite reported success")
 	}

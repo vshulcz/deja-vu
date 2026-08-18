@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 // The first build takes about ten seconds on a real corpus. It already runs
@@ -94,10 +96,7 @@ func (f *fileProgress) flush(force bool) {
 	if err := os.MkdirAll(filepath.Dir(f.path), 0o700); err != nil {
 		return
 	}
-	tmp := f.path + ".tmp"
-	if os.WriteFile(tmp, b, 0o600) == nil {
-		_ = os.Rename(tmp, f.path)
-	}
+	_ = atomicfile.Write(f.path, b, 0o600)
 }
 
 func (f *fileProgress) done() { _ = os.Remove(f.path) }

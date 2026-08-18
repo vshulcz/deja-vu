@@ -20,6 +20,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 // promptHookBudget keeps per-prompt injections small: this fires on every
@@ -424,11 +426,7 @@ func rotateHookseen(p, sid string) {
 			keep = append(keep, ln)
 		}
 	}
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, []byte(strings.Join(keep, "\n")+"\n"), 0o600); err != nil {
-		return
-	}
-	_ = os.Rename(tmp, p)
+	_ = atomicfile.Write(p, []byte(strings.Join(keep, "\n")+"\n"), 0o600)
 }
 
 // rememberInjectedIDs records arbitrary dedupe tokens against a session, so a

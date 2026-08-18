@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -632,18 +633,14 @@ func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error)
 	if changed == 0 {
 		return 0, nil
 	}
-	tmp := path + ".tmp"
 	body := strings.Join(lines, "\n")
 	if body != "" {
 		body += "\n"
 	}
-	if err := os.WriteFile(tmp, []byte(body), 0o600); err != nil {
-		// A rewrite that ran out of room left its temp file behind, on the
-		// filesystem that just filled up (#808).
-		_ = os.Remove(tmp)
-		return 0, err
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	// A rewrite that ran out of room used to leave its temp file behind, on the
+	// filesystem that just filled up (#808); atomicfile removes it on any
+	// failure, and gives it a name a second writer cannot land on (#1319).
+	if err := atomicfile.Write(path, []byte(body), 0o600); err != nil {
 		return 0, err
 	}
 	return changed, nil

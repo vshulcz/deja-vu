@@ -6,11 +6,14 @@ package usage
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 // Event kinds. Search is tracked too but statusline only counts memory
@@ -301,23 +304,18 @@ func rotate(p string) {
 	if len(keep) == len(all) {
 		return
 	}
-	tmp := p + ".tmp"
-	f, err := os.Create(tmp)
-	if err != nil {
-		return
-	}
-	w := bufio.NewWriter(f)
+	// One buffer, then one atomic replace. The temp name used to be derived
+	// from the log's own path, and this is the one writer in deja with no lock
+	// at all by design — two rotations at once shared that name and could
+	// publish a half-written log, which read as no history rather than as one
+	// lost event (#1319).
+	var buf bytes.Buffer
 	for _, e := range keep {
 		if b, err := json.Marshal(e); err == nil {
-			_, _ = w.Write(append(b, '\n'))
+			buf.Write(append(b, '\n'))
 		}
 	}
-	flushed := w.Flush()
-	if f.Close() != nil || flushed != nil {
-		_ = os.Remove(tmp)
-		return
-	}
-	_ = os.Rename(tmp, p)
+	_ = atomicfile.Write(p, buf.Bytes(), 0o600)
 }
 
 // WornSessions counts, per session id, how often agent-initiated recalls

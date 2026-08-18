@@ -2,11 +2,14 @@ package usage
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
 // A Snapshot is the full text of one served digest, kept so `deja log` can
@@ -105,18 +108,14 @@ func rotateSnapshots(p string) {
 		return
 	}
 	snaps := snapshotsFrom(p, snapshotsToKeep) // newest first
-	tmp := p + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		return
-	}
+	var buf bytes.Buffer
 	for i := len(snaps) - 1; i >= 0; i-- {
 		if b, err := json.Marshal(snaps[i]); err == nil {
-			_, _ = f.Write(append(b, '\n'))
+			buf.Write(append(b, '\n'))
 		}
 	}
-	_ = f.Close()
-	_ = os.Rename(tmp, p)
+	// Same shared-temp-name defect as the usage log above (#1319).
+	_ = atomicfile.Write(p, buf.Bytes(), 0o600)
 }
 
 // snapshotsFrom reads a snapshot file and returns up to n entries, newest
