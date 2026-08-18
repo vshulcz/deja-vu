@@ -1117,27 +1117,20 @@ func TestInstallHonorsUpstreamHomes(t *testing.T) {
 // its absence from --help led at least one user to conclude it did not exist.
 // This test pins each documented flag to the parser that implements it.
 func TestUsageDocumentsSearchFlags(t *testing.T) {
-	var b bytes.Buffer
-	old := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	os.Stdout = w
-	printUsage()
-	if err := w.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
-	os.Stdout = old
-	if _, err := b.ReadFrom(r); err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	got := b.String()
+	// usageText rather than printUsage through a pipe. The text is what is under
+	// test, and swapping os.Stdout for a pipe hung on windows until the suite's
+	// twelve-minute alarm fired, taking every later test in the package with it
+	// (#1119).
+	got := usageText()
 
-	for _, flag := range []string{
-		"--harness", "--project", "--since", "--role",
-		"--limit", "--all", "--re", "--json", "--no-embed",
-	} {
+	// Every flag parseSearch accepts, read from the list the parser itself uses,
+	// so a flag added without a line in the help is caught here rather than by
+	// the person who cannot find it.
+	for _, flag := range searchFlags {
+		if flag == "--rebuild" {
+			// Documented with the commands that take it, not in the search block.
+			continue
+		}
 		if !strings.Contains(got, flag) {
 			t.Errorf("printUsage does not document %s, but parseSearch accepts it", flag)
 		}
@@ -1160,6 +1153,8 @@ func flagArgsFor(flag string) []string {
 		return []string{"--role", "user", "q"}
 	case "--limit":
 		return []string{"--limit", "15", "q"}
+	case "--session":
+		return []string{"--session", "01a00feb", "q"}
 	default:
 		return []string{flag, "q"}
 	}
