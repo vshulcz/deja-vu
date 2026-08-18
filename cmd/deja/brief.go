@@ -65,7 +65,7 @@ func runBrief(dir string, w io.Writer) error {
 			}
 		}
 		if ov.Sessions == 0 {
-			printNoHistory(w)
+			printNoHistory(w, staleEmptyIndex(dir))
 			return nil
 		}
 	}
@@ -396,11 +396,43 @@ func buildForFirstRun(dir string) (bool, error) {
 // printNoHistory is the honest empty state: the index built and found nothing.
 // It names where deja looked, because the usual cause is that the agent stores
 // live somewhere this machine does not have.
-func printNoHistory(w io.Writer) {
+// staleEmptyIndex reports whether the empty index is out of date — the stores
+// have changed since it was written.
+//
+// The order anyone trying a new tool follows: install it, run `deja` to see
+// what it does (nothing yet), work for a day, run it again. The first run wrote
+// an empty index, and the refresh above only fires when there is no manifest at
+// all, so the second run kept saying the machine had no history while twelve
+// sessions sat on disk (#1313). Answering by rebuilding is not open to this
+// screen — measured at 7.0s behind another index's lock, exit 1 on a read-only
+// index directory, and indexing narration through the layout — so it says the
+// true thing cheaply instead. UpToDate reads the manifest and stats the stores;
+// it builds nothing and takes no lock, and it is only asked when the index
+// holds no sessions at all. Measured at 3.4ms over 1552 files in a 950 MB
+// store, which is a quarter of what this screen already spends.
+func staleEmptyIndex(dir string) bool {
+	if !index.HasManifest(dir) {
+		return false
+	}
+	fresh, _ := index.UpToDate(dir, "")
+	return !fresh
+}
+
+func printNoHistory(w io.Writer, stale bool) {
+	if stale {
+		fmt.Fprintln(w, "deja-vu "+version+" · history found, not indexed yet")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "your agents have written since deja last looked — run `deja index`")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "  deja index       read what is new")
+		fmt.Fprintln(w, "  deja sources     what was looked for, and where")
+		fmt.Fprintln(w, "  deja help        every command")
+		return
+	}
 	fmt.Fprintln(w, "deja-vu "+version+" · no agent history found yet")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "deja reads the session stores your agents already write —")
-	fmt.Fprintln(w, "Claude Code, Codex, opencode, Cursor, Gemini, Copilot and ten more.")
+	fmt.Fprintln(w, "Claude Code, Codex, opencode, Cursor, Gemini, Copilot and twelve more.")
 	fmt.Fprintln(w, "Nothing was found on this machine, which usually means no agent has")
 	fmt.Fprintln(w, "run here yet, or its store lives somewhere else.")
 	fmt.Fprintln(w)
