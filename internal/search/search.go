@@ -1207,11 +1207,21 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	// dropped "we decided to cap retries at 3" from the turn below it. That
 	// is the problem statement without its resolution (#R8).
 	prevKept := false
-	written := printContextChunks(w, s, budget, func(m model.Message) (bool, bool) {
-		matched := qlow != "" && (strings.Contains(strings.ToLower(m.Text), qlow) || MatchesParts(m.Text, terms, phrases, nil))
-		keep := matched || m.Role == "user" || (m.Role == "assistant" && prevKept)
+	written := printContextChunks(w, s, budget, func(m model.Message) (bool, int) {
+		weight := 0
+		if qlow != "" {
+			low := strings.ToLower(m.Text)
+			// How much of the query the turn carries, counted the way the hit
+			// snippets already rank passages: a turn that says the word once in
+			// passing must not outrank the exchange that keeps returning to it.
+			weight = countIn(m.Text, low, terms, phrases, qlow, nil)
+			if weight == 0 && strings.Contains(low, qlow) {
+				weight = 1
+			}
+		}
+		keep := weight > 0 || m.Role == "user" || (m.Role == "assistant" && prevKept)
 		prevKept = keep
-		return keep, matched
+		return keep, weight
 	})
 	if written > 0 {
 		return
@@ -1221,10 +1231,10 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, bool) { return true, false })
+	printContextChunks(w, s, budget, func(m model.Message) (bool, int) { return true, 0 })
 }
 
-func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok, matched bool)) int {
+func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, weight int)) int {
 	// A digest is what someone pipes into a prompt, so it carries the
 	// conversation. The work records — tool output, the files a turn touched, the
 	// commands it ran, the spans it replaced — are indexed and searchable by role
@@ -1233,42 +1243,56 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	// blocks. Collect the kept turns in one ordered pass so the include callback's
 	// prevKept bookkeeping still runs left to right.
 	type chunk struct {
-		text    string
-		matched bool
+		text string
+		// weight is how much of the query this turn carries, so the window can
+		// sit where the matches are rather than where the first one is.
+		weight int
 	}
 	var chunks []chunk
 	for _, m := range s.Messages {
 		if isWorkRecord(m.Role) {
 			continue
 		}
-		ok, matched := include(m)
+		ok, weight := include(m)
 		if !ok {
 			continue
 		}
-		text := SafeText(contextText(m.Text, matched))
+		text := SafeText(contextText(m.Text, weight > 0))
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text), matched})
+		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text), weight})
 	}
 	if len(chunks) == 0 {
 		return 0
 	}
-	// Anchor the budget window on the first matched turn (with one turn of
-	// lead-in, usually the question when the answer is what matched). Walking from
-	// the top instead let earlier scaffolding crowd the match out of budget: a
-	// query whose answer sat deep in a long session got 8KB of unrelated opening
-	// and none of the turns it found (#R8-budget). No match means the fallback
-	// overview, which wants the session's start, so it stays anchored at 0.
-	start := 0
-	for i, c := range chunks {
-		if c.matched {
-			start = i
-			if start > 0 {
-				start--
-			}
-			break
+	// Anchor the budget window where the matched turns are densest, with one turn
+	// of lead-in (usually the question when the answer is what matched). Walking
+	// from the top let earlier scaffolding crowd the match out of budget: a query
+	// whose answer sat deep in a long session got 8KB of unrelated opening and
+	// none of the turns it found (#R8-budget). Anchoring on the first match alone
+	// left the other half of that: a word mentioned once in passing at the top
+	// pinned the window there, and the exchange that settled the question — every
+	// later mention of it — fell outside the budget again (#1322). No match means
+	// the fallback overview, which wants the session's start, so it stays at 0.
+	start, best, span := 0, 0, 0
+	sum, bytes, left := 0, 0, 0
+	for right, c := range chunks {
+		sum += c.weight
+		bytes += len(c.text)
+		for left < right && bytes > budget {
+			sum -= chunks[left].weight
+			bytes -= len(chunks[left].text)
+			left++
 		}
+		if sum > best {
+			best, start, span = sum, left, bytes
+		}
+	}
+	// The lead-in is only worth having if it does not push a matched turn back
+	// out of the budget it was just chosen for.
+	if best > 0 && start > 0 && span+len(chunks[start-1].text) <= budget {
+		start--
 	}
 	written := 0
 	for _, c := range chunks[start:] {
