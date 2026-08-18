@@ -970,6 +970,11 @@ func titleBoost(titleHits, queryTokenCount int) float64 {
 func countDocumentWords(s string, terms []string, variants map[string][]string, counts, userCounts []int, user bool) int {
 	length := 0
 	start := -1
+	// cjk counts the characters of a run written in a script without spaces, and
+	// other counts the rest of that run, so a mixed run like "scheduler調度器"
+	// contributes both. Counted here rather than in a second pass over the word:
+	// this runs over every message of every candidate on every search.
+	cjk, other := 0, 0
 	for i := 0; i <= len(s); {
 		isWord := false
 		size := 0
@@ -977,12 +982,34 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 			r, n := utf8.DecodeRuneInString(s[i:])
 			size = n
 			isWord = unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
+			if isWord {
+				if cjkfold.IsCJK(r) {
+					cjk++
+				} else {
+					other++
+				}
+			}
 		}
 		if isWord && start < 0 {
 			start = i
 		} else if !isWord && start >= 0 {
 			word := s[start:i]
-			length++
+			// Length feeds BM25's normalisation, the part that stops a long
+			// document mentioning a term once from outranking a short one about
+			// it. Chinese, Japanese and Korean put no spaces between words, so a
+			// four-thousand-character aside was one word long and normalisation
+			// had nothing to work with: measured on the same content, a passing
+			// mention was separated from the answer by 6.2x in English and 1.3x
+			// in Chinese (#1344). Their characters are the words.
+			if cjk > 0 {
+				length += cjk
+				if other > 0 {
+					length++
+				}
+			} else {
+				length++
+			}
+			cjk, other = 0, 0
 			for j, term := range terms {
 				matched := word == term
 				if !matched {
