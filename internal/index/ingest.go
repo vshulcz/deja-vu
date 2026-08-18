@@ -1169,33 +1169,6 @@ func mergeTouchedCounted(have []string, hits []int, add []string, addHits []int)
 	return rankTouchedCounted(count)
 }
 
-// unionHashes appends what is new, keeping order stable so two builds of the
-// same session compare equal.
-func unionHashes(have, add []uint64) []uint64 {
-	if len(add) == 0 {
-		return have
-	}
-	seen := make(map[uint64]bool, len(have)+len(add))
-	for _, h := range have {
-		seen[h] = true
-	}
-	for _, h := range add {
-		if !seen[h] {
-			seen[h] = true
-			have = append(have, h)
-		}
-	}
-	return have
-}
-
-// mergeTouched keeps the earlier order — the ranking a full pass produced — and
-// adds paths the tail introduced, bounded the same way topTouchedFiles bounds.
-// mergeTouched fuses two ranked lists of touched paths. Both sides come out of
-// rankTouched, where position is the ranking and nothing else carries it, so the
-// merge takes one from each side in turn. Appending the new list after the old
-// one and cutting at the cap ignored the ranking it was handed: six paths from
-// an earlier batch filled the list and the file this batch worked on hardest
-// never appeared, though Touched is the files a session worked on most (#1333).
 func mergeTouched(have, add []string) []string {
 	seen := make(map[string]bool, len(have)+len(add))
 	out := make([]string, 0, touchedFileCap)
