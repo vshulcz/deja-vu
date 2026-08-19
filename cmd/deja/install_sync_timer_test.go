@@ -32,9 +32,19 @@ func TestInstallSyncTimerWritesAUnitTheSystemReads(t *testing.T) {
 	if r.Action == "unchanged" {
 		t.Errorf("the first install wrote nothing")
 	}
-	b, err := os.ReadFile(r.Path)
-	if err != nil {
+	if _, err := os.Stat(r.Path); err != nil {
 		t.Fatalf("the unit is not where install said it is: %v", err)
+	}
+	// systemd splits the work in two: install reports the timer, because that
+	// is what a person enables, and the command lives in the service beside
+	// it. launchd keeps both in one plist.
+	unit := r.Path
+	if runtime.GOOS == "linux" {
+		unit = filepath.Join(syncAutoUnitDir(), "deja-sync.service")
+	}
+	b, err := os.ReadFile(unit)
+	if err != nil {
+		t.Fatalf("cannot read %s: %v", unit, err)
 	}
 	body := string(b)
 	// It has to run the bare form and nothing else: that is the one that
@@ -195,4 +205,30 @@ func sameArgs(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+// The target is only offered where deja can actually schedule something.
+// Offering one that always fails is worse than not offering it — and the
+// suite's own invariants install every target for real, so a target that
+// refuses its platform fails them.
+func TestSyncTimerIsOfferedOnlyWhereItCanRun(t *testing.T) {
+	for goos, want := range map[string]bool{
+		"darwin": true, "linux": true,
+		"windows": false, "plan9": false, "freebsd": false,
+	} {
+		if got := syncTimerSchedulable(goos); got != want {
+			t.Errorf("syncTimerSchedulable(%q) = %v, want %v", goos, got, want)
+		}
+	}
+	// And the list follows that answer on this machine.
+	var listed bool
+	for _, n := range installTargetNames() {
+		if n == "sync-timer" {
+			listed = true
+		}
+	}
+	if listed != syncTimerSchedulable(runtime.GOOS) {
+		t.Errorf("sync-timer listed=%v on %s, but schedulable=%v",
+			listed, runtime.GOOS, syncTimerSchedulable(runtime.GOOS))
+	}
 }
