@@ -2,6 +2,7 @@ package search
 
 import (
 	"bytes"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"strings"
 	"testing"
 	"time"
@@ -84,7 +85,7 @@ func TestAWideScriptLineFitsToo(t *testing.T) {
 		if !strings.HasPrefix(line, "  ") {
 			continue
 		}
-		if got := columns(line); got > 60 {
+		if got := termwidth.Columns(line); got > 60 {
 			t.Errorf("a CJK snippet printed %d columns wide: %q", got, line)
 		}
 	}
@@ -101,8 +102,8 @@ func TestColumnsCountsWideRunes(t *testing.T) {
 		{"a调b", 4},
 		{"", 0},
 	} {
-		if got := columns(tc.in); got != tc.want {
-			t.Errorf("columns(%q) = %d, want %d", tc.in, got, tc.want)
+		if got := termwidth.Columns(tc.in); got != tc.want {
+			t.Errorf("termwidth.Columns(%q) = %d, want %d", tc.in, got, tc.want)
 		}
 	}
 }

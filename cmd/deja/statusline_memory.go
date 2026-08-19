@@ -13,6 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // The status line is the only surface deja has that is present *during* the
@@ -227,7 +228,12 @@ func statuslineMemoryLineTo(m fileMemory, maxTitle int) string {
 func trimStatuslineTitle(t string) string { return safeForStatusline(t, statuslineMaxTitle) }
 
 // safeForStatusline strips what a terminal would act on rather than print, and
-// bounds the length in runes.
+// bounds the length in columns.
+//
+// Columns rather than runes because the bound exists to keep the bar inside
+// the terminal: a CJK title is one rune and two columns per character, so a
+// 38-rune cap let a Chinese title print 76 columns and take the line past the
+// edge that #1076 fixed for Latin text.
 //
 // Control characters (Cc) cover the carriage return and the escape byte.
 // Format characters (Cf) are the quieter half of the same problem: U+202E
@@ -242,9 +248,8 @@ func safeForStatusline(s string, max int) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	r := []rune(s)
-	if len(r) > max {
-		return strings.TrimSpace(string(r[:max])) + "…"
+	if termwidth.Columns(s) > max {
+		return strings.TrimSpace(termwidth.Cut(s, max)) + "…"
 	}
 	return s
 }
@@ -273,7 +278,7 @@ func withFileMemory(dir string, in transcriptSource, usage string) string {
 	// rule: it is the half that has to survive. The title is its elastic part,
 	// with a floor so a long filename cannot cut it to a stub.
 	mem := "deja · " + statuslineMemoryLineTo(m, statuslineMaxTitle)
-	if over := visibleLen(mem) - width; over > 0 {
+	if over := barColumns(mem) - width; over > 0 {
 		budget := statuslineMaxTitle - over
 		if budget < statuslineMinTitle {
 			budget = statuslineMinTitle
@@ -284,7 +289,7 @@ func withFileMemory(dir string, in transcriptSource, usage string) string {
 	// it past the edge; dropping it is the trade this function already
 	// documents, and half of it beats a line that runs off.
 	for _, tail := range []string{shortenUsage(usage), firstUsageFact(usage)} {
-		if tail != "" && visibleLen(mem)+3+visibleLen(tail) <= width {
+		if tail != "" && barColumns(mem)+3+barColumns(tail) <= width {
 			return mem + " · " + tail
 		}
 	}
@@ -300,6 +305,10 @@ func firstUsageFact(usage string) string {
 	}
 	return parts[0]
 }
+
+// barColumns is how wide a rendered segment prints, ignoring the colour
+// escapes, which occupy no cell.
+func barColumns(s string) int { return termwidth.Columns(ansiRE.ReplaceAllString(s, "")) }
 
 // statuslineWidth is the bar deja lays out for. Same reasoning as briefWidth:
 // no dependency may be added to read the real size, 80 is wrong least often,
