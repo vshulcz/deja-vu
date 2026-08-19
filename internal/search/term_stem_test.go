@@ -36,3 +36,36 @@ func TestTermStemMatchesInflectionAndNotEverything(t *testing.T) {
 		})
 	}
 }
+
+// A term is a mention where a word begins. Traced by instrumenting the matcher
+// on a real store: "mini" scored a hit on "cron minimum granularity is 1
+// minute", and that row of a table then won the slot the reader sees first.
+//
+// Short terms must also end the word. Requiring that of everything under seven
+// characters was measured and cost more than it saved — the benchmark went
+// 14/14 to 13/14 and the live rate 88% to 86%, because "hermes", "score" and
+// "tick" belong inside longer words. Four characters is where the trade turns.
+func TestTermIsAMentionWhereAWordBegins(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		text string
+		term string
+		want bool
+	}{
+		{"a short term inside a longer word", "cron minimum granularity is 1 minute", "mini", false},
+		{"a short term as its own word", "подними mini и проверь", "mini", true},
+		{"a short term before punctuation", "файл mini.yaml на месте", "mini", true},
+		// Long enough to be trusted as a prefix: these read as one topic.
+		{"a longer term running on", "the scoreboard was rebuilt", "score", true},
+		{"a longer term after a separator", "смотри ~/.hermes/config", "hermes", true},
+		// The stem may run on to the right; it still has to start a word.
+		{"an inflected ending", "индексацию перенесли", "индексация", true},
+		{"a stem inside a longer word", "переиндексацию отложили", "индексация", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := TextCarriesTerm(tc.text, tc.term); got != tc.want {
+				t.Errorf("TextCarriesTerm(%q, %q) = %v, want %v", tc.text, tc.term, got, tc.want)
+			}
+		})
+	}
+}

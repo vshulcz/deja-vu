@@ -249,15 +249,80 @@ func termHits(text string, terms []string) int {
 		if t == "" {
 			continue
 		}
-		if strings.Contains(low, strings.ToLower(t)) {
+		if containsWord(low, strings.ToLower(t)) {
 			n++
 			continue
 		}
-		if stem := termStem(t); stem != "" && strings.Contains(low, stem) {
+		// The stem is checked the same way: it may run on to the right, that
+		// being the ending it exists for, but it still has to start a word.
+		// Without that "индексация" matched inside "переиндексацию".
+		if stem := termStem(t); stem != "" && containsWord(low, stem) {
 			n++
 		}
 	}
 	return n
+}
+
+// wholeWordMax is how short a term has to be before it must be a whole word.
+//
+// Traced by instrumenting the matcher on a real store: "mini" scored a hit on
+// "cron minimum granularity is 1 minute", and that row of a table then won the
+// slot the reader sees first. A word of four letters or fewer sits inside too
+// many others to be trusted as a fragment.
+//
+// Deliberately low. Requiring it of everything below seven characters was
+// measured too: it cost the benchmark 14/14 -> 13/14 and the live rate 88% ->
+// 86%, because "hermes", "score" and "tick" legitimately appear inside longer
+// words the reader wants.
+const wholeWordMax = 4
+
+// containsWord finds a term where a word starts. A short one must end there
+// too; a longer one may run on, which is what an ending or a compound looks
+// like — "hermes/config", "индексацию".
+func containsWord(text, term string) bool {
+	if term == "" {
+		return false
+	}
+	whole := len([]rune(term)) <= wholeWordMax
+	for at := 0; ; {
+		i := strings.Index(text[at:], term)
+		if i < 0 {
+			return false
+		}
+		i += at
+		startsWord := !wordRuneBefore(text, i)
+		endsWord := !whole || !wordRuneAt(text, i+len(term))
+		if startsWord && endsWord {
+			return true
+		}
+		at = i + 1
+		if at >= len(text) {
+			return false
+		}
+	}
+}
+
+// wordRuneBefore and wordRuneAt decode whole runes: indexing a byte lands in
+// the middle of a Cyrillic letter and reads it as punctuation.
+func wordRuneBefore(text string, i int) bool {
+	if i <= 0 {
+		return false
+	}
+	r, _ := utf8.DecodeLastRuneInString(text[:i])
+	return isWordRune(r)
+}
+
+func wordRuneAt(text string, i int) bool {
+	if i >= len(text) {
+		return false
+	}
+	r, _ := utf8.DecodeRuneInString(text[i:])
+	return isWordRune(r)
+}
+
+func isWordRune(r rune) bool {
+	return r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') || r >= 0x400
 }
 
 // termStemMin is how long a term must be before its ending may be trimmed.
