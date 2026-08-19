@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja files <topic>` answers which files a piece of work actually touched.
@@ -256,7 +257,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	for _, r := range rows {
-		fmt.Fprintf(stdout, "  %-*s %d\n", col, trimPathTo(trimPath(r.path), col), r.n)
+		// Padded here rather than with %-*s, whose width is runes: a path under
+		// a Chinese directory is one rune and two columns per character, so the
+		// counts stopped lining up in a column of their own.
+		path := trimPathTo(trimPath(r.path), col)
+		fmt.Fprintf(stdout, "  %s%s %d\n", path, strings.Repeat(" ", max(0, col-termwidth.Columns(path))), r.n)
 	}
 	return nil
 }
@@ -388,14 +393,28 @@ var repoCheck sync.Map
 // file name survives: the tail is what identifies it, and a head-first cut
 // leaves rows that all read "…/src/".
 func trimPathTo(p string, width int) string {
-	r := []rune(p)
-	if width <= 0 || len(r) <= width {
+	if width <= 0 || termwidth.Columns(p) <= width {
 		return p
 	}
 	if width < 4 {
-		return string(r[len(r)-width:])
+		return tailToColumns(p, width)
 	}
-	return "…" + string(r[len(r)-(width-1):])
+	return "…" + tailToColumns(p, width-1)
+}
+
+// tailToColumns is the last width columns of s, cut on a character boundary.
+// A wide character that would only half fit is dropped rather than split.
+func tailToColumns(s string, width int) string {
+	r := []rune(s)
+	n := 0
+	for i := len(r) - 1; i >= 0; i-- {
+		w := termwidth.RuneColumns(r[i])
+		if n+w > width {
+			return string(r[i+1:])
+		}
+		n += w
+	}
+	return s
 }
 
 // trimPath keeps the tail that identifies a file without the home directory in
