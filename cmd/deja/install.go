@@ -577,6 +577,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installGooseAuto(exe, uninstall)
 	case "statusline":
 		return installStatusline(exe, uninstall)
+	case "sync-timer":
+		return installSyncTimer(exe, uninstall)
 	default:
 		return installResult{}, unknownTargetError(target)
 	}
@@ -1515,5 +1517,11 @@ func installTargetNames() []string {
 		// prompt to, so there is no -auto pair to install.
 		"zed",
 		"statusline",
+		// Not a harness, and deliberately not "-auto": that suffix means a
+		// harness's auto-recall hook, and this is the timer that keeps this
+		// machine's memory in step with the others. It belongs in this list
+		// because `deja install --all` is where someone setting up a second
+		// machine looks.
+		"sync-timer",
 	}
 }
