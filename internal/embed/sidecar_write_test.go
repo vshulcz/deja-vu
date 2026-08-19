@@ -37,6 +37,13 @@ func TestWriteLeavesTheOldSidecarWhenItCannotFinish(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores the permissions this test needs")
 	}
+	// Chmod succeeds on Windows and changes nothing, so the mode bits are not
+	// evidence — whether the directory actually refuses a new file is.
+	if probe, err := os.Create(filepath.Join(parent, "probe")); err == nil {
+		probe.Close()
+		_ = os.Remove(probe.Name())
+		t.Skip("the directory still accepts writes when read-only")
+	}
 	if err := write(dir, Sidecar{Model: "m", Dim: 1, Generation: "g2"}); err == nil {
 		t.Error("a write into a read-only directory reported success")
 	}
