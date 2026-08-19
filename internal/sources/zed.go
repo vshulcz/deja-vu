@@ -76,6 +76,35 @@ func ZedDB() string {
 	return EnvPath("DEJA_ZED_DB", filepath.Join(ZedRoot(), "threads", "threads.db"))
 }
 
+// ZedSettingsPath is the settings file Zed's agent reads MCP servers from. It
+// is the *config* directory, not the data one ZedRoot points at: on this
+// machine, measured, `~/.config/zed/settings.json` beside a data store under
+// `~/Library/Application Support/Zed`.
+//
+// macOS and Linux are the same path because Zed asks for a config dir rather
+// than following the platform convention; Windows is APPDATA. DEJA_ZED_CONFIG
+// overrides the lot, which is how this is tested without a Zed install and how
+// someone whose layout differs can point deja at it.
+func ZedSettingsPath() string {
+	if p := os.Getenv("DEJA_ZED_CONFIG"); p != "" {
+		return p
+	}
+	return filepath.Join(zedConfigDir(runtime.GOOS), "settings.json")
+}
+
+func zedConfigDir(goos string) string {
+	if goos == "windows" {
+		if p := os.Getenv("APPDATA"); p != "" {
+			return filepath.Join(p, "Zed")
+		}
+		return filepath.Join(Home(), "AppData", "Roaming", "Zed")
+	}
+	if p := os.Getenv("XDG_CONFIG_HOME"); p != "" {
+		return filepath.Join(p, "zed")
+	}
+	return filepath.Join(Home(), ".config", "zed")
+}
+
 // ZstdAvailable reports whether the zstd CLI the zed parser shells out to is
 // on PATH. Zed compresses every thread it writes, so without this the store is
 // readable but its contents are not.
