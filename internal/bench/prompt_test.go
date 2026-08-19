@@ -22,7 +22,7 @@ func TestGeneratePromptShape(t *testing.T) {
 		// would make a query match two chains and blur the measurement; the
 		// bucket exists to measure exactly that condition — a scope holding
 		// several unrelated pieces of work and not the answer.
-		if c.Kind != "bucket" && c.Kind != "haystack" && c.Kind != "haystack-noise" {
+		if c.Kind != "bucket" && c.Kind != "haystack" && c.Kind != "haystack-noise" && c.Kind != "russian" {
 			if projects[c.Project] {
 				t.Fatalf("project %q shared by two chains; a query would match both", c.Project)
 			}

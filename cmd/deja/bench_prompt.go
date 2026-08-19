@@ -95,6 +95,17 @@ type promptReport struct {
 	// with plainly unrelated work and none with silence — the hook never says
 	// it does not know, which is what teaches an agent to stop reading it.
 	OffTopic promptArmReport `json:"off_topic"`
+	// Questions in Russian, wrapped in the filler a person types around them.
+	// The corpus was English-only, so nothing here spoke the language whose
+	// filler list had just been extended — and over-filtering is the way that
+	// change fails: put one subject word in the list by mistake and the
+	// question falls silent. Measured: adding the three subjects to the filler
+	// list takes this arm from 3/3 to 1/3.
+	//
+	// It does not see the defect that prompted the extension. That one was
+	// about which line the block opens with, and every arm here scores which
+	// session was chosen.
+	Russian promptArmReport `json:"russian_questions"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -174,6 +185,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 			arm = &report.Bucket
 		case "haystack":
 			arm = &report.Haystack
+		case "russian":
+			arm = &report.Russian
 		default:
 			realTerms = append(realTerms, len(terms))
 		}
@@ -219,6 +232,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	}
 	finishPromptArm(&report.Haystack, nil)
 	finishPromptArm(&report.OffTopic, nil)
+	finishPromptArm(&report.Russian, nil)
 	return report, nil
 }
 

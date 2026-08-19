@@ -47,6 +47,9 @@ const PromptBucketProject = promptBucketProject
 // actually decided each question, so the benchmark can see which wins.
 const promptHaystackProject = "promptbenchhaystack"
 
+// promptRussianProject holds every Russian chain, so they compete.
+const promptRussianProject = "promptbenchru"
+
 // PromptHaystackProject is that project, exported so the benchmark can ask it
 // a question it never answered.
 const PromptHaystackProject = promptHaystackProject
@@ -64,6 +67,21 @@ type promptTopic struct {
 
 // Each topic is one short word plus the sentence a session would record and
 // the question someone would ask about it months later.
+// promptRussianTopics are the same shape as the English ones, with the filler
+// a person actually types around the subject. The session they answer opens
+// with filler too, so a filler term would match the wrong line as well as the
+// wrong session.
+func promptRussianTopics() []promptTopic {
+	return []promptTopic{
+		{"вебхук", "повторную доставку вебхука ограничили тремя попытками",
+			"напомни, сколько попыток у повторной доставки вебхука, и что делать дальше"},
+		{"шардирование", "шардирование по клиенту заменили на шардирование по региону",
+			"погоди, а по чему у нас в итоге шардирование, покажи ещё раз"},
+		{"индексация", "индексацию перенесли в фоновый воркер после записи",
+			"подожди, где именно теперь происходит индексация, объясни снова"},
+	}
+}
+
 func promptTopics() []promptTopic {
 	return []promptTopic{
 		{"etag", "the stale etag reuse was replaced with generation checks", "why did we replace the stale etag reuse?"},
@@ -222,6 +240,43 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			Messages: []model.Message{{Role: "user", Text: "we decided prepared statements go behind pgbouncer in session mode", Time: answer}},
 		}},
 	})
+	// Questions in Russian, asked the way they are actually typed: an
+	// interjection, a request verb, and the subject somewhere in the middle.
+	// They share one project so the filler-heavy openings of the others
+	// compete, and they guard the filler list against being over-extended —
+	// one subject word added by mistake and the question goes unanswered.
+	for i, ru := range promptRussianTopics() {
+		id := fmt.Sprintf("prompt-ru-%02d", i)
+		// One project for all three, so the filler-heavy openings of the other
+		// two compete: a filler term matches a filler line, and with nothing
+		// to compete against it the right session wins anyway and the defect
+		// stays invisible.
+		project := promptRussianProject
+		t := base.Add(time.Duration(2000+i*10) * time.Minute)
+		msgs := []model.Message{
+			{Role: "user", Text: "погоди, а что там дальше по задаче", Time: t},
+			{Role: "assistant", Text: "смотрю, сейчас продолжу", Time: t.Add(time.Minute)},
+		}
+		for k := 0; k < 40; k++ {
+			at := t.Add(time.Duration(k+2) * time.Minute)
+			msgs = append(msgs,
+				model.Message{Role: "user", Text: "давай дальше, покажи ещё раз", Time: at},
+				model.Message{Role: "assistant", Text: "снова прогнал и поправил", Time: at.Add(time.Second)},
+			)
+		}
+		msgs = append(msgs, model.Message{
+			Role: "assistant", Text: "решили: " + ru.fact,
+			Time: t.Add(200 * time.Minute),
+		})
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "russian",
+			Topic: ru.word, Question: ru.question,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(200 * time.Minute), Messages: msgs,
+			}},
+		})
+	}
 	// The haystack. Measured on a frozen copy of a real index 2026-08-20: of 45
 	// live prompts, 33 were answered by one session of 38131 messages and 11 by
 	// one of 29190 — the two largest in the index, in order of size, for
