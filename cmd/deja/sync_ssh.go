@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/peers"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -30,10 +32,13 @@ var sshRunner = func(name string, args ...string) (string, error) {
 func runSyncSSH(dir string, args []string) error {
 	host := ""
 	pull, full := false, false
+	both := false
 	for _, a := range args {
 		switch a {
 		case "--pull":
 			pull = true
+		case "--both":
+			both = true
 		case "--full":
 			full = true
 		default:
@@ -49,10 +54,64 @@ func runSyncSSH(dir string, args []string) error {
 	if host == "" {
 		return fmt.Errorf("sync ssh needs a host (an ssh alias or user@host)")
 	}
-	if pull {
-		return syncSSHPull(dir, host, full)
+	return syncSSHHost(dir, host, pull, full, both)
+}
+
+// syncSSHHost runs one exchange and records it, so the next `deja sync` knows
+// this host without being told again.
+func syncSSHHost(dir, host string, pull, full, both bool) error {
+	if both {
+		if err := syncOneWay(dir, host, false, full); err != nil {
+			return err
+		}
+		return syncOneWay(dir, host, true, full)
 	}
-	return syncSSHPush(dir, host, full)
+	return syncOneWay(dir, host, pull, full)
+}
+
+func syncOneWay(dir, host string, pull, full bool) error {
+	var err error
+	if pull {
+		err = syncSSHPull(dir, host, full)
+	} else {
+		err = syncSSHPush(dir, host, full)
+	}
+	// Recorded either way: a peer that has been failing for a week is exactly
+	// what the report exists to show, and it is invisible if only successes
+	// are written down.
+	if rerr := peers.Record(host, pull, time.Now(), err); rerr != nil && err == nil {
+		fmt.Fprintf(os.Stderr, "deja: synced with %s, but could not record it: %v\n", host, rerr)
+	}
+	return err
+}
+
+// runSyncAll exchanges with every machine this one already syncs with. The
+// host had to be typed every time, which with three machines is six commands
+// and a thing to remember rather than a thing that happens. Records do not
+// travel through a third machine — an export never forwards what arrived by
+// sync — so every pair has to meet directly, and that is what this does.
+func runSyncAll(dir string, full bool) error {
+	list := peers.Load()
+	if len(list) == 0 {
+		return fmt.Errorf("no machines to sync with yet — name one once with `deja sync ssh <host>` and deja will remember it")
+	}
+	var failed int
+	for _, p := range list {
+		fmt.Fprintf(os.Stdout, "deja: %s\n", p.Host)
+		if err := syncSSHHost(dir, p.Host, false, full, true); err != nil {
+			// One unreachable laptop must not stop the server from getting
+			// what the desktop did.
+			fmt.Fprintf(os.Stderr, "deja: %s: %v\n", p.Host, err)
+			failed++
+		}
+	}
+	if failed == len(list) {
+		return fmt.Errorf("none of the %d machines could be reached", len(list))
+	}
+	if failed > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d of %d machines could not be reached\n", failed, len(list))
+	}
+	return nil
 }
 
 func syncSSHPush(dir, host string, full bool) error {

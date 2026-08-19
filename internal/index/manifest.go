@@ -78,6 +78,26 @@ func ImportedSessionCounts(dir string) map[string]int {
 	return out
 }
 
+// ImportedByMachine counts indexed sessions per machine they were worked on.
+// A peer line that says "last exchange two days ago" and nothing else leaves
+// open whether anything ever actually arrived from there.
+func ImportedByMachine(dir string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]int{}
+	for _, meta := range m.Sessions {
+		if meta.From != "" {
+			out[meta.From]++
+		}
+	}
+	return out
+}
+
 // HasManifest reports whether this directory holds an index. A rebuild's swap
 // takes the directory away for a moment, and answering "no" there sent every
 // hook down the no-index path: it asked for a rebuild that was already running

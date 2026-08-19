@@ -2543,7 +2543,8 @@ Usage:
   deja how <what> [--project name] [--limit n]  (commands this machine actually ran)
   deja sync export <dir> [--full] [--peer name]
   deja sync import <dir>
-  deja sync ssh <host> [--pull] [--full]
+  deja sync                       (exchange with every machine deja knows, both ways)
+  deja sync ssh <host> [--pull] [--both] [--full]
   deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]
   deja sources
   deja completion <bash|zsh|fish>

@@ -37,8 +37,14 @@ func ownCopyLine(own int) string {
 }
 
 func runSync(dir string, args []string) error {
+	// Bare `deja sync` is every machine deja already knows, both ways: the
+	// point of a memory that spans machines is that keeping it in step is not
+	// a chore anyone has to remember the hosts for.
+	if len(args) == 0 || (len(args) == 1 && args[0] == "--full") {
+		return runSyncAll(dir, len(args) == 1)
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("sync needs export <dir>, import <dir>, or ssh <host>")
+		return fmt.Errorf("sync needs export <dir>, import <dir>, ssh <host> — or no argument at all, for every machine deja knows")
 	}
 	switch args[0] {
 	case "ssh":

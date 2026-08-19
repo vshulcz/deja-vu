@@ -99,6 +99,8 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	fmt.Fprintln(w)
 	doctorMCP(w)
 	fmt.Fprintln(w)
+	doctorPeers(w, dir, time.Now())
+	fmt.Fprintln(w)
 	doctorHooks(w)
 	// After doctorHooks, not inside it: that function returns early on a
 	// machine without claude settings, which is exactly a machine whose other
