@@ -106,6 +106,12 @@ type promptReport struct {
 	// about which line the block opens with, and every arm here scores which
 	// session was chosen.
 	Russian promptArmReport `json:"russian_questions"`
+	// What the block actually shows. Every other arm scores which session was
+	// chosen; none of them looks at the lines inside it, which is how a recall
+	// that had found the right session came to open with "продолжай дальше"
+	// and read as worthless. Correct here means the first line the agent sees
+	// carries a word from the question.
+	Shown promptArmReport `json:"shown_line"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -190,6 +196,16 @@ func measurePrompt(seed int64) (promptReport, error) {
 		default:
 			realTerms = append(realTerms, len(terms))
 		}
+		// What the block opens with, for the questions that have an answer to
+		// open with. Scored apart from whether the right session was picked:
+		// the two fail independently.
+		if fired && (chain.Kind == "" || chain.Kind == "russian") {
+			report.Shown.Cases++
+			if shownLineCarriesATerm(indexDir, scope, terms) {
+				report.Shown.Fired++
+				report.Shown.Correct++
+			}
+		}
 		arm.Cases++
 		if fired {
 			arm.Fired++
@@ -233,13 +249,54 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Haystack, nil)
 	finishPromptArm(&report.OffTopic, nil)
 	finishPromptArm(&report.Russian, nil)
+	finishPromptArm(&report.Shown, nil)
 	return report, nil
+}
+
+// shownLineCarriesATerm builds the block the hook would inject and reports
+// whether its first content line holds any of the query's terms. A block whose
+// opening line came from the top of a long transcript does not, and that line
+// is the whole frame an agent reads before deciding to ignore the rest.
+func shownLineCarriesATerm(dir, project string, terms []string) bool {
+	ranked, matched, strong, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	if err != nil {
+		return false
+	}
+	var keep []model.Session
+	for i, s := range ranked {
+		if !recallWorthShowing(terms, matched[i], strong[i]) {
+			continue
+		}
+		keep = append(keep, s)
+		break
+	}
+	if len(keep) == 0 {
+		return false
+	}
+	block := search.AutoRecallDigestFor(keep, promptHookBudget-recallFrameOverhead, terms)
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		// The header line names the session; the first line under it is what
+		// frames the block.
+		if !strings.HasPrefix(line, "- User:") && !strings.HasPrefix(line, "- Assistant:") {
+			continue
+		}
+		low := strings.ToLower(line)
+		for _, t := range terms {
+			if t != "" && strings.Contains(low, strings.ToLower(t)) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 // promptBenchProbe runs the same two steps the hook runs: extract terms, then
 // ask the index for this project's sessions ranked by them. Anything the hook
 // would discard downstream is discarded here too, so the number reported is
 // what a user would actually see.
+
 func promptBenchProbe(dir, project, chainID string, terms []string) (fired, correct bool) {
 	if !promptTermsWorthAsking(terms) {
 		return false, false
