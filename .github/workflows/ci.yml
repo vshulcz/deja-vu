@@ -26,7 +26,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     # windows runs the suite about ten times slower than the others; the cap is
     # what turns a slow run into a cancellation that prints no test output.
-    timeout-minutes: 30
+    # 30 was the cap while the windows leg took 26m; on 2026-08-19 it reached
+    # 29m30s and died with no output, so the margin is gone rather than the run
+    # being unlucky. 45 keeps a real hang bounded — the go -timeout below still
+    # kills one with a stack long before this.
+    timeout-minutes: 45
     env:
       # Whether this leg does real work. The windows runner needs twenty-odd
       # minutes for a job the others finish in two, and it varies by a third
@@ -64,7 +68,7 @@ jobs:
       # the queue times out and the log says only "go test -race" (#838). Raised
       # to 12m as the suite grew — cmd/deja under -race on the windows runner
       # runs ~6m of real, non-hung work, and 12m keeps a wide margin below the
-      # job's 30m so a true hang still dies with a stack.
+      # job's cap so a true hang still dies with a stack.
       # Coverage instrumentation is only read on Linux, where the floor runs.
       # Windows paid for -covermode=atomic on top of -race and threw the
       # profile away: the test step alone was 1726s of the job's 30m cap.
