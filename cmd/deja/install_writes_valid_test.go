@@ -22,6 +22,12 @@ func TestEveryTargetWritesReadableFiles(t *testing.T) {
 			t.Setenv("USERPROFILE", home)
 			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 			t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
+			// Windows resolvers read APPDATA rather than the home directory.
+			// Left at the package-wide value, a target that writes there lands
+			// outside the directory walked below and the check passes on a
+			// target that wrote nothing here.
+			t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+			t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
 			t.Setenv("DEJA_INDEX_DIR", filepath.Join(home, "index.db"))
 
 			if _, err := installTarget(target, "/usr/local/bin/deja", false); err != nil {

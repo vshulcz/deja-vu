@@ -407,7 +407,10 @@ func TestInstallZedFindsTheEntryEndPastAComment(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("the entry was lost:\n%s", got)
 	}
-	if entry["command"] != "/usr/local/bin/deja" {
+	// Windows wraps the executable in cmd /c, so what the entry holds is
+	// whatever mcpCommandArgs makes of it, not the path as written.
+	wantCommand, _ := mcpCommandArgs("/usr/local/bin/deja")
+	if entry["command"] != wantCommand {
 		t.Errorf("the entry was not updated: %v", entry)
 	}
 	if strings.Contains(string(got), "/old/path/deja") {

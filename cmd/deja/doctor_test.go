@@ -196,6 +196,8 @@ func TestDoctorJSONGolden(t *testing.T) {
 	// Windows rather than ~/.config, so the golden keeps the posix path and
 	// the platform difference is normalised here.
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Block/goose/config", "<tmp>/home/.config/goose")
+	// Zed is the other one: %APPDATA%\Zed on Windows, ~/.config/zed elsewhere.
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Zed", "<tmp>/home/.config/zed")
 	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)
