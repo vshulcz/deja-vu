@@ -47,14 +47,14 @@ func TestFilesRowStripsWhatTheTerminalActsOn(t *testing.T) {
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	var body strings.Builder
-	body.WriteString(`{"type":"user","sessionId":"h1","cwd":"` + repo + `","timestamp":"2026-07-20T10:00:00Z","message":{"role":"user","content":"the retry storm on checkout"}}` + "\n")
+	body.WriteString(`{"type":"user","sessionId":"h1","cwd":` + jsonString(repo) + `,"timestamp":"2026-07-20T10:00:00Z","message":{"role":"user","content":"the retry storm on checkout"}}` + "\n")
 	for _, p := range paths {
 		q, err := json.Marshal(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		body.WriteString(`{"type":"assistant","sessionId":"h1","cwd":"` + repo +
-			`","timestamp":"2026-07-20T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":` +
+		body.WriteString(`{"type":"assistant","sessionId":"h1","cwd":` + jsonString(repo) +
+			`,"timestamp":"2026-07-20T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":` +
 			string(q) + `}}]}}` + "\n")
 	}
 	if err := os.WriteFile(filepath.Join(root, "h1.jsonl"), []byte(body.String()), 0o644); err != nil {
