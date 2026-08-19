@@ -47,9 +47,23 @@ func runSync(dir string, args []string) error {
 		full := false
 		rest := args[1:]
 		out := ""
-		for _, a := range rest {
+		peer := ""
+		for i := 0; i < len(rest); i++ {
+			a := rest[i]
 			if a == "--full" {
 				full = true
+				continue
+			}
+			// Who this batch is for. Watermarks are per peer: without a name
+			// every export shares one, so a backup taken by hand and a pull
+			// from another machine each settle records the other still needs
+			// — and the second one silently sends almost nothing.
+			if a == "--peer" {
+				if i+1 >= len(rest) {
+					return fmt.Errorf("sync export: --peer needs a name")
+				}
+				i++
+				peer = rest[i]
 				continue
 			}
 			// A dropped flag fell back to the incremental path, which on a
@@ -57,7 +71,7 @@ func runSync(dir string, args []string) error {
 			// records into an empty directory while the reader believed they
 			// had carried their whole memory to another machine (#745).
 			if strings.HasPrefix(a, "-") {
-				return fmt.Errorf("sync export: unknown flag %q — only --full is accepted", a)
+				return fmt.Errorf("sync export: unknown flag %q — only --full and --peer are accepted", a)
 			}
 			out = a
 		}
@@ -76,7 +90,7 @@ func runSync(dir string, args []string) error {
 		if full {
 			n, err = index.ExportFull(dir, out)
 		} else {
-			n, err = index.Export(dir, out)
+			n, err = index.ExportTo(dir, out, peer)
 		}
 		if err != nil {
 			// `open …/deja-sync-b9849e838232-1785639771368128000.jsonl:

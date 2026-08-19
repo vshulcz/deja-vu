@@ -2541,7 +2541,7 @@ Usage:
   deja friction [--limit n]
   deja fix "<error text>" [--limit n]  (what was run after this error before)
   deja how <what> [--project name] [--limit n]  (commands this machine actually ran)
-  deja sync export <dir> [--full]
+  deja sync export <dir> [--full] [--peer name]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]
   deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]

@@ -121,9 +121,27 @@ func syncSSHPull(dir, host string, full bool) error {
 	if full {
 		exportCmd += " --full"
 	}
-	remote := fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" %s %s`, exportCmd, shellQuote(rtmp))
-	out, err := sshRunner("ssh", host, "sh -lc "+shellQuote(remote))
+	// Name this machine, so the remote settles what it sent us against us and
+	// nobody else. Without it a pull shares one watermark with every hand-run
+	// `deja sync export` there: whichever ran first settles the records, and
+	// the other silently receives almost nothing.
+	pullCmd := exportCmd
+	if self := index.MachineName(); self != "" {
+		pullCmd += " --peer " + shellQuote(self)
+	}
+	remoteCmd := func(c string) string {
+		return fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" %s %s`, c, shellQuote(rtmp))
+	}
+	out, err := sshRunner("ssh", host, "sh -lc "+shellQuote(remoteCmd(pullCmd)))
 	out = strings.TrimSpace(out)
+	// A deja too old to know --peer refuses the flag rather than ignoring it,
+	// which is the behaviour that stops a typo from exporting nothing (#745).
+	// Upgrading both machines at once is not something a person does, so fall
+	// back to the shared watermark rather than failing the pull.
+	if err != nil && strings.Contains(out, "unknown flag") && pullCmd != exportCmd {
+		out, err = sshRunner("ssh", host, "sh -lc "+shellQuote(remoteCmd(exportCmd)))
+		out = strings.TrimSpace(out)
+	}
 	if err != nil {
 		return fmt.Errorf("remote export: %v: %s", err, out)
 	}

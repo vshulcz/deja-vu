@@ -63,6 +63,13 @@ func ExportFull(dir, outDir string) (int, error) {
 	return exportRecords(dir, outDir, "", true)
 }
 
+// ExportTo is Export for a named peer: the watermark it advances is that
+// peer's alone. An empty name keeps the shared one, which is what a hand-taken
+// backup uses.
+func ExportTo(dir, outDir, peer string) (int, error) {
+	return exportRecords(dir, outDir, peer, false)
+}
+
 // ExportDeferred writes batches like Export but does not advance the
 // watermarks; the returned commit persists them once the receiver has
 // acknowledged the batch. Watermarked sync must be acknowledged delivery:
