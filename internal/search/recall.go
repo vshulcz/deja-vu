@@ -420,10 +420,10 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 		switch m.Role {
 		case "user":
 			if !noiseMessage(m.Text) && hits > bestUser.hits {
-				bestUser = scored{i, hits, firstLine(text, 160)}
+				bestUser = scored{i, hits, lineAround(text, 160, terms)}
 			}
 		case "assistant":
-			assistants = append(assistants, scored{i, hits, firstLine(text, 220)})
+			assistants = append(assistants, scored{i, hits, lineAround(text, 220, terms)})
 		}
 	}
 	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].hits > assistants[j].hits })
@@ -567,12 +567,64 @@ func noiseMessage(s string) bool {
 func digestLine(s string) string { return SafeLine(s) }
 
 func firstLine(s string, n int) string {
+	return lineAround(s, n, nil)
+}
+
+// lineAround shortens a line to n characters, keeping the part that matched
+// rather than the part that came first.
+//
+// Cutting from the start was how a line that genuinely answered the question
+// came to be shown without the answer in it: measured on a real store, a
+// question about "hermes" and "mini" recalled the session that discusses both
+// and displayed "Домёржь PR и веди #1084 + A. Репо …", because the words sat
+// past the hundred-and-sixtieth character. The reader sees a line about
+// something else and stops reading the block.
+func lineAround(s string, n int, terms []string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	r := []rune(s)
 	if len(r) <= n {
 		return s
 	}
-	return strings.TrimSpace(string(r[:n])) + "…"
+	at := -1
+	low := strings.ToLower(s)
+	for _, t := range terms {
+		if t == "" {
+			continue
+		}
+		i := strings.Index(low, strings.ToLower(t))
+		if i < 0 {
+			if stem := termStem(t); stem != "" {
+				i = strings.Index(low, stem)
+			}
+		}
+		if i >= 0 && (at < 0 || i < at) {
+			at = len([]rune(s[:i]))
+		}
+	}
+	// Nothing matched, or it matched inside the window anyway: the old cut is
+	// the right one.
+	if at < 0 || at < n {
+		return strings.TrimSpace(string(r[:n])) + "…"
+	}
+	// A little before the match, so the reader lands on a phrase rather than
+	// mid-word, and the rest of the budget after it.
+	const lead = 40
+	start := at - lead
+	if start < 0 {
+		start = 0
+	}
+	end := start + n
+	if end > len(r) {
+		end = len(r)
+	}
+	out := strings.TrimSpace(string(r[start:end]))
+	if start > 0 {
+		out = "…" + out
+	}
+	if end < len(r) {
+		out += "…"
+	}
+	return out
 }
 
 // smokeAnswerMax is how short a reply has to be to read as a token rather than
