@@ -260,10 +260,10 @@ func zedSession(db string, r zedRow) (model.Session, bool) {
 	// by the array itself, which is what recall actually reads.
 	for _, raw := range th.Messages {
 		role, text := zedMessage(raw)
-		if text == "" || HarnessAuthored(role) {
-			continue
+		if text != "" && !HarnessAuthored(role) {
+			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: started})
 		}
-		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: started})
+		s.Messages = append(s.Messages, zedWork(raw, started)...)
 	}
 	if len(s.Messages) == 0 {
 		return model.Session{}, false
@@ -361,6 +361,136 @@ func zedMessage(raw json.RawMessage) (role, text string) {
 		return "assistant", zedContentText(body, "Text")
 	}
 	return zedLegacyMessage(tagged)
+}
+
+// zedWork is what the agent did rather than what it said: the commands it ran
+// and the files it named. Zed keeps both inside the same content array as the
+// prose, tagged ToolUse, and dropping them left `deja how`, `deja blame`, the
+// files-touched line and the worked-on-most ranking blind on a Zed store —
+// measured there: 797 ToolUse blocks against 69 Agent.Text ones, so the parser
+// was indexing the talk and none of the work.
+//
+// Tool results are not here to be indexed: Zed stores the call and not what
+// came back, so a Zed session cannot pair an error with the command that
+// followed it the way `deja fix` does elsewhere.
+//
+// Modern threads only. An agent-1 message carries `segments` rather than a
+// tagged content array, and whether tool calls appear there is not something
+// this can be written against: every thread on the store measured for this was
+// version 0.3.0, and the shape of a legacy tool segment is unknown. Guessing
+// at it would be the mistake zedBody's data_type refuses to make. A legacy
+// thread keeps the behaviour it had, which is its prose.
+//
+// One record per message, as claude's parser emits: a thread that touches the
+// same file in three exchanges says so three times, and the ranking reads how
+// often a file was worked on.
+func zedWork(raw json.RawMessage, t time.Time) []model.Message {
+	var tagged map[string]json.RawMessage
+	if json.Unmarshal(raw, &tagged) != nil {
+		return nil
+	}
+	body, ok := tagged["Agent"]
+	if !ok {
+		return nil
+	}
+	var msg struct {
+		Content []struct {
+			ToolUse *struct {
+				Name  string          `json:"name"`
+				Input json.RawMessage `json:"input"`
+			} `json:"ToolUse"`
+		} `json:"content"`
+	}
+	if json.Unmarshal(body, &msg) != nil {
+		return nil
+	}
+	var out []model.Message
+	var paths []string
+	for _, block := range msg.Content {
+		if block.ToolUse == nil {
+			continue
+		}
+		if cmd := zedCommand(block.ToolUse.Name, block.ToolUse.Input); cmd != "" {
+			if IndexCommands() && worthIndexing(cmd) {
+				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+			}
+			continue
+		}
+		paths = append(paths, zedToolPaths(block.ToolUse.Name, block.ToolUse.Input)...)
+	}
+	if len(paths) > 0 && IndexToolPaths() {
+		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(dedupeStrings(paths), "\n"), Time: t})
+	}
+	return out
+}
+
+// zedCommand is the shell line a terminal call ran, or "" when the call is not
+// one. The name is Zed's own and stable across both thread formats.
+func zedCommand(name string, input json.RawMessage) string {
+	if name != "terminal" {
+		return ""
+	}
+	var in struct {
+		Command string `json:"command"`
+	}
+	if json.Unmarshal(input, &in) != nil {
+		return ""
+	}
+	return strings.TrimSpace(in.Command)
+}
+
+// zedPathTools are the calls whose input names a file. `terminal` is absent for
+// the reason claude's list gives: a path inside a shell command is guesswork.
+// `grep` and `find_path` are absent because they name a pattern and a scope,
+// not a file the session worked on.
+var zedPathTools = map[string][]string{
+	"edit_file":        {"path"},
+	"read_file":        {"path"},
+	"create_directory": {"path"},
+	"delete_path":      {"path"},
+	"move_path":        {"source_path", "destination_path"},
+	"open":             {"path"},
+}
+
+func zedToolPaths(name string, input json.RawMessage) []string {
+	fields, ok := zedPathTools[name]
+	if !ok {
+		return nil
+	}
+	var in map[string]json.RawMessage
+	if json.Unmarshal(input, &in) != nil {
+		return nil
+	}
+	var out []string
+	for _, f := range fields {
+		raw, ok := in[f]
+		if !ok {
+			continue
+		}
+		var p string
+		if json.Unmarshal(raw, &p) != nil {
+			continue
+		}
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// dedupeStrings keeps the first of each path: a thread reads the same file
+// many times over, and the record is about which files the work touched.
+func dedupeStrings(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := in[:0:0]
+	for _, s := range in {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
 }
 
 // zedContentText joins the wanted variants of a content block array. A Text
