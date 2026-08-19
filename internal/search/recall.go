@@ -270,7 +270,18 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 		// from the top of the session: on a real block that padding read as
 		// "two schedulers were live after the failover" under an answer about
 		// the retry budget.
-		if matched && m.Role == "assistant" {
+		//
+		// The same holds for the question line, and it was not applied there.
+		// When nothing the user said matched, this loop took the first thing
+		// they said in the whole session — on a long one that is "carry on
+		// then". Measured on a real store: a recall that had found the right
+		// session opened with "продолжай дальше" and read as worthless, which
+		// is how a correct answer teaches an agent to stop reading these.
+		// Better to show the matched line alone than to frame it with filler.
+		// With terms in hand this skips the question line too; without them the
+		// block still opens with the session's own first question, which is
+		// what the session-start digest is for.
+		if matched && (m.Role == "assistant" || len(terms) > 0) {
 			continue
 		}
 		text := contextText(m.Text, false)
