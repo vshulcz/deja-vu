@@ -88,6 +88,22 @@ const (
 	keepWindow = 14 * 24 * time.Hour
 )
 
+// ahead reports a timestamp past the end of the reader's day — a clock that
+// ran fast before it was corrected, or a log carried over from such a machine.
+//
+// The counters are windows on the recent past, and an event dated ahead of the
+// window sits inside every one of them: measured with a single event stamped a
+// year out, "today" reported it every day for a year, and the rotation that
+// bounds the log keeps whatever is newer than its cutoff, so it never aged
+// out. The end of the day rather than the instant, because a few minutes of
+// ordinary skew is not a false event — a year is.
+func ahead(t, now time.Time) bool {
+	// The window is half-open, as every other one here is: midnight belongs to
+	// the day it opens, not to the one it closes.
+	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, 1)
+	return !t.Before(end)
+}
+
 // Path returns the usage log location for an index dir: a sibling file, like
 // the .lock file, so it survives full index rebuilds.
 func Path(indexDir string) string {
@@ -146,7 +162,7 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(midnight) {
+		if e.Time.Before(midnight) || ahead(e.Time, now) {
 			continue
 		}
 		switch e.Kind {
@@ -165,10 +181,11 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 // DejaVuWeek counts this week's déjà vu moments — prompts the user's own
 // history already answered.
 func DejaVuWeek(indexDir string) int {
-	cut := time.Now().AddDate(0, 0, -7)
+	now := time.Now()
+	cut := now.AddDate(0, 0, -7)
 	n := 0
 	for _, e := range read(Path(indexDir)) {
-		if e.Kind == KindDejaVu && e.Time.After(cut) && e.Sessions > 0 {
+		if e.Kind == KindDejaVu && e.Time.After(cut) && !ahead(e.Time, now) && e.Sessions > 0 {
 			n++
 		}
 	}
@@ -181,7 +198,7 @@ func TodayRaw(indexDir string) int64 {
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	var raw int64
 	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(midnight) {
+		if e.Time.Before(midnight) || ahead(e.Time, now) {
 			continue
 		}
 		switch e.Kind {
@@ -231,9 +248,10 @@ func Totals(indexDir string) Summary {
 // calls) — the honest demand-side number — while injected counts the hook
 // deliveries deja pushed unprompted.
 func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
-	cut := time.Now().Add(-7 * 24 * time.Hour)
+	now := time.Now()
+	cut := now.Add(-7 * 24 * time.Hour)
 	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(cut) || e.Empty {
+		if e.Time.Before(cut) || ahead(e.Time, now) || e.Empty {
 			continue
 		}
 		switch e.Kind {
@@ -274,7 +292,10 @@ func read(p string) []Event {
 }
 
 // rotate rewrites the log keeping only the recent window once it grows past
-// rotateAt. Concurrent writers may lose an event during the swap; usage data
+// rotateAt. An event dated ahead of the window is kept rather than dropped:
+// the counters ignore it (see ahead), it costs one line, and deleting a
+// recorded event on a guess about someone's clock is the one thing here that
+// cannot be undone. Concurrent writers may lose an event during the swap; usage data
 // is advisory, so that trade keeps the hot path lock-free.
 //
 // Size is the trigger, but the window is what actually bounds the file, and
