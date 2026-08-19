@@ -608,10 +608,14 @@ func focusSession(s model.Session, terms []string) model.Session {
 	const window = 2
 	keep := map[int]bool{}
 	for i, m := range s.Messages {
-		text := strings.ToLower(m.Text)
 		hits := 0
 		for _, t := range terms {
-			if strings.Contains(text, strings.ToLower(t)) {
+			// The same rule the block is built with. This step spelled the
+			// word the way the question happened to spell it, while the
+			// ranking that chose the session and the digest that shows a line
+			// from it both fold the ending — so a session whose only mention
+			// was in another case was narrowed to nothing and dropped whole.
+			if search.TextCarriesTerm(m.Text, t) {
 				hits++
 			}
 		}
