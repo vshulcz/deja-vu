@@ -8,11 +8,29 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
+// ownCollisionCount makes a test's collision count its own.
+//
+// The counter is package state that ReportCollisions drains, so a test that
+// asserts a number reads whatever an earlier one left behind. Under -shuffle
+// that is exactly what happened: "reported 3 collisions on a clean store",
+// from a build three tests away.
+//
+// Drained twice on purpose. Before, so the assertion is about this build; and
+// after, so a test that legitimately produces collisions does not hand them to
+// whoever runs next — which is how production reads it too, one drain per
+// build rather than one before each read.
+func ownCollisionCount(t *testing.T) {
+	t.Helper()
+	ReportCollisions()
+	t.Cleanup(func() { ReportCollisions() })
+}
+
 // Identity is harness:id and nothing guarantees it is unique: two files named
 // session-1.jsonl in different projects produced one manifest row whose project
 // came from one transcript and whose title came from the other, differently on
 // every build (#698).
 func TestSessionsSharingAnIDAreAttributedTheSameWayEveryBuild(t *testing.T) {
+	ownCollisionCount(t)
 	tmp := t.TempDir()
 	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
@@ -72,6 +90,7 @@ func TestSessionsSharingAnIDAreAttributedTheSameWayEveryBuild(t *testing.T) {
 }
 
 func TestReportCollisionsIsZeroWithoutOne(t *testing.T) {
+	ownCollisionCount(t)
 	tmp := t.TempDir()
 	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
@@ -97,6 +116,7 @@ func TestReportCollisionsIsZeroWithoutOne(t *testing.T) {
 // The incremental pass walks a map of changed files; unsorted, which session
 // won a shared id depended on that order (#698).
 func TestIncrementalPassAttributesCollisionsTheSameWay(t *testing.T) {
+	ownCollisionCount(t)
 	tmp := t.TempDir()
 	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
@@ -152,6 +172,7 @@ func TestIncrementalPassAttributesCollisionsTheSameWay(t *testing.T) {
 // held by the transcript that did not change has to be carried over — losing it
 // was how the first attempt at #698 deleted a session.
 func TestReindexingOneHalfOfACollisionKeepsTheOther(t *testing.T) {
+	ownCollisionCount(t)
 	tmp := t.TempDir()
 	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
