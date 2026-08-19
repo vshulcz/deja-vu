@@ -244,6 +244,11 @@
       "name": "goose",
       "state": "config-missing",
       "path": "<tmp>/home/.config/goose/config.yaml"
+    },
+    {
+      "name": "zed",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/zed/settings.json"
     }
   ],
   "sqlite3": {

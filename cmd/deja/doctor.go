@@ -848,7 +848,29 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"copilot", guidancePath("copilot"), doctorFileWired},
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired},
 		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired},
+		{"zed", sources.ZedSettingsPath(), doctorZedWired},
 	}
+}
+
+// doctorZedWired reads the same JSONC the installer writes, with the same
+// scanner. The generic probe falls back to looking for "deja" anywhere in an
+// unparseable file, which in a settings file full of comments answers a
+// different question than "is the server wired".
+func doctorZedWired(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	text := string(b)
+	open := zedTopLevelOpen(text)
+	if open < 0 {
+		return false
+	}
+	block := zedFindKey(text, open+1, zedServerKey)
+	if block == nil {
+		return false
+	}
+	return zedFindKey(text, block.valueOpen+1, "deja") != nil
 }
 
 func doctorFileWired(path string) bool {
