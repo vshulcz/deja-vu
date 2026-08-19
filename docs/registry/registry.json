@@ -502,7 +502,7 @@
    "last_verified": "2026-08-17",
    "display_name": "Zed",
    "capabilities": {
-    "mcp": false,
+    "mcp": true,
     "auto": false,
     "skill": false,
     "command": false,
@@ -511,10 +511,6 @@
     "prereq": "sqlite3 + zstd"
    },
    "gaps": {
-    "mcp": {
-     "state": "todo",
-     "why": "Zed runs MCP servers — it keeps a context server registry and reads them from settings — but deja has no install target that writes that wiring, so nothing here claims it works yet"
-    },
     "auto": {
      "state": "impossible",
      "why": "Zed's agent exposes no lifecycle hook: nothing in the editor runs a command before a prompt is sent, so there is no point at which recall could be injected. Becomes work the day Zed ships one",

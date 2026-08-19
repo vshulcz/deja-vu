@@ -149,17 +149,11 @@ func zedFindKey(text string, from int, key string) *zedSpan {
 	want := `"` + key + `"`
 	depth := 0
 	for i := from; i < len(text); i++ {
+		if j := zedSkipComment(text, i); j != i {
+			i = j - 1
+			continue
+		}
 		switch {
-		case text[i] == '/' && i+1 < len(text) && text[i+1] == '/':
-			for i < len(text) && text[i] != '\n' {
-				i++
-			}
-		case text[i] == '/' && i+1 < len(text) && text[i+1] == '*':
-			i += 2
-			for i+1 < len(text) && (text[i] != '*' || text[i+1] != '/') {
-				i++
-			}
-			i++
 		case text[i] == '"':
 			end := zedStringEnd(text, i)
 			if end < 0 {
@@ -189,6 +183,30 @@ func zedFindKey(text string, from int, key string) *zedSpan {
 	return nil
 }
 
+// zedSkipComment returns the index one past a comment starting at i, or i
+// itself when there is none. Both shapes, in one place: handling `//` in three
+// scanners and forgetting `/* */` in the fourth is how a settings file with a
+// block comment gets its object end read wrong and its contents mangled.
+func zedSkipComment(text string, i int) int {
+	if i+1 >= len(text) || text[i] != '/' {
+		return i
+	}
+	switch text[i+1] {
+	case '/':
+		for i < len(text) && text[i] != '\n' {
+			i++
+		}
+		return i
+	case '*':
+		i += 2
+		for i+1 < len(text) && (text[i] != '*' || text[i+1] != '/') {
+			i++
+		}
+		return i + 2
+	}
+	return i
+}
+
 // zedStringEnd is one past the closing quote of the string starting at i.
 func zedStringEnd(text string, i int) int {
 	for j := i + 1; j < len(text); j++ {
@@ -206,6 +224,10 @@ func zedStringEnd(text string, i int) int {
 func zedValueOpen(text string, from int) int {
 	seenColon := false
 	for i := from; i < len(text); i++ {
+		if j := zedSkipComment(text, i); j != i {
+			i = j - 1
+			continue
+		}
 		switch {
 		case text[i] == ':':
 			seenColon = true
@@ -215,10 +237,6 @@ func zedValueOpen(text string, from int) int {
 			}
 			return i
 		case text[i] == ' ' || text[i] == '\t' || text[i] == '\n' || text[i] == '\r':
-		case text[i] == '/' && i+1 < len(text) && text[i+1] == '/':
-			for i < len(text) && text[i] != '\n' {
-				i++
-			}
 		default:
 			return -1
 		}
@@ -230,20 +248,20 @@ func zedValueOpen(text string, from int) int {
 func zedObjectEnd(text string, open int) int {
 	depth := 0
 	for i := open; i < len(text); i++ {
-		switch {
-		case text[i] == '"':
+		if j := zedSkipComment(text, i); j != i {
+			i = j - 1
+			continue
+		}
+		switch text[i] {
+		case '"':
 			end := zedStringEnd(text, i)
 			if end < 0 {
 				return -1
 			}
 			i = end - 1
-		case text[i] == '/' && i+1 < len(text) && text[i+1] == '/':
-			for i < len(text) && text[i] != '\n' {
-				i++
-			}
-		case text[i] == '{':
+		case '{':
 			depth++
-		case text[i] == '}':
+		case '}':
 			depth--
 			if depth == 0 {
 				return i + 1
