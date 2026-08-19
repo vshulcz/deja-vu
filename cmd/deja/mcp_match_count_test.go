@@ -84,12 +84,20 @@ func firstLines(s string, n int) string {
 // contradict it on the same screen.
 func TestRelevanceHitsAreNotCalledMatches(t *testing.T) {
 	dir := manySessionStore(t, 40)
-	text, _, _, _, err := recallTextResult(dir, "pipeline stalled parser frames rejects", "", 5, 0, 4096)
+	// The query mixes words from both halves of the fixture: "parser rejects
+	// frames" appears only in the rare session, "pipeline stalled" only in the
+	// forty bulk ones. No session can hold all of them, so exact matching has
+	// nothing to return and the relevance tier answers — a property of how the
+	// store is built rather than of how ranking happens to score today.
+	text, _, _, _, err := recallTextResult(dir, "parser rejects frames the pipeline stalled", "", 5, 0, 4096)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A fixture that stops reaching the tier makes this test guard nothing,
+	// and skipping there hides that: the query above stopped reaching it once
+	// already, and the test went quiet instead of saying so.
 	if !strings.Contains(text, "ranked by relevance") {
-		t.Skipf("this query did not reach the relevance tier:\n%s", firstLines(text, 3))
+		t.Fatalf("the fixture no longer reaches the relevance tier, so this test guards nothing:\n%s", firstLines(text, 3))
 	}
 	if strings.Contains(text, "matched)") {
 		t.Errorf("relevance-tier sessions were reported as matches:\n%s", firstLines(text, 4))
@@ -108,8 +116,12 @@ func TestTheFollowUpCountMatchesWhatWasServed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Same rule as above. This one is the more fragile of the two — it holds
+	// only while 900 bytes is smaller than fifteen served sessions — so it
+	// fails loudly rather than skipping: a message format that shrinks enough
+	// to fit them all should stop this test, not quiet it.
 	if served >= 15 {
-		t.Skip("the budget did not cut this answer short")
+		t.Fatalf("the budget no longer cuts this answer short (served %d of 15), so this test guards nothing", served)
 	}
 	want := fmt.Sprintf("%d more match(es) — call recall again with offset=%d.", 40-served, served)
 	if !strings.Contains(text, want) {
