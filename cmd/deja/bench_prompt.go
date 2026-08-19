@@ -36,6 +36,24 @@ func offTopicQuestions() []string {
 	}
 }
 
+// absentSubjectQuestions ask about something this project has never held,
+// using words it does hold. Measured on a real store: of the blocks that opened
+// on a line carrying none of their terms, four of five were this — a question
+// about a phone tether, a mobile hotspot, another project's tool, asked while
+// sitting in this repository's directory. The subject appears nowhere in the
+// project (0 sessions, 0 hits), the ordinary words appear everywhere, and the
+// hook answers on those.
+//
+// The right answer is silence, and it is the one case tonight where firing
+// less often is the improvement.
+func absentSubjectQuestions() []string {
+	return []string{
+		"did the kestrel timeout ever affect the zeppelin mast",
+		"how does escrow release interact with the anemometer",
+		"which parquet batch carried the quetzalcoatl rows",
+	}
+}
+
 func negativeQuestions() []string {
 	return []string{
 		"how do I bake sourdough bread at home",
@@ -112,6 +130,14 @@ type promptReport struct {
 	// and read as worthless. Correct here means the first line the agent sees
 	// carries a word from the question.
 	Shown promptArmReport `json:"shown_line"`
+	// Questions whose subject the project has never held, asked with words it
+	// has. Every fire is a false one: there is nothing to answer with.
+	//
+	// A target, not a guard. Today everything fires, so this arm reads 3/3
+	// however the questions are written — swapping the absent subject for a
+	// present one changes nothing. It earns its keep the day the number moves,
+	// and until then it says how far there is to go.
+	AbsentSubject promptArmReport `json:"absent_subject"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -249,7 +275,15 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Haystack, nil)
 	finishPromptArm(&report.OffTopic, nil)
 	finishPromptArm(&report.Russian, nil)
+	for _, q := range absentSubjectQuestions() {
+		report.AbsentSubject.Cases++
+		if fired, _ := promptBenchProbe(indexDir, bench.PromptHaystackProject, "no-such-chain", prompt.Terms(q)); fired {
+			report.AbsentSubject.Fired++
+			report.AbsentSubject.FalseFires++
+		}
+	}
 	finishPromptArm(&report.Shown, nil)
+	finishPromptArm(&report.AbsentSubject, nil)
 	return report, nil
 }
 
