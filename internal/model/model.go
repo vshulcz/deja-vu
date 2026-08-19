@@ -46,6 +46,10 @@ type Session struct {
 	// promoted note stopped looking like one across a machine boundary and the
 	// rules written for notes stopped applying to it (#975).
 	OrigID string `json:"orig_id,omitempty"`
+	// From is the machine this session was worked on, when it arrived by sync.
+	// Empty for local work and for batches written by a deja that did not
+	// stamp an origin.
+	From string `json:"from,omitempty"`
 	// Lifecycle carries the state of a promoted note that arrived by sync: the
 	// states live in the other machine's notes.jsonl, which never travels
 	// (#975).

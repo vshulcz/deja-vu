@@ -1090,7 +1090,7 @@ func metaForSession(s model.Session) SessionMeta {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
 	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages),
-		OrigID: s.OrigID, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
+		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
 // extendDerived folds messages appended to an already-indexed session into the
@@ -1508,7 +1508,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 		Title: meta.Title, AgentTitle: meta.AgentTitle, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
 		GaveUp: meta.GaveUp,
 		Words:  meta.Words,
-		OrigID: meta.OrigID, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
+		OrigID: meta.OrigID, From: meta.From, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }
 

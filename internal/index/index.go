@@ -159,6 +159,13 @@ type SessionMeta struct {
 	// silently stopped applying (#975). Additive: older manifests decode with
 	// it empty.
 	OrigID string `json:",omitempty"`
+	// From is the machine this session was worked on. Every imported session
+	// read as "from elsewhere" and nothing more, so with three machines
+	// exchanging history there was no way to ask what the server did, and no
+	// way to notice one of them had stopped sending. Additive: a manifest
+	// written before it existed decodes with it empty, and a batch from an
+	// older deja carries no origin, so both degrade to what they said before.
+	From string `json:",omitempty"`
 	// Lifecycle is the state of a promoted note that arrived by sync. The
 	// local states live in notes.jsonl, which the other machine does not have,
 	// so a decision retracted there read as accepted here (#975).

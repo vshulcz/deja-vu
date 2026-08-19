@@ -28,6 +28,27 @@ type SyncRecord struct {
 	Role      string    `json:"role"`
 	Text      string    `json:"text"`
 	Time      time.Time `json:"time"`
+	// Origin is the machine that exported the record. Additive: a batch
+	// written before this field existed decodes with it empty, and the
+	// receiving side then says only that the session came from elsewhere,
+	// which is what it said before.
+	Origin syncName `json:"origin,omitempty"`
+}
+
+// syncName is a metadata string that survives being sent the wrong shape. A
+// batch is another machine's file, and this machine may be older or newer than
+// the one that wrote it: decoding a plain string field strictly means one
+// record carrying an object where a name was expected refuses the entire file
+// and imports nothing. A name deja cannot read is worth losing; the history
+// behind it is not.
+type syncName string
+
+func (n *syncName) UnmarshalJSON(b []byte) error {
+	var s string
+	if json.Unmarshal(b, &s) == nil {
+		*n = syncName(s)
+	}
+	return nil
 }
 
 // Export writes records newer than the watermarks for an unnamed peer (a
@@ -113,6 +134,7 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		m.ExportWatermarks = map[string]int64{}
 	}
 	bySource := map[string][]SyncRecord{}
+	self := MachineName()
 	nextWatermarks := map[string]int64{}
 	for k, v := range m.ExportWatermarks {
 		nextWatermarks[k] = v
@@ -178,7 +200,12 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 			return
 		}
 		text, _ := redact.Text(r.Text)
-		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time}
+		// Always this machine: an export never forwards what arrived by sync
+		// (the syncImportPath check above), so nothing here was worked on
+		// anywhere else. If records ever do transit, this becomes meta.From
+		// with a fallback — a machine that relays must not sign someone else's
+		// work as its own.
+		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time, Origin: syncName(self)}
 		bySource[source] = append(bySource[source], rec)
 		touched[wk] = true
 		tn := r.Time.UnixNano()
@@ -554,7 +581,7 @@ func Import(dir, inDir string) (int, error) {
 			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
 			meta := metas[key]
 			if meta.ID == "" {
-				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath, OrigID: origID}
+				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath, OrigID: origID, From: string(sr.Origin)}
 			}
 			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
 				meta.Started = sr.Time
@@ -770,6 +797,9 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 		rec.Project = sanitizeSyncField(rec.Project, syncFieldMax)
 		rec.Harness = sanitizeSyncField(rec.Harness, syncFieldMax)
 		rec.Role = sanitizeSyncField(rec.Role, syncFieldMax)
+		// The origin is rendered into the same result lines, from the same
+		// other machine's text, so it takes the same flattening.
+		rec.Origin = syncName(sanitizeSyncField(string(rec.Origin), syncFieldMax))
 		if err := fn(rec); err != nil {
 			return err
 		}

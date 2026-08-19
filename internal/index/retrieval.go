@@ -1681,6 +1681,9 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
 			return
 		}
+		if !fromMatches(meta.From, o.From) {
+			return
+		}
 		if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {
 			return
 		}
@@ -1818,11 +1821,28 @@ func sessionMetaByOrd(m Manifest) map[uint32]SessionMeta {
 	return out
 }
 
+// fromMatches answers whether a session belongs to the machine asked for.
+// "local" means this machine's own work, which is every session that did not
+// arrive by sync — the one name a person always has, whatever their hosts are
+// called.
+func fromMatches(sessionFrom, want string) bool {
+	if want == "" {
+		return true
+	}
+	if strings.EqualFold(want, "local") {
+		return sessionFrom == ""
+	}
+	return strings.EqualFold(sessionFrom, want)
+}
+
 func sessionMetaMatches(meta SessionMeta, o query.Options) bool {
 	if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
 		return false
 	}
 	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
+		return false
+	}
+	if !fromMatches(meta.From, o.From) {
 		return false
 	}
 	if o.Since > 0 && meta.Updated.Before(time.Now().Add(-o.Since)) {

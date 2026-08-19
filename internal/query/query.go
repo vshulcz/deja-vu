@@ -47,8 +47,13 @@ type Options struct {
 	// Finding the session by what was said and then searching inside it — for a
 	// command, a file, an error — took reopening the transcript by hand (#1321).
 	Session string
-	Since   time.Duration
-	Limit   int
+	// From narrows to the machine a session was worked on: "mini" for what the
+	// server did, "local" for this machine's own work. Without it a history
+	// gathered from three machines is one undifferentiated pile, and there is
+	// no way to ask what any one of them has been doing.
+	From  string
+	Since time.Duration
+	Limit int
 	// Total and Capped travel from RunDetailed to Print so the JSON envelope
 	// can report how many sessions matched before the cap, not merely how many
 	// survived it. Counting the survivors measures the cap.

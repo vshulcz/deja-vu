@@ -749,7 +749,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// Project, id and title are text a harness wrote, and this is one
 		// line: an escape byte in any of them recolours the rest of the
 		// listing and a carriage return rewinds it (#1090).
-		fmt.Printf("[%s · %s · %s · %s]", s.Harness, redact.SafeForDisplay(s.Project), when, redact.SafeForDisplay(s.ID))
+		fmt.Printf("[%s · %s · %s · %s]", s.Harness, redact.SafeForDisplay(displayProject(s)), when, redact.SafeForDisplay(s.ID))
 		title := s.Title
 		if title == "" {
 			title = firstUserTitle(s)
@@ -1495,7 +1495,7 @@ func parseLast(args []string) (int, search.Options, string, error) {
 		switch a {
 		case "--json":
 			o.JSON = true
-		case "--harness", "--project", "--since", "--role":
+		case "--harness", "--project", "--since", "--role", "--from":
 			if i+1 >= len(args) {
 				return n, o, sinceRaw, fmt.Errorf("%s needs value", a)
 			}
@@ -1508,6 +1508,8 @@ func parseLast(args []string) (int, search.Options, string, error) {
 				o.Project = v
 			case "--role":
 				o.Role = v
+			case "--from":
+				o.From = v
 			default:
 				d, err := parseDur(v)
 				if err != nil {
@@ -1532,6 +1534,12 @@ func parseLast(args []string) (int, search.Options, string, error) {
 }
 
 func filterRecentSources(ss []model.Session, o search.Options) []model.Session {
+	// These are sessions read straight off this machine's stores, so they are
+	// local by definition: asking for another machine's work must not hand
+	// back this one's.
+	if o.From != "" && !strings.EqualFold(o.From, "local") {
+		return nil
+	}
 	if o.Harness == "" && o.Project == "" && o.Since <= 0 && o.Role == "" {
 		return ss
 	}
@@ -2536,7 +2544,7 @@ Usage:
   deja sync export <dir> [--full]
   deja sync import <dir>
   deja sync ssh <host> [--pull] [--full]
-  deja last [n] [--json] [--project name] [--harness name] [--since duration] [--role user|assistant|tool|files|command|edit]
+  deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]
   deja sources
   deja completion <bash|zsh|fish>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
