@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"html/template"
 	"os"
 	"path/filepath"
 	"sort"
@@ -170,49 +171,24 @@ func pageFor(id, display, h1 string) meta {
 	}
 }
 
-// jsonInScript makes a JSON document safe to sit inside a <script> element.
-// The headline comes from a heading in a markdown file: a `</script>` in one
-// would end the element early and everything after it would be parsed as HTML,
-// on every page the generator writes. Escaping the three characters that can
-// start a tag or a comment keeps the JSON valid and inert.
-func jsonInScript(b []byte) string {
-	r := strings.NewReplacer("<", `\u003c`, ">", `\u003e`, "&", `\u0026`)
-	return r.Replace(string(b))
-}
-
-func render(m meta, body string, others []link) string {
-	url := site + "/registry/" + m.Slug + ".html"
-	esc := func(s string) string { return html.EscapeString(s) }
-	ld, _ := json.Marshal(map[string]any{
-		"@context": "https://schema.org", "@type": "TechArticle",
-		"headline": m.Heading, "description": m.Description, "url": url,
-		"inLanguage": "en",
-		"author":     map[string]string{"@type": "Person", "name": "vshulcz"},
-		"publisher":  map[string]string{"@type": "Person", "name": "vshulcz"},
-		"isPartOf":   map[string]string{"@type": "WebSite", "name": "deja-vu", "url": site + "/"},
-	})
-	crumbs, _ := json.Marshal(map[string]any{
-		"@context": "https://schema.org", "@type": "BreadcrumbList",
-		"itemListElement": []any{
-			map[string]any{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": site + "/"},
-			map[string]any{"@type": "ListItem", "position": 2, "name": "Harnesses", "item": site + "/guide/harnesses.html"},
-			map[string]any{"@type": "ListItem", "position": 3, "name": m.Heading, "item": url},
-		},
-	})
-	return `<!DOCTYPE html>
+// pageTemplate is rendered by html/template, which escapes per context: an
+// attribute, an element body and the inside of a <script> are three different
+// escapes, and getting that right by hand is how a heading from a markdown
+// file ends up closing the script element on every page the generator writes.
+var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 <html lang="en" class="no-js">
 <head>
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>` + esc(m.Title) + `</title>
-<meta name="description" content="` + esc(m.Description) + `">
-<link rel="canonical" href="` + url + `">
+<title>{{.Title}}</title>
+<meta name="description" content="{{.Description}}">
+<link rel="canonical" href="{{.URL}}">
 <meta property="og:type" content="article">
-<meta property="og:title" content="` + esc(m.Title) + `">
-<meta property="og:description" content="` + esc(m.Description) + `">
-<meta property="og:url" content="` + url + `">
-<meta property="og:image" content="` + site + `/assets/og.png">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:image" content="{{.Site}}/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
@@ -222,22 +198,22 @@ func render(m meta, body string, others []link) string {
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
-<meta name="twitter:title" content="` + esc(m.Title) + `">
-<meta name="twitter:description" content="` + esc(m.Description) + `">
-<meta name="twitter:image" content="` + site + `/assets/og.png">
+<meta name="twitter:title" content="{{.Title}}">
+<meta name="twitter:description" content="{{.Description}}">
+<meta name="twitter:image" content="{{.Site}}/assets/og.png">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
-<link rel="sitemap" type="application/xml" href="` + site + `/sitemap.xml">
-<script type="application/ld+json">` + jsonInScript(ld) + `</script>
-<script type="application/ld+json">` + jsonInScript(crumbs) + `</script>
+<link rel="sitemap" type="application/xml" href="{{.Site}}/sitemap.xml">
+<script type="application/ld+json">{{.Article}}</script>
+<script type="application/ld+json">{{.Crumbs}}</script>
 </head>
 <body>
 <div class="glow"></div>
 <nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
 <div class="wrap"><div class="doc">
-` + sidebar(m.Slug, others) + `
+{{.Sidebar}}
 <article>
-<h1>` + esc(m.Heading) + `</h1>
-` + body + `
+<h1>{{.Heading}}</h1>
+{{.Body}}
 <hr>
 <p>deja reads this format and seventeen others, and turns what it finds into memory your
 agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
@@ -247,7 +223,46 @@ history.</p>
 </div></div>
 </body>
 </html>
-`
+`))
+
+type pageData struct {
+	Title, Description, Heading, URL, Site string
+	Article, Crumbs                        any
+	Sidebar, Body                          template.HTML
+}
+
+func render(m meta, body string, others []link) string {
+	url := site + "/registry/" + m.Slug + ".html"
+	article := map[string]any{
+		"@context": "https://schema.org", "@type": "TechArticle",
+		"headline": m.Heading, "description": m.Description, "url": url,
+		"inLanguage": "en",
+		"author":     map[string]string{"@type": "Person", "name": "vshulcz"},
+		"publisher":  map[string]string{"@type": "Person", "name": "vshulcz"},
+		"isPartOf":   map[string]string{"@type": "WebSite", "name": "deja-vu", "url": site + "/"},
+	}
+	crumbs := map[string]any{
+		"@context": "https://schema.org", "@type": "BreadcrumbList",
+		"itemListElement": []any{
+			map[string]any{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": site + "/"},
+			map[string]any{"@type": "ListItem", "position": 2, "name": "Harnesses", "item": site + "/guide/harnesses.html"},
+			map[string]any{"@type": "ListItem", "position": 3, "name": m.Heading, "item": url},
+		},
+	}
+	var b strings.Builder
+	err := pageTemplate.Execute(&b, pageData{
+		Title: m.Title, Description: m.Description, Heading: m.Heading,
+		URL: url, Site: site, Article: article, Crumbs: crumbs,
+		// The body is HTML this generator built from markdown it escaped on
+		// the way through; the sidebar is built from registry names, escaped
+		// there. Both are already safe, which is what template.HTML asserts.
+		Sidebar: template.HTML(sidebar(m.Slug, others)),
+		Body:    template.HTML(body),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return b.String()
 }
 
 // writeSitemap adds the registry pages to the sitemap, keeping every entry
