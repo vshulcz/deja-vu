@@ -487,3 +487,55 @@ func TestInstallZedKeepsABlockThatStillHoldsSomething(t *testing.T) {
 		t.Errorf("deja survived:\n%s", back)
 	}
 }
+
+// Wiring deja into Zed and then asking doctor whether it is wired have to give
+// the same answer. Doctor's generic probe falls back to looking for "deja"
+// anywhere in a file it cannot parse, and a settings file is full of comments,
+// so Zed gets the installer's own scanner.
+func TestDoctorReportsZedWiring(t *testing.T) {
+	path := zedSettingsFile(t, `// Zed settings
+{
+  // deja is not installed here — this line only says the word
+  "context_servers": {
+    "some-other": {
+      "command": "other"
+    }
+  },
+  "ui_font_size": 16
+}
+`)
+	if doctorZedWired(path) {
+		t.Error("doctor calls Zed wired with no deja entry")
+	}
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if !doctorZedWired(path) {
+		b, _ := os.ReadFile(path)
+		t.Errorf("doctor does not see the entry install just wrote:\n%s", b)
+	}
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if doctorZedWired(path) {
+		b, _ := os.ReadFile(path)
+		t.Errorf("doctor still calls it wired after uninstall:\n%s", b)
+	}
+	if doctorZedWired(filepath.Join(t.TempDir(), "nothing.json")) {
+		t.Error("doctor calls a machine with no settings file wired")
+	}
+}
+
+// The zed line has to be in doctor's list at all: an install target whose
+// result doctor never reports is wiring nobody can check.
+func TestDoctorListsZed(t *testing.T) {
+	var found bool
+	for _, c := range doctorMCPConfigs() {
+		if c.name == "zed" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("doctor lists no zed row, so `deja install zed` cannot be verified")
+	}
+}
