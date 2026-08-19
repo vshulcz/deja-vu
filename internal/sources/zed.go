@@ -443,13 +443,19 @@ func zedCommand(name string, input json.RawMessage) string {
 // the reason claude's list gives: a path inside a shell command is guesswork.
 // `grep` and `find_path` are absent because they name a pattern and a scope,
 // not a file the session worked on.
+// `list_directory` is absent for the same reason: it names a directory being
+// looked around in, not a file the work touched.
 var zedPathTools = map[string][]string{
-	"edit_file":        {"path"},
-	"read_file":        {"path"},
-	"create_directory": {"path"},
-	"delete_path":      {"path"},
-	"move_path":        {"source_path", "destination_path"},
-	"open":             {"path"},
+	"edit_file":              {"path"},
+	"read_file":              {"path"},
+	"create_directory":       {"path"},
+	"delete_path":            {"path"},
+	"move_path":              {"source_path", "destination_path"},
+	"copy_path":              {"source_path", "destination_path"},
+	"open":                   {"path"},
+	"diagnostics":            {"path"},
+	"save_file":              {"paths"},
+	"restore_file_from_disk": {"paths"},
 }
 
 func zedToolPaths(name string, input json.RawMessage) []string {
@@ -467,12 +473,23 @@ func zedToolPaths(name string, input json.RawMessage) []string {
 		if !ok {
 			continue
 		}
+		// Two shapes for the same thing: most tools take one path, and the
+		// ones that act on a selection take a list under `paths`.
 		var p string
-		if json.Unmarshal(raw, &p) != nil {
+		if json.Unmarshal(raw, &p) == nil {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
 			continue
 		}
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
+		var ps []string
+		if json.Unmarshal(raw, &ps) != nil {
+			continue
+		}
+		for _, p := range ps {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
 		}
 	}
 	return out

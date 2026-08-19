@@ -22,6 +22,10 @@ const zedWorkBody = `{"version":"0.3.0","title":"worked thread","updated_at":"20
  {"ToolUse":{"id":"c5","name":"read_file","input":{"path":"/w/app/queue/retry.go","start_line":1,"end_line":80}}},
  {"ToolUse":{"id":"c6","name":"move_path","input":{"source_path":"/w/app/old.go","destination_path":"/w/app/queue/jitter.go"}}},
  {"ToolUse":{"id":"c7","name":"terminal","input":{"command":"go build ./...","cd":"/w/app"}}},
+ {"ToolUse":{"id":"c8","name":"copy_path","input":{"source_path":"/w/app/queue/retry.go","destination_path":"/w/app/queue/retry_backup.go"}}},
+ {"ToolUse":{"id":"c9","name":"save_file","input":{"paths":["/w/app/queue/jitter.go","/w/app/README.md"]}}},
+ {"ToolUse":{"id":"c10","name":"diagnostics","input":{"path":"/w/app/queue/lint.go"}}},
+ {"ToolUse":{"id":"c11","name":"list_directory","input":{"path":"/w/app/vendor"}}},
  {"Text":"We spread the wakeups over a second."}
 ],"tool_results":{},"reasoning_details":null}}
 ]}`
@@ -94,6 +98,14 @@ func TestZedIndexesTheFilesAThreadTouched(t *testing.T) {
 		"/w/app/queue/retry.go",
 		"/w/app/old.go",
 		"/w/app/queue/jitter.go",
+		// A copy names both ends, the same as a move.
+		"/w/app/queue/retry_backup.go",
+		// save_file and restore_file_from_disk act on a selection, so their
+		// paths arrive as a list rather than one string.
+		"/w/app/README.md",
+		// Asking for a file's diagnostics is the agent looking at that file,
+		// the same as reading it.
+		"/w/app/queue/lint.go",
 	}
 	for _, w := range want {
 		found := false
@@ -140,5 +152,9 @@ func TestZedLeavesSearchesAndShellPathsOutOfTheFileRecord(t *testing.T) {
 		if role == RoleFiles && strings.Contains(text, "/w/app\n") {
 			t.Errorf("a terminal's working directory was recorded as a file: %q", text)
 		}
+	}
+	// Listing a directory is looking around, not working on a file.
+	if strings.Contains(joined, "/w/app/vendor") {
+		t.Errorf("a directory listing reached the file record:\n%s", joined)
 	}
 }
