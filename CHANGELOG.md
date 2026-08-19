@@ -7,8 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.17.3] - 2026-08-19
+
+Most of this release is one finding repeated in twenty places: deja measured
+text in bytes and runes where the thing being measured was characters and
+terminal columns. A Chinese session digested to nothing, a Japanese word was
+indexed as two, a Russian conclusion was swallowed by its own preamble, and a
+CJK title printed 110 columns on an 80-column terminal. None of it showed on an
+English store, which is why it lasted.
+
 ### Added
 - Zed's built-in agent is the eighteenth harness deja indexes. Its threads are one SQLite store under Zed's *data* directory — `~/Library/Application Support/Zed/threads/threads.db` on macOS, not the `~/.config/zed` that holds only settings — and every thread body inside it is a zstd frame, so reading them needs the `zstd` CLI beside `sqlite3`. With either tool missing, `deja sources` says which one rather than reporting an empty history. Both thread document generations parse, because Zed rewrites a thread in the current shape only when that thread is next saved, so a store mixes them indefinitely. (#183)
+- A CLI skill for the harnesses that have no MCP: the same memory reaches them through the commands they can run. (#1371)
+- `deja search --session` narrows a search to one conversation, for when the session is known and the line inside it is not. (#1362)
+- The brief lays out for the terminal it is in rather than assuming eighty columns, which is what a split pane is not. (#1367)
+- deja says what makes memory arrive at the two moments people notice it missing — the first run and the first recall. (#1277)
+
+### Fixed
+- Sessions written in Chinese, Japanese or Korean now carry their weight everywhere they were dropped: the digest returned nothing for them, recall skipped them as having nothing to say, a question asked in Chinese never counted as asked before, length normalisation did not apply, and repeat-question, superseded and related-note signals were all off. (#1341, #1343, #1345, #1347, #1349)
+- Thresholds that read "forty characters" and counted bytes: the same-fact floor was forty characters for English and twenty for Russian, so a preamble swallowed the conclusion behind it; a wall's length was bounded in bytes, so a Russian line was held to sixty characters and a Chinese one to forty. (#1395, #1402)
+- Text handed to an agent is cut on character boundaries. The answer line under a recall split the character sitting on its cap, because the walk back to a word boundary finds none in scripts that write no spaces. (#1391, #1405, #1410)
+- Japanese words are indexed whole across the marks written inside them, rather than as the pieces either side. (#1392)
+- Every one-line surface is measured in terminal columns rather than runes: the status line, the files table, the brief's recent lines and the search results each ran off the edge by half their width on CJK text. (#1386, #1398, #1399, #1401)
+- The bytes a terminal acts on are stripped from every surface that prints recorded text — the files rows, the show header, the digest headers, and titles a harness authored. A file name can carry an escape or a carriage return on any Unix host. (#1400, #1406, #1407, #1408)
+- Excerpts show the part of a message that answers the query rather than the first place a word appears, spend their whole window when the match sits at the end, and are chosen by where the query's terms meet. (#1319, #1323, #1326, #1328, #1330, #1332, #1387, #1393, #1396)
+- A recall payload does not pay twice for one answer, and says how many sessions matched rather than only how many came back. (#1379, #1394)
+- Incremental updates keep what they used to delete: the mined sidecars, new fix pairs, commands that became habits, and the evidence a pair needs until a second session confirms it. (#1296, #1297, #1299, #1382)
+- Writes that replace a good file are atomic and carry their own temp name, so two deja processes cannot publish each other's half-written work. (#1302, #1389)
+- Readers wait out an index swap instead of reporting the store as missing, and a hook running during a rebuild no longer decides there is no index. (#1375, #1378, #1390)
+- A vector sidecar built for an earlier index is refused rather than trusted, and a rewritten records file no longer keeps the old generation. (#1356, #1358)
+- The trust policy holds on every path data can leave by — embeddings, the exclude list, the whole brief screen, impact credits, and the MCP `how` tool, which was filtering by the CLI's rules rather than the agent's. (#1310, #1351, #1353, #1372, #1373, #1376, #1380)
+- Windows paths are handled as Windows writes them: a project is spelled the same on every platform, project scoping matches both separators, a synced path is trimmed, and an import error is reported rather than surfacing as a raw syscall number. (#1287, #1288, #1289, #1315)
+- Clocks that disagree no longer produce impossible answers: an event dated in the future stays out of today and this week, a session stamped ahead of the clock is not "-576000m old", and `ctx` dates sessions in the reader's zone. (#1314, #1404, #1409)
+- An incremental update no longer writes credentials into the mined fix pairs: redaction applies on that path as it does on a full build. (#1300)
+
+### Changed
+- Co-occurring pairs are counted a shard at a time during indexing. (#1366)
+- `deja sources` reports the files deja reads rather than the tree around them. (#1363)
 
 
 ## [0.17.2] - 2026-08-16
