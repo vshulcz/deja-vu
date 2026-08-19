@@ -260,7 +260,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// Padded here rather than with %-*s, whose width is runes: a path under
 		// a Chinese directory is one rune and two columns per character, so the
 		// counts stopped lining up in a column of their own.
-		path := trimPathTo(trimPath(r.path), col)
+		path := filesRowPath(r.path, col)
 		fmt.Fprintf(stdout, "  %s%s %d\n", path, strings.Repeat(" ", max(0, col-termwidth.Columns(path))), r.n)
 	}
 	return nil
@@ -388,6 +388,18 @@ func inRepositoryUncached(p string) bool {
 }
 
 var repoCheck sync.Map
+
+// filesRowPath is what one row shows: the head removed, what the terminal acts
+// on removed, and the rest bounded to the column.
+//
+// SafeLine comes before the bound, not after. A file name can hold an escape
+// or a carriage return — recorded from the tool call verbatim, and #1090
+// stripped them from the other reading surfaces while this row was missed —
+// and those bytes print as nothing, so measuring the path with them still in
+// it spends the budget the file name needs.
+func filesRowPath(p string, col int) string {
+	return trimPathTo(search.SafeLine(trimPath(p)), col)
+}
 
 // trimPathTo bounds a path to a column width, cutting from the left so the
 // file name survives: the tail is what identifies it, and a head-first cut
