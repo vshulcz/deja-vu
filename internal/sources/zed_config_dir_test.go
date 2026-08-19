@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -47,7 +46,7 @@ func TestZedSettingsPathHonoursTheOverride(t *testing.T) {
 	if got := ZedSettingsPath(); got != want {
 		t.Errorf("ZedSettingsPath = %q, want %q", got, want)
 	}
-	os.Unsetenv("DEJA_ZED_CONFIG")
+	t.Setenv("DEJA_ZED_CONFIG", "")
 	if got := ZedSettingsPath(); got == want {
 		t.Errorf("the override outlived its variable: %q", got)
 	}
