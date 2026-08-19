@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Claude Code stores its history — session format</title>
+<meta name="description" content="Where Claude Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/claude-code.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Claude Code stores its history — session format">
+<meta property="og:description" content="Where Claude Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/claude-code.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Claude Code stores its history — session format">
+<meta name="twitter:description" content="Where Claude Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Claude Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Claude Code session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/claude-code.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/claude-code.html","name":"Claude Code session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html" aria-current="page">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Claude Code session format</h1>
+<h2 id="store-and-files">Store and files</h2>
+<p>Claude Code writes transcripts below <code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/</code>. deja can point only session reads elsewhere with <code>DEJA_CLAUDE_ROOT</code>. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with <code>-</code>; nested <code>subagents/*.jsonl</code> files are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>.</p>
+<p>The top-level <code>~/.claude.json</code> is not a transcript. When <code>CLAUDE_CONFIG_DIR</code> is set, Claude moves that file to <code>$CLAUDE_CONFIG_DIR/.claude.json</code>.</p>
+<h2 id="records">Records</h2>
+<p>Message records have <code>type</code>, <code>sessionId</code>, <code>timestamp</code>, and a <code>message</code> object. <code>message.content</code> is either a string or an array whose useful parts have <code>text</code> or <code>content</code>.</p>
+<pre><code class="language-json">{&#34;type&#34;:&#34;assistant&#34;,&#34;sessionId&#34;:&#34;session-7&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:01Z&#34;,&#34;message&#34;:{&#34;role&#34;:&#34;assistant&#34;,&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The failing check is in parser.go.&#34;}]}}</code></pre>
+<p><code>type: &#34;user&#34;</code> maps to <code>user</code> and <code>type: &#34;assistant&#34;</code> maps to <code>assistant</code>; a non-empty <code>message.role</code> takes precedence. Timestamps are RFC 3339 strings in observed files. deja also accepts numeric Unix seconds or milliseconds.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>JSONL can end in a partial line while Claude is writing. Malformed lines are skipped; a later indexing pass reads the completed tail.</li>
+<li>Tool and control records use other <code>type</code> values and do not become messages.</li>
+<li>Project path encoding is ambiguous because <code>-</code> represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.</li>
+<li>Subagent logs largely duplicate parent content and are opt-in.</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-07-17</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

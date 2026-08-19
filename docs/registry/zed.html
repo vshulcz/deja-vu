@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Zed stores its history — session format</title>
+<meta name="description" content="Where Zed writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/zed.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Zed stores its history — session format">
+<meta property="og:description" content="Where Zed writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/zed.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Zed stores its history — session format">
+<meta name="twitter:description" content="Where Zed writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Zed writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Zed session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/zed.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/zed.html","name":"Zed session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html" aria-current="page">Zed</a></aside>
+<article>
+<h1>Zed session format</h1>
+<h2 id="store-and-files">Store and files</h2>
+<p>Zed&#39;s built-in agent keeps every thread in one SQLite database under Zed&#39;s <strong>data</strong> directory, following its own <code>paths::data_dir()</code>:</p>
+<div class="tablewrap"><table>
+<tr><th>Platform</th><th>Store</th></tr>
+<tr><td>macOS</td><td><code>~/Library/Application Support/Zed/threads/threads.db</code></td></tr>
+<tr><td>Linux, FreeBSD</td><td><code>${XDG_DATA_HOME:-~/.local/share}/zed/threads/threads.db</code></td></tr>
+<tr><td>Windows</td><td><code>%LOCALAPPDATA%\Zed\threads\threads.db</code></td></tr>
+</table></div>
+<p><code>~/.config/zed</code> is the *config* directory. It exists on every platform and holds <code>settings.json</code>, keymaps and prompts — it holds no threads, so a reader that looks there finds nothing on a machine with years of history.</p>
+<p>A Flatpak install overrides the Linux root with <code>FLATPAK_XDG_DATA_HOME</code>. <code>DEJA_ZED_ROOT</code> relocates the root and <code>DEJA_ZED_DB</code> points at a store directly; the second is how the fixture is read without a Zed install.</p>
+<p>Reading this store needs the <code>sqlite3</code> CLI, like opencode&#39;s and Cursor&#39;s, <strong>and</strong> the <code>zstd</code> CLI, which no other harness needs. Thread bodies are compressed; sqlite3 alone opens the store and reads nothing out of it. With either tool missing, <code>deja sources</code> and <code>deja doctor</code> say which one rather than reporting an empty history.</p>
+<h2 id="records">Records</h2>
+<p>One row is one thread, and one thread is one session. The table Zed ends up with is:</p>
+<pre><code class="language-sql">CREATE TABLE threads (
+    id TEXT PRIMARY KEY,
+    summary TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    data_type TEXT NOT NULL,
+    data BLOB NOT NULL,
+    parent_id TEXT,
+    folder_paths TEXT,
+    folder_paths_order TEXT,
+    created_at TEXT
+);</code></pre>
+<p>Only the first five columns are in the <code>CREATE TABLE</code>. The rest arrive as <code>ALTER TABLE</code> statements Zed runs at startup, so a store an older Zed wrote and a newer one has never opened has only the original five.</p>
+<p><code>data_type</code> is <code>zstd</code> for everything Zed writes today and <code>json</code> for rows written before compression landed. Either way the payload is one thread document, and the document is flattened — Zed serialises <code>SerializedThread { #[serde(flatten)] thread, version }</code>, so <code>version</code> sits beside the thread&#39;s own fields rather than wrapping them.</p>
+<p>Current documents are version <code>0.3.0</code> and hold Rust&#39;s externally tagged <code>Message</code> enum:</p>
+<pre><code class="language-json">{&#34;version&#34;:&#34;0.3.0&#34;,&#34;title&#34;:&#34;read the zed thread store&#34;,&#34;updated_at&#34;:&#34;2026-07-19T09:00:02Z&#34;,
+ &#34;messages&#34;:[{&#34;User&#34;:{&#34;id&#34;:&#34;u1&#34;,&#34;content&#34;:[{&#34;Text&#34;:&#34;where does zed keep its agent threads?&#34;}]}},
+             {&#34;Agent&#34;:{&#34;content&#34;:[{&#34;Text&#34;:&#34;in threads.db under the data dir&#34;}],&#34;tool_results&#34;:{}}},
+             &#34;Resume&#34;]}</code></pre>
+<p>A document written by the previous agent generation names the title <code>summary</code> and carries internally tagged segments instead:</p>
+<pre><code class="language-json">{&#34;version&#34;:&#34;0.2.0&#34;,&#34;summary&#34;:&#34;legacy zed thread&#34;,&#34;updated_at&#34;:&#34;2026-07-19T08:00:02Z&#34;,
+ &#34;messages&#34;:[{&#34;id&#34;:1,&#34;role&#34;:&#34;user&#34;,&#34;segments&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;does the old shape still load?&#34;}]}]}</code></pre>
+<p>Both matter. Zed rewrites a thread in the current shape only when that thread is next saved, so a store mixes generations indefinitely.</p>
+<p><code>User</code> maps to <code>user</code> and <code>Agent</code> to <code>assistant</code>; a legacy document&#39;s <code>role</code> is already lowercase (<code>user</code>, <code>assistant</code>, <code>system</code>), and <code>system</code> is dropped as harness-authored. <code>Text</code> blocks are indexed and joined with newlines, and a <code>Mention</code>&#39;s inlined <code>content</code> is indexed because that is the text Zed put in front of the model. Thinking, redacted thinking, tool calls, tool results, images and the <code>Resume</code> control marker are skipped.</p>
+<p><code>folder_paths</code> is a serialized <code>PathList</code>: the workspace roots newline-joined in lexicographic order, with <code>folder_paths_order</code> holding comma-joined display indices. The first path names the project.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>Thread documents carry no per-message timestamp in either generation. Every message inherits the thread&#39;s start, as aider&#39;s do; message order comes from the array.</li>
+<li><code>updated_at</code> and <code>created_at</code> are Rust <code>to_rfc3339</code> output, so they end in <code>+00:00</code> rather than <code>Z</code>. They are not lexicographically comparable with a Go <code>RFC3339Nano</code> watermark — <code>.</code> sorts below <code>Z</code>, so comparing them as text drops a row that is newer by a fraction of a second. The incremental filter normalises both sides with <code>strftime</code> first, and keeps a row whose timestamp SQLite cannot parse rather than assuming it was already seen.</li>
+<li><code>created_at</code> is set from <code>updated_at</code> when a thread is first written, so a fresh thread&#39;s window is a point, not a range. On a store predating the column the window collapses onto <code>updated_at</code>.</li>
+<li>A thread body that will not decode — a truncated frame, an unknown <code>data_type</code>, a document that is not a thread — costs that thread only. One unreadable row must not cost a user every other thread they have.</li>
+<li><code>parent_id</code> marks a subagent thread. Those rows are indexed like any other today; nothing filters them.</li>
+<li>The compressed fixture row is a real zstd frame, so its bytes are opaque in review. The SQL states the plaintext it decompresses to and a test pins the two together.</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-08-17</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

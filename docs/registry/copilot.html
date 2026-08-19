@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Copilot CLI stores its history — session format</title>
+<meta name="description" content="Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/copilot.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Copilot CLI stores its history — session format">
+<meta property="og:description" content="Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/copilot.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Copilot CLI stores its history — session format">
+<meta name="twitter:description" content="Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Copilot CLI","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/copilot.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/copilot.html","name":"Copilot CLI","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html" aria-current="page">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Copilot CLI</h1>
+<ul>
+<li><strong>ID</strong>: <code>copilot</code></li>
+<li><strong>Store</strong>: <code>~/.copilot/session-state/&lt;sessionId&gt;/events.jsonl</code></li>
+<li><strong>Read override</strong>: <code>DEJA_COPILOT_ROOT</code> (points at the <code>session-state</code> directory)</li>
+<li><strong>Format</strong>: append-only JSONL, one event per line, each <code>{type, data, timestamp}</code></li>
+</ul>
+<p><code>session.start</code> carries <code>sessionId</code> and <code>context.cwd</code>, which is where the</p>
+<p>project name comes from; the directory the file sits in is not the id and can</p>
+<p>differ from it. Conversation turns are <code>user.message</code> and <code>assistant.message</code>,</p>
+<p>both with <code>data.content</code> as a plain string.</p>
+<p>The work is filed outside the message stream. <code>tool.execution_start</code> carries</p>
+<p><code>toolName</code> and <code>arguments</code> — <code>path</code> for the file tools, <code>command</code> for <code>bash</code>,</p>
+<p>and <code>old_str</code>/<code>new_str</code> for an edit, which is the one place the replaced text</p>
+<p>survives. <code>tool.execution_complete</code> carries <code>data.result.content</code> and a</p>
+<p><code>success</code> flag; failed results are indexed on purpose, because the error a</p>
+<p>command hit is what a later search reaches for. <code>session.shutdown</code> also lists</p>
+<p><code>codeChanges.filesModified</code>, the only harness that hands over a modified-file</p>
+<p>list the parser does not have to infer.</p>
+<ul>
+<li><strong>MCP</strong>: <code>deja install copilot</code> writes <code>mcpServers.deja</code> into</li>
+</ul>
+<p><code>~/.copilot/mcp-config.json</code>.</p>
+<ul>
+<li><strong>Guidance</strong>: a skill Copilot loads on demand.</li>
+<li><strong>Auto-recall</strong>: none. Copilot CLI exposes no hook that can inject context,</li>
+</ul>
+<p>so MCP plus guidance is the whole install.</p>
+<ul>
+<li><strong>Resume</strong>: <code>copilot --resume &lt;sessionId&gt;</code>.</li>
+<li><strong>Handoff</strong>: exec.</li>
+</ul>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><code>assistant.message</code> records whose content is empty and whose work is entirely</li>
+</ul>
+<p>in tool calls used to be dropped; the tool events now carry them.</p>
+<ul>
+<li>Tool names are lowercase (<code>edit</code>, <code>read</code>, <code>write</code>, <code>bash</code>) where Claude Code</li>
+</ul>
+<p>capitalises, and the edit argument is <code>old_str</code> rather than <code>old_string</code>.</p>
+<ul>
+<li>A session directory can outlive its <code>events.jsonl</code>; the discovery walk only</li>
+</ul>
+<p>picks up files that exist.</p>
+<p>Specified in <a href="https://github.com/vshulcz/deja-vu/issues/655">#655</a>, work</p>
+<p>records added in <a href="https://github.com/vshulcz/deja-vu/pull/1231">#1231</a>.</p>
+<p><strong>Last verified:</strong> 2026-08-14</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

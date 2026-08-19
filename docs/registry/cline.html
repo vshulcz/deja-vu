@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Cline stores its history — session format</title>
+<meta name="description" content="Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/cline.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Cline stores its history — session format">
+<meta property="og:description" content="Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/cline.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Cline stores its history — session format">
+<meta name="twitter:description" content="Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Cline","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/cline.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/cline.html","name":"Cline","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html" aria-current="page">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Cline</h1>
+<ul>
+<li><strong>ID</strong>: <code>cline</code></li>
+<li><strong>Stores</strong> (two generations, one harness):</li>
+<li>modern CLI/SDK: <code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/&lt;sessionId&gt;/&lt;sessionId&gt;.messages.json</code> with a <code>&lt;sessionId&gt;.json</code> manifest beside it</li>
+<li>legacy VS Code extension (<code>saoudrizwan.claude-dev</code>): <code>&lt;host globalStorage&gt;/tasks/&lt;taskId&gt;/api_conversation_history.json</code> with <code>state/taskHistory.json</code> supplying title, cwd and timestamp; Code, Code Insiders, VSCodium, Cursor and Windsurf host roots are probed</li>
+<li><strong>Read overrides</strong>: <code>DEJA_CLINE_ROOT</code> (modern sessions dir), <code>DEJA_CLINE_ROOTS</code> (path list of legacy extension roots)</li>
+<li><strong>Format</strong>: whole-file JSON rewritten on change (not append-only) — full re-parse after atomic replacement, no incremental offsets</li>
+</ul>
+<p>Only <code>user</code>/<code>assistant</code> turns with string content or <code>type:&#34;text&#34;</code> blocks are</p>
+<p>indexed. Tool payloads, thinking, files, images, compaction artifacts and</p>
+<p>non-lead agents are skipped by design. The legacy <code>&lt;task&gt;...&lt;/task&gt;</code> user</p>
+<p>envelope is unwrapped so the tags are not indexed.</p>
+<ul>
+<li><strong>MCP</strong>: <code>deja install cline</code> writes <code>mcpServers.deja</code> into</li>
+</ul>
+<p><code>${CLINE_MCP_SETTINGS_PATH:-$CLINE_DATA_DIR/settings/cline_mcp_settings.json}</code></p>
+<p>(flattened command/args shape, accepted by current Cline; existing entries</p>
+<p>preserved).</p>
+<ul>
+<li><strong>Resume</strong>: <code>cline --id &lt;sessionId&gt;</code> for modern sessions only; legacy VS</li>
+</ul>
+<p>Code tasks reopen from the extension UI.</p>
+<ul>
+<li><strong>Handoff</strong>: paste.</li>
+</ul>
+<p>Specified by the community in</p>
+<p><a href="https://github.com/vshulcz/deja-vu/issues/253">#253</a> with synthetic samples</p>
+<p>and upstream source references.</p>
+<p><strong>Last verified:</strong> 2026-07-28</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

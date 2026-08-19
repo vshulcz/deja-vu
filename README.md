@@ -252,7 +252,8 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 <!-- matrix:end -->
 
 Custom store locations go through `DEJA_*_ROOT` variables, and each agent's own relocation
-variable is honored too. The [session format registry](docs/registry/README.md) documents
+variable is honored too. The
+[session format registry](https://vshulcz.github.io/deja-vu/registry/README.html) documents
 the observed paths, record schemas and role mapping per harness, with synthetic fixtures
 keeping those descriptions checked against the parsers.
 

@@ -134,6 +134,17 @@ func notes(r registry, code, esc func(string) string) string {
 	return "\n" + b.String() + "\n"
 }
 
+// registryLink points a harness at the page documenting its session format.
+// The matrix says where each store is; the page says what is in it, and a
+// reader who came looking for one wants the other.
+func registryLink(id, display string) string {
+	// One page is filed under a different name than its registry entry.
+	if id == "claude" {
+		id = "claude-code"
+	}
+	return `<a href="../registry/` + id + `.html">` + html.EscapeString(display) + `</a>`
+}
+
 func htmlTable(r registry) string {
 	var b strings.Builder
 	b.WriteString("<table>\n<tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Skill</th><th>Command</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>\n")
@@ -146,7 +157,7 @@ func htmlTable(r registry) string {
 			prereq = "—"
 		}
 		fmt.Fprintf(&b, "<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
-			e.DisplayName, strings.Join(e.StorePaths, "</code><br><code>"),
+			registryLink(e.ID, e.DisplayName), strings.Join(e.StorePaths, "</code><br><code>"),
 			gapMark(e, "mcp", e.Capabilities.MCP), gapMark(e, "auto", e.Capabilities.Auto),
 			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
 			gapMark(e, "resume", e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where OpenClaw stores its history — session format</title>
+<meta name="description" content="Where OpenClaw writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/openclaw.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where OpenClaw stores its history — session format">
+<meta property="og:description" content="Where OpenClaw writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/openclaw.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where OpenClaw stores its history — session format">
+<meta name="twitter:description" content="Where OpenClaw writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where OpenClaw writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"OpenClaw","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/openclaw.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/openclaw.html","name":"OpenClaw","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html" aria-current="page">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>OpenClaw</h1>
+<ul>
+<li><strong>ID</strong>: <code>openclaw</code></li>
+<li><strong>Store</strong>: <code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.jsonl</code> — one append-only pi-format transcript per session, per agent</li>
+<li><strong>Read override</strong>: <code>DEJA_OPENCLAW_ROOT</code> (agents root), <code>OPENCLAW_STATE_DIR</code> (OpenClaw&#39;s own state override, also honored)</li>
+<li><strong>Format</strong>: JSONL, append-cheap incremental parse from offset</li>
+</ul>
+<p>OpenClaw&#39;s agent runtime is pi-lineage, so transcripts share pi&#39;s line shape:</p>
+<p>a <code>{&#34;type&#34;:&#34;session&#34;}</code> header (id, timestamp, optional cwd) followed by</p>
+<p><code>{&#34;type&#34;:&#34;message&#34;}</code> entries whose <code>message.content</code> is a block array. The</p>
+<p>shared pi parser handles both; when the header carries a <code>cwd</code>, it becomes</p>
+<p>the project key, otherwise sessions attribute to <code>openclaw-&lt;agentId&gt;</code>.</p>
+<p>Skipped in the sessions directory: <code>sessions.json</code> (store metadata),</p>
+<p>compaction checkpoints (<code>&lt;id&gt;.checkpoint.&lt;uuid&gt;.jsonl</code>), and archived</p>
+<p>transcripts (<code>.deleted</code>/<code>.reset</code>/<code>.bak</code> suffixes). Newer OpenClaw builds can</p>
+<p>keep session *metadata* in SQLite; transcripts stay JSONL files, which is all</p>
+<p>deja reads. Format verified against openclaw source</p>
+<p>(<code>src/config/sessions/paths.ts</code>, <code>artifacts.ts</code>, <code>src/transcripts/store.ts</code>).</p>
+<ul>
+<li><strong>MCP</strong>: <code>deja install openclaw</code> wires deja into <code>openclaw.json</code> under</li>
+</ul>
+<p><code>mcp.servers</code> (OpenClaw&#39;s own layout, not the common <code>mcpServers</code> root).</p>
+<p>Live-verified: <code>openclaw mcp probe deja</code> reports the tools and the agent</p>
+<p>calls <code>recall</code> mid-turn.</p>
+<ul>
+<li><strong>Resume</strong>: OpenClaw&#39;s own session continuity.</li>
+<li><strong>Handoff</strong>: paste.</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-07-23</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

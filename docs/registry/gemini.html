@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Gemini CLI stores its history — session format</title>
+<meta name="description" content="Where Gemini CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/gemini.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Gemini CLI stores its history — session format">
+<meta property="og:description" content="Where Gemini CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/gemini.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Gemini CLI stores its history — session format">
+<meta name="twitter:description" content="Where Gemini CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Gemini CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Gemini CLI session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/gemini.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/gemini.html","name":"Gemini CLI session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html" aria-current="page">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Gemini CLI session format</h1>
+<h2 id="store-and-files">Store and files</h2>
+<p>Gemini CLI stores chats under <code>~/.gemini/tmp/&lt;project-id&gt;/chats/</code>. If <code>GEMINI_CLI_HOME</code> is set, Gemini appends <code>.gemini</code> to that directory. deja can override only session reads with <code>DEJA_GEMINI_ROOT</code>.</p>
+<p>Two generations coexist: whole-session <code>.json</code> files and replayable <code>.jsonl</code> files. <code>projects.json</code> maps working directories to project IDs; a per-project <code>.project_root</code> file is another observed source for the project name.</p>
+<h2 id="records">Records</h2>
+<p>Whole-session JSON has <code>sessionId</code>, <code>startTime</code>, <code>lastUpdated</code>, and a <code>messages</code> array. JSONL puts the session fields on its first metadata line, followed by message and control lines.</p>
+<pre><code class="language-json">{&#34;sessionId&#34;:&#34;session-7&#34;,&#34;startTime&#34;:&#34;2026-07-17T09:00:00Z&#34;,&#34;lastUpdated&#34;:&#34;2026-07-17T09:00:02Z&#34;}
+{&#34;id&#34;:&#34;message-1&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:01Z&#34;,&#34;type&#34;:&#34;gemini&#34;,&#34;content&#34;:[{&#34;text&#34;:&#34;The configuration is valid.&#34;}]}</code></pre>
+<p><code>type: &#34;user&#34;</code> maps to <code>user</code>; <code>gemini</code> and <code>model</code> map to <code>assistant</code>. Other types, including informational and error events, are ignored. Content is a string or an array of parts with <code>text</code>. All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>A resumed legacy <code>.json</code> session can be rewritten as <code>.jsonl</code>. deja deduplicates by session ID and prefers JSONL.</li>
+<li>JSONL <code>$set.lastUpdated</code> patches session metadata.</li>
+<li><code>$rewindTo</code> replays history by removing the referenced message and everything after it before later records are applied.</li>
+<li>The chats tree also contains non-session JSON such as checkpoints; files without a valid session ID and messages are ignored.</li>
+<li>Nested subagent chat files occur below a parent chat directory.</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-07-24</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

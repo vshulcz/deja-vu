@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Hermes stores its history — session format</title>
+<meta name="description" content="Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/hermes.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Hermes stores its history — session format">
+<meta property="og:description" content="Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/hermes.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Hermes stores its history — session format">
+<meta name="twitter:description" content="Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Hermes","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/hermes.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/hermes.html","name":"Hermes","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html" aria-current="page">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Hermes</h1>
+<ul>
+<li><strong>ID</strong>: <code>hermes</code></li>
+<li><strong>Store</strong>: <code>~/.hermes/state.db</code> (0.17+) or <code>~/.hermes/profiles/&lt;profile&gt;/state.db</code> (older builds, one store per profile)</li>
+<li><strong>Read overrides</strong>: <code>DEJA_HERMES_PROFILES_ROOT</code> for the profiles directory, <code>DEJA_HERMES_DB</code> to pin a single store</li>
+<li><strong>Format</strong>: SQLite relational store</li>
+</ul>
+<p>A flat <code>messages</code> table, grouped by <code>session_id</code>: <code>role</code>, <code>content</code>, and <code>timestamp</code></p>
+<p>as REAL epoch seconds. Rows with <code>role</code> of <code>tool</code> carry no prose and are skipped, as</p>
+<p>are rows with a null <code>content</code>. There is no working directory in the schema, so the</p>
+<p>profile name stands in for the project.</p>
+<ul>
+<li><strong>MCP</strong>: <code>mcp_servers</code> in <code>~/.hermes/config.yaml</code>; <code>deja install hermes-auto</code> also drops a plugin whose <code>pre_llm_call</code> hook injects recall and registers <code>/deja</code>.</li>
+<li><strong>Resume</strong>: Hermes has its own session commands; nothing documented that starts a session from a prompt.</li>
+<li><strong>Handoff</strong>: paste.</li>
+</ul>
+<p>Requested in <a href="https://github.com/vshulcz/deja-vu/issues/355">#355</a>.</p>
+<p><strong>Last verified:</strong> 2026-07-28</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

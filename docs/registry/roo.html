@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Roo Code stores its history — session format</title>
+<meta name="description" content="Where Roo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/roo.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Roo Code stores its history — session format">
+<meta property="og:description" content="Where Roo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/roo.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Roo Code stores its history — session format">
+<meta name="twitter:description" content="Where Roo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Roo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Roo Code","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/roo.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/roo.html","name":"Roo Code","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html" aria-current="page">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Roo Code</h1>
+<ul>
+<li><strong>ID</strong>: <code>roo</code></li>
+<li><strong>Store</strong>: VS Code-host globalStorage <code>rooveterinaryinc.roo-cline/tasks/&lt;taskId&gt;/api_conversation_history.json</code>; per-task metadata in <code>history_item.json</code> (id, ts, task, workspace). Code, Code Insiders, VSCodium, Cursor and Windsurf host roots are probed.</li>
+<li><strong>Read override</strong>: <code>DEJA_ROO_ROOTS</code> (path list)</li>
+<li><strong>Format</strong>: whole-file JSON rewritten on change; full re-parse per pass</li>
+</ul>
+<p>The transcript shape matches Cline&#39;s legacy store (Roo is a Cline fork), so</p>
+<p>the same text-block extraction and <code>&lt;task&gt;</code> envelope unwrapping apply.</p>
+<p>Format verified against Roo-Code source (<code>src/shared/globalFileNames.ts</code>,</p>
+<p><code>src/core/task-persistence</code>); a live-loop validation with the running</p>
+<p>extension is still welcome — Roo is GUI-only, so deja reads its history and</p>
+<p>serves it to other agents rather than injecting into Roo itself.</p>
+<ul>
+<li><strong>MCP</strong>: Roo manages its own MCP servers from the extension UI</li>
+</ul>
+<p>(<code>mcp_settings.json</code>); point it at <code>deja mcp</code> manually if desired.</p>
+<ul>
+<li><strong>Resume</strong>: extension UI only.</li>
+<li><strong>Handoff</strong>: paste.</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-07-27</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

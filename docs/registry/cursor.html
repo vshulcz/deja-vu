@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Cursor stores its history — session format</title>
+<meta name="description" content="Where Cursor writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/cursor.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Cursor stores its history — session format">
+<meta property="og:description" content="Where Cursor writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/cursor.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Cursor stores its history — session format">
+<meta name="twitter:description" content="Where Cursor writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Cursor writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Cursor session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/cursor.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/cursor.html","name":"Cursor session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html" aria-current="page">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Cursor session format</h1>
+<h2 id="stores-and-files">Stores and files</h2>
+<p>Cursor IDE stores chats in <code>state.vscdb</code> under <code>globalStorage/</code> and <code>workspaceStorage/*/</code>. The user root is <code>~/Library/Application Support/Cursor/User</code> on macOS and <code>~/.config/Cursor/User</code> on other systems; an existing <code>$XDG_CONFIG_HOME/Cursor/User</code> is used when available. <code>DEJA_CURSOR_ROOT</code> overrides IDE discovery.</p>
+<p>Cursor CLI writes <code>projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code> below <code>${CURSOR_CONFIG_DIR:-~/.cursor}</code>. <code>DEJA_CURSOR_CLI_ROOT</code> overrides transcript reads. Subagent transcripts are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>.</p>
+<h2 id="ide-sqlite-records">IDE SQLite records</h2>
+<p>The <code>cursorDiskKV(key, value)</code> table has session values at <code>composerData:&lt;id&gt;</code> and message values at <code>bubbleId:&lt;composer-id&gt;:&lt;bubble-id&gt;</code>.</p>
+<pre><code class="language-json">{&#34;composerId&#34;:&#34;composer-7&#34;,&#34;name&#34;:&#34;Fix cache invalidation&#34;,&#34;createdAt&#34;:1784278800000,&#34;lastUpdatedAt&#34;:1784278802000}
+{&#34;type&#34;:1,&#34;text&#34;:&#34;Why is this stale?&#34;,&#34;timestamp&#34;:1784278801000,&#34;workspaceProjectDir&#34;:&#34;/work/api&#34;}</code></pre>
+<p>Bubble <code>type: 1</code> maps to <code>user</code>; other numeric types map to <code>assistant</code>. Text uses <code>text</code>, falling back to <code>rawText</code>. Timestamps are Unix milliseconds. The first bubble with <code>workspaceProjectDir</code> supplies the project. Reading SQLite requires the <code>sqlite3</code> CLI.</p>
+<h2 id="cli-jsonl-records">CLI JSONL records</h2>
+<pre><code class="language-json">{&#34;role&#34;:&#34;assistant&#34;,&#34;message&#34;:{&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The cache key omitted the locale.&#34;}]}}</code></pre>
+<p>Only <code>user</code> and <code>assistant</code> roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as <code>turn_ended</code> are ignored. The transcript has no message timestamps, so deja uses file modification time.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.</li>
+<li>SQLite values are JSON inside a key-value table and malformed or null entries occur.</li>
+<li>CLI project path encoding has the same separator-versus-hyphen ambiguity as Claude Code.</li>
+<li>SQLite text is capped at 64 KiB. CLI subagent duplication is opt-in.</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-07-17</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>
