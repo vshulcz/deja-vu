@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"runtime"
 	"strconv"
 	"testing"
 )
@@ -68,6 +69,14 @@ func TestEveryImplementedTargetIsListed(t *testing.T) {
 		found++
 		for _, name := range names {
 			if listed[name] {
+				return true
+			}
+			// A target can be implemented everywhere and offered only where it
+			// works. sync-timer answers on every platform — with an
+			// explanation naming the one it cannot schedule for, which is
+			// better than "unknown target" — but it is listed only where deja
+			// can write a unit, because the list is what `--all` installs.
+			if name == "sync-timer" && !syncTimerSchedulable(runtime.GOOS) {
 				return true
 			}
 		}
