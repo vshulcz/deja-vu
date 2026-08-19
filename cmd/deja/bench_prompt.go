@@ -47,16 +47,24 @@ func offTopicQuestions() []string {
 // The right answer is silence, and it is the one case tonight where firing
 // less often is the improvement.
 func absentSubjectQuestions() []string {
-	// The subjects are real topics of *other* projects in this corpus, not
-	// invented words. That is the live shape: measured on a real store,
-	// "айфоновский" appears in two sessions on this machine and in none of
-	// this project's, so the question is about work that happened elsewhere.
-	// A word that exists nowhere at all is a different and much weaker
-	// signal — nothing can answer it, here or anywhere.
+	// The subject belongs to another project; the rest is the vocabulary a
+	// long working session is made of. That combination is the live shape,
+	// found by printing the candidates rather than reasoning about them:
+	//
+	//   q     = which branch was the oauth rotation on when the suite passed
+	//   terms = [branch oauth rotation suite passed]
+	//   cand  = the 1000-message noise session, matched=3 strong=3
+	//
+	// The subject contributes nothing. "branch", "suite" and "passed" carry
+	// the match, and the session that says them most often wins — which is
+	// whichever session is longest. Two earlier drafts of these questions
+	// measured something else: one joined the absent subject to a topic the
+	// project really holds, so answering was reasonable, and one used words
+	// that exist nowhere, where the hook already stays silent (0/3).
 	return []string{
-		"did the kestrel timeout ever affect the etag reuse",
-		"how does escrow release interact with the oauth rotation",
-		"which parquet batch carried the gzip streaming rows",
+		"did the etag reuse ever break the branch during a suite run",
+		"which branch was the oauth rotation on when the suite passed",
+		"does the gzip streaming touch the branch the suite builds",
 	}
 }
 
