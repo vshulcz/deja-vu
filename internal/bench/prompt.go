@@ -47,6 +47,10 @@ const PromptBucketProject = promptBucketProject
 // actually decided each question, so the benchmark can see which wins.
 const promptHaystackProject = "promptbenchhaystack"
 
+// PromptHaystackProject is that project, exported so the benchmark can ask it
+// a question it never answered.
+const PromptHaystackProject = promptHaystackProject
+
 type PromptCorpus struct {
 	Chains []PromptChain
 	Hash   string

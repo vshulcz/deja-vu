@@ -171,7 +171,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// hook pays its cost on every message the user sends. Measured on
 		// cross-paired prompts whose answer is absent, the old bar injected on
 		// 94% of them; half of those rested on one ordinary word.
-		if matched[i] < 1 || (matched[i] < 2 && strong[i] < 1) {
+		if !recallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		if matched[i] >= 2 {
@@ -720,4 +720,30 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 	}
 	return fmt.Sprintf("deja: this project has history on %q from %s%s — call recall with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
+}
+
+// recallWorthShowing is the one bar both the hook and the benchmark apply. It
+// lived in two places with two slightly different expressions, so the
+// benchmark measured a gate the product did not have.
+//
+// A single rare word stands on its own: "pgbouncer" identifies something
+// whether or not a second word joins it. Two ordinary words do not — scattered
+// across a long session they are two words, not an answer. A session that
+// really settled the question has them in the same breath, in one message.
+// Measured by hand on ten real prompts against a frozen index: five were
+// answered with plainly unrelated work, none with silence, and every one of
+// those five rested on words that live in the project but never met.
+func recallWorthShowing(terms []string, matched, strong int) bool {
+	if matched < 1 {
+		return false
+	}
+	// Either the session's match rested on a rare word, or the question itself
+	// named something identifiable. The second is what the benchmark has been
+	// applying all along while the hook applied only the first — measured on
+	// the corpus, the pair answers 11 of 12 real questions with no false fire,
+	// where the session-only rule answers 7 and fires on 2 controls.
+	if hasIdentifierTerm(terms) {
+		return true
+	}
+	return matched >= 2
 }

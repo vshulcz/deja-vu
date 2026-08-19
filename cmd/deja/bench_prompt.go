@@ -25,6 +25,17 @@ import (
 // not contain: a run that fires on those is trading noise for coverage.
 // negativeQuestions ask about work no chain contains. A run that fires on
 // these is buying coverage with noise.
+// offTopicQuestions join two topics the project really discussed into a
+// question it never answered. Unlike the negative controls, every word here is
+// present somewhere in the project; only the question is new.
+func offTopicQuestions() []string {
+	return []string{
+		"did the kestrel timeout ever delay an escrow release",
+		"do we write parquet before or after the kestrel handshake",
+		"which escrow rows ended up in the parquet batch",
+	}
+}
+
 func negativeQuestions() []string {
 	return []string{
 		"how do I bake sourdough bread at home",
@@ -78,6 +89,12 @@ type promptReport struct {
 	// touched everything matches everything, and narrowing it to the matching
 	// part keeps it winning.
 	Haystack promptArmReport `json:"haystack"`
+	// The off-topic arm: a question built from words the project really uses,
+	// about something nobody ever decided. Every fire is a false one. Measured
+	// by hand on ten real prompts against a frozen index, five were answered
+	// with plainly unrelated work and none with silence — the hook never says
+	// it does not know, which is what teaches an agent to stop reading it.
+	OffTopic promptArmReport `json:"off_topic"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -192,7 +209,16 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Marathon, nil)
 	finishPromptArm(&report.Fresh, nil)
 	finishPromptArm(&report.Bucket, nil)
+	// Asked against the project that holds every one of its words.
+	for _, q := range offTopicQuestions() {
+		report.OffTopic.Cases++
+		if fired, _ := promptBenchProbe(indexDir, bench.PromptHaystackProject, "no-such-chain", prompt.Terms(q)); fired {
+			report.OffTopic.Fired++
+			report.OffTopic.FalseFires++
+		}
+	}
 	finishPromptArm(&report.Haystack, nil)
+	finishPromptArm(&report.OffTopic, nil)
 	return report, nil
 }
 
@@ -204,14 +230,15 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}
 	for i, s := range ranked {
-		// Every gate the hook applies, applied here too — a benchmark that
-		// skips one reports a recall the user would never see.
-		if matched[i] < 1 || (matched[i] < 2 && !hasIdentifierTerm(terms)) {
+		// The same bar the hook applies, from the same function — kept in one
+		// place because the two drifted: this one asked whether the query held
+		// an identifier, the hook asked whether the session did.
+		if !recallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		if len(s.Messages) > dejaVuMaxMessages {
