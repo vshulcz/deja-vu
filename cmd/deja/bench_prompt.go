@@ -71,6 +71,13 @@ type promptReport struct {
 	// Until this existed the benchmark handed the probe the correct project
 	// every time, so it could not see a scope failure at all.
 	Bucket promptArmReport `json:"bucket_scope"`
+	// The haystack arm: three questions answered by three small sessions, in a
+	// project that also holds one very long session mentioning all of them.
+	// Correct means the small session won. Measured on a real store, one
+	// session of 1476 messages answered 33 of 45 live prompts — a session that
+	// touched everything matches everything, and narrowing it to the matching
+	// part keeps it winning.
+	Haystack promptArmReport `json:"haystack"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -128,7 +135,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 		}
 		// Filler that only exists to fill the bucket has no question of its
 		// own; it is asked about through the bucket-answer chain below.
-		if chain.Kind == "bucket" {
+		if chain.Kind == "bucket" || chain.Kind == "haystack-noise" {
 			continue
 		}
 		terms := prompt.Terms(chain.Question)
@@ -148,6 +155,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 			arm = &report.Fresh
 		case "bucket-answer":
 			arm = &report.Bucket
+		case "haystack":
+			arm = &report.Haystack
 		default:
 			realTerms = append(realTerms, len(terms))
 		}
@@ -183,6 +192,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Marathon, nil)
 	finishPromptArm(&report.Fresh, nil)
 	finishPromptArm(&report.Bucket, nil)
+	finishPromptArm(&report.Haystack, nil)
 	return report, nil
 }
 

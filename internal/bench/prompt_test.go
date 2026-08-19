@@ -22,7 +22,7 @@ func TestGeneratePromptShape(t *testing.T) {
 		// would make a query match two chains and blur the measurement; the
 		// bucket exists to measure exactly that condition — a scope holding
 		// several unrelated pieces of work and not the answer.
-		if c.Kind != "bucket" {
+		if c.Kind != "bucket" && c.Kind != "haystack" && c.Kind != "haystack-noise" {
 			if projects[c.Project] {
 				t.Fatalf("project %q shared by two chains; a query would match both", c.Project)
 			}
@@ -42,7 +42,7 @@ func TestGeneratePromptShape(t *testing.T) {
 		// asked about through the bucket-answer chain, whose question is the
 		// one that must go unanswered. A chain nobody asks about still has to
 		// earn its place, and this one earns it by being the wrong answer.
-		if c.Kind == "bucket" {
+		if c.Kind == "bucket" || c.Kind == "haystack-noise" {
 			continue
 		}
 		if topics[c.Topic] {

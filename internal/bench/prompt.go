@@ -43,6 +43,10 @@ const promptBucketProject = "promptbenchbucket"
 // question against the catch-all rather than against the right answer.
 const PromptBucketProject = promptBucketProject
 
+// promptHaystackProject holds one very long session and the small ones that
+// actually decided each question, so the benchmark can see which wins.
+const promptHaystackProject = "promptbenchhaystack"
+
 type PromptCorpus struct {
 	Chains []PromptChain
 	Hash   string
@@ -214,6 +218,62 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			Messages: []model.Message{{Role: "user", Text: "we decided prepared statements go behind pgbouncer in session mode", Time: answer}},
 		}},
 	})
+	// The haystack. Measured on a frozen copy of a real index 2026-08-20: of 45
+	// live prompts, 33 were answered by one session of 38131 messages and 11 by
+	// one of 29190 — the two largest in the index, in order of size, for
+	// questions with nothing in common. A session that touched everything
+	// matches everything, and narrowing it to the part that matched leaves it
+	// winning.
+	//
+	// The shape matters: a long session that mentions a topic once does not
+	// compete, so an earlier fixture proved nothing. This one repeats each
+	// topic the way a long night of work really does.
+	hay := []promptTopic{
+		{"kestrel", "the kestrel timeout was raised to ninety seconds", "why is the kestrel timeout ninety seconds?"},
+		{"escrow", "escrow release waits on the second signature", "what does escrow release wait for?"},
+		{"parquet", "parquet writes are batched per hour, not per row", "how often do we write parquet?"},
+	}
+	var noise []model.Message
+	for k := 0; k < 200; k++ {
+		t := base.Add(time.Duration(1200+k) * time.Minute)
+		noise = append(noise,
+			model.Message{Role: "user", Text: fillerText(rng, "another pass over the same branch"), Time: t},
+			model.Message{Role: "assistant", Text: fillerText(rng, "adjusted it and ran the suite again"), Time: t.Add(time.Minute)},
+		)
+		// Every topic comes up again and again, which is what a long session
+		// does and what makes it beat the session that actually decided it.
+		for _, h := range hay {
+			// In passing, the way a long session mentions everything: the
+			// topic comes up, the decision does not. A message that carries
+			// the fact too is not a haystack — it is a better answer, and an
+			// earlier fixture made that mistake.
+			noise = append(noise, model.Message{
+				Role: "assistant",
+				Text: "looked at " + h.word + " again on the way past",
+				Time: t.Add(2 * time.Minute),
+			})
+		}
+	}
+	chains = append(chains, PromptChain{
+		ID: "prompt-haystack-noise", Project: promptHaystackProject, Kind: "haystack-noise",
+		Sessions: []model.Session{{
+			ID: "prompt-haystack-noise-session", Harness: "claude", Project: promptHaystackProject,
+			Started: base.Add(1200 * time.Minute), Updated: base.Add(1500 * time.Minute), Messages: noise,
+		}},
+	})
+	for i, h := range hay {
+		id := fmt.Sprintf("prompt-haystack-%02d", i)
+		t := base.Add(time.Duration(1800+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: promptHaystackProject, Kind: "haystack",
+			Topic: h.word, Question: h.question,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: promptHaystackProject,
+				Started: t, Updated: t,
+				Messages: []model.Message{{Role: "user", Text: "we decided " + h.fact, Time: t}},
+			}},
+		})
+	}
 	// Negative controls share the corpus but hold none of its topics, so a
 	// question about them must not recall anything.
 	for i := 0; i < PromptNegativeCount; i++ {
