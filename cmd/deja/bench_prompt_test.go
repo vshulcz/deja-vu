@@ -25,6 +25,13 @@ func TestPromptBenchCorpusIsMeasurable(t *testing.T) {
 		}
 		// One topic per chain: the context corpus gives them all the same
 		// vocabulary, which scores zero no matter what the extractor does.
+		// Filler for the catch-all scope carries no question of its own: it is
+		// asked about through the bucket-answer chain, whose question is the
+		// one that must go unanswered. A chain nobody asks about still has to
+		// earn its place, and this one earns it by being the wrong answer.
+		if c.Kind == "bucket" {
+			continue
+		}
 		if topics[c.Topic] {
 			t.Fatalf("topic %q appears in more than one chain", c.Topic)
 		}
@@ -116,5 +123,27 @@ func TestFinishPromptArmHandlesEmptyArms(t *testing.T) {
 	}
 	if arm.MedianTerm == 0 {
 		t.Fatal("median term count not computed")
+	}
+}
+
+// The bucket arm measures a scope that cannot hold the answer, so nothing it
+// returns is ever right. Until it existed the benchmark handed the probe the
+// correct project on every case and could not see a scope failure at all —
+// which is how `bench prompt` reported precision 1.00 while the hook was
+// injecting a stranger's session on a real machine (2026-08-19).
+func TestBucketArmCannotBeSatisfied(t *testing.T) {
+	report, err := measurePrompt(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := report.Bucket
+	if b.Cases == 0 {
+		t.Fatal("the bucket case is not in the corpus, so a wrong scope goes unmeasured")
+	}
+	if b.Correct != 0 {
+		t.Errorf("the bucket arm scored %d correct — nothing in a catch-all scope is the answer, so the question is being asked against the right project instead", b.Correct)
+	}
+	if b.Fired != b.FalseFires {
+		t.Errorf("fired %d but counted %d false — every fire out of the bucket is a false one", b.Fired, b.FalseFires)
 	}
 }

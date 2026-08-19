@@ -64,6 +64,13 @@ type promptReport struct {
 	// get answered.
 	Marathon promptArmReport `json:"marathon_sessions"`
 	Fresh    promptArmReport `json:"fresh_sessions"`
+	// The bucket arm: a question asked while the project scope is a catch-all
+	// that holds unrelated work and not the answer. Every fire here is a false
+	// one — the right behaviour is silence, because a neighbour pulled out of
+	// a catch-all is what teaches an agent to stop reading these injections.
+	// Until this existed the benchmark handed the probe the correct project
+	// every time, so it could not see a scope failure at all.
+	Bucket promptArmReport `json:"bucket_scope"`
 }
 
 func runBenchPrompt(args []string) error {
@@ -119,20 +126,39 @@ func measurePrompt(seed int64) (promptReport, error) {
 		if chain.Negative {
 			continue
 		}
+		// Filler that only exists to fill the bucket has no question of its
+		// own; it is asked about through the bucket-answer chain below.
+		if chain.Kind == "bucket" {
+			continue
+		}
 		terms := prompt.Terms(chain.Question)
-		fired, correct := promptBenchProbe(indexDir, chain.Project, chain.ID, terms)
+		// The bucket question is asked against the catch-all scope rather than
+		// against its own project — that is the whole point of the case, and
+		// it is the only arm where the probe is not handed the right answer.
+		scope := chain.Project
+		if chain.Kind == "bucket-answer" {
+			scope = bench.PromptBucketProject
+		}
+		fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms)
 		arm := &report.Real
 		switch chain.Kind {
 		case "marathon":
 			arm = &report.Marathon
 		case "fresh":
 			arm = &report.Fresh
+		case "bucket-answer":
+			arm = &report.Bucket
 		default:
 			realTerms = append(realTerms, len(terms))
 		}
 		arm.Cases++
 		if fired {
 			arm.Fired++
+			// Nothing in the bucket can be the answer, so anything it returns
+			// is a false fire.
+			if chain.Kind == "bucket-answer" {
+				arm.FalseFires++
+			}
 		}
 		if correct {
 			arm.Correct++
@@ -156,6 +182,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Negative, negTerms)
 	finishPromptArm(&report.Marathon, nil)
 	finishPromptArm(&report.Fresh, nil)
+	finishPromptArm(&report.Bucket, nil)
 	return report, nil
 }
 

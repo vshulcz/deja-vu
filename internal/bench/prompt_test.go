@@ -18,10 +18,16 @@ func TestGeneratePromptShape(t *testing.T) {
 	projects := map[string]bool{}
 	var real, negative, marathon, fresh int
 	for _, c := range corpus.Chains {
-		if projects[c.Project] {
-			t.Fatalf("project %q shared by two chains; a query would match both", c.Project)
+		// One project is shared on purpose. Everywhere else a shared project
+		// would make a query match two chains and blur the measurement; the
+		// bucket exists to measure exactly that condition — a scope holding
+		// several unrelated pieces of work and not the answer.
+		if c.Kind != "bucket" {
+			if projects[c.Project] {
+				t.Fatalf("project %q shared by two chains; a query would match both", c.Project)
+			}
+			projects[c.Project] = true
 		}
-		projects[c.Project] = true
 		if c.Negative {
 			negative++
 			if len(c.Sessions) == 0 {
@@ -32,6 +38,13 @@ func TestGeneratePromptShape(t *testing.T) {
 		real++
 		// One topic per chain: the context corpus gives them all the same
 		// vocabulary, and a term in every chain identifies none of them.
+		// Filler for the catch-all scope carries no question of its own: it is
+		// asked about through the bucket-answer chain, whose question is the
+		// one that must go unanswered. A chain nobody asks about still has to
+		// earn its place, and this one earns it by being the wrong answer.
+		if c.Kind == "bucket" {
+			continue
+		}
 		if topics[c.Topic] {
 			t.Fatalf("topic %q appears twice", c.Topic)
 		}

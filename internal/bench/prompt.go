@@ -28,9 +28,20 @@ type PromptChain struct {
 	Negative bool
 	// Kind names what this chain is here to measure: "" for the plain case,
 	// "marathon" for a chain whose sessions are long enough to be skipped
-	// wholesale, "fresh" for one worked on minutes ago.
+	// wholesale, "fresh" for one worked on minutes ago, "bucket" for filler
+	// sharing a catch-all scope and "bucket-answer" for the question whose
+	// answer sits outside that scope.
 	Kind string
 }
+
+// promptBucketProject is the shared scope an agent gets when it is started
+// from a directory that is not a project: everything launched from there lands
+// in it, and the repository being worked on does not.
+const promptBucketProject = "promptbenchbucket"
+
+// PromptBucketProject is that scope, exported so the benchmark can ask its
+// question against the catch-all rather than against the right answer.
+const PromptBucketProject = promptBucketProject
 
 type PromptCorpus struct {
 	Chains []PromptChain
@@ -161,6 +172,48 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	chains = append(chains, promptShapeChain(rng, len(topics)+1, "fresh", promptTopic{
 		"idempotency", "the import path became idempotent by keying on the source hash", "how did we make the import idempotent?",
 	}, time.Now().Add(-2*time.Minute).UTC(), 3))
+	// The bucket case. An agent started from a parent directory — a home
+	// directory, a workspace root — gets a project scope that holds everything
+	// ever launched from there, and not the repository actually being worked
+	// on. Measured on a real machine 2026-08-19: from /Users/shulcz the scope
+	// was [shulcz, Users/shulcz], the answer lay in another project entirely,
+	// and the hook injected an unrelated session from the bucket instead.
+	//
+	// The right answer is silence. A neighbour from the bucket is worse than
+	// nothing: it spends tokens and teaches the agent to ignore the next one.
+	// One of these shares ordinary words with the question below without
+	// answering it. That is what the real miss looked like: not a session
+	// about nothing, but a neighbour carrying two of the same common words,
+	// which is enough to clear a bar meant for rare ones.
+	for i, junk := range []promptTopic{
+		{"tarpit", "the crawler tarpit was left in place deliberately", ""},
+		{"statement", "the statement cache is disabled on the read mirror after those failures", ""},
+		{"quotas", "the per-tenant quota was moved into the gateway", ""},
+	} {
+		id := fmt.Sprintf("prompt-bucket-%02d", i)
+		t := base.Add(time.Duration(900+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: promptBucketProject, Kind: "bucket",
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: promptBucketProject,
+				Started: t, Updated: t,
+				Messages: []model.Message{{Role: "user", Text: "we decided " + junk.fact, Time: t}},
+			}},
+		})
+	}
+	// The question asked while scoped to that bucket. Its answer is in a
+	// project of its own, which the bucket scope does not contain.
+	answer := base.Add(1000 * time.Minute)
+	chains = append(chains, PromptChain{
+		ID: "prompt-bucket-answer", Project: "promptbenchelsewhere", Kind: "bucket-answer",
+		Topic:    "pgbouncer",
+		Question: "how did we deal with the pgbouncer prepared statement failures?",
+		Sessions: []model.Session{{
+			ID: "prompt-bucket-answer-session", Harness: "claude", Project: "promptbenchelsewhere",
+			Started: answer, Updated: answer,
+			Messages: []model.Message{{Role: "user", Text: "we decided prepared statements go behind pgbouncer in session mode", Time: answer}},
+		}},
+	})
 	// Negative controls share the corpus but hold none of its topics, so a
 	// question about them must not recall anything.
 	for i := 0; i < PromptNegativeCount; i++ {
