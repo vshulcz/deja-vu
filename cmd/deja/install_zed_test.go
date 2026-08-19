@@ -91,6 +91,13 @@ func zedStripForTest(b []byte) []byte {
 				i++
 			}
 			out = append(out, '\n')
+		case c == '/' && i+1 < len(b) && b[i+1] == '*':
+			i += 2
+			for i+1 < len(b) && (b[i] != '*' || b[i+1] != '/') {
+				i++
+			}
+			i++
+			out = append(out, ' ')
 		default:
 			out = append(out, c)
 		}
@@ -310,5 +317,114 @@ func TestInstallZedDoesNotMistakeAKeyInsideAnotherServer(t *testing.T) {
 	}
 	if entry["path"] != nil {
 		t.Errorf("the nested block was edited instead of ours: %v", entry)
+	}
+}
+
+// JSONC has two comment shapes and a settings file may use either anywhere.
+// A block comment sitting between a key and its value, or holding a brace,
+// used to be read as content: the object end came out wrong and the edit
+// landed in the middle of someone's settings.
+func TestInstallZedSurvivesBlockComments(t *testing.T) {
+	path := zedSettingsFile(t, `/* Zed settings
+   { not an object } */
+{
+  "context_servers": /* which servers the agent may call */ {
+    "some-other": {
+      /* the wrapper opens a brace here { and never closes it */
+      "command": "other"
+    }
+  },
+  "ui_font_size": 16
+}
+`)
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	got, _ := os.ReadFile(path)
+	for _, keep := range []string{
+		"/* Zed settings",
+		"/* which servers the agent may call */",
+		"/* the wrapper opens a brace here { and never closes it */",
+		`"ui_font_size": 16`,
+		`"some-other"`,
+	} {
+		if !strings.Contains(string(got), keep) {
+			t.Errorf("the file lost %q:\n%s", keep, got)
+		}
+	}
+	if zedDejaEntry(t, path) == nil {
+		t.Fatalf("deja was not installed:\n%s", got)
+	}
+	// One block, not two. A scanner that loses its place inside a comment
+	// reports no block at all and inserts a second one; the entry is then
+	// readable and the settings are still wrong.
+	if n := strings.Count(string(got), `"context_servers"`); n != 1 {
+		t.Errorf("the file has %d context_servers blocks:\n%s", n, got)
+	}
+
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	back, _ := os.ReadFile(path)
+	if zedDejaEntry(t, path) != nil {
+		t.Errorf("deja survived the uninstall:\n%s", back)
+	}
+	if !strings.Contains(string(back), `"some-other"`) {
+		t.Errorf("uninstall took the other server with it:\n%s", back)
+	}
+}
+
+// Someone annotates the entry deja installed, and the note holds a brace that
+// never closes. Replacing or removing that entry needs its end, and a scanner
+// that counts braces inside comments finds the wrong one — which is how an
+// uninstall takes the settings after it along too.
+func TestInstallZedFindsTheEntryEndPastAComment(t *testing.T) {
+	path := zedSettingsFile(t, `{
+  "context_servers": {
+    "deja": {
+      /* installed by deja — the wrapper opens a brace { on purpose */
+      "command": "/old/path/deja",
+      "args": ["mcp"]
+    },
+    "some-other": {
+      "command": "other"
+    }
+  },
+  "ui_font_size": 16
+}
+`)
+	// Replacing: the old path goes, everything after the entry stays.
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	got, _ := os.ReadFile(path)
+	entry := zedDejaEntry(t, path)
+	if entry == nil {
+		t.Fatalf("the entry was lost:\n%s", got)
+	}
+	if entry["command"] != "/usr/local/bin/deja" {
+		t.Errorf("the entry was not updated: %v", entry)
+	}
+	if strings.Contains(string(got), "/old/path/deja") {
+		t.Errorf("the old command survived beside the new one:\n%s", got)
+	}
+	for _, keep := range []string{`"some-other"`, `"ui_font_size": 16`} {
+		if !strings.Contains(string(got), keep) {
+			t.Errorf("replacing the entry took %q with it:\n%s", keep, got)
+		}
+	}
+
+	// Removing: the same end, and the same everything-after.
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	back, _ := os.ReadFile(path)
+	if zedDejaEntry(t, path) != nil {
+		t.Errorf("deja survived:\n%s", back)
+	}
+	for _, keep := range []string{`"some-other"`, `"command": "other"`, `"ui_font_size": 16`} {
+		if !strings.Contains(string(back), keep) {
+			t.Errorf("uninstall took %q with it:\n%s", keep, back)
+		}
 	}
 }

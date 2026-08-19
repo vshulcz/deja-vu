@@ -244,7 +244,7 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | — | paste | — |
 | Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |
-| Zed | — | ✕ | — | — | ✕ | paste | sqlite3 + zstd |
+| Zed | ✅ | ✕ | — | — | ✕ | paste | sqlite3 + zstd |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated
 
