@@ -2,6 +2,7 @@ package search
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -85,7 +86,21 @@ func clip(s string) string {
 		cut--
 	}
 	if cut == 0 {
+		// No word boundary anywhere in the first 260 bytes, which is every
+		// answer written in Chinese, Japanese or Korean — those scripts put no
+		// spaces between words. Cutting at the cap split the character sitting
+		// on it, and the invalid byte went into the recall payload an agent
+		// reads: measured on a store of eight Chinese sessions, the `→ ` line
+		// under the top hit ended in half a character (#1319).
 		cut = answerCap
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+		// Reaching zero means the first 260 bytes hold no character start at
+		// all, which stored text cannot be — records are decoded as UTF-8 and
+		// re-checked on the way in. If it ever happens, the mark alone is the
+		// honest answer: the old cut returned those 260 bytes and handed an
+		// agent a line it could not read.
 	}
 	return strings.TrimSpace(s[:cut]) + "…"
 }
