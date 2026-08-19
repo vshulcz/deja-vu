@@ -117,6 +117,15 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 
 func humanAge(d time.Duration) string {
 	switch {
+	case d < 0:
+		// A timestamp ahead of the clock. Transcripts carry whatever time the
+		// machine that wrote them had, and a store synced from a machine whose
+		// clock runs fast brings that here — measured as "-576000m old" on a
+		// session dated a year ahead, since every negative duration fell into
+		// the minutes branch. The receipt exists for the reader to sanity-check
+		// what is being handed off, so it says what it knows rather than a
+		// number that cannot be true.
+		return "unknown age"
 	case d < time.Hour:
 		return fmt.Sprintf("%dm old", int(d.Minutes()))
 	case d < 48*time.Hour:
