@@ -528,6 +528,77 @@ func attachAnswers(dir string, hits []search.Hit) {
 	}
 }
 
+// shownAnswers counts the excerpts that are answer lines rather than matched
+// text, which is how many conclusions the drop below can take.
+func shownAnswers(snippets []string) int {
+	n := 0
+	for _, sn := range snippets {
+		if strings.HasPrefix(strings.TrimSpace(sn), "→ ") {
+			n++
+		}
+	}
+	return n
+}
+
+// withoutShownAnswer drops conclusions the excerpts above already carry. The
+// comparison is on the text alone: the answer line is written with an arrow
+// prefix and a conclusion is not, and the same sentence can be trimmed to a
+// different number of sentences on the two paths, so the shorter one being a
+// prefix of the longer counts as the same fact.
+func withoutShownAnswer(cs []string, snippets []string) []string {
+	if len(cs) == 0 || len(snippets) == 0 {
+		return cs
+	}
+	shown := make([]string, 0, len(snippets))
+	for _, sn := range snippets {
+		if t := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(sn), "→ ")); t != sn {
+			shown = append(shown, t)
+		}
+	}
+	if len(shown) == 0 {
+		return cs
+	}
+	out := cs[:0:0]
+	for _, c := range cs {
+		dup := false
+		for _, sh := range shown {
+			if sameFact(c, sh) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// sameFact reports whether two lines say the same thing. One being a prefix of
+// the other counts, because the answer line and the conclusions list trim to a
+// different number of sentences — but only when the shorter one is long enough
+// to be a fact rather than an opening: "We decided to" is the start of every
+// second conclusion an agent writes, and dropping the specific line behind it
+// would lose the answer to keep the preamble.
+func sameFact(a, b string) bool {
+	if a == b {
+		return true
+	}
+	short, long := a, b
+	if len(short) > len(long) {
+		short, long = long, short
+	}
+	if len(short) < sameFactFloor {
+		return false
+	}
+	return strings.HasPrefix(long, short)
+}
+
+// sameFactFloor is how much of a sentence has to agree before two lines count
+// as one fact. Forty characters is past any shared opening — "we decided to
+// use" is nineteen — and inside the shortest conclusion worth printing.
+const sameFactFloor = 40
+
 // recallListingLine makes one line of the recall listing safe to hand a model.
 //
 // The listing is built here rather than by the search printer, so it never
@@ -722,7 +793,19 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 				if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
 					whole = full
 				}
-				if cs := digest.Conclusions(whole, left, 3); len(cs) > 0 {
+				// Not the line already shown as this hit's answer. The answer
+				// under the excerpt and the newest conclusion are usually the
+				// same sentence, and printing it twice charged the agent twice
+				// for one fact — 16% of a small payload — while costing the
+				// conclusions list one of its three slots (#1319).
+				// Ask for as many extra as there are answer lines above: the
+				// drop below can take any of them, and asking for a fixed one
+				// more still showed two where three were available.
+				want := 3 + shownAnswers(h.Snippets)
+				if cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets); len(cs) > 0 {
+					if len(cs) > 3 {
+						cs = cs[:3]
+					}
 					fmt.Fprintln(&hb, "  what this session concluded:")
 					for _, c := range cs {
 						fmt.Fprintf(&hb, "  → %s\n", recallListingLine(c))
