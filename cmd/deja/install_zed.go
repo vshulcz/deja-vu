@@ -160,8 +160,8 @@ func zedFindKey(text string, from int, key string) *zedSpan {
 			i = j - 1
 			continue
 		}
-		switch {
-		case text[i] == '"':
+		switch text[i] {
+		case '"':
 			end := zedStringEnd(text, i)
 			if end < 0 {
 				return nil
@@ -178,9 +178,9 @@ func zedFindKey(text string, from int, key string) *zedSpan {
 				return &zedSpan{keyStart: i, valueOpen: open, valueEnd: close}
 			}
 			i = end - 1
-		case text[i] == '{' || text[i] == '[':
+		case '{', '[':
 			depth++
-		case text[i] == '}' || text[i] == ']':
+		case '}', ']':
 			if depth == 0 {
 				return nil // end of the object we were searching
 			}
@@ -235,15 +235,15 @@ func zedValueOpen(text string, from int) int {
 			i = j - 1
 			continue
 		}
-		switch {
-		case text[i] == ':':
+		switch text[i] {
+		case ':':
 			seenColon = true
-		case text[i] == '{':
+		case '{':
 			if !seenColon {
 				return -1
 			}
 			return i
-		case text[i] == ' ' || text[i] == '\t' || text[i] == '\n' || text[i] == '\r':
+		case ' ', '\t', '\n', '\r':
 		default:
 			return -1
 		}
