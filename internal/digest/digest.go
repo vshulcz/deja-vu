@@ -29,8 +29,8 @@ func Share(s model.Session, budget int) string {
 	if !s.Updated.IsZero() {
 		date = s.Updated.Format(time.RFC3339)
 	}
-	fmt.Fprintf(&b, "# deja share: %s\n\n", s.ID)
-	fmt.Fprintf(&b, "- Project: %s\n", s.Project)
+	fmt.Fprintf(&b, "# deja share: %s\n\n", oneLine(s.ID))
+	fmt.Fprintf(&b, "- Project: %s\n", oneLine(s.Project))
 	fmt.Fprintf(&b, "- Harness: %s\n", s.Harness)
 	fmt.Fprintf(&b, "- Date: %s\n\n", date)
 	appendSection := func(title string, messages []model.Message) {
@@ -400,7 +400,7 @@ func Handoff(s model.Session, budget int) string {
 	if !s.Updated.IsZero() {
 		date = s.Updated.Format(time.RFC3339)
 	}
-	fmt.Fprintf(&b, "You are picking up work handed off from a %s session (project %s, %s). ", s.Harness, s.Project, date)
+	fmt.Fprintf(&b, "You are picking up work handed off from a %s session (project %s, %s). ", s.Harness, oneLine(s.Project), date)
 	b.WriteString("Below is the packaged context: the problem, key conclusions so far, and where it stopped. Continue from there instead of re-deriving what is already done.\n\n")
 	body := Share(s, budget*3/4)
 	// Drop the share header line; the framing above replaces it.
@@ -415,8 +415,35 @@ func Handoff(s model.Session, budget int) string {
 	// The digest is a lossy slice by construction. Tell the receiving agent it
 	// can pull deeper instead of being stuck with the summary: push+pull, not
 	// one-shot push.
-	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.\n", Short(s.ID), Short(s.ID))
+	// The head, not the joined form: this id is meant to be typed back as
+	// `deja show <id>`, and that matches on a prefix. Measured on an id with a
+	// break in it — `deja show x1abcdef` finds the session, `deja show
+	// "x1abcdef fake"` matches nothing.
+	short := idSelector(Short(s.ID))
+	fmt.Fprintf(&b, "\n\nThis is a compact slice of session %s. If anything you need is missing — an exact error, a file, a decision — search the full history with `deja \"<term>\"` or `deja show %s`, or call the deja MCP tools recall / recall_context if available.\n", short, short)
 	return strings.TrimSpace(b.String()) + "\n"
+}
+
+// oneLine is a session field made safe for a line of a document deja writes.
+//
+// Project and id are text deja did not author — a directory name, a
+// harness-assigned id — and both land in structured headers here: a break in
+// either splits a markdown header in two, and the stray half then reads as
+// part of the digest. The handoff framing shows it plainly: it strips the
+// share header by cutting at the first newline, so an id containing one left
+// the rest of that id standing at the top of what another agent is handed.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(redact.SafeForDisplay(s)), " ")
+}
+
+// idSelector is an id cut to something the reader can type back. oneLine
+// keeps every word so the header still names the session in full; here only
+// the leading run is useful, because a prefix is what the lookup takes.
+func idSelector(s string) string {
+	if f := strings.Fields(redact.SafeForDisplay(s)); len(f) > 0 {
+		return f[0]
+	}
+	return ""
 }
 
 // tailSection returns the last few substantive exchanges verbatim so the
