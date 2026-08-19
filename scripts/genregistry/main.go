@@ -170,6 +170,16 @@ func pageFor(id, display, h1 string) meta {
 	}
 }
 
+// jsonInScript makes a JSON document safe to sit inside a <script> element.
+// The headline comes from a heading in a markdown file: a `</script>` in one
+// would end the element early and everything after it would be parsed as HTML,
+// on every page the generator writes. Escaping the three characters that can
+// start a tag or a comment keeps the JSON valid and inert.
+func jsonInScript(b []byte) string {
+	r := strings.NewReplacer("<", `\u003c`, ">", `\u003e`, "&", `\u0026`)
+	return r.Replace(string(b))
+}
+
 func render(m meta, body string, others []link) string {
 	url := site + "/registry/" + m.Slug + ".html"
 	esc := func(s string) string { return html.EscapeString(s) }
@@ -217,8 +227,8 @@ func render(m meta, body string, others []link) string {
 <meta name="twitter:image" content="` + site + `/assets/og.png">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="` + site + `/sitemap.xml">
-<script type="application/ld+json">` + string(ld) + `</script>
-<script type="application/ld+json">` + string(crumbs) + `</script>
+<script type="application/ld+json">` + jsonInScript(ld) + `</script>
+<script type="application/ld+json">` + jsonInScript(crumbs) + `</script>
 </head>
 <body>
 <div class="glow"></div>
