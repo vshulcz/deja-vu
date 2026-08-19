@@ -281,9 +281,9 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 		if !strings.HasPrefix(line, "- User:") && !strings.HasPrefix(line, "- Assistant:") {
 			continue
 		}
-		low := strings.ToLower(line)
 		for _, t := range terms {
-			if t != "" && strings.Contains(low, strings.ToLower(t)) {
+			// The same rule the block was built with, from the same function.
+			if t != "" && search.TextCarriesTerm(line, t) {
 				return true
 			}
 		}

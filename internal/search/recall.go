@@ -226,9 +226,19 @@ func autoRecallSession(s model.Session, now time.Time, provenance bool) string {
 }
 
 // termHits counts how many distinct query terms a text carries. It decides
-// which lines of a matched session are worth showing, so it folds case and
-// nothing else: a term the ranking reached through a stem fold is not found
-// here, which costs that line its place and never costs correctness.
+// which lines of a matched session are worth showing.
+//
+// Case folding alone was not enough. The ranking reaches a session through a
+// stem fold, and this did not: asked "где именно теперь происходит индексация",
+// the ranking found the session that says "индексацию перенесли в фоновый
+// воркер" and this found no line in it, so the block fell back to the top of
+// the transcript and showed "погоди, а что там дальше по задаче". The comment
+// here used to say that costs the line its place and never costs correctness —
+// it costs the reader the whole block.
+//
+// So a long term also matches on its stem: inflection changes the ending, not
+// the first several characters. Short terms keep the exact rule, where a
+// trimmed prefix would match far too much.
 func termHits(text string, terms []string) int {
 	if len(terms) == 0 {
 		return 0
@@ -236,11 +246,43 @@ func termHits(text string, terms []string) int {
 	low := strings.ToLower(text)
 	n := 0
 	for _, t := range terms {
-		if t != "" && strings.Contains(low, strings.ToLower(t)) {
+		if t == "" {
+			continue
+		}
+		if strings.Contains(low, strings.ToLower(t)) {
+			n++
+			continue
+		}
+		if stem := termStem(t); stem != "" && strings.Contains(low, stem) {
 			n++
 		}
 	}
 	return n
+}
+
+// termStemMin is how long a term must be before its ending may be trimmed.
+// Deliberately not a stemmer: deja indexes a dozen languages and a real one for
+// each is a different project. Dropping two characters covers the case endings
+// that made the difference here without letting "index" match "indeed".
+const termStemMin = 7
+
+// TextCarriesTerm reports whether a line holds a term, folding case and, for a
+// long term, its inflected endings. Exported so a caller scoring what the
+// block shows applies the same rule the block was built with — the two drifted
+// once already, in the gate, and the benchmark then measured a bar the product
+// did not have.
+func TextCarriesTerm(text, term string) bool {
+	return termHits(text, []string{term}) > 0
+}
+
+// termStem is a term with its last two characters dropped, or empty when the
+// term is too short for that to still identify it.
+func termStem(t string) string {
+	r := []rune(strings.ToLower(t))
+	if len(r) < termStemMin {
+		return ""
+	}
+	return string(r[:len(r)-2])
 }
 
 func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms []string) string {
