@@ -602,6 +602,25 @@ func Conclusions(s model.Session, budget int, max int) []string {
 	return out
 }
 
+// isCJKSentenceEnd is the full stop, exclamation and question mark Chinese and
+// Japanese write. They are separate characters from the ASCII ones, so a
+// message in either script contained no sentence end as far as this file was
+// concerned (#1319).
+//
+// The fullwidth full stop U+FF0E is deliberately absent: it is also how a
+// decimal point is written in fullwidth digits, and the space rule that keeps
+// "v1.2" together cannot help here — these scripts put no space after a stop,
+// so the rule has to be dropped for them. The enumeration comma and the
+// fullwidth semicolon are absent for the plainer reason that neither ends a
+// sentence.
+func isCJKSentenceEnd(r rune) bool {
+	switch r {
+	case '\u3002', '\uff01', '\uff1f':
+		return true
+	}
+	return false
+}
+
 // firstSentences keeps the opening n sentences of a message: a conclusion
 // states itself up front and then explains, and recall pays for every byte.
 func firstSentences(s string, n int) string {
@@ -611,16 +630,21 @@ func firstSentences(s string, n int) string {
 	}
 	count := 0
 	for i, r := range s {
-		if r != '.' && r != '!' && r != '?' {
-			continue
-		}
-		// "v1.2" and "e.g." are not sentence ends: require a space after.
-		if i+1 < len(s) && s[i+1] != ' ' {
+		switch {
+		case r == '.' || r == '!' || r == '?':
+			// "v1.2" and "e.g." are not sentence ends: require a space after.
+			if i+1 < len(s) && s[i+1] != ' ' {
+				continue
+			}
+		case isCJKSentenceEnd(r):
+			// No space rule here: these scripts put none after the stop, so
+			// requiring one would find no sentence at all.
+		default:
 			continue
 		}
 		count++
 		if count == n {
-			return strings.TrimSpace(s[:i+1])
+			return strings.TrimSpace(s[:i+utf8.RuneLen(r)])
 		}
 	}
 	const cap = 240
