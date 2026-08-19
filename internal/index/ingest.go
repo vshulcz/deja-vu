@@ -1068,6 +1068,14 @@ func metaForSession(s model.Session) SessionMeta {
 		// composer name, the first user message — and are persisted in
 		// sessions.gob, so they need the same scrubbing as record text.
 		title, _ = redact.Text(title)
+		// And the same bound. A title the source authored went to the
+		// one-line surfaces whole: measured at 384 characters with the
+		// newlines still in it, so one session printed several rows of
+		// `deja last` and the text after the break began "[claude · …",
+		// which is deja's own listing format (#1090 covers the escape bytes;
+		// this is the line break). Derived titles have been collapsed and cut
+		// since they existed.
+		title = boundSourceTitle(s.Harness, title)
 	}
 	// The import fields travel with the session, not with the transcript: a
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
@@ -1677,6 +1685,22 @@ func titleWorthy(t string) bool {
 		!strings.HasPrefix(t, "Caveat:")
 }
 
+// boundSourceTitle collapses and bounds a title the source authored, the way
+// a derived one has always been.
+//
+// Notes are exempt. A promoted note's title ends in its state — "… [rejected]"
+// — and the state is what every one-line surface reads it for, so cutting the
+// tail would drop exactly the part that matters and, worse, make a state
+// change invisible to the comparison that decides whether to rewrite the row
+// (#R11). Note titles are deja's own text, so the injection this bound exists
+// to stop cannot arrive through them.
+func boundSourceTitle(harness, title string) string {
+	if harness == "deja" {
+		return title
+	}
+	return truncateTitle(title, 60)
+}
+
 func truncateTitle(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")
 	r := []rune(s)
@@ -2272,8 +2296,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				// one-line surface — `deja last`, the digest, the citation the
 				// hook hands the agent to say aloud — reading "[accepted]"
 				// until an unrelated rebuild happened to run (#R11).
-				if t, _ := redact.Text(s.Title); t != meta.Title {
-					meta.Title, meta.AgentTitle = t, s.AgentTitle
+				if t, _ := redact.Text(s.Title); boundSourceTitle(s.Harness, t) != meta.Title {
+					meta.Title, meta.AgentTitle = boundSourceTitle(s.Harness, t), s.AgentTitle
 				}
 			}
 			// Only the session that owns this row. The full build writes these
