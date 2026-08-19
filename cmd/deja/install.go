@@ -540,6 +540,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 			return installResult{}, err
 		}
 		return installKimiAuto(exe, uninstall)
+	case "zed":
+		return installZedMCP(sources.ZedSettingsPath(), exe, uninstall)
 	case "cline":
 		return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 	case "roo":
@@ -1509,6 +1511,9 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"grok", "grok-auto", "copilot", "roo", "aider",
+		// Zed's agent takes MCP servers and nothing else: no CLI to hand a
+		// prompt to, so there is no -auto pair to install.
+		"zed",
 		"statusline",
 	}
 }
