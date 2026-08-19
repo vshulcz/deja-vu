@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -76,7 +77,13 @@ func normalizeFriction(l string) string {
 // recent call last):`, and clustering those put an empty line at the top of
 // every measurement this was built from.
 func isFriction(l string) bool {
-	if len(l) < frictionLineMin || len(l) > frictionLineMax {
+	// Characters, not bytes. The bound is about how much of a line a person can
+	// recognise, and in bytes it held a Russian error to 60 characters and a
+	// Chinese one to 40 while giving English 120: an 89-character Russian line
+	// was dropped where an 80-character English one was kept, so the wall a
+	// Russian-speaking user keeps hitting never reached `deja friction`, the
+	// environment block or `deja fix` (#1319).
+	if n := utf8.RuneCountInString(l); n < frictionLineMin || n > frictionLineMax {
 		return false
 	}
 	for _, generic := range []string{

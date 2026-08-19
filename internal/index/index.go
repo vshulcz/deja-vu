@@ -53,7 +53,11 @@ import (
 // two runs and the bigrams came out of the pieces. A store built before this
 // holds the split keys and a query built after it asks for the joined ones, so
 // the bump is what makes the one rebuild that re-derives them happen (#1319).
-const version = 27
+// 28: what counts as a wall is bounded in characters rather than bytes, so a
+// line written in Russian or Chinese is held to the same length as an English
+// one. A store built before this holds fewer friction signatures, and nothing
+// re-derives them without the bump — the same shape as 22 and 23 (#1319).
+const version = 28
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
