@@ -588,7 +588,7 @@ func sameFact(a, b string) bool {
 	if len(short) > len(long) {
 		short, long = long, short
 	}
-	if len(short) < sameFactFloor {
+	if utf8.RuneCountInString(short) < sameFactFloor {
 		return false
 	}
 	return strings.HasPrefix(long, short)
@@ -597,6 +597,11 @@ func sameFact(a, b string) bool {
 // sameFactFloor is how much of a sentence has to agree before two lines count
 // as one fact. Forty characters is past any shared opening — "we decided to
 // use" is nineteen — and inside the shortest conclusion worth printing.
+//
+// Characters, not bytes. Counted in bytes the floor was forty for English and
+// twenty for Russian, so a thirty-character preamble cleared it and the
+// specific line behind it was dropped — the exact loss the paragraph above
+// says the floor exists to prevent.
 const sameFactFloor = 40
 
 // recallListingLine makes one line of the recall listing safe to hand a model.
