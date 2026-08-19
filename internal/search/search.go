@@ -1242,7 +1242,12 @@ func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {
 }
 
 func PrintSession(w io.Writer, s model.Session) {
-	fmt.Fprintf(w, "# %s · %s · %s\n", s.Harness, s.Project, s.ID)
+	// Project and id are transcript text a harness wrote, and this is one
+	// line: an escape byte in either recolours the transcript that follows, a
+	// carriage return rewinds the header, and a newline splits it into two
+	// lines of what reads as deja's own output. PrintContext below has said
+	// this since #1090; this header was missed by it.
+	fmt.Fprintf(w, "# %s · %s · %s\n", s.Harness, SafeLine(s.Project), SafeLine(s.ID))
 	for _, m := range s.Messages {
 		txt := redact.SafeForDisplay(collapseTool(m.Text))
 		if strings.TrimSpace(txt) == "" {
