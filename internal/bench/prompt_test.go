@@ -46,7 +46,7 @@ func TestGeneratePromptShape(t *testing.T) {
 		// asked about through the bucket-answer chain, whose question is the
 		// one that must go unanswered. A chain nobody asks about still has to
 		// earn its place, and this one earns it by being the wrong answer.
-		if c.Kind == "bucket" || c.Kind == "haystack-noise" || c.Kind == "concluded-noise" {
+		if c.Kind == "bucket" || c.Kind == "haystack-noise" || c.Kind == "concluded-noise" || c.Kind == "background" {
 			continue
 		}
 		if topics[c.Topic] {

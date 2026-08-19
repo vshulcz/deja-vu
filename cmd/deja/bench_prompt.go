@@ -258,8 +258,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 		}
 		// Filler that only exists to fill the bucket has no question of its
 		// own; it is asked about through the bucket-answer chain below.
-		if chain.Kind == "bucket" || chain.Kind == "haystack-noise" ||
-			chain.Kind == "concluded-noise" {
+		if chain.Kind == "bucket" || chain.Kind == "haystack-noise" || chain.Kind == "concluded-noise" || chain.Kind == "background" {
 			continue
 		}
 		terms := prompt.Terms(chain.Question)

@@ -51,6 +51,36 @@ const PromptBucketProject = promptBucketProject
 // actually decided each question, so the benchmark can see which wins.
 const promptHaystackProject = "promptbenchhaystack"
 
+// promptBackgroundCount is how many ordinary sessions sit behind the cases, so
+// that a word common in working talk is common here too.
+const promptBackgroundCount = 300
+
+// promptWorkingTalk is the vocabulary of ordinary work — the words that fill a
+// long session without identifying anything in it. Sessions draw two each, so
+// no single phrase becomes so common that it falls out of the query entirely.
+var promptWorkingTalk = []string{
+	"pushed the branch and ran the suite again",
+	"the suite passed after the last fix",
+	"rebased onto main and forced the check to rerun",
+	"the build failed on the first attempt",
+	"reverted that change and measured again",
+	"opened a draft and left it for review",
+	"the test was flaky so I ran it twice",
+	"merged it once the checks went green",
+	"looked at the diff and reduced the scope",
+	"the numbers came out the same as before",
+	"added a case that covers the empty input",
+	"renamed it for consistency with the caller",
+	"the linter complained about an unused value",
+	"split the change into two smaller commits",
+	"checked it on the other machine as well",
+	"the output looked right on the second pass",
+	"dropped the extra logging before pushing",
+	"waited for the run and read the summary",
+	"tried it locally and it behaved the same",
+	"tagged the release after the last merge",
+}
+
 // promptRussianProject holds every Russian chain, so they compete.
 const promptRussianProject = "promptbenchru"
 
@@ -646,6 +676,45 @@ func GeneratePrompt(seed int64) PromptCorpus {
 				ID: id + "-session", Harness: "claude", Project: promptHaystackProject,
 				Started: t, Updated: t,
 				Messages: []model.Message{{Role: "user", Text: "we decided " + h.fact, Time: t}},
+			}},
+		})
+	}
+	// Background: three hundred short sessions of ordinary working talk, in
+	// their own projects, holding none of the topics above.
+	//
+	// They exist so that idf means something. Without them a word living in one
+	// session of thirty scores 2.89 and a word living in ten scores 1.19, while
+	// on a real index of fifteen hundred sessions the same words score 4.13 and
+	// 0.4 — different scales, so a threshold measured here said nothing about
+	// there. Measured on the small corpus: raising the informative floor from
+	// 2.0 to 3.0 took this benchmark from 11/12 to 0/12 and changed nothing at
+	// all on a real store.
+	//
+	// The vocabulary is the words a long working session is made of, drawn two
+	// at a time from a pool, so that each lands in roughly one session in
+	// twenty. That ratio is the point: on a real store "branch" sits in 94
+	// sessions of about 1500 and scores 2.79, just over the floor meant for
+	// words that identify something. A background that repeated one phrase in
+	// every session put it in 89% of them instead, dropped it far under the
+	// floor, and hid the very defect this corpus exists to reproduce.
+	for i := 0; i < promptBackgroundCount; i++ {
+		id := fmt.Sprintf("prompt-bg-%03d", i)
+		t := base.Add(time.Duration(3000+i) * time.Minute)
+		a := promptWorkingTalk[(i*7)%len(promptWorkingTalk)]
+		b := promptWorkingTalk[(i*13+3)%len(promptWorkingTalk)]
+		var msgs []model.Message
+		for k := 0; k < 6; k++ {
+			at := t.Add(time.Duration(k) * time.Minute)
+			msgs = append(msgs,
+				model.Message{Role: "user", Text: fillerText(rng, a), Time: at},
+				model.Message{Role: "assistant", Text: fillerText(rng, b), Time: at.Add(time.Second)},
+			)
+		}
+		chains = append(chains, PromptChain{
+			ID: id, Project: fmt.Sprintf("promptbenchbg%03d", i), Kind: "background",
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: fmt.Sprintf("promptbenchbg%03d", i),
+				Started: t, Updated: t.Add(6 * time.Minute), Messages: msgs,
 			}},
 		})
 	}
