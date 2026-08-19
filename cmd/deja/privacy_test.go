@@ -114,6 +114,25 @@ func TestSourcesReportsActiveExclusions(t *testing.T) {
 	if err != nil || !strings.Contains(out, "excluded-patterns=1") || !strings.Contains(out, "excluded-sessions=") {
 		t.Fatalf("sources=%q err=%v", out, err)
 	}
+	// On every store line, not merely somewhere in the output: three separate
+	// places print this count, so asserting the string alone passed with the
+	// harness loop's copy removed — another line carried it.
+	var checked int
+	for _, line := range strings.Split(out, "\n") {
+		name, rest, ok := strings.Cut(line, "\t")
+		if !ok || name == "" || !strings.Contains(rest, "sessions=") {
+			continue
+		}
+		checked++
+		if !strings.Contains(line, "excluded-patterns=1") {
+			t.Errorf("the %s line does not name the active patterns: %q", name, line)
+		}
+	}
+	// Enough lines to be the listing rather than one store that happens to
+	// carry it; the exact number is deja's business, not this test's.
+	if checked < 5 {
+		t.Fatalf("wrong fixture: only %d store lines in\n%s", checked, out)
+	}
 }
 
 // The transcript on disk does not change when a session is forgotten, so the
