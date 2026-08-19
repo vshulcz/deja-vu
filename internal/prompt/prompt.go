@@ -160,6 +160,23 @@ var cyrPromptStop = map[string]bool{
 	"давай": true, "было": true, "были": true, "будет": true, "быть": true,
 	"есть": true, "нет": true, "если": true, "или": true, "как": true,
 	"что": true, "где": true, "там": true, "тут": true, "уже": true, "ещё": true,
+	// Measured on live prompts from this machine: about a third of the terms
+	// extracted from a Russian question were words like these, and in the worst
+	// case four of five — `напомни, что мы уже выясняли про can шину на omoda
+	// через adb` yielded [omoda напомни выясняли через дальше]. A filler term
+	// is not harmless: it matches a filler line, and that line then takes the
+	// slot the reader sees first.
+	//
+	// The English half of this list covers its own language well — the negative
+	// controls built from "can you run the tests again" fire on nothing. These
+	// are the Russian equivalents of exactly those words.
+	"погоди": true, "подожди": true, "смотри": true, "слушай": true,
+	"напомни": true, "покажи": true, "ответь": true, "скажи": true,
+	"объясни": true, "проверь": true, "дальше": true, "через": true,
+	"снова": true, "опять": true, "потом": true, "теперь": true,
+	"вообще": true, "своего": true, "свои": true, "текущую": true,
+	"текущий": true, "хочу": true, "можешь": true, "нашел": true,
+	"нашёл": true, "выясняли": true, "разбирались": true,
 }
 
 // Candidates is how many ranked sessions the hook asks for before
