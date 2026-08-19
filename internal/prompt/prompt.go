@@ -40,6 +40,16 @@ func Terms(prompt string) []string {
 		return len(out) == 6
 	}
 	for _, f := range fields {
+		// A word at the end of a sentence arrives with its full stop attached,
+		// and the dot then does two things at once: it marks the token as an
+		// identifier, so "score." counts as one, and it stops the token from
+		// ever matching the text, which says "score". Measured on live prompts:
+		// "quality score. с чего начать" yielded the term "score.", which
+		// matched nothing anywhere while still earning the recall its place.
+		//
+		// Only the edges are trimmed. A dot inside a token is what makes an IP
+		// address, a version or a filename one word.
+		f = strings.Trim(f, "._-/")
 		if len(f) < 3 || query.IsStopWord(f) || seen[f] || !techTerm(f) {
 			continue
 		}
