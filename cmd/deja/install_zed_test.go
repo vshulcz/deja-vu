@@ -52,9 +52,11 @@ func zedDejaEntry(t *testing.T, path string) map[string]any {
 	if err := json.Unmarshal(zedStripForTest(b), &root); err != nil {
 		t.Fatalf("the file Zed would read does not parse: %v\n%s", err, b)
 	}
+	// No block at all is a legitimate answer: uninstalling the only server
+	// takes the block with it.
 	servers, ok := root["context_servers"].(map[string]any)
 	if !ok {
-		t.Fatalf("no context_servers in\n%s", b)
+		return nil
 	}
 	entry, ok := servers["deja"].(map[string]any)
 	if !ok {
@@ -187,6 +189,9 @@ func TestInstallZedIsIdempotentAndReversible(t *testing.T) {
 		if !strings.Contains(string(back), line) {
 			t.Errorf("uninstall took %q with it:\n%s", line, back)
 		}
+	}
+	if string(back) != zedRealSettings {
+		t.Errorf("install then uninstall did not put the file back:\n--- want ---\n%s--- got ---\n%s", zedRealSettings, back)
 	}
 }
 
@@ -426,5 +431,59 @@ func TestInstallZedFindsTheEntryEndPastAComment(t *testing.T) {
 		if !strings.Contains(string(back), keep) {
 			t.Errorf("uninstall took %q with it:\n%s", keep, back)
 		}
+	}
+}
+
+// install then uninstall has to leave the file it was handed, byte for byte.
+// Leaving an empty "context_servers": {} behind is a change the reader did not
+// ask for and did not make.
+func TestInstallZedLeavesNoEmptyBlockBehind(t *testing.T) {
+	before := `// Zed settings
+{
+  "theme": "One Dark",
+  "buffer_font_size": 15
+}
+`
+	path := zedSettingsFile(t, before)
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if zedDejaEntry(t, path) == nil {
+		t.Fatal("deja was not installed")
+	}
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	back, _ := os.ReadFile(path)
+	if string(back) != before {
+		t.Errorf("uninstall did not put the file back:\n--- want ---\n%s--- got ---\n%s", before, back)
+	}
+}
+
+// But a block that still holds something the reader put there stays, even when
+// deja was the only server in it.
+func TestInstallZedKeepsABlockThatStillHoldsSomething(t *testing.T) {
+	path := zedSettingsFile(t, `{
+  "context_servers": {
+    // the agent talks to these
+    "deja": {
+      "command": "/old/deja",
+      "args": ["mcp"]
+    }
+  },
+  "theme": "One Dark"
+}
+`)
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	back, _ := os.ReadFile(path)
+	for _, keep := range []string{`"context_servers"`, "// the agent talks to these", `"theme": "One Dark"`} {
+		if !strings.Contains(string(back), keep) {
+			t.Errorf("uninstall took %q with it:\n%s", keep, back)
+		}
+	}
+	if zedDejaEntry(t, path) != nil {
+		t.Errorf("deja survived:\n%s", back)
 	}
 }

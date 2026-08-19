@@ -87,6 +87,13 @@ func zedSettingsWith(text, entry string, uninstall bool) (string, error) {
 	}
 	if uninstall {
 		cut := zedEntrySpan(text, inner)
+		// If deja was the only server, the key goes too: a settings file that
+		// gains an empty "context_servers": {} after an uninstall is not the
+		// file the reader had before install. Anything else left in there —
+		// another server, or a comment someone wrote — keeps the block.
+		if strings.TrimSpace(text[block.valueOpen+1:cut[0]]+text[cut[1]:block.valueEnd-1]) == "" {
+			cut = zedEntrySpan(text, block)
+		}
 		return text[:cut[0]] + text[cut[1]:], nil
 	}
 	return text[:inner.valueOpen] + entry + text[inner.valueEnd:], nil
