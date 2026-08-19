@@ -47,10 +47,16 @@ func offTopicQuestions() []string {
 // The right answer is silence, and it is the one case tonight where firing
 // less often is the improvement.
 func absentSubjectQuestions() []string {
+	// The subjects are real topics of *other* projects in this corpus, not
+	// invented words. That is the live shape: measured on a real store,
+	// "айфоновский" appears in two sessions on this machine and in none of
+	// this project's, so the question is about work that happened elsewhere.
+	// A word that exists nowhere at all is a different and much weaker
+	// signal — nothing can answer it, here or anywhere.
 	return []string{
-		"did the kestrel timeout ever affect the zeppelin mast",
-		"how does escrow release interact with the anemometer",
-		"which parquet batch carried the quetzalcoatl rows",
+		"did the kestrel timeout ever affect the etag reuse",
+		"how does escrow release interact with the oauth rotation",
+		"which parquet batch carried the gzip streaming rows",
 	}
 }
 
