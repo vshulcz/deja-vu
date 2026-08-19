@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -190,7 +191,7 @@ func runBrief(dir string, w io.Writer) error {
 			// 2025" is six columns longer than "today" and the three lines
 			// came out three different lengths (#1073).
 			head := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, s.Project, search.RelativeDate(s.Updated))
-			title = trimBriefTitleTo(title, briefTitleBudget(visibleLen(head)))
+			title = trimBriefTitleTo(title, briefTitleBudget(barColumns(head)))
 			fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, s.Project, dim, search.RelativeDate(s.Updated), reset)
 			if title != "" {
 				fmt.Fprintf(w, " · %s", title)
@@ -321,9 +322,12 @@ func trimBriefTitleTo(t string, max int) string {
 		return r
 	}, t)
 	t = strings.Join(strings.Fields(t), " ")
-	r := []rune(t)
-	if len(r) > max {
-		return string(r[:max]) + "…"
+	// Columns rather than runes: the budget is what is left of the terminal,
+	// and a Chinese title is one rune and two columns per character, so a
+	// 44-rune cap printed 88 columns and the line the budget exists to fit
+	// ran off the edge (#1073 fixed the same overflow for Latin text).
+	if termwidth.Columns(t) > max {
+		return termwidth.Cut(t, max) + "…"
 	}
 	return t
 }
