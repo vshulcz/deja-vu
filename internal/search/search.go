@@ -1519,7 +1519,14 @@ func snippet(s, q string, re *regexp.Regexp) string {
 	}
 	end := start + 300
 	if end > len(r) {
+		// Spend the whole window: a match near the end of a message left the
+		// tail of the budget unused and showed 120 runes where a match in the
+		// middle of the same message showed 302 — and the end is where the
+		// answer sits in a long output as often as anywhere (#1319).
 		end = len(r)
+		if start = end - 300; start < 0 {
+			start = 0
+		}
 	}
 	out := strings.TrimSpace(string(r[start:end]))
 	out = strings.Trim(out, " ,.;:-\n\t")
