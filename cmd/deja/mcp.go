@@ -784,6 +784,14 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// recall itself. Later hits stay excerpt-only; they are candidates to
 		// choose between, not answers.
 		if i == 0 {
+			// The plus is deliberate as it stands, and measured: making it a
+			// minus — which is what the words above suggest — changes nothing
+			// on a full page (identical payloads at 4096, 3000 and 2400 bytes,
+			// with and without long conclusions) and only withholds the block
+			// on a nearly empty one, where it fits with room to spare. The
+			// outer trim is what actually bounds the payload. Left as it is
+			// rather than "corrected" blind; whoever changes it should measure
+			// the same three budgets first (#1319).
 			if left := budget - headerRoom + hb.Len() - recallConclusionsReserve; left > recallConclusionsMin {
 				// The hit carries only the matching messages, so the decision —
 				// usually worded nothing like the query — is not in it. Read the
