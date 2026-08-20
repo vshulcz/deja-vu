@@ -159,3 +159,45 @@ func TestBlockDoesNotQuoteTheAgentAboutToLook(t *testing.T) {
 		}
 	}
 }
+
+// The other shape of a harness check: call the tool and answer in a fixed form.
+// Measured on a real store, 2 blocks of 114 quoted one, and the "answer" one of
+// them counted as was itself a check — the question set used to score the tool
+// contains its own smoke tests.
+func TestAScriptedToolCheckIsNotRecalled(t *testing.T) {
+	for _, ask := range []string{
+		"Call the deja recall MCP tool with query 'connection pool exhausted'. Answer one line: did it find anything",
+		"\u0432\u044b\u0437\u043e\u0432\u0438 deja recall \u0441 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u043c 'connection pool exhausted', \u0438 \u0437\u0430\u043a\u043e\u043d\u0447\u0438 \u043e\u0442\u0432\u0435\u0442 \u0441\u043b\u043e\u0432\u043e\u043c \u0433\u043e\u0442\u043e\u0432\u043e",
+	} {
+		s := model.Session{
+			Harness: "claude", ID: "scripted", Project: "proj",
+			Updated: time.Now(),
+			Messages: []model.Message{
+				{Role: "user", Text: ask},
+				{Role: "assistant", Text: "pgbouncer pool exhausted, \u0433\u043e\u0442\u043e\u0432\u043e"},
+			},
+		}
+		if got := autoRecallSessionForAsked(s, time.Now(), true, []string{"pool"},
+			"connection pool exhausted"); got != "" {
+			t.Errorf("a scripted tool check reached the block:\n%s", got)
+		}
+	}
+}
+
+// Asking the tool to check its memory is ordinary work when the question is
+// real: "проверь память deja, напомни, что мы решали про прокси" must survive.
+func TestARealRequestToCheckMemorySurvives(t *testing.T) {
+	s := model.Session{
+		Harness: "claude", ID: "real2", Project: "proj",
+		Updated: time.Now(),
+		Messages: []model.Message{
+			{Role: "user", Text: "\u043f\u0440\u043e\u0432\u0435\u0440\u044c \u043f\u0430\u043c\u044f\u0442\u044c deja, \u043d\u0430\u043f\u043e\u043c\u043d\u0438 \u043f\u0440\u043e \u043f\u0440\u043e\u043a\u0441\u0438"},
+			{Role: "assistant", Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 \u043f\u0440\u043e\u043a\u0441\u0438 \u0444\u0438\u043b\u044c\u0442\u0440\u0443\u0435\u043c \u043f\u043e quality score, \u043f\u043e\u0440\u043e\u0433 0.7"},
+		},
+	}
+	got := autoRecallSessionForAsked(s, time.Now(), true, []string{"\u043f\u0440\u043e\u043a\u0441\u0438"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 \u043f\u0440\u043e\u043a\u0441\u0438")
+	if !strings.Contains(got, "0.7") {
+		t.Errorf("a real question about the work was filtered as a tool check:\n%s", got)
+	}
+}

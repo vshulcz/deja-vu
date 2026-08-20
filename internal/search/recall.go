@@ -812,6 +812,11 @@ var emptyMemoryPhrases = []string{
 // openclaw deja harness live test alpha" or its echo.
 var selfTestPhrases = []string{
 	"reply with exactly",
+	// The same check in its other shape: call the tool and answer in a fixed
+	// form. Measured on a real store, 2 blocks of 114 quoted one of these.
+	"answer one line",
+	"закончи ответ",
+	"ответь одной строкой",
 	"ответь ровно",
 	"harness live test",
 	"smoke test alpha",
