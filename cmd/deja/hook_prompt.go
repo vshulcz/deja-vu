@@ -776,7 +776,15 @@ func focusSession(s model.Session, terms []string) model.Session {
 	focusCalls++
 	const window = 2
 	keep := map[int]bool{}
+	// Lowercase every message once and hand the result to both passes: the
+	// narrowing below and, when the session stays too big, the density pass
+	// after it. Each of them used to lowercase the whole session again, and a
+	// marathon session is thousands of messages.
+	low := make([]string, len(s.Messages))
 	for i, m := range s.Messages {
+		low[i] = strings.ToLower(m.Text)
+	}
+	for i := range s.Messages {
 		// The same rule the block is built with. This step spelled the word
 		// the way the question happened to spell it, while the ranking that
 		// chose the session and the digest that shows a line from it both fold
@@ -785,7 +793,7 @@ func focusSession(s model.Session, terms []string) model.Session {
 		//
 		// Asked for the whole query at once: per term, each call lowercased the
 		// entire message again.
-		if !search.TextCarriesAnyTerm(m.Text, terms) {
+		if search.TermHitsLowered(low[i], terms) == 0 {
 			continue
 		}
 		for j := i - window; j <= i+window; j++ {
@@ -809,7 +817,7 @@ func focusSession(s model.Session, terms []string) model.Session {
 	// windows — the places where the most distinct terms land together are
 	// where the answer is, and the rest is the session's background noise.
 	if len(focused) > dejaVuMaxMessages {
-		s.Messages = densestMessages(s.Messages, terms, dejaVuMaxMessages)
+		s.Messages = densestMessages(s.Messages, low, terms, dejaVuMaxMessages)
 		return s
 	}
 	s.Messages = focused
@@ -818,16 +826,15 @@ func focusSession(s model.Session, terms []string) model.Session {
 
 // densestMessages keeps the cap best messages by how many distinct terms each
 // one carries, in original order so the exchange still reads as a conversation.
-func densestMessages(msgs []model.Message, terms []string, cap int) []model.Message {
+func densestMessages(msgs []model.Message, low, terms []string, cap int) []model.Message {
 	type scored struct {
 		i, hits int
 	}
 	var ranked []scored
-	for i, m := range msgs {
-		text := strings.ToLower(m.Text)
+	for i := range msgs {
 		hits := 0
 		for _, t := range terms {
-			if strings.Contains(text, strings.ToLower(t)) {
+			if strings.Contains(low[i], t) {
 				hits++
 			}
 		}
