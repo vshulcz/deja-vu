@@ -79,6 +79,16 @@ var promptWorkingTalk = []string{
 	"waited for the run and read the summary",
 	"tried it locally and it behaved the same",
 	"tagged the release after the last merge",
+	// The negative controls are built from the words that live in every
+	// session's working noise, so the noise here has to hold them too —
+	// otherwise the benchmark calls "open the file and read it" a rare match
+	// and measures the fixture instead of the product.
+	"open the file and read it again",
+	"paste the output of that command here",
+	"walk me through the trace once more",
+	"adjust the patch and try it again",
+	"add a log line around that call",
+	"write the code for it and run the tests",
 }
 
 // promptRussianProject holds every Russian chain, so they compete.
@@ -700,8 +710,13 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	for i := 0; i < promptBackgroundCount; i++ {
 		id := fmt.Sprintf("prompt-bg-%03d", i)
 		t := base.Add(time.Duration(3000+i) * time.Minute)
+		// Both strides are coprime with the pool length, so every phrase gets
+		// used about equally. An earlier draft stepped by 13 over 26 phrases,
+		// which reaches two of them and leaves the rest rare — and a word the
+		// fixture happens to find rare is scored as one that identifies
+		// something, which is the very thing being measured.
 		a := promptWorkingTalk[(i*7)%len(promptWorkingTalk)]
-		b := promptWorkingTalk[(i*13+3)%len(promptWorkingTalk)]
+		b := promptWorkingTalk[(i*11+5)%len(promptWorkingTalk)]
 		var msgs []model.Message
 		for k := 0; k < 6; k++ {
 			at := t.Add(time.Duration(k) * time.Minute)
