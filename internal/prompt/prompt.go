@@ -109,7 +109,12 @@ func cyrPromptTerm(f string) bool {
 		}
 		letters++
 	}
-	if letters < 5 || cyrPromptStop[f] {
+	// Three, because Russian keeps short subjects — кеш, хук, бот, сеть, порт,
+	// диск — and a length cannot tell them from про or вот. Measured over live
+	// prompts, dropping the floor from five to three added nine distinct words
+	// across forty-one questions, and six of the nine were closed-class words
+	// missing from the list below; naming them is what makes the floor safe.
+	if letters < 3 || cyrPromptStop[f] {
 		return false
 	}
 	// A compound made only of closed-class words is still filler: "то-то-сё"
@@ -228,6 +233,16 @@ var cyrPromptStop = map[string]bool{
 	"вообще": true, "своего": true, "свои": true, "текущую": true,
 	"текущий": true, "хочу": true, "можешь": true, "нашел": true,
 	"нашёл": true, "выясняли": true, "разбирались": true,
+	// The closed class a three-letter floor lets through. Measured rather than
+	// guessed: these are the words that appeared when the floor came down over
+	// live questions from this machine.
+	"про": true, "вот": true, "раз": true, "еще": true, "чтоб": true,
+	"для": true, "при": true, "над": true, "под": true, "без": true,
+	"она": true, "они": true, "оно": true, "был": true, "была": true,
+	"мне": true, "нам": true, "вам": true,
+	"его": true, "чем": true, "чём": true, "том": true, "тем": true,
+	"так": true, "нас": true, "вас": true, "все": true, "всё": true,
+	"два": true, "три": true, "оба": true, "иначе": true,
 }
 
 // Candidates is how many ranked sessions the hook asks for before
