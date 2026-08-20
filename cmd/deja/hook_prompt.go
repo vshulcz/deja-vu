@@ -722,11 +722,20 @@ func presentableTopic(t string) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r >= 0x400
 }
 
+// focusCalls counts how many sessions were narrowed. A seam, like
+// rebuildInProgress above: narrowing walks every message of a session that can
+// run to sixteen thousand of them, and the two cheap reasons to discard a
+// candidate are checked before it. Nothing else can hold that order in place —
+// the output is identical either way and only the time differs, and a test that
+// watches a clock is a test that fails on someone else's machine.
+var focusCalls int
+
 // focusSession narrows a long session to the neighbourhood of the messages
 // that matched, so a haystack contributes its relevant part rather than being
 // dropped or flooding the digest. Two messages either side keeps the exchange
 // readable: a question without its answer recalls nothing useful.
 func focusSession(s model.Session, terms []string) model.Session {
+	focusCalls++
 	const window = 2
 	keep := map[int]bool{}
 	for i, m := range s.Messages {
