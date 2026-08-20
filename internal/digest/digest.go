@@ -547,8 +547,70 @@ func CarriesDecision(text string) bool {
 // both, so a line matched on that phrase then counted as a conclusion because
 // of it. Measured on the benchmark, the question "по чему у нас в итоге
 // шардирование" promoted a session about something else entirely.
+
+// planAfterMarker are what follows a state word when the sentence is a plan
+// rather than an outcome: "теперь давай", "now let's". The state markers were
+// added because a decision is as often reported as the state something ended up
+// in — but the same words open the next task. Measured by reading ten lines the
+// rule counted as conclusions, four were plans: "Go-структуры готовы. Теперь
+// SQL — 2 SELECT" and "PR открыт. Теперь главное — сделать так, чтобы деплой не
+// мог соврать".
+var planAfterMarker = []string{
+	"теперь давай", "теперь главное", "теперь нужно", "теперь надо",
+	"теперь буду", "теперь сделаю", "теперь я", "now let's", "now i'll",
+	"now we need", "now i will",
+}
+
+// blankOpeningNow removes "теперь" where it opens a clause, which is how a
+// plan starts — "Теперь SQL — 2 SELECT" — and leaves it where it reports a
+// state: "прод-пины теперь ложатся на deploy/prod". Both readings were counted
+// as decisions; reading ten such lines on a real store, four were plans.
+func blankOpeningNow(low string) string {
+	const word = "теперь"
+	out := low
+	for i := 0; ; {
+		j := strings.Index(out[i:], word)
+		if j < 0 {
+			return out
+		}
+		at := i + j
+		opens := true
+		for k := at - 1; k >= 0; k-- {
+			r := rune(out[k])
+			if r == ' ' || r == '\t' || r == '*' || r == '#' {
+				continue
+			}
+			opens = !isWordByte(out[k])
+			break
+		}
+		if opens {
+			out = out[:at] + strings.Repeat(" ", len(word)) + out[at+len(word):]
+		}
+		i = at + len(word)
+	}
+}
+
+// isWordByte says whether a byte belongs to a word rather than to punctuation.
+// Cyrillic is multi-byte, and every continuation byte is >= 0x80, so this reads
+// "part of a word" for them too.
+func isWordByte(b byte) bool {
+	switch {
+	case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b >= '0' && b <= '9':
+		return true
+	case b >= 0x80:
+		return true
+	}
+	return false
+}
+
 func CarriesDecisionExcept(text string, asked []string) bool {
 	low := strings.ToLower(text)
+	for _, p := range planAfterMarker {
+		// A plan may still report an outcome elsewhere in the line, so this
+		// blanks the plan wording rather than disqualifying the whole line.
+		low = strings.ReplaceAll(low, p, " ")
+	}
+	low = blankOpeningNow(low)
 	for _, d := range decisionMarkers {
 		if !strings.Contains(low, d) {
 			continue
