@@ -151,10 +151,14 @@ export default {
       async (event) => {
         const prompt = typeof event?.prompt === "string" ? event.prompt.trim() : "";
         if (!prompt) return;
+        // Recall skips what it already showed this agent session, keyed by the
+        // session id. A payload without one turns that off: measured on a real
+        // store, half of all injections were then a word-for-word repeat.
+        const sessionID = event?.sessionId || event?.session_id || event?.session?.id || "";
         let recall = "";
         try {
           recall = execFileSync(DEJA, ["hook-prompt", "--plain"], {
-            input: JSON.stringify({ prompt, cwd: process.cwd() }),
+            input: JSON.stringify({ prompt, session_id: sessionID, cwd: process.cwd() }),
             encoding: "utf8",
             timeout: 10000,
             maxBuffer: 4 * 1024 * 1024,

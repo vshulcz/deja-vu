@@ -132,7 +132,10 @@ export default function (pi: any) {
         }
         return;
       }
-      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "" }));
+      // The session id lets recall skip what it already showed this session;
+      // without one it repeats itself on every message.
+      const sessionID = event.sessionId || event.session_id || ctx?.session?.id || "";
+      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID }));
       if (!raw) return;
       const resp = JSON.parse(raw);
       if (resp && resp.systemMessage) ctx.ui.notify(resp.systemMessage, "info");
