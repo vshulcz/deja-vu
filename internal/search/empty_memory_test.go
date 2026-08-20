@@ -130,3 +130,32 @@ func TestAHarnessCheckWrittenAsASearchIsIgnored(t *testing.T) {
 		t.Errorf("a harness check reached the block:\n%s", got)
 	}
 }
+
+// The same failure has more than one wording, and the first list caught one of
+// them. Reading ten blocks the sweep counted as on topic turned up three more:
+// the agent announcing it is about to look, that it looked and found nothing,
+// or that it may not look at all. Measured after the first list, 4 blocks of
+// 114 still opened on one of these.
+func TestBlockDoesNotQuoteTheAgentAboutToLook(t *testing.T) {
+	for _, line := range []string{
+		"\u041f\u0440\u043e\u0432\u0435\u0440\u044e \u043f\u0430\u043c\u044f\u0442\u044c \u0438 \u0438\u0441\u0442\u043e\u0440\u0438\u044e \u043f\u0440\u043e\u0448\u043b\u044b\u0445 \u0441\u0435\u0441\u0441\u0438\u0439 \u043f\u043e can \u0448\u0438\u043d\u0435",
+		"\u041c\u043d\u0435 \u043d\u0443\u0436\u043d\u043e \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d\u0438\u0435 \u043d\u0430 \u0434\u043e\u0441\u0442\u0443\u043f \u043a \u043c\u043e\u0435\u0439 \u043f\u0430\u043c\u044f\u0442\u0438 \u043f\u0440\u043e can \u0448\u0438\u043d\u0443",
+		"\u042f \u043d\u0435 \u043d\u0430\u0448\u0435\u043b \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044e \u043f\u0440\u043e can \u0448\u0438\u043d\u0443 \u0432 \u043c\u043e\u0435\u0439 \u043f\u0430\u043c\u044f\u0442\u0438",
+	} {
+		s := model.Session{Messages: []model.Message{
+			{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 can \u0448\u0438\u043d\u043e\u0439"},
+			{Role: "assistant", Text: line},
+			{Role: "assistant", Text: "can \u0448\u0438\u043d\u0443 \u0432 \u0438\u0442\u043e\u0433\u0435 \u0447\u0438\u0442\u0430\u0435\u043c \u0447\u0435\u0440\u0435\u0437 adb, \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c 500"},
+		}}
+		_, lines := matchedLinesAsked(s, []string{"can", "\u0448\u0438\u043d\u0443"},
+			"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 can \u0448\u0438\u043d\u043e\u0439")
+		for _, ln := range lines {
+			if strings.Contains(ln, "\u043f\u0430\u043c\u044f\u0442") {
+				t.Errorf("the block quotes the agent talking about its memory: %q", ln)
+			}
+		}
+		if !quotedAny(lines, "500") {
+			t.Errorf("the line that answered was dropped for %q: %q", line, lines)
+		}
+	}
+}

@@ -781,6 +781,17 @@ func densestLine(text string, terms []string) (string, int) {
 // the answer — measured on a real store, 3 blocks of 119 opened on one, two of
 // them for the same question about a CAN bus.
 var emptyMemoryPhrases = []string{
+	// The same failure in the wordings a second reading turned up: the agent
+	// announcing it is about to look, or that it looked and found nothing, or
+	// that it may not look at all. Measured on a real store after the first
+	// list, 4 blocks of 114 still opened on one of these.
+	"проверю память",
+	"проверю историю прошлых",
+	"поищу в памяти",
+	"не нашел информаци",
+	"не нашёл информаци",
+	"разрешение на доступ",
+	"в моей памяти нет",
 	"don't have any previous conversation",
 	"no previous conversation context",
 	"no prior sessions",
