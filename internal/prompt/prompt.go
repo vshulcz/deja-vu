@@ -113,6 +113,21 @@ func hasCJKRune(s string) bool {
 	return false
 }
 
+// shortWord is the three-letter English words that are work, not subjects. A
+// question is about "ttl" or "dns"; it is never about "log" on its own.
+var shortWord = map[string]bool{
+	"log": true, "run": true, "fix": true, "add": true, "set": true,
+	"get": true, "put": true, "new": true, "old": true, "the": true,
+	"and": true, "for": true, "but": true, "not": true, "all": true,
+	"any": true, "one": true, "two": true, "out": true, "off": true,
+	"top": true, "end": true, "use": true, "see": true, "way": true,
+	"day": true, "now": true, "how": true, "why": true, "who": true,
+	"its": true, "has": true, "was": true, "are": true, "can": true,
+	"did": true, "let": true, "try": true, "job": true, "bug": true,
+	"yes": true, "may": true, "our": true, "his": true, "her": true,
+	"you": true, "too": true, "own": true, "per": true, "via": true,
+}
+
 // promptFiller is the short English filler a four-character floor lets
 // through. search.IsStopWord is deliberately not extended: it governs search
 // queries too, where "about" typed on purpose should still match.
@@ -155,6 +170,14 @@ func techTerm(f string) bool {
 	// and no false fire on any negative control; three scores higher still
 	// but starts keeping words like "log" and "run", so four is where the
 	// evidence stops being comfortable.
+	if long == 3 {
+		// Three letters is where the acronyms live — ttl, dns, wal, api, ssh,
+		// mcp, tls — and the reason the floor stood at four is that it is also
+		// where "log" and "run" live. Naming those instead of measuring their
+		// length keeps both: the list is closed-class English, the same kind
+		// the Russian half of this file already carries.
+		return !shortWord[f]
+	}
 	return long >= 4
 }
 

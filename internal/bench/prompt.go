@@ -96,6 +96,13 @@ func promptTopics() []promptTopic {
 		{"dns", "dns lookups are cached for 30 seconds inside the pool", "how long do we cache dns lookups?"},
 		{"panic", "a panic in the parser is recovered and logged as a corrupt file", "what happens when the parser panics?"},
 		{"wal", "wal mode is enabled so readers stop blocking the writer", "why did we turn on wal mode?"},
+		// Asked with nothing but the subject and filler around it. The other
+		// three-letter topics here are asked in sentences carrying words the
+		// answering session also uses — "settle", "mode" — so they pass on
+		// those and the floor never shows. Measured: "what ttl did we settle
+		// on" reduces to [settle], and the ttl case is answered by a word that
+		// has nothing to do with ttl.
+		{"tls", "tls verification stays on for the internal mesh", "напомни, что там было с tls"},
 	}
 }
 
