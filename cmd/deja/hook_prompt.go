@@ -563,6 +563,37 @@ func recentlyInjected(dir, sid string, window int) map[string]bool {
 	return out
 }
 
+// forgetInjected drops one agent session's entries from the seen list, so
+// recall may send it again what it was already shown. Used when the harness
+// truncates the conversation and the blocks go with it.
+func forgetInjected(dir, sid string) {
+	// An early return, not a rule: with no id the filter below matches nothing
+	// and the file is rewritten unchanged, so this saves a read and a write.
+	if sid == "" {
+		return
+	}
+	p := dir + ".hookseen"
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return
+	}
+	var kept []string
+	for _, line := range strings.Split(string(b), "\n") {
+		if line == "" {
+			continue
+		}
+		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == sid {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	out := ""
+	if len(kept) > 0 {
+		out = strings.Join(kept, "\n") + "\n"
+	}
+	_ = atomicfile.Write(p, []byte(out), 0o600)
+}
+
 func rememberInjected(dir, sid string, ss []model.Session) {
 	if sid == "" {
 		return

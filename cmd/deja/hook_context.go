@@ -121,6 +121,11 @@ func endsAValue(b []byte) bool {
 func runHookPrecompact(dir string) {
 	var input precompactHookInput
 	_ = json.Unmarshal(readHookStdin(), &input)
+	// Compaction throws away the blocks this session was shown, and the list
+	// that stops them repeating outlives them — so the memory the agent just
+	// lost is exactly the memory recall refuses to send again. Forget what this
+	// session was shown; everything else in the file belongs to other sessions.
+	forgetInjected(dir, input.SessionID)
 	requestWarmup(dir)
 }
 
