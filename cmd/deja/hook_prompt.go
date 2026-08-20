@@ -322,7 +322,7 @@ func hasIdentifierTerm(terms []string) bool {
 		// something the way a five-letter Latin word does — so the bar is one
 		// letter lower there.
 		n := utf8.RuneCountInString(t)
-		if (n >= 5 || (n >= 4 && hasCyrillic(t))) && !soleWorkingWord[t] {
+		if n >= 3 && !soleWorkingWord[t] {
 			return true
 		}
 		for _, r := range t {
@@ -347,16 +347,11 @@ var soleWorkingWord = map[string]bool{
 	"commit": true, "commits": true, "deploy": true, "fixes": true, "again": true,
 	"write": true, "wrote": true, "merge": true, "start": true, "print": true,
 	"there": true, "these": true, "those": true, "which": true, "where": true,
-}
-
-// hasCyrillic reports whether the term is written in Cyrillic.
-func hasCyrillic(t string) bool {
-	for _, r := range t {
-		if r >= 0x400 && r <= 0x4FF {
-			return true
-		}
-	}
-	return false
+	// Four letters, once the bar came down to three: a question is never about
+	// "line" or "file" on its own, and the negative controls built from them
+	// started firing the moment they could reach the store.
+	"line": true, "file": true, "code": true, "read": true, "open": true,
+	"task": true, "step": true, "note": true, "logs": true, "docs": true,
 }
 
 // byIdentifying orders the query's terms by what the index says each is worth,

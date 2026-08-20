@@ -112,10 +112,20 @@ func TestTheSingleTermBarCountsLettersNotBytes(t *testing.T) {
 	if !promptTermsWorthAsking([]string{"сеть"}) {
 		t.Fatal("a four-letter Cyrillic subject was refused")
 	}
-	if promptTermsWorthAsking([]string{"тут"}) {
-		t.Fatal("a three-letter Cyrillic filler word opened the store on its own")
+	// Through extraction, which is where filler is named. Handing the bar a
+	// word the extractor would never produce tests a contract nothing has:
+	// both floors came down to three letters, and what is work is named rather
+	// than measured.
+	if promptTermsWorthAsking(prompt.Terms("ну тут вот так")) {
+		t.Fatal("a question of nothing but filler opened the store")
 	}
-	if promptTermsWorthAsking([]string{"code"}) {
-		t.Fatal("a four-letter ordinary word opened the store on its own")
+	if promptTermsWorthAsking(prompt.Terms("add a log line here")) {
+		t.Fatal("a question about ordinary work opened the store")
+	}
+	if !promptTermsWorthAsking(prompt.Terms("напомни, что там было с кеш")) {
+		t.Fatal("a three-letter Russian subject was refused before the store was opened")
+	}
+	if !promptTermsWorthAsking(prompt.Terms("what ttl did we settle on")) {
+		t.Fatal("a three-letter acronym was refused before the store was opened")
 	}
 }
