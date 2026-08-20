@@ -15,12 +15,15 @@ import (
 func TestHookseenRotatesInsteadOfFreezing(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "idx.db")
 	p := dir + ".hookseen"
-	// Fill past 1MB with other sessions' lines, plus one line for our session.
+	// This session's line goes first, before a megabyte of other sessions'.
+	// Written last it lands inside the tail rotation keeps anyway, and the rule
+	// that saves it — keep every line of the current session, wherever it sits —
+	// is never exercised: removing that rule left this test green.
 	var b strings.Builder
+	b.WriteString("mysession alreadyseen1\n")
 	for i := 0; b.Len() < (1<<20)+1000; i++ {
 		b.WriteString("othersess" + strings.Repeat("x", 40) + " sid\n")
 	}
-	b.WriteString("mysession alreadyseen1\n")
 	if err := os.WriteFile(p, []byte(b.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
