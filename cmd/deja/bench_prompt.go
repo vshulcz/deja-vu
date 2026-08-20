@@ -160,6 +160,10 @@ type promptReport struct {
 	// question identifies anything, so dropping the subject leaves a working
 	// verb and the answer is never found.
 	ShortSubject promptArmReport `json:"short_subject"`
+	// The echo arm: the session holds the user's own earlier copy of the very
+	// sentence being typed now. Correct means the block opens on what was
+	// concluded rather than handing the question back.
+	Echo promptArmReport `json:"echo_line"`
 	// The concluded arm: two sessions hold the subject, one only mentioned it
 	// and the other settled it. Correct means the block carries what was
 	// settled.
@@ -287,6 +291,16 @@ func measurePrompt(seed int64) (promptReport, error) {
 				}
 			}
 			continue
+		case "echo-line":
+			arm = &report.Echo
+			arm.Cases++
+			arm.Fired++
+			if blockOpensOnEcho(indexDir, scope, terms, chain.Question) {
+				arm.FalseFires++
+			} else {
+				arm.Correct++
+			}
+			continue
 		case "decoy":
 			// Scored with the question's own terms, the way the hook builds the
 			// block. An earlier version of this arm rebuilt it from the topic
@@ -367,6 +381,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Decision, nil)
 	finishPromptArm(&report.Concluded, nil)
 	finishPromptArm(&report.ShortSubject, nil)
+	finishPromptArm(&report.Echo, nil)
 	finishPromptArm(&report.AbsentSubject, nil)
 	return report, nil
 }
@@ -526,4 +541,34 @@ func finishPromptArm(arm *promptArmReport, terms []int) {
 	if len(terms) > 0 {
 		arm.MedianTerm = percentileInt(terms, 50)
 	}
+}
+
+// blockOpensOnEcho reports whether the first line the agent would read is the
+// question it just asked, handed back.
+func blockOpensOnEcho(dir, project string, terms []string, question string) bool {
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	if err != nil {
+		return false
+	}
+	var keep []model.Session
+	for i, s := range ranked {
+		if !recallWorthShowing(terms, matched[i], strong[i]) {
+			continue
+		}
+		keep = append(keep, s)
+		if len(keep) == 2 {
+			break
+		}
+	}
+	if len(keep) == 0 {
+		return false
+	}
+	for _, ln := range strings.Split(search.AutoRecallDigestForAsked(keep, 2000, terms, question), "\n") {
+		t := strings.TrimSpace(ln)
+		if !strings.HasPrefix(t, "- User:") && !strings.HasPrefix(t, "- Assistant:") {
+			continue
+		}
+		return strings.Contains(strings.ToLower(t), strings.ToLower(question))
+	}
+	return false
 }

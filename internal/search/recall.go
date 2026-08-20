@@ -53,6 +53,15 @@ func AutoRecallDigest(ss []model.Session, budget int) string {
 // on a real 8608-message session, the block an agent received carried one or
 // two of the four words it had searched for.
 func AutoRecallDigestFor(ss []model.Session, budget int, terms []string) string {
+	return AutoRecallDigestForAsked(ss, budget, terms, "")
+}
+
+// AutoRecallDigestForAsked is AutoRecallDigestFor knowing what was just typed,
+// so the block does not open by handing it back. A person repeats an
+// instruction — "да, начинай с ретрая" — and the session holding the earlier
+// copy wins the opening slot on carrying every word of it, being the same
+// sentence. Measured on a real store, that was 22 of 104 injected blocks.
+func AutoRecallDigestForAsked(ss []model.Session, budget int, terms []string, asked string) string {
 	if budget <= 0 {
 		budget = 2000
 	}
@@ -61,7 +70,7 @@ func AutoRecallDigestFor(ss []model.Session, budget int, terms []string) string 
 		if b.Len() >= budget {
 			break
 		}
-		section := autoRecallSessionFor(s, time.Now(), false, terms)
+		section := autoRecallSessionForAsked(s, time.Now(), false, terms, asked)
 		if section == "" {
 			continue
 		}
@@ -359,11 +368,15 @@ func termStem(t string) string {
 }
 
 func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms []string) string {
+	return autoRecallSessionForAsked(s, now, provenance, terms, "")
+}
+
+func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, terms []string, asked string) string {
 	var problem string
 	var conclusions []string
 	matched := false
 	if len(terms) > 0 {
-		problem, conclusions = matchedLines(s, terms)
+		problem, conclusions = matchedLinesAsked(s, terms, asked)
 		matched = len(conclusions) > 0
 	} else {
 		// No question yet — this is the block handed over at session start.
@@ -466,6 +479,10 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 // caller's fallback, so a session that ranked through a stem fold still shows
 // something rather than nothing.
 func matchedLines(s model.Session, terms []string) (string, []string) {
+	return matchedLinesAsked(s, terms, "")
+}
+
+func matchedLinesAsked(s model.Session, terms []string, asked string) (string, []string) {
 	type scored struct {
 		idx, hits int
 		text      string
@@ -512,7 +529,7 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 		}
 		switch m.Role {
 		case "user":
-			if !noiseMessage(m.Text) && hits > bestUser.hits {
+			if !noiseMessage(m.Text) && !nearCopy(line, asked) && hits > bestUser.hits {
 				bestUser = scored{i, hits, lineAround(text, 160, terms)}
 			}
 		case "assistant":
@@ -865,6 +882,42 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 				continue
 			}
 			out[a.ID] = b.Updated.Format("2006-01-02")
+		}
+	}
+	return out
+}
+
+// nearCopy reports whether a line is essentially the text just typed. Half the
+// words shared is enough: a repeated instruction comes back with a word changed
+// or a number bumped, and it is still nothing the reader does not already have
+// in front of them.
+func nearCopy(line, asked string) bool {
+	if asked == "" {
+		return false
+	}
+	a, b := contentWords(line), contentWords(asked)
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	shared := 0
+	for w := range a {
+		if b[w] {
+			shared++
+		}
+	}
+	union := len(a) + len(b) - shared
+	return union > 0 && float64(shared)/float64(union) >= 0.5
+}
+
+func contentWords(s string) map[string]bool {
+	out := map[string]bool{}
+	wordy := func(r rune) bool {
+		return r == '_' || r == '-' || r == '.' || r == '/' ||
+			(r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r >= 0x400
+	}
+	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !wordy(r) }) {
+		if len([]rune(w)) >= 3 {
+			out[w] = true
 		}
 	}
 	return out

@@ -411,6 +411,31 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// The echo. A person repeats an instruction, and the session holding the
+	// earlier copy of it wins the opening line — it carries every word of the
+	// question, being the same sentence. Measured on a real store, 22 of 104
+	// injected blocks opened on a near-copy of the message the agent was
+	// reading at that moment.
+	for i, d := range []promptTopic{
+		{"cormorant", "the fix: cormorant retries are capped at four", "start the cormorant retry now"},
+		{"kittiwake", "the fix: kittiwake writes go to the replica", "start the kittiwake write now"},
+	} {
+		id := fmt.Sprintf("prompt-echo-%02d", i)
+		project := fmt.Sprintf("promptbenchecho%02d", i)
+		t := base.Add(time.Duration(3300+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "echo-line",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: d.question, Time: t},
+					{Role: "assistant", Text: d.fact, Time: t.Add(5 * time.Minute)},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

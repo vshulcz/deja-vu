@@ -285,7 +285,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// way of its own to tell "mm_status" from "decide", and the session
 		// that answers often says both — measured live, ten of the answers
 		// this hook newly returns open on the ordinary word.
-		digest := search.AutoRecallDigestFor(ss, promptHookBudget-recallFrameOverhead, byIdentifying(terms, idfOf))
+		digest := search.AutoRecallDigestForAsked(ss, promptHookBudget-recallFrameOverhead, byIdentifying(terms, idfOf), string(input.Prompt))
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
