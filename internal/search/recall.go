@@ -504,6 +504,9 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	}
 	var bestUser scored
 	var assistants []scored
+	// Which messages carried a query word, so the lines just after them can be
+	// considered for the conclusion slot below.
+	matchedAt := make(map[int]bool, 8)
 	for i, m := range s.Messages {
 		// Score the raw text, not what contextText returns: it joins lines and
 		// keeps only the first eight of them, so by then there is nothing left
@@ -518,6 +521,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		if hits == 0 {
 			continue
 		}
+		matchedAt[i] = true
 		// Among lines that carry the question words, prefer the one that
 		// concluded something. Five ways of choosing by where and how often a
 		// word fell were measured and none moved the number; these markers are
@@ -564,6 +568,32 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	// concluding line that does not say the subject settles some other
 	// question, and putting it first reads as an answer to this one — measured
 	// live, preferring conclusions without this cost one answer of 58.
+	// A conclusion often does not repeat the question's words — "in the end we
+	// settled on 40" follows the line that named the pool — so it never becomes
+	// a candidate at all. Take the agent's next lines after a matched one as
+	// candidates for the second slot when they conclude something: measured on
+	// a real store, of the blocks carrying no conclusion, a third had one in
+	// the session they came from, and this is why.
+	if len(matchedAt) > 0 {
+		for i, m := range s.Messages {
+			if m.Role != "assistant" || matchedAt[i] {
+				continue
+			}
+			if !nearMatch(matchedAt, i, replyWindow) {
+				continue
+			}
+			// Checked here as well as where the slot is filled: this keeps
+			// the candidate list short rather than deciding anything, so
+			// removing it changes cost and not output.
+			line, _ := densestLine(m.Text, terms)
+			if line == "" || !digest.CarriesDecision(line) {
+				continue
+			}
+			if text := contextText(line, false); strings.TrimSpace(text) != "" {
+				assistants = append(assistants, scored{i, 0, lineAround(text, 220, terms)})
+			}
+		}
+	}
 	// Two slots, and they answer different questions: one says what the session
 	// was about, the other what it settled. Filling both by word count gave two
 	// lines of the first kind — measured on a real store, 35 blocks of 100
@@ -608,6 +638,21 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		out = append(out, a.text)
 	}
 	return bestUser.text, out
+}
+
+// replyWindow is how far after a matched line the reply to it may sit. A
+// harness writes tool calls and status lines in between, so the conclusion is
+// rarely the very next message and never far.
+const replyWindow = 4
+
+// nearMatch says whether index i follows a matched message within the window.
+func nearMatch(matched map[int]bool, i, window int) bool {
+	for j := i - window; j < i; j++ {
+		if matched[j] {
+			return true
+		}
+	}
+	return false
 }
 
 // rankOfBestTerm scores which of the query's terms a line carries, counting the

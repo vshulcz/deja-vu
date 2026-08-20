@@ -67,3 +67,63 @@ func TestBlockKeepsTheSubjectBesideTheConclusion(t *testing.T) {
 		t.Errorf("the subject vanished from the block: %q", lines)
 	}
 }
+
+// A conclusion rarely repeats the question's words: the line that named the
+// subject comes first, and the answer follows it saying "in the end we settled
+// on 40". Scored line by line, that answer is not a candidate at all. Measured
+// on a real store, taking the agent's next lines as candidates for the
+// conclusion slot moved blocks carrying a conclusion from 44 of 100 to 49.
+func TestBlockTakesTheAnswerThatFollowsTheMention(t *testing.T) {
+	s := model.Session{Messages: []model.Message{
+		{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer"},
+		{Role: "assistant", Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0441\u043d\u044f\u043b\u0438"},
+		{Role: "assistant", Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 \u043e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u043b\u0438\u0441\u044c \u043d\u0430 40"},
+		{Role: "assistant", Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0441\u0440\u0430\u0432\u043d\u0438\u043b\u0438"},
+		{Role: "assistant", Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u043f\u043e\u0441\u0442\u0440\u043e\u0438\u043b\u0438"},
+	}}
+	_, lines := matchedLinesAsked(s, []string{"pgbouncer", "pool", "\u043c\u0435\u0442\u0440\u0438\u043a\u0438"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer")
+	if !quoted(lines, "\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u043b\u0438\u0441\u044c \u043d\u0430 40") {
+		t.Errorf("the answer following the mention was never a candidate: %q", lines)
+	}
+}
+
+// It has to follow a line that matched, though: a conclusion from another part
+// of the session settles another question.
+func TestBlockIgnoresAFarAwayConclusion(t *testing.T) {
+	msgs := []model.Message{{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer"}}
+	for i := 0; i < 3; i++ {
+		msgs = append(msgs, model.Message{Role: "assistant",
+			Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0441\u043d\u044f\u043b\u0438"})
+	}
+	for i := 0; i < 8; i++ {
+		msgs = append(msgs, model.Message{Role: "assistant",
+			Text: "\u043f\u0440\u0430\u0432\u0438\u043c \u0441\u043e\u0432\u0441\u0435\u043c \u0434\u0440\u0443\u0433\u043e\u0435 \u043c\u0435\u0441\u0442\u043e"})
+	}
+	msgs = append(msgs, model.Message{Role: "assistant",
+		Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 cron \u043f\u0435\u0440\u0435\u0435\u0445\u0430\u043b \u043d\u0430 03:17"})
+	_, lines := matchedLinesAsked(model.Session{Messages: msgs},
+		[]string{"pgbouncer", "pool", "\u043c\u0435\u0442\u0440\u0438\u043a\u0438"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer")
+	if quoted(lines, "cron") {
+		t.Errorf("a conclusion from elsewhere in the session was quoted: %q", lines)
+	}
+}
+
+// The line taken from beside a match has to be a conclusion. Any next line
+// qualifying would fill the second slot with whatever the agent said next —
+// "running the tests" — which is the noise the slot exists to avoid.
+func TestBlockDoesNotTakeAnOrdinaryNextLine(t *testing.T) {
+	s := model.Session{Messages: []model.Message{
+		{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer"},
+		{Role: "assistant", Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0441\u043d\u044f\u043b\u0438"},
+		{Role: "assistant", Text: "\u0433\u043e\u043d\u044e \u0442\u0435\u0441\u0442\u044b \u0434\u0430\u043b\u044c\u0448\u0435"},
+		{Role: "assistant", Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u0441\u0440\u0430\u0432\u043d\u0438\u043b\u0438"},
+		{Role: "assistant", Text: "pgbouncer pool \u043c\u0435\u0442\u0440\u0438\u043a\u0438 \u043f\u043e\u0441\u0442\u0440\u043e\u0438\u043b\u0438"},
+	}}
+	_, lines := matchedLinesAsked(s, []string{"pgbouncer", "pool", "\u043c\u0435\u0442\u0440\u0438\u043a\u0438"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 pgbouncer")
+	if quoted(lines, "\u0433\u043e\u043d\u044e \u0442\u0435\u0441\u0442\u044b") {
+		t.Errorf("an ordinary next line took the conclusion slot: %q", lines)
+	}
+}
