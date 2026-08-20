@@ -503,7 +503,7 @@ func relevanceResult(ss []model.Session, matched int, idf map[string]float64) Se
 // sessions. Conversational filler ("post", "text", "claude") is frequent in
 // any large corpus and clears nothing. Terms living in one or two sessions
 // are informative regardless — small corpora never reach the ratio bar.
-const dejaVuIDFFloor = 1.5
+const dejaVuIDFFloor = 2.0
 
 // dejaVuStrongIDFFloor is the bar for a term rare enough to justify an
 // UNPROMPTED recall on its own. The ordinary floor admits words that merely
@@ -513,7 +513,7 @@ const dejaVuIDFFloor = 1.5
 // Measured on cross-paired prompts (the answer never present), the hook would
 // have injected on 94% of them; requiring a strong term for the single-match
 // case removes the half that rests on one ordinary word.
-const dejaVuStrongIDFFloor = 2.3
+const dejaVuStrongIDFFloor = 3.0
 
 // ProjectRelevant ranks the current project's sessions by how well they match
 // the prompt terms — without reconstructing an AND query, which poisons on
