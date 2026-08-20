@@ -150,7 +150,25 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND.
-	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates)
+	// The sessions this agent session has already been shown, and the one it is
+	// writing, are discarded a few lines below on their id alone. Handing them
+	// to the ranking means they are never read: on a real store that is 15 of
+	// 26 candidates, each read from disk in full before being dropped.
+	seen := alreadyInjected(dir, input.SessionID)
+	skip := make(map[string]bool, len(seen)+1)
+	for id := range seen {
+		skip[id] = true
+	}
+	if input.SessionID != "" {
+		skip[input.SessionID] = true
+	}
+	ranked, matched, strong, idfOf, err := index.ProjectRelevantSkipping(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates, skip)
+	rankedAlreadyShown = 0
+	for _, s := range ranked {
+		if skip[s.ID] {
+			rankedAlreadyShown++
+		}
+	}
 	if err != nil || len(ranked) == 0 {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
@@ -161,7 +179,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// says so and lets such a question through — but saying "you have been here"
 	// on one word teaches the reader to ignore the line, so that stays at two.
 	worthDigest := false
-	seen := alreadyInjected(dir, input.SessionID)
 	pol := policy.Load()
 	for i, s := range ranked {
 		// Every other injection path asks the policy first; this one is a
@@ -721,6 +738,12 @@ func presentableTopic(t string) bool {
 	}
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r >= 0x400
 }
+
+// rankedAlreadyShown counts candidates the ranking returned despite having been
+// injected already. A seam, like focusCalls below: such a session is read from
+// disk in full and then dropped on its id, and nothing in the output changes
+// either way, so only a count can hold the skip in place.
+var rankedAlreadyShown int
 
 // focusCalls counts how many sessions were narrowed. A seam, like
 // rebuildInProgress above: narrowing walks every message of a session that can

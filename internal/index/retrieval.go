@@ -526,6 +526,15 @@ const dejaVuStrongIDFFloor = 3.0
 // INFORMATIVE terms hit (idf >= dejaVuIDFFloor) — callers gate on it so
 // generic words cannot manufacture a confident "you have been here".
 func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, []int, map[string]float64, error) {
+	return ProjectRelevantSkipping(dir, projects, terms, n, nil)
+}
+
+// ProjectRelevantSkipping is ProjectRelevant without the sessions the caller
+// has already dealt with. The per-prompt hook discards a candidate it injected
+// earlier in the same agent session, and measured on a real store that is 15 of
+// the 26 it ranks — every one read from disk in full first, only to be dropped
+// on its id.
+func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip map[string]bool) ([]model.Session, []int, []int, map[string]float64, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -543,7 +552,7 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	metas, matched, strong, idf, rerr := relevantMetasMatched(dir, m, projects, terms, n)
+	metas, matched, strong, idf, rerr := relevantMetasMatched(dir, m, projects, terms, n, skip)
 	if rerr != nil {
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
@@ -560,8 +569,12 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	return out, matched, strong, idf, nil
 }
 
-func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, map[string]float64, error) {
-	rank, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
+func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, map[string]float64, error) {
+	var keep func(SessionMeta) bool
+	if len(skip) > 0 {
+		keep = func(meta SessionMeta) bool { return !skip[meta.ID] }
+	}
+	rank, err := relevantMetasCounts(dir, m, projects, terms, n, keep)
 	return rank.metas, rank.informative, rank.strong, rank.idf, err
 }
 
