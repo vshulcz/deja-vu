@@ -340,6 +340,14 @@ func TextCarriesTerm(text, term string) bool {
 	return termHits(text, []string{term}) > 0
 }
 
+// TextCarriesAnyTerm is TextCarriesTerm over a whole query. Asking term by term
+// lowercases the message once per term, and the per-prompt hook does that for
+// every message of a session that can run to sixteen thousand of them: measured
+// on a real store, narrowing the candidates cost 498 ms of the hook's 577.
+func TextCarriesAnyTerm(text string, terms []string) bool {
+	return termHits(text, terms) > 0
+}
+
 // termStem is a term with its last two characters dropped, or empty when the
 // term is too short for that to still identify it.
 func termStem(t string) string {

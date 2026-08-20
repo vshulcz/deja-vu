@@ -709,18 +709,15 @@ func focusSession(s model.Session, terms []string) model.Session {
 	const window = 2
 	keep := map[int]bool{}
 	for i, m := range s.Messages {
-		hits := 0
-		for _, t := range terms {
-			// The same rule the block is built with. This step spelled the
-			// word the way the question happened to spell it, while the
-			// ranking that chose the session and the digest that shows a line
-			// from it both fold the ending — so a session whose only mention
-			// was in another case was narrowed to nothing and dropped whole.
-			if search.TextCarriesTerm(m.Text, t) {
-				hits++
-			}
-		}
-		if hits == 0 {
+		// The same rule the block is built with. This step spelled the word
+		// the way the question happened to spell it, while the ranking that
+		// chose the session and the digest that shows a line from it both fold
+		// the ending — so a session whose only mention was in another case was
+		// narrowed to nothing and dropped whole.
+		//
+		// Asked for the whole query at once: per term, each call lowercased the
+		// entire message again.
+		if !search.TextCarriesAnyTerm(m.Text, terms) {
 			continue
 		}
 		for j := i - window; j <= i+window; j++ {
