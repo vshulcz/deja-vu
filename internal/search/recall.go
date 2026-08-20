@@ -428,7 +428,7 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 			continue
 		}
 		text := contextText(m.Text, false)
-		if strings.TrimSpace(text) == "" {
+		if strings.TrimSpace(text) == "" || saysItHasNoMemory(text) {
 			continue
 		}
 		switch m.Role {
@@ -543,6 +543,11 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		// carrying an ordinary word the same session happens to use. Without
 		// this every query word weighs the same and "decide" wins on being
 		// said three times.
+		// Judged on the excerpt, not the line: the excerpt is what the reader
+		// sees, and it can carry the admission in from a neighbouring line.
+		if saysItHasNoMemory(contextText(line, false)) {
+			continue
+		}
 		hits = hits*len(terms) + rankOfBestTerm(line, terms)
 		text := contextText(line, false)
 		if strings.TrimSpace(text) == "" {
@@ -586,7 +591,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 			// the candidate list short rather than deciding anything, so
 			// removing it changes cost and not output.
 			line, _ := densestLine(m.Text, terms)
-			if line == "" || !digest.CarriesDecision(line) {
+			if line == "" || !digest.CarriesDecision(line) || saysItHasNoMemory(line) {
 				continue
 			}
 			if text := contextText(line, false); strings.TrimSpace(text) != "" {
@@ -763,6 +768,36 @@ func densestLine(text string, terms []string) (string, int) {
 		return text, 0
 	}
 	return best, bestHits
+}
+
+// emptyMemoryPhrases are what an agent says when it had no history to work
+// from, or when it was refused the tool that would have found some. Quoting
+// such a line hands the reader a past failure of this very tool as if it were
+// the answer — measured on a real store, 3 blocks of 119 opened on one, two of
+// them for the same question about a CAN bus.
+var emptyMemoryPhrases = []string{
+	"don't have any previous conversation",
+	"no previous conversation context",
+	"no prior sessions",
+	"нет данных о прошл",
+	"нет контекста о прошл",
+	"нет истории",
+	"не нашёл ничего",
+	"не нашел ничего",
+	"нужно разрешение на использование инструмента",
+	"permission to use",
+	"not granted",
+}
+
+// saysItHasNoMemory reports whether a line is one of those admissions.
+func saysItHasNoMemory(line string) bool {
+	low := strings.ToLower(line)
+	for _, p := range emptyMemoryPhrases {
+		if strings.Contains(low, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // blockedPhrases are how a harness reports that a call did not happen. They
