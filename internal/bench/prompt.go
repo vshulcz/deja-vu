@@ -384,6 +384,33 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// The short subject. Measured on a real store over the questions the user
+	// actually typed: five of the nine that recalled nothing named their
+	// subject in two characters — "как там pr, смержился?", "ну что там v3
+	// показал". The extractor's length floor drops those, the question is left
+	// holding a working verb, and the gate then correctly refuses to answer on
+	// one working word. Correct here means the session that concluded about the
+	// short subject is found.
+	for i, d := range []promptTopic{
+		{"v3", "v3 of the exporter halved the scrape time", "ну что там v3 показал"},
+		{"pr", "the pr went in after the flake was fixed", "как там pr, смержился?"},
+	} {
+		id := fmt.Sprintf("prompt-short-%02d", i)
+		project := fmt.Sprintf("promptbenchshort%02d", i)
+		t := base.Add(time.Duration(3100+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "short-subject",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "смотрим " + d.word, Time: t},
+					{Role: "assistant", Text: d.fact, Time: t.Add(5 * time.Minute)},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

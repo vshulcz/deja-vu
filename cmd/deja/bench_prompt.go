@@ -155,6 +155,11 @@ type promptReport struct {
 	// that tell one from the other are English, and half the sessions on a real
 	// store are not.
 	Decision promptArmReport `json:"decision_line"`
+	// The short-subject arm: the question names its subject in two characters,
+	// the way people name a version or a pull request. Nothing else in the
+	// question identifies anything, so dropping the subject leaves a working
+	// verb and the answer is never found.
+	ShortSubject promptArmReport `json:"short_subject"`
 	// The concluded arm: two sessions hold the subject, one only mentioned it
 	// and the other settled it. Correct means the block carries what was
 	// settled.
@@ -270,6 +275,18 @@ func measurePrompt(seed int64) (promptReport, error) {
 				arm.Correct++
 			}
 			continue
+		case "short-subject":
+			arm = &report.ShortSubject
+			arm.Cases++
+			if fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms); fired {
+				arm.Fired++
+				if correct {
+					arm.Correct++
+				} else {
+					arm.FalseFires++
+				}
+			}
+			continue
 		case "decoy":
 			// Scored with the question's own terms, the way the hook builds the
 			// block. An earlier version of this arm rebuilt it from the topic
@@ -349,6 +366,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Decoy, nil)
 	finishPromptArm(&report.Decision, nil)
 	finishPromptArm(&report.Concluded, nil)
+	finishPromptArm(&report.ShortSubject, nil)
 	finishPromptArm(&report.AbsentSubject, nil)
 	return report, nil
 }

@@ -50,7 +50,7 @@ func Terms(prompt string) []string {
 		// Only the edges are trimmed. A dot inside a token is what makes an IP
 		// address, a version or a filename one word.
 		f = strings.Trim(f, "._-/")
-		if len(f) < 3 || query.IsStopWord(f) || seen[f] || !techTerm(f) {
+		if (len(f) < 3 && !shortSubject(f)) || query.IsStopWord(f) || seen[f] || !techTerm(f) {
 			continue
 		}
 		if add(f) {
@@ -176,6 +176,9 @@ func techTerm(f string) bool {
 	if promptFiller[f] {
 		return false
 	}
+	if shortSubjectWord[f] {
+		return true
+	}
 	long := 0
 	for _, r := range f {
 		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
@@ -202,6 +205,30 @@ func techTerm(f string) bool {
 		return !shortWord[f]
 	}
 	return long >= 4
+}
+
+// shortSubject keeps the two-character words that name a thing rather than
+// describe one. The floor at three exists to stop "in", "on" and "to" from
+// earning a recall, and it also drops the way people name versions and pull
+// requests: measured on the questions the user actually typed, five of the nine
+// that recalled nothing named their subject in two characters — "ну что там v3
+// показал", "как там pr, смержился?" — leaving the question holding a working
+// verb and nothing to search for.
+func shortSubject(f string) bool {
+	if len(f) != 2 {
+		return false
+	}
+	// A version label: one letter and one digit.
+	if f[0] >= 'a' && f[0] <= 'z' && f[1] >= '0' && f[1] <= '9' {
+		return true
+	}
+	return shortSubjectWord[f]
+}
+
+// Closed class, the same shape as shortWord below it: named rather than
+// measured, because two letters cannot be told apart by length.
+var shortSubjectWord = map[string]bool{
+	"pr": true, "mr": true, "ci": true, "db": true, "ui": true, "qa": true,
 }
 
 // The closed class plus the handful of verbs that open half of all questions.
