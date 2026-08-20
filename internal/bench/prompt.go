@@ -436,6 +436,31 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// A compound name whose parts are short. The Cyrillic floor is three
+	// letters for a single word — "кеш", "хук" — but a hyphenated word needed a
+	// part of five, so "стоп-лист" and "прод-бд" were dropped entirely and the
+	// question was left holding a verb. Measured on a real store, compound
+	// subjects come back on topic 68% of the time against 100% for plain ones.
+	for i, d := range []promptTopic{
+		{"стоп-лист", "в итоге решили: стоп-лист держим в редисе", "что мы решали про стоп-лист"},
+		{"прод-бд", "в итоге решили: прод-бд читаем только с реплики", "что мы решали про прод-бд"},
+	} {
+		id := fmt.Sprintf("prompt-compound-%02d", i)
+		project := fmt.Sprintf("promptbenchcompound%02d", i)
+		t := base.Add(time.Duration(3500+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "compound-subject",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "смотрим " + d.word, Time: t},
+					{Role: "assistant", Text: d.fact, Time: t.Add(5 * time.Minute)},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

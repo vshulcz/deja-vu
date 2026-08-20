@@ -171,6 +171,10 @@ type promptReport struct {
 	// sentence being typed now. Correct means the block opens on what was
 	// concluded rather than handing the question back.
 	Echo promptArmReport `json:"echo_line"`
+	// The compound arm: a hyphenated subject whose parts are short. The floor
+	// for a single Cyrillic word is three letters; a compound needed five in one
+	// part, so ordinary names fell through.
+	Compound promptArmReport `json:"compound_subject"`
 	// The concluded arm: two sessions hold the subject, one only mentioned it
 	// and the other settled it. Correct means the block carries what was
 	// settled.
@@ -308,6 +312,18 @@ func measurePrompt(seed int64) (promptReport, error) {
 				arm.Correct++
 			}
 			continue
+		case "compound-subject":
+			arm = &report.Compound
+			arm.Cases++
+			if fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms); fired {
+				arm.Fired++
+				if correct {
+					arm.Correct++
+				} else {
+					arm.FalseFires++
+				}
+			}
+			continue
 		case "decoy":
 			// Scored with the question's own terms, the way the hook builds the
 			// block. An earlier version of this arm rebuilt it from the topic
@@ -389,6 +405,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Concluded, nil)
 	finishPromptArm(&report.ShortSubject, nil)
 	finishPromptArm(&report.Echo, nil)
+	finishPromptArm(&report.Compound, nil)
 	finishPromptArm(&report.AbsentSubject, nil)
 	return report, nil
 }
