@@ -40,8 +40,12 @@ func TestLogJSONShapesAreStable(t *testing.T) {
 		"t": true, "kind": true, "bytes": true, "sessions": true,
 		"empty": true, "raw": true, "ids": true,
 	})
+	// "into" is additive and optional: it names the agent session an injection
+	// went to, which the log never recorded. Without it the only measure of
+	// whether a recall was used is the sentence the block asks the agent to
+	// say — 22 of 1218 injections on a real store, which counts reporting.
 	assertShape(t, "Snapshot", topLevelJSONKeys(Snapshot{}), map[string]bool{
 		"t": true, "kind": true, "sessions": true, "bytes": true,
-		"policy": true, "terms": true, "digest": true,
+		"policy": true, "terms": true, "into": true, "digest": true,
 	})
 }

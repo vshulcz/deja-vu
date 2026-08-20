@@ -25,8 +25,14 @@ type Snapshot struct {
 	Policy string `json:"policy,omitempty"`
 	// Terms are the query terms behind a déjà vu firing, kept so a wrong
 	// "you have been here" can be explained after the fact.
-	Terms  []string `json:"terms,omitempty"`
-	Digest string   `json:"digest"`
+	Terms []string `json:"terms,omitempty"`
+	// Into is the agent session this went to, as the harness names it. Without
+	// it the log says what was injected and never to whom, so the only way to
+	// tell whether a recall was used is the sentence the block asks the agent
+	// to say — measured on a real store, that sentence appears after 22 of 1218
+	// injections, which measures reporting rather than use.
+	Into   string `json:"into,omitempty"`
+	Digest string `json:"digest"`
 }
 
 const (
@@ -55,8 +61,14 @@ func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
 // It is the only signal deja has that the *user* came back, as opposed to an
 // agent pulling something, and it could not reach ranking at all.
 func RecordDigestTerms(indexDir, kind, digest string, sessions int, raw int64, terms []string, ids ...string) {
+	RecordDigestInto(indexDir, kind, digest, "", sessions, raw, terms, ids...)
+}
+
+// RecordDigestInto is RecordDigestTerms knowing which agent session received
+// the injection, so a later reading of the store can ask whether it was used.
+func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int64, terms []string, ids ...string) {
 	RecordServedSessions(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids)
-	snapshotWriteTerms(indexDir, kind, digest, sessions, "", terms)
+	snapshotWriteInto(indexDir, kind, digest, into, sessions, "", terms)
 }
 
 // RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
@@ -82,6 +94,10 @@ func snapshotWrite(indexDir, kind, digest string, sessions int, policyName strin
 }
 
 func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName string, terms []string) {
+	snapshotWriteInto(indexDir, kind, digest, "", sessions, policyName, terms)
+}
+
+func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
 	if digest == "" {
 		return
 	}
@@ -95,7 +111,8 @@ func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName 
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions, Bytes: len(digest), Policy: policyName, Terms: terms, Digest: digest})
+	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
+		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
 	if err != nil {
 		return
 	}

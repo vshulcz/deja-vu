@@ -316,7 +316,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		}
 	}
 	out := frameRecall(body)
-	usage.RecordDigestTerms(dir, usage.KindDejaVu, out, len(ss), rawSize(ss), terms, sessionIDs(ss)...)
+	usage.RecordDigestInto(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+		terms, sessionIDs(ss)...)
 	if plain {
 		fmt.Fprintln(stdout, out)
 		return nil
