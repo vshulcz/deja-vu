@@ -507,7 +507,7 @@ var decisionMarkers = []string{
 	// Half the sessions on a real store are in Russian, and a list of English
 	// phrases reads every line of them as a passing mention. These are the
 	// same shapes: what was concluded, what turned out, what got fixed.
-	"решили", "в итоге", "оказалось", "причина", "выяснилось", "вывод",
+	"решили", "в итоге", "оказалось", "причина", "выяснилось", "вывод:", "мой вывод",
 	"выбрали", "остановились", "исправил", "починил", "заработало",
 	"не будем", "убрали", "переделали", "смержил", "выкатили",
 	// Mirrors of entries already in the English half: "works now", "passes
