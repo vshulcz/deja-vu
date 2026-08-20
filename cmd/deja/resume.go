@@ -140,6 +140,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "goose session --resume --session-id " + s.ID, nil
 	case "pi":
 		return piProjectDirFor(s), "pi --session " + s.ID, nil
+	case "omp":
+		return "", "omp --resume " + s.ID, nil
 	case "copilot":
 		return "", "copilot --resume=" + s.ID, nil
 	default:

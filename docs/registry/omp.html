@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where omp (Oh My Pi) stores its history — session format</title>
+<meta name="description" content="Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/omp.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where omp (Oh My Pi) stores its history — session format">
+<meta property="og:description" content="Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/omp.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where omp (Oh My Pi) stores its history — session format">
+<meta name="twitter:description" content="Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"omp (Oh My Pi)","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/omp.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/omp.html","name":"omp (Oh My Pi)","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="omp.html" aria-current="page">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>omp (Oh My Pi)</h1>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Value</th></tr>
+<tr><td><strong>Format</strong></td><td>JSONL transcript</td></tr>
+<tr><td><strong>Default store path</strong></td><td><code>~/.omp/agent/sessions/&lt;encoded-project&gt;/&lt;ISO-timestamp&gt;_&lt;uuid&gt;.jsonl</code></td></tr>
+<tr><td><strong>Env override</strong></td><td><code>DEJA_OMP_ROOT</code></td></tr>
+<tr><td><strong>deja parser</strong></td><td><code>internal/sources/omp.go</code></td></tr>
+<tr><td><strong>Last verified</strong></td><td>2026-08-20</td></tr>
+</table></div>
+<h2 id="discovery">Discovery</h2>
+<p>omp (Oh My Pi, <code>github.com/can1357/oh-my-pi</code>) stores session transcripts under</p>
+<p><code>~/.omp/agent/sessions/</code>. Each project directory uses Claude Code&#39;s single-dash</p>
+<p>path encoding, e.g. <code>-Code-pleasure-course</code> for <code>/Users/halo/Code/pleasure-course</code>.</p>
+<p>Within each project directory, session files are named</p>
+<p><code>&lt;ISO-timestamp&gt;_&lt;uuid&gt;.jsonl</code>.</p>
+<h2 id="file-layout">File layout</h2>
+<p>Each <code>.jsonl</code> file is a single session. The first line is a session header:</p>
+<pre><code class="language-json">{&#34;type&#34;:&#34;session&#34;,&#34;version&#34;:3,&#34;id&#34;:&#34;&lt;uuid&gt;&#34;,&#34;timestamp&#34;:&#34;&lt;ISO-8601&gt;&#34;,&#34;cwd&#34;:&#34;&lt;absolute-path&gt;&#34;,&#34;title&#34;:&#34;...&#34;}</code></pre>
+<p>Subsequent lines are typed events:</p>
+<div class="tablewrap"><table>
+<tr><th><code>type</code></th><th>Description</th></tr>
+<tr><td><code>session</code></td><td>Session header (first line only)</td></tr>
+<tr><td><code>title</code> / <code>title_change</code></td><td>Title metadata</td></tr>
+<tr><td><code>model_change</code></td><td>Model/provider switch</td></tr>
+<tr><td><code>thinking_level_change</code></td><td>Thinking level adjustment</td></tr>
+<tr><td><code>message</code></td><td>User prompt, assistant response, or tool result</td></tr>
+<tr><td><code>custom</code></td><td>Tool execution lifecycle events (skipped)</td></tr>
+</table></div>
+<h2 id="message-records">Message records</h2>
+<p>Messages use a wrapper envelope:</p>
+<pre><code class="language-json">{
+  &#34;type&#34;: &#34;message&#34;,
+  &#34;id&#34;: &#34;&lt;hex&gt;&#34;,
+  &#34;parentId&#34;: &#34;&lt;hex-or-null&gt;&#34;,
+  &#34;timestamp&#34;: &#34;&lt;ISO-8601&gt;&#34;,
+  &#34;message&#34;: {
+    &#34;role&#34;: &#34;user|assistant|toolResult|developer&#34;,
+    &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: &#34;...&#34;}],
+    &#34;timestamp&#34;: 1786964225859
+  }
+}</code></pre>
+<h3 id="roles">Roles</h3>
+<div class="tablewrap"><table>
+<tr><th><code>message.role</code></th><th>deja maps to</th></tr>
+<tr><td><code>user</code></td><td><code>user</code></td></tr>
+<tr><td><code>assistant</code></td><td><code>assistant</code></td></tr>
+<tr><td><code>toolResult</code></td><td>tool output (<code>RoleToolOutput</code>)</td></tr>
+<tr><td><code>developer</code></td><td>skipped</td></tr>
+</table></div>
+<h3 id="content">Content</h3>
+<p><code>message.content</code> is an array of typed blocks. deja extracts <code>text</code> from blocks</p>
+<p>where <code>&#34;type&#34;: &#34;text&#34;</code>. Blocks with <code>&#34;type&#34;: &#34;thinking&#34;</code>, <code>&#34;type&#34;: &#34;toolCall&#34;</code>,</p>
+<p>or <code>&#34;type&#34;: &#34;image&#34;</code> are skipped.</p>
+<h3 id="timestamps">Timestamps</h3>
+<p>Both ISO-8601 strings (<code>&#34;timestamp&#34;</code> in the envelope) and Unix milliseconds</p>
+<p>(<code>&#34;timestamp&#34;</code> inside <code>message</code>) are observed. The parser uses the envelope</p>
+<p>timestamp.</p>
+<h2 id="session-identity">Session identity</h2>
+<p>The <code>id</code> field from the session header line is used as the session ID. The UUID</p>
+<p>also appears in the filename.</p>
+<h2 id="project-attribution">Project attribution</h2>
+<p>omp&#39;s session header carries a real <code>cwd</code>, which is promoted to the project key</p>
+<p>(<code>useHeaderCwd=true</code> in the shared pi-lineage parser). This is more accurate</p>
+<p>than decoding the single-dash directory name, which drops the leading path</p>
+<p>segment (<code>-Code-pleasure-course</code> would otherwise decode to <code>pleasure/course</code>).</p>
+<h2 id="mcp">MCP</h2>
+<p>omp supports MCP via <code>~/.omp/agent/mcp.json</code> with the standard <code>mcpServers</code></p>
+<p>shape (schema <code>can1357/oh-my-pi/.../mcp-schema.json</code>). It also exposes an</p>
+<p>extension/hook API (<code>--hook</code>, <code>--extension</code>) and skills/rules discovery.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>Project directory encoding uses Claude Code&#39;s single <code>-</code> prefix (e.g.</li>
+</ul>
+<p><code>-Code-foo</code>) rather than pi&#39;s <code>--</code> prefix/suffix. The shared</p>
+<p><code>resolveEncodedPath</code> handles both, but omp relies on the header <code>cwd</code> instead.</p>
+<ul>
+<li><code>toolResult</code> messages carry a <code>toolCallId</code>/<code>toolName</code> and a <code>content</code> array of</li>
+</ul>
+<p><code>text</code> blocks; deja indexes the text as tool output.</p>
+<ul>
+<li>The <code>parentId</code> chain forms a tree, not a flat list; deja ignores the tree</li>
+</ul>
+<p>structure and processes messages in file order.</p>
+<p><strong>Last verified:</strong> 2026-08-20</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

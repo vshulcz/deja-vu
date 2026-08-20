@@ -37,7 +37,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"CURSOR_CONFIG_DIR", "DEJA_AIDER_ROOTS", "DEJA_ANTIGRAVITY_ROOT",
 		"DEJA_CLAUDE_ROOT", "DEJA_CODEX_ROOT", "DEJA_CURSOR_CLI_ROOT",
 		"DEJA_CURSOR_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GROK_ROOT", "DEJA_GOOSE_ROOT", "DEJA_GOOSE_DB",
-		"DEJA_PI_ROOT", "DEJA_QWEN_ROOT", "DEJA_KIMI_ROOT", "KIMI_CODE_HOME",
+		"DEJA_PI_ROOT", "DEJA_OMP_ROOT", "DEJA_QWEN_ROOT", "DEJA_KIMI_ROOT", "KIMI_CODE_HOME",
 		"DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "CLINE_DIR", "CLINE_DATA_DIR",
 		"CLINE_SESSION_DATA_DIR", "CLINE_MCP_SETTINGS_PATH", "DEJA_ROO_ROOTS",
 		"DEJA_OPENCLAW_ROOT", "OPENCLAW_STATE_DIR",
@@ -221,6 +221,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseQwenFile(path)
 	case "pi":
 		sessions, err = ParsePiFile(path)
+	case "omp":
+		sessions, err = ParseOmpFile(path)
 	case "openclaw":
 		sessions, err = ParseOpenClawFile(path)
 	case "copilot":

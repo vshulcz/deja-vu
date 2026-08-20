@@ -241,6 +241,8 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"aider", "--message", prompt}, true
 	case "pi":
 		return []string{"pi", prompt}, true
+	case "omp":
+		return []string{"omp", prompt}, true
 	case "grok":
 		return []string{"grok", prompt}, true
 	case "cursor":
@@ -273,5 +275,5 @@ var handoffAlias = map[string]string{"agy": "antigravity"}
 var handoffPasteOnly = map[string]bool{"openclaw": true, "hermes": true, "roo": true, "zed": true}
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "grok", "cline", "goose", "kimi"}
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "omp", "grok", "cline", "goose", "kimi"}
 }

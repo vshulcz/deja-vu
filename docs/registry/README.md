@@ -19,6 +19,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Goose](goose.md) | legacy JSONL and SQLite session store |
 | [Qwen Code](qwen.md) | JSONL transcript |
 | [pi](pi.md) | JSONL transcript |
+| [omp (Oh My Pi)](omp.md) | JSONL transcript |
 | [Cline](cline.md) | task JSON, two store generations |
 | [Kimi Code](kimi.md) | per-agent wire JSONL |
 | [OpenClaw](openclaw.md) | append-only pi-format JSONL |

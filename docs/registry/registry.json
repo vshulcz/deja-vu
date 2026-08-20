@@ -392,6 +392,45 @@
    }
   },
   {
+   "id": "omp",
+   "store_paths": [
+    "${DEJA_OMP_ROOT:-~/.omp/agent/sessions}/**/*.jsonl"
+   ],
+   "format_kind": "jsonl",
+   "fixture_paths": [
+    "fixtures/registry/omp/session.jsonl"
+   ],
+   "parser_source": "internal/sources/omp.go",
+   "last_verified": "2026-08-20",
+   "display_name": "omp (Oh My Pi)",
+   "capabilities": {
+    "mcp": true,
+    "auto": false,
+    "skill": false,
+    "command": false,
+    "resume": true,
+    "handoff": "exec",
+    "prereq": ""
+   },
+   "gaps": {
+    "auto": {
+     "state": "todo",
+     "why": "omp exposes a hook/extension API (--hook, --extension) and skills/rules discovery, so recall could be injected before a prompt, but deja writes no omp extension yet",
+     "source": "omp --help"
+    },
+    "skill": {
+     "state": "todo",
+     "why": "omp reads RULES.md and skills, so guidance has somewhere to live, but deja neither owns nor writes one for it yet",
+     "source": "~/.omp/agent/RULES.md"
+    },
+    "command": {
+     "state": "todo",
+     "why": "Follows the skill gap: deja writes no file for omp, so there is nothing for a command to be defined in",
+     "source": ""
+    }
+   }
+  },
+  {
    "id": "openclaw",
    "store_paths": [
     "${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl",

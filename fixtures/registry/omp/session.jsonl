@@ -1,0 +1,5 @@
+{"type":"session","version":3,"id":"reg-omp-001","timestamp":"2026-08-17T10:56:36.424Z","cwd":"/workspace/registry-demo","title":"registry conformance"}
+{"type":"model_change","id":"mc1","parentId":null,"timestamp":"2026-08-17T10:56:36.516Z","model":"ollama-cloud/deepseek-v4-pro:0813"}
+{"type":"thinking_level_change","id":"tl1","parentId":"mc1","timestamp":"2026-08-17T10:56:36.517Z","thinkingLevel":"high"}
+{"type":"message","id":"u1","parentId":"tl1","timestamp":"2026-08-17T10:57:05.912Z","message":{"role":"user","content":[{"type":"text","text":"registry conformance question"}],"timestamp":1786964225859}}
+{"type":"message","id":"a1","parentId":"u1","timestamp":"2026-08-17T10:57:12.306Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"reasoning"},{"type":"text","text":"registry conformance answer"}],"timestamp":1786964232306}}

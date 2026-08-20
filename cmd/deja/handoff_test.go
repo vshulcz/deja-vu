@@ -37,6 +37,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		"qwen":     {"qwen", "-i", "P"},
 		"aider":    {"aider", "--message", "P"},
 		"pi":       {"pi", "P"},
+		"omp":      {"omp", "P"},
 		"grok":     {"grok", "P"},
 		"cursor":   {"cursor-agent", "P"},
 		"copilot":  {"copilot", "-p", "P"},

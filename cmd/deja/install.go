@@ -464,6 +464,7 @@ func existingTargets() []string {
 		"cline":       sources.ClineConfigDir(),
 		"hermes":      sources.HermesHome(),
 		"pi":          sources.PiConfigDir(),
+		"omp":         sources.OmpConfigDir(),
 		"openclaw":    sources.OpenClawStateDir(),
 		// aider keeps no config directory: its history file is what says it
 		// has been used here. The binary alone would match every machine that
@@ -561,6 +562,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
 	case "pi-auto":
 		return installPiAuto(exe, uninstall)
+	case "omp":
+		return installMCPJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
 	case "openclaw-auto":
@@ -1509,6 +1512,7 @@ func installTargetNames() []string {
 		"kimi", "kimi-auto",
 		"hermes", "hermes-auto",
 		"pi", "pi-auto",
+		"omp",
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",

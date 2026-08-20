@@ -306,6 +306,15 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "omp", Load: LoadOmp, Files: OmpSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "omp",
+				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, OmpRoot()) },
+				Parse:     fullParse(ParseOmpFile),
+				ParseFrom: offsetParse(ParseOmpFileFromOffset),
+			}},
+		},
+		{
 			Name: "openclaw", Load: LoadOpenClaw, Files: OpenClawSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "openclaw",
