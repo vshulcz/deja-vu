@@ -846,6 +846,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"kimi", filepath.Join(sources.KimiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"cline", sources.ClineMCPSettingsPath(), doctorJSONWired("mcpServers")},
 		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
+		{"omp", filepath.Join(sources.OmpConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
 		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired},
 		{"copilot", guidancePath("copilot"), doctorFileWired},
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired},

@@ -122,6 +122,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "omp",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.omp/agent/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "openclaw",
       "state": "missing",
       "paths": [
@@ -224,6 +233,11 @@
       "name": "pi",
       "state": "config-missing",
       "path": "<tmp>/home/.pi/agent/mcp.json"
+    },
+    {
+      "name": "omp",
+      "state": "config-missing",
+      "path": "<tmp>/home/.omp/agent/mcp.json"
     },
     {
       "name": "openclaw",

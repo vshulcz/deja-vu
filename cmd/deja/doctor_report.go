@@ -256,6 +256,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles(), sources.ParseKimiFile},
 		{"goose", []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles(), parseDoctorGoose},
 		{"pi", []string{sources.PiRoot()}, sources.PiSessionFiles(), sources.ParsePiFile},
+		{"omp", []string{sources.OmpRoot()}, sources.OmpSessionFiles(), sources.ParseOmpFile},
 		{"openclaw", []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles(), sources.ParseOpenClawFile},
 		{"copilot", []string{sources.CopilotRoot()}, sources.CopilotSessionFiles(), sources.ParseCopilotFile},
 		// Both were listed by the text rows and by nothing else: absent here,
