@@ -353,6 +353,37 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// The same shape in English: a session says its subject three times in
+	// passing before it concludes anything. The decision arm was Russian only,
+	// so the English markers — the older half of the list — had nothing
+	// guarding them.
+	for i, d := range []promptTopic{
+		{"kingfisher", "kingfisher retries are capped at four", "what did we decide about kingfisher"},
+		{"saltmarsh", "saltmarsh writes go to the replica", "what did we decide about saltmarsh"},
+	} {
+		id := fmt.Sprintf("prompt-decen-%02d", i)
+		project := fmt.Sprintf("promptbenchdecen%02d", i)
+		t := base.Add(time.Duration(2900+i*10) * time.Minute)
+		msgs := make([]model.Message, 0, 4)
+		for k := 0; k < 3; k++ {
+			msgs = append(msgs, model.Message{
+				Role: "assistant",
+				Text: "will look at " + d.word + " later, not touching it yet",
+				Time: t.Add(time.Duration(k) * time.Minute),
+			})
+		}
+		msgs = append(msgs, model.Message{
+			Role: "assistant", Text: "the fix: " + d.fact, Time: t.Add(10 * time.Minute),
+		})
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "decision-en",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute), Messages: msgs,
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

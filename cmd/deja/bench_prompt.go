@@ -262,6 +262,14 @@ func measurePrompt(seed int64) (promptReport, error) {
 				arm.Correct++
 			}
 			continue
+		case "decision-en":
+			arm = &report.Decision
+			arm.Cases++
+			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
+				arm.Fired++
+				arm.Correct++
+			}
+			continue
 		case "decoy":
 			// Scored with the question's own terms, the way the hook builds the
 			// block. An earlier version of this arm rebuilt it from the topic
