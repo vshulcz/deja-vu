@@ -268,6 +268,15 @@ var cyrPromptStop = map[string]bool{
 	// for; it also sits in the decision markers, so keeping it made a line
 	// count as a conclusion because the asker had used the phrase.
 	"итоге": true, "итог": true, "конце": true, "концов": true,
+	// Imperatives that open a message and name nothing. Measured on a real
+	// store, "продолжай DDD-рефактор" matched a session on "продолжай" and
+	// showed "продолжай и не отключай больше streisand"; five messages of 142
+	// got a block whose only terms were words of this kind.
+	// Imperatives that open a message and name nothing. Measured on a real
+	// store, "продолжай DDD-рефактор" matched a session on "продолжай" and
+	// showed "продолжай и не отключай больше streisand"; five messages of 142
+	// got a block whose only terms were words of this kind.
+	"продолжай": true, "продолжи": true, "хорошо": true,
 	"для": true, "при": true, "над": true, "под": true, "без": true,
 	"она": true, "они": true, "оно": true, "был": true, "была": true,
 	"мне": true, "нам": true, "вам": true,
