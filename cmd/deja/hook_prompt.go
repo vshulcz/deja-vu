@@ -235,6 +235,21 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if len(ss) == 0 {
 		return nil
 	}
+	// Of the two candidates, lead with the one that settled something about the
+	// question rather than the one that merely mentioned it. The benchmark has
+	// been applying this since the arm was written — and saying so in a comment
+	// that claimed the hook did the same — while the hook did not, so the
+	// concluded_session arm scored a behaviour the product never had.
+	// Of the two candidates, lead with the one that settled something about the
+	// question rather than the one that merely mentioned it. The benchmark has
+	// been applying this since the arm was written — and saying so in a comment
+	// that claimed the hook did the same — while the hook did not, so the
+	// concluded_session arm scored a behaviour the product never had.
+	// Of the two candidates, lead with the one that settled something about the
+	// question rather than the one that merely mentioned it. The benchmark has
+	// been applying this since the arm was written — and saying so in a comment
+	// that claimed the hook did the same — while the hook did not.
+	ss = search.LeadWithConclusion(ss, terms)
 	// A rejected session is not an equal answer, and the mark has to travel
 	// with it into the block the agent reads (#761).
 	ss, rejectedWarning := orderForInjection(ss)
