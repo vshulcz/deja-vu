@@ -100,6 +100,15 @@ func TestInstallOpencodePlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(b)
+	// The session id has to travel with the per-prompt payload: recall skips
+	// what it already showed a session, and without an id there is nothing to
+	// skip by. Measured on a real store, half of all injections were a
+	// word-for-word repeat, nearly all within a minute of each other.
+	for _, want := range []string{"session_id", "input?.sessionID", "last?.info?.sessionID"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("opencode plugin does not pass %q, so recall cannot dedupe:\n%s", want, s)
+		}
+	}
 	for _, want := range []string{"experimental.chat.system.transform", "/opt/deja", "hook-context", "cache"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("plugin missing %q:\n%s", want, s)

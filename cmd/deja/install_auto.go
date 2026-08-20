@@ -210,7 +210,7 @@ export const DejaRecall = async ({ $, client }) => {
     // Per-prompt recall, the same relevance pass Claude Code gets on
     // UserPromptSubmit: the session digest is ranked by the project, this is
     // ranked by what the user just asked. Silent when nothing matches.
-    "experimental.chat.messages.transform": async (_input, output) => {
+    "experimental.chat.messages.transform": async (input, output) => {
       try {
         const msgs = output.messages || []
         let last
@@ -221,7 +221,12 @@ export const DejaRecall = async ({ $, client }) => {
         const parts = (last.parts || []).filter((p) => p?.type === "text" && p.text)
         const prompt = parts.map((p) => p.text).join("\n").trim()
         if (!prompt) return
-        const raw = await $%secho ${JSON.stringify({ prompt })} | %s%q hook-prompt%s.text()
+        // The session id travels with the payload so recall can skip what it
+        // already showed this session. Without it every message re-injects the
+        // same block: measured on a real store, half of all injections were a
+        // word-for-word repeat, and all but five of those came within a minute.
+        const sessionID = input?.sessionID || last?.info?.sessionID || ""
+        const raw = await $%secho ${JSON.stringify({ prompt, session_id: sessionID })} | %s%q hook-prompt%s.text()
         if (!raw.trim()) return
         const extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext
         if (!extra) return
