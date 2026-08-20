@@ -315,9 +315,14 @@ func measurePrompt(seed int64) (promptReport, error) {
 		case "short-subject":
 			arm = &report.ShortSubject
 			arm.Cases++
-			if fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms); fired {
+			// Through the hook, not the copy of its loop above: measured by
+			// asking both about every chain in the corpus, this is the one arm
+			// of seven where they disagree — "как там pr, смержился?" scored
+			// correct here while the hook answered nothing.
+			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
+				"benchshort"); fired {
 				arm.Fired++
-				if correct {
+				if carries {
 					arm.Correct++
 				} else {
 					arm.FalseFires++
@@ -337,7 +342,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 		case "tool-only":
 			arm = &report.ToolOnly
 			arm.Cases++
-			if fired, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact,
+			if fired, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
 				"benchtoolonly"); fired {
 				arm.Fired++
 				arm.FalseFires++
@@ -350,7 +355,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 			arm.Cases++
 			// Asked from the session that holds the answer: recalling it to
 			// itself spends tokens to say what is already on screen.
-			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact,
+			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact, chain.Topic,
 				chain.ID+"-session"); fired && carries {
 				arm.Fired++
 				arm.FalseFires++
@@ -361,7 +366,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 		case "hook-e2e":
 			arm = &report.EndToEnd
 			arm.Cases++
-			fired, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact)
+			fired, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact, chain.Topic)
 			if fired {
 				arm.Fired++
 				if carries {
@@ -662,11 +667,11 @@ func blockOpensOnEcho(dir, project string, terms []string, question string) bool
 // hookEndToEnd runs the real hook over the bench index and reports whether it
 // spoke and whether what it showed carries the fact. The probe above copies the
 // hook's loop; this calls it.
-func hookEndToEnd(dir, project, question, fact string) (fired, carries bool) {
-	return hookEndToEndAs(dir, project, question, fact, "benche2e")
+func hookEndToEnd(dir, project, question, fact, topic string) (fired, carries bool) {
+	return hookEndToEndAs(dir, project, question, fact, topic, "benche2e")
 }
 
-func hookEndToEndAs(dir, project, question, fact, sid string) (fired, carries bool) {
+func hookEndToEndAs(dir, project, question, fact, topic, sid string) (fired, carries bool) {
 	for _, suf := range []string{".hookseen", ".dejavu", ".envblock", ".injections.jsonl", ".usage.jsonl"} {
 		_ = os.Remove(dir + suf)
 	}
@@ -685,8 +690,14 @@ func hookEndToEndAs(dir, project, question, fact, sid string) (fired, carries bo
 	if !strings.Contains(got, "deja-recall") {
 		return false, false
 	}
+	// Seven runes was a guard against matching the subject itself, which every
+	// block says. It also made a fact of ordinary short words unmatchable: "the
+	// pr went in after the flake was fixed" has no word that long, so the arm
+	// scored a false fire no product change could ever fix. Skip the short
+	// words and the subject instead of the short words alone.
 	for _, w := range strings.Fields(fact) {
-		if len([]rune(w)) < 7 {
+		w = strings.Trim(w, ".,:;!?()\"'\u00ab\u00bb")
+		if len([]rune(w)) < 5 || strings.EqualFold(w, topic) {
 			continue
 		}
 		if strings.Contains(strings.ToLower(got), strings.ToLower(w)) {
