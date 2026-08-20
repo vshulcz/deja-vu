@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -154,9 +156,22 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// writing, are discarded a few lines below on their id alone. Handing them
 	// to the ranking means they are never read: on a real store that is 15 of
 	// 26 candidates, each read from disk in full before being dropped.
+	// What this agent session was already shown, by the text of the block
+	// rather than by the session it came from. Banning the session banned
+	// everything else it holds: measured on a real store, walking one working
+	// session of eighty messages, the second half got three blocks where the
+	// same messages without the ban got thirty-eight, and only seven of those
+	// were word-for-word repeats. The same past session answers many questions
+	// in a day, and after the first answer it went silent.
 	seen := alreadyInjected(dir, input.SessionID)
-	skip := make(map[string]bool, len(seen)+1)
-	for id := range seen {
+	// A session shown a moment ago is skipped before it is read — that is what
+	// keeps an answering call from reading every candidate off disk. A session
+	// shown an hour ago is fair game again: the same past work answers many
+	// questions in a day, and what stops it repeating itself is the block
+	// fingerprint below, not a ban on where it came from.
+	recent := recentlyInjected(dir, input.SessionID, injectionCooldown)
+	skip := make(map[string]bool, len(recent)+1)
+	for id := range recent {
 		skip[id] = true
 	}
 	if input.SessionID != "" {
@@ -244,9 +259,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			// than the one asked.
 			continue
 		}
-		if seen[s.ID] {
-			continue
-		}
+
 		// A marathon session that touched everything matches everything, so
 		// it used to be skipped whole. But the sessions people ask about are
 		// exactly the long ones — measured here, only 2% of sessions cross
@@ -285,7 +298,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// A rejected session is not an equal answer, and the mark has to travel
 	// with it into the block the agent reads (#761).
 	ss, rejectedWarning := orderForInjection(ss)
-	rememberInjected(dir, input.SessionID, ss)
+
 	// "You have been here" on the strength of one word teaches the user to
 	// ignore the line. The recall itself still goes in.
 	showLine := confident && dejaVuLineDue(dir, input.SessionID)
@@ -315,7 +328,15 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			body += "\n" + nudge
 		}
 	}
+	// The same block twice is wallpaper, and the reader stops looking. Judged
+	// on what would be shown, so a session whose other lines answer the next
+	// question still gets to answer it.
+	if seen[blockFingerprint(body)] {
+		return emitNudgeOnly(stdout, plain, nudge)
+	}
 	out := frameRecall(body)
+	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
+	rememberInjected(dir, input.SessionID, ss)
 	usage.RecordDigestInto(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
 		terms, sessionIDs(ss)...)
 	if plain {
@@ -492,10 +513,52 @@ func alreadyInjected(dir, sid string) map[string]bool {
 		return out
 	}
 	for _, line := range strings.Split(string(b), "\n") {
+		// Two fields when the entry is a block fingerprint, three when it is a
+		// session with the time it was shown.
 		parts := strings.Fields(line)
-		if len(parts) == 2 && parts[0] == sid {
+		if len(parts) >= 2 && parts[0] == sid {
 			out[parts[1]] = true
 		}
+	}
+	return out
+}
+
+// blockFingerprint identifies what a block says, so the same words are not
+// shown to the same agent session twice while the session they came from stays
+// available for what else it holds.
+func blockFingerprint(body string) string {
+	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(body), " ")))
+	return hex.EncodeToString(sum[:8])
+}
+
+// injectionCooldown is how many later injections a session sits out after
+// being shown. Counted in injections rather than minutes because that is what
+// the reader experiences: a run of messages about one thing should not keep
+// re-reading the same session, and a day that comes back to it should get it
+// again. Ten is the length of a short stretch of work.
+const injectionCooldown = 10
+
+// recentlyInjected is alreadyInjected narrowed to the last few things this
+// agent session was shown.
+func recentlyInjected(dir, sid string, window int) map[string]bool {
+	out := map[string]bool{}
+	if sid == "" || window <= 0 {
+		return out
+	}
+	b, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		return out
+	}
+	lines := strings.Split(string(b), "\n")
+	// Newest first: the window counts injections, and the file is append-only.
+	kept := 0
+	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
+		parts := strings.Fields(lines[i])
+		if len(parts) < 2 || parts[0] != sid {
+			continue
+		}
+		kept++
+		out[parts[1]] = true
 	}
 	return out
 }
@@ -518,8 +581,9 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 		return
 	}
 	defer f.Close()
+	stamp := time.Now().UTC().Format(time.RFC3339)
 	for _, s := range ss {
-		fmt.Fprintf(f, "%s %s\n", sid, s.ID)
+		fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
 	}
 }
 
