@@ -31,10 +31,17 @@ func TestAFocusedWinTakesABetterPlaceButPaysForIt(t *testing.T) {
 	if at < 0 {
 		t.Fatal("the session disappeared from the ranking")
 	}
-	// Its price puts it level with the session already holding that place, and a
-	// tie goes to the view that ranked the whole query — so it lands just behind.
-	if at != focusPrice+1 {
-		t.Errorf("a session first on the focused view sits at %d, want %d: paid its price and no more", at, focusPrice+1)
+	// Under reciprocal rank fusion the two views trade places instead of one
+	// paying the other a fixed toll: first on the focused view is worth a lot,
+	// last on the whole query little, and the sum decides. What matters is not
+	// the exact place — that is the fusion constant's business — but that the
+	// session climbs out of the tail without taking the front.
+	if at == 0 {
+		t.Error("a session convincing on the rare word alone took the front")
+	}
+	if at >= len(out)/2 {
+		t.Errorf("a session first on the focused view sits at %d of %d: the "+
+			"focused view bought it nothing", at, len(out))
 	}
 }
 
@@ -69,5 +76,30 @@ func TestAgreementLeavesTheOrderAlone(t *testing.T) {
 		if r.meta.ID != ranked[i].meta.ID {
 			t.Fatalf("agreeing views still reordered the ranking at %d: %q, want %q", i, r.meta.ID, ranked[i].meta.ID)
 		}
+	}
+}
+
+// The fusion constant damps how much one top place is worth. Summing 1/rank
+// rather than 1/(k+rank) lets a single first place outweigh being second on
+// both views, which is the behaviour reciprocal rank fusion exists to avoid
+// (Cormack, Clarke & Buettcher, SIGIR 2009). Measured on a real store, dropping
+// the constant to zero puts the ranking back where it stood before the fusion.
+func TestFusionDampsASingleTopPlace(t *testing.T) {
+	ranked := make([]relevanceScored, 10)
+	// "a" leads the whole query and is last on the rare part of it, and "i"
+	// leads the rare part while sitting ninth on the whole query. "b" is second
+	// on both. Second twice is the better bet, and only a damped sum says so:
+	// undamped, one first place carries either of the other two past it.
+	focus := []float64{1, 90, 80, 70, 60, 50, 40, 30, 100, 10}
+	for i := range ranked {
+		ranked[i] = relevanceScored{
+			meta:  SessionMeta{ID: string(rune('a' + i))},
+			score: float64(10 - i),
+			focus: focus[i],
+		}
+	}
+	if out := fuseFocus(ranked); out[0].meta.ID != "b" {
+		t.Errorf("front went to %q, want b: second on both views beats first on one",
+			out[0].meta.ID)
 	}
 }
