@@ -318,6 +318,19 @@ func measurePrompt(seed int64) (promptReport, error) {
 				arm.Correct++
 			}
 			continue
+		case "hook-e2e-self":
+			arm = &report.EndToEnd
+			arm.Cases++
+			// Asked from the session that holds the answer: recalling it to
+			// itself spends tokens to say what is already on screen.
+			if fired, carries := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact,
+				chain.ID+"-session"); fired && carries {
+				arm.Fired++
+				arm.FalseFires++
+			} else {
+				arm.Correct++
+			}
+			continue
 		case "hook-e2e":
 			arm = &report.EndToEnd
 			arm.Cases++
@@ -621,6 +634,10 @@ func blockOpensOnEcho(dir, project string, terms []string, question string) bool
 // spoke and whether what it showed carries the fact. The probe above copies the
 // hook's loop; this calls it.
 func hookEndToEnd(dir, project, question, fact string) (fired, carries bool) {
+	return hookEndToEndAs(dir, project, question, fact, "benche2e")
+}
+
+func hookEndToEndAs(dir, project, question, fact, sid string) (fired, carries bool) {
 	for _, suf := range []string{".hookseen", ".dejavu", ".envblock", ".injections.jsonl", ".usage.jsonl"} {
 		_ = os.Remove(dir + suf)
 	}
@@ -631,7 +648,7 @@ func hookEndToEnd(dir, project, question, fact string) (fired, carries bool) {
 	defer func() { _ = os.Setenv("CLAUDE_PROJECT_DIR", old) }()
 
 	var out bytes.Buffer
-	payload := fmt.Sprintf(`{"prompt":%q,"session_id":"benche2e"}`, question)
+	payload := fmt.Sprintf(`{"prompt":%q,"session_id":%q}`, question, sid)
 	if err := runHookPromptMode(dir, strings.NewReader(payload), &out, true); err != nil {
 		return false, false
 	}

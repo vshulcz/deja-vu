@@ -482,6 +482,28 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// Asked from inside the session that holds the answer: the hook must not
+	// recall a session to itself, and with two cases the end-to-end arm could
+	// not see that rule at all.
+	for i, d := range []promptTopic{
+		{"whimbrel", "the fix: whimbrel retries are capped at four", "what did we decide about whimbrel"},
+	} {
+		id := fmt.Sprintf("prompt-e2eself-%02d", i)
+		project := fmt.Sprintf("promptbenche2eself%02d", i)
+		t := base.Add(time.Duration(3900+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "hook-e2e-self",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "смотрим " + d.word, Time: t},
+					{Role: "assistant", Text: d.fact, Time: t.Add(5 * time.Minute)},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"
