@@ -179,6 +179,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// says so and lets such a question through — but saying "you have been here"
 	// on one word teaches the reader to ignore the line, so that stays at two.
 	worthDigest := false
+	// The one word of the question that identifies something, kept apart for
+	// the test below: asking whether any term was spoken lets "показал" answer
+	// for "v11", and nearly every session says a word like that.
+	leadTerms := terms
+	if ordered := byIdentifying(terms, idfOf); len(ordered) > 0 {
+		leadTerms = ordered[:1]
+	}
 	pol := policy.Load()
 	for i, s := range ranked {
 		// Every other injection path asks the policy first; this one is a
@@ -227,6 +234,14 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// line. Measured on a 1149-session store, moving these two checks up
 		// takes the hook's median from 181 ms to 136 ms.
 		if s.ID == input.SessionID {
+			continue
+		}
+		if !search.SpeechCarriesAnyTerm(s, leadTerms) {
+			// The subject matched, but only where a tool printed it: a
+			// failing job line, a bumped dependency, a pinned action
+			// version. Nobody in that session said anything about it, and a
+			// block built from those lines answers a different question
+			// than the one asked.
 			continue
 		}
 		if seen[s.ID] {

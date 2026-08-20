@@ -571,6 +571,31 @@ func rankOfBestTerm(line string, terms []string) int {
 	return 0
 }
 
+// SpeechCarriesAnyTerm reports whether anyone in the session said one of these
+// words, as opposed to a tool printing it. A version label that appears only in
+// a failing job line, a dependency bump or a pinned action is in the session
+// and answers nothing about that version.
+//
+// Measured on a real store, of the eight questions the per-prompt hook answered
+// with unrelated work, six had every match in the session it showed under the
+// role tool-output — a temp path /var/folders/v3/, an npm notice, a line of
+// someone else's source. The role is already recorded, so this needs no guess
+// about what a line looks like.
+func SpeechCarriesAnyTerm(s model.Session, terms []string) bool {
+	if len(terms) == 0 {
+		return true
+	}
+	for _, m := range s.Messages {
+		if m.Role == roleToolOutput {
+			continue
+		}
+		if TextCarriesAnyTerm(m.Text, terms) {
+			return true
+		}
+	}
+	return false
+}
+
 // LeadWithConclusion puts a session that settled something about the query
 // first. Ranking counts how often and how rarely the query's words appear and
 // cannot see the difference between settling a question and discussing it: a

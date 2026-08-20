@@ -181,6 +181,10 @@ type promptReport struct {
 	// lives in the hook — the order of the gates, what the block opens with,
 	// whether a pointer goes out — moves no number here at all.
 	EndToEnd promptArmReport `json:"hook_end_to_end"`
+	// The tool-only arm: another session holds the subject, but every mention
+	// of it was printed by a tool. Nothing there answers the question, so
+	// correct means the hook stays silent.
+	ToolOnly promptArmReport `json:"tool_only"`
 	// The concluded arm: two sessions hold the subject, one only mentioned it
 	// and the other settled it. Correct means the block carries what was
 	// settled.
@@ -318,6 +322,17 @@ func measurePrompt(seed int64) (promptReport, error) {
 				arm.Correct++
 			}
 			continue
+		case "tool-only":
+			arm = &report.ToolOnly
+			arm.Cases++
+			if fired, _ := hookEndToEndAs(indexDir, scope, chain.Question, chain.Fact,
+				"benchtoolonly"); fired {
+				arm.Fired++
+				arm.FalseFires++
+			} else {
+				arm.Correct++
+			}
+			continue
 		case "hook-e2e-self":
 			arm = &report.EndToEnd
 			arm.Cases++
@@ -439,6 +454,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Echo, nil)
 	finishPromptArm(&report.Compound, nil)
 	finishPromptArm(&report.EndToEnd, nil)
+	finishPromptArm(&report.ToolOnly, nil)
 	finishPromptArm(&report.AbsentSubject, nil)
 	return report, nil
 }

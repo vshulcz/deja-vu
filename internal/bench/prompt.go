@@ -504,6 +504,36 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// The subject appears in another session only in what a tool printed, and
+	// in the part of that output the index keeps: a failing job line, a
+	// dependency bump. Nobody there said anything about it, so the answer is
+	// silence. Measured on a real store, of the eight questions the hook still
+	// answers with unrelated work, six are exactly this shape — every match in
+	// the session it showed carried the role tool-output and no other.
+	for i, d := range []promptTopic{
+		{"v41", "[2026-08-16T20:43:05+0300] [MainThread] [W] [toil.leader] Job 'WDLStartJob' " +
+			"kind-WDLStartJob/instance-z1bqhro3 v41 is completely failed",
+			"ну что там v41 показал"},
+	} {
+		id := fmt.Sprintf("prompt-toolonly-%02d", i)
+		project := fmt.Sprintf("promptbenchtoolonly%02d", i)
+		t := base.Add(time.Duration(4300+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "tool-only",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "\u043f\u0440\u043e\u0433\u043e\u043d\u0438 \u043f\u0430\u0439\u043f\u043b\u0430\u0439\u043d \u0435\u0449\u0451 \u0440\u0430\u0437", Time: t},
+					{Role: "tool-output", Text: d.fact, Time: t.Add(time.Minute)},
+					{Role: "tool-output", Text: "error: bump github.com/pion/stun/" + d.word +
+						" from 3.1.1 to 3.1.5 failed", Time: t.Add(2 * time.Minute)},
+					{Role: "assistant", Text: "\u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u0442\u0438\u043b, \u0434\u0430\u043b\u044c\u0448\u0435 \u0441\u043c\u043e\u0442\u0440\u044e \u043b\u043e\u0433\u0438", Time: t.Add(5 * time.Minute)},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

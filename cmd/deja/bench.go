@@ -180,6 +180,44 @@ func containsRelevant(hits []search.Hit, ids []string, limit int) bool {
 	return false
 }
 
+// benchTranscriptLine writes one message the way the harness would have
+// recorded it.
+//
+// Tool output is not a role in a Claude transcript: it arrives as a user line
+// whose content is a tool_result block, and the reader labels it tool-output
+// on the way in. Writing the string "tool-output" into the type field instead
+// produced a line the reader skips entirely, so the corpus could hold no tool
+// output at all — a benchmark arm built on it was green because the message
+// was missing, not because the behaviour was right.
+func benchTranscriptLine(sid string, m model.Message) (string, error) {
+	type message struct {
+		Role    string `json:"role"`
+		Content any    `json:"content"`
+	}
+	line := struct {
+		Type    string  `json:"type"`
+		ID      string  `json:"sessionId"`
+		Time    string  `json:"timestamp"`
+		Message message `json:"message"`
+	}{Type: m.Role, ID: sid, Time: m.Time.UTC().Format(time.RFC3339),
+		Message: message{Role: m.Role, Content: m.Text}}
+	if m.Role == benchRoleToolOutput {
+		line.Type = "user"
+		line.Message = message{Role: "user", Content: []map[string]string{
+			{"type": "tool_result", "content": m.Text},
+		}}
+	}
+	b, err := json.Marshal(line)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// benchRoleToolOutput is the role a corpus chain uses to say "a tool printed
+// this". It mirrors sources.RoleToolOutput.
+const benchRoleToolOutput = "tool-output"
+
 func writeBenchCorpus(root string, sessions []model.Session) error {
 	for _, s := range sessions {
 		path := filepath.Join(root, s.Project, s.ID+".jsonl")
@@ -191,24 +229,12 @@ func writeBenchCorpus(root string, sessions []model.Session) error {
 			return err
 		}
 		for _, m := range s.Messages {
-			line := struct {
-				Type    string `json:"type"`
-				ID      string `json:"sessionId"`
-				Time    string `json:"timestamp"`
-				Message struct {
-					Role    string `json:"role"`
-					Content string `json:"content"`
-				} `json:"message"`
-			}{Type: m.Role, ID: s.ID, Time: m.Time.UTC().Format(time.RFC3339), Message: struct {
-				Role    string `json:"role"`
-				Content string `json:"content"`
-			}{Role: m.Role, Content: m.Text}}
-			b, marshalErr := json.Marshal(line)
+			b, marshalErr := benchTranscriptLine(s.ID, m)
 			if marshalErr != nil {
 				_ = f.Close()
 				return marshalErr
 			}
-			if _, writeErr := fmt.Fprintln(f, string(b)); writeErr != nil {
+			if _, writeErr := fmt.Fprintln(f, b); writeErr != nil {
 				_ = f.Close()
 				return writeErr
 			}
