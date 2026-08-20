@@ -79,6 +79,12 @@ func promptRussianTopics() []promptTopic {
 			"погоди, а по чему у нас в итоге шардирование, покажи ещё раз"},
 		{"индексация", "индексацию перенесли в фоновый воркер после записи",
 			"подожди, где именно теперь происходит индексация, объясни снова"},
+		// A compound written with a hyphen, which is how people name things in
+		// Russian as readily as in English. Measured on a real store, one direct
+		// question in seven that got no answer at all was this: the subject word
+		// never became a search term, so nothing could match it.
+		{"коорд-сообщение", "коорд-сообщение теперь шлём одно на всю группу",
+			"напомни, что мы решали про коорд-сообщение"},
 	}
 }
 

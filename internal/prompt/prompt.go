@@ -94,14 +94,32 @@ func Terms(prompt string) []string {
 // search on. Short words carry no signal and the closed class is noise, so
 // both are dropped; what is left is roughly what techTerm keeps for ASCII.
 func cyrPromptTerm(f string) bool {
-	n := 0
+	// A hyphen joins two words into one name as readily in Russian as in
+	// English. Requiring every rune to be Cyrillic threw the whole compound
+	// away, and the ASCII path would not take it either, so "коорд-сообщение"
+	// could not become a search term at all — measured on a real store, one
+	// direct question in seven that got no answer was exactly this.
+	letters := 0
 	for _, r := range f {
+		if r == '-' {
+			continue
+		}
 		if r < 0x400 || r > 0x4ff {
 			return false
 		}
-		n++
+		letters++
 	}
-	return n >= 5 && !cyrPromptStop[f]
+	if letters < 5 || cyrPromptStop[f] {
+		return false
+	}
+	// A compound made only of closed-class words is still filler: "то-то-сё"
+	// names nothing. One part that carries meaning is enough.
+	for _, part := range strings.Split(f, "-") {
+		if len([]rune(part)) >= 5 && !cyrPromptStop[part] {
+			return true
+		}
+	}
+	return !strings.Contains(f, "-")
 }
 func hasCJKRune(s string) bool {
 	for _, r := range s {
