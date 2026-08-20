@@ -3,6 +3,7 @@ package search
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -72,5 +73,60 @@ func TestTheReplySlotIgnoresAnEmptyMemoryAdmission(t *testing.T) {
 		if strings.Contains(strings.ToLower(ln), "don't have any previous") {
 			t.Errorf("the reply slot quoted an empty-memory admission: %q", ln)
 		}
+	}
+}
+
+// A harness check is a conversation with the tool, not about the work: one
+// message asks for an exact string back and the next repeats it. Such a session
+// has nothing to recall, so none of it is shown — measured on a real store, 4
+// blocks of 119 quoted one, and 11% of that store's sessions hold one, because
+// the tool is developed against it.
+func TestAHarnessCheckIsNotRecalledAtAll(t *testing.T) {
+	s := model.Session{
+		Harness: "claude", ID: "smoke", Project: "proj",
+		Updated: time.Now(),
+		Messages: []model.Message{
+			{Role: "user", Text: "Reply with exactly: openclaw deja harness live test alpha"},
+			{Role: "assistant", Text: "openclaw deja harness live test alpha"},
+		},
+	}
+	if got := autoRecallSessionForAsked(s, time.Now(), true, []string{"harness"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness"); got != "" {
+		t.Errorf("a harness check reached the block:\n%s", got)
+	}
+}
+
+// Work that merely mentions the harness is ordinary work and stays.
+func TestWorkAboutTheHarnessIsStillRecalled(t *testing.T) {
+	s := model.Session{
+		Harness: "claude", ID: "real", Project: "proj",
+		Updated: time.Now(),
+		Messages: []model.Message{
+			{Role: "user", Text: "\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness"},
+			{Role: "assistant", Text: "\u0432 \u0438\u0442\u043e\u0433\u0435 harness \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d \u0447\u0435\u0440\u0435\u0437 \u043f\u043b\u0430\u0433\u0438\u043d"},
+		},
+	}
+	got := autoRecallSessionForAsked(s, time.Now(), true, []string{"harness"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness")
+	if !strings.Contains(got, "\u043f\u043b\u0430\u0433\u0438\u043d") {
+		t.Errorf("ordinary work about the harness was dropped:\n%s", got)
+	}
+}
+
+// Each phrase carries its own weight: a check written as a search for the
+// fixture string, without the "reply with exactly" wording, is the shape the
+// live harness sweep actually leaves behind.
+func TestAHarnessCheckWrittenAsASearchIsIgnored(t *testing.T) {
+	s := model.Session{
+		Harness: "claude", ID: "smoke2", Project: "proj",
+		Updated: time.Now(),
+		Messages: []model.Message{
+			{Role: "user", Text: "search for openclaw deja harness live test alpha and name the harness"},
+			{Role: "assistant", Text: "openclaw"},
+		},
+	}
+	if got := autoRecallSessionForAsked(s, time.Now(), true, []string{"harness"},
+		"\u0447\u0442\u043e \u0442\u0430\u043c \u0441 harness"); got != "" {
+		t.Errorf("a harness check reached the block:\n%s", got)
 	}
 }

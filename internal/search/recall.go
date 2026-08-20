@@ -387,6 +387,11 @@ func autoRecallSessionFor(s model.Session, now time.Time, provenance bool, terms
 }
 
 func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, terms []string, asked string) string {
+	// A harness check has nothing to recall: it exists to prove the wiring
+	// works, and quoting it hands the reader a test fixture.
+	if isHarnessCheck(s) {
+		return ""
+	}
 	var problem string
 	var conclusions []string
 	matched := false
@@ -789,12 +794,40 @@ var emptyMemoryPhrases = []string{
 	"not granted",
 }
 
+// selfTestPhrases are the shape of a harness check: a message asking for an
+// exact string back, and the echo of it. They are conversations with the tool
+// rather than about the work, and quoting one tells the reader nothing.
+// Measured on a real store, 4 blocks of 119 quoted "Reply with exactly:
+// openclaw deja harness live test alpha" or its echo.
+var selfTestPhrases = []string{
+	"reply with exactly",
+	"ответь ровно",
+	"harness live test",
+	"smoke test alpha",
+}
+
 // saysItHasNoMemory reports whether a line is one of those admissions.
 func saysItHasNoMemory(line string) bool {
 	low := strings.ToLower(line)
 	for _, p := range emptyMemoryPhrases {
 		if strings.Contains(low, p) {
 			return true
+		}
+	}
+	return false
+}
+
+// isHarnessCheck reports whether a session is a conversation with the tool
+// rather than about the work: one message asks for an exact string back and the
+// next repeats it. Measured on a real store, 11% of sessions hold one, and 4
+// blocks of 119 quoted one back as if it were memory.
+func isHarnessCheck(s model.Session) bool {
+	for _, m := range s.Messages {
+		low := strings.ToLower(m.Text)
+		for _, p := range selfTestPhrases {
+			if strings.Contains(low, p) {
+				return true
+			}
 		}
 	}
 	return false
