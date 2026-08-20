@@ -80,6 +80,44 @@ func TestPromptBenchScoresAndReports(t *testing.T) {
 	if report.CorpusHash == "" {
 		t.Fatal("report carries no corpus hash, so results cannot be compared across runs")
 	}
+	// Every other arm was reported and nothing read it. Over one night three
+	// separate changes moved shown_line, haystack and russian_questions and the
+	// suite stayed green — the numbers only appeared in a PR description, where
+	// they are worth exactly as much as whoever remembered to look.
+	//
+	// Floors, not equalities: an arm that improves must not need this file
+	// edited, and the three arms that still read false fires are held at their
+	// current count so the known defects cannot quietly grow.
+	if report.Shown.Correct < report.Shown.Cases {
+		t.Fatalf("shown_line %d/%d: a block opened on a line carrying none of the question",
+			report.Shown.Correct, report.Shown.Cases)
+	}
+	if report.Haystack.Correct < 3 {
+		t.Fatalf("haystack %d/%d: a long session that mentions everything won again",
+			report.Haystack.Correct, report.Haystack.Cases)
+	}
+	if report.Russian.Correct < 3 {
+		t.Fatalf("russian_questions %d/%d", report.Russian.Correct, report.Russian.Cases)
+	}
+	if report.Marathon.Fired < 1 || report.Fresh.Fired < 1 {
+		t.Fatalf("marathon %d/%d, fresh %d/%d: a shape the gates turn away",
+			report.Marathon.Fired, report.Marathon.Cases, report.Fresh.Fired, report.Fresh.Cases)
+	}
+	// Known defects, held where they are. Each has its own entry in the loop
+	// journal and none has a fix that survived measurement on a real store.
+	for _, k := range []struct {
+		name string
+		arm  promptArmReport
+		max  int
+	}{
+		{"absent_subject", report.AbsentSubject, 3},
+		{"off_topic", report.OffTopic, 3},
+		{"bucket_scope", report.Bucket, 1},
+	} {
+		if k.arm.FalseFires > k.max {
+			t.Fatalf("%s false fires rose to %d of %d, was %d", k.name, k.arm.FalseFires, k.arm.Cases, k.max)
+		}
+	}
 }
 
 func TestRunBenchPromptWritesJSONAndText(t *testing.T) {
