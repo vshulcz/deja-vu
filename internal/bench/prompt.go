@@ -85,6 +85,12 @@ func promptRussianTopics() []promptTopic {
 		// never became a search term, so nothing could match it.
 		{"коорд-сообщение", "коорд-сообщение теперь шлём одно на всю группу",
 			"напомни, что мы решали про коорд-сообщение"},
+		// Four letters, which is where Russian keeps its short subjects — сеть,
+		// порт, диск, кеш. The floor for Cyrillic stands at five, so none of
+		// them can become a search term at all, the same way ttl and dns could
+		// not before the English floor was named rather than measured.
+		{"кеш", "кеш инвалидируем по версии схемы, а не по времени",
+			"напомни, что там было с кеш"},
 	}
 }
 
