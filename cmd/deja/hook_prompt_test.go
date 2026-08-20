@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/stats"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 func TestHookPromptInjectsOnRelevantHit(t *testing.T) {
@@ -519,5 +520,26 @@ func TestDejaVuLineDoesNotClaimAPeersWorkAsYours(t *testing.T) {
 	// The rest of the line — the topic and why it fired — is unchanged.
 	if !strings.Contains(got, "ticker window") || !strings.Contains(got, "via: ticker") {
 		t.Errorf("the line lost what it is for: %q", got)
+	}
+}
+
+// The headline names three of the query's terms as the reason. They have to be
+// terms the block underneath actually carries: measured on a real store, the
+// block opened on a line carrying a term the product used in 94 cases of 94,
+// while the three words named above it agreed only 71 times.
+func TestTheHeadlineNamesTermsTheBlockCarries(t *testing.T) {
+	block := "- User: the pgbouncer prepared statement failures came back\n"
+	terms := []string{"deploy", "reboot", "pgbouncer", "statement"}
+	got := viaTerms(block, terms)
+	if len(got) == 0 {
+		t.Fatal("no terms chosen")
+	}
+	if !search.TextCarriesTerm(block, got[0]) {
+		t.Fatalf("headline leads with %q, which the block does not carry", got[0])
+	}
+	// Terms the block does not carry still get named once the carried ones run
+	// out — the line says what the question was about, not only what matched.
+	if len(got) != 3 {
+		t.Fatalf("via = %v, want three terms", got)
 	}
 }

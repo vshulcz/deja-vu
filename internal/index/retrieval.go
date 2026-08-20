@@ -783,13 +783,26 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			missed bool
 		)
 		if len(orKeys) > 1 && !isCyrToken(term) {
-			// Fold stem forms in ONLY when the exact token is absent from
-			// the corpus: "camped" with no postings tries "camping", but an
-			// exact hit is never diluted by its variants. Russian inflects
-			// too heavily for that gate — a Cyrillic term keeps its whole
-			// form union, matching сеть against сетью and сети alike.
+			// Fold stem forms in ONLY when the exact token is absent from the
+			// sessions being ranked: "camped" with no postings tries "camping",
+			// but an exact hit is never diluted by its variants. Russian
+			// inflects too heavily for that gate — a Cyrillic term keeps its
+			// whole form union, matching сеть against сетью and сети alike.
+			//
+			// Absent from *these* sessions, not from the whole store. Asking
+			// the store meant that unrelated work decided it: with "write"
+			// somewhere in the index the fold switched off, and "how often do
+			// we write parquet?" stopped matching the session that says
+			// "parquet writes are batched per hour". Measured on the benchmark,
+			// that lost the haystack arm a case — a question missing the one
+			// session that answers it because of sessions in other projects.
 			if exact, err := br.postings(orKeys[0]); err == nil && len(exact) > 0 {
-				orKeys = orKeys[:1]
+				for _, pp := range exact {
+					if _, ok := inProject[pp.Sid]; ok {
+						orKeys = orKeys[:1]
+						break
+					}
+				}
 			}
 		}
 		if len(orKeys) > 1 {

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -247,7 +249,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = out
 	if showLine {
-		resp.SystemMessage = dejaVuLine(ss[0], terms...)
+		resp.SystemMessage = dejaVuLine(ss[0], viaTerms(out, terms)...)
 	}
 	if resp.SystemMessage == "" {
 		// No presentable topic — inject the context silently rather than
@@ -287,13 +289,48 @@ func promptTermsWorthAsking(terms []string) bool {
 // something that reads like a term of art — long, or shaped like a symbol.
 func hasIdentifierTerm(terms []string) bool {
 	for _, t := range terms {
-		if len(t) >= 6 {
+		// Letters, not bytes. Counting bytes read "omoda" as filler and every
+		// Cyrillic word of three letters as a term of art, because Cyrillic
+		// takes two bytes a letter. Measured on a real store: "напомни, что мы
+		// уже выясняли про can шину на omoda" reduces to one term, three
+		// sessions hold it, and nothing was recalled.
+		//
+		// Russian carries its meaning in shorter words — "сеть", "порт" name
+		// something the way a five-letter Latin word does — so the bar is one
+		// letter lower there.
+		n := utf8.RuneCountInString(t)
+		if (n >= 5 || (n >= 4 && hasCyrillic(t))) && !soleWorkingWord[t] {
 			return true
 		}
 		for _, r := range t {
 			if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// soleWorkingWord is the ordinary vocabulary a session is made of, long enough
+// to pass the letter bar and carrying nothing on its own. The list is consulted
+// only here, where the store has not been opened yet: keeping it shut for a
+// lone filler word is worth 62ms of the 67ms such a prompt would otherwise
+// cost, measured against a real index. Once the store is open the ranking
+// decides on evidence and no list is needed.
+var soleWorkingWord = map[string]bool{
+	"tests": true, "test": true, "retry": true, "build": true, "error": true,
+	"errors": true, "check": true, "checks": true, "files": true, "patch": true,
+	"trace": true, "output": true, "command": true, "branch": true, "suite": true,
+	"commit": true, "commits": true, "deploy": true, "fixes": true, "again": true,
+	"write": true, "wrote": true, "merge": true, "start": true, "print": true,
+	"there": true, "these": true, "those": true, "which": true, "where": true,
+}
+
+// hasCyrillic reports whether the term is written in Cyrillic.
+func hasCyrillic(t string) bool {
+	for _, r := range t {
+		if r >= 0x400 && r <= 0x4FF {
+			return true
 		}
 	}
 	return false
@@ -527,6 +564,38 @@ func recordDejaVuLine(path, sid string, now time.Time) bool {
 	return true
 }
 
+// viaTerms picks the three query terms the headline will name. Terms the block
+// underneath actually carries come first: the line is the reason given for the
+// recall, and naming words the reader cannot find below it reads as a misfire.
+// Measured on a real store, the block opened on a line carrying a term the
+// product used in 94 cases of 94, while the first three terms in extraction
+// order agreed with it in 71.
+func viaTerms(block string, terms []string) []string {
+	if len(terms) <= 3 {
+		return terms
+	}
+	out := make([]string, 0, 3)
+	for _, t := range terms {
+		if len(out) == 3 {
+			break
+		}
+		if search.TextCarriesTerm(block, t) {
+			out = append(out, t)
+		}
+	}
+	// Short of three, fill from the rest in the order they were asked, so the
+	// line still says what the question was about.
+	for _, t := range terms {
+		if len(out) == 3 {
+			break
+		}
+		if !slices.Contains(out, t) {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // dejaVuLine is the one visible line a déjà vu moment earns: which past
 // session answered, and how old it is.
 func dejaVuLine(s model.Session, terms ...string) string {
@@ -542,6 +611,8 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	// visible reason reads as noise the first time it misfires.
 	why := ""
 	if len(terms) > 0 {
+		// Callers pass terms already chosen by viaTerms; the cap stays here so
+		// a caller that has not is still held to three.
 		if len(terms) > 3 {
 			terms = terms[:3]
 		}

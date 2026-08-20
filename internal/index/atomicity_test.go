@@ -252,6 +252,47 @@ func TestProjectRelevantRanksByIDFNotFiller(t *testing.T) {
 	}
 }
 
+// Whether "write" also tries "writes" was decided by the whole store, so work
+// in an unrelated project could switch the fold off and leave a question
+// matching nothing in the project that answers it.
+func TestStemFoldIsDecidedByTheProjectNotTheStore(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	mk := func(project, id, text string) {
+		p := filepath.Join(claudeRoot, project)
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		line := `{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(p, id+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The session that answers says "writes"; the exact form the question uses
+	// exists only somewhere else entirely.
+	mk("-tmp-app", "answer", "parquet writes are batched per hour, not per row")
+	mk("-tmp-other", "elsewhere", "remember to write the changelog before tagging")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, matched, _, err := ProjectRelevant(dir, []string{"app"}, []string{"write", "parquet"}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) == 0 || got[0].ID != "answer" {
+		t.Fatalf("ranking = %v, want the session that says \"writes\"", got)
+	}
+	// Both query terms have to count. Asserting only the order passes whether
+	// or not the fold happened, because nothing else in this project holds
+	// "parquet" — the count is the fact being fixed.
+	if matched[0] != 2 {
+		t.Fatalf("matched = %d, want both terms: the fold was decided by another project's session", matched[0])
+	}
+}
+
 func TestProjectRelevantDottedTermNeedsAllSubTokens(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")

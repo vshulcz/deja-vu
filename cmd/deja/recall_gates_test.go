@@ -100,3 +100,22 @@ func TestPromptFillerIsDropped(t *testing.T) {
 		t.Fatal("filtering took the real terms with it")
 	}
 }
+
+// The single-term bar counted bytes, so it read a five-letter Latin word as
+// filler and any three-letter Cyrillic one as a term of art. Measured on a real
+// store: "напомни, что мы уже выясняли про can шину на omoda через adb"
+// reduces to one term, three sessions hold it, and the hook stayed quiet.
+func TestTheSingleTermBarCountsLettersNotBytes(t *testing.T) {
+	if !promptTermsWorthAsking([]string{"omoda"}) {
+		t.Fatal("a five-letter subject was refused before the store was opened")
+	}
+	if !promptTermsWorthAsking([]string{"сеть"}) {
+		t.Fatal("a four-letter Cyrillic subject was refused")
+	}
+	if promptTermsWorthAsking([]string{"тут"}) {
+		t.Fatal("a three-letter Cyrillic filler word opened the store on its own")
+	}
+	if promptTermsWorthAsking([]string{"code"}) {
+		t.Fatal("a four-letter ordinary word opened the store on its own")
+	}
+}
