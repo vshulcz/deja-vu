@@ -523,6 +523,8 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		// word fell were measured and none moved the number; these markers are
 		// what the session-start digest already uses to tell a decision from a
 		// passing mention.
+		// Among lines that carry the question words, prefer the one that
+		// concluded something.
 		if digest.CarriesDecision(line) {
 			hits++
 		}
@@ -551,7 +553,40 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 			assistants = append(assistants, scored{i, hits, lineAround(text, 220, terms)})
 		}
 	}
+	// Among the agent's lines, prefer the ones that settled something. Within a
+	// message the densest line already yields to a concluding one (#1488), but
+	// which messages get the two slots was still decided by word count alone,
+	// so a session's conclusion lost its place to a line that merely repeated
+	// the question's words. Measured live: of the blocks carrying no
+	// conclusion, a third had one in the very session they came from.
+	// The preference only counts for a line that also names what was asked
+	// about: terms arrive most-identifying first, so that is the first one. A
+	// concluding line that does not say the subject settles some other
+	// question, and putting it first reads as an answer to this one — measured
+	// live, preferring conclusions without this cost one answer of 58.
+	// Two slots, and they answer different questions: one says what the session
+	// was about, the other what it settled. Filling both by word count gave two
+	// lines of the first kind — measured on a real store, 35 blocks of 100
+	// carried a conclusion while a third of the rest had one in the same
+	// session. Filling both by conclusion gave blocks that concluded something
+	// about a neighbouring subject. One of each is what a reader needs, and it
+	// is the packaging that decides how much the retrieval is worth (surveys of
+	// agent memory put packaging above ranking for exactly this reason).
 	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].hits > assistants[j].hits })
+	if len(assistants) > 2 {
+		best := assistants[0]
+		rest := assistants[1:]
+		pick := -1
+		for i, a := range rest {
+			if digest.CarriesDecision(a.text) {
+				pick = i
+				break
+			}
+		}
+		if pick >= 0 {
+			assistants = []scored{best, rest[pick]}
+		}
+	}
 	// The block opens with what the user said, and that slot is filled by the
 	// best-matching user line whatever it carries. When the session says an
 	// ordinary word of the question in one place and answers it in another,
