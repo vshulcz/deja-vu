@@ -224,6 +224,42 @@ func TestHookPromptRequiresRealOverlap(t *testing.T) {
 	}
 }
 
+// A question whose whole subject is one rare word still gets the memory, not a
+// pointer to it. Withholding it turned the answer on whether some ordinary word
+// of the question happened to appear in that session too: measured on a real
+// store, "напомни, что мы решали про X" returned content 63% of the time and
+// "what did we decide about X" never — the same subject in the same session. On
+// a store without marathon sessions the crisper phrasing returned content in 0
+// of 78. The "you have been here" line stays at two terms, which is what the
+// test above guards.
+func TestOneRareWordStillGetsTheMemory(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-delta", "one.jsonl"), "one", []string{
+		`{"type":"user","sessionId":"one","timestamp":"` + old + `","message":{"role":"user","content":"the quetzalcoatl stampede was fixed by jittering the retry"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "delta")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	var out bytes.Buffer
+	in := strings.NewReader(`{"prompt":"quetzalcoatl"}`)
+	if err := runHookPrompt(index.DefaultDir(), in, &out); err != nil {
+		t.Fatal(err)
+	}
+	// A pointer names the topic in full, so checking for the words is not
+	// enough — the quoted transcript is what separates the memory from a
+	// pointer to it.
+	if !strings.Contains(out.String(), "- User:") {
+		t.Fatalf("one rare word earned a pointer instead of the memory:\n%s", out.String())
+	}
+}
+
 func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 	s := model.Session{
 		Harness: "codex", ID: "x", Project: "app",

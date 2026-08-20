@@ -156,6 +156,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	ss := make([]model.Session, 0, 2)
 	confident := false
+	// worthDigest is the payload decision, kept apart from the announcement.
+	// A word rare enough to identify something is a real match — the bar above
+	// says so and lets such a question through — but saying "you have been here"
+	// on one word teaches the reader to ignore the line, so that stays at two.
+	worthDigest := false
 	seen := alreadyInjected(dir, input.SessionID)
 	pol := policy.Load()
 	for i, s := range ranked {
@@ -176,8 +181,22 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if !recallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
+		// A word rare enough to identify something is a real match on its own —
+		// the bar just above says so in as many words, and lets such a question
+		// through. The payload rule did not: it asked only for two informative
+		// terms, so whether the reader got the memory or a pointer to it turned
+		// on whether some ordinary word of the question happened to also appear
+		// in that session.
+		//
+		// Measured on a real store over sixty subjects the project holds:
+		// "напомни, что мы решали про X" returned content 63% of the time and
+		// "what did we decide about X" returned it never — the same question,
+		// the same answer sitting in the same session.
 		if matched[i] >= 2 {
 			confident = true
+		}
+		if matched[i] >= 2 || strong[i] >= 1 {
+			worthDigest = true
 		}
 		// A marathon session that touched everything matches everything, so
 		// it used to be skipped whole. But the sessions people ask about are
@@ -223,7 +242,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// keeps it discoverable — the agent learns there is history here and can
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
 	var body string
-	if confident {
+	if worthDigest {
 		digest := search.AutoRecallDigestFor(ss, promptHookBudget-recallFrameOverhead, terms)
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
