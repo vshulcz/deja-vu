@@ -50,7 +50,7 @@ func BenchmarkRussianRelevance(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		if _, _, _, err := ProjectRelevant(dir, []string{"app"}, terms, 10); err != nil {
+		if _, _, _, _, err := ProjectRelevant(dir, []string{"app"}, terms, 10); err != nil {
 			b.Fatal(err)
 		}
 	}

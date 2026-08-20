@@ -24,7 +24,7 @@ func TestReadsDoNotBlockWhileTheIndexIsLocked(t *testing.T) {
 	go func() {
 		defer close(done)
 		_, _, _ = FindByPrefix(dir, "nothing")
-		_, _, _, _ = ProjectRelevant(dir, []string{"p"}, []string{"term"}, 3)
+		_, _, _, _, _ = ProjectRelevant(dir, []string{"p"}, []string{"term"}, 3)
 		_, _ = RecentProject(dir, "p", 3)
 		_, _, _ = FirstMatch(dir, []string{"term"}, 3)
 	}()

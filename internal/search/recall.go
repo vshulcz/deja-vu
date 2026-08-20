@@ -478,6 +478,12 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 		if hits == 0 {
 			continue
 		}
+		// Terms arrive most-identifying first when the caller knows the order,
+		// so a line carrying the word that identified the match beats one
+		// carrying an ordinary word the same session happens to use. Without
+		// this every query word weighs the same and "decide" wins on being
+		// said three times.
+		hits = hits*len(terms) + rankOfBestTerm(line, terms)
 		text := contextText(line, false)
 		if strings.TrimSpace(text) == "" {
 			continue
@@ -492,6 +498,16 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 		}
 	}
 	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].hits > assistants[j].hits })
+	// The block opens with what the user said, and that slot is filled by the
+	// best-matching user line whatever it carries. When the session says an
+	// ordinary word of the question in one place and answers it in another,
+	// that puts the ordinary line first: measured live, "what did we decide
+	// about mm_status" opened on "1. **Decide**: User settings or project
+	// settings?" while the answer sat two lines below. If a line the agent
+	// wrote is worth more, lead with that instead of framing it with this.
+	if len(assistants) > 0 && assistants[0].hits > bestUser.hits {
+		bestUser = scored{}
+	}
 	if len(assistants) > 2 {
 		assistants = assistants[:2]
 	}
@@ -503,6 +519,17 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 		out = append(out, a.text)
 	}
 	return bestUser.text, out
+}
+
+// rankOfBestTerm scores which of the query's terms a line carries, counting the
+// earliest in the slice — the most identifying one — for the most.
+func rankOfBestTerm(line string, terms []string) int {
+	for i, t := range terms {
+		if t != "" && TextCarriesTerm(line, t) {
+			return len(terms) - i
+		}
+	}
+	return 0
 }
 
 // densestLine returns the line of a message carrying the most query terms, and

@@ -150,7 +150,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND.
-	ranked, matched, strong, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates)
 	if err != nil || len(ranked) == 0 {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
@@ -243,7 +243,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
 	var body string
 	if worthDigest {
-		digest := search.AutoRecallDigestFor(ss, promptHookBudget-recallFrameOverhead, terms)
+		// Hand the digest the query's words most-identifying first. It has no
+		// way of its own to tell "mm_status" from "decide", and the session
+		// that answers often says both — measured live, ten of the answers
+		// this hook newly returns open on the ordinary word.
+		digest := search.AutoRecallDigestFor(ss, promptHookBudget-recallFrameOverhead, byIdentifying(terms, idfOf))
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
@@ -353,6 +357,18 @@ func hasCyrillic(t string) bool {
 		}
 	}
 	return false
+}
+
+// byIdentifying orders the query's terms by what the index says each is worth,
+// rarest first, so a caller choosing one line out of a session can prefer the
+// word that identified the match over the word that merely appeared in it.
+func byIdentifying(terms []string, idf map[string]float64) []string {
+	if len(idf) == 0 || len(terms) < 2 {
+		return terms
+	}
+	out := append([]string(nil), terms...)
+	sort.SliceStable(out, func(i, j int) bool { return idf[out[i]] > idf[out[j]] })
+	return out
 }
 
 // citationLine pre-writes the narration so the agent copies structure instead

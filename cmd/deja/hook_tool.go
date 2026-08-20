@@ -228,7 +228,7 @@ func commandDecisionLine(dir, cmd string) string {
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
-	ranked, matched, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
+	ranked, matched, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
 	if err != nil {
 		return ""
 	}

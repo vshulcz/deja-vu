@@ -205,7 +205,7 @@ func TestRussianRelevanceFoldsInflections(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Nominative singular in the prompt, instrumental plural in the session.
-	got, matched, _, err := ProjectRelevant(dir, []string{"app"}, []string{"миграция", "репликация"}, 3)
+	got, matched, _, _, err := ProjectRelevant(dir, []string{"app"}, []string{"миграция", "репликация"}, 3)
 	if err != nil {
 		t.Fatal(err)
 	}

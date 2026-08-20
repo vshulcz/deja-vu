@@ -90,7 +90,7 @@ func TestASyncedProjectIsInScopeUnderTheLocalName(t *testing.T) {
 // filter as search, so this checks it survives that too.
 func TestAutoRecallReachesSyncedWork(t *testing.T) {
 	dir := importedIndex(t)
-	ss, _, _, err := ProjectRelevant(dir, []string{"svc"}, []string{"ratelimiter", "smoothing", "window"}, 5)
+	ss, _, _, _, err := ProjectRelevant(dir, []string{"svc"}, []string{"ratelimiter", "smoothing", "window"}, 5)
 	if err != nil {
 		t.Fatal(err)
 	}

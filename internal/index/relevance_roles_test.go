@@ -86,7 +86,7 @@ func TestRelevanceHonoursTheRequestedRole(t *testing.T) {
 // context is pasting the wrong thing.
 func TestProjectRelevantDoesNotServeWorkRecords(t *testing.T) {
 	dir := rolesIndex(t)
-	ss, _, _, err := ProjectRelevant(dir, []string{"p"}, []string{"frobnicator", "values", "rollout"}, 5)
+	ss, _, _, _, err := ProjectRelevant(dir, []string{"p"}, []string{"frobnicator", "values", "rollout"}, 5)
 	if err != nil {
 		t.Fatal(err)
 	}

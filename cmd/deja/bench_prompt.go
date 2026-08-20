@@ -324,7 +324,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 // opening line came from the top of a long transcript does not, and that line
 // is the whole frame an agent reads before deciding to ignore the rest.
 func shownLineCarriesATerm(dir, project string, terms []string) bool {
-	ranked, matched, strong, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
@@ -362,10 +362,13 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 // and reports whether its first quoted line carries the subject rather than an
 // ordinary word the question shares with the same session.
 func firstShownLineCarries(dir, project string, terms []string, topic string) bool {
-	ranked, matched, strong, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return false
 	}
+	// Ordered the way the hook orders them, so the arm scores the block the
+	// product builds rather than one built from the raw query.
+	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
 		if !recallWorthShowing(terms, matched[i], strong[i]) {
@@ -396,7 +399,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, strong, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}

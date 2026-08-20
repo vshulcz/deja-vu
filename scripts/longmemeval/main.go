@@ -529,7 +529,7 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 		// identifier test and a six-term cap, so measuring the gate on
 		// relevance terms measured a rule that never runs.
 		terms := prompt.Terms(questions[i].Question)
-		_, matched, strong, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
+		_, matched, strong, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
 		if err != nil {
 			cleanup()
 			fatal(err)

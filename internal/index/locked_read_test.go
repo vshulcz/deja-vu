@@ -46,7 +46,7 @@ func TestReadsAnswerWhileTheIndexLockIsHeld(t *testing.T) {
 	var got int
 	go func() {
 		defer close(done)
-		sessions, _, _, rerr := ProjectRelevant(dir, []string{"app"},
+		sessions, _, _, _, rerr := ProjectRelevant(dir, []string{"app"},
 			[]string{"quetzalcoatl"}, 2)
 		if rerr != nil {
 			t.Errorf("read under the lock: %v", rerr)

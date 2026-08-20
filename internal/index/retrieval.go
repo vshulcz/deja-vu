@@ -525,7 +525,7 @@ const dejaVuStrongIDFFloor = 3.0
 // the prompt terms. matched reports, per returned session, how many distinct
 // INFORMATIVE terms hit (idf >= dejaVuIDFFloor) — callers gate on it so
 // generic words cannot manufacture a confident "you have been here".
-func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, []int, error) {
+func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Session, []int, []int, map[string]float64, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -534,35 +534,35 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 	// rebuild — which every user hits on an index-format upgrade.
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if ok {
 		defer unlock()
 	}
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	metas, matched, strong, rerr := relevantMetasMatched(dir, m, projects, terms, n)
+	metas, matched, strong, idf, rerr := relevantMetasMatched(dir, m, projects, terms, n)
 	if rerr != nil {
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
 		// stays quiet on an error.
-		return nil, nil, nil, rerr
+		return nil, nil, nil, nil, rerr
 	}
 	if len(metas) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	out, err := sessionsServable(dir, metas, query.Options{})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return out, matched, strong, nil
+	return out, matched, strong, idf, nil
 }
 
-func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, error) {
+func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int) ([]SessionMeta, []int, []int, map[string]float64, error) {
 	rank, err := relevantMetasCounts(dir, m, projects, terms, n, nil)
-	return rank.metas, rank.informative, rank.strong, err
+	return rank.metas, rank.informative, rank.strong, rank.idf, err
 }
 
 // relevanceRanking is what one ranking pass produced. It was seven return
