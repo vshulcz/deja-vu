@@ -642,13 +642,26 @@ func ConcludedAbout(s model.Session, terms []string) bool {
 // than where it opens.
 func densestLine(text string, terms []string) (string, int) {
 	best, bestHits := "", 0
+	// A line that settled something outranks a denser one that did not. The
+	// preference existed a step later, applied to whichever line this function
+	// had already picked, so a paragraph that names the subject twice while
+	// putting it off beat the sentence below it that answered. Measured on a
+	// real store, 35 of 119 blocks quoted a weaker line than the same session
+	// held; the mentions and the conclusion are usually in one message, which
+	// is the case the message-level preference cannot see.
+	bestDecides := false
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		if h := termHits(line, terms); h > bestHits {
-			best, bestHits = line, h
+		h := termHits(line, terms)
+		if h == 0 {
+			continue
+		}
+		decides := digest.CarriesDecision(line)
+		if best == "" || (decides && !bestDecides) || (decides == bestDecides && h > bestHits) {
+			best, bestHits, bestDecides = line, h, decides
 		}
 	}
 	if best == "" {

@@ -534,6 +534,36 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// The conclusion and the passing mentions sit in ONE message, which is how
+	// an agent actually writes: a paragraph that names the subject twice while
+	// putting it off, then the line that settles it. The line is picked by how
+	// many query words it holds and only then asked whether it concluded
+	// anything, so the denser mention wins and the answer is never quoted.
+	// Measured on a real store: 35 of 119 blocks quoted a weaker line than one
+	// the same session held.
+	for i, d := range []promptTopic{
+		{"dunlin", "the fix: dunlin retries are capped at four",
+			"what did we decide about dunlin"},
+	} {
+		id := fmt.Sprintf("prompt-decinline-%02d", i)
+		project := fmt.Sprintf("promptbenchdecinline%02d", i)
+		t := base.Add(time.Duration(4700+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "decision-inline",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "\u0447\u0442\u043e \u0441 " + d.word, Time: t},
+					{Role: "assistant", Time: t.Add(5 * time.Minute), Text: "" +
+						"looked at " + d.word + " and at the " + d.word + " retries, not touching either yet\n" +
+						"still reading the " + d.word + " docs, will decide about " + d.word + " later\n" +
+						d.fact},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

@@ -163,6 +163,10 @@ type promptReport struct {
 	// that tell one from the other are English, and half the sessions on a real
 	// store are not.
 	Decision promptArmReport `json:"decision_line"`
+	// The inline-decision arm: the passing mentions and the conclusion are in
+	// one message. Correct means the block quotes the conclusion rather than
+	// the denser line above it.
+	DecisionInline promptArmReport `json:"decision_inline"`
 	// The short-subject arm: the question names its subject in two characters,
 	// the way people name a version or a pull request. Nothing else in the
 	// question identifies anything, so dropping the subject leaves a working
@@ -286,6 +290,14 @@ func measurePrompt(seed int64) (promptReport, error) {
 			}
 		case "concluded":
 			arm = &report.Concluded
+			arm.Cases++
+			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
+				arm.Fired++
+				arm.Correct++
+			}
+			continue
+		case "decision-inline":
+			arm = &report.DecisionInline
 			arm.Cases++
 			if blockCarries(indexDir, scope, terms, chain.Fact, chain.Topic) {
 				arm.Fired++
@@ -449,6 +461,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Shown, nil)
 	finishPromptArm(&report.Decoy, nil)
 	finishPromptArm(&report.Decision, nil)
+	finishPromptArm(&report.DecisionInline, nil)
 	finishPromptArm(&report.Concluded, nil)
 	finishPromptArm(&report.ShortSubject, nil)
 	finishPromptArm(&report.Echo, nil)
