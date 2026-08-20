@@ -744,7 +744,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	}
 	br := newBucketReader(dir)
 	defer br.close()
-	totalDocs := float64(len(m.Sessions)) + 1
+	totalDocs := float64(countedDocs(m)) + 1
 	idfOf := map[string]float64{}
 	score := map[uint32]float64{}
 	// focus is the same scoring restricted to the words that distinguish. A
@@ -825,7 +825,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 		if len(orKeys) > 1 {
 			// OR path: union postings across the term's stem forms.
-			df := map[uint32]bool{}
+			df := map[uint32]map[int64]bool{}
 			hit = map[uint32]bool{}
 			tf = map[uint32]int{}
 			offs = map[uint32]map[int64]bool{}
@@ -838,7 +838,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 					continue
 				}
 				for _, pp := range posts {
-					df[pp.Sid] = true
+					noteDF(df, pp.Sid, pp.Off)
 					if _, ok := inProject[pp.Sid]; ok {
 						hit[pp.Sid] = true
 						tf[pp.Sid]++
@@ -854,7 +854,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			if len(hit) == 0 {
 				continue
 			}
-			minDF = len(df)
+			minDF = countDF(df)
 			termsKnown++
 			// fallthrough to idf/scoring below
 		} else {
@@ -869,12 +869,12 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				}
 				// Document frequency in sessions, not postings: one marathon
 				// session repeating a term 300 times must not make it common.
-				df := map[uint32]bool{}
+				df := map[uint32]map[int64]bool{}
 				keyHit := map[uint32]bool{}
 				keyTF := map[uint32]int{}
 				keyOffs := map[uint32]map[int64]bool{}
 				for _, pp := range posts {
-					df[pp.Sid] = true
+					noteDF(df, pp.Sid, pp.Off)
 					if _, ok := inProject[pp.Sid]; ok {
 						keyHit[pp.Sid] = true
 						keyTF[pp.Sid]++
@@ -902,8 +902,8 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				// sets the term's idf. A union would let a message containing
 				// only a common sub-token ("index" of "pkg/index") collect the
 				// full term mass, and best-message ranking amplifies that.
-				if minDF == -1 || len(df) < minDF {
-					minDF = len(df)
+				if minDF == -1 || countDF(df) < minDF {
+					minDF = countDF(df)
 					offs = keyOffs
 				}
 				if len(hit) == 0 {
@@ -2979,6 +2979,62 @@ func safe(s string) string {
 		}
 		return '_'
 	}, s)
+}
+
+// dfMessageCap is how much one session may contribute to a term's document
+// frequency. Counting whole sessions inverts the signal on a real store: eleven
+// sessions of twenty to sixty thousand messages hold 99% of everything ever
+// said, so a subject word living in sixteen of them scores 1.31 while "branch",
+// living in thirteen, scores 1.50 — the most specific word in the store ranks
+// as commoner than the most ordinary one. Counting every message instead brings
+// back the failure this deliberately avoids, where one marathon repeating a
+// word three hundred times makes it common.
+//
+// Capping the contribution keeps both. Measured on a real store, a cap of 25
+// reproduces what treating each 200-message episode as a document gives —
+// pgbouncer 3.40 against 3.37, singbox 4.17 against 4.70 — while working words
+// stay near 2: branch 2.18, suite 2.53, windows 2.15. The separation lands on
+// the strong floor that was already there.
+const dfMessageCap = 25
+
+// countedDocs is the corpus size in the unit noteDF counts: messages, with each
+// session contributing at most dfMessageCap of them. A manifest written before
+// message counts were kept degrades to one document per session, which is what
+// the ranking did before — the numbers stay consistent, they just stay coarse
+// until the index is next built.
+func countedDocs(m Manifest) int {
+	n := 0
+	for _, meta := range m.Sessions {
+		c := meta.Counted
+		if c <= 0 {
+			c = 1
+		}
+		n += min(c, dfMessageCap)
+	}
+	return n
+}
+
+// noteDF records that a term appeared in one more message of a session, up to
+// the cap.
+func noteDF(df map[uint32]map[int64]bool, sid uint32, off int64) {
+	seen := df[sid]
+	if seen == nil {
+		seen = map[int64]bool{}
+		df[sid] = seen
+	}
+	if len(seen) < dfMessageCap {
+		seen[off] = true
+	}
+}
+
+// countDF is the document frequency in the same unit the corpus size uses:
+// messages, with each session contributing at most dfMessageCap of them.
+func countDF(df map[uint32]map[int64]bool) int {
+	n := 0
+	for _, seen := range df {
+		n += len(seen)
+	}
+	return n
 }
 
 // stemMatchForms generates the same candidate surface forms stemMatches

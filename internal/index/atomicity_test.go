@@ -1,6 +1,7 @@
 package index
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -333,4 +334,63 @@ func TestProjectRelevantDottedTermNeedsAllSubTokens(t *testing.T) {
 	if !found {
 		t.Fatalf("full-address session missing: got=%v matched=%v", len(got), matched)
 	}
+}
+
+// A subject word said once in each of four sessions is rarer than a working
+// word said forty times in each of three. Counting whole sessions says the
+// opposite — measured on a real store, "pgbouncer" scored 1.31 and "branch"
+// 1.50, because eleven marathon sessions hold 99% of everything ever said and
+// every one of them mentions the ordinary word.
+func TestRarityCountsMessagesNotWholeSessions(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	write := func(id string, lines []string) {
+		p := filepath.Join(claudeRoot, "-tmp-app")
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		var b strings.Builder
+		for _, text := range lines {
+			b.WriteString(`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"` + text + `"}}` + "\n")
+		}
+		if err := os.WriteFile(filepath.Join(p, id+".jsonl"), []byte(b.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		write(fmt.Sprintf("subj%d", i), []string{"we put prepared statements behind pgbouncer today"})
+	}
+	for i := 0; i < 3; i++ {
+		var lines []string
+		for k := 0; k < 40; k++ {
+			lines = append(lines, fmt.Sprintf("pushed the branch again after fix %d", k))
+		}
+		write(fmt.Sprintf("work%d", i), lines)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	subj := termRarity(t, dir, "pgbouncer")
+	work := termRarity(t, dir, "branch")
+	if subj <= work {
+		t.Fatalf("pgbouncer scored %d, branch %d: the subject has to be the rarer of the two", subj, work)
+	}
+}
+
+// termRarity reports what the ranking thought one term was worth, scaled to an
+// integer so a comparison reads cleanly.
+func termRarity(t *testing.T, dir, term string) int {
+	t.Helper()
+	m, err := readManifestCached(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rank, err := relevantMetasCounts(dir, m, []string{"app"}, []string{term}, 8, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return int(rank.idf[term] * 1000)
 }
