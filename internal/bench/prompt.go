@@ -461,6 +461,27 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// Two chains for the end-to-end arm, which runs the hook itself.
+	for i, d := range []promptTopic{
+		{"ptarmigan", "the fix: ptarmigan retries are capped at four", "what did we decide about ptarmigan"},
+		{"godwit", "в итоге решили: godwit пишет только в реплику", "что мы решали про godwit"},
+	} {
+		id := fmt.Sprintf("prompt-e2e-%02d", i)
+		project := fmt.Sprintf("promptbenche2e%02d", i)
+		t := base.Add(time.Duration(3700+i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: project, Kind: "hook-e2e",
+			Topic: d.word, Question: d.question, Fact: d.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: project,
+				Started: t, Updated: t.Add(10 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "смотрим " + d.word, Time: t},
+					{Role: "assistant", Text: d.fact, Time: t.Add(5 * time.Minute)},
+				},
+			}},
+		})
+	}
 	// The decoy line. The session that answers also says an ordinary word the
 	// question happens to use, in a place that has nothing to do with the
 	// subject. Measured on a real store: "what did we decide about mm_status"

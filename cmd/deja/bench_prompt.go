@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -175,6 +176,11 @@ type promptReport struct {
 	// for a single Cyrillic word is three letters; a compound needed five in one
 	// part, so ordinary names fell through.
 	Compound promptArmReport `json:"compound_subject"`
+	// The end-to-end arm: the hook itself, not the copy of its loop this file
+	// carries. Every other arm reaches into the index directly, so a change that
+	// lives in the hook — the order of the gates, what the block opens with,
+	// whether a pointer goes out — moves no number here at all.
+	EndToEnd promptArmReport `json:"hook_end_to_end"`
 	// The concluded arm: two sessions hold the subject, one only mentioned it
 	// and the other settled it. Correct means the block carries what was
 	// settled.
@@ -312,6 +318,19 @@ func measurePrompt(seed int64) (promptReport, error) {
 				arm.Correct++
 			}
 			continue
+		case "hook-e2e":
+			arm = &report.EndToEnd
+			arm.Cases++
+			fired, carries := hookEndToEnd(indexDir, scope, chain.Question, chain.Fact)
+			if fired {
+				arm.Fired++
+				if carries {
+					arm.Correct++
+				} else {
+					arm.FalseFires++
+				}
+			}
+			continue
 		case "compound-subject":
 			arm = &report.Compound
 			arm.Cases++
@@ -406,6 +425,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.ShortSubject, nil)
 	finishPromptArm(&report.Echo, nil)
 	finishPromptArm(&report.Compound, nil)
+	finishPromptArm(&report.EndToEnd, nil)
 	finishPromptArm(&report.AbsentSubject, nil)
 	return report, nil
 }
@@ -595,4 +615,37 @@ func blockOpensOnEcho(dir, project string, terms []string, question string) bool
 		return strings.Contains(strings.ToLower(t), strings.ToLower(question))
 	}
 	return false
+}
+
+// hookEndToEnd runs the real hook over the bench index and reports whether it
+// spoke and whether what it showed carries the fact. The probe above copies the
+// hook's loop; this calls it.
+func hookEndToEnd(dir, project, question, fact string) (fired, carries bool) {
+	for _, suf := range []string{".hookseen", ".dejavu", ".envblock", ".injections.jsonl", ".usage.jsonl"} {
+		_ = os.Remove(dir + suf)
+	}
+	old := os.Getenv("CLAUDE_PROJECT_DIR")
+	if err := os.Setenv("CLAUDE_PROJECT_DIR", "/"+project); err != nil {
+		return false, false
+	}
+	defer func() { _ = os.Setenv("CLAUDE_PROJECT_DIR", old) }()
+
+	var out bytes.Buffer
+	payload := fmt.Sprintf(`{"prompt":%q,"session_id":"benche2e"}`, question)
+	if err := runHookPromptMode(dir, strings.NewReader(payload), &out, true); err != nil {
+		return false, false
+	}
+	got := out.String()
+	if !strings.Contains(got, "deja-recall") {
+		return false, false
+	}
+	for _, w := range strings.Fields(fact) {
+		if len([]rune(w)) < 7 {
+			continue
+		}
+		if strings.Contains(strings.ToLower(got), strings.ToLower(w)) {
+			return true, true
+		}
+	}
+	return true, false
 }
