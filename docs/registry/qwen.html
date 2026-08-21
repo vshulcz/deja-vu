@@ -43,6 +43,12 @@
 <p>Each line is a JSON object with <code>type</code>, <code>sessionId</code>, <code>timestamp</code>, and a <code>message</code> object. Message text is in <code>message.parts</code>; parts marked <code>thought: true</code> are reasoning and are excluded.</p>
 <pre><code class="language-json">{&#34;type&#34;:&#34;assistant&#34;,&#34;sessionId&#34;:&#34;session-7&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:01Z&#34;,&#34;message&#34;:{&#34;role&#34;:&#34;model&#34;,&#34;parts&#34;:[{&#34;text&#34;:&#34;The failing check is in parser.go.&#34;}]}}</code></pre>
 <p><code>message.role</code> <code>model</code> maps to <code>assistant</code> and <code>user</code> maps to <code>user</code>; when it is absent, the top-level <code>type</code> is used. Parts with text are joined with newlines. RFC 3339 and numeric Unix timestamps are accepted.</p>
+<h2 id="resume">Resume</h2>
+<p><code>qwen -r &lt;id&gt;</code> reopens a session by id, and the id is the chat file&#39;s name —</p>
+<p>the same one deja indexes. The command has to run in the project directory:</p>
+<p><code>qwen sessions list</code> shows only the current project&#39;s sessions, so from</p>
+<p>anywhere else the id resolves to nothing. deja recovers that directory from the</p>
+<p>encoded path and prints <code>cd &lt;project&gt; &amp;&amp; qwen -r &lt;id&gt;</code>.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>JSONL can end in a partial line while Qwen is writing. Malformed lines are skipped.</li>

@@ -119,6 +119,30 @@ func TestRunResumePrintAndErrors(t *testing.T) {
 	}
 }
 
+// qwen scopes `qwen sessions list` to the current project, so the id alone is
+// not enough: run the command anywhere else and it reopens nothing.
+func TestResumeQwenRunsInTheProjectDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "projects", "my-app")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
+	encoded := strings.ReplaceAll(real, string(filepath.Separator), "-")
+	path := filepath.Join(tmp, "qwen", "projects", encoded, "chats", "a2d5a292.jsonl")
+
+	dir, cmd, err := resumeCommand(model.Session{Harness: "qwen", ID: "a2d5a292", Project: "my-app", Path: path})
+	if err != nil {
+		t.Fatalf("qwen resume: %v", err)
+	}
+	if cmd != "qwen -r a2d5a292" {
+		t.Fatalf("cmd = %q", cmd)
+	}
+	if runtime.GOOS != "windows" && dir != real {
+		t.Fatalf("dir = %q, want the project directory %q", dir, real)
+	}
+}
+
 // Hermes was the one harness deja gave up on, while its own CLI takes the
 // exact session ID deja indexes.
 func TestResumeHermes(t *testing.T) {

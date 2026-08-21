@@ -16,6 +16,14 @@ Each line is a JSON object with `type`, `sessionId`, `timestamp`, and a `message
 
 `message.role` `model` maps to `assistant` and `user` maps to `user`; when it is absent, the top-level `type` is used. Parts with text are joined with newlines. RFC 3339 and numeric Unix timestamps are accepted.
 
+## Resume
+
+`qwen -r <id>` reopens a session by id, and the id is the chat file's name —
+the same one deja indexes. The command has to run in the project directory:
+`qwen sessions list` shows only the current project's sessions, so from
+anywhere else the id resolves to nothing. deja recovers that directory from the
+encoded path and prints `cd <project> && qwen -r <id>`.
+
 ## Known quirks and drift
 
 - JSONL can end in a partial line while Qwen is writing. Malformed lines are skipped.

@@ -22,6 +22,19 @@ func QwenSessionFiles() []string {
 
 func LoadQwen() []model.Session { return parseFiles(QwenSessionFiles(), ParseQwenFile) }
 
+// QwenProjectDirBase returns the encoded project dir name for a transcript
+// path, e.g. "-Users-x-projects-app" for
+// .../projects/-Users-x-projects-app/chats/s.jsonl. qwen resumes a session
+// only from the directory it belongs to.
+func QwenProjectDirBase(path string) string {
+	dir := projectDir(filepath.Join(QwenRoot(), "projects"), path)
+	base := filepath.Base(dir)
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		return ""
+	}
+	return base
+}
+
 func ParseQwenFile(path string) ([]model.Session, error) {
 	return parseQwenFileFromOffset(path, 0)
 }

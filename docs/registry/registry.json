@@ -334,17 +334,11 @@
     "auto": true,
     "skill": true,
     "command": true,
-    "resume": false,
+    "resume": true,
     "handoff": "exec",
     "prereq": ""
    },
-   "gaps": {
-    "resume": {
-     "state": "todo",
-     "why": "`-r, --resume` takes a session id and `-c, --continue` reopens the most recent one for the project, so the mechanism is there. Unbuilt rather than absent.",
-     "source": "qwen --help"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "kimi",

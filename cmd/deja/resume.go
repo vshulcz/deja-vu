@@ -131,7 +131,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "roo":
 		return "", "", fmt.Errorf("roo tasks reopen from the extension's history UI, not the terminal")
 	case "qwen":
-		return "", "", fmt.Errorf("qwen sessions reopen from inside the CLI: run qwen, then /chat resume")
+		return qwenProjectDirFor(s), "qwen -r " + s.ID, nil
 	case "openclaw":
 		return "", "", fmt.Errorf("openclaw keeps its own session continuity — message the same agent and it continues; see openclaw sessions")
 	case "kimi":
@@ -156,6 +156,20 @@ func claudeProjectDirFor(s model.Session) string {
 		return ""
 	}
 	base := sources.ClaudeProjectDirBase(s.Path)
+	if base == "" {
+		return ""
+	}
+	return sources.ResolveEncodedPath(base)
+}
+
+// qwenProjectDirFor recovers the original working directory from the
+// transcript location. qwen scopes its session list to the current project,
+// so `qwen -r <id>` finds nothing when run from anywhere else.
+func qwenProjectDirFor(s model.Session) string {
+	if s.Path == "" {
+		return ""
+	}
+	base := sources.QwenProjectDirBase(s.Path)
 	if base == "" {
 		return ""
 	}

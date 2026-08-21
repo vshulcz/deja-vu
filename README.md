@@ -238,7 +238,7 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 | Grok Build | ✅ | ✅ | ✅ | ✅ | ? | ✅ | sqlite3 (grok-dev store) |
 | Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 |
 | Goose | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | deja goose |
-| Qwen Code | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
+| Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
