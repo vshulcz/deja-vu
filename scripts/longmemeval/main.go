@@ -633,7 +633,7 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 func passHookGates(ranked []model.Session, matched, _ []int, terms []string) []model.Session {
 	kept := ranked[:0]
 	for i, s := range ranked {
-		if i < len(matched) && matched[i] < 2 && search.SessionIsAbout(s, terms) < 1 {
+		if i < len(matched) && !search.RecallWorthShowing(terms, matched[i]) {
 			continue
 		}
 		if !search.SpeechCarriesAnyTerm(s, terms) {
@@ -799,12 +799,11 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 		best, _ := bestSignals(matched, strong)
 		// The gate admits a single term when the session keeps returning to it,
 		// so this arm asks the same question the hook asks.
+		// The bar admits a single match when the question names something
+		// identifiable, which is what the hook asks here too.
 		about := 0
-		for _, cand := range ranked {
-			if search.SessionIsAbout(cand, terms) > 0 {
-				about = 1
-				break
-			}
+		if len(ranked) > 0 && search.RecallWorthShowing(terms, 1) {
+			about = 1
 		}
 		switch {
 		case best >= 2:

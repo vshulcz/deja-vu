@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"io"
 	"regexp"
 	"strconv"
@@ -278,7 +279,7 @@ func planSearchSteps(plan string) [][]string {
 			terms = terms[:planTermLimit]
 		}
 		need := 2
-		if hasIdentifierTerm(terms) {
+		if search.HasIdentifierTerm(terms) {
 			need = 1
 		}
 		if len(terms) < need {

@@ -11,20 +11,19 @@ func spoke(text string) model.Session {
 	return model.Session{Messages: []model.Message{{Role: "assistant", Text: text}}}
 }
 
-func TestPassHookGatesDropsWhatTheHookWouldNotInject(t *testing.T) {
+// The benchmark applies the product's bar rather than a copy of it: a question
+// naming something identifiable earns an injection on one match, a question
+// made of ordinary words needs two.
+func TestPassHookGatesAppliesTheProductBar(t *testing.T) {
 	terms := []string{"pgbouncer", "shard"}
-
-	// One mention of one term is a hint, not a subject.
-	weak := spoke("pgbouncer looks fine on the shard")
-	if got := passHookGates([]model.Session{weak}, []int{1}, nil, terms); len(got) != 0 {
-		t.Errorf("one ordinary mention is not enough to inject, kept %d", len(got))
+	if got := passHookGates([]model.Session{spoke("pgbouncer on the shard")},
+		[]int{1}, nil, terms); len(got) != 1 {
+		t.Errorf("a question naming pgbouncer earns an injection on one match, kept %d", len(got))
 	}
-
-	// A session that keeps returning to the term is admitted on that term alone,
-	// which is the rule the hook ships (#1515).
-	about := spoke(strings.Repeat("pgbouncer again ", 20))
-	if got := passHookGates([]model.Session{about}, []int{1}, nil, terms); len(got) != 1 {
-		t.Errorf("a session that repeats the term is about it, kept %d", len(got))
+	ordinary := []string{"build"}
+	if got := passHookGates([]model.Session{spoke("build for dinner")},
+		[]int{1}, nil, ordinary); len(got) != 0 {
+		t.Errorf("one ordinary word is not a subject on its own: kept %d", len(got))
 	}
 
 	// Matched only where a tool printed the word: nobody spoke about it.

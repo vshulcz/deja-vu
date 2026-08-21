@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/vshulcz/deja-vu/internal/prompt"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"strings"
 	"testing"
 
@@ -73,7 +74,7 @@ func TestFocusSessionFallsBackToTheDensestWindows(t *testing.T) {
 // and in a small corpus even "file" clears the informativeness bar — so a
 // single hit is only trusted when the question named something specific.
 func TestSingleTermNeedsAnIdentifier(t *testing.T) {
-	if hasIdentifierTerm([]string{"open", "file", "read"}) {
+	if search.HasIdentifierTerm([]string{"open", "file", "read"}) {
 		t.Fatal("everyday words accepted as an identifier")
 	}
 	for _, terms := range [][]string{
@@ -82,7 +83,7 @@ func TestSingleTermNeedsAnIdentifier(t *testing.T) {
 		{"error", "e404"},
 		{"npm_token", "rotate"},
 	} {
-		if !hasIdentifierTerm(terms) {
+		if !search.HasIdentifierTerm(terms) {
 			t.Fatalf("%v has no term specific enough?", terms)
 		}
 	}
