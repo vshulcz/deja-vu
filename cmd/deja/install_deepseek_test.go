@@ -78,6 +78,52 @@ func TestInstallDeepSeekWritesTheHomeLayer(t *testing.T) {
 	}
 }
 
+// dsh registers slash commands in code, so /deja is a plugin file the profile
+// row names by absolute path. Both the shape of that file and the order of the
+// two writes were learnt by running dsh: a row naming a missing file, a wrong
+// `inject` declaration, or `handle` where it wants `handler` each fail the
+// whole profile load rather than skipping the plugin.
+func TestInstallDeepSeekWritesTheCommandPlugin(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DSH_HOME", filepath.Join(home, ".dsh"))
+
+	if _, err := installDeepSeekMCP("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	plugin := filepath.Join(home, ".dsh", "plugins", "deja", "command.js")
+	body, err := os.ReadFile(plugin)
+	if err != nil {
+		t.Fatalf("no command plugin: %v", err)
+	}
+	js := string(body)
+	if !strings.Contains(js, "apply.inject") {
+		t.Errorf("the plugin declares no dependency, so ctx.commands is unreachable:\n%s", js)
+	}
+	if !strings.Contains(js, "async handler(") {
+		t.Errorf("the command has no handler field dsh accepts:\n%s", js)
+	}
+	if !strings.Contains(js, `name: "deja"`) {
+		t.Errorf("the command is not named deja:\n%s", js)
+	}
+
+	layer, err := os.ReadFile(filepath.Join(home, ".dsh", "cordis.patch.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(layer), plugin) {
+		t.Errorf("the layer does not name the plugin file:\n%s", layer)
+	}
+
+	if _, err := installDeepSeekMCP("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Dir(plugin)); !os.IsNotExist(err) {
+		t.Errorf("uninstall left the plugin behind: %v", err)
+	}
+}
+
 // Uninstalling on a machine that never had deja must not create the file.
 func TestUninstallDeepSeekWithoutALayerWritesNothing(t *testing.T) {
 	home := t.TempDir()

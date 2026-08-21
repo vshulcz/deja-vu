@@ -95,9 +95,20 @@
 <p>skill catalogue into the turn and reads that directory, so it needs no file of</p>
 <p>its own — checked by asking a running dsh to list its skills.</p>
 <ul>
-<li><strong>Command</strong>: still open. Slash commands are plugin rows rather than files in a</li>
+<li><strong>Command</strong>: <code>deja install deepseek</code> also writes a plugin at</li>
 </ul>
-<p>directory, so a <code>/deja</code> command means shipping a command plugin.</p>
+<p><code>$DSH_HOME/plugins/deja/command.js</code> and names it from the same layer, because</p>
+<p>dsh registers slash commands in code (<code>ctx.commands.register</code>) rather than</p>
+<p>from a directory of markdown. A profile row may name an absolute path, which</p>
+<p>is how deja ships one without publishing a package. Three details fail the</p>
+<p>whole profile load rather than skipping the plugin, and each was found by</p>
+<p>running it: the dependency is declared as <code>apply.inject</code>, the field is</p>
+<p><code>handler</code> and not <code>handle</code>, and a row naming a file that is not there yet</p>
+<p>takes the profile down — so the plugin is written before the layer and the</p>
+<p>layer is rewritten before the plugin is removed. The command plane itself is</p>
+<p>a UI service, so <code>/deja</code> lives in the web and tui profiles; a headless run has</p>
+<p>no command adapter, and what a headless boot proves is that the plugin</p>
+<p>registers cleanly.</p>
 <ul>
 <li><strong>Auto-recall</strong>: no hook found. The harness has a plugin runtime but nothing</li>
 </ul>

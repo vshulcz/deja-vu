@@ -529,7 +529,7 @@
     "mcp": true,
     "auto": false,
     "skill": true,
-    "command": false,
+    "command": true,
     "resume": false,
     "handoff": "paste",
     "prereq": "zstd"
@@ -539,11 +539,6 @@
      "state": "unknown",
      "why": "The harness fires events through its plugin runtime, but nothing published says which of them run before a prompt reaches the model, and a hook that fires after is too late to inject recall. Needs a read of the agent-loop plugin contract before it can be called work or a dead end.",
      "source": "dsh 0.1.1-rc.2"
-    },
-    "command": {
-     "state": "todo",
-     "why": "Slash commands are plugin rows in the composed profile rather than files in a directory deja can write, so a /deja command means shipping a command plugin — work, not an obstacle. MCP now goes in through the home patch layer, which is the same seam.",
-     "source": "dsh 0.1.1-rc.2, @deepseek-ai/dsh-commands"
     }
    }
   },

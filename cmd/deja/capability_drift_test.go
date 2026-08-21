@@ -124,6 +124,10 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
 		case "pi":
 			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
+		case "deepseek":
+			// dsh registers commands in code, so deja ships a plugin file the
+			// profile row names by path.
+			gotCommand = strings.Contains(dshCommandJS("/bin/deja"), "ctx.commands.register")
 		case "goose":
 			// Goose declares commands in config.yaml, not a commands directory.
 			gotCommand = strings.Contains(gooseRecipe("/bin/deja"), "title: deja")

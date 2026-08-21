@@ -45,8 +45,19 @@ harness falls back to the first prompt.
 - **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. dsh splices a
   skill catalogue into the turn and reads that directory, so it needs no file of
   its own — checked by asking a running dsh to list its skills.
-- **Command**: still open. Slash commands are plugin rows rather than files in a
-  directory, so a `/deja` command means shipping a command plugin.
+- **Command**: `deja install deepseek` also writes a plugin at
+  `$DSH_HOME/plugins/deja/command.js` and names it from the same layer, because
+  dsh registers slash commands in code (`ctx.commands.register`) rather than
+  from a directory of markdown. A profile row may name an absolute path, which
+  is how deja ships one without publishing a package. Three details fail the
+  whole profile load rather than skipping the plugin, and each was found by
+  running it: the dependency is declared as `apply.inject`, the field is
+  `handler` and not `handle`, and a row naming a file that is not there yet
+  takes the profile down — so the plugin is written before the layer and the
+  layer is rewritten before the plugin is removed. The command plane itself is
+  a UI service, so `/deja` lives in the web and tui profiles; a headless run has
+  no command adapter, and what a headless boot proves is that the plugin
+  registers cleanly.
 - **Auto-recall**: no hook found. The harness has a plugin runtime but nothing
   published says which event runs before a prompt reaches the model, and one
   firing after is too late to inject recall.
