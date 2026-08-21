@@ -527,20 +527,14 @@
    "display_name": "DeepSeek Harness",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "skill": true,
     "command": true,
     "resume": false,
     "handoff": "paste",
     "prereq": "zstd"
    },
-   "gaps": {
-    "auto": {
-     "state": "todo",
-     "why": "Work rather than a dead end, and no longer a guess: a session log carries `request/context` and `agent/inbox/spliced` before every model call, and the system-prompt plugin already splices its own sections into a turn, so a plugin can reach the context deja would inject into. What is missing is the contributor API those plugins use — deja loads a plugin from an absolute path today (that is how /deja ships), so the remaining work is the injection contract, not the seam.",
-     "source": "dsh 0.1.1-rc.2 session log; @deepseek-ai/dsh-system-prompt"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "zed",

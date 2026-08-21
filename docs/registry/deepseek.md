@@ -58,9 +58,17 @@ harness falls back to the first prompt.
   a UI service, so `/deja` lives in the web and tui profiles; a headless run has
   no command adapter, and what a headless boot proves is that the plugin
   registers cleanly.
-- **Auto-recall**: no hook found. The harness has a plugin runtime but nothing
-  published says which event runs before a prompt reaches the model, and one
-  firing after is too late to inject recall.
+- **Auto-recall**: `deja install deepseek-auto` writes a second plugin at
+  `$DSH_HOME/plugins/deja/auto.js`. It listens on `agent/pre-step`, the event
+  that carries the messages entering the step the agent is about to take, and
+  splices the recall block in front of the last user message. The handler is
+  middleware, so it calls `next()` first and returns that decision with the
+  longer message list — returning a bare `{messages}` ends the turn with
+  `Cannot read properties of undefined (reading 'kind')`. The plain
+  `deja install deepseek` target keeps the MCP server and `/deja` but writes no
+  such plugin, and removes it along with its row when someone drops back to it.
+  Verified against a local model with no tools in play: dsh answered a question
+  about a pool size that only the injected block carried.
 - **Resume**: the tui app takes `--resume <session>` (a flag of the booted app,
   not of the launcher — `dsh --profile headless --resume` is rejected). deja
   stores the session id the flag wants, so the mapping is direct.

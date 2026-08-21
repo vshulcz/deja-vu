@@ -110,10 +110,18 @@
 <p>no command adapter, and what a headless boot proves is that the plugin</p>
 <p>registers cleanly.</p>
 <ul>
-<li><strong>Auto-recall</strong>: no hook found. The harness has a plugin runtime but nothing</li>
+<li><strong>Auto-recall</strong>: <code>deja install deepseek-auto</code> writes a second plugin at</li>
 </ul>
-<p>published says which event runs before a prompt reaches the model, and one</p>
-<p>firing after is too late to inject recall.</p>
+<p><code>$DSH_HOME/plugins/deja/auto.js</code>. It listens on <code>agent/pre-step</code>, the event</p>
+<p>that carries the messages entering the step the agent is about to take, and</p>
+<p>splices the recall block in front of the last user message. The handler is</p>
+<p>middleware, so it calls <code>next()</code> first and returns that decision with the</p>
+<p>longer message list — returning a bare <code>{messages}</code> ends the turn with</p>
+<p><code>Cannot read properties of undefined (reading &#39;kind&#39;)</code>. The plain</p>
+<p><code>deja install deepseek</code> target keeps the MCP server and <code>/deja</code> but writes no</p>
+<p>such plugin, and removes it along with its row when someone drops back to it.</p>
+<p>Verified against a local model with no tools in play: dsh answered a question</p>
+<p>about a pool size that only the injected block carried.</p>
 <ul>
 <li><strong>Resume</strong>: the tui app takes <code>--resume &lt;session&gt;</code> (a flag of the booted app,</li>
 </ul>

@@ -569,6 +569,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installOmpAuto(exe, uninstall)
 	case "deepseek":
 		return installDeepSeekMCP(exe, uninstall)
+	case "deepseek-auto":
+		return installDeepSeekAuto(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
 	case "openclaw-auto":
@@ -1518,7 +1520,7 @@ func installTargetNames() []string {
 		"hermes", "hermes-auto",
 		"pi", "pi-auto",
 		"omp", "omp-auto",
-		"deepseek",
+		"deepseek", "deepseek-auto",
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",
