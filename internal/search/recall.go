@@ -780,13 +780,22 @@ func densestLine(text string, terms []string) (string, int) {
 	// answered next, the blocks carrying words that answer used from 26 to 27 of
 	// 100. Taking the line before it instead — the same added volume — drops
 	// them to 22, so this is the choice and not the length.
+	// Two lines, not one: an answer often takes a sentence to set up and a
+	// sentence to land. Replayed on a real store, blocks carrying words the
+	// answer later used went 27 to 28 of 100 for 11 tokens a message, while the
+	// equal-volume control — one line before the match and one after — falls to
+	// 25, so the gain is the direction and not the size.
+	took := 0
 	for _, next := range lines[bestAt+1:] {
 		next = strings.TrimSpace(next)
 		if next == "" {
 			continue
 		}
 		best += " " + next
-		break
+		took++
+		if took == 2 {
+			break
+		}
 	}
 	return best, bestHits
 }
