@@ -320,7 +320,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// way of its own to tell "mm_status" from "decide", and the session
 		// that answers often says both — measured live, ten of the answers
 		// this hook newly returns open on the ordinary word.
-		digest := search.AutoRecallDigestForAsked(ss, promptHookBudget-recallFrameOverhead, byIdentifying(terms, idfOf), string(input.Prompt))
+		digest := search.AutoRecallDigestForAsked(ss, digestBudget(confident), byIdentifying(terms, idfOf), string(input.Prompt))
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
@@ -975,6 +975,21 @@ func sessionIDs(ss []model.Session) []string {
 }
 
 const promptHookLead = "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one short line what deja-vu recalled; otherwise ignore silently.\n"
+
+// digestBudget is how much room the block gets. A match resting on a single
+// rare word is a weaker claim than one resting on two, and it is where most of
+// the injections on unrelated prompts come from: measured on cross-paired
+// LongMemEval prompts, halving that case takes the average injected block from
+// 1077 to 977 characters. It costs nothing that can be measured on real
+// questions — 52 answers of 58 either way — because the block that answers a
+// single-word question rarely needed the second half.
+func digestBudget(confident bool) int {
+	budget := promptHookBudget - recallFrameOverhead
+	if !confident {
+		budget /= 2
+	}
+	return budget
+}
 
 // weakRecallPointer is what an unconfident match injects instead of a digest:
 // one line saying history exists and how to reach it. A single rare term is a
