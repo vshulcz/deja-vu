@@ -525,6 +525,7 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 	}
 	carried, carriedOne, carriedRare, blocks, silent, wantN := 0, 0, 0, 0, 0, 0
 	lostInPackaging, lostInRanking, notThere := 0, 0, 0
+	silentButReachable := 0
 	for i := range questions {
 		q := questions[i]
 		dir, cleanup, err := buildHaystackIndex(q)
@@ -533,18 +534,27 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 			fatal(err)
 		}
 		terms := prompt.Terms(q.Question)
-		ranked, _, _, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
+		ranked, matched, strong, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
 		if err != nil {
 			cleanup()
 			fatal(err)
 		}
-		if len(ranked) > 2 {
-			ranked = ranked[:2]
-		}
+		// The gates the prompt hook applies between ranking and quoting. Two
+		// informative terms earn an injection, or one rare enough to identify
+		// something on its own; and a session that only matched inside tool
+		// output never spoke about the subject.
+		ranked = passHookGates(ranked, matched, strong, terms)
 		block := search.AutoRecallDigestForAsked(ranked, 1536, terms, q.Question)
 		cleanup()
 		if strings.TrimSpace(block) == "" {
 			silent++
+			// Silence is free only when there was nothing to say. Count the
+			// questions whose answer names something the haystack calls by the
+			// same rare word: those the hook could have helped with.
+			if whereLost(carryWords(string(q.Answer)), carryWords(q.Question),
+				haystackSpread(q), nil) == "ranking" {
+				silentButReachable++
+			}
 			continue
 		}
 		blocks++
@@ -589,7 +599,8 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 		}
 		wantN += len(want)
 	}
-	fmt.Printf("answer-carry: blocks %d (silent %d)\n", blocks, silent)
+	fmt.Printf("answer-carry: blocks %d (silent %d, of them reachable %d)\n",
+		blocks, silent, silentButReachable)
 	if blocks > 0 {
 		fmt.Printf("  block carries >=2 words of the gold answer: %d (%.0f%%)\n",
 			carried, 100*float64(carried)/float64(blocks))
@@ -606,6 +617,29 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 		fmt.Printf("  missed, no identifying word anywhere:      %d (%.0f%%)\n",
 			notThere, 100*float64(notThere)/float64(blocks))
 	}
+}
+
+// passHookGates keeps the sessions the prompt hook would actually quote. Two
+// informative terms earn an injection, or one rare enough to identify something
+// on its own; and a session that matched only inside tool output never spoke
+// about the subject. Without these the benchmark measured a path no user gets:
+// it assumed every question produces a block, while the hook stays silent on
+// 86 of these 500.
+func passHookGates(ranked []model.Session, matched, strong []int, terms []string) []model.Session {
+	kept := ranked[:0]
+	for i, s := range ranked {
+		if i < len(matched) && matched[i] < 2 && (i >= len(strong) || strong[i] < 1) {
+			continue
+		}
+		if !search.SpeechCarriesAnyTerm(s, terms) {
+			continue
+		}
+		kept = append(kept, s)
+		if len(kept) == 2 {
+			break
+		}
+	}
+	return kept
 }
 
 // whereLost says where a question's identifying words stopped: "packaging" when
