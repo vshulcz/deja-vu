@@ -29,6 +29,7 @@ var readmeGuidanceNames = map[string]string{
 	"hermes":      "Hermes",
 	"roo":         "Roo Code",
 	"omp":         "omp",
+	"deepseek":    "DeepSeek Harness",
 	// Grok is named in its own sentence in the same paragraph, because the
 	// home copy only applies when a project has no .grok/GROK.md.
 	"grok": "Grok",

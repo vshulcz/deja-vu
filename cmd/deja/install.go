@@ -465,6 +465,7 @@ func existingTargets() []string {
 		"hermes":      sources.HermesHome(),
 		"pi":          sources.PiConfigDir(),
 		"omp":         sources.OmpConfigDir(),
+		"deepseek":    sources.DSHHome(),
 		"openclaw":    sources.OpenClawStateDir(),
 		// aider keeps no config directory: its history file is what says it
 		// has been used here. The binary alone would match every machine that
@@ -564,6 +565,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installPiAuto(exe, uninstall)
 	case "omp":
 		return installMCPJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), exe, uninstall)
+	case "deepseek":
+		return installDeepSeekMCP(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
 	case "openclaw-auto":
@@ -1513,6 +1516,7 @@ func installTargetNames() []string {
 		"hermes", "hermes-auto",
 		"pi", "pi-auto",
 		"omp",
+		"deepseek",
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",

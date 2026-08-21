@@ -532,34 +532,24 @@
    "last_verified": "2026-08-21",
    "display_name": "DeepSeek Harness",
    "capabilities": {
-    "mcp": false,
+    "mcp": true,
     "auto": false,
-    "skill": false,
+    "skill": true,
     "command": false,
     "resume": false,
     "handoff": "paste",
     "prereq": "zstd"
    },
    "gaps": {
-    "mcp": {
-     "state": "todo",
-     "why": "dsh has a plugin runtime and loads MCP servers through a profile's plugin list under $DSH_HOME/profiles/<name>, not from a config file with an mcpServers root. Wiring deja means writing a profile patch layer, which is work rather than an obstacle.",
-     "source": "dsh 0.1.1-rc.2, dsh plugin --help"
-    },
     "auto": {
      "state": "unknown",
      "why": "The harness fires events through its plugin runtime, but nothing published says which of them run before a prompt reaches the model, and a hook that fires after is too late to inject recall. Needs a read of the agent-loop plugin contract before it can be called work or a dead end.",
      "source": "dsh 0.1.1-rc.2"
     },
-    "skill": {
-     "state": "todo",
-     "why": "dsh reads a skill catalogue and splices it into the turn — a session log shows the entries verbatim, including deja's own once it is on disk — so the surface exists and the install path for it does not.",
-     "source": "session log, source.kind == skill-catalog"
-    },
     "command": {
      "state": "todo",
-     "why": "Slash commands are a profile concern here, same as MCP: they live in the booted profile rather than a shared config directory deja can write.",
-     "source": "dsh 0.1.1-rc.2, dsh --help"
+     "why": "Slash commands are plugin rows in the composed profile rather than files in a directory deja can write, so a /deja command means shipping a command plugin — work, not an obstacle. MCP now goes in through the home patch layer, which is the same seam.",
+     "source": "dsh 0.1.1-rc.2, @deepseek-ai/dsh-commands"
     }
    }
   },

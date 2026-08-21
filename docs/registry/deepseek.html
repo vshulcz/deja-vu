@@ -82,14 +82,27 @@
 <p><code>session/title</code> gives the session its name; when the model never answered, the</p>
 <p>harness falls back to the first prompt.</p>
 <ul>
-<li><strong>MCP</strong>: not wired. dsh loads plugins from its profile directories rather than</li>
+<li><strong>MCP</strong>: <code>deja install deepseek</code> writes <code>$DSH_HOME/cordis.patch.yml</code>, the</li>
 </ul>
-<p>a config file with an <code>mcpServers</code> root, so <code>deja install</code> has nothing to write</p>
-<p>yet.</p>
+<p>home-level patch layer every profile composes over its own. An MCP server here</p>
+<p>is a plugin row (<code>@deepseek-ai/dsh-mcp-client</code>) inside an <code>insert:</code> list — a</p>
+<p>bare row is rejected with <code>entry &#34;mcp-deja&#34; not found</code>, because a patch entry</p>
+<p>addresses a row that already exists. After it, dsh lists <code>mcp__deja__recall</code>,</p>
+<p><code>recall_context</code>, <code>remember</code>, <code>blame</code>, <code>fix</code> and <code>how</code> itself.</p>
 <ul>
-<li><strong>Auto-recall</strong>: no hook. The harness has a plugin runtime but no documented</li>
+<li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>. dsh splices a</li>
 </ul>
-<p>pre-prompt event deja can attach to.</p>
+<p>skill catalogue into the turn and reads that directory, so it needs no file of</p>
+<p>its own — checked by asking a running dsh to list its skills.</p>
+<ul>
+<li><strong>Command</strong>: still open. Slash commands are plugin rows rather than files in a</li>
+</ul>
+<p>directory, so a <code>/deja</code> command means shipping a command plugin.</p>
+<ul>
+<li><strong>Auto-recall</strong>: no hook found. The harness has a plugin runtime but nothing</li>
+</ul>
+<p>published says which event runs before a prompt reaches the model, and one</p>
+<p>firing after is too late to inject recall.</p>
 <ul>
 <li><strong>Resume</strong>: the tui app takes <code>--resume &lt;session&gt;</code> (a flag of the booted app,</li>
 </ul>

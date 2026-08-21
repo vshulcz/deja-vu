@@ -36,11 +36,20 @@ These event types carry the conversation:
 `session/title` gives the session its name; when the model never answered, the
 harness falls back to the first prompt.
 
-- **MCP**: not wired. dsh loads plugins from its profile directories rather than
-  a config file with an `mcpServers` root, so `deja install` has nothing to write
-  yet.
-- **Auto-recall**: no hook. The harness has a plugin runtime but no documented
-  pre-prompt event deja can attach to.
+- **MCP**: `deja install deepseek` writes `$DSH_HOME/cordis.patch.yml`, the
+  home-level patch layer every profile composes over its own. An MCP server here
+  is a plugin row (`@deepseek-ai/dsh-mcp-client`) inside an `insert:` list — a
+  bare row is rejected with `entry "mcp-deja" not found`, because a patch entry
+  addresses a row that already exists. After it, dsh lists `mcp__deja__recall`,
+  `recall_context`, `remember`, `blame`, `fix` and `how` itself.
+- **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. dsh splices a
+  skill catalogue into the turn and reads that directory, so it needs no file of
+  its own — checked by asking a running dsh to list its skills.
+- **Command**: still open. Slash commands are plugin rows rather than files in a
+  directory, so a `/deja` command means shipping a command plugin.
+- **Auto-recall**: no hook found. The harness has a plugin runtime but nothing
+  published says which event runs before a prompt reaches the model, and one
+  firing after is too late to inject recall.
 - **Resume**: the tui app takes `--resume <session>` (a flag of the booted app,
   not of the launcher — `dsh --profile headless --resume` is rejected). deja
   stores the session id the flag wants, so the mapping is direct.
