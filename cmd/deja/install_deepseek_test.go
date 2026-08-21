@@ -112,7 +112,10 @@ func TestInstallDeepSeekWritesTheCommandPlugin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(layer), plugin) {
+	// Quoted the way the writer quotes it: a Windows path goes into the layer
+	// as "C:\\Users\\…", so comparing against the raw path fails there and
+	// passes everywhere else — which is how it reached CI.
+	if !strings.Contains(string(layer), yamlQuote(plugin)) {
 		t.Errorf("the layer does not name the plugin file:\n%s", layer)
 	}
 
