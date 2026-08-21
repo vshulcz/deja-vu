@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/prompt"
@@ -28,14 +29,15 @@ import (
 )
 
 type lmeQuestion struct {
-	QuestionID        string      `json:"question_id"`
-	QuestionType      string      `json:"question_type"`
-	Question          string      `json:"question"`
-	QuestionDate      string      `json:"question_date"`
-	HaystackDates     []string    `json:"haystack_dates"`
-	HaystackSessionID []string    `json:"haystack_session_ids"`
-	HaystackSessions  [][]lmeTurn `json:"haystack_sessions"`
-	AnswerSessionIDs  []string    `json:"answer_session_ids"`
+	QuestionID        string          `json:"question_id"`
+	QuestionType      string          `json:"question_type"`
+	Question          string          `json:"question"`
+	QuestionDate      string          `json:"question_date"`
+	HaystackDates     []string        `json:"haystack_dates"`
+	HaystackSessionID []string        `json:"haystack_session_ids"`
+	HaystackSessions  [][]lmeTurn     `json:"haystack_sessions"`
+	AnswerSessionIDs  []string        `json:"answer_session_ids"`
+	Answer            json.RawMessage `json:"answer"`
 }
 
 var hitCounts []int
@@ -52,6 +54,7 @@ func main() {
 	verbose := flag.Bool("v", false, "log per-question results")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
 	hookPrecision := flag.Int("hook-precision", 0, "measure the auto-recall hook gate on N cross-paired prompts (0 = off)")
+	answerCarry := flag.Int("answer-carry", 0, "measure how often the injected block carries the gold answer's words (0 = off)")
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
 	flag.Parse()
@@ -82,6 +85,10 @@ func main() {
 			}
 		}
 		questions = kept
+	}
+	if *answerCarry > 0 {
+		runAnswerCarry(questions, *answerCarry)
+		return
 	}
 	if *hookPrecision > 0 {
 		runHookPrecision(questions, *hookPrecision)
@@ -511,6 +518,77 @@ func buildHaystackIndex(q lmeQuestion) (string, func(), error) {
 // present — and the probe reports how often the hook's gate would still inject.
 // It replicates the gate rather than calling the hook: ProjectRelevant with the
 // prompt's terms, then the matched-count bar the hook applies.
+func runAnswerCarry(questions []lmeQuestion, limit int) {
+	if limit > 0 && limit < len(questions) {
+		questions = questions[:limit]
+	}
+	carried, carriedOne, blocks, silent, wantN := 0, 0, 0, 0, 0
+	for i := range questions {
+		q := questions[i]
+		dir, cleanup, err := buildHaystackIndex(q)
+		if err != nil {
+			cleanup()
+			fatal(err)
+		}
+		terms := prompt.Terms(q.Question)
+		ranked, _, _, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
+		if err != nil {
+			cleanup()
+			fatal(err)
+		}
+		if len(ranked) > 2 {
+			ranked = ranked[:2]
+		}
+		block := search.AutoRecallDigestForAsked(ranked, 1536, terms, q.Question)
+		cleanup()
+		if strings.TrimSpace(block) == "" {
+			silent++
+			continue
+		}
+		blocks++
+		asked := carryWords(q.Question)
+		have := carryWords(block)
+		want := carryWords(string(q.Answer))
+		hits := 0
+		for w := range want {
+			if asked[w] {
+				continue
+			}
+			if have[w] {
+				hits++
+			}
+		}
+		if hits >= 2 {
+			carried++
+		}
+		if hits >= 1 {
+			carriedOne++
+		}
+		wantN += len(want)
+	}
+	fmt.Printf("answer-carry: blocks %d (silent %d)\n", blocks, silent)
+	if blocks > 0 {
+		fmt.Printf("  block carries >=2 words of the gold answer: %d (%.0f%%)\n",
+			carried, 100*float64(carried)/float64(blocks))
+		fmt.Printf("  block carries >=1 word:                    %d (%.0f%%)\n",
+			carriedOne, 100*float64(carriedOne)/float64(blocks))
+		fmt.Printf("  words in a gold answer, on average:        %.1f\n",
+			float64(wantN)/float64(blocks))
+	}
+}
+
+func carryWords(text string) map[string]bool {
+	out := map[string]bool{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if len([]rune(w)) >= 5 {
+			out[w] = true
+		}
+	}
+	return out
+}
+
 func runHookPrecision(questions []lmeQuestion, limit int) {
 	if limit > 0 && limit < len(questions) {
 		questions = questions[:limit]
