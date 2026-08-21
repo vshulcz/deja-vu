@@ -24,6 +24,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -523,6 +524,7 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 		questions = questions[:limit]
 	}
 	carried, carriedOne, carriedRare, blocks, silent, wantN := 0, 0, 0, 0, 0, 0
+	lostInPackaging, lostInRanking, notThere := 0, 0, 0
 	for i := range questions {
 		q := questions[i]
 		dir, cleanup, err := buildHaystackIndex(q)
@@ -569,6 +571,15 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 		}
 		if rare >= 1 {
 			carriedRare++
+		} else {
+			switch whereLost(want, asked, spread, ranked) {
+			case "packaging":
+				lostInPackaging++
+			case "ranking":
+				lostInRanking++
+			default:
+				notThere++
+			}
 		}
 		if hits >= 2 {
 			carried++
@@ -588,7 +599,38 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 			float64(wantN)/float64(blocks))
 		fmt.Printf("  block carries a word few sessions use:     %d (%.0f%%)\n",
 			carriedRare, 100*float64(carriedRare)/float64(blocks))
+		fmt.Printf("  missed, word sat in a quoted session:      %d (%.0f%%)\n",
+			lostInPackaging, 100*float64(lostInPackaging)/float64(blocks))
+		fmt.Printf("  missed, word sat elsewhere in the haystack:%d (%.0f%%)\n",
+			lostInRanking, 100*float64(lostInRanking)/float64(blocks))
+		fmt.Printf("  missed, no identifying word anywhere:      %d (%.0f%%)\n",
+			notThere, 100*float64(notThere)/float64(blocks))
 	}
+}
+
+// whereLost says where a question's identifying words stopped: "packaging" when
+// a session the block quoted holds one and the block still left it out,
+// "ranking" when one lives in the haystack but not in a quoted session, and
+// "absent" when the answer names nothing the haystack calls by the same word.
+func whereLost(want, asked map[string]bool, spread map[string]int, quoted []model.Session) string {
+	inHaystack := false
+	for w := range want {
+		if asked[w] || spread[w] == 0 || spread[w] > 3 {
+			continue
+		}
+		inHaystack = true
+		for _, s := range quoted {
+			for _, m := range s.Messages {
+				if carryWords(m.Text)[w] {
+					return "packaging"
+				}
+			}
+		}
+	}
+	if inHaystack {
+		return "ranking"
+	}
+	return "absent"
 }
 
 // haystackSpread counts how many of this question's sessions use each word, so
