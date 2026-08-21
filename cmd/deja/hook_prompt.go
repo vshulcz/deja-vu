@@ -30,7 +30,14 @@ import (
 
 // promptHookBudget keeps per-prompt injections small: this fires on every
 // user message, so it must be a hint, not a payload.
-const promptHookBudget = 1024
+//
+// 1024 cut the two quoted lines mid-sentence, and what it cut was the tail —
+// the paths, names and numbers an answer reuses. Measured on a real store by
+// replaying the sweep and comparing each block against what the agent actually
+// answered next: blocks carrying words the answer went on to use rose from 20%
+// to 25%, and blocks carrying a conclusion from 55 to 57 of 100, for 24 tokens
+// a message. 2048 buys nothing further (25% again, 253 tokens).
+const promptHookBudget = 1536
 
 // dejaVuMaxMessages caps how large a session can be and still read as one
 // rememberable episode. Marathon catch-all sessions rank into everything.
