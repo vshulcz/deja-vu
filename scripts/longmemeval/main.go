@@ -522,7 +522,7 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 	if limit > 0 && limit < len(questions) {
 		questions = questions[:limit]
 	}
-	carried, carriedOne, blocks, silent, wantN := 0, 0, 0, 0, 0
+	carried, carriedOne, carriedRare, blocks, silent, wantN := 0, 0, 0, 0, 0, 0
 	for i := range questions {
 		q := questions[i]
 		dir, cleanup, err := buildHaystackIndex(q)
@@ -549,14 +549,26 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 		asked := carryWords(q.Question)
 		have := carryWords(block)
 		want := carryWords(string(q.Answer))
-		hits := 0
+		spread := haystackSpread(q)
+		hits, rare := 0, 0
 		for w := range want {
 			if asked[w] {
 				continue
 			}
-			if have[w] {
-				hits++
+			if !have[w] {
+				continue
 			}
+			hits++
+			// A word most of the haystack uses is carried by accident: on a
+			// real store, reading the cases where two ordinary words matched
+			// showed the block had brought nothing identifying. Count the
+			// words few sessions say — a name, a path, a number.
+			if spread[w] > 0 && spread[w] <= 3 {
+				rare++
+			}
+		}
+		if rare >= 1 {
+			carriedRare++
 		}
 		if hits >= 2 {
 			carried++
@@ -574,7 +586,28 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 			carriedOne, 100*float64(carriedOne)/float64(blocks))
 		fmt.Printf("  words in a gold answer, on average:        %.1f\n",
 			float64(wantN)/float64(blocks))
+		fmt.Printf("  block carries a word few sessions use:     %d (%.0f%%)\n",
+			carriedRare, 100*float64(carriedRare)/float64(blocks))
 	}
+}
+
+// haystackSpread counts how many of this question's sessions use each word, so
+// a match on a word the whole haystack repeats can be told from a match on one
+// that identifies a session.
+func haystackSpread(q lmeQuestion) map[string]int {
+	spread := make(map[string]int, 1024)
+	for _, session := range q.HaystackSessions {
+		seen := map[string]bool{}
+		for _, turn := range session {
+			for w := range carryWords(turn.Content) {
+				seen[w] = true
+			}
+		}
+		for w := range seen {
+			spread[w]++
+		}
+	}
+	return spread
 }
 
 func carryWords(text string) map[string]bool {
