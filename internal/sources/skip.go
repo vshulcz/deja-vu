@@ -15,6 +15,15 @@ func SkipReason(harness string) string {
 	if harness == "zed" {
 		return zedSkipReason()
 	}
+	// DeepSeek Harness writes its log as zstd frames by default, so without the
+	// tool the files are there and unreadable — the same failure as Zed's, one
+	// layer up: whole sessions rather than thread bodies inside a store.
+	if harness == "deepseek" {
+		if ZstdAvailable() || len(DeepSeekSessionFiles()) == 0 {
+			return ""
+		}
+		return "zstd CLI not found"
+	}
 	if SQLite3Available() {
 		return ""
 	}

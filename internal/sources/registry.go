@@ -324,6 +324,19 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			// DeepSeek Harness writes one log per session, zstd-framed by
+			// default, so a machine without the zstd CLI sees the files and
+			// reads nothing out of them (SkipReason says so).
+			Name: "deepseek", Load: LoadDeepSeek, Files: DeepSeekSessionFiles,
+			Kinds: []FileKind{{
+				Name: "deepseek",
+				Match: func(p string) bool {
+					return hasBase(p, "session.jsonl") || hasBase(p, "session.jsonl.zstd")
+				},
+				Parse: fullParse(ParseDeepSeekFile),
+			}},
+		},
+		{
 			// Zed's agent writes no session files: one SQLite store under its
 			// data dir, whose thread bodies are zstd frames rather than JSON.
 			Name: "zed", Load: LoadZed, Files: func() []string { return []string{ZedDB()} },

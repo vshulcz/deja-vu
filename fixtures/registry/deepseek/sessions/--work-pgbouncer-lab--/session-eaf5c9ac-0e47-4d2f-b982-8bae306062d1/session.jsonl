@@ -1,0 +1,9 @@
+{"type":"session","version":0,"id":"session-eaf5c9ac-0e47-4d2f-b982-8bae306062d1","createdAt":1787320263519,"cwd":"/work/pgbouncer-lab","delegationDepth":0}
+{"type":"permission/preset","seq":0,"time":1787320263520,"data":{"preset":"workspace-write"}}
+{"type":"session/title","seq":10,"time":1787320263581,"data":{"title":"pgbouncer pool size","source":{"kind":"fallback"}}}
+{"type":"user/message","seq":7,"time":1787320263580,"data":{"content":[{"type":"text","text":"how many connections do we hold per shard"}],"source":{"kind":"user"},"role":"user"}}
+{"type":"user/message","seq":8,"time":1787320263580,"data":{"content":[{"type":"text","text":"Current runtime context. This snapshot supersedes earlier runtime-context snapshots."}],"source":{"kind":"plugin","plugin":"@deepseek-ai/dsh-system-prompt"},"role":"user"}}
+{"type":"assistant/chunk","seq":12,"time":1787320263585,"data":{"turn":1,"step":1,"chunk":{"type":"text-delta","text":"we hold "}}}
+{"type":"assistant/chunk","seq":13,"time":1787320263586,"data":{"turn":1,"step":1,"chunk":{"type":"text-delta","text":"40 per shard, pinned in the pgbouncer config"}}}
+{"type":"assistant/chunk","seq":14,"time":1787320263589,"data":{"turn":1,"step":1,"chunk":{"type":"finish","reason":{"kind":"stop"}}}}
+{"type":"turn/end","seq":15,"time":1787320263590,"data":{"turn":1}}

@@ -25,6 +25,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Copilot CLI](copilot.md) | session event JSONL |
 | [Roo Code](roo.md) | task JSON in VS Code globalStorage |
 | [Hermes](hermes.md) | SQLite state store |
+| [DeepSeek Harness](deepseek.md) | append-only session log, zstd-framed JSONL |
 | [Zed](zed.md) | SQLite thread store, zstd-compressed bodies |
 
 ## Reporting drift

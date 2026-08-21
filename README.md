@@ -97,7 +97,7 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Eighteen coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Nineteen coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -220,7 +220,7 @@ The server exposes `recall`, `recall_context`, `blame`, `fix`, `how` and `rememb
 ## Supported harnesses
 
 <!-- matrix:start -->
-Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &middot; Gemini CLI &middot; Cursor &middot; Antigravity &middot; Grok Build &middot; Hermes &middot; Goose &middot; Qwen Code &middot; Kimi Code &middot; pi &middot; OpenClaw &middot; Copilot CLI &middot; Roo Code &middot; Zed.
+Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &middot; Gemini CLI &middot; Cursor &middot; Antigravity &middot; Grok Build &middot; Hermes &middot; Goose &middot; Qwen Code &middot; Kimi Code &middot; pi &middot; OpenClaw &middot; Copilot CLI &middot; Roo Code &middot; DeepSeek Harness &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
@@ -244,6 +244,7 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | — | paste | — |
 | Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |
+| DeepSeek Harness | — | ? | — | — | ? | paste | zstd |
 | Zed | ✅ | ✕ | — | — | ✕ | paste | sqlite3 + zstd |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated

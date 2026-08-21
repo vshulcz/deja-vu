@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where DeepSeek Harness stores its history — session format</title>
+<meta name="description" content="Where DeepSeek Harness writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/deepseek.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where DeepSeek Harness stores its history — session format">
+<meta property="og:description" content="Where DeepSeek Harness writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/deepseek.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where DeepSeek Harness stores its history — session format">
+<meta name="twitter:description" content="Where DeepSeek Harness writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where DeepSeek Harness writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"DeepSeek Harness","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/deepseek.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/deepseek.html","name":"DeepSeek Harness","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="deepseek.html" aria-current="page">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>DeepSeek Harness</h1>
+<ul>
+<li><strong>ID</strong>: <code>deepseek</code></li>
+<li><strong>Store</strong>: <code>${DSH_HOME:-~/.dsh}/sessions/&lt;workspace-slug&gt;/session-&lt;uuid&gt;/session.jsonl.zstd</code> — one append-only log per session</li>
+<li><strong>Read override</strong>: <code>DEJA_DEEPSEEK_ROOT</code> (sessions root), <code>DSH_HOME</code> (the harness&#39;s own home, also honored)</li>
+<li><strong>Format</strong>: JSONL, written as consecutive zstd frames by default; raw lines</li>
+</ul>
+<p>are a configuration and both are read</p>
+<ul>
+<li><strong>Prerequisite</strong>: the <code>zstd</code> CLI, for the same reason Zed needs it. Without</li>
+</ul>
+<p>it the sessions are found and none of them can be read, and <code>deja index</code> says</p>
+<p>so rather than reporting an empty store.</p>
+<p>The first line is the session header — `{&#34;type&#34;:&#34;session&#34;,&#34;id&#34;:&#34;session-&lt;uuid&gt;&#34;,</p>
+<p>&#34;createdAt&#34;:&lt;ms&gt;,&#34;cwd&#34;:&#34;…&#34;}<code> — and the project comes from that </code>cwd`. Every</p>
+<p>line after it is one event: <code>{type, seq, time, data}</code>.</p>
+<p>Three event types carry the conversation:</p>
+<ul>
+<li><code>user/message</code> with <code>data.source.kind == &#34;user&#34;</code> is what a person typed. The</li>
+</ul>
+<p>same type also carries what plugins splice into the turn — the sandbox policy</p>
+<p>snapshot, the skill catalogue — under other source kinds, and those are the</p>
+<p>harness describing itself rather than history worth recalling.</p>
+<ul>
+<li><code>assistant/chunk</code> with <code>data.chunk.type == &#34;text-delta&#34;</code> holds the answer a</li>
+</ul>
+<p>token at a time; the deltas of one run are joined into a single message.</p>
+<ul>
+<li><code>assistant/chunk</code> with <code>data.chunk.type == &#34;tool-result&#34;</code> is tool output, kept</li>
+</ul>
+<p>under the <code>tool-output</code> role so search can tell it from speech.</p>
+<p><code>session/title</code> gives the session its name; when the model never answered, the</p>
+<p>harness falls back to the first prompt.</p>
+<ul>
+<li><strong>MCP</strong>: not wired. dsh loads plugins from its profile directories rather than</li>
+</ul>
+<p>a config file with an <code>mcpServers</code> root, so <code>deja install</code> has nothing to write</p>
+<p>yet.</p>
+<ul>
+<li><strong>Auto-recall</strong>: no hook. The harness has a plugin runtime but no documented</li>
+</ul>
+<p>pre-prompt event deja can attach to.</p>
+<ul>
+<li><strong>Resume</strong>: dsh&#39;s own <code>--resume &lt;session&gt;</code>; deja stores the session id, and the</li>
+</ul>
+<p>mapping is direct.</p>
+<ul>
+<li><strong>Handoff</strong>: paste.</li>
+</ul>
+<p>Format verified by installing dsh 0.1.1-rc.2, running it, and reading what it</p>
+<p>wrote (<code>@deepseek-ai/dsh-session-persistence-jsonl</code>).</p>
+<p><strong>Last verified:</strong> 2026-08-21</p>
+
+<hr>
+<p>deja reads this format and seventeen others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

@@ -225,6 +225,11 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseOpenClawFile(path)
 	case "copilot":
 		sessions, err = ParseCopilotFile(path)
+	case "deepseek":
+		// The fixture is stored raw: the harness writes zstd frames by default,
+		// and a registry fixture that needs an external tool to read cannot be
+		// checked on a machine that lacks it.
+		sessions, err = ParseDeepSeekFile(path)
 	default:
 		t.Fatalf("no conformance parser for %q", id)
 	}
