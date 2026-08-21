@@ -252,7 +252,12 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 			t.Fatalf("%s fixture produced incomplete session: %#v", id, session)
 		}
 		for _, message := range session.Messages {
-			if (message.Role != "user" && message.Role != "assistant") || strings.TrimSpace(message.Text) == "" || message.Time.IsZero() {
+			// tool-output is a role the index stores and the search filters by
+			// (retrieval.go: roleToolOutput); a fixture whose harness records
+			// what a tool printed should be able to show it.
+			role := message.Role
+			if (role != "user" && role != "assistant" && role != "tool-output") ||
+				strings.TrimSpace(message.Text) == "" || message.Time.IsZero() {
 				t.Fatalf("%s fixture produced invalid message: %#v", id, message)
 			}
 		}

@@ -28,11 +28,21 @@ import (
 // skill catalogue — under a different source kind, and those are the harness
 // talking to itself, not history worth recalling.
 //
-// The agent's turn arrives in pieces: `assistant/chunk` events whose
-// data.chunk.type is "text-delta" hold the text a token at a time, so they are
-// joined until something else ends the run.
+// The agent's turn is written twice. It streams as `assistant/chunk` deltas —
+// and long runs of those are packed into rows of another type entirely, so the
+// stream alone is not readable without unpacking it — and then lands complete
+// in one `assistant/message` whose data.message.content is a block array. The
+// complete one is what deja reads; the deltas are the fallback for a run that
+// was interrupted before it landed.
 //
-// Verified against dsh 0.1.1-rc.2 by running it and reading what it wrote.
+// Reasoning blocks in that array are the model thinking out loud, not what it
+// told the person, so they stay out of the transcript.
+//
+// Tool output is its own event, `tool/result`, whose content nests a
+// tool-result block around the text.
+//
+// Verified against dsh 0.1.1-rc.2 driven by a local model, over sessions that
+// answered, called a tool, and failed before answering.
 
 // DSHHome is the harness's own home directory, following its DSH_HOME variable.
 func DSHHome() string {
@@ -70,6 +80,9 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 		Project: "-",
 		Path:    path,
 	}
+	// Deltas of the step being streamed, kept only until that step's complete
+	// message arrives; a step that ends without one was interrupted, and then
+	// the deltas are all there is.
 	var pending []string
 	var pendingAt time.Time
 	flush := func() {
@@ -119,22 +132,39 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 			}
 		case "assistant/chunk":
 			chunk, _ := data["chunk"].(map[string]any)
-			kind, _ := chunk["type"].(string)
-			switch kind {
-			case "text-delta":
+			if kind, _ := chunk["type"].(string); kind == "text-delta" {
 				if text, _ := chunk["text"].(string); text != "" {
 					pending = append(pending, text)
 					pendingAt = at
 					s.Touch(at)
 				}
-			case "tool-result":
-				flush()
-				if text := deepSeekToolText(chunk); text != "" {
-					s.Messages = append(s.Messages, model.Message{Role: "tool-output", Text: text, Time: at})
-					s.Touch(at)
-				}
-			default:
-				flush()
+			}
+		case "text-chunks":
+			// A run of three or more consecutive deltas is stored as one packed
+			// row rather than as the events themselves, so a reader that knows
+			// only `assistant/chunk` loses exactly the long answers.
+			at := parseTimeAny(e["time0"])
+			for _, part := range deepSeekPackedTexts(data["texts"]) {
+				pending = append(pending, part)
+				pendingAt = at
+				s.Touch(at)
+			}
+		case "assistant/message":
+			// The complete message supersedes whatever of it was streamed.
+			pending = nil
+			msg, _ := data["message"].(map[string]any)
+			if text := deepSeekContentText(msg["content"]); text != "" {
+				s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: at})
+				s.Touch(at)
+			}
+		case "step/end", "turn/end":
+			flush()
+		case "tool/result":
+			flush()
+			msg, _ := data["message"].(map[string]any)
+			if text := deepSeekToolText(msg["content"]); text != "" {
+				s.Messages = append(s.Messages, model.Message{Role: "tool-output", Text: text, Time: at})
+				s.Touch(at)
 			}
 		}
 	}
@@ -169,6 +199,7 @@ func deepSeekContentText(v any) string {
 		if !ok {
 			continue
 		}
+		// "reasoning" is the model thinking out loud; "text" is what it said.
 		if t, _ := block["type"].(string); t != "" && t != "text" {
 			continue
 		}
@@ -179,19 +210,46 @@ func deepSeekContentText(v any) string {
 	return strings.TrimSpace(strings.Join(out, "\n"))
 }
 
-func deepSeekToolText(chunk map[string]any) string {
-	if text, _ := chunk["text"].(string); text != "" {
-		return strings.TrimSpace(text)
+// deepSeekPackedTexts reads the texts of a packed chunk row. The row keeps the
+// deltas verbatim in order; the timings beside them reconstruct each member's
+// own clock, which a transcript does not need.
+func deepSeekPackedTexts(v any) []string {
+	parts, ok := v.([]any)
+	if !ok {
+		return nil
 	}
-	if text := deepSeekContentText(chunk["content"]); text != "" {
-		return text
-	}
-	if out, ok := chunk["result"]; ok {
-		if text, _ := out.(string); text != "" {
-			return strings.TrimSpace(text)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if text, _ := p.(string); text != "" {
+			out = append(out, text)
 		}
 	}
-	return ""
+	return out
+}
+
+// deepSeekToolText unwraps tool output, which nests one block array inside
+// another: the outer block says which call this answers, the inner one carries
+// the text the tool printed.
+func deepSeekToolText(v any) string {
+	blocks, ok := v.([]any)
+	if !ok {
+		return deepSeekContentText(v)
+	}
+	var out []string
+	for _, b := range blocks {
+		block, ok := b.(map[string]any)
+		if !ok {
+			continue
+		}
+		if text := deepSeekContentText(block["content"]); text != "" {
+			out = append(out, text)
+			continue
+		}
+		if text, _ := block["text"].(string); text != "" {
+			out = append(out, text)
+		}
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
 }
 
 // readDeepSeekLog returns the log as plain JSONL. The default encoding is a
