@@ -755,7 +755,9 @@ func densestLine(text string, terms []string) (string, int) {
 	// held; the mentions and the conclusion are usually in one message, which
 	// is the case the message-level preference cannot see.
 	bestDecides := false
-	for _, line := range strings.Split(text, "\n") {
+	lines := strings.Split(text, "\n")
+	bestAt := -1
+	for i, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -766,11 +768,25 @@ func densestLine(text string, terms []string) (string, int) {
 		}
 		decides := digest.CarriesDecision(line)
 		if best == "" || (decides && !bestDecides) || (decides == bestDecides && h > bestHits) {
-			best, bestHits, bestDecides = line, h, decides
+			best, bestHits, bestDecides, bestAt = line, h, decides, i
 		}
 	}
 	if best == "" {
 		return text, 0
+	}
+	// The line that answers usually sits right under the line that names the
+	// subject, and since #1505 the quote has room for both. Taking the line
+	// after the match raised, on a real store replayed against what the agent
+	// answered next, the blocks carrying words that answer used from 26 to 27 of
+	// 100. Taking the line before it instead — the same added volume — drops
+	// them to 22, so this is the choice and not the length.
+	for _, next := range lines[bestAt+1:] {
+		next = strings.TrimSpace(next)
+		if next == "" {
+			continue
+		}
+		best += " " + next
+		break
 	}
 	return best, bestHits
 }
