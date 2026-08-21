@@ -630,10 +630,10 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 // about the subject. Without these the benchmark measured a path no user gets:
 // it assumed every question produces a block, while the hook stays silent on
 // 86 of these 500.
-func passHookGates(ranked []model.Session, matched, strong []int, terms []string) []model.Session {
+func passHookGates(ranked []model.Session, matched, _ []int, terms []string) []model.Session {
 	kept := ranked[:0]
 	for i, s := range ranked {
-		if i < len(matched) && matched[i] < 2 && (i >= len(strong) || strong[i] < 1) {
+		if i < len(matched) && matched[i] < 2 && search.SessionIsAbout(s, terms) < 1 {
 			continue
 		}
 		if !search.SpeechCarriesAnyTerm(s, terms) {
@@ -791,18 +791,19 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 		// identifier test and a six-term cap, so measuring the gate on
 		// relevance terms measured a rule that never runs.
 		terms := prompt.Terms(questions[i].Question)
-		_, matched, strong, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
+		ranked, matched, strong, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
 		if err != nil {
 			cleanup()
 			fatal(err)
 		}
-		best, bestStrong := 0, 0
-		for k, m := range matched {
-			if m > best {
-				best = m
-			}
-			if k < len(strong) && strong[k] > bestStrong {
-				bestStrong = strong[k]
+		best, _ := bestSignals(matched, strong)
+		// The gate admits a single term when the session keeps returning to it,
+		// so this arm asks the same question the hook asks.
+		about := 0
+		for _, cand := range ranked {
+			if search.SessionIsAbout(cand, terms) > 0 {
+				about = 1
+				break
 			}
 		}
 		switch {
@@ -811,7 +812,7 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 			wouldInject++
 		case best == 1:
 			oneTerm++
-			if bestStrong >= 1 {
+			if about >= 1 {
 				wouldInject++ // a rare term still earns a single-match inject
 			}
 		}
