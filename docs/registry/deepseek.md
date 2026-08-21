@@ -55,9 +55,9 @@ harness falls back to the first prompt.
   `handler` and not `handle`, and a row naming a file that is not there yet
   takes the profile down — so the plugin is written before the layer and the
   layer is rewritten before the plugin is removed. The command plane itself is
-  a UI service, so `/deja` lives in the web and tui profiles; a headless run has
-  no command adapter, and what a headless boot proves is that the plugin
-  registers cleanly.
+  a UI service, so `/deja` lives in the web profile; a headless run has no
+  command adapter, and what a headless boot proves is that the plugin registers
+  cleanly.
 - **Auto-recall**: `deja install deepseek-auto` writes a second plugin at
   `$DSH_HOME/plugins/deja/auto.js`. It listens on `agent/pre-step`, the event
   that carries the messages entering the step the agent is about to take, and
@@ -69,9 +69,11 @@ harness falls back to the first prompt.
   such plugin, and removes it along with its row when someone drops back to it.
   Verified against a local model with no tools in play: dsh answered a question
   about a pool size that only the injected block carried.
-- **Resume**: the tui app takes `--resume <session>` (a flag of the booted app,
-  not of the launcher — `dsh --profile headless --resume` is rejected). deja
-  stores the session id the flag wants, so the mapping is direct.
+- **Resume**: none. The launcher's examples mention a tui profile taking
+  `--resume <session>`, but this release ships no bundle for one — the two apps
+  are `headless`, which takes a task and exits, and `web`, whose flags are all
+  about the server. Reopening a conversation is something the web sidebar does,
+  so there is nothing for deja to print.
 - **Handoff**: paste.
 
 Format verified by installing dsh 0.1.1-rc.2, pointing it at a local model over

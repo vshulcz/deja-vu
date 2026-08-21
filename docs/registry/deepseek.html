@@ -106,9 +106,9 @@
 <p><code>handler</code> and not <code>handle</code>, and a row naming a file that is not there yet</p>
 <p>takes the profile down — so the plugin is written before the layer and the</p>
 <p>layer is rewritten before the plugin is removed. The command plane itself is</p>
-<p>a UI service, so <code>/deja</code> lives in the web and tui profiles; a headless run has</p>
-<p>no command adapter, and what a headless boot proves is that the plugin</p>
-<p>registers cleanly.</p>
+<p>a UI service, so <code>/deja</code> lives in the web profile; a headless run has no</p>
+<p>command adapter, and what a headless boot proves is that the plugin registers</p>
+<p>cleanly.</p>
 <ul>
 <li><strong>Auto-recall</strong>: <code>deja install deepseek-auto</code> writes a second plugin at</li>
 </ul>
@@ -123,10 +123,12 @@
 <p>Verified against a local model with no tools in play: dsh answered a question</p>
 <p>about a pool size that only the injected block carried.</p>
 <ul>
-<li><strong>Resume</strong>: the tui app takes <code>--resume &lt;session&gt;</code> (a flag of the booted app,</li>
+<li><strong>Resume</strong>: none. The launcher&#39;s examples mention a tui profile taking</li>
 </ul>
-<p>not of the launcher — <code>dsh --profile headless --resume</code> is rejected). deja</p>
-<p>stores the session id the flag wants, so the mapping is direct.</p>
+<p><code>--resume &lt;session&gt;</code>, but this release ships no bundle for one — the two apps</p>
+<p>are <code>headless</code>, which takes a task and exits, and <code>web</code>, whose flags are all</p>
+<p>about the server. Reopening a conversation is something the web sidebar does,</p>
+<p>so there is nothing for deja to print.</p>
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>

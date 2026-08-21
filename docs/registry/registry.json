@@ -534,7 +534,13 @@
     "handoff": "paste",
     "prereq": "zstd"
    },
-   "gaps": {}
+   "gaps": {
+    "resume": {
+     "state": "impossible",
+     "why": "dsh ships two apps, headless and web; neither takes a session id. The launcher documents a tui profile that this release has no bundle for, and reopening a conversation is something the web UI sidebar does, not a command deja can print",
+     "source": "no resume flag in dsh 0.1.1-rc.2 headless or web"
+    }
+   }
   },
   {
    "id": "zed",
