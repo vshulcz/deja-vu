@@ -637,8 +637,14 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	if len(assistants) > 0 && assistants[0].hits > bestUser.hits {
 		bestUser = scored{}
 	}
-	if len(assistants) > 2 {
-		assistants = assistants[:2]
+	// Three quotes, not two. The pair rule above already trims to two whenever
+	// a session has a conclusion to pair with its subject, so this only widens
+	// short sessions that have neither — and there the third line is what
+	// carries the identifying word. On LongMemEval blocks carrying a word few
+	// sessions use went from 80 to 87 of 500, and the cases where that word sat
+	// in a session the block had already quoted fell from 54 to 47.
+	if len(assistants) > 3 {
+		assistants = assistants[:3]
 	}
 	// Back into the order they were said: two conclusions read as a sequence,
 	// and keeping them in score order tells the story backwards.

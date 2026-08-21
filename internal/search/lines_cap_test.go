@@ -12,7 +12,13 @@ import (
 // A session that says the subject in twenty places must not spend twenty lines
 // saying so: the hook pays for this block on every message. Removing the cap
 // left the whole suite green.
-func TestDigestShowsAtMostTwoAssistantLinesPerSession(t *testing.T) {
+//
+// The cap is three. It was two until the labelled benchmark could measure what
+// the third line buys: on LongMemEval blocks carrying a word few sessions use
+// went from 80 to 87 of 500, and on a real store the block cost did not move,
+// because a session that concludes something is paired down to two lines before
+// this cap is reached.
+func TestDigestShowsAtMostThreeAssistantLinesPerSession(t *testing.T) {
 	now := time.Now().Add(-48 * time.Hour)
 	msgs := make([]model.Message, 0, 21)
 	for i := 0; i < 20; i++ {
@@ -38,7 +44,7 @@ func TestDigestShowsAtMostTwoAssistantLinesPerSession(t *testing.T) {
 	if quoted == 0 {
 		t.Fatalf("nothing was quoted, so the cap is untested:\n%s", block)
 	}
-	if quoted > 2 {
-		t.Errorf("session contributed %d lines; two is the cap:\n%s", quoted, block)
+	if quoted > 3 {
+		t.Errorf("session contributed %d lines; three is the cap:\n%s", quoted, block)
 	}
 }
