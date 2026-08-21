@@ -564,7 +564,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 				bestUser = scored{i, hits, lineAround(text, 160, terms)}
 			}
 		case "assistant":
-			assistants = append(assistants, scored{i, hits, lineAround(text, 220, terms)})
+			assistants = append(assistants, scored{i, hits, lineAround(text, 320, terms)})
 		}
 	}
 	// Among the agent's lines, prefer the ones that settled something. Within a
@@ -600,7 +600,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 				continue
 			}
 			if text := contextText(line, false); strings.TrimSpace(text) != "" {
-				assistants = append(assistants, scored{i, 0, lineAround(text, 220, terms)})
+				assistants = append(assistants, scored{i, 0, lineAround(text, 320, terms)})
 			}
 		}
 	}
