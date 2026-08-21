@@ -82,6 +82,11 @@ func commandFilePath(harness string) string {
 		return filepath.Join(homeDir(), ".roo", "commands", "deja.md")
 	case "gemini":
 		return filepath.Join(sources.GeminiHome(), "commands", "deja.toml")
+	case "omp":
+		// The active profile's agent directory; the default profile's is
+		// ~/.omp/agent. A named profile reads its own, which is why install
+		// writes the profiles it finds rather than this one alone.
+		return filepath.Join(sources.OmpConfigDir(), "commands", "deja.md")
 	}
 	return ""
 }

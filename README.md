@@ -91,7 +91,7 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes and Roo Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes, Roo Code and omp each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
 
 </details>
 
@@ -241,7 +241,7 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| omp (Oh My Pi) | ✅ | — | — | — | ✅ | ✅ | — |
+| omp (Oh My Pi) | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | — | paste | — |
 | Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |

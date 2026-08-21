@@ -42,7 +42,7 @@
 <tr><td><strong>Default store path</strong></td><td><code>~/.omp/agent/sessions/&lt;encoded-project&gt;/&lt;ISO-timestamp&gt;_&lt;uuid&gt;.jsonl</code></td></tr>
 <tr><td><strong>Env override</strong></td><td><code>DEJA_OMP_ROOT</code></td></tr>
 <tr><td><strong>deja parser</strong></td><td><code>internal/sources/omp.go</code></td></tr>
-<tr><td><strong>Last verified</strong></td><td>2026-08-20</td></tr>
+<tr><td><strong>Last verified</strong></td><td>2026-08-21</td></tr>
 </table></div>
 <h2 id="discovery">Discovery</h2>
 <p>omp (Oh My Pi, <code>github.com/can1357/oh-my-pi</code>) stores session transcripts under</p>
@@ -50,6 +50,23 @@
 <p>path encoding, e.g. <code>-Code-pleasure-course</code> for <code>/Users/halo/Code/pleasure-course</code>.</p>
 <p>Within each project directory, session files are named</p>
 <p><code>&lt;ISO-timestamp&gt;_&lt;uuid&gt;.jsonl</code>.</p>
+<p>That is the default profile&#39;s store, and it is not the only one. A named</p>
+<p>profile (<code>omp --profile &lt;name&gt;</code>, <code>OMP_PROFILE</code>, or the legacy <code>PI_PROFILE</code>)</p>
+<p>relocates omp&#39;s whole user scope, sessions included, and an <code>omp</code> directory</p>
+<p>under <code>XDG_DATA_HOME</code> relocates it again — with no <code>agent</code> segment there. deja</p>
+<p>reads all four:</p>
+<div class="tablewrap"><table>
+<tr><th>Where</th><th>Sessions</th></tr>
+<tr><td>Default profile</td><td><code>~/.omp/agent/sessions/</code></td></tr>
+<tr><td>Named profile</td><td><code>~/.omp/profiles/&lt;name&gt;/agent/sessions/</code></td></tr>
+<tr><td>XDG</td><td><code>$XDG_DATA_HOME/omp/sessions/</code></td></tr>
+<tr><td>XDG, named profile</td><td><code>$XDG_DATA_HOME/omp/profiles/&lt;name&gt;/sessions/</code></td></tr>
+</table></div>
+<p><code>DEJA_OMP_ROOT</code> overrides all of them: with it set, that directory is the only</p>
+<p>one read. XDG counts only when <code>$XDG_DATA_HOME/omp</code> exists, since the variable</p>
+<p>itself is set on most Linux desktops whether or not omp lives there.</p>
+<p>Verified by running omp 17.4.1 each way and following where the transcript</p>
+<p>landed.</p>
 <h2 id="file-layout">File layout</h2>
 <p>Each <code>.jsonl</code> file is a single session. The first line is a session header:</p>
 <pre><code class="language-json">{&#34;type&#34;:&#34;session&#34;,&#34;version&#34;:3,&#34;id&#34;:&#34;&lt;uuid&gt;&#34;,&#34;timestamp&#34;:&#34;&lt;ISO-8601&gt;&#34;,&#34;cwd&#34;:&#34;&lt;absolute-path&gt;&#34;,&#34;title&#34;:&#34;...&#34;}</code></pre>
@@ -100,10 +117,22 @@
 <p>(<code>useHeaderCwd=true</code> in the shared pi-lineage parser). This is more accurate</p>
 <p>than decoding the single-dash directory name, which drops the leading path</p>
 <p>segment (<code>-Code-pleasure-course</code> would otherwise decode to <code>pleasure/course</code>).</p>
-<h2 id="mcp">MCP</h2>
-<p>omp supports MCP via <code>~/.omp/agent/mcp.json</code> with the standard <code>mcpServers</code></p>
-<p>shape (schema <code>can1357/oh-my-pi/.../mcp-schema.json</code>). It also exposes an</p>
-<p>extension/hook API (<code>--hook</code>, <code>--extension</code>) and skills/rules discovery.</p>
+<h2 id="mcp-skill-command">MCP, skill, command</h2>
+<p><code>deja install omp</code> writes <code>~/.omp/agent/mcp.json</code> with the standard <code>mcpServers</code></p>
+<p>shape — the file upstream documents as the primary user-scope MCP config. After</p>
+<p>it, omp lists deja&#39;s tools itself (<code>mcp__deja_recall</code>, <code>recall_context</code>,</p>
+<p><code>remember</code>, <code>blame</code>, <code>fix</code>, <code>how</code>).</p>
+<p>The skill is the shared <code>~/.agents/skills/deja-history/SKILL.md</code>: omp&#39;s <code>agents</code></p>
+<p>provider reads that directory, so it needs no file of its own. Checked by asking</p>
+<p>a running omp to list its skills.</p>
+<p>The command is <code>~/.omp/agent/commands/deja.md</code>. Typing <code>/deja &lt;question&gt;</code> runs</p>
+<p>recall and answers from the result — verified end to end against a live omp</p>
+<p>answering from an earlier omp session.</p>
+<p>A named profile reads its own <code>mcp.json</code> and <code>commands/</code> under</p>
+<p><code>~/.omp/profiles/&lt;name&gt;/agent/</code>; install writes the default profile&#39;s, which is</p>
+<p>what a person on the default profile reads.</p>
+<p>Auto-recall is still open: omp has an extension/hook API (<code>--hook</code>,</p>
+<p><code>--extension</code>) and deja writes no extension for it yet.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Project directory encoding uses Claude Code&#39;s single <code>-</code> prefix (e.g.</li>
@@ -118,7 +147,7 @@
 <li>The <code>parentId</code> chain forms a tree, not a flat list; deja ignores the tree</li>
 </ul>
 <p>structure and processes messages in file order.</p>
-<p><strong>Last verified:</strong> 2026-08-20</p>
+<p><strong>Last verified:</strong> 2026-08-21</p>
 
 <hr>
 <p>deja reads this format and seventeen others, and turns what it finds into memory your
