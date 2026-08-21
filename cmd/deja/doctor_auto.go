@@ -52,6 +52,9 @@ func autoWirings() []autoWiring {
 			return filepath.Join(sources.OpenClawStateDir(), "hooks", openclawHookName, "handler.js")
 		}, "hook-context", ""},
 		{"cline", func() string { return filepath.Join(sources.ClinePluginsDir(), "deja", "index.js") }, "hook-context", ""},
+		{"omp", func() string {
+			return filepath.Join(sources.OmpConfigDir(), "extensions", "deja", "index.js")
+		}, "hook-prompt", ""},
 		{"goose", func() string { return gooseHookPath() }, "hook-goose", ""},
 		{"grok", func() string { return grokHooksPath() }, "hook-context", ""},
 		{"aider", func() string { return aiderContextPath() }, "",

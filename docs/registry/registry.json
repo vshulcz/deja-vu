@@ -408,20 +408,14 @@
    "display_name": "omp (Oh My Pi)",
    "capabilities": {
     "mcp": true,
-    "auto": false,
+    "auto": true,
     "skill": true,
     "command": true,
     "resume": true,
     "handoff": "exec",
     "prereq": ""
    },
-   "gaps": {
-    "auto": {
-     "state": "todo",
-     "why": "omp exposes a hook/extension API (--hook, --extension) and skills/rules discovery, so recall could be injected before a prompt, but deja writes no omp extension yet",
-     "source": "omp --help"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "openclaw",

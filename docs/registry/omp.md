@@ -125,8 +125,13 @@ A named profile reads its own `mcp.json` and `commands/` under
 `~/.omp/profiles/<name>/agent/`; install writes the default profile's, which is
 what a person on the default profile reads.
 
-Auto-recall is still open: omp has an extension/hook API (`--hook`,
-`--extension`) and deja writes no extension for it yet.
+**Auto-recall**: `deja install omp-auto` writes an extension module at
+`~/.omp/agent/extensions/deja/index.js`. It handles omp's `context` event —
+the one seam that reaches the model before it answers — runs `deja hook-prompt`
+with the last user message, and prepends the block to that message. `input`
+never fires in print mode and `before_agent_start` carries the prompt without
+the context to change, which is why `context` and not either of them; all three
+were watched with a probe extension against omp 17.4.1.
 
 ## Known quirks and drift
 

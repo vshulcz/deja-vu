@@ -131,8 +131,13 @@
 <p>A named profile reads its own <code>mcp.json</code> and <code>commands/</code> under</p>
 <p><code>~/.omp/profiles/&lt;name&gt;/agent/</code>; install writes the default profile&#39;s, which is</p>
 <p>what a person on the default profile reads.</p>
-<p>Auto-recall is still open: omp has an extension/hook API (<code>--hook</code>,</p>
-<p><code>--extension</code>) and deja writes no extension for it yet.</p>
+<p><strong>Auto-recall</strong>: <code>deja install omp-auto</code> writes an extension module at</p>
+<p><code>~/.omp/agent/extensions/deja/index.js</code>. It handles omp&#39;s <code>context</code> event —</p>
+<p>the one seam that reaches the model before it answers — runs <code>deja hook-prompt</code></p>
+<p>with the last user message, and prepends the block to that message. <code>input</code></p>
+<p>never fires in print mode and <code>before_agent_start</code> carries the prompt without</p>
+<p>the context to change, which is why <code>context</code> and not either of them; all three</p>
+<p>were watched with a probe extension against omp 17.4.1.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Project directory encoding uses Claude Code&#39;s single <code>-</code> prefix (e.g.</li>

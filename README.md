@@ -241,7 +241,7 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| omp (Oh My Pi) | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
+| omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | — | paste | — |
 | Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |
