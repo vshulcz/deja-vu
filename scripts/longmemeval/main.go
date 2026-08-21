@@ -56,6 +56,7 @@ func main() {
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
 	hookPrecision := flag.Int("hook-precision", 0, "measure the auto-recall hook gate on N cross-paired prompts (0 = off)")
 	answerCarry := flag.Int("answer-carry", 0, "measure how often the injected block carries the gold answer's words (0 = off)")
+	gateSignals := flag.Int("gate-signals", 0, "compare the gate's inputs on haystacks that hold the answer and haystacks that do not (0 = off)")
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
 	flag.Parse()
@@ -86,6 +87,10 @@ func main() {
 			}
 		}
 		questions = kept
+	}
+	if *gateSignals > 0 {
+		runGateSignals(questions, *gateSignals)
+		return
 	}
 	if *answerCarry > 0 {
 		runAnswerCarry(questions, *answerCarry)
@@ -696,6 +701,76 @@ func carryWords(text string) map[string]bool {
 		}
 	}
 	return out
+}
+
+// bestSignals reduces a ranking to what the gate actually looks at: the most
+// informative terms any one candidate matched, and how many of those were rare
+// enough to identify something.
+func bestSignals(matched, strong []int) (int, int) {
+	best, bestStrong := 0, 0
+	for k, m := range matched {
+		if m > best {
+			best = m
+		}
+		if k < len(strong) && strong[k] > bestStrong {
+			bestStrong = strong[k]
+		}
+	}
+	return best, bestStrong
+}
+
+func runGateSignals(questions []lmeQuestion, limit int) {
+	if limit > 0 && limit < len(questions) {
+		questions = questions[:limit]
+	}
+	n := len(questions)
+	type dist struct{ matched, strong, cases, injects int }
+	var own, other dist
+	ownM, otherM := map[int]int{}, map[int]int{}
+	for i := range questions {
+		for _, pair := range []struct {
+			q   lmeQuestion
+			own bool
+		}{{questions[i], true}, {questions[(i+1)%n], false}} {
+			dir, cleanup, err := buildHaystackIndex(pair.q)
+			if err != nil {
+				cleanup()
+				fatal(err)
+			}
+			terms := prompt.Terms(questions[i].Question)
+			_, matched, strong, _, err := index.ProjectRelevant(dir, nil, terms, prompt.Candidates)
+			cleanup()
+			if err != nil {
+				fatal(err)
+			}
+			best, bestStrong := bestSignals(matched, strong)
+			d, hist := &own, ownM
+			if !pair.own {
+				d, hist = &other, otherM
+			}
+			d.cases++
+			d.matched += best
+			d.strong += bestStrong
+			hist[best]++
+			if best >= 2 || (best == 1 && bestStrong >= 1) {
+				d.injects++
+			}
+		}
+	}
+	for _, row := range []struct {
+		name string
+		d    dist
+		hist map[int]int
+	}{{"answer present", own, ownM}, {"answer absent", other, otherM}} {
+		fmt.Printf("%-15s cases %d, injects %d (%.0f%%), avg matched %.2f, avg strong %.2f\n",
+			row.name, row.d.cases, row.d.injects,
+			100*float64(row.d.injects)/float64(row.d.cases),
+			float64(row.d.matched)/float64(row.d.cases),
+			float64(row.d.strong)/float64(row.d.cases))
+		for k := 0; k <= 5; k++ {
+			fmt.Printf("    matched==%d: %d\n", k, row.hist[k])
+		}
+	}
 }
 
 func runHookPrecision(questions []lmeQuestion, limit int) {
