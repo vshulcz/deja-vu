@@ -127,7 +127,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		case "goose":
 			// Goose declares commands in config.yaml, not a commands directory.
 			gotCommand = strings.Contains(gooseRecipe("/bin/deja"), "title: deja")
-		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot", "grok":
+		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot", "grok", "zed":
 			// These make a skill invocable by name, so the skill deja installs
 			// is the command and a second file would only add another entry.
 			// OpenClaw reports "Available as command: yes"; `agy plugin
@@ -136,7 +136,8 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			// of skills; Qwen lists them under /skills; Kimi invokes
 			// /skill:<name>; Copilot invokes /<skill-name>. Grok Build lists
 			// skills with user-invocable frontmatter and an argument hint for
-			// its slash-command autocomplete.
+			// its slash-command autocomplete. Zed lists skills under `/` and
+			// invokes them by their frontmatter name.
 			gotCommand = gotSkill
 		default:
 			// The rest read a command from a file, so the claim is whether we

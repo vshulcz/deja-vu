@@ -69,4 +69,17 @@ Both matter. Zed rewrites a thread in the current shape only when that thread is
 - `parent_id` marks a subagent thread. Those rows are indexed like any other today; nothing filters them.
 - The compressed fixture row is a real zstd frame, so its bytes are opaque in review. The SQL states the plaintext it decompresses to and a test pins the two together.
 
-**Last verified:** 2026-08-17
+## Skill and command
+
+Zed 1.4.2 replaced its rules library with Agent Skills and loads them globally
+from `~/.agents/skills/<name>/SKILL.md` — the shared file deja already writes,
+so `deja install zed` needs no Zed-specific one. Typing `/` in the agent panel
+lists those skills by name, which is what a `/deja` command would have been:
+the skill is the command, as it is for Codex, Qwen, Kimi and Copilot.
+
+Auto-recall stays out of reach for a different reason than a missing file: the
+editor runs nothing before a prompt is sent, so there is no point to inject at.
+
+Checked against Zed 1.16.1.
+
+**Last verified:** 2026-08-21

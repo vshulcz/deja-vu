@@ -57,7 +57,9 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 
 // sharedSkillHarnesses read the cross-agent skills directory defined by the
 // Agent Skills standard. Measured, not assumed, for gemini, openclaw and qwen:
-// each finds a skill placed only there. The rest are from their own docs.
+// each finds a skill placed only there. The rest are from their own docs:
+// Zed 1.4.2 replaced its rules library with Agent Skills and loads them from
+// ~/.agents/skills globally, which is the file deja already writes.
 //
 // Writing one file instead of one per harness is not only tidier. Gemini prints
 // "Skill conflict detected" when the same skill exists in both its own
@@ -66,7 +68,7 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 var sharedSkillHarnesses = map[string]bool{
 	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
 	"roo": true, "codex": true, "goose": true, "openclaw": true,
-	"omp": true, "deepseek": true,
+	"omp": true, "deepseek": true, "zed": true,
 }
 
 // sharedSkillPath is the one file all of them read. Claude Code is deliberately

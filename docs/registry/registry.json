@@ -561,13 +561,13 @@
     "fixtures/registry/zed/zed.sql"
    ],
    "parser_source": "internal/sources/zed.go",
-   "last_verified": "2026-08-17",
+   "last_verified": "2026-08-21",
    "display_name": "Zed",
    "capabilities": {
     "mcp": true,
     "auto": false,
-    "skill": false,
-    "command": false,
+    "skill": true,
+    "command": true,
     "resume": false,
     "handoff": "paste",
     "prereq": "sqlite3 + zstd"
@@ -577,14 +577,6 @@
      "state": "impossible",
      "why": "Zed's agent exposes no lifecycle hook: nothing in the editor runs a command before a prompt is sent, so there is no point at which recall could be injected. Becomes work the day Zed ships one",
      "source": "no hook API in Zed 0.61"
-    },
-    "skill": {
-     "state": "todo",
-     "why": "Zed reads rules files, so guidance has somewhere to live, but deja neither owns nor writes one for it yet"
-    },
-    "command": {
-     "state": "todo",
-     "why": "Follows the skill gap: deja writes no file for Zed, so there is nothing for a command to be defined in"
     },
     "resume": {
      "state": "impossible",
