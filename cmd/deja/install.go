@@ -847,6 +847,11 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	// names the file's or command's prior decision. Scoped to the tools that
 	// change something so it never fires on a Read or a Glob.
 	nextRoot = updateClaudeHook(nextRoot, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit", uninstall)
+	// The other half of the point of action: the pre-tool line speaks before a
+	// command runs, this one speaks when it failed and the store knows what
+	// followed that error before. Bash only — a failed edit does not carry a
+	// shell error signature.
+	nextRoot = updateClaudeHook(nextRoot, "PostToolUse", exe+" hook-tool-after", "Bash", uninstall)
 	next, err := json.MarshalIndent(nextRoot, "", "  ")
 	if err != nil {
 		return installResult{}, err
@@ -875,6 +880,8 @@ func hookStatusMessage(event string) string {
 		return "Saving this session to memory…"
 	case "PreToolUse":
 		return "Checking what this touches…"
+	case "PostToolUse":
+		return "Checking what fixed this before…"
 	}
 	return ""
 }

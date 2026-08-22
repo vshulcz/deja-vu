@@ -105,7 +105,7 @@ to local files, and deja turns those files into one memory layer all of them rea
 | **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
 | **Cross-agent recall** | The MCP `recall` tool answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
 | **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8%. |
-| **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. |
+| **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. When a command fails, a `PostToolUse` hook answers with what followed that same error here before — the pair an agent never thinks to ask for. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
 
 <details>
