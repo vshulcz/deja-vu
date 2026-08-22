@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.18.0] - 2026-08-22
+
 Two new harnesses, the resume column finished, and a recall path rebuilt around
 one question: does the block deja injects carry the answer, or only the word the
 question happened to share.
@@ -738,7 +741,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/vshulcz/deja-vu/compare/v0.17.3...v0.18.0
 [0.17.1]: https://github.com/vshulcz/deja-vu/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/vshulcz/deja-vu/compare/v0.16.9...v0.17.0
 [0.16.7]: https://github.com/vshulcz/deja-vu/compare/v0.16.6...v0.16.7
