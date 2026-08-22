@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The registry documents where eighteen agents keep their history — the one
+// The registry documents where every harness deja reads keeps its history — the one
 // thing about deja people put to a search engine in their own words. Those
 // pages existed only as .md, which GitHub Pages serves as text/markdown: no
 // title, no description, not in the sitemap. The HTML is generated from the

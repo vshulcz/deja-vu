@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -81,6 +83,83 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 			t.Errorf("%s never says %q; the registry has %d harnesses", name, want, n)
 		}
 	}
+}
+
+// The word form is pinned above; this is the other way the count is written.
+// The landing page and the comparison page say it in digits — "17 harnesses,
+// one index" sat under a matrix listing twenty of them, and the comparison
+// against MemPalace argued from a number three releases old. Nobody re-reads a
+// sentence when a harness lands, so the sentence has to fail here.
+func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
+	root := filepath.Join("..", "..")
+	n := registryHarnessCount(t, root)
+
+	claim := regexp.MustCompile(`(\d+)\s*(?:&nbsp;)?\s*(?:coding\s+)?(?:harnesses|harness|agents)\b`)
+	var files []string
+	for _, dir := range []string{".", "docs", "docs/guide"} {
+		entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(dir)))
+		if err != nil {
+			t.Fatalf("%s: %v", dir, err)
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			if ext := filepath.Ext(e.Name()); ext != ".html" && ext != ".md" {
+				continue
+			}
+			// The changelog is a record of what was true at each release and
+			// must keep saying it.
+			if e.Name() == "CHANGELOG.md" {
+				continue
+			}
+			files = append(files, filepath.ToSlash(filepath.Join(dir, e.Name())))
+		}
+	}
+	for _, name := range files {
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for _, m := range claim.FindAllStringSubmatch(string(b), -1) {
+			got, err := strconv.Atoi(m[1])
+			if err != nil || got < 10 || got > 40 {
+				// Not a claim about how many harnesses there are: "3 agents"
+				// in a sentence about someone else's tool, a version, a count
+				// of something entirely different.
+				continue
+			}
+			if got != n {
+				t.Errorf("%s says %q; the registry has %d harnesses", name, strings.TrimSpace(m[0]), n)
+			}
+		}
+	}
+}
+
+// registryHarnessCount is how many harnesses deja reads, from the one file that
+// decides it. deja itself is in the registry as the reader, not as something it
+// reads.
+func registryHarnessCount(t *testing.T, root string) int {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(root, "docs", "registry", "registry.json"))
+	if err != nil {
+		t.Fatalf("registry: %v", err)
+	}
+	var reg struct {
+		Harnesses []struct {
+			ID string `json:"id"`
+		} `json:"harnesses"`
+	}
+	if err := json.Unmarshal(b, &reg); err != nil {
+		t.Fatalf("registry: %v", err)
+	}
+	n := 0
+	for _, h := range reg.Harnesses {
+		if h.ID != "deja" {
+			n++
+		}
+	}
+	return n
 }
 
 // The npm page is the one a lot of people meet the project on, and it had
