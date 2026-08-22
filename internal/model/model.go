@@ -56,6 +56,14 @@ type Session struct {
 	Lifecycle     string `json:"lifecycle,omitempty"`
 	LifecycleNote string `json:"lifecycle_note,omitempty"`
 	LifecycleAt   string `json:"lifecycle_at,omitempty"`
+	// Kind, Parent and Agent describe a session an agent spawned rather than a
+	// person: the harness's own word for it ("subagent", "subagent_fork"), the
+	// session it was forked from when the harness records one, and the name of
+	// the agent that ran it. Only harnesses that write the edge themselves fill
+	// these — deja does not infer a parent from timing or naming (#1385).
+	Kind   string `json:"kind,omitempty"`
+	Parent string `json:"parent,omitempty"`
+	Agent  string `json:"agent,omitempty"`
 }
 
 // Source identifies where a session entered this deja index. Instance is an

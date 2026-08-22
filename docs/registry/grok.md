@@ -27,6 +27,16 @@ global `deja install` cannot wire it. Run `grok mcp add deja --command deja
 
 Consecutive assistant chunks with the same `promptId` are joined. Consecutive user chunks with the same `promptIndex` are joined.
 
+## Spawn tree
+
+`summary.json` records what a session is and where it came from:
+`session_kind` (`subagent`, `subagent_fork`), `parent_session_id`, `agent_name`
+and `forked_at`. deja reads the first three into the session record — they show
+up in `--json` as `kind`, `parent` and `agent`, and `deja show` names the
+session a child was spawned from and the children a parent spawned. A
+`subagent` with no `parent_session_id` keeps its kind and no edge: which
+session asked for it is not written down, and deja does not guess.
+
 ## Known quirks and drift
 
 - The ACP stream contains large tool updates. deja filters lines for message chunk kinds before decoding JSON.

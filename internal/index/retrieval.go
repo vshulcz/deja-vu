@@ -1574,6 +1574,30 @@ func FindManyByIdentity(dir string, ids []Identity) ([]model.Session, error) {
 	return sessionsForMetas(dir, metas)
 }
 
+// ChildrenOf lists the sessions an agent spawned from this one, newest first.
+// Only the harnesses that record the edge themselves produce any: deja does
+// not guess a parent from timing or naming (#1385).
+func ChildrenOf(dir, id string) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if id == "" {
+		return nil, nil
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.Session
+	for _, meta := range m.Sessions {
+		if meta.Parent == id {
+			out = append(out, sessionFromMeta(meta))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Updated.After(out[j].Updated) })
+	return out, nil
+}
+
 // FindByID looks a session up when only its id is known. Hook payloads carry
 // one without naming the harness, and the id is unique in practice: the
 // harnesses that generate them use uuids or their own prefixed ids.

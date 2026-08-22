@@ -146,6 +146,9 @@ when empty:
 | `lifecycle` | state of an imported promoted note: `accepted`, `rejected`, `superseded` or `stale` |
 | `lifecycle_note` | the note left with that state |
 | `lifecycle_at` | when that state was set |
+| `kind` | the harness's own word for a session an agent spawned (`subagent`, `subagent_fork`); absent for sessions a person started |
+| `parent` | the session this one was spawned from, where the harness records the edge itself — deja never infers one |
+| `agent` | name of the agent that ran a spawned session |
 
 `messages` is likewise absent rather than empty on `last`, which never returns
 turns.

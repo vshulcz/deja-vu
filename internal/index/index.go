@@ -159,6 +159,14 @@ type SessionMeta struct {
 	// silently stopped applying (#975). Additive: older manifests decode with
 	// it empty.
 	OrigID string `json:",omitempty"`
+	// Kind, Parent and Agent describe a session an agent spawned: the
+	// harness's own word for it, the session it was forked from, and the agent
+	// that ran it. Only filled where the harness writes the edge itself.
+	// Additive: an older manifest decodes with them empty and every surface
+	// says what it said before.
+	Kind   string `json:",omitempty"`
+	Parent string `json:",omitempty"`
+	Agent  string `json:",omitempty"`
 	// From is the machine this session was worked on. Every imported session
 	// read as "from elsewhere" and nothing more, so with three machines
 	// exchanging history there was no way to ask what the server did, and no

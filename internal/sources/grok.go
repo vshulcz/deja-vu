@@ -53,6 +53,12 @@ type grokSummary struct {
 	GeneratedTitle string `json:"generated_title"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
+	// Grok Build records the spawn edge itself: a forked child names the
+	// session it came from, a plain subagent says only what it is. deja reads
+	// what is written and invents nothing (#1385).
+	SessionKind     string `json:"session_kind"`
+	ParentSessionID string `json:"parent_session_id"`
+	AgentName       string `json:"agent_name"`
 }
 
 func ParseGrokFile(path string) ([]model.Session, error) {
@@ -82,7 +88,8 @@ func parseGrokFileFromOffset(path string, offset int64) ([]model.Session, error)
 	if title == "" {
 		title = doc.SessionSummary
 	}
-	s := model.Session{ID: id, Harness: "grok", Project: projectName(cwd), Path: path, Title: title}
+	s := model.Session{ID: id, Harness: "grok", Project: projectName(cwd), Path: path, Title: title,
+		Kind: doc.SessionKind, Parent: doc.ParentSessionID, Agent: doc.AgentName}
 	if t, err := time.Parse(time.RFC3339Nano, doc.CreatedAt); err == nil {
 		s.Touch(t)
 	}

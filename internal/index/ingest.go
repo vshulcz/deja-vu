@@ -1090,6 +1090,7 @@ func metaForSession(s model.Session) SessionMeta {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
 	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages),
+		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent,
 		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
@@ -1508,6 +1509,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 		Title: meta.Title, AgentTitle: meta.AgentTitle, Started: meta.Started, Updated: meta.Updated, Touched: meta.Touched,
 		GaveUp: meta.GaveUp,
 		Words:  meta.Words,
+		Kind:   meta.Kind, Parent: meta.Parent, Agent: meta.Agent,
 		OrigID: meta.OrigID, From: meta.From, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }

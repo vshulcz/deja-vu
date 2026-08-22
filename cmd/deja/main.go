@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
@@ -435,9 +436,41 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if note := bucketDayNote(s); note != "" {
 		fmt.Fprintln(os.Stderr, note)
 	}
+	printSpawnEdges(os.Stderr, dir, s)
 	search.PrintSession(os.Stdout, s)
 	return nil
 }
+
+// printSpawnEdges names the sessions around this one when an agent spawned it
+// or spawned others from it. A subagent's work lives in its own session, so a
+// reader who found the parent could not get to it and a reader who found the
+// child could not say what asked for it (#1385).
+func printSpawnEdges(w io.Writer, dir string, s model.Session) {
+	if s.Parent != "" {
+		by := ""
+		if s.Agent != "" {
+			by = " as " + s.Agent
+		}
+		fmt.Fprintf(w, "deja: spawned from %s%s — `deja show %s`\n", digest.Short(s.Parent), by, digest.Short(s.Parent))
+	} else if s.Kind != "" {
+		// A kind with no parent is all the harness recorded; saying which
+		// session asked for it would be a guess.
+		fmt.Fprintf(w, "deja: %s session — the harness records no parent for it\n", s.Kind)
+	}
+	children, err := ChildrenOfSession(dir, s.ID)
+	if err != nil || len(children) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(children))
+	for _, c := range children {
+		ids = append(ids, digest.Short(c.ID))
+	}
+	fmt.Fprintf(w, "deja: spawned %d session%s: %s\n", len(ids), pluralS(len(ids)), strings.Join(ids, ", "))
+}
+
+// ChildrenOfSession is a thin seam so the surface can be tested without an
+// index on disk.
+var ChildrenOfSession = index.ChildrenOf
 
 // bucketDayNote explains a note bucket's date when the records inside it fall
 // on a different local day than the id claims — and stays silent otherwise, so
