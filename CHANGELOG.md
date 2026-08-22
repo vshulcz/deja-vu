@@ -26,6 +26,7 @@ question happened to share.
 - A Claude subagent's transcript is its own session, keyed by `agentId` with the parent recorded, rather than a copy of the parent folded under the same id. The registry no longer calls those files duplicates: the parent keeps the launch and a summary, the turns and the tool stream live only in the child. Still behind `DEJA_INCLUDE_SUBAGENTS=1`, now for index size rather than for work that was said to be there twice. (#1384)
 - Recall quotes the line that settled something instead of the densest mention of a word, carries two lines past the match, and leads with the session that concluded rather than the one that echoed. The per-prompt budget went to 1536 bytes and a single-rare-word match gets half of it. (#1463, #1467, #1475, #1488, #1492, #1493, #1504, #1506, #1507, #1511, #1514)
 - Ranking fuses its two views with reciprocal rank fusion rather than one overriding the other. (#1491)
+- How rare a word is takes the rarer of two verdicts — one document per session, and one per message with each session capped. Sessions alone called a subject word common because the marathons that hold most of a store all mention it; messages alone called the topic of one long session filler. On a replay of 59 real questions the block answered 43 against 41, with none lost. (#1450, #1536)
 - The hook and the benchmark apply one bar, in one place. The benchmark had been measuring a gate the product did not have — three times, in three different ways. (#1438, #1516, #1517)
 
 ### Fixed
@@ -34,6 +35,7 @@ question happened to share.
 - The block no longer opens with the message being typed, nor with the top of a transcript that merely mentioned the word. (#1439, #1458, #1479)
 - Per-prompt recall carries the agent session id in opencode, pi and OpenClaw, so the same block is not repeated and a compacted context forgets what it was shown. (#1495, #1496, #1497, #1498)
 - A plan is not a decision, and a stated outcome is. (#1478, #1501)
+- The prompt benchmark can judge rarity at all: it ran on thirty chains of invented vocabulary where every word was rare, and now carries 300 sessions of ordinary working talk behind them. The false fires that surfaced were the fixture answering its own controls — chain filler quoted three of them word for word — and are back to zero. (#1448, #1534, #1535, #1538)
 
 
 ## [0.17.3] - 2026-08-19
