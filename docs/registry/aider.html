@@ -49,6 +49,11 @@ The query misses the tenant predicate.
 <h2 id="message-mapping">Message mapping</h2>
 <p>Outside fenced code blocks, <code>#### </code> starts or continues a user message. Plain Markdown is assistant output. Lines beginning with <code>&gt; </code> are tool or system output and are not indexed. Blank lines remain part of the current message.</p>
 <p>The header timestamp uses local time with layout <code>YYYY-MM-DD HH:MM:SS</code>. aider does not store message timestamps, so every message receives the session start. It does not store a session ID; deja derives a stable ID from the history path and the session&#39;s ordinal in that file.</p>
+<h2 id="skills">Skills</h2>
+<p>None, and there is nothing to build on. aider loads instruction files rather</p>
+<p>than offering a catalogue an agent picks from: <code>--read</code> (and a CONVENTIONS.md by</p>
+<p>habit) puts a file in every message, which is exactly what deja&#39;s context file</p>
+<p>already is. A skill here would be the same always-on text under another name.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>The file is append-only and can contain many launches.</li>

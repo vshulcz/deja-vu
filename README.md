@@ -231,7 +231,7 @@ Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| aider | ⚠ | ✅ | ? | ⚠ | ✕ | ✅ | deja aider |
+| aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats) |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |

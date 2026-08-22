@@ -22,6 +22,13 @@ Outside fenced code blocks, `#### ` starts or continues a user message. Plain Ma
 
 The header timestamp uses local time with layout `YYYY-MM-DD HH:MM:SS`. aider does not store message timestamps, so every message receives the session start. It does not store a session ID; deja derives a stable ID from the history path and the session's ordinal in that file.
 
+## Skills
+
+None, and there is nothing to build on. aider loads instruction files rather
+than offering a catalogue an agent picks from: `--read` (and a CONVENTIONS.md by
+habit) puts a file in every message, which is exactly what deja's context file
+already is. A skill here would be the same always-on text under another name.
+
 ## Known quirks and drift
 
 - The file is append-only and can contain many launches.

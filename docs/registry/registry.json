@@ -129,8 +129,9 @@
      "source": "https://github.com/Aider-AI/aider/pull/5539"
     },
     "skill": {
-     "state": "unknown",
-     "why": "no skills mechanism found and none requested beyond surfacing skills published elsewhere; aider offers no plugin surface deja could use, but nothing states it cannot"
+     "state": "impossible",
+     "why": "aider loads instruction files, it does not load them by name on demand: --read (and a CONVENTIONS.md by habit) puts a file in every message, which is what deja already writes as aider's context file. There is no catalogue an agent picks from, so a skill would only be the same always-on text under another name",
+     "source": "aider 0.86.2 --help: --read/--file/--config, no skills flag"
     },
     "command": {
      "state": "blocked",
