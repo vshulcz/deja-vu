@@ -72,40 +72,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	if targetArgs[0] == "--auto" {
 		targets = nil
 		for _, t := range existingTargets() {
-			switch t {
-			case "claude-code":
-				targets = append(targets, "claude-auto")
-			case "codex":
-				targets = append(targets, "codex-auto")
-			case "opencode":
-				targets = append(targets, "opencode-auto")
-			case "gemini":
-				targets = append(targets, "gemini-auto")
-			case "qwen":
-				targets = append(targets, "qwen-auto")
-			case "kimi":
-				targets = append(targets, "kimi-auto")
-			case "cursor":
-				targets = append(targets, "cursor-auto")
-			case "pi":
-				targets = append(targets, "pi-auto")
-			case "hermes":
-				targets = append(targets, "hermes-auto")
-			case "openclaw":
-				targets = append(targets, "openclaw-auto")
-			case "antigravity":
-				targets = append(targets, "antigravity-auto")
-			case "cline":
-				targets = append(targets, "cline-auto")
-			case "goose":
-				targets = append(targets, "goose-auto")
-			case "grok":
-				targets = append(targets, "grok-auto")
-			default:
-				// The IDE extensions: the MCP server is the deepest integration
-				// those harnesses support.
-				targets = append(targets, t)
-			}
+			targets = append(targets, autoTargetFor(t))
 		}
 		if len(targets) == 0 {
 			fmt.Println("no known agent config directories found")
@@ -1397,6 +1364,27 @@ func opencodeHasMCPKey(lines []string) bool {
 		}
 	}
 	return false
+}
+
+// autoTargetFor maps a detected harness to the deepest integration it has: the
+// -auto target where one exists, the plain one otherwise (the IDE extensions,
+// where an MCP server is as far as it goes).
+//
+// This was a hand-written switch, and the two harnesses added after it was
+// written fell through to the default — so `deja install --auto` wired their
+// MCP server and quietly left auto-recall off on a machine that has it.
+func autoTargetFor(detected string) string {
+	// Detection reports Claude as "claude-code" while its target is "claude".
+	base := detected
+	if base == "claude-code" {
+		base = "claude"
+	}
+	for _, name := range installTargetNames() {
+		if name == base+"-auto" {
+			return name
+		}
+	}
+	return detected
 }
 
 // withAutoTargets pairs each target with its -auto sibling where one exists,
