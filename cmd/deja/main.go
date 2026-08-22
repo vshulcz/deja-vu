@@ -564,7 +564,7 @@ func cmdCtx(dir string, rest []string) error {
 		}
 	}
 	o := search.Options{Query: nfcfold.Compose(q), All: true}
-	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
+	if err := ensureForCLISearch(dir, o, false, os.Stderr); err != nil {
 		if !staleUnwritableIndex(dir, err) {
 			return err
 		}
@@ -782,6 +782,30 @@ func cmdSearch(dir string, rest []string, sourceInstance string) error {
 	return runSearch(dir, rest, sourceInstance)
 }
 
+// ensureForCLISearch keeps a search off the rewrite path. Appending the new
+// bytes of a grown transcript is cheap and stays inline; work that rewrites the
+// index — a store that rewrote itself, a removed file, a harness with no append
+// path — is handed to the detached warmup, and the search answers from the
+// index it already has. MCP made that trade at #1305 because a rebuild blows
+// the client's timeout; the CLI kept waiting, and on a 1.7 GB store a query
+// that matched nothing took 194 s while a live Grok session grew (#1521).
+//
+// `--rebuild` still waits: someone who asked for the rebuild wants its result.
+func ensureForCLISearch(dir string, o search.Options, force bool, progress io.Writer) error {
+	if force {
+		return index.EnsureForSearch(dir, o, true, progress)
+	}
+	stale, err := index.EnsureForSearchStale(dir, o, progress)
+	if err != nil {
+		return err
+	}
+	if stale {
+		requestWarmup(dir)
+		fmt.Fprintln(progress, "deja: answering from the index as it was — refreshing in the background")
+	}
+	return nil
+}
+
 func runSearch(dir string, args []string, sourceInstance string) error {
 	force := false
 	var filtered []string
@@ -806,7 +830,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	o.SourceInstance = sourceInstance
 	o.RecallWorn = usage.WornSessions(dir)
 	prepareFirstIndexGreeting(dir)
-	if err := withBuildProgress(func() error { return index.EnsureForSearch(dir, o, force, os.Stderr) }); err != nil {
+	if err := withBuildProgress(func() error { return ensureForCLISearch(dir, o, force, os.Stderr) }); err != nil {
 		// A store that cannot be written still has an index that can be read:
 		// answering from it beats answering nothing (#904).
 		if !staleUnwritableIndex(dir, err) {
