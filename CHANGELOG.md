@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Two new harnesses, the resume column finished, and a recall path rebuilt around
+one question: does the block deja injects carry the answer, or only the word the
+question happened to share.
+
+### Added
+- omp (Oh My Pi) is the nineteenth harness deja indexes, contributed by [@hanchang](https://github.com/hanchang). Sessions are pi-format JSONL under `~/.omp/agent/sessions`, with profiles and XDG relocations read too; it gets the shared skill, a `/deja` command and auto-recall through an extension on its context event. (#1455, #1520, #1523, #1525)
+- DeepSeek Harness is the twentieth. Sessions are zstd-framed JSONL under `$DSH_HOME`; MCP, the shared skill and a `/deja` command arrive through the home patch layer, and `deja install deepseek-auto` adds a plugin on `agent/pre-step` that puts recall in front of the model. Verified against a running dsh with no tools in play. (#1518, #1519, #1524, #1527)
+- `deja resume` now reopens qwen, Gemini CLI, Cursor CLI and OpenClaw sessions. Each takes the id deja already indexes — OpenClaw through the session key its store maps that id to — and the command carries the project directory where the harness scopes its session list to one. (#1528, #1529)
+- Grok's spawn tree: `session_kind`, `parent_session_id` and `agent_name` come out of `summary.json` into the session record, `--json` carries them, and `show` names the session a child was forked from and the children a parent spawned. deja never infers an edge the harness did not write. (#1385)
+- One `deja sync` command for every machine, a timer that keeps them in step without being asked, and a report that shows a sync going stale — plus the machine a memory came from, carried across. (#1430, #1432, #1433)
+- The session format registry is published as pages, so what deja reads out of each store is a thing you can link to. (#1434)
+- Zed reads the shared skill, and that skill is its command. (#1426, #1428, #1429, #1526)
+
+### Changed
+- A growing Grok session appends to the index instead of rewriting it. The stream is parsed from its last safe offset when the prefix hash still matches; a rewind that truncates and regrows still reparses in full. On a 1.7 GB store a live session made every search pay for a full rewrite. (#1522)
+- CLI search stops waiting for that rewrite. Appends stay inline; rewrite-grade work goes to the detached warmup and the search answers from the index it has, the way the MCP tools already did. `--rebuild` still waits. (#1521)
+- A Claude subagent's transcript is its own session, keyed by `agentId` with the parent recorded, rather than a copy of the parent folded under the same id. The registry no longer calls those files duplicates: the parent keeps the launch and a summary, the turns and the tool stream live only in the child. Still behind `DEJA_INCLUDE_SUBAGENTS=1`, now for index size rather than for work that was said to be there twice. (#1384)
+- Recall quotes the line that settled something instead of the densest mention of a word, carries two lines past the match, and leads with the session that concluded rather than the one that echoed. The per-prompt budget went to 1536 bytes and a single-rare-word match gets half of it. (#1463, #1467, #1475, #1488, #1492, #1493, #1504, #1506, #1507, #1511, #1514)
+- Ranking fuses its two views with reciprocal rank fusion rather than one overriding the other. (#1491)
+- The hook and the benchmark apply one bar, in one place. The benchmark had been measuring a gate the product did not have — three times, in three different ways. (#1438, #1516, #1517)
+
+### Fixed
+- Russian questions reach the same recall English ones do: filler is filtered by the same rule, short subjects and three-letter acronyms survive term extraction, a hyphen inside a word no longer drops it, and decision markers read as conclusions. (#1440, #1459, #1460, #1462, #1465, #1468, #1470)
+- deja stops quoting itself. A past session saying it had no memory, the harness checks run against the tool, and a scripted probe are not history worth recalling. (#1499, #1500, #1502, #1503)
+- The block no longer opens with the message being typed, nor with the top of a transcript that merely mentioned the word. (#1439, #1458, #1479)
+- Per-prompt recall carries the agent session id in opencode, pi and OpenClaw, so the same block is not repeated and a compacted context forgets what it was shown. (#1495, #1496, #1497, #1498)
+- A plan is not a decision, and a stated outcome is. (#1478, #1501)
+
 
 ## [0.17.3] - 2026-08-19
 

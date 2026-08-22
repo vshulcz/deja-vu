@@ -28,8 +28,8 @@ If `deja` is not on PATH, use the npx form: `"command": "npx", "args": ["-y", "@
 
 For the twenty harnesses deja installs into — Claude Code, Codex, Cursor, opencode,
 Gemini CLI, Cline, Copilot CLI, Roo Code, aider, Goose, Qwen Code, Kimi Code,
-Antigravity, Grok Build, OpenClaw, pi and Hermes — there is a one-command setup
-instead:
+Antigravity, Grok Build, OpenClaw, pi, omp, DeepSeek Harness, Zed and Hermes —
+there is a one-command setup instead:
 
 ```sh
 deja install --auto   # MCP recall everywhere it finds, plus session-start recall

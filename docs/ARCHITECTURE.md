@@ -123,6 +123,20 @@ The export watermark is per source path (falling back to session key for synthet
 - append-only JSONL/opencode changes: append new records and update touched buckets;
 - removed files or non-append changes: rewrite the index while preserving unchanged records and replacing changed sessions.
 
+A file takes the append path only when the prefix deja already read is still
+byte-for-byte what it read: a rewind that truncates and regrows past the old
+length looks exactly like growth, and appending onto it would leave the replaced
+turns in the index for good. The recorded prefix hash is what tells the two
+apart, so a live transcript that only grew is read from its last safe offset
+rather than reparsed whole.
+
+Search does not wait for the rewrite branch. `EnsureForSearchStale` runs the
+cheap half inline and reports that the rest is outstanding; the caller refreshes
+in a detached warmup and answers from the index it already has. Both the MCP
+tools and the CLI take that path — a rewrite of a gigabyte of records and
+buckets is not a cost a query can pay — while `deja index` and
+`deja search --rebuild` still do the work in front of you.
+
 Cold rebuild does all parsing first, then writes `records.bin`, buckets, and manifest from one goroutine. That keeps the on-disk index coherent and avoids concurrent writers.
 
 ## MCP server design
