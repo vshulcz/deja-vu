@@ -18,7 +18,7 @@ disk, and hands the right one back when it is needed.</p>
 <p align="center"><b>Every memory tool starts empty and records forward. deja starts full.</b></p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>~1.5&nbsp;ms</b> median search over 3.5&nbsp;GB<br>
+<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.6%</b> on LoCoMo &middot; <b>sub-millisecond</b> lookups over 5&nbsp;GB of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
@@ -298,13 +298,15 @@ where no prior fact is relevant. The corpus generator and the relevance labels a
 ordinary reviewed Go. Audit what "relevant" means before trusting any figure, ours
 included.
 
-Measured on a real corpus of 1,250+ sessions, roughly 3.3GB across three harnesses:
+Measured on a real store of 1,551 sessions and 143k messages — 5.2 GB across nine
+harnesses:
 
 | Measurement | Result |
 | --- | --- |
-| Warm search | **~1.5 ms** median, ~14 ms on the most common word in the store |
-| Cold index (once) | ~10 s |
-| Index size | ~2.3% of corpus |
+| Lookup, in process | **~0.4 ms** median (`deja bench recall`), ~25 ms on the LongMemEval-S haystacks |
+| `deja <query>`, end to end | ~0.2 s median on that store: process start, the freshness check over every store, ranking, printing |
+| Freshness check alone | ~30 ms when nothing changed |
+| Index size | 160 MB, ~3% of corpus |
 
 The index is incremental. When a session file grows, only that file is re-read.
 
@@ -324,7 +326,9 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 are your agent's data. They do not enter deja's index, digests, shares or sync exports.
 
 **Will it slow my agent down?** A recall is a lexical lookup against a local index:
-~1.5 ms median. Nothing waits on a model.
+~0.4 ms median, and nothing waits on a model. A hook adds the process start and a
+freshness check over your stores on top of that — tens of milliseconds on a store of
+a few gigabytes.
 
 **Do I have to change how I work?** No. The agent calls recall itself, and with
 auto-recall it already knows the project's prior decisions when the session opens.
