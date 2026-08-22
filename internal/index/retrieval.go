@@ -794,11 +794,20 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// term counts only where every sub-token is present; idf comes from
 		// the rarest sub-token, which is the one that actually identifies.
 		var (
-			hit    map[uint32]bool
-			tf     map[uint32]int
-			minDF  = -1
-			offs   map[uint32]map[int64]bool
-			missed bool
+			hit map[uint32]bool
+			tf  map[uint32]int
+			// minDF is in capped messages, minSess in whole sessions. Neither
+			// unit is right alone: sessions call a subject word common because
+			// the marathons everything lives in all mention it, and capped
+			// messages call a word that saturates one long session filler —
+			// which is exactly what the name of the thing you have been working
+			// on all month looks like. The rarer of the two verdicts wins, so a
+			// term has to read as ordinary under BOTH before it is treated as
+			// filler.
+			minDF   = -1
+			minSess = -1
+			offs    map[uint32]map[int64]bool
+			missed  bool
 		)
 		if len(orKeys) > 1 && !isCyrToken(term) {
 			// Fold stem forms in ONLY when the exact token is absent from the
@@ -854,7 +863,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			if len(hit) == 0 {
 				continue
 			}
-			minDF = countDF(df)
+			minDF, minSess = countDF(df), len(df)
 			termsKnown++
 			// fallthrough to idf/scoring below
 		} else {
@@ -903,7 +912,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				// only a common sub-token ("index" of "pkg/index") collect the
 				// full term mass, and best-message ranking amplifies that.
 				if minDF == -1 || countDF(df) < minDF {
-					minDF = countDF(df)
+					minDF, minSess = countDF(df), len(df)
 					offs = keyOffs
 				}
 				if len(hit) == 0 {
@@ -916,20 +925,23 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 			termsKnown++
 		}
-		idf := math.Log(totalDocs / float64(minDF+1))
+		idf := math.Max(
+			math.Log(totalDocs/float64(minDF+1)),
+			math.Log(float64(len(m.Sessions)+1)/float64(minSess+1)),
+		)
 		idfOf[term] = idf
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
 			// in only a couple of sessions still identifies them.
-			if minDF > 2 {
+			if minSess > 2 {
 				continue
 			}
 			idf = 0.1
 		}
-		informative := idf >= dejaVuIDFFloor || minDF <= 2
+		informative := idf >= dejaVuIDFFloor || minSess <= 2
 		// Rare enough to identify something on its own: either well past the
 		// ordinary bar, or living in a single session of the whole corpus.
-		strong := idf >= dejaVuStrongIDFFloor || minDF <= 1
+		strong := idf >= dejaVuStrongIDFFloor || minSess <= 1
 		for ord := range hit {
 			mm := perMessage[ord]
 			if mm == nil {
