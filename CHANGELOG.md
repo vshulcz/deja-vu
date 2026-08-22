@@ -34,6 +34,7 @@ question happened to share.
 - deja stops quoting itself. A past session saying it had no memory, the harness checks run against the tool, and a scripted probe are not history worth recalling. (#1499, #1500, #1502, #1503)
 - The block no longer opens with the message being typed, nor with the top of a transcript that merely mentioned the word. (#1439, #1458, #1479)
 - Per-prompt recall carries the agent session id in opencode, pi and OpenClaw, so the same block is not repeated and a compacted context forgets what it was shown. (#1495, #1496, #1497, #1498)
+- `deja install --auto` wired omp and DeepSeek Harness for MCP and left their auto-recall off, because the mapping from a detected harness to its deepest target was a hand-written switch and both landed after it. It comes from the target table now. (#1544)
 - A plan is not a decision, and a stated outcome is. (#1478, #1501)
 - The prompt benchmark can judge rarity at all: it ran on thirty chains of invented vocabulary where every word was rare, and now carries 300 sessions of ordinary working talk behind them. The false fires that surfaced were the fixture answering its own controls — chain filler quoted three of them word for word — and are back to zero. (#1448, #1534, #1535, #1538)
 
