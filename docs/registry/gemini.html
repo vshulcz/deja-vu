@@ -44,6 +44,13 @@
 <pre><code class="language-json">{&#34;sessionId&#34;:&#34;session-7&#34;,&#34;startTime&#34;:&#34;2026-07-17T09:00:00Z&#34;,&#34;lastUpdated&#34;:&#34;2026-07-17T09:00:02Z&#34;}
 {&#34;id&#34;:&#34;message-1&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:01Z&#34;,&#34;type&#34;:&#34;gemini&#34;,&#34;content&#34;:[{&#34;text&#34;:&#34;The configuration is valid.&#34;}]}</code></pre>
 <p><code>type: &#34;user&#34;</code> maps to <code>user</code>; <code>gemini</code> and <code>model</code> map to <code>assistant</code>. Other types, including informational and error events, are ignored. Content is a string or an array of parts with <code>text</code>. All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.</p>
+<h2 id="resume">Resume</h2>
+<p><code>gemini --resume &lt;uuid&gt;</code> takes the session id deja indexes — the <code>--help</code> text</p>
+<p>mentions only <code>latest</code> and an index, but the CLI&#39;s own error names</p>
+<p><code>--resume {uuid}</code> and 0.55.1 accepts one. No <code>cd</code>: gemini scopes the lookup by</p>
+<p>a hash of the working directory and stores only the hash, so there is nothing</p>
+<p>to invert into a path. From the wrong directory it says &#34;No previous sessions</p>
+<p>found for this project&#34; rather than opening someone else&#39;s.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>A resumed legacy <code>.json</code> session can be rewritten as <code>.jsonl</code>. deja deduplicates by session ID and prefers JSONL.</li>

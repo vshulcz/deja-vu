@@ -347,3 +347,24 @@ func cursorTranscriptProject(path string) string {
 	}
 	return encoded
 }
+
+// CursorTranscriptProjectDirBase returns the encoded project dir of a CLI
+// transcript in the form resolveEncodedPath walks. Cursor writes the encoding
+// without a leading separator ("Users-x-app", not "-Users-x-app"), so the
+// prefix is added back here rather than teaching the shared resolver a third
+// dialect.
+func CursorTranscriptProjectDirBase(path string) string {
+	dir := filepath.Clean(path)
+	for !strings.EqualFold(filepath.Base(filepath.Dir(dir)), "projects") {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+	encoded := filepath.Base(dir)
+	if encoded == "" || encoded == "." {
+		return ""
+	}
+	return "-" + encoded
+}

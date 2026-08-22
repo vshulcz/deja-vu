@@ -25,6 +25,16 @@ Bubble `type: 1` maps to `user`; other numeric types map to `assistant`. Text us
 
 Only `user` and `assistant` roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as `turn_ended` are ignored. The transcript has no message timestamps, so deja uses file modification time.
 
+## Resume
+
+CLI chats only. A transcript is named after the chat id `cursor-agent --resume`
+takes, and the command runs in the project directory because Cursor lists chats
+per workspace — deja prints `cd <project> && cursor-agent --resume <id>`, the
+directory recovered from the encoded path (Cursor writes it without the leading
+separator, `Users-x-app`). Live-verified: the resumed chat answered from its own
+history. IDE chats carry a composer id from `state.vscdb` that the CLI does not
+take, so those still reopen only in the editor.
+
 ## Known quirks and drift
 
 - Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.

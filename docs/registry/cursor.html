@@ -47,6 +47,14 @@
 <h2 id="cli-jsonl-records">CLI JSONL records</h2>
 <pre><code class="language-json">{&#34;role&#34;:&#34;assistant&#34;,&#34;message&#34;:{&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The cache key omitted the locale.&#34;}]}}</code></pre>
 <p>Only <code>user</code> and <code>assistant</code> roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as <code>turn_ended</code> are ignored. The transcript has no message timestamps, so deja uses file modification time.</p>
+<h2 id="resume">Resume</h2>
+<p>CLI chats only. A transcript is named after the chat id <code>cursor-agent --resume</code></p>
+<p>takes, and the command runs in the project directory because Cursor lists chats</p>
+<p>per workspace — deja prints <code>cd &lt;project&gt; &amp;&amp; cursor-agent --resume &lt;id&gt;</code>, the</p>
+<p>directory recovered from the encoded path (Cursor writes it without the leading</p>
+<p>separator, <code>Users-x-app</code>). Live-verified: the resumed chat answered from its own</p>
+<p>history. IDE chats carry a composer id from <code>state.vscdb</code> that the CLI does not</p>
+<p>take, so those still reopen only in the editor.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.</li>

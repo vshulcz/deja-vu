@@ -163,17 +163,11 @@
     "auto": true,
     "skill": true,
     "command": true,
-    "resume": false,
+    "resume": true,
     "handoff": "exec",
     "prereq": ""
    },
-   "gaps": {
-    "resume": {
-     "state": "todo",
-     "why": "`-r, --resume` exists but takes \"latest\" or a position in the list rather than a session id, and `--session-id` starts a new session under a chosen id instead of reopening one. Handing back a position is only correct until the next session is written, so this needs the index-to-id question settled before deja prints anything.",
-     "source": "gemini 0.55.1 --help"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "cursor",
@@ -196,17 +190,11 @@
     "auto": true,
     "skill": true,
     "command": true,
-    "resume": false,
+    "resume": true,
     "handoff": "exec",
     "prereq": "sqlite3 (IDE chats)"
    },
-   "gaps": {
-    "resume": {
-     "state": "todo",
-     "why": "`cursor-agent --resume [chatId]` reopens a chat by id. What is not settled is whether the id deja reads out of state.vscdb is that chatId; printing the wrong one sends the user to someone else's conversation or to an error.",
-     "source": "cursor-agent --help"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "antigravity",
@@ -429,17 +417,11 @@
     "auto": true,
     "skill": true,
     "command": true,
-    "resume": false,
+    "resume": true,
     "handoff": "paste",
     "prereq": ""
    },
-   "gaps": {
-    "resume": {
-     "state": "todo",
-     "why": "`openclaw agent` takes `--session-id` and `--session-key`, and reusing a key continues that session — verified while driving it against a recording endpoint. What deja stores is the session file name, so the mapping to a key is the open part.",
-     "source": "openclaw agent --help, 2026.7.1-2"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "copilot",

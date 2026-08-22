@@ -60,7 +60,14 @@
 <p>Live-verified: <code>openclaw mcp probe deja</code> reports the tools and the agent</p>
 <p>calls <code>recall</code> mid-turn.</p>
 <ul>
-<li><strong>Resume</strong>: OpenClaw&#39;s own session continuity.</li>
+<li><strong>Resume</strong>: <code>openclaw chat --session &lt;key&gt;</code>. OpenClaw addresses a</li>
+</ul>
+<p>conversation by key (<code>agent:&lt;id&gt;:&lt;name&gt;</code>); the uuid its transcript is named</p>
+<p>after opens nothing, and the mapping lives in <code>sessions.json</code> beside the</p>
+<p>transcripts. deja reads the key from there. Live-verified: the terminal UI</p>
+<p>came up on <code>agent:main:main</code> with that session&#39;s history, and a run through</p>
+<p><code>openclaw agent --session-id</code> answered from it.</p>
+<ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-07-23</p>

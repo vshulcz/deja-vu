@@ -17,6 +17,15 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 
 `type: "user"` maps to `user`; `gemini` and `model` map to `assistant`. Other types, including informational and error events, are ignored. Content is a string or an array of parts with `text`. All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.
 
+## Resume
+
+`gemini --resume <uuid>` takes the session id deja indexes — the `--help` text
+mentions only `latest` and an index, but the CLI's own error names
+`--resume {uuid}` and 0.55.1 accepts one. No `cd`: gemini scopes the lookup by
+a hash of the working directory and stores only the hash, so there is nothing
+to invert into a path. From the wrong directory it says "No previous sessions
+found for this project" rather than opening someone else's.
+
 ## Known quirks and drift
 
 - A resumed legacy `.json` session can be rewritten as `.jsonl`. deja deduplicates by session ID and prefers JSONL.

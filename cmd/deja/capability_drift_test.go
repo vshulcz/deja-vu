@@ -185,7 +185,7 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		}
 
 		// Resume: resumeCommand must succeed for a plausible session.
-		s := model.Session{ID: "abc123", Harness: h.ID, Project: "p", Path: "/tmp/x.jsonl"}
+		s := plausibleSession(t, h.ID)
 		_, _, rerr := resumeCommand(s)
 		if (rerr == nil) != c.Resume {
 			t.Fatalf("%s: registry resume=%v, resumeCommand err=%v", h.ID, c.Resume, rerr)
@@ -229,4 +229,25 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			t.Fatalf("README matrix missing row for %s — run `go run ./scripts/genmatrix`", h.DisplayName)
 		}
 	}
+}
+
+// plausibleSession builds the session the resume invariant is checked against.
+// Most harnesses need nothing but an id; openclaw's command comes out of its
+// session store, so a bare path would fail the check for the right reason and
+// the wrong one at once.
+func plausibleSession(t *testing.T, harness string) model.Session {
+	t.Helper()
+	s := model.Session{ID: "abc123", Harness: harness, Project: "p", Path: "/tmp/x.jsonl"}
+	if harness == "openclaw" {
+		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		store := `{"agent:main:main":{"sessionId":"abc123"}}`
+		if err := os.WriteFile(filepath.Join(dir, "sessions.json"), []byte(store), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		s.Path = filepath.Join(dir, "abc123.jsonl")
+	}
+	return s
 }

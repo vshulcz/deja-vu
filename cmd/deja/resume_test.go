@@ -143,6 +143,81 @@ func TestResumeQwenRunsInTheProjectDirectory(t *testing.T) {
 	}
 }
 
+// Cursor's CLI transcripts are named after the chat id `--resume` takes, while
+// IDE chats come out of a different store and reopen only in the editor.
+func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "app")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Cursor encodes without the leading separator: Users-x-app, not -Users-x-app.
+	encoded := strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
+	id := "de875c53-88ae-4e73-8953-9813479364d8"
+	path := filepath.Join(tmp, "projects", encoded, "agent-transcripts", id, id+".jsonl")
+
+	dir, cmd, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Project: "app", Path: path})
+	if err != nil {
+		t.Fatalf("cursor resume: %v", err)
+	}
+	if cmd != "cursor-agent --resume "+id {
+		t.Fatalf("cmd = %q", cmd)
+	}
+	if runtime.GOOS != "windows" && dir != real {
+		t.Fatalf("dir = %q, want the project directory %q", dir, real)
+	}
+
+	// An IDE chat carries a composer id from state.vscdb, which cursor-agent
+	// does not take: printing the command anyway sends someone to a new chat.
+	if _, _, err := resumeCommand(model.Session{Harness: "cursor", ID: "composer-1", Path: filepath.Join(tmp, "state.vscdb")}); err == nil {
+		t.Fatal("an IDE chat produced a terminal command")
+	}
+}
+
+// gemini takes the session uuid deja indexes, and scopes the lookup to a hash
+// of the working directory it cannot invert — so the command carries no cd.
+func TestResumeGeminiPrintsNoDirectory(t *testing.T) {
+	dir, cmd, err := resumeCommand(model.Session{Harness: "gemini", ID: "a5bc80ac-786c", Project: "app", Path: "/g/tmp/app/chats/s.jsonl"})
+	if err != nil {
+		t.Fatalf("gemini resume: %v", err)
+	}
+	if cmd != "gemini --resume a5bc80ac-786c" {
+		t.Fatalf("cmd = %q", cmd)
+	}
+	if dir != "" {
+		t.Fatalf("dir = %q, want none — the store keeps a hash, not a path", dir)
+	}
+}
+
+// OpenClaw addresses a conversation by key, and the uuid its file is named
+// after opens nothing. The key lives in the store beside the transcript.
+func TestResumeOpenClawUsesTheSessionKey(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "7de16196.jsonl")
+	store := `{"agent:main:other":{"sessionId":"0000"},"agent:main:main":{"sessionId":"7de16196"}}`
+	if err := os.WriteFile(filepath.Join(dir, "sessions.json"), []byte(store), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, cmd, err := resumeCommand(model.Session{Harness: "openclaw", ID: "7de16196", Project: "openclaw-main", Path: path})
+	if err != nil {
+		t.Fatalf("openclaw resume: %v", err)
+	}
+	if cmd != "openclaw chat --session agent:main:main" {
+		t.Fatalf("cmd = %q", cmd)
+	}
+
+	// A transcript the store does not know about has no key, and a command
+	// built from the uuid would open a new conversation instead of that one.
+	orphan := filepath.Join(dir, "deadbeef.jsonl")
+	if _, _, err := resumeCommand(model.Session{Harness: "openclaw", ID: "deadbeef", Path: orphan}); err == nil {
+		t.Fatal("a session missing from the store resumed anyway")
+	}
+}
+
 // Hermes was the one harness deja gave up on, while its own CLI takes the
 // exact session ID deja indexes.
 func TestResumeHermes(t *testing.T) {

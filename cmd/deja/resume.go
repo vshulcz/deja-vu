@@ -82,6 +82,12 @@ func formatResumeCommand(dir, cmdline string) string {
 // from a session store cannot alter the command deja builds or prints.
 var resumeIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
+// openclawKeyPattern matches a session key (agent:<id>:<name>). Colons are
+// what separates a key's parts, so the id pattern is too strict here — and
+// anything looser than this would let a key read off disk carry shell
+// metacharacters into a printed command.
+var openclawKeyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
+
 // resumeCommand maps a session to (workdir, command). workdir is empty when
 // the harness resumes globally or the original directory is unknown.
 func resumeCommand(s model.Session) (string, string, error) {
@@ -115,10 +121,17 @@ func resumeCommand(s model.Session) (string, string, error) {
 		dir := filepath.Dir(s.Path)
 		return "", "", fmt.Errorf("aider has no session resume — run aider in %s and it continues the same history", dir)
 	case "gemini":
-		return "", "", fmt.Errorf("gemini sessions reopen from inside the CLI: run gemini, then /chat resume")
+		// No cd: gemini scopes its session list by a hash of the working
+		// directory, and the store keeps only that hash — there is nothing to
+		// invert back into a path. Run from the wrong directory it says "No
+		// previous sessions found for this project" rather than opening the
+		// wrong one.
+		return "", "gemini --resume " + s.ID, nil
 	case "cursor":
 		if strings.HasSuffix(s.Path, ".jsonl") {
-			return "", "", fmt.Errorf("cursor CLI transcripts have no documented resume command yet")
+			// A CLI transcript is named after the chat id `--resume` takes.
+			// Cursor lists chats per workspace, so this runs in the project.
+			return cursorProjectDirFor(s), "cursor-agent --resume " + s.ID, nil
 		}
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
@@ -133,7 +146,14 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "qwen":
 		return qwenProjectDirFor(s), "qwen -r " + s.ID, nil
 	case "openclaw":
-		return "", "", fmt.Errorf("openclaw keeps its own session continuity — message the same agent and it continues; see openclaw sessions")
+		key := sources.OpenClawSessionKey(s.Path)
+		if key == "" {
+			return "", "", fmt.Errorf("session %s is not in openclaw's session store, so it has no key to reopen by", digest.Short(s.ID))
+		}
+		if !openclawKeyPattern.MatchString(key) {
+			return "", "", fmt.Errorf("session key %q contains characters deja will not place in a command", key)
+		}
+		return "", "openclaw chat --session " + key, nil
 	case "kimi":
 		return "", "kimi --session " + s.ID, nil
 	case "goose":
@@ -170,6 +190,19 @@ func qwenProjectDirFor(s model.Session) string {
 		return ""
 	}
 	base := sources.QwenProjectDirBase(s.Path)
+	if base == "" {
+		return ""
+	}
+	return sources.ResolveEncodedPath(base)
+}
+
+// cursorProjectDirFor recovers the working directory a CLI transcript belongs
+// to, when the encoded name still resolves on this machine.
+func cursorProjectDirFor(s model.Session) string {
+	if s.Path == "" {
+		return ""
+	}
+	base := sources.CursorTranscriptProjectDirBase(s.Path)
 	if base == "" {
 		return ""
 	}

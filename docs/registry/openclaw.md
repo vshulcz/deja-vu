@@ -22,7 +22,12 @@ deja reads. Format verified against openclaw source
   `mcp.servers` (OpenClaw's own layout, not the common `mcpServers` root).
   Live-verified: `openclaw mcp probe deja` reports the tools and the agent
   calls `recall` mid-turn.
-- **Resume**: OpenClaw's own session continuity.
+- **Resume**: `openclaw chat --session <key>`. OpenClaw addresses a
+  conversation by key (`agent:<id>:<name>`); the uuid its transcript is named
+  after opens nothing, and the mapping lives in `sessions.json` beside the
+  transcripts. deja reads the key from there. Live-verified: the terminal UI
+  came up on `agent:main:main` with that session's history, and a run through
+  `openclaw agent --session-id` answered from it.
 - **Handoff**: paste.
 
 **Last verified:** 2026-07-23

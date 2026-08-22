@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -70,4 +72,29 @@ func openclawProject(path string) string {
 		return "openclaw-" + agent
 	}
 	return "openclaw"
+}
+
+// OpenClawSessionKey returns the session key that owns a transcript, or "" when
+// the store does not name one. OpenClaw addresses a conversation by key
+// (`agent:<id>:<name>`) rather than by the uuid its file is named after: the
+// terminal UI takes `--session <key>` and nothing takes the uuid. The mapping
+// lives in sessions.json beside the transcripts.
+func OpenClawSessionKey(path string) string {
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(path), "sessions.json"))
+	if err != nil {
+		return ""
+	}
+	var store map[string]struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.Unmarshal(b, &store); err != nil {
+		return ""
+	}
+	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	for key, rec := range store {
+		if rec.SessionID == id {
+			return key
+		}
+	}
+	return ""
 }
