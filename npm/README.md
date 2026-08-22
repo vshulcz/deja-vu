@@ -18,7 +18,7 @@ DeepSeek Harness, Hermes and Zed.
 deja turns those files into one memory layer that all of them can read.
 
 One Go binary. No LLM, no embeddings, no API key, nothing leaves the machine.
-**84.9% hit@1** on LongMemEval-S, **~1.5 ms** median search over 3.5 GB.
+**85.3% hit@1** on LongMemEval-S, **~1.5 ms** median search over 3.5 GB.
 
 ```sh
 npx @vshulcz/deja-vu "connection pool exhausted"   # search, no install

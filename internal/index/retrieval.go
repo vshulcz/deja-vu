@@ -498,6 +498,25 @@ func relevanceResult(ss []model.Session, matched int, idf map[string]float64) Se
 	}
 }
 
+// rankIDF is what a match is WORTH: documents counted in sessions, the unit
+// ranking has always used. Weighting by the gate's number instead lifts every
+// term a few long sessions happen to repeat, which reorders the top of the
+// result — measured on LongMemEval-S, 1.7 points of hit@1, with preference
+// questions falling from 36.7% to 26.7%.
+func rankIDF(sessions, minSess int) float64 {
+	return math.Log(float64(sessions+1) / float64(minSess+1))
+}
+
+// gateIDF is whether a term is worth speaking up about at all: the rarer of the
+// two verdicts, so a word has to read as ordinary counted in sessions AND
+// counted in capped messages before it is treated as filler. Sessions alone
+// call a subject word common, because the marathons that hold most of a store
+// all mention it; capped messages alone call the topic of one long session
+// filler.
+func gateIDF(totalDocs float64, minDF int, rank float64) float64 {
+	return math.Max(math.Log(totalDocs/float64(minDF+1)), rank)
+}
+
 // dejaVuIDFFloor is the informativeness bar for a term to count toward a
 // déjà vu match: ln(N/df) >= 2 keeps terms present in at most ~13% of
 // sessions. Conversational filler ("post", "text", "claude") is frequent in
@@ -925,10 +944,21 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 			termsKnown++
 		}
-		idf := math.Max(
-			math.Log(totalDocs/float64(minDF+1)),
-			math.Log(float64(len(m.Sessions)+1)/float64(minSess+1)),
-		)
+		// Two verdicts on how rare the term is, and they answer two different
+		// questions. Whether the term is worth speaking up about is the rarer
+		// of the two: sessions alone call a subject word common because the
+		// marathons that hold most of a store all mention it, and capped
+		// messages alone call the topic of one long session filler.
+		//
+		// What a term is WORTH once it matched is a different question, and
+		// the capped-message view is the wrong answer to it: it lifts every
+		// term that a few long sessions happen to concentrate, which reorders
+		// the top of the ranking. Measured on LongMemEval-S, weighting by the
+		// rarer verdict cost 1.7 points of hit@1 — preference questions fell
+		// from 36.7% to 26.7% — while the gate it was introduced for kept its
+		// gain. So the score keeps counting documents in sessions.
+		rank := rankIDF(len(m.Sessions), minSess)
+		idf := gateIDF(totalDocs, minDF, rank)
 		idfOf[term] = idf
 		if idf <= 0 {
 			// In a tiny corpus every ratio collapses to zero; a term living
@@ -937,6 +967,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				continue
 			}
 			idf = 0.1
+		}
+		if rank <= 0 {
+			rank = 0.1
 		}
 		informative := idf >= dejaVuIDFFloor || minSess <= 2
 		// Rare enough to identify something on its own: either well past the
@@ -955,14 +988,14 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 			for off := range offs[ord] {
 				mm[off]++
-				mi[off] += idf
+				mi[off] += rank
 			}
 		}
 		for ord := range hit {
 			// Saturated term frequency: repeated mentions add confidence
 			// with quickly diminishing returns, so a marathon session cannot
 			// bury a focused one through sheer repetition.
-			weighted := idf * (1 + 0.25*math.Log2(float64(tf[ord])))
+			weighted := rank * (1 + 0.25*math.Log2(float64(tf[ord])))
 			score[ord] += weighted
 			if informative {
 				focus[ord] += weighted

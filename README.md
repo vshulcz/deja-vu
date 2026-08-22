@@ -18,7 +18,7 @@ disk, and hands the right one back when it is needed.</p>
 <p align="center"><b>Every memory tool starts empty and records forward. deja starts full.</b></p>
 
 <p align="center">
-<b>84.9% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>~1.5&nbsp;ms</b> median search over 3.5&nbsp;GB<br>
+<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.8%</b> on LoCoMo &middot; <b>~1.5&nbsp;ms</b> median search over 3.5&nbsp;GB<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
