@@ -34,6 +34,13 @@ type claudeLine struct {
 	SessionID string          `json:"sessionId"`
 	Timestamp json.RawMessage `json:"timestamp"`
 	Message   *claudeMessage  `json:"message"`
+	// A sidechain file is a subagent's own run. Every line in it repeats the
+	// parent's sessionId, so keying on that folded the child's work into the
+	// parent and one of the two won (#1384). agentId is what identifies the
+	// child, and attributionAgent names which agent it was.
+	IsSidechain      bool   `json:"isSidechain"`
+	AgentID          string `json:"agentId"`
+	AttributionAgent string `json:"attributionAgent"`
 }
 
 type claudeMessage struct {
@@ -57,7 +64,16 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 		if v.Type != "user" && v.Type != "assistant" {
 			return
 		}
-		if v.SessionID != "" {
+		if v.IsSidechain && v.AgentID != "" {
+			// The child is its own session, spawned by the parent whose id
+			// every one of these lines carries.
+			s.ID = v.AgentID
+			s.Kind = "sidechain"
+			s.Parent = v.SessionID
+			if v.AttributionAgent != "" {
+				s.Agent = v.AttributionAgent
+			}
+		} else if v.SessionID != "" {
 			s.ID = v.SessionID
 		}
 		t := claudeTime(v.Timestamp)

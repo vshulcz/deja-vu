@@ -39,6 +39,29 @@ func TestShowNamesTheSessionsAroundASpawn(t *testing.T) {
 		t.Errorf("the parent does not list its children:\n%s", got)
 	}
 
+	// One long session spawns a hundred agents. Naming every child buries the
+	// count, which is the part a reader can act on.
+	many := make([]model.Session, 0, 161)
+	for i := 0; i < 161; i++ {
+		many = append(many, model.Session{ID: "aa" + strings.Repeat("b", 8) + string(rune('a'+i%26))})
+	}
+	ChildrenOfSession = func(dir, id string) ([]model.Session, error) { return many, nil }
+	w.Reset()
+	printSpawnEdges(&w, "", model.Session{ID: "busy-parent"})
+	got = w.String()
+	if !strings.Contains(got, "spawned 161 sessions") || !strings.Contains(got, "and 158 more") {
+		t.Errorf("the children line is not summarised:\n%s", got)
+	}
+	if len(got) > 200 {
+		t.Errorf("the children line is %d characters long:\n%s", len(got), got)
+	}
+	ChildrenOfSession = func(dir, id string) ([]model.Session, error) {
+		if id != "01a00a65-7a72-7102-9574-0de51ab0d0ee" {
+			return nil, nil
+		}
+		return []model.Session{{ID: "01a00a65-child-one"}, {ID: "01a00a65-child-two"}}, nil
+	}
+
 	// A subagent whose harness recorded no parent gets a line about what it is
 	// and no guess about who started it.
 	w.Reset()

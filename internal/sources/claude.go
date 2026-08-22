@@ -41,8 +41,11 @@ func ClaudeFiles() []string {
 }
 
 // ClaudeFileWanted reports whether a path under the Claude root belongs in
-// the index. Subagent transcripts mostly duplicate their parent session, so
-// they are skipped unless DEJA_INCLUDE_SUBAGENTS=1.
+// the index. A subagent's transcript is not a copy of its parent: the parent
+// keeps the launch, the agent id and a summary of what came back, while the
+// turns and the tool stream live only in the child file. They are skipped for
+// index size, not because the work is already there — DEJA_INCLUDE_SUBAGENTS=1
+// takes them in, as their own sessions (#1384).
 func ClaudeFileWanted(p string) bool {
 	if !strings.HasSuffix(p, ".jsonl") {
 		return false
@@ -75,7 +78,16 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 		if typ != "user" && typ != "assistant" {
 			return
 		}
-		if id, _ := m["sessionId"].(string); id != "" {
+		side, _ := m["isSidechain"].(bool)
+		agent, _ := m["agentId"].(string)
+		if side && agent != "" {
+			s.ID = agent
+			s.Kind = "sidechain"
+			s.Parent, _ = m["sessionId"].(string)
+			if name, _ := m["attributionAgent"].(string); name != "" {
+				s.Agent = name
+			}
+		} else if id, _ := m["sessionId"].(string); id != "" {
 			s.ID = id
 		}
 		t := parseTimeAny(m["timestamp"])

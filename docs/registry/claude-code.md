@@ -4,6 +4,16 @@
 
 Claude Code writes transcripts below `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/`. deja can point only session reads elsewhere with `DEJA_CLAUDE_ROOT`. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with `-`; nested `subagents/*.jsonl` files are excluded unless `DEJA_INCLUDE_SUBAGENTS=1`.
 
+A subagent's transcript is not a copy of its parent. The parent keeps the launch,
+the `agentId` and a summary of what came back; the child's own turns and tool
+stream exist only in the sidechain file, where every line carries
+`isSidechain: true`, the parent's `sessionId`, its own `agentId` and an
+`attributionAgent` naming which agent ran. The default skip is about index size,
+not about the work being there twice — with the env var set, deja indexes each
+sidechain as its own session keyed by `agentId`, with the parent recorded as its
+`parent` (#1384). Keying on `sessionId`, which the child repeats, folded the two
+together and one of them won.
+
 The top-level `~/.claude.json` is not a transcript. When `CLAUDE_CONFIG_DIR` is set, Claude moves that file to `$CLAUDE_CONFIG_DIR/.claude.json`.
 
 ## Records

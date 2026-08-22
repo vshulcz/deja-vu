@@ -461,11 +461,18 @@ func printSpawnEdges(w io.Writer, dir string, s model.Session) {
 	if err != nil || len(children) == 0 {
 		return
 	}
-	ids := make([]string, 0, len(children))
-	for _, c := range children {
+	// A long session spawns a hundred agents; naming them all buries the line
+	// that says how many there were.
+	const named = 3
+	ids := make([]string, 0, named)
+	for _, c := range children[:min(named, len(children))] {
 		ids = append(ids, digest.Short(c.ID))
 	}
-	fmt.Fprintf(w, "deja: spawned %d session%s: %s\n", len(ids), pluralS(len(ids)), strings.Join(ids, ", "))
+	rest := ""
+	if len(children) > len(ids) {
+		rest = fmt.Sprintf(" and %d more", len(children)-len(ids))
+	}
+	fmt.Fprintf(w, "deja: spawned %d session%s: %s%s\n", len(children), pluralS(len(children)), strings.Join(ids, ", "), rest)
 }
 
 // ChildrenOfSession is a thin seam so the surface can be tested without an

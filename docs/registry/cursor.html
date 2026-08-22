@@ -38,7 +38,11 @@
 <h1>Cursor session format</h1>
 <h2 id="stores-and-files">Stores and files</h2>
 <p>Cursor IDE stores chats in <code>state.vscdb</code> under <code>globalStorage/</code> and <code>workspaceStorage/*/</code>. The user root is <code>~/Library/Application Support/Cursor/User</code> on macOS and <code>~/.config/Cursor/User</code> on other systems; an existing <code>$XDG_CONFIG_HOME/Cursor/User</code> is used when available. <code>DEJA_CURSOR_ROOT</code> overrides IDE discovery.</p>
-<p>Cursor CLI writes <code>projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code> below <code>${CURSOR_CONFIG_DIR:-~/.cursor}</code>. <code>DEJA_CURSOR_CLI_ROOT</code> overrides transcript reads. Subagent transcripts are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>.</p>
+<p>Cursor CLI writes <code>projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code> below <code>${CURSOR_CONFIG_DIR:-~/.cursor}</code>. <code>DEJA_CURSOR_CLI_ROOT</code> overrides transcript reads. Subagent transcripts are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code> — for index</p>
+<p>size, not because the parent already holds that work. Unlike Claude&#39;s sidechain</p>
+<p>files, Cursor&#39;s have not been read here: what the parent keeps and what only the</p>
+<p>child has is unverified for this harness, so deja indexes them as it finds them</p>
+<p>rather than deriving an edge it has not seen.</p>
 <h2 id="ide-sqlite-records">IDE SQLite records</h2>
 <p>The <code>cursorDiskKV(key, value)</code> table has session values at <code>composerData:&lt;id&gt;</code> and message values at <code>bubbleId:&lt;composer-id&gt;:&lt;bubble-id&gt;</code>.</p>
 <pre><code class="language-json">{&#34;composerId&#34;:&#34;composer-7&#34;,&#34;name&#34;:&#34;Fix cache invalidation&#34;,&#34;createdAt&#34;:1784278800000,&#34;lastUpdatedAt&#34;:1784278802000}
