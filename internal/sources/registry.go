@@ -181,7 +181,8 @@ func Registry() []Harness {
 				Match: func(p string) bool {
 					return hasBase(p, "updates.jsonl") && strings.HasPrefix(p, filepath.Join(GrokRoot(), "sessions"))
 				},
-				Parse: fullParse(ParseGrokFile),
+				Parse:     fullParse(ParseGrokFile),
+				ParseFrom: offsetParse(ParseGrokFileFromOffset),
 			}, {
 				// The maintained CLI writes no session files at all: one
 				// SQLite store beside the config, like opencode's.

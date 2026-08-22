@@ -2185,7 +2185,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			return false
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot":
+		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot", "grok":
 		default:
 			return false
 		}

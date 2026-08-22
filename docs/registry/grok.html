@@ -54,7 +54,12 @@
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>The ACP stream contains large tool updates. deja filters lines for message chunk kinds before decoding JSON.</li>
-<li>Rewind can truncate and regrow <code>updates.jsonl</code>; changed streams are reparsed in full.</li>
+<li>Rewind can truncate and regrow <code>updates.jsonl</code>, which looks like growth from</li>
+</ul>
+<p>the outside. deja compares the prefix hash it recorded: an intact prefix takes</p>
+<p>the append path and reads only the new bytes, a moved one reparses the stream</p>
+<p>in full. A live session used to rewrite the whole index on every touch.</p>
+<ul>
 <li><code>generated_title</code> takes precedence over <code>session_summary</code>.</li>
 <li>Missing summary files fall back to directory IDs and the <code>.cwd</code> or URL-decoded path.</li>
 <li>Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.</li>

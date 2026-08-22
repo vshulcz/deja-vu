@@ -30,7 +30,10 @@ Consecutive assistant chunks with the same `promptId` are joined. Consecutive us
 ## Known quirks and drift
 
 - The ACP stream contains large tool updates. deja filters lines for message chunk kinds before decoding JSON.
-- Rewind can truncate and regrow `updates.jsonl`; changed streams are reparsed in full.
+- Rewind can truncate and regrow `updates.jsonl`, which looks like growth from
+  the outside. deja compares the prefix hash it recorded: an intact prefix takes
+  the append path and reads only the new bytes, a moved one reparses the stream
+  in full. A live session used to rewrite the whole index on every touch.
 - `generated_title` takes precedence over `session_summary`.
 - Missing summary files fall back to directory IDs and the `.cwd` or URL-decoded path.
 - Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.

@@ -30,8 +30,9 @@ func GrokRoot() string {
 
 // Grok Build stores sessions by URL-encoded working directory. summary.json
 // carries metadata and updates.jsonl is the authoritative ACP conversation
-// stream. Grok can truncate and regrow the stream after a rewind, so changed
-// files are always reparsed in full.
+// stream. Grok can truncate and regrow the stream after a rewind, which looks
+// like growth from the outside — the index compares the recorded prefix hash
+// before resuming a parse, and reparses in full when it moved.
 
 func GrokSessionFiles() []string {
 	return walkFiles(filepath.Join(GrokRoot(), "sessions"), func(p string) bool {
@@ -55,6 +56,19 @@ type grokSummary struct {
 }
 
 func ParseGrokFile(path string) ([]model.Session, error) {
+	return parseGrokFileFromOffset(path, 0)
+}
+
+// ParseGrokFileFromOffset reads only the bytes appended past offset. A live
+// session's updates.jsonl grows all day and the index used to reparse and
+// rewrite the whole thing on every touch (#1522); the ingest layer only calls
+// this once the recorded prefix hash still matches, so a rewind that truncates
+// and regrows still goes the long way.
+func ParseGrokFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseGrokFileFromOffset(path, offset)
+}
+
+func parseGrokFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	doc := readGrokSummary(path)
 	id := doc.Info.ID
 	if id == "" {
@@ -80,7 +94,7 @@ func ParseGrokFile(path string) ([]model.Session, error) {
 	// records now land between those chunks, so the join remembers where the
 	// speech was rather than assuming it was the message just added.
 	lastKey, lastSpeech := "", -1
-	err := scanGrokUpdates(path, func(event grokUpdateEvent) {
+	err := scanGrokUpdatesFrom(path, offset, func(event grokUpdateEvent) {
 		role := ""
 		switch event.Params.Update.Kind {
 		case "user_message_chunk":
@@ -245,11 +259,20 @@ var grokToolUpdate = []byte(`"sessionUpdate":"tool_call_update"`)
 // indexing cost is dominated by reading the log rather than materializing tool
 // payloads that will be discarded.
 func scanGrokUpdates(path string, fn func(grokUpdateEvent)) error {
+	return scanGrokUpdatesFrom(path, 0, fn)
+}
+
+func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+	if offset > 0 {
+		if _, err := f.Seek(offset, io.SeekStart); err != nil {
+			return err
+		}
+	}
 	r := bufio.NewReaderSize(f, 1024*1024)
 	for {
 		line, err := r.ReadBytes('\n')
