@@ -63,6 +63,8 @@
 <li><b>Regex</b> — <code>deja --re "timeout|deadline exceeded"</code>.</li>
 <li><b>Filters</b> — <code>--harness</code>, <code>--project</code>, <code>--since 30d</code>, <code>--role assistant</code>. Beyond the conversation roles, the index keeps what the agent did: <code>--role files</code> for the paths a turn opened, <code>--role command</code> for the commands that ran, <code>--role edit</code> for the spans an edit replaced, <code>--role tool-output</code> for what a tool printed. These are searchable but stay out of ordinary results, since a path that happens to contain the words of a question is not an answer to it.</li>
 </ul>
+<h2>What a subagent did</h2>
+<p>When an agent hands work to a subagent — a Claude Code Task, a Cursor subagent — that run gets its own transcript. The parent session keeps the launch and a summary of what came back; the turns and the tool stream exist only in the child file, which deja skips by default to keep the index small. Set <code>DEJA_INCLUDE_SUBAGENTS=1</code> and it indexes them as sessions of their own, each naming the session that spawned it, so a hit can say which run it came from. Grok Build records the same edge itself, and <code>deja show</code> names the parent and the children either way.</p>
 <h2>When nothing matches exactly</h2>
 <p>On zero results deja widens the net in order, and marks how each hit was found:</p>
 <ul>
