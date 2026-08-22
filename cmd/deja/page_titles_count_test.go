@@ -35,4 +35,43 @@ func TestPageTitlesCountTheRestOfTheHarnesses(t *testing.T) {
 			t.Errorf("%s does not say %q — the registry has %d harnesses", c.file, want, n)
 		}
 	}
+
+	// The registry pages close with "deja reads this format and N others". The
+	// word was typed into the generator's template, so all twenty pages kept
+	// saying seventeen for three harnesses running.
+	dir := filepath.Join(root, "docs", "registry")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("registry pages: %v", err)
+	}
+	want := fmt.Sprintf("this format and %s others", countWordForTest(n-1))
+	pages := 0
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".html" || e.Name() == "README.html" {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatalf("%s: %v", e.Name(), err)
+		}
+		pages++
+		if !strings.Contains(string(b), want) {
+			t.Errorf("docs/registry/%s does not say %q", e.Name(), want)
+		}
+	}
+	if pages != n {
+		t.Errorf("%d registry pages for %d harnesses", pages, n)
+	}
+}
+
+// countWordForTest spells the number the generator's template spells.
+func countWordForTest(n int) string {
+	words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven",
+		"eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+		"sixteen", "seventeen", "eighteen", "nineteen", "twenty", "twenty-one",
+		"twenty-two", "twenty-three", "twenty-four", "twenty-five"}
+	if n < 0 || n >= len(words) {
+		return fmt.Sprint(n)
+	}
+	return words[n]
 }

@@ -65,7 +65,7 @@ func run() error {
 	}
 	sort.Strings(paths)
 	// Every page lists every other one. This is the reason the registry is
-	// worth publishing at all: eighteen pages that answer "where does this
+	// worth publishing at all: a page per format that answers "where does this
 	// agent keep its history" are each other's best route in, for a reader
 	// and for a crawler that would otherwise reach none of them.
 	var links []link
@@ -215,7 +215,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 <h1>{{.Heading}}</h1>
 {{.Body}}
 <hr>
-<p>deja reads this format and seventeen others, and turns what it finds into memory your
+<p>deja reads this format and {{.Others}} others, and turns what it finds into memory your
 agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
 wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
 history.</p>
@@ -227,8 +227,24 @@ history.</p>
 
 type pageData struct {
 	Title, Description, Heading, URL, Site string
-	Article, Crumbs                        any
-	Sidebar, Body                          template.HTML
+	// Others is how many other formats deja reads, spelled out. It was a word
+	// typed into the template, so every one of these twenty pages kept saying
+	// seventeen after three harnesses landed.
+	Others          string
+	Article, Crumbs any
+	Sidebar, Body   template.HTML
+}
+
+// countWord spells a small number the way the pages read it.
+func countWord(n int) string {
+	words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven",
+		"eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+		"sixteen", "seventeen", "eighteen", "nineteen", "twenty", "twenty-one",
+		"twenty-two", "twenty-three", "twenty-four", "twenty-five"}
+	if n < 0 || n >= len(words) {
+		return fmt.Sprint(n)
+	}
+	return words[n]
 }
 
 func render(m meta, body string, others []link) string {
@@ -253,6 +269,10 @@ func render(m meta, body string, others []link) string {
 	err := pageTemplate.Execute(&b, pageData{
 		Title: m.Title, Description: m.Description, Heading: m.Heading,
 		URL: url, Site: site, Article: article, Crumbs: crumbs,
+		// Every page but this one. The list is one page per harness format —
+		// README is skipped when it is built — so this is the count the
+		// sentence means.
+		Others: countWord(len(others) - 1),
 		// The body is HTML this generator built from markdown it escaped on
 		// the way through; the sidebar is built from registry names, escaped
 		// there. Both are already safe, which is what template.HTML asserts.
