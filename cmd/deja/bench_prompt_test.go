@@ -71,14 +71,13 @@ func TestPromptBenchScoresAndReports(t *testing.T) {
 	if report.Real.Fired < 8 {
 		t.Fatalf("real questions answered dropped to %d/%d", report.Real.Fired, report.Real.Cases)
 	}
-	// Five, not zero, and that is the point of the background sessions: on the
-	// thirty-chain corpus every word was rare, so the gate looked perfect and
-	// nothing about rarity could be measured here. With ordinary working talk
-	// behind it the corpus reads the defect the product actually has. The
-	// number is recorded so it cannot grow quietly while the fix is measured
-	// (#1534); real questions went 11/12 -> 13/13 in the same move.
-	if report.Negative.FalseFires > 5 {
-		t.Fatalf("%d false fires on negative controls, was 5", report.Negative.FalseFires)
+	// Back to zero (#1534). The five this recorded were the fixture answering
+	// its own controls: every content chain's filler quoted three of them word
+	// for word, and the background sessions are built from the same working
+	// vocabulary on purpose, so asking one inside its own project matched its
+	// own text. Neither said anything about the bar.
+	if report.Negative.FalseFires != 0 {
+		t.Fatalf("%d false fires on negative controls", report.Negative.FalseFires)
 	}
 	if report.Real.Precision < 1 {
 		t.Fatalf("precision fell to %.2f", report.Real.Precision)

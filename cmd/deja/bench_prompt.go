@@ -432,6 +432,13 @@ func measurePrompt(seed int64) (promptReport, error) {
 		negTerms = append(negTerms, len(terms))
 		report.Negative.Cases++
 		for _, chain := range corpus.Chains {
+			// Background sessions are the corpus's working noise, built from
+			// the same vocabulary the controls are: asking one of them inside
+			// its own project matches its own text, which measures the fixture
+			// rather than the bar.
+			if chain.Kind == "background" {
+				continue
+			}
 			if fired, _ := promptBenchProbe(indexDir, chain.Project, chain.ID, terms); fired {
 				report.Negative.Fired++
 				report.Negative.FalseFires++

@@ -203,8 +203,8 @@ func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, sta
 	msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: start}}
 	for k := 0; k < turns; k++ {
 		msgs = append(msgs,
-			model.Message{Role: "user", Text: fillerText(rng, "ran it again and pasted the output"), Time: start.Add(time.Duration(2*k+2) * time.Minute)},
-			model.Message{Role: "assistant", Text: fillerText(rng, "walked the trace and adjusted the patch"), Time: start.Add(time.Duration(2*k+3) * time.Minute)},
+			model.Message{Role: "user", Text: fillerText(rng, "started it over and watched what happened"), Time: start.Add(time.Duration(2*k+2) * time.Minute)},
+			model.Message{Role: "assistant", Text: fillerText(rng, "followed it down and rewrote the middle part"), Time: start.Add(time.Duration(2*k+3) * time.Minute)},
 		)
 	}
 	last := start.Add(time.Duration(2*turns+3) * time.Minute)
@@ -241,8 +241,8 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: t}}
 			for k := 0; k < 4+rng.Intn(6); k++ {
 				msgs = append(msgs,
-					model.Message{Role: "user", Text: fillerText(rng, "ran it again and pasted the output"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
-					model.Message{Role: "assistant", Text: fillerText(rng, "walked the trace and adjusted the patch"), Time: t.Add(time.Duration(2*k+3) * time.Minute)},
+					model.Message{Role: "user", Text: fillerText(rng, "started it over and watched what happened"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
+					model.Message{Role: "assistant", Text: fillerText(rng, "followed it down and rewrote the middle part"), Time: t.Add(time.Duration(2*k+3) * time.Minute)},
 				)
 			}
 			chain.Sessions = append(chain.Sessions, model.Session{
@@ -653,7 +653,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		t := base.Add(time.Duration(1200+k) * time.Minute)
 		noise = append(noise,
 			model.Message{Role: "user", Text: fillerText(rng, "another pass over the same branch"), Time: t},
-			model.Message{Role: "assistant", Text: fillerText(rng, "adjusted it and ran the suite again"), Time: t.Add(time.Minute)},
+			model.Message{Role: "assistant", Text: fillerText(rng, "tweaked it and ran the suite again"), Time: t.Add(time.Minute)},
 		)
 		// Every topic comes up again and again, which is what a long session
 		// does and what makes it beat the session that actually decided it.
