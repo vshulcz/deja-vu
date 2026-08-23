@@ -199,9 +199,9 @@ jobs:
               ...Object.values(mcp.mcpServers ?? {}).flatMap((s) => s.args ?? []),
               ...Object.values(hooks.hooks ?? {}).flat().flatMap((g) => (g.hooks ?? []).map((h) => h.command)),
             ];
-            // The variable is spelled without its braces here: shellcheck reads
-            // a ${...} inside this single-quoted script as a shell expansion
-            // that was meant to expand, and fails the lint.
+            // Spelled without its opening brace on purpose: shellcheck reads a
+            // dollar-brace sequence inside this single-quoted script as a shell
+            // expansion someone forgot to quote, and fails the lint.
             const rootVar = "GROK_PLUGIN_ROOT}/";
             for (const command of commands) {
               const at = String(command).indexOf(rootVar);
