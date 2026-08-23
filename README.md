@@ -273,10 +273,10 @@ for people who install extensions there rather than from a CLI:
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 
-Either path is enough on its own, and having both is not a problem: each package
-looks at what `deja install` wrote and contributes only what is missing, so
-nothing is recalled or registered twice. The one pair that cannot see itself is
-a Zed extension installed after `deja install zed`, and `deja doctor` says so.
+Either path is enough on its own, and having both is not a problem: the opencode
+and dsh packages read what `deja install` wrote and contribute only what is
+missing, and in Zed both halves use one server id, so there is nothing to have
+twice whichever order you install in.
 
 Each uses the deja you already have; the copy it bundles is only the fallback.
 

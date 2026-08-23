@@ -106,7 +106,6 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	// machine without claude settings, which is exactly a machine whose other
 	// harnesses may still be wired to a binary that moved.
 	doctorWiringExe(w)
-	doctorDoubleWiring(w)
 	fmt.Fprintln(w)
 	doctorIndex(w, report.Index, dir)
 	fmt.Fprintln(w)
@@ -860,21 +859,17 @@ func doctorMCPConfigs() []doctorMCPConfig {
 // scanner. The generic probe falls back to looking for "deja" anywhere in an
 // unparseable file, which in a settings file full of comments answers a
 // different question than "is the server wired".
+//
+// Either id counts as wired: the current one, and the one deja wrote before
+// the two halves were given the same id. A machine that has not reinstalled
+// since is still wired, and should not be told otherwise.
 func doctorZedWired(path string) bool {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
 	text := string(b)
-	open := zedTopLevelOpen(text)
-	if open < 0 {
-		return false
-	}
-	block := zedFindKey(text, open+1, zedServerKey)
-	if block == nil {
-		return false
-	}
-	return zedFindKey(text, block.valueOpen+1, "deja") != nil
+	return zedLocate(text, zedServerID) != nil || zedLocate(text, zedLegacyServerID) != nil
 }
 
 func doctorFileWired(path string) bool {

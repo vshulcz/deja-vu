@@ -17,6 +17,19 @@ import (
 // byte as it was, in the spirit of #1285.
 const zedServerKey = "context_servers"
 
+// zedServerID is the id both halves of deja use in Zed: the extension declares
+// its context server under it, and `deja install zed` writes its own entry
+// under the same one. Zed keys servers by id and takes them unique across
+// settings and the extension registry, so one id is one server however the user
+// arrived — CLI first, extension first, or both. Two ids would be two servers
+// each starting `deja mcp`, which is the shape this used to have.
+const zedServerID = "deja-context-server"
+
+// zedLegacyServerID is what deja wrote before that. Installing again renames
+// it, so a machine that ended up with both stops running deja twice without
+// anyone having to be told about it.
+const zedLegacyServerID = "deja"
+
 // installZedMCP adds or removes deja's entry in Zed's settings.
 func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 	old, err := os.ReadFile(path)
@@ -28,14 +41,6 @@ func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 
-	// The Zed extension declares a context server of its own, and Zed records
-	// it in this same file under its extension id. Adding ours next to it
-	// starts `deja mcp` twice and shows the agent every tool twice, so the
-	// extension wins: it is the thing the user installed from Zed's UI.
-	if !uninstall && zedExtensionPresent(string(old)) {
-		return installResult{Path: path, Action: "skipped: the Zed extension already provides it"}, nil
-	}
-
 	if len(strings.TrimSpace(string(old))) == 0 {
 		// Nothing to preserve. Uninstalling from a file that does not exist
 		// must not create one (#676).
@@ -45,7 +50,7 @@ func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return installResult{}, err
 		}
-		fresh := fmt.Sprintf("{\n  %q: {\n    \"deja\": %s\n  }\n}\n", zedServerKey, entry)
+		fresh := fmt.Sprintf("{\n  %q: {\n    %q: %s\n  }\n}\n", zedServerKey, zedServerID, entry)
 		a, werr := writeIfChanged(path, old, []byte(fresh))
 		return installResult{Path: path, Action: a}, werr
 	}
@@ -77,55 +82,112 @@ func zedSettingsWith(text, entry string, uninstall bool) (string, error) {
 	if open < 0 {
 		return "", fmt.Errorf("zed: %s does not look like a settings object; add %q by hand", "settings.json", zedServerKey)
 	}
-	block := zedFindKey(text, open+1, zedServerKey)
-	if block == nil {
+	// The id deja used to write is dropped first, in both directions: on
+	// install it becomes the current one, on uninstall it goes with it. A file
+	// carrying both ran two servers.
+	if legacy := zedLocate(text, zedLegacyServerID); legacy != nil {
+		text = zedDropEntry(text, legacy.block, legacy.entry)
+	}
+
+	found := zedLocate(text, zedServerID)
+	if found == nil {
 		if uninstall {
 			return text, nil
 		}
-		insert := fmt.Sprintf("\n  %q: {\n    \"deja\": %s\n  },", zedServerKey, entry)
+		if block := zedFindKey(text, open+1, zedServerKey); block != nil {
+			insert := fmt.Sprintf("\n    %q: %s,", zedServerID, entry)
+			return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
+		}
+		open = zedTopLevelOpen(text)
+		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  },", zedServerKey, zedServerID, entry)
 		return text[:open+1] + insert + text[open+1:], nil
 	}
-	inner := zedFindKey(text, block.valueOpen+1, "deja")
-	if inner == nil {
-		if uninstall {
-			return text, nil
-		}
-		insert := fmt.Sprintf("\n    \"deja\": %s,", entry)
-		return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
+	// The same id is the extension's, and Zed writes its own entry there when
+	// the extension is installed. That entry is the user's, not ours: leave it
+	// exactly as it is, in both directions.
+	if !zedEntryIsOurs(text, found.entry) {
+		return text, nil
 	}
 	if uninstall {
-		cut := zedEntrySpan(text, inner)
-		// If deja was the only server, the key goes too: a settings file that
-		// gains an empty "context_servers": {} after an uninstall is not the
-		// file the reader had before install. Anything else left in there —
-		// another server, or a comment someone wrote — keeps the block.
-		if strings.TrimSpace(text[block.valueOpen+1:cut[0]]+text[cut[1]:block.valueEnd-1]) == "" {
-			cut = zedEntrySpan(text, block)
-		}
-		return text[:cut[0]] + text[cut[1]:], nil
+		return zedDropEntry(text, found.block, found.entry), nil
 	}
-	return text[:inner.valueOpen] + entry + text[inner.valueEnd:], nil
+	return text[:found.entry.valueOpen] + entry + text[found.entry.valueEnd:], nil
 }
 
-// zedExtensionPresent reports whether Zed's own extension already declares the
-// server. Zed writes the extension's id into context_servers when the user
-// installs it, so the id in the settings is the signal — the extension
-// directory moved between Zed versions, the settings key did not.
-func zedExtensionPresent(text string) bool {
+// zedLocation is deja's entry and the context_servers block holding it.
+type zedLocation struct{ block, entry *zedSpan }
+
+func zedLocate(text, id string) *zedLocation {
 	open := zedTopLevelOpen(text)
 	if open < 0 {
-		return false
+		return nil
 	}
 	block := zedFindKey(text, open+1, zedServerKey)
 	if block == nil {
-		return false
+		return nil
 	}
-	return zedFindKey(text, block.valueOpen+1, zedExtensionServerID) != nil
+	entry := zedFindKey(text, block.valueOpen+1, id)
+	if entry == nil {
+		return nil
+	}
+	return &zedLocation{block: block, entry: entry}
 }
 
-// zedExtensionServerID is the id in extensions/zed/extension.toml. Zed keys the
-// settings entry by it, so the two have to stay the same string.
-const zedExtensionServerID = "deja-context-server"
+// zedEntryIsOurs reports whether an entry is the one deja writes — a command to
+// run — rather than the extension's, which carries `settings` and no command.
+//
+// The key is looked for on its own rather than through zedFindKey: that one
+// wants an object value, and `"command"` holds a string. Asking it here reads
+// as a working check and quietly answers "no" for every entry deja ever wrote.
+func zedEntryIsOurs(text string, entry *zedSpan) bool {
+	return zedHasKey(text, entry.valueOpen+1, "command")
+}
+
+// zedHasKey reports whether a key exists at the current object depth. Deeper
+// objects are skipped, so a "command" nested in some other setting inside the
+// entry is not mistaken for the entry's own.
+func zedHasKey(text string, from int, key string) bool {
+	want := `"` + key + `"`
+	depth := 0
+	for i := from; i < len(text); i++ {
+		if j := zedSkipComment(text, i); j != i {
+			i = j - 1
+			continue
+		}
+		switch text[i] {
+		case '"':
+			end := zedStringEnd(text, i)
+			if end < 0 {
+				return false
+			}
+			if depth == 0 && text[i:end] == want {
+				return true
+			}
+			i = end - 1
+		case '{', '[':
+			depth++
+		case '}', ']':
+			if depth == 0 {
+				return false // end of the object being searched
+			}
+			depth--
+		}
+	}
+	return false
+}
+
+// zedDropEntry removes one server entry, and the context_servers block with it
+// when nothing else was in there: a settings file that gains an empty
+// "context_servers": {} after an uninstall is not the file the reader had
+// before install. Anything else left — another server, or a comment someone
+// wrote — keeps the block.
+func zedDropEntry(text string, block, entry *zedSpan) string {
+	cut := zedEntrySpan(text, entry)
+	if strings.TrimSpace(text[block.valueOpen+1:cut[0]]+text[cut[1]:block.valueEnd-1]) == "" {
+		cut = zedEntrySpan(text, block)
+	}
+	return text[:cut[0]] + text[cut[1]:]
+}
 
 // zedSpan is where a key and its object value sit in the text.
 type zedSpan struct {

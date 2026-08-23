@@ -23,13 +23,12 @@ Install the extension from Zed's extension list. On first use it downloads a
 release build of the `deja` binary into its own directory; if you already have
 one, point at it:
 
-`deja install --auto` reaches Zed too, and writes a context server into
-`settings.json` directly — the shorter path when you have the CLI. It leaves
-settings alone if this extension is already installed. The reverse order is the
-one case nothing can catch by itself: install the extension after the CLI and
-both entries are there, each starting its own `deja mcp`, so the agent sees
-every tool twice. `deja doctor` reports it, and `deja uninstall zed` removes
-deja's own entry and keeps the extension.
+`deja install --auto` reaches Zed too, and writes the server into
+`settings.json` directly — the shorter path when you have the CLI. Both use the
+same id, `deja-context-server`, and Zed keys servers by id, so either order
+leaves exactly one server: the installer leaves this extension's entry alone
+when it finds it, and installing the extension later lands on the same key
+rather than beside it. `deja uninstall zed` removes what the CLI wrote.
 
 ```json
 {

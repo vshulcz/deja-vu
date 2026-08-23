@@ -86,7 +86,7 @@ copilot plugin marketplace add vshulcz/deja-vu &amp;&amp; copilot plugin install
 <pre>opencode plugin opencode-deja
 dsh plugin add dsh-deja
 # Zed: Extensions → deja</pre>
-<div class="note">Either path is enough — <code>deja install --auto</code> wires all three as well. Each package reads what the installer wrote and contributes only what is missing, so having both does not register a tool or recall a session twice. The one pair that cannot see itself is a Zed extension installed after <code>deja install zed</code>; <code>deja doctor</code> reports it, and <code>deja uninstall zed</code> keeps the extension.</div>
+<div class="note">Either path is enough — <code>deja install --auto</code> wires all three as well. The opencode and dsh packages read what the installer wrote and contribute only what is missing, and in Zed both halves register under one server id, so having both never means two servers or a tool listed twice.</div>
 <p>After that, an agent can call <code>recall</code> the moment you reference past work — see <a href="agents.html">Agents &amp; MCP</a>. Confirm the wiring any time with <code>deja doctor</code>.</p>
 <h2>Optional: semantic recall</h2>
 <p>If you run a local embedding endpoint (Ollama, LM Studio), <code>deja embed</code> adds a vector sidecar so rephrased queries still match. Without one, deja works exactly as before. See <a href="search.html">Search</a>.</p>

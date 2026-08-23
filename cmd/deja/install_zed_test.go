@@ -58,7 +58,7 @@ func zedDejaEntry(t *testing.T, path string) map[string]any {
 	if !ok {
 		return nil
 	}
-	entry, ok := servers["deja"].(map[string]any)
+	entry, ok := servers[zedServerID].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -543,11 +543,10 @@ func TestDoctorListsZed(t *testing.T) {
 	}
 }
 
-// A user who installs the Zed extension and then runs `deja install --auto`
-// would otherwise get two context servers pointing at the same binary: Zed's
-// own entry for the extension and ours. Both start `deja mcp`, and the agent
-// sees every tool twice.
-func TestZedInstallSkipsWhenExtensionIsPresent(t *testing.T) {
+// The extension's own entry is the user's, not ours: `deja install` writes
+// under the same id, finds that entry and leaves it exactly as it is rather
+// than turning it into a command of ours.
+func TestZedInstallLeavesTheExtensionEntryAlone(t *testing.T) {
 	body := `{
   "context_servers": {
     "deja-context-server": {
@@ -558,32 +557,97 @@ func TestZedInstallSkipsWhenExtensionIsPresent(t *testing.T) {
 }
 `
 	path := zedSettingsFile(t, body)
-	res, err := installZedMCP(path, "deja", false)
-	if err != nil {
+	if _, err := installZedMCP(path, "deja", false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(res.Action, "skipped") {
-		t.Fatalf("action = %q, want a skip", res.Action)
-	}
-	after, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(after) != body {
-		t.Fatalf("settings were rewritten:\n%s", after)
+	if got := zedRead(t, path); got != body {
+		t.Fatalf("settings were rewritten:\n%s", got)
 	}
 }
 
-// The skip keys off the extension's id, so the id in the manifest Zed reads and
-// the constant here have to be the same string. They are edited in different
-// files, months apart.
-func TestZedExtensionIDMatchesManifest(t *testing.T) {
+// The id deja writes and the id the extension declares have to be the same
+// string — that is the whole reason the two cannot become two servers. They
+// live in different files, edited months apart.
+func TestZedServerIDMatchesTheExtensionManifest(t *testing.T) {
 	manifest := string(repoFile(t, "extensions/zed/extension.toml"))
-	want := "id = \"" + zedExtensionServerID + "\""
-	if !strings.Contains(manifest, want) {
+	if want := "id = \"" + zedServerID + "\""; !strings.Contains(manifest, want) {
 		t.Fatalf("extension.toml does not declare %s:\n%s", want, manifest)
 	}
-	if !strings.Contains(manifest, "[context_servers."+zedExtensionServerID+"]") {
-		t.Fatalf("extension.toml does not register the context server under %q:\n%s", zedExtensionServerID, manifest)
+	if !strings.Contains(manifest, "[context_servers."+zedServerID+"]") {
+		t.Fatalf("extension.toml does not register the context server under %q:\n%s", zedServerID, manifest)
 	}
+}
+
+// The id deja wrote before this is renamed by the next install, so a machine
+// that already had both stops running two servers without being told.
+func TestZedInstallRenamesTheLegacyEntry(t *testing.T) {
+	path := zedSettingsFile(t, `{
+  "context_servers": {
+    "deja": {"command": "/old/deja", "args": ["mcp"]},
+    "other": {"command": "other"}
+  }
+}
+`)
+	if _, err := installZedMCP(path, "/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	after := zedRead(t, path)
+	if strings.Contains(after, `"deja":`) {
+		t.Fatalf("the old id survived:\n%s", after)
+	}
+	if strings.Count(after, `"deja-context-server"`) != 1 || !strings.Contains(after, "/usr/local/bin/deja") {
+		t.Fatalf("want exactly one current entry naming this binary:\n%s", after)
+	}
+	if !strings.Contains(after, `"other"`) {
+		t.Fatalf("another server was lost:\n%s", after)
+	}
+}
+
+// Uninstall takes both ids with it, including the one from before the rename.
+func TestZedUninstallRemovesBothIDs(t *testing.T) {
+	path := zedSettingsFile(t, `{
+  "context_servers": {
+    "deja": {"command": "/old/deja", "args": ["mcp"]},
+    "deja-context-server": {"command": "/usr/local/bin/deja", "args": ["mcp"]}
+  },
+  "ui_font_size": 16
+}
+`)
+	if _, err := installZedMCP(path, "deja", true); err != nil {
+		t.Fatal(err)
+	}
+	after := zedRead(t, path)
+	if strings.Contains(after, "deja") {
+		t.Fatalf("an entry survived uninstall:\n%s", after)
+	}
+	if !strings.Contains(after, "ui_font_size") {
+		t.Fatalf("the rest of the settings did not survive:\n%s", after)
+	}
+}
+
+// An extension entry is not deja's to delete: uninstalling the CLI wiring on a
+// machine where the extension provides the server has to leave it running.
+func TestZedUninstallKeepsTheExtensionEntry(t *testing.T) {
+	body := `{
+  "context_servers": {
+    "deja-context-server": {"enabled": true, "settings": {}}
+  }
+}
+`
+	path := zedSettingsFile(t, body)
+	if _, err := installZedMCP(path, "deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := zedRead(t, path); got != body {
+		t.Fatalf("the extension entry was touched:\n%s", got)
+	}
+}
+
+func zedRead(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
