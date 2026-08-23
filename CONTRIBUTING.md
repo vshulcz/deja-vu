@@ -1,5 +1,16 @@
 # Contributing
 
+## Where to start
+
+Issues labelled [good first issue](https://github.com/vshulcz/deja-vu/labels/good%20first%20issue)
+are bounded, and each one names the case it is wrong on, so you can reproduce
+before you change anything.
+
+Every pull request from outside the project so far has been answered the same
+day: 29 merged of 33, median four hours from opening to merge, the slowest 15
+hours, none left waiting. If yours sits longer than that, something went wrong
+on our side — say so in the thread.
+
 ## Build and test
 
 deja requires Go 1.25 and has no runtime Go dependencies. Before opening a pull
