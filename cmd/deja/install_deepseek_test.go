@@ -127,9 +127,11 @@ func TestInstallDeepSeekWritesTheCommandPlugin(t *testing.T) {
 	}
 }
 
-// The pre-step chain answers a decision — { kind: "enter", messages } — not a
-// bare list, and returning one without its kind kills the turn. Both the event
-// and the shape came from probing a running dsh.
+// Recall has to arrive through `ctx.systemPrompt.context`, the seam the host
+// evaluates on every assembly. A middleware on `agent/pre-step` also loads,
+// also completes the turn, and never reaches the request: a later listener in
+// that waterfall rebuilds its answer from the payload and drops the added
+// message. That was verified by reading what dsh 0.1.1-rc.2 actually sent.
 func TestInstallDeepSeekWritesTheAutoRecallPlugin(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -145,17 +147,23 @@ func TestInstallDeepSeekWritesTheAutoRecallPlugin(t *testing.T) {
 		t.Fatalf("no auto-recall plugin: %v", err)
 	}
 	js := string(body)
-	if !strings.Contains(js, `ctx.on("agent/pre-step"`) {
-		t.Errorf("the plugin listens on no event that can inject:\n%s", js)
+	if !strings.Contains(js, "ctx.systemPrompt.context(") {
+		t.Errorf("the plugin uses no seam whose text reaches the request:\n%s", js)
 	}
-	if !strings.Contains(js, "...decision") {
-		t.Errorf("the handler drops the chain's decision, so the turn dies on its kind:\n%s", js)
+	if strings.Contains(js, `ctx.on("agent/pre-step"`) {
+		t.Errorf("the plugin injects where the addition is silently dropped:\n%s", js)
+	}
+	if !strings.Contains(js, `apply.inject = ["systemPrompt"]`) {
+		t.Errorf("the service is not declared, so the plugin never applies:\n%s", js)
+	}
+	if !strings.Contains(js, `"agent/inbox/spliced"`) {
+		t.Errorf("at assembly time the prompt is only in the inbox splice, and this plugin never reads it:\n%s", js)
 	}
 	if !strings.Contains(js, `"hook-prompt", "--plain"`) {
 		t.Errorf("the plugin never asks deja for a block:\n%s", js)
 	}
 	if !strings.Contains(js, "prompt !== asked") {
-		t.Errorf("no guard on the cached prompt, so deja runs again every step:\n%s", js)
+		t.Errorf("no guard on the cached prompt, so deja runs again every assembly:\n%s", js)
 	}
 
 	layer, err := os.ReadFile(filepath.Join(home, ".dsh", "cordis.patch.yml"))
