@@ -11,6 +11,8 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { contributions } from "./lib.js";
+
 const require = createRequire(import.meta.url);
 
 // The tool registry lives in the host. A plugin that throws on a missing peer
@@ -292,11 +294,16 @@ function isHuman(message) {
   return Boolean(message) && (!message.source || message.source.kind === "user");
 }
 
-// cliPluginDir is where `deja install dsh` writes plugins of its own. A user
-// who ran the installer and then added this package has both in the profile:
-// two `/deja` commands and the same recall on the system prompt twice. The
-// files on disk win — the installer keeps them current — and this package then
-// contributes only what they do not: the model-facing tools.
+// `deja install dsh` writes plugins of its own into DSH_HOME and adds them to
+// the profile, so a user who ran the installer and then added this package has
+// both: two `/deja` commands, the same recall on the system prompt twice, and
+// deja's MCP server answering the same six questions the tools here do. What
+// the installer wrote wins — it is the copy `deja install` keeps current — and
+// this package contributes only the parts that are missing.
+//
+// The two halves are separate on purpose: `deja install dsh` writes command.js
+// and the MCP row, and only `deja install dsh-auto` adds auto.js. A profile can
+// have the command from the installer and still want recall from here.
 function cliPluginDir() {
   const home = process.env.DSH_HOME || join(homedir(), ".dsh");
   return join(home, "plugins", "deja");
@@ -311,13 +318,13 @@ function installedByCLI(file) {
 }
 
 function apply(ctx, config) {
-  tools(ctx);
-  // Each half stands down on its own: `deja install dsh` writes command.js,
-  // and only `deja install dsh-auto` adds auto.js, so a profile can have the
-  // command from the installer and still want recall from here.
-  if (!installedByCLI("command.js")) command(ctx);
-  if (installedByCLI("auto.js")) return;
-  if (!config || config.autoRecall !== false) autoRecall(ctx);
+  const adds = contributions(
+    { command: installedByCLI("command.js"), auto: installedByCLI("auto.js") },
+    config,
+  );
+  if (adds.tools) tools(ctx);
+  if (adds.command) command(ctx);
+  if (adds.recall) autoRecall(ctx);
 }
 
 apply.inject = ["tools", "commands", "systemPrompt"];

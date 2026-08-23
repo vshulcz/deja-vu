@@ -20,6 +20,12 @@ embeddings, nothing leaves the machine.
 opencode installs the package on start. The deja binary comes with it, but a
 deja you installed yourself always wins — see [Which binary](#which-binary).
 
+`deja install --auto` wires opencode too, and is the shorter path if you have
+the CLI: it adds deja's MCP server and writes a plugin of its own. Having both
+is fine. This package reads what the installer left — the MCP entry in
+`opencode.json`, the plugin file in `plugins/deja.js` — and contributes only
+what is missing, so nothing is registered or recalled twice.
+
 ## What you get
 
 Six tools the model can call:
@@ -51,8 +57,9 @@ And recall nobody has to ask for:
 
 - `autoRecall` (default `true`) — the three hooks above. Turn off to keep only
   the tools.
-- `tools` (default `true`) — the six tools. Turn off if you already reach deja
-  through its MCP server and do not want them twice.
+- `tools` (default `true`) — the six tools. They are skipped on their own when
+  `deja install` already wired the MCP server; set this to `false` to drop them
+  when you reach deja some other way.
 - `bin` — path to a specific deja binary.
 
 ## Which binary

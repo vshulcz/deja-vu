@@ -106,6 +106,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	// machine without claude settings, which is exactly a machine whose other
 	// harnesses may still be wired to a binary that moved.
 	doctorWiringExe(w)
+	doctorDoubleWiring(w)
 	fmt.Fprintln(w)
 	doctorIndex(w, report.Index, dir)
 	fmt.Fprintln(w)

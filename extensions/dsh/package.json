@@ -1,6 +1,6 @@
 {
   "name": "dsh-deja",
-  "version": "0.20.2",
+  "version": "0.20.3",
   "description": "Brings the session history of nineteen other coding agents into DeepSeek Harness: recall, session digest and per-file history tools over a local index, plus optional automatic recall before each step.",
   "type": "module",
   "main": "index.js",
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "lib.js",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",

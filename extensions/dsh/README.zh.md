@@ -14,9 +14,12 @@ dsh plugin --profile web add dsh-deja
 
 插件调用 `deja` 可执行文件。它作为依赖随插件一起安装；如果 `PATH` 上已有 `deja` 就直接使用，`DEJA_BIN` 可覆盖两者。
 
+装了 CLI 的话，`deja install --auto` 也会把 dsh 接好——写入 deja 的 MCP 服务端和 `/deja` 命令——那条路更短。
+两边都装也没问题：插件会检查 `$DSH_HOME/plugins/deja/` 下安装器写了什么，只补缺的部分，工具和命令不会注册两次。
+
 ## 提供的能力
 
-三个模型可调用的工具：
+六个模型可调用的工具：
 
 | 工具 | 回答什么 |
 |---|---|

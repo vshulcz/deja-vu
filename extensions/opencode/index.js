@@ -11,9 +11,17 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { accessSync, constants, existsSync } from "node:fs"
+import { accessSync, constants, existsSync, readFileSync } from "node:fs"
 
-import { clampLimit, cliPluginPath, contextText, lastUserText } from "./lib.js"
+import {
+  clampLimit,
+  cliPluginPath,
+  configPaths,
+  contextText,
+  contributions,
+  lastUserText,
+  mcpWired,
+} from "./lib.js"
 
 const require = createRequire(import.meta.url)
 const run_ = promisify(execFile)
@@ -99,6 +107,27 @@ const MISSING =
   "deja is not installed on this machine, so there is no history to search. " +
   "Install it with: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh"
 
+// installerWiring reads what `deja install` left on disk for opencode: the MCP
+// server in the config, and the plugin file `--auto` writes. Both reads are
+// wrapped — a config we cannot read means "not wired", so the worst case is
+// this package doing the work twice rather than not at all.
+function installerWiring() {
+  const wiring = { mcp: false, recall: false }
+  try {
+    wiring.recall = existsSync(cliPluginPath(process.env, homedir()))
+  } catch {}
+  try {
+    for (const path of configPaths(process.env, homedir())) {
+      if (!existsSync(path)) continue
+      if (mcpWired(readFileSync(path, "utf8"))) {
+        wiring.mcp = true
+        break
+      }
+    }
+  } catch {}
+  return wiring
+}
+
 export const DejaPlugin = async ({ client, directory }, options = {}) => {
   const config = options || {}
   const bin = resolveDeja(typeof config.bin === "string" ? config.bin : "")
@@ -117,7 +146,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
 
   const hooks = {}
 
-  if (config.tools !== false && tool) {
+  // What `deja install` already wired for opencode is not repeated here. It
+  // writes an MCP server (the same six answers, under their own names) and,
+  // with --auto, a plugin file of its own that opencode loads beside this
+  // package — verified with `opencode debug config`, which resolves both into
+  // one plugin list. Whatever the installer wrote wins, because that is the
+  // copy `deja install` keeps current; this package fills the gaps.
+  const adds = contributions(installerWiring(), config)
+
+  if (adds.tools && tool) {
     const schema = tool.schema
     hooks.tool = {
       deja_recall: tool({
@@ -187,16 +224,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
     }
   }
 
-  if (config.autoRecall === false) return hooks
-
-  // `deja install opencode-auto` writes a plugin of its own, and opencode loads
-  // it alongside this package: two entries in the resolved plugin list, both
-  // pushing the same recall onto the system prompt and both raising the same
-  // toast. The file on disk wins because the installer keeps it current; this
-  // package keeps its tools and drops only the duplicated recall.
-  try {
-    if (existsSync(cliPluginPath(process.env, homedir()))) return hooks
-  } catch {}
+  if (!adds.recall) return hooks
 
   // opencode has no session-start hook. The system prompt is assembled on
   // every request, so the session digest is fetched once and pushed there —

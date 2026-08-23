@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import apply from "../index.js";
+import { contributions } from "../lib.js";
 
 const source = readFileSync(new URL("../index.js", import.meta.url), "utf8");
 
@@ -92,16 +93,21 @@ test("nothing installed by the CLI: the package contributes everything", () => {
     apply(ctx, {});
     return ctx;
   });
+  // The tool count is not asserted: registering them needs the dsh-tools peer,
+  // which the host provides and this test does not have.
   assert.deepEqual(ctx.seen.commands, ["deja"]);
   assert.deepEqual(ctx.seen.context, ["deja:recall"]);
 });
 
-test("the CLI's command file stands the package's command down", () => {
+test("the CLI's install stands the command and the tools down", () => {
+  // command.js and the mcp-deja profile row are written by the same install, so
+  // its presence means the six answers are already reachable over MCP.
   const ctx = withDSHHome(["command.js"], () => {
     const ctx = fakeCtx();
     apply(ctx, {});
     return ctx;
   });
+  assert.equal(ctx.seen.tools, 0);
   assert.deepEqual(ctx.seen.commands, []);
   assert.deepEqual(ctx.seen.context, ["deja:recall"], "recall was not installed by the CLI, so it stays here");
 });
@@ -112,7 +118,18 @@ test("the CLI's auto file stands the package's recall down", () => {
     apply(ctx, {});
     return ctx;
   });
+  assert.equal(ctx.seen.tools, 0);
   assert.deepEqual(ctx.seen.commands, []);
   assert.deepEqual(ctx.seen.context, []);
-  assert.ok(ctx.seen.tools >= 0, "tools are never duplicated: the CLI install does not register any");
+});
+
+// The registration decision on its own: the cases above cannot see the tools,
+// because registering them needs the dsh-tools peer the host provides.
+test("contributions fills the gaps and never repeats the installer", () => {
+  assert.deepEqual(contributions({}, {}), { tools: true, command: true, recall: true });
+  assert.deepEqual(contributions({ command: true }, {}), { tools: false, command: false, recall: true });
+  assert.deepEqual(contributions({ command: true, auto: true }, {}), { tools: false, command: false, recall: false });
+  assert.deepEqual(contributions({ auto: true }, {}), { tools: true, command: true, recall: false });
+  assert.deepEqual(contributions({}, { autoRecall: false }), { tools: true, command: true, recall: false });
+  assert.deepEqual(contributions(undefined, undefined), { tools: true, command: true, recall: true });
 });

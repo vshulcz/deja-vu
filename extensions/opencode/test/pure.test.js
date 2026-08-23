@@ -5,7 +5,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { clampLimit, cliPluginPath, contextText, lastUserText } from "../lib.js"
+import {
+  clampLimit,
+  cliPluginPath,
+  contextText,
+  contributions,
+  lastUserText,
+  mcpWired,
+  stripJSONComments,
+} from "../lib.js"
 import { DejaPlugin } from "../index.js"
 
 test("contextText reads the hook shape deja prints", () => {
@@ -46,6 +54,22 @@ test("clampLimit keeps the window small", () => {
   assert.equal(clampLimit(NaN), 5)
 })
 
+// The plugin reads the installer's own config home, so the tests point it at a
+// temporary one rather than at the machine's.
+async function withConfigHome(dir, run) {
+  const previous = process.env.XDG_CONFIG_HOME
+  process.env.XDG_CONFIG_HOME = dir
+  try {
+    await run()
+  } finally {
+    if (previous === undefined) delete process.env.XDG_CONFIG_HOME
+    else process.env.XDG_CONFIG_HOME = previous
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+const quietClient = () => ({ tui: { showToast: async () => {} } })
+
 test("cliPluginPath follows the installer's own config home", () => {
   assert.equal(
     cliPluginPath({ XDG_CONFIG_HOME: "/cfg" }, "/home/x"),
@@ -64,33 +88,65 @@ test("the plugin stands down when the installer's own plugin is on disk", async 
   const dir = mkdtempSync(join(tmpdir(), "deja-oc-"))
   mkdirSync(join(dir, "opencode", "plugins"), { recursive: true })
   writeFileSync(join(dir, "opencode", "plugins", "deja.js"), "// installed by deja\n")
-
-  const client = { tui: { showToast: async () => {} } }
-  const env = process.env.XDG_CONFIG_HOME
-  process.env.XDG_CONFIG_HOME = dir
-  try {
-    const hooks = await DejaPlugin({ client, directory: dir })
+  await withConfigHome(dir, async () => {
+    const hooks = await DejaPlugin({ client: quietClient(), directory: dir })
     assert.equal(hooks["experimental.chat.system.transform"], undefined)
     assert.equal(hooks["experimental.chat.messages.transform"], undefined)
-  } finally {
-    if (env === undefined) delete process.env.XDG_CONFIG_HOME
-    else process.env.XDG_CONFIG_HOME = env
-    rmSync(dir, { recursive: true, force: true })
-  }
+  })
 })
 
 test("without it the recall hooks are installed", async () => {
   const dir = mkdtempSync(join(tmpdir(), "deja-oc-"))
-  const client = { tui: { showToast: async () => {} } }
-  const env = process.env.XDG_CONFIG_HOME
-  process.env.XDG_CONFIG_HOME = dir
-  try {
-    const hooks = await DejaPlugin({ client, directory: dir })
+  await withConfigHome(dir, async () => {
+    const hooks = await DejaPlugin({ client: quietClient(), directory: dir })
     assert.equal(typeof hooks["experimental.chat.system.transform"], "function")
     assert.equal(typeof hooks["experimental.chat.messages.transform"], "function")
-  } finally {
-    if (env === undefined) delete process.env.XDG_CONFIG_HOME
-    else process.env.XDG_CONFIG_HOME = env
-    rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+test("mcpWired reads the entry the installer writes, comments and all", () => {
+  const config = `{
+  // deja was wired by \`deja install opencode\`
+  "mcp": {
+    "deja": {"type":"local","command":["/usr/local/bin/deja","mcp"]}
   }
+}`
+  assert.equal(mcpWired(config), true)
+  assert.equal(mcpWired(`{"mcp": {"other": {}}}`), false)
+  assert.equal(mcpWired("{}"), false)
+  assert.equal(mcpWired("not json"), false)
+  assert.equal(mcpWired(""), false)
+})
+
+test("stripJSONComments leaves what is inside strings alone", () => {
+  assert.equal(stripJSONComments(`{"a":"http://x"} // tail`).trim(), `{"a":"http://x"}`)
+  assert.equal(stripJSONComments(`{/* off */"a":1}`), `{"a":1}`)
+  assert.equal(stripJSONComments(`{"a":"say \\"//\\" here"}`), `{"a":"say \\"//\\" here"}`)
+})
+
+test("an MCP server in the config leaves recall as this package's job", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "deja-oc-"))
+  mkdirSync(join(dir, "opencode"), { recursive: true })
+  writeFileSync(
+    join(dir, "opencode", "opencode.json"),
+    JSON.stringify({ mcp: { deja: { type: "local", command: ["deja", "mcp"] } } }),
+  )
+  await withConfigHome(dir, async () => {
+    const hooks = await DejaPlugin({ client: quietClient(), directory: dir })
+    assert.equal(typeof hooks["experimental.chat.system.transform"], "function")
+  })
+})
+
+// The registration decision itself, since the hook tests above cannot see the
+// tools: registering those needs opencode's own plugin package, which the host
+// provides and the test environment does not.
+test("contributions fills the gaps and never repeats the installer", () => {
+  assert.deepEqual(contributions({}, {}), { tools: true, recall: true })
+  assert.deepEqual(contributions({ mcp: true }, {}), { tools: false, recall: true })
+  assert.deepEqual(contributions({ recall: true }, {}), { tools: true, recall: false })
+  assert.deepEqual(contributions({ mcp: true, recall: true }, {}), { tools: false, recall: false })
+  // The user's own switches still win over an empty machine.
+  assert.deepEqual(contributions({}, { tools: false }), { tools: false, recall: true })
+  assert.deepEqual(contributions({}, { autoRecall: false }), { tools: true, recall: false })
+  assert.deepEqual(contributions(undefined, {}), { tools: true, recall: true })
 })

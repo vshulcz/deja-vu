@@ -22,9 +22,15 @@ The plugin runs the `deja` binary. It is pulled in as a dependency, so npm
 installs it with the plugin; a `deja` already on `PATH` is used as-is, and
 `DEJA_BIN` overrides both.
 
+If you have the CLI, `deja install --auto` wires dsh too — it adds deja's MCP
+server and a `/deja` command to your profile — and that is the shorter path.
+Having both is fine: this plugin looks for what the installer wrote in
+`$DSH_HOME/plugins/deja/` and contributes only what is missing, so the tools and
+the command are never registered twice.
+
 ## What it adds
 
-Three tools the model can call:
+Six tools the model can call:
 
 | Tool | Answers |
 |---|---|

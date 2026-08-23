@@ -261,10 +261,11 @@ variable is honored too. The
 the observed paths, record schemas and role mapping per harness, with synthetic fixtures
 keeping those descriptions checked against the parsers.
 
-### Harnesses with their own package format
+### Harnesses with a package of their own
 
-Three of them install extensions their own way rather than through `deja
-install`. Those packages live in [`extensions/`](extensions):
+`deja install --auto` wires all three of these like every other harness, and
+that stays the shortest path. They also have a package in their own ecosystem,
+for people who install extensions there rather than from a CLI:
 
 | Harness | Package | Install |
 | --- | --- | --- |
@@ -272,10 +273,12 @@ install`. Those packages live in [`extensions/`](extensions):
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 
+Either path is enough on its own, and having both is not a problem: each package
+looks at what `deja install` wrote and contributes only what is missing, so
+nothing is recalled or registered twice. The one pair that cannot see itself is
+a Zed extension installed after `deja install zed`, and `deja doctor` says so.
+
 Each uses the deja you already have; the copy it bundles is only the fallback.
-`deja install` also wires all three, so running both is fine: the package finds
-what the installer wrote and drops the part it already covers, rather than
-recalling twice.
 
 ## Semantic recall (optional)
 
