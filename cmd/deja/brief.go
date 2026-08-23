@@ -88,7 +88,10 @@ func runBrief(dir string, w io.Writer) error {
 	// header because that is the only line a first-time reader is certain to
 	// read.
 	if nothingWired() {
-		fmt.Fprintf(w, "wire       %sno agent is wired to this yet%s — `deja install --auto`\n", bold, reset)
+		// 53 columns: every line of the brief fits a 60-column pane (#604),
+		// and the longer wording left `--auto` wrapped alone on its own line
+		// of the first screen a fresh install shows (#1411).
+		fmt.Fprintf(w, "wire       %sno agent wired yet%s — `deja install --auto`\n", bold, reset)
 	}
 
 	recalls, bytes, _ := usage.TodayWithInjections(dir)

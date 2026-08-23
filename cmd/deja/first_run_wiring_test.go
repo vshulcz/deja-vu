@@ -63,7 +63,7 @@ func TestTheBriefStopsSayingItOnceWired(t *testing.T) {
 	if err := runBrief(index.DefaultDir(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "no agent is wired") {
+	if strings.Contains(out.String(), "no agent wired yet") {
 		t.Errorf("a wired machine is still being told to wire itself:\n%s", out.String())
 	}
 }

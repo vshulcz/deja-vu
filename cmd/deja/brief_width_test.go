@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -166,5 +167,36 @@ func TestBriefRecentLinesHonourColumns(t *testing.T) {
 		if w := visibleWidth(l); w > 80 {
 			t.Errorf("COLUMNS=not-a-number: line is %d columns: %q", w, l)
 		}
+	}
+}
+
+// #604 budgeted the brief's transcript lines against the terminal, but deja's
+// own copy was not budgeted: the wire line ran to 64 columns and wrapped
+// `--auto` alone onto a second line of the first screen a fresh install shows
+// (#1411). Every line of the brief fits a 60-column pane, this one included.
+func TestBriefWireLineFitsSixtyColumns(t *testing.T) {
+	day := 24 * time.Hour
+	dir := briefStore(t, "tmp/projc", time.Hour, 2*day, 5*day)
+
+	for _, cols := range []int{60, 80, 120} {
+		t.Run(strconv.Itoa(cols), func(t *testing.T) {
+			t.Setenv("COLUMNS", strconv.Itoa(cols))
+			var buf bytes.Buffer
+			if err := runBrief(dir, &buf); err != nil {
+				t.Fatal(err)
+			}
+			var wire string
+			for _, l := range strings.Split(buf.String(), "\n") {
+				if strings.Contains(l, "install --auto") {
+					wire = l
+				}
+			}
+			if wire == "" {
+				t.Fatalf("no wire line on an unwired store:\n%s", buf.String())
+			}
+			if w := visibleWidth(wire); w > 60 {
+				t.Errorf("COLUMNS=%d: wire line is %d columns, wraps on a 60-column pane: %q", cols, w, wire)
+			}
+		})
 	}
 }
