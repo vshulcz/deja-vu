@@ -100,7 +100,17 @@ release:
   # changelog nobody can reply to, and an empty Discussions tab that reads as
   # an empty room.
   discussion_category_name: Announcements
+  # What changed goes first. The CHANGELOG section for this version is written
+  # by hand and says what the release is; the generated commit list below it
+  # says which pull requests carried it. Install is the last thing a reader
+  # needs and used to be the first thing on the page — a release page that
+  # opened with `curl … | sh` and never said what was new.
+  #
+  # RELEASE_LEDE is filled by the release workflow from CHANGELOG.md. Empty is
+  # a valid answer: a release cut before its changelog entry lands still ships.
   header: |
+    {{ envOrDefault "RELEASE_LEDE" "" }}
+  footer: |
     ## Install
 
     ```sh
