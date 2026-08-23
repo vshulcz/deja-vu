@@ -997,7 +997,16 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		// answer, and nothing says another N are waiting behind --all. deja
 		// narrates every other place the ladder hides a session, so it says
 		// this one too.
-		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
+		//
+		// Except to a reader who already typed --all: there the list was cut by
+		// an explicit --limit, or by the relevance tier's own retrieval window,
+		// and neither of those lifts with the flag they are being sent to
+		// (#1608). Say what is shown and leave the advice out.
+		if o.All {
+			fmt.Fprintf(os.Stderr, "deja: showing %d of %d\n", len(hits), o.Total)
+		} else {
+			fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
+		}
 	}
 	// The window this is being printed into, so the lines can be budgeted
 	// rather than assumed 80 wide. Only for a terminal: a pipe gets the whole
