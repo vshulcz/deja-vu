@@ -24,11 +24,17 @@ func Columns(s string) int {
 // was a line that ran past the edge by exactly one column per rune — 🚀 was
 // missing, then ✅ ✨ ❌ ⚡ ⭐ 🆗 🟰 were missing from the block that replaced
 // it (#1594). Patching block by block kept losing to the next emoji someone
-// typed, so the ranges below are the complete Wide and Fullwidth set from the
-// Unicode character database, generated rather than guessed.
+// typed, so the ranges below are the Wide and Fullwidth set from the Unicode
+// character database, generated rather than guessed. It is complete as of
+// Unicode 15.0: emoji added later count one column until the table is
+// regenerated, which narrows the failure from "the next emoji someone types" to
+// "the next Unicode release".
 //
-// A combining mark still counts one: this is a layout budget, not a shaping
-// engine, and over-counting a mark shortens a line rather than overflowing it.
+// Combining marks are counted as the table finds them, which means the CJK ones
+// (U+3099, U+302A) count two even though they render on the base character —
+// `か` plus U+3099 measures four columns and draws two. This is a layout budget,
+// not a shaping engine, and over-counting shortens a line rather than running
+// it past the edge; the same was true of the hand-written table this replaced.
 func RuneColumns(r rune) int {
 	if r < wideRanges[0].lo {
 		return 1
