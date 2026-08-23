@@ -64,3 +64,35 @@ func TestCutRightKeepsTheTail(t *testing.T) {
 		t.Errorf("CutRight shortened a string that fits: %q", got)
 	}
 }
+
+// The table stopped at 1F64F, so a rocket counted one column and every line
+// carrying one ran a column past the edge — at 60 and again at 80, which is
+// what a single mismeasured rune looks like (#1594).
+func TestRuneColumnsCoversTheWideEmojiBlocks(t *testing.T) {
+	for _, tc := range []struct {
+		r    rune
+		name string
+	}{
+		{'🚀', "rocket"},
+		{'🚗', "car"},
+		{'🛑', "stop sign"},
+		{'🟠', "orange circle"},
+		{'🟩', "green square"},
+		{'🩺', "stethoscope"},
+		{'🪟', "window"},
+		{'🫠', "melting face"},
+		{'🔥', "fire, already covered"},
+		{'语', "CJK, already covered"},
+	} {
+		if got := RuneColumns(tc.r); got != 2 {
+			t.Errorf("RuneColumns(%q) = %d, want 2 (%s)", tc.r, got, tc.name)
+		}
+	}
+	// Latin, punctuation and the dingbats terminals draw in one cell stay at
+	// one: widening those would cut titles a character early for everyone.
+	for _, r := range []rune{'a', ' ', '·', '…', '—', '✓'} {
+		if got := RuneColumns(r); got != 1 {
+			t.Errorf("RuneColumns(%q) = %d, want 1", r, got)
+		}
+	}
+}

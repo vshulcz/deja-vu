@@ -34,8 +34,13 @@ func RuneColumns(r rune) int {
 		r >= 0xFE30 && r <= 0xFE6F, // CJK compatibility forms
 		r >= 0xFF00 && r <= 0xFF60, // fullwidth forms
 		r >= 0xFFE0 && r <= 0xFFE6,
-		r >= 0x1F300 && r <= 0x1F64F, // emoji
-		r >= 0x1F900 && r <= 0x1F9FF,
+		r >= 0x1F300 && r <= 0x1F64F, // emoji: pictographs and faces
+		r >= 0x1F680 && r <= 0x1F6FF, // transport and map symbols — 🚀 was one
+		// column here, so a title carrying it ran a column past the edge at
+		// every width (#1594)
+		r >= 0x1F7E0 && r <= 0x1F7EB, // coloured circles and squares
+		r >= 0x1F900 && r <= 0x1F9FF, // supplemental pictographs
+		r >= 0x1FA70 && r <= 0x1FAFF, // pictographs extended-A
 		r >= 0x20000 && r <= 0x3FFFD: // CJK extensions B and beyond
 		return 2
 	}
