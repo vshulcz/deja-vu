@@ -62,4 +62,19 @@ main.optionalDependencies = Object.fromEntries(
 );
 fs.writeFileSync(mainPkgPath, JSON.stringify(main, null, 2));
 run("npm publish --access public", mainDir);
-console.log(`published ${platforms.length} platform packages + @vshulcz/deja-vu@${version}`);
+
+// The DeepSeek Harness plugin. dsh's plugin market installs from npm and
+// verifies the tarball against the repo, so this has to be published rather
+// than left for people to clone. It rides the same version as the binary it
+// runs, which is also the version it depends on.
+const dshDir = path.join(work, "dsh-deja");
+fs.cpSync("packages/dsh-deja", dshDir, { recursive: true });
+const dshPkgPath = path.join(dshDir, "package.json");
+const dsh = JSON.parse(fs.readFileSync(dshPkgPath, "utf8"));
+dsh.version = version;
+dsh.dependencies["@vshulcz/deja-vu"] = version;
+fs.writeFileSync(dshPkgPath, JSON.stringify(dsh, null, 2));
+fs.copyFileSync("LICENSE", path.join(dshDir, "LICENSE"));
+run("npm publish --access public", dshDir);
+
+console.log(`published ${platforms.length} platform packages + @vshulcz/deja-vu@${version} + dsh-deja@${version}`);
