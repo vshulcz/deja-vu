@@ -296,7 +296,11 @@ func printStats(w io.Writer, r stats.Report) {
 		if pad < 1 {
 			pad = 1
 		}
-		fmt.Fprintf(w, "  %s%s %4d sessions  %5d messages\n", tag, strings.Repeat(" ", pad), h.Sessions, h.Messages)
+		// The counts are padded columns, but the nouns are prose: a machine
+		// with one session read "1 sessions  1 messages" eight lines above the
+		// Highlights block that says "1 message" (#1598).
+		fmt.Fprintf(w, "  %s%s %4d session%-2s %5d message%s\n", tag, strings.Repeat(" ", pad),
+			h.Sessions, pluralS(h.Sessions), h.Messages, pluralS(h.Messages))
 	}
 	fmt.Fprintln(w)
 
@@ -328,7 +332,7 @@ func printStats(w io.Writer, r stats.Report) {
 		// if the visible bar were the whole shape — while Range, two lines
 		// above, names months the chart never draws (#854).
 		if shown, total := monthlyTotal(r.Monthly), r.TotalMessages; total > shown && shown*2 < total {
-			fmt.Fprintf(w, "  %d of %d messages are older than the chart — see the range above\n", total-shown, total)
+			fmt.Fprintf(w, "  %d of %d message%s are older than the chart — see the range above\n", total-shown, total, pluralS(total))
 		}
 	}
 	fmt.Fprintln(w)
@@ -351,7 +355,8 @@ func printStats(w io.Writer, r stats.Report) {
 			fmt.Fprintf(w, "  Distilled        %s served from %s of transcripts — ~%d× less context\n", humanBytes(int64(r.Recall.Bytes)), humanBytes(r.Recall.RawBytes), ratio)
 		}
 	}
-	fmt.Fprintf(w, "  This week        %d recalls by your agents · %s re-used (plus %d auto-injections)\n", r.WeekRecalls, humanBytes(int64(r.WeekBytes)), r.WeekInjected)
+	fmt.Fprintf(w, "  This week        %d recall%s by your agents · %s re-used (plus %d auto-injection%s)\n",
+		r.WeekRecalls, pluralS(r.WeekRecalls), humanBytes(int64(r.WeekBytes)), r.WeekInjected, pluralS(r.WeekInjected))
 	if r.Recall.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  Déjà vu          %d prompt%s your own history already answered\n", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))
 	}
@@ -361,7 +366,7 @@ func printStats(w io.Writer, r stats.Report) {
 	if r.HandoffsIn > 0 {
 		fmt.Fprintf(w, "  Handoffs         %d session%s started from a handoff\n", r.HandoffsIn, pluralS(r.HandoffsIn))
 	}
-	fmt.Fprintf(w, "  Injections       %d · %d sessions · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, humanBytes(int64(r.Recall.InjectedBytes)))
+	fmt.Fprintf(w, "  Injections       %d · %d session%s · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, pluralS(r.Recall.InjectedSessions), humanBytes(int64(r.Recall.InjectedBytes)))
 	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)
 }
 
