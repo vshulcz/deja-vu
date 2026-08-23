@@ -24,8 +24,8 @@ func TestStatsImpactCountsAndArithmetic(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{
-		"2 agent-initiated recalls",
-		"1 session starts began with project memory",
+		"2 agent-initiated recalls returned matches",
+		"1 session start began with project memory",
 		"1 session recalled 2+ times",
 		"1 prompts matched work",
 		"50× less",
@@ -45,6 +45,22 @@ func TestStatsImpactCountsAndArithmetic(t *testing.T) {
 	}
 	if r.Recalls != 2 || r.Injections != 1 || r.ReusedTwice != 1 || r.DejaVuMoments != 1 || r.ServedBytes != 3500 || r.RawBytes != 175000 {
 		t.Fatalf("json report wrong: %+v", r)
+	}
+}
+
+func TestPrintImpactSingularGrammar(t *testing.T) {
+	var out bytes.Buffer
+	if err := printImpact(&out, usage.ImpactReport{Recalls: 1, Injections: 1}, 0, false); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, want := range []string{
+		"1 agent-initiated recall returned matches",
+		"1 session start began with project memory",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("impact output missing %q:\n%s", want, got)
+		}
 	}
 }
 
