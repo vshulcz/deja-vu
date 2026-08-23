@@ -156,8 +156,8 @@ func InjectedToday(indexDir string) int {
 	return injected
 }
 
-// TodayWithInjections returns today's agent-memory events, served bytes, and
-// the subset of those bytes injected by session-start hooks.
+// TodayWithInjections returns today's non-empty agent-requested memory events,
+// served bytes, and the subset of those bytes injected by session-start hooks.
 func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -167,11 +167,12 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 		}
 		switch e.Kind {
 		case KindRecall, KindContext, KindBlame:
+			if e.Empty {
+				continue
+			}
 			recalls++
 			bytes += e.Bytes
 		case KindHook, KindDejaVu, KindTool:
-			recalls++
-			bytes += e.Bytes
 			injected += e.Bytes
 		}
 	}
@@ -266,8 +267,8 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 	return recalls, bytes, injected, injectedBytes
 }
 
-// Today sums events since local midnight: agent recalls (recall, context,
-// hook) and the context bytes they served.
+// Today sums non-empty agent-requested events since local midnight and the
+// context bytes they served. Automatic injections are reported separately.
 func Today(indexDir string) (recalls int, bytes int) {
 	recalls, bytes, _ = TodayWithInjections(indexDir)
 	return recalls, bytes

@@ -72,7 +72,7 @@ func TestStatuslineCountsRecalls(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "2 recalls") || !strings.Contains(got, "3.0 KB ctx") || !strings.Contains(got, "1.0 KB injected") {
+	if !strings.Contains(got, "1 recall") || !strings.Contains(got, "2.0 KB ctx") || !strings.Contains(got, "1.0 KB injected") {
 		t.Fatalf("statusline = %q", got)
 	}
 }
