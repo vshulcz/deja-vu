@@ -8,14 +8,25 @@ recall arrives with the prompt, and the agent can search history itself.
 ## Install
 
 ```
-/plugins install https://github.com/vshulcz/deja-vu/releases/latest/download/kimi-deja.zip
+/plugins install https://github.com/vshulcz/deja-vu
 /reload
 ```
 
-Installing from the repository URL does not work: Kimi looks for
-`kimi.plugin.json` at the repository root or in a single top-level directory,
-and this is a monorepo. From a clone, `/plugins install <path>/extensions/kimi`
-does work.
+That form pins the latest release and records where it came from, which is what
+Kimi's update check reads. There is also a `kimi-deja.zip` release asset — 16 KB
+instead of a 3 MB repository — for a marketplace entry or an install that should
+not pull the whole project.
+
+## Updates
+
+Kimi only notifies about updates for plugins installed from its own
+marketplace. For a repository install, `/plugins install` again pulls the
+current release, and `deja doctor` says when the copy you have is behind the
+one this deja ships:
+
+```
+kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with this deja — reinstall it in Kimi to update)
+```
 
 Then install the binary if you do not have it:
 

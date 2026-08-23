@@ -49,7 +49,7 @@ opencode、DeepSeek Harness、Zed 和 Kimi Code 也有各自生态里的包，�
 opencode plugin opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed：扩展面板里搜 deja
-# Kimi Code：/plugins install <kimi-deja.zip 的发布地址>
+# Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
 ```
 
 `deja install --auto` 已经把这四个接好了，两条路走哪条都够。两边都装也没问题：包会看

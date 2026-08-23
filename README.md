@@ -272,7 +272,7 @@ for people who install extensions there rather than from a CLI:
 | opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
-| Kimi Code | plugin `deja` | `/plugins install .../releases/latest/download/kimi-deja.zip` |
+| Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 
 Either path is enough on its own, and having both is not a problem: the
 opencode, dsh and Kimi packages read what `deja install` wrote and contribute

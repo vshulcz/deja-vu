@@ -98,7 +98,13 @@ func doctorAutoRecall(w io.Writer) {
 		// its own hook is the one that runs when the installer has not written
 		// here at all.
 		if a.name == "kimi" && kimiPluginInstalled() && (err != nil || !strings.Contains(string(b), a.marker)) {
-			fmt.Fprintf(w, "  %-12s %-11s %s  (the Kimi Code plugin recalls on every prompt)\n", a.name, "plugin", path)
+			// Behind is the line worth the width: what it does is in the
+			// README, what to run is not obvious from anywhere.
+			note := kimiPluginNote()
+			if note == "" || note == "v"+kimiPluginVersion {
+				note = "the Kimi Code plugin recalls on every prompt"
+			}
+			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "plugin", path, note)
 			continue
 		}
 		switch {

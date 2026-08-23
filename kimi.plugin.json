@@ -1,0 +1,42 @@
+{
+  "name": "deja",
+  "version": "0.1.0",
+  "description": "Recall the sessions your other coding agents already wrote \u2014 Claude Code, Codex, Cursor, opencode and sixteen more, including work from before deja was installed.",
+  "keywords": [
+    "memory",
+    "recall",
+    "sessions",
+    "search",
+    "history"
+  ],
+  "author": "vshulcz",
+  "homepage": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT",
+  "interface": {
+    "displayName": "deja",
+    "shortDescription": "Search your own past AI coding sessions, from every tool on this machine.",
+    "longDescription": "deja indexes the session files coding agents already write to disk \u2014 Claude Code, Codex, Cursor, opencode, Gemini, Zed and more \u2014 and answers from them. Ask what you fixed before instead of debugging it twice. The index is local: no LLM, no embeddings, nothing leaves the machine. Needs the deja binary: https://github.com/vshulcz/deja-vu",
+    "developerName": "vshulcz",
+    "websiteURL": "https://github.com/vshulcz/deja-vu"
+  },
+  "skills": "./extensions/kimi/skills/",
+  "commands": "./extensions/kimi/commands/",
+  "sessionStart": {
+    "skill": "deja-history"
+  },
+  "mcpServers": {
+    "deja": {
+      "command": "node",
+      "args": [
+        "./extensions/kimi/bin/deja-mcp.mjs"
+      ]
+    }
+  },
+  "hooks": [
+    {
+      "event": "UserPromptSubmit",
+      "command": "node ./extensions/kimi/hooks/recall.mjs",
+      "timeout": 30
+    }
+  ]
+}

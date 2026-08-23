@@ -87,3 +87,35 @@ func TestKimiPluginKnowsTheInstallersMarker(t *testing.T) {
 		t.Fatalf("extensions/kimi/lib.mjs does not carry the marker the installer writes:\n%s", kimiHookMarker)
 	}
 }
+
+// The version doctor compares against has to be the version the plugin ships,
+// and the manifest a GitHub install reads has to be the same plugin as the one
+// in the zip — only its paths differ.
+func TestKimiManifestsAgree(t *testing.T) {
+	var plugin, root map[string]any
+	if err := json.Unmarshal(repoFile(t, "extensions/kimi/kimi.plugin.json"), &plugin); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(repoFile(t, "kimi.plugin.json"), &root); err != nil {
+		t.Fatal(err)
+	}
+	if plugin["version"] != kimiPluginVersion {
+		t.Fatalf("kimiPluginVersion is %q, the manifest says %v", kimiPluginVersion, plugin["version"])
+	}
+	for _, key := range []string{"name", "version", "description", "license", "sessionStart"} {
+		a, _ := json.Marshal(plugin[key])
+		b, _ := json.Marshal(root[key])
+		if string(a) != string(b) {
+			t.Fatalf("%s differs between the two manifests: %s vs %s", key, a, b)
+		}
+	}
+	// The root manifest addresses the same files from one directory up.
+	if root["skills"] != "./extensions/kimi/skills/" || root["commands"] != "./extensions/kimi/commands/" {
+		t.Fatalf("root manifest does not point into extensions/kimi: %v %v", root["skills"], root["commands"])
+	}
+	for _, rel := range []string{"extensions/kimi/hooks/recall.mjs", "extensions/kimi/bin/deja-mcp.mjs"} {
+		if _, err := os.Stat(filepath.Join("..", "..", rel)); err != nil {
+			t.Fatalf("root manifest points at %s, which is not there: %v", rel, err)
+		}
+	}
+}
