@@ -12,6 +12,8 @@ disk. Nothing has to have been recorded ahead of time: the history is already
 there, including the months before deja was installed. If you moved to dsh last
 week, everything you did before last week is still reachable from inside it.
 
+<p align="center"><img src="assets/panel.png" width="820" alt="The history strip above the DSH composer: one row per past session, with the agent it came from, the project, the date and the match count"></p>
+
 ## Install
 
 ```sh
@@ -33,6 +35,10 @@ Three tools the model can call:
 | `deja_blame` | The sessions that discussed a file, before you edit or delete it. |
 
 One command: `/deja <what to look for>`.
+
+A strip above the composer, so it is there without asking the model for it:
+type a query, get one row per past session — the agent it came from, the
+project, the date, the match count — and click a row to open the rest.
 
 And, unless you turn it off, automatic recall: before each step the plugin asks
 deja whether this machine's history answers the prompt, and adds the answer to
