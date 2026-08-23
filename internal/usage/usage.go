@@ -178,10 +178,15 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	return recalls, bytes, injected
 }
 
-// TodayDemand returns today's non-empty, agent-requested memory events and
-// their served bytes. Automatic injections and empty results are excluded so
+// TodayDemand returns today's non-empty, agent-requested memory events, the
+// bytes they served, and separately the bytes deja injected unprompted.
+// Automatic injections and empty results stay out of the recall count so
 // headline counters use the same demand-side definition as Week.
-func TodayDemand(indexDir string) (recalls, bytes int) {
+//
+// Injections come back from the same pass rather than from a second call: the
+// statusline renders on every prompt, and two passes over the log can also
+// straddle a write and report two numbers that were never true together.
+func TodayDemand(indexDir string) (recalls, bytes, injected int) {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for _, e := range read(Path(indexDir)) {
@@ -192,9 +197,11 @@ func TodayDemand(indexDir string) (recalls, bytes int) {
 		case KindRecall, KindContext, KindBlame:
 			recalls++
 			bytes += e.Bytes
+		case KindHook, KindDejaVu, KindTool:
+			injected += e.Bytes
 		}
 	}
-	return recalls, bytes
+	return recalls, bytes, injected
 }
 
 // DejaVuWeek counts this week's déjà vu moments — prompts the user's own

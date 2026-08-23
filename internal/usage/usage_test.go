@@ -166,8 +166,8 @@ func TestTodayExcludesEmptyRecallsAndInjections(t *testing.T) {
 	RecordResult(dir, KindRecall, 700, 1, true)
 	RecordResult(dir, KindHook, 300, 1, false)
 	RecordResult(dir, KindRecall, 500, 1, false)
-	if recalls, bytes := TodayDemand(dir); recalls != 1 || bytes != 500 {
-		t.Fatalf("today demand = %d recalls, %d bytes; want 1/500", recalls, bytes)
+	if recalls, bytes, injected := TodayDemand(dir); recalls != 1 || bytes != 500 || injected != 300 {
+		t.Fatalf("today demand = %d recalls, %d bytes, %d injected; want 1/500/300", recalls, bytes, injected)
 	}
 	if recalls, bytes, injected := TodayWithInjections(dir); recalls != 3 || bytes != 1500 || injected != 300 {
 		t.Fatalf("today all = %d recalls, %d bytes, %d injected; want 3/1500/300", recalls, bytes, injected)

@@ -73,9 +73,16 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		fmt.Fprint(stdout, withFileMemory(dir, in, line))
 		return nil
 	}
-	recalls, bytes := usage.TodayDemand(dir)
-	_, _, injected := usage.TodayWithInjections(dir)
+	recalls, bytes, injected := usage.TodayDemand(dir)
 	if recalls == 0 {
+		// Injections are not recalls, but they are the whole day for someone
+		// who lives on auto-recall: saying "0 B injected" while memory has
+		// been arriving since morning is the kind of untrue line #1403 is
+		// about.
+		if injected > 0 {
+			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · no agent recalls today · %s injected", humanBytes(int64(injected)))))
+			return nil
+		}
 		if wr, wb, _, _ := usage.Week(dir); wr > 0 {
 			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · quiet today · %d agent recalls, %s re-used this week", wr, humanBytes(int64(wb)))))
 			return nil
