@@ -7,7 +7,7 @@ are bounded, and each one names the case it is wrong on, so you can reproduce
 before you change anything.
 
 Every pull request from outside the project so far has been answered the same
-day: 29 merged of 33, median four hours from opening to merge, the slowest 15
+day: 31 merged of 35, median four hours from opening to merge, the slowest 15
 hours, none left waiting. If yours sits longer than that, something went wrong
 on our side — say so in the thread.
 
