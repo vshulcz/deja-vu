@@ -118,12 +118,12 @@ type bm25Document struct {
 // countIn scores one message against the query the way the exact tier does:
 // a parts match first, then either a whole-query substring count for a single
 // bare token or a per-token count, plus any quoted phrases.
-func countIn(text, low string, qtoks, phrases []string, qlow string, variants map[string][]string) int {
+func countIn(text, low string, qtoks, phrases []string, variants map[string][]string) int {
 	if !MatchesParts(text, qtoks, phrases, variants) {
 		return 0
 	}
 	if len(qtoks) == 1 && len(phrases) == 0 && variants == nil {
-		// The token, not the raw query: `qlow` still carries whatever
+		// The token, not the raw query: the query string still carries whatever
 		// punctuation the reader typed, and counting that scored zero for
 		// "retry?" — the shape of a pasted question — on a session
 		// MatchesParts had already accepted (#1603).
@@ -147,11 +147,9 @@ func countIn(text, low string, qtoks, phrases []string, qlow string, variants ma
 
 func runScored(ss []model.Session, o Options) ([]Hit, error) {
 	var re *regexp.Regexp
-	qlow := strings.ToLower(o.Query)
 	qtoks, phrases := QueryParts(o.Query)
 	// Cross-script CJK: prepared once, used only when a raw match scores zero.
 	queryCJK := cjkfold.HasCJK(o.Query)
-	qlowFolded := cjkfold.String(qlow)
 	qtoksFolded, phrasesFolded := QueryParts(cjkfold.String(o.Query))
 	if o.Regex {
 		var err error
@@ -233,7 +231,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			if re != nil {
 				c = len(re.FindAllStringIndex(m.Text, -1))
 			} else {
-				c = countIn(m.Text, low, qtoks, phrases, qlow, o.FuzzyVariants)
+				c = countIn(m.Text, low, qtoks, phrases, o.FuzzyVariants)
 				// Postings are keyed on Traditional-folded CJK, so a query in
 				// one script legitimately reaches a record in the other. This
 				// counting pass works on surface text and would score that
@@ -242,7 +240,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				if c == 0 && queryCJK {
 					foldedLow := cjkfold.String(low)
 					c = countIn(cjkfold.String(m.Text), foldedLow, qtoksFolded,
-						phrasesFolded, qlowFolded, o.FuzzyVariants)
+						phrasesFolded, o.FuzzyVariants)
 					if c > 0 {
 						windowText, windowToks = foldedLow, qtoksFolded
 					}
@@ -264,8 +262,14 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				}
 			}
 			doc.length += countDocumentWords(low, qtoks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
-			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qlow) {
-				n := strings.Count(low, qlow)
+			// The token, not the raw query — the same rule as countIn. This
+			// path is what scores `retry` inside `retry-backoff`, which
+			// countDocumentWords cannot match because it counts whole words
+			// and treats the hyphen as one. Comparing the raw query here left
+			// a punctuated query with a session that matched three times and
+			// scored zero, ranked below one that matched once (#1603).
+			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qtoks[0]) {
+				n := strings.Count(low, qtoks[0])
 				doc.termCount[0] += n
 				if m.Role == "user" {
 					doc.userCount[0] += n
@@ -1324,7 +1328,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 			// How much of the query the turn carries, counted the way the hit
 			// snippets already rank passages: a turn that says the word once in
 			// passing must not outrank the exchange that keeps returning to it.
-			weight = countIn(m.Text, low, terms, phrases, qlow, nil)
+			weight = countIn(m.Text, low, terms, phrases, nil)
 			if weight == 0 && strings.Contains(low, qlow) {
 				weight = 1
 			}

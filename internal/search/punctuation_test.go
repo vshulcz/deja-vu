@@ -34,3 +34,39 @@ func TestOneWordQueryIgnoresPunctuation(t *testing.T) {
 		}
 	}
 }
+
+// Membership is not enough: the same query with punctuation has to rank the
+// same way. The BM25 path had its own copy of the raw-query comparison, so a
+// session that says the word three times inside a hyphenated token scored zero
+// and sorted below one that says it once (#1603).
+func TestPunctuatedQueryRanksLikeThePlainOne(t *testing.T) {
+	now := time.Now()
+	ss := []model.Session{
+		{ID: "hyp", Harness: "claude", Project: "p", Updated: now,
+			Messages: []model.Message{{Role: "user", Text: "retry-backoff retry-backoff retry-backoff again"}}},
+		{ID: "pln", Harness: "claude", Project: "p", Updated: now,
+			Messages: []model.Message{{Role: "user", Text: "one plain retry here"}}},
+	}
+
+	order := func(q string) []string {
+		hits, err := Run(ss, Options{Query: q, Limit: 10})
+		if err != nil {
+			t.Fatalf("%q: %v", q, err)
+		}
+		var ids []string
+		for _, h := range hits {
+			ids = append(ids, h.Session.ID)
+		}
+		return ids
+	}
+
+	plain := order("retry")
+	if len(plain) != 2 {
+		t.Fatalf("plain query found %d sessions, want 2: %v", len(plain), plain)
+	}
+	for _, q := range []string{"retry?", "retry!", "(retry)"} {
+		if got := order(q); len(got) != len(plain) || got[0] != plain[0] || got[1] != plain[1] {
+			t.Errorf("%q ranked %v, plain ranked %v", q, got, plain)
+		}
+	}
+}
