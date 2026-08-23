@@ -416,7 +416,20 @@ func briefTitleBudget(prefixLen int) int {
 // exporting it — a child process only sees it when someone exported it on
 // purpose, which is the same override briefWidth already honours.
 func printableWidth(w io.Writer) int {
-	if os.Getenv("COLUMNS") == "" && !statColorOK(w) {
+	if os.Getenv("COLUMNS") != "" {
+		return briefWidth()
+	}
+	// briefWanted, not statColorOK: this asks whether the reader has a screen,
+	// and a reader who turned colour off still has one. Asking the colour
+	// question here handed those readers a zero — "do not cut" — so the lines
+	// this budget exists to fit wrapped instead (#1596, the same shape as
+	// #1588).
+	//
+	// The reach is wider than the brief: `files`, `restore` and `search` read
+	// this too, and a NO_COLOR terminal now gets the same layout every other
+	// terminal already had.
+	f, ok := w.(*os.File)
+	if !ok || !briefWanted(f) {
 		return 0
 	}
 	return briefWidth()
