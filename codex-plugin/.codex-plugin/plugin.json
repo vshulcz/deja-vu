@@ -9,13 +9,21 @@
   "homepage": "https://github.com/vshulcz/deja-vu",
   "repository": "https://github.com/vshulcz/deja-vu",
   "license": "MIT",
-  "keywords": ["memory", "recall", "sessions", "search"],
+  "keywords": [
+    "memory",
+    "recall",
+    "sessions",
+    "search"
+  ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
+  "hooks": [
+    "./hooks/hooks.json"
+  ],
   "interface": {
     "displayName": "deja-vu",
     "shortDescription": "Search and recall your own past AI coding sessions.",
-    "longDescription": "deja indexes the sessions you already have on this machine — Claude Code, Codex, Cursor, opencode and a dozen others — and gives Codex tools to search them. Ask what you fixed before instead of debugging it twice.",
+    "longDescription": "deja indexes the sessions you already have on this machine \u2014 Claude Code, Codex, Cursor, opencode and a dozen others \u2014 and gives Codex tools to search them. Ask what you fixed before instead of debugging it twice.",
     "developerName": "vshulcz",
     "category": "Productivity",
     "capabilities": [],

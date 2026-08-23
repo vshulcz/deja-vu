@@ -211,6 +211,14 @@ func doctorWiringExe(w io.Writer) {
 func doctorCodexHook(w io.Writer) {
 	hooksPath := filepath.Join(sources.CodexHome(), "hooks.json")
 	if _, err := os.Stat(hooksPath); err != nil {
+		// The plugin ships the same hooks under its own root, and codex trusts
+		// those the same way. Nothing was installed here, and nothing is
+		// missing either.
+		if codexPluginInstalled() {
+			fmt.Fprintf(w, "  %-12s %-11s %s  (the Codex plugin carries the hooks; codex asks once to trust them)\n",
+				"codex-hook", "plugin", hooksPath)
+			return
+		}
 		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", hooksPath)
 		return
 	}
@@ -813,6 +821,11 @@ func doctorMCP(w io.Writer) {
 		// plugin as "not wired" sends someone to run an install that only
 		// pushes the plugin aside.
 		if status != "wired" && c.name == "kimi" && kimiPluginInstalled() {
+			status = "plugin"
+		}
+		// Same for Codex: `codex plugin add deja-vu@deja-vu` brings the server
+		// and the hooks with it.
+		if status != "wired" && c.name == "codex" && codexPluginInstalled() {
 			status = "plugin"
 		}
 		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)

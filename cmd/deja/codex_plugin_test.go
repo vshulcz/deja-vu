@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -101,5 +102,78 @@ func TestBundledSkillsMatchInstaller(t *testing.T) {
 		if want := guidanceText("claude"); got != want {
 			t.Fatalf("%s has drifted from guidanceText:\n--- file ---\n%s\n--- installer ---\n%s", p, got, want)
 		}
+	}
+}
+
+// The plugin's own hooks are what a marketplace install gets instead of
+// `deja install codex-auto`. Codex discovers them at hooks/hooks.json and
+// expands ${PLUGIN_ROOT}; a path it cannot resolve is a hook that never runs.
+func TestCodexPluginHooks(t *testing.T) {
+	var file struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Type    string `json:"type"`
+				Command string `json:"command"`
+				Timeout int    `json:"timeout"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(repoFile(t, "codex-plugin/hooks/hooks.json"), &file); err != nil {
+		t.Fatalf("hooks.json: %v", err)
+	}
+	want := map[string]string{
+		"SessionStart":     "hook-context",
+		"UserPromptSubmit": "hook-prompt",
+		"PreCompact":       "hook-precompact",
+	}
+	for event, sub := range want {
+		groups, ok := file.Hooks[event]
+		if !ok || len(groups) == 0 || len(groups[0].Hooks) == 0 {
+			t.Fatalf("no %s hook in the plugin", event)
+		}
+		cmd := groups[0].Hooks[0].Command
+		if !strings.HasPrefix(cmd, "${PLUGIN_ROOT}/hooks/deja.sh ") || !strings.HasSuffix(cmd, sub) {
+			t.Fatalf("%s runs %q, not the plugin's own script with %s", event, cmd, sub)
+		}
+		if groups[0].Hooks[0].Type != "command" || groups[0].Hooks[0].Timeout <= 0 {
+			t.Fatalf("%s entry is not a command with a timeout: %+v", event, groups[0].Hooks[0])
+		}
+	}
+
+	info, err := os.Stat(filepath.Join("..", "..", "codex-plugin", "hooks", "deja.sh"))
+	if err != nil {
+		t.Fatalf("the script the hooks point at is missing: %v", err)
+	}
+	if info.Mode()&0o111 == 0 {
+		t.Fatalf("codex-plugin/hooks/deja.sh is not executable (%v) — Codex runs it directly", info.Mode())
+	}
+
+	var manifest struct {
+		Hooks []string `json:"hooks"`
+	}
+	if err := json.Unmarshal(repoFile(t, "codex-plugin/.codex-plugin/plugin.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Hooks) != 1 || manifest.Hooks[0] != "./hooks/hooks.json" {
+		t.Fatalf("the manifest does not declare the hooks file: %v", manifest.Hooks)
+	}
+}
+
+// The plugin stands down when `deja install codex-auto` has already written
+// the same hook into Codex's own hooks.json. If the installer's command stops
+// matching what the script greps for, both fire and the digest arrives twice.
+func TestCodexPluginStandsDownForTheInstaller(t *testing.T) {
+	script := string(repoFile(t, "codex-plugin/hooks/deja.sh"))
+	if !strings.Contains(script, "CODEX_HOME") {
+		t.Fatal("the script does not honour CODEX_HOME, so a relocated Codex home hides the installer's wiring")
+	}
+	pattern := regexp.MustCompile(`deja[^"]*hook-(context|prompt|precompact)`)
+	written, err := json.Marshal(map[string]any{"command": "/opt/homebrew/bin/deja hook-context"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pattern.MatchString(string(written)) {
+		t.Fatalf("the script's own pattern does not match what the installer writes: %s", written)
 	}
 }

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The Codex plugin carries its own hooks: a marketplace install now brings session-start recall, per-prompt recall and pre-compaction capture with it, instead of only tools and the skill. It stands down where `deja install codex-auto` already wrote the same hook into Codex's own hooks.json.
 - A Kimi Code plugin, in `extensions/kimi`. One `/plugins install` gives Kimi the MCP tools, the shared skill, a `/deja:recall` command and recall on every prompt through its `UserPromptSubmit` hook. It stands down where `deja install kimi` already wired the same thing, so having both is not two of anything.
 
 
