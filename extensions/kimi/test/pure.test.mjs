@@ -20,11 +20,26 @@ test("kimiHome follows KIMI_CODE_HOME, which is what Kimi hands its plugins", ()
 })
 
 test("installerHookPresent finds the marker deja install kimi-auto writes", () => {
-  const written = `${installerHookMarker}\n[[hooks]]\nevent = "UserPromptSubmit"\n`
+  const written = `${installerHookMarker}\n[[hooks]]\nevent = "UserPromptSubmit"\ncommand = "deja hook-prompt --plain"\n`
   assert.equal(installerHookPresent(written), true)
   assert.equal(installerHookPresent('[[hooks]]\nevent = "Stop"\n'), false)
   assert.equal(installerHookPresent(""), false)
   assert.equal(installerHookPresent(undefined), false)
+})
+
+// An older deja wired kimi through SessionStart, whose output Kimi runs and
+// then ignores. That block still carries the marker, and standing down for it
+// would leave the user with no recall from either half.
+test("a stale installer block does not count as wiring", () => {
+  const stale = `${installerHookMarker}\n[[hooks]]\nevent = "SessionStart"\ncommand = "deja hook-context"\ntimeout = 10\n`
+  assert.equal(installerHookPresent(stale), false)
+
+  // A live block followed by the user's own rule is still a live block, and a
+  // hook-prompt call in *their* rule is not ours to stand down for.
+  const followed = `${installerHookMarker}\n[[hooks]]\ncommand = "deja hook-prompt --plain"\n\n[[hooks]]\nevent = "Stop"\n`
+  assert.equal(installerHookPresent(followed), true)
+  const theirs = `${installerHookMarker}\n[[hooks]]\nevent = "SessionStart"\ncommand = "deja hook-context"\n\n[[hooks]]\ncommand = "deja hook-prompt --plain"\n`
+  assert.equal(installerHookPresent(theirs), false)
 })
 
 test("installerMcpPresent reads mcp.json, and a broken one is not evidence", () => {
@@ -41,7 +56,7 @@ test("installerOwns reads the real files under the config home", () => {
     assert.equal(installerOwns("hook", env), false)
     assert.equal(installerOwns("mcp", env), false)
 
-    writeFileSync(join(dir, "config.toml"), `${installerHookMarker}\n[[hooks]]\n`)
+    writeFileSync(join(dir, "config.toml"), `${installerHookMarker}\n[[hooks]]\ncommand = "deja hook-prompt --plain"\n`)
     writeFileSync(join(dir, "mcp.json"), '{"mcpServers":{"deja":{"command":"deja"}}}')
     assert.equal(installerOwns("hook", env), true)
     assert.equal(installerOwns("mcp", env), true)
@@ -97,7 +112,7 @@ test("the hook stands down when the installer already wired the same recall", as
     assert.match(call(), /RECALLED/)
 
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, "config.toml"), `${installerHookMarker}\n[[hooks]]\n`)
+    writeFileSync(join(dir, "config.toml"), `${installerHookMarker}\n[[hooks]]\ncommand = "deja hook-prompt --plain"\n`)
     assert.equal(call().trim(), "")
   } finally {
     rmSync(dir, { recursive: true, force: true })

@@ -62,8 +62,30 @@ function executable(path) {
 // recall appended twice on every prompt.
 export const installerHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`)"
 
+// The marker alone is not enough: an install from an older deja can leave a
+// block that no longer calls anything Kimi consumes — its output went to
+// SessionStart, which Kimi runs and then ignores. Standing down for a block
+// like that would mean no recall at all, from either half. `deja doctor` calls
+// the same state stale, and reads this file the same way.
 export function installerHookPresent(configToml) {
-  return String(configToml || "").includes(installerHookMarker)
+  const text = String(configToml || "")
+  const at = text.indexOf(installerHookMarker)
+  if (at < 0) return false
+  return blockAfter(text.slice(at + installerHookMarker.length)).includes("hook-prompt")
+}
+
+// blockAfter returns the marked entry and stops at the next table header, so a
+// [[hooks]] rule the user wrote below ours is not read as part of it.
+function blockAfter(rest) {
+  const lines = []
+  let started = false
+  for (const line of rest.split("\n")) {
+    const header = line.trimStart().startsWith("[")
+    if (header && started) break
+    if (header) started = true
+    lines.push(line)
+  }
+  return lines.join("\n")
 }
 
 // installerMcpPresent reports whether `deja install kimi` already declared the
