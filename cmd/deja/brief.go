@@ -105,11 +105,19 @@ func runBrief(dir string, w io.Writer) error {
 		recalls == 0 && weekRecalls == 0 && dejaVu == 0 && !ov.Oldest.IsZero()
 	line := fmt.Sprintf("today      %d session%s", ov.SessionsToday, pluralS(ov.SessionsToday))
 	if recalls > 0 {
-		line += fmt.Sprintf(" · %d recall%s served (%s", recalls, pluralS(recalls), humanBytes(int64(bytes)))
+		// Three widths of the same fact, longest first: a narrow pane keeps the
+		// count and loses the sizes rather than wrapping them onto a line of
+		// their own (#1588).
+		served := fmt.Sprintf(" · %d recall%s served", recalls, pluralS(recalls))
+		sizes := fmt.Sprintf(" (%s", humanBytes(int64(bytes)))
 		if raw := usage.TodayRaw(dir); bytes > 0 && raw/int64(bytes) >= 2 {
-			line += " from " + humanBytes(raw)
+			sizes += " from " + humanBytes(raw)
 		}
-		line += ")"
+		sizes += ")"
+		line += served
+		if barColumns(line+sizes) <= briefWidth() {
+			line += sizes
+		}
 	}
 	if !quietWeek {
 		fmt.Fprintln(w, line)
@@ -272,6 +280,10 @@ func runBrief(dir string, w io.Writer) error {
 	// suggestion. Printing it twice on the one screen that has to be legible
 	// is worse than not printing it at all.
 	if q := suggestFirstQuery(dir); q != "" && !justGreeted {
+		// The note is fixed wording; the query is the part that grows, so it
+		// carries the cut when the pane is narrow (#1588).
+		note := " (from your own history)"
+		q = trimBriefTitleTo(q, briefTitleBudget(briefLabelColumns+barColumns(`deja ""`)+barColumns(note)))
 		fmt.Fprintf(w, "try        %sdeja \"%s\"%s %s(from your own history)%s\n", bold, q, reset, dim, reset)
 	}
 	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
@@ -310,11 +322,17 @@ func pluralS(n int) string {
 // screen, a bell rings on every refresh. The `recent` lines have printed them
 // raw since they existed; this is one place for all of them (#634 set the same
 // rule for the status bar).
-func trimBriefTitle(t string) string { return trimBriefTitleTo(t, briefTitleMax) }
+// The cap was a constant at every width, which is 56 columns with the label —
+// wider than the 50-column pane the constant's own comment claimed it fitted,
+// so `asked`, `reused` and `hit` ran off the edge of a narrow one (#1588).
+func trimBriefTitle(t string) string { return trimBriefTitleTo(t, briefTitleBudget(briefLabelColumns)) }
 
-// briefTitleMax is the width the fixed-prefix lines (`asked`, `reused`, `hit`)
-// are laid out to: an 11-column label plus 44 plus the ellipsis is 56, which
-// fits the narrowest terminal anyone opens.
+// briefLabelColumns is the fixed prefix every line but `recent` carries: a
+// name, padded to the column the values line up on.
+const briefLabelColumns = 11
+
+// briefTitleMax is the width a wide terminal cuts titles to, so one long title
+// cannot fill the screen. Below that the terminal's own width wins.
 const briefTitleMax = 44
 
 func trimBriefTitleTo(t string, max int) string {
