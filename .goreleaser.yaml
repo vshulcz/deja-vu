@@ -96,6 +96,10 @@ changelog:
       - "^test:"
 
 release:
+  # Every release opens a thread people can answer in. The alternative is a
+  # changelog nobody can reply to, and an empty Discussions tab that reads as
+  # an empty room.
+  discussion_category_name: Announcements
   header: |
     ## Install
 
