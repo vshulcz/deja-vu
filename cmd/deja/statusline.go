@@ -73,7 +73,8 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		fmt.Fprint(stdout, withFileMemory(dir, in, line))
 		return nil
 	}
-	recalls, bytes, injected := usage.TodayWithInjections(dir)
+	recalls, bytes := usage.TodayDemand(dir)
+	_, _, injected := usage.TodayWithInjections(dir)
 	if recalls == 0 {
 		if wr, wb, _, _ := usage.Week(dir); wr > 0 {
 			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · quiet today · %d agent recalls, %s re-used this week", wr, humanBytes(int64(wb)))))

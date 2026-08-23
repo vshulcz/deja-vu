@@ -156,8 +156,8 @@ func InjectedToday(indexDir string) int {
 	return injected
 }
 
-// TodayWithInjections returns today's non-empty agent-requested memory events,
-// served bytes, and the subset of those bytes injected by session-start hooks.
+// TodayWithInjections returns today's agent-memory events, served bytes, and
+// the subset of those bytes injected by session-start hooks.
 func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -167,16 +167,34 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 		}
 		switch e.Kind {
 		case KindRecall, KindContext, KindBlame:
-			if e.Empty {
-				continue
-			}
 			recalls++
 			bytes += e.Bytes
 		case KindHook, KindDejaVu, KindTool:
+			recalls++
+			bytes += e.Bytes
 			injected += e.Bytes
 		}
 	}
 	return recalls, bytes, injected
+}
+
+// TodayDemand returns today's non-empty, agent-requested memory events and
+// their served bytes. Automatic injections and empty results are excluded so
+// headline counters use the same demand-side definition as Week.
+func TodayDemand(indexDir string) (recalls, bytes int) {
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	for _, e := range read(Path(indexDir)) {
+		if e.Time.Before(midnight) || ahead(e.Time, now) || e.Empty {
+			continue
+		}
+		switch e.Kind {
+		case KindRecall, KindContext, KindBlame:
+			recalls++
+			bytes += e.Bytes
+		}
+	}
+	return recalls, bytes
 }
 
 // DejaVuWeek counts this week's déjà vu moments — prompts the user's own
@@ -267,8 +285,7 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 	return recalls, bytes, injected, injectedBytes
 }
 
-// Today sums non-empty agent-requested events since local midnight and the
-// context bytes they served. Automatic injections are reported separately.
+// Today sums today's agent-memory events and their served bytes.
 func Today(indexDir string) (recalls int, bytes int) {
 	recalls, bytes, _ = TodayWithInjections(indexDir)
 	return recalls, bytes

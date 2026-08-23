@@ -26,8 +26,8 @@ func TestRecordAndToday(t *testing.T) {
 	Record(dir, KindHook, 500)
 	Record(dir, KindSearch, 9999) // human search, not counted
 	recalls, bytes := Today(dir)
-	if recalls != 1 || bytes != 1000 {
-		t.Fatalf("today = %d recalls %d bytes, want 1/1000", recalls, bytes)
+	if recalls != 2 || bytes != 1500 {
+		t.Fatalf("today = %d recalls %d bytes, want 2/1500", recalls, bytes)
 	}
 	if _, err := os.Stat(Path(dir)); err != nil {
 		t.Fatalf("usage log missing: %v", err)
@@ -156,8 +156,8 @@ func TestRotateKeepsRecentWindow(t *testing.T) {
 		t.Fatalf("log not rotated, size %d", fi.Size())
 	}
 	recalls, bytes := Today(dir)
-	if recalls != 1 || bytes != 2 {
-		t.Fatalf("today after rotate = %d/%d, want 1/2", recalls, bytes)
+	if recalls != 2 || bytes != 5 {
+		t.Fatalf("today after rotate = %d/%d, want 2/5", recalls, bytes)
 	}
 }
 
@@ -166,8 +166,11 @@ func TestTodayExcludesEmptyRecallsAndInjections(t *testing.T) {
 	RecordResult(dir, KindRecall, 700, 1, true)
 	RecordResult(dir, KindHook, 300, 1, false)
 	RecordResult(dir, KindRecall, 500, 1, false)
-	if recalls, bytes, injected := TodayWithInjections(dir); recalls != 1 || bytes != 500 || injected != 300 {
-		t.Fatalf("today = %d recalls, %d bytes, %d injected; want 1/500/300", recalls, bytes, injected)
+	if recalls, bytes := TodayDemand(dir); recalls != 1 || bytes != 500 {
+		t.Fatalf("today demand = %d recalls, %d bytes; want 1/500", recalls, bytes)
+	}
+	if recalls, bytes, injected := TodayWithInjections(dir); recalls != 3 || bytes != 1500 || injected != 300 {
+		t.Fatalf("today all = %d recalls, %d bytes, %d injected; want 3/1500/300", recalls, bytes, injected)
 	}
 }
 
