@@ -3,7 +3,9 @@
 // Usage: node scripts/release-npm.mjs <version> <dist-dir>
 //   <dist-dir> must contain deja-vu_<version>_<os>_<arch>.{tar.gz,zip}
 // Publishes @vshulcz/deja-vu-<os>-<arch> for each platform, then @vshulcz/deja-vu.
-// The DeepSeek Harness plugin lives in vshulcz/dsh-deja and publishes itself.
+// The harness packages under extensions/ publish separately, by hand: a plugin
+// fix should not wait for a deja release, and a deja release should not
+// republish a plugin that has not changed.
 // Requires NODE_AUTH_TOKEN (set by actions/setup-node from the NPM_TOKEN secret).
 import { execSync } from "node:child_process";
 import fs from "node:fs";
