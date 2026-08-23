@@ -397,7 +397,7 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	if err := Ensure(dir, "claude", false, &log); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(log.String(), "deja: updated 1 file (1 new messages)") {
+	if !strings.Contains(log.String(), "deja: updated 1 file (1 new message)") {
 		t.Fatalf("incremental log missing partial ingest line: %q", log.String())
 	}
 	if strings.Contains(log.String(), "indexing sessions") {

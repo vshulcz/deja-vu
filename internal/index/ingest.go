@@ -1906,7 +1906,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			return fmt.Errorf("append: %w", err)
 		}
 		if progress != nil {
-			fmt.Fprintf(progress, "deja: updated %d file (%d new messages)\n", filesTouched, messages)
+			fmt.Fprintf(progress, "deja: updated %d file%s (%d new message%s)\n", filesTouched, pluralS(filesTouched), messages, pluralS(messages))
 		}
 		return nil
 	}
