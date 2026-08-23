@@ -14,13 +14,13 @@ const require = createRequire(import.meta.url);
 // missing peer takes the whole profile down with it, so both imports degrade:
 // without them the command and automatic recall still work, only the
 // model-facing tools are skipped.
+// The tool registry lives in the host. A plugin that throws on a missing peer
+// takes the whole profile down with it, so this degrades: without dsh-tools the
+// command and automatic recall still work, only the model-facing tools are
+// skipped.
 let defineTool = null;
-let z = null;
-let createUserMessage = null;
 try {
   ({ defineTool } = await import("@deepseek-ai/dsh-tools"));
-  z = (await import("@deepseek-ai/schemastery")).default;
-  ({ createUserMessage } = await import("@deepseek-ai/dsh-llm"));
 } catch {}
 
 const PLATFORM = process.platform === "win32" ? "windows" : process.platform;
@@ -59,12 +59,14 @@ function run(args, input) {
 const NOTHING = "Nothing in this machine's history matches that.";
 
 function tools(ctx) {
-  if (!defineTool || !z) return;
+  if (!defineTool) return;
 
   // Every tool here answers with the text deja printed, so one output
-  // declaration serves all three.
+  // declaration serves all three. The schema is plain JSON Schema — a
+  // schemastery instance is rejected as "schema must be a value schema object",
+  // because the host validates that this is an ordinary JSON record.
   const TEXT_OUTPUT = {
-    schema: z.string(),
+    schema: { type: "string" },
     render: (_args, value) => [{ type: "text", text: String(value) }],
   };
 

@@ -44,8 +44,5 @@
   },
   "dependencies": {
     "@vshulcz/deja-vu": "0.0.0"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-tools": "^0.1.0"
   }
 }
