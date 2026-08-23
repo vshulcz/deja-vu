@@ -2,10 +2,15 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -20,14 +25,41 @@ import (
 // 9 at 50, 12 at 40. `today`, `before` and `try` carried no budget at all, and
 // the fixed-prefix lines were cut to a constant 44 columns — 56 with the label,
 // wider than the pane (#1588).
-func TestBriefLinesFitNarrowTerminals(t *testing.T) {
-	day := 24 * time.Hour
-	// A project path of the length people actually have, and recalls served
-	// today: the `today` line only grows past the edge once it carries the two
-	// sizes, and `before` only once the project name is long.
-	dir := briefStore(t, "work/platform/services/session-indexer", 12*day, 15*day, 19*day)
+// briefNarrowStore seeds the lines the width contract is about: one question
+// asked in three sessions (which is what puts `asked` and `before` on the
+// screen), a project path of the length people actually have, a span that
+// carries a year, and recalls served today so the `today` line grows its
+// sizes. The first fixture for this test had none of those and passed while
+// `before` was 64 columns wide (#1588).
+func briefNarrowStore(t *testing.T) string {
+	t.Helper()
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "-work-platform-services-kafka-consumer-rebalance")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	const question = "why does the kafka consumer rebalance keep flapping in staging"
+	for i, age := range []time.Duration{400 * 24 * time.Hour, 380 * 24 * time.Hour, 12 * 24 * time.Hour} {
+		sid := string(rune('a'+i)) + "1b2c3d4"
+		at := time.Now().Add(-age).UTC().Format(time.RFC3339)
+		body := fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/platform/services/kafka-consumer-rebalance","timestamp":%q,"message":{"role":"user","content":%q}}`,
+			sid, at, question) + "\n"
+		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
 	usage.RecordDigest(dir, usage.KindRecall, strings.Repeat("x", 4096), 3, 262144)
 	usage.RecordDigest(dir, usage.KindDejaVu, "dv digest", 2, 4096)
+	return dir
+}
+
+func TestBriefLinesFitNarrowTerminals(t *testing.T) {
+	dir := briefNarrowStore(t)
 
 	// 60 is the width the code lays out for — briefTitleBudget names the
 	// 60-column split pane #604 fixed — and 80 is the default. Below 60 the
