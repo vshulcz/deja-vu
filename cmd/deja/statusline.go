@@ -84,7 +84,11 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 			return nil
 		}
 		if wr, wb, _, _ := usage.Week(dir); wr > 0 {
-			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · quiet today · %d agent recalls, %s re-used this week", wr, humanBytes(int64(wb)))))
+			// The line below this one already branches at one; this one said
+			// "1 agent recalls" all day, on the surface the reader looks at
+			// most (#1600).
+			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · quiet today · %d agent recall%s, %s re-used this week",
+				wr, pluralS(wr), humanBytes(int64(wb)))))
 			return nil
 		}
 		fmt.Fprint(stdout, withFileMemory(dir, in, "deja · no recalls yet today · 0 B injected"))
