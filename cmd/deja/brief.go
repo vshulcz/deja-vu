@@ -501,9 +501,6 @@ func printNoHistory(w io.Writer, stale bool) {
 	fmt.Fprintln(w, "  deja help        every command")
 }
 
-// askedWhen says how far apart the askings were, which is the point of the
-// line: the same question in May and again in June is worth a reader's
-// attention in a way that "asked 4 times" is not.
 // fitBriefWhen makes the `before` line fit by shortening the project path and
 // nothing else. Cutting the end instead drops "last worked <date>" and the
 // reuse count — the two facts #843 added because they are not restatements of
@@ -530,6 +527,9 @@ func fitBriefWhen(when string, room int) string {
 	return when[:start+len(in)] + termwidth.Cut(project, keep) + "…" + when[end:]
 }
 
+// askedWhen says how far apart the askings were, which is the point of the
+// line: the same question in May and again in June is worth a reader's
+// attention in a way that "asked 4 times" is not.
 func askedWhen(a index.AskedTwice) string {
 	n := len(a.Sessions)
 	newest := a.Sessions[0].Updated
