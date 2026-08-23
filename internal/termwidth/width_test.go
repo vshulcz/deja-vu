@@ -47,3 +47,20 @@ func TestCutStopsAtTheBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestCutRightKeepsTheTail(t *testing.T) {
+	if got := CutRight("work/数据平台/消费者重平衡", 12); got != "消费者重平衡" {
+		t.Errorf("CutRight = %q, want the last six characters", got)
+	}
+	if got := Columns(CutRight("work/数据平台/消费者重平衡", 11)); got > 11 {
+		t.Errorf("CutRight returned %d columns for a budget of 11", got)
+	}
+	// A wide rune that would straddle the budget is dropped whole rather than
+	// half-printed.
+	if got := CutRight("平衡", 1); got != "" {
+		t.Errorf("CutRight = %q, want nothing to fit in one column", got)
+	}
+	if got := CutRight("abc", 10); got != "abc" {
+		t.Errorf("CutRight shortened a string that fits: %q", got)
+	}
+}

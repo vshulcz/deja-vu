@@ -207,9 +207,19 @@ func runBrief(dir string, w io.Writer) error {
 			// in every store state — worst on an old store, where "Jun 27
 			// 2025" is six columns longer than "today" and the three lines
 			// came out three different lengths (#1073).
-			head := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, s.Project, search.RelativeDate(s.Updated))
+			// The project is the only part of this prefix that grows without
+			// bound, and a CJK name is two columns per character: at 60 columns
+			// the prefix alone reached 58, the budget fell to its floor and the
+			// line ran to 71 — a wrapped row rather than a ragged end (#1592).
+			// Shorten the path first, then budget the title against what is
+			// left.
+			// Measure the line with no project in it, so the two separators and
+			// the date are all counted exactly once.
+			bare := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, "", search.RelativeDate(s.Updated))
+			project := fitBriefProject(s.Project, barColumns(bare))
+			head := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, project, search.RelativeDate(s.Updated))
 			title = trimBriefTitleTo(title, briefTitleBudget(barColumns(head)))
-			fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, s.Project, dim, search.RelativeDate(s.Updated), reset)
+			fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, project, dim, search.RelativeDate(s.Updated), reset)
 			if title != "" {
 				fmt.Fprintf(w, " · %s", title)
 			}
@@ -500,6 +510,29 @@ func printNoHistory(w io.Writer, stale bool) {
 	fmt.Fprintln(w, "  deja doctor      check the setup")
 	fmt.Fprintln(w, "  deja help        every command")
 }
+
+// fitBriefProject keeps a project name inside what the rest of the line leaves
+// it, so the title budget still has room to work with. The floor is the tail of
+// the path: "…/消费者重平衡" says which project this is, where the first
+// characters of a long prefix rarely do (#1592).
+func fitBriefProject(project string, rest int) string {
+	room := briefWidth() - rest - briefRecentTitleFloor - 1 // the title's ellipsis
+	if room < briefProjectFloor {
+		room = briefProjectFloor
+	}
+	if barColumns(project) <= room {
+		return project
+	}
+	return "…" + termwidth.CutRight(project, room-1)
+}
+
+// briefRecentTitleFloor mirrors the floor in briefTitleBudget: shortening the
+// project buys nothing if the title is then cut to nothing anyway.
+const briefRecentTitleFloor = 12
+
+// briefProjectFloor is the shortest project fragment worth printing. Below it
+// the line overflows instead, the trade the title floor already makes.
+const briefProjectFloor = 8
 
 // fitBriefWhen makes the `before` line fit by shortening the project path and
 // nothing else. Cutting the end instead drops "last worked <date>" and the

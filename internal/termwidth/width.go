@@ -54,3 +54,19 @@ func Cut(s string, width int) string {
 	}
 	return s
 }
+
+// CutRight keeps as much of the end of s as fits in width columns. A path is
+// identified by its tail — "…/消费者重平衡" says which project this is, where
+// the first characters of a long prefix rarely do.
+func CutRight(s string, width int) string {
+	n := 0
+	runes := []rune(s)
+	for i := len(runes) - 1; i >= 0; i-- {
+		w := RuneColumns(runes[i])
+		if n+w > width {
+			return string(runes[i+1:])
+		}
+		n += w
+	}
+	return s
+}
