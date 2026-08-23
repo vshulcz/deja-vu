@@ -23,6 +23,16 @@ const platforms = [
 const work = fs.mkdtempSync("/tmp/deja-npm-");
 const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: "inherit" });
 
+// published answers whether that exact version is already on the registry.
+function published(name, want) {
+  try {
+    execSync(`npm view ${name}@${want} version`, { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 for (const [goos, goarch] of platforms) {
   const ext = goos === "windows" ? "zip" : "tar.gz";
   const archive = path.join(dist, `deja-vu_${version}_${goos}_${goarch}.${ext}`);
@@ -75,6 +85,13 @@ dsh.version = version;
 dsh.dependencies["@vshulcz/deja-vu"] = version;
 fs.writeFileSync(dshPkgPath, JSON.stringify(dsh, null, 2));
 fs.copyFileSync("LICENSE", path.join(dshDir, "LICENSE"));
-run("npm publish --access public", dshDir);
+// A plugin fix can ship between releases, taking that version number with it.
+// Publishing it twice is a hard error that would fail the whole release, and
+// the already-published tarball is the same code.
+if (published("dsh-deja", version)) {
+  console.log(`dsh-deja@${version} already on npm, skipping`);
+} else {
+  run("npm publish --access public", dshDir);
+}
 
 console.log(`published ${platforms.length} platform packages + @vshulcz/deja-vu@${version} + dsh-deja@${version}`);
