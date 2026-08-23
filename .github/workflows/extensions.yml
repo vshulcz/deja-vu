@@ -151,5 +151,13 @@ jobs:
                 bad++;
               }
             }
+            // Zed reads the licence from the extension directory the registry
+            // builds, not from the repository root: a monorepo entry with the
+            // licence only at the top fails packaging with "No license was
+            // found."
+            if (!fs.existsSync("extensions/zed/LICENSE")) {
+              console.error("extensions/zed: no LICENSE where Zed looks for it");
+              bad++;
+            }
             process.exit(bad ? 1 : 0);
           '
