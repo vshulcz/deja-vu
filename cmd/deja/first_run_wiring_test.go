@@ -63,7 +63,10 @@ func TestTheBriefStopsSayingItOnceWired(t *testing.T) {
 	if err := runBrief(index.DefaultDir(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "no agent wired yet") {
+	// On the label rather than the sentence: the sentence is copy and has been
+	// reworded once already (#1411), and a guard that reads a literal quietly
+	// stops guarding the moment the words change.
+	if strings.Contains(out.String(), "deja install --auto") {
 		t.Errorf("a wired machine is still being told to wire itself:\n%s", out.String())
 	}
 }
