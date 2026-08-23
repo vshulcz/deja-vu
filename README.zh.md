@@ -49,7 +49,7 @@ dsh plugin --profile web add dsh-deja
 ```
 
 它带来三个模型可调用的工具（`deja_recall`、`deja_session`、`deja_blame`）、`/deja` 命令，
-以及可选的自动召回。详见 [packages/dsh-deja](packages/dsh-deja/README.zh.md)。
+以及可选的自动召回。详见 [vshulcz/dsh-deja](https://github.com/vshulcz/dsh-deja)。
 
 其他安装方式：`brew install vshulcz/tap/deja-vu`、
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`，或者用
