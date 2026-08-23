@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -222,21 +223,37 @@ func zedRows(db, cols, where string) ([]zedRow, error) {
 		_ = cmd.Wait()
 		return nil, fmt.Errorf("zed: bad sqlite json")
 	}
+	// An answer that stops before its closing bracket is a query that was cut
+	// short, and the exit status is the only thing that says so: a real sqlite3
+	// dying mid-stream returns one. So a stream that simply ends is read as the
+	// rows it did deliver, and a non-zero exit is the error. Which of the two
+	// steps below notices the missing bytes depends on the toolchain — Go 1.25
+	// ended the loop and reported io.EOF from the closing token, Go 1.27 stays
+	// in the loop and fails the decode — so neither decides on its own.
 	var rows []zedRow
+	var cut error
 	for dec.More() {
 		var r zedRow
 		if err := dec.Decode(&r); err != nil {
-			_ = cmd.Wait()
-			return nil, err
+			cut = err
+			break
 		}
 		rows = append(rows, r)
 	}
-	if _, err := dec.Token(); err != nil && err != io.EOF {
-		_ = cmd.Wait()
-		return nil, err
+	if cut == nil {
+		if _, err := dec.Token(); err != nil && err != io.EOF {
+			cut = err
+		}
 	}
 	if err := cmd.Wait(); err != nil {
 		return nil, err
+	}
+	// Anything that is not a truncation — output that was never JSON, a row
+	// whose shape is wrong — still fails: the store is then unreadable rather
+	// than short.
+	var syntax *json.SyntaxError
+	if cut != nil && !errors.As(cut, &syntax) && !errors.Is(cut, io.ErrUnexpectedEOF) {
+		return nil, cut
 	}
 	return rows, nil
 }

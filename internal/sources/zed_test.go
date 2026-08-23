@@ -516,7 +516,11 @@ func TestParseZedDBSurvivesASqlite3ThatDoesNotAnswerInRows(t *testing.T) {
 	}{
 		{name: "not json at all", stdout: "not json\n", wantErr: true},
 		{name: "a json object rather than an array", stdout: `{"id":"x"}`, wantErr: true},
-		{name: "an array that stops mid-row", stdout: `[{"id":"x",`, wantErr: true},
+		// Stopping mid-row is the same cut-short answer as stopping between
+		// rows, and with a clean exit it is read the same way: whatever rows
+		// arrived whole. Go 1.25 told the two apart by which step failed, Go
+		// 1.27 does not, and the exit status was always the better signal.
+		{name: "an array that stops mid-row", stdout: `[{"id":"x",`, wantErr: false},
 		// A truncated array that still exits 0 is read as the rows it did
 		// deliver: the exit status is what says the query was cut short, and a
 		// real sqlite3 that dies mid-stream returns one. Asserting an error
