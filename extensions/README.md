@@ -18,8 +18,18 @@ submitted.
 
 ## Publishing
 
-npm packages publish from their own directory, which is why each carries its own
-`LICENSE` and a `repository.directory` field:
+The release publishes the npm packages at the release's own version, so
+`opencode-deja@0.21.0` and `dsh-deja@0.21.0` are the ones built against
+`deja 0.21.0` — `scripts/release-npm.mjs` sets the version and the
+`@vshulcz/deja-vu` dependency together. Each package keeps its own `LICENSE`
+and `repository.directory` because npm publishes from that directory.
+
+The two packages were versioned independently before this, so a release whose
+version is still behind what npm serves is skipped with a line saying so,
+rather than moving the `latest` tag backwards. They join the release version as
+soon as it passes them.
+
+Publishing by hand is still possible when a fix should not wait for a release:
 
 ```
 cd extensions/opencode && npm publish --access public
