@@ -808,6 +808,13 @@ func doctorMCP(w io.Writer) {
 				status = "not wired"
 			}
 		}
+		// The Kimi Code plugin declares the same server, and stands down when
+		// this file already has it. Reporting a machine that installed the
+		// plugin as "not wired" sends someone to run an install that only
+		// pushes the plugin aside.
+		if status != "wired" && c.name == "kimi" && kimiPluginInstalled() {
+			status = "plugin"
+		}
 		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)
 		if note := doctorWiringNote(c.name); note != "" && status == "wired" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", note)

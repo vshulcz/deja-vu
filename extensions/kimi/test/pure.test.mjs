@@ -103,3 +103,43 @@ test("the hook stands down when the installer already wired the same recall", as
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// The MCP launcher is the plugin's other entry point: Kimi starts it, and
+// whatever it does with stdio is the server the agent talks to.
+test("the MCP launcher stands down when the installer already declared the server", async () => {
+  const { execFileSync } = await import("node:child_process")
+  const dir = mkdtempSync(join(tmpdir(), "deja-kimi-mcp-"))
+  try {
+    const fake = join(dir, "deja")
+    writeFileSync(fake, "#!/bin/sh\necho STARTED\nexit 7\n")
+    chmodSync(fake, 0o755)
+    const script = new URL("../bin/deja-mcp.mjs", import.meta.url).pathname
+    const call = () => {
+      try {
+        return {
+          out: execFileSync(process.execPath, [script], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+            env: { ...process.env, DEJA_BIN: fake, KIMI_CODE_HOME: dir },
+          }),
+          code: 0,
+        }
+      } catch (err) {
+        return { out: String(err.stdout ?? ""), code: err.status }
+      }
+    }
+
+    // Nothing wired: the launcher runs deja and hands its exit code back, so a
+    // server that dies is reported as dead rather than as an empty success.
+    const ran = call()
+    assert.match(ran.out, /STARTED/)
+    assert.equal(ran.code, 7)
+
+    writeFileSync(join(dir, "mcp.json"), '{"mcpServers":{"deja":{"command":"deja"}}}')
+    const stoodDown = call()
+    assert.doesNotMatch(stoodDown.out, /STARTED/)
+    assert.equal(stoodDown.code, 0)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

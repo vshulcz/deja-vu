@@ -51,7 +51,15 @@ appended twice.
 
 This plugin checks for the installer's wiring and stands down when it finds it —
 the CLI's copy is the one `deja install` keeps current. `deja uninstall kimi`
-hands ownership back to the plugin.
+hands ownership back to the plugin, with no reinstall in between: the check runs
+when the hook fires and when the server starts, not once at install time.
+
+`deja doctor` reports `plugin` for kimi when the plugin is what carries the
+wiring, so a plugin-only machine does not read as unwired.
+
+Two things it cannot see: an MCP entry you added by hand under a name other than
+`deja` (it would run beside this one), and a hook you wrote yourself that calls
+deja without the installer's marker comment.
 
 ## License
 
