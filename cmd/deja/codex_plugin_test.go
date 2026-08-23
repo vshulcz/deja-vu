@@ -97,6 +97,8 @@ func TestBundledSkillsMatchInstaller(t *testing.T) {
 		"codex-plugin/skills/deja-history/SKILL.md",
 		"claude-plugin/skills/deja-history/SKILL.md",
 		"extensions/kimi/skills/deja-history/SKILL.md",
+		"extensions/grok/skills/deja-history/SKILL.md",
+		"extensions/kimi/skills/deja-history/SKILL.md",
 	} {
 		got := string(repoFile(t, p))
 		if want := guidanceText("claude"); got != want {

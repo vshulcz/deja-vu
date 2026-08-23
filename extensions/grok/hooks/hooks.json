@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${GROK_PLUGIN_ROOT}/hooks/recall.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -274,9 +274,10 @@ for people who install extensions there rather than from a CLI:
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
+| Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
 
 Either path is enough on its own, and having both is not a problem: the
-opencode, dsh, Kimi and Codex packages read what `deja install` wrote and
+opencode, dsh, Kimi, Grok and Codex packages read what `deja install` wrote and
 contribute only what is missing, and in Zed both halves use one server id, so
 there is nothing to have twice whichever order you install in.
 

@@ -11,6 +11,7 @@ same local index.
 | [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin add dsh-deja` |
 | [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
 
 Two more integrations live outside this directory because their registries read
 a fixed path in this repository: `claude-plugin/` (Claude Code marketplace) and
@@ -36,6 +37,12 @@ Publishing by hand is still possible when a fix should not wait for a release:
 cd extensions/opencode && npm publish --access public
 cd extensions/dsh      && npm publish --access public
 ```
+
+The Grok plugin is published by a catalog entry, not by us: the entry in
+`xai-org/plugin-marketplace` pins a full commit SHA of this repository and a
+`path` of `extensions/grok`, and Grok re-verifies the SHA after cloning. A new
+version of the plugin means a pull request there that moves the pin — nothing
+ships until it does.
 
 The Zed extension is not published by us: `zed-industries/extensions` pins this
 repository as a submodule and builds `extensions/zed`. A new version means
