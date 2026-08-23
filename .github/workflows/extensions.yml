@@ -199,9 +199,14 @@ jobs:
               ...Object.values(mcp.mcpServers ?? {}).flatMap((s) => s.args ?? []),
               ...Object.values(hooks.hooks ?? {}).flat().flatMap((g) => (g.hooks ?? []).map((h) => h.command)),
             ];
+            // The variable is spelled without its braces here: shellcheck reads
+            // a ${...} inside this single-quoted script as a shell expansion
+            // that was meant to expand, and fails the lint.
+            const rootVar = "GROK_PLUGIN_ROOT}/";
             for (const command of commands) {
-              if (!String(command).includes("${GROK_PLUGIN_ROOT}")) { console.error("path is not rooted at the plugin: " + command); bad++; continue; }
-              const rel = String(command).split("${GROK_PLUGIN_ROOT}/")[1].replace(/"$/, "");
+              const at = String(command).indexOf(rootVar);
+              if (at < 0) { console.error("path is not rooted at the plugin: " + command); bad++; continue; }
+              const rel = String(command).slice(at + rootVar.length).replace(/"$/, "");
               if (!fs.existsSync(rel)) { console.error("points at a file that is not in the bundle: " + rel); bad++; }
             }
             process.exit(bad ? 1 : 0);
