@@ -547,13 +547,13 @@
    "gaps": {
     "auto": {
      "state": "impossible",
-     "why": "Zed's agent exposes no lifecycle hook: nothing in the editor runs a command before a prompt is sent, so there is no point at which recall could be injected. Becomes work the day Zed ships one",
-     "source": "no hook API in Zed 0.61"
+     "why": "Zed's agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one",
+     "source": "no hook API in Zed 1.16.1 or extension API 0.7"
     },
     "resume": {
      "state": "impossible",
      "why": "The agent lives in the editor and no zed CLI flag reopens a thread by id, so there is nothing for deja to print. Reopening a thread is a thing the editor does, not a command",
-     "source": "no resume flag in the zed CLI"
+     "source": "no thread flag in the zed CLI of 1.16.1"
     }
    }
   }

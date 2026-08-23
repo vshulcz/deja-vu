@@ -87,7 +87,7 @@
 <li>aider <code>command</code> — the slash command set is built in; adding custom commands is an open feature request upstream, not something a third party can wire today (https://github.com/Aider-AI/aider/issues/894)</li>
 <li>Copilot CLI <code>auto</code> — Copilot runs the hooks but drops their context, so recall there is MCP plus the skill</li>
 <li>Roo Code <code>auto</code> — Roo&#39;s hooks are in flight upstream, not shipped: PR #10785 implements a Claude Code-style hooks system, #11128 is Hooks beta and #11663 Hooks phase 1, all still open, and no release names lifecycle hooks. A user&#39;s bug report about PreToolUse coverage (#10834) shows they work on a branch build. Becomes work the day one of those merges (https://github.com/RooCodeInc/Roo-Code/pull/10785)</li>
-<li>Zed <code>auto</code> — Zed&#39;s agent exposes no lifecycle hook: nothing in the editor runs a command before a prompt is sent, so there is no point at which recall could be injected. Becomes work the day Zed ships one (no hook API in Zed 0.61)</li>
+<li>Zed <code>auto</code> — Zed&#39;s agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one (no hook API in Zed 1.16.1 or extension API 0.7)</li>
 </ul><!-- matrix:end -->
 <p>Each format is documented in the <a href="../registry/README.html">session format registry</a>, with synthetic fixtures and a conformance test that catches upstream drift.</p>
 <h2>Adding a harness</h2>
