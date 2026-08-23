@@ -10,6 +10,7 @@ same local index.
 | [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin opencode-deja` |
 | [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin add dsh-deja` |
 | [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
+| [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install <kimi-deja.zip url>` |
 
 Two more integrations live outside this directory because their registries read
 a fixed path in this repository: `claude-plugin/` (Claude Code marketplace) and
@@ -31,6 +32,12 @@ repository as a submodule and builds `extensions/zed`. A new version means
 bumping `version` in `extensions/zed/extension.toml` and opening a PR there that
 moves the submodule to the new commit.
 
+The Kimi Code plugin ships as the `kimi-deja.zip` release asset, built by
+goreleaser from `extensions/kimi`. Kimi installs a plugin from a local path, a
+zip URL or a GitHub repository — and the repository form looks for
+`kimi.plugin.json` at the repository root or in a single top-level directory, so
+a monorepo has to go through the zip.
+
 ## Rules that cost us time once
 
 - **Resolve the binary in this order, everywhere:** an explicit setting or
@@ -39,9 +46,10 @@ moves the submodule to the new commit.
   `brew upgrade` has to win over whatever we bundled.
 - **Recall is optional.** A harness must never lose a turn because history was
   unavailable: every call is wrapped, every failure is silent.
-- **Assume the other install is there too.** `deja install` wires these three
+- **Assume the other install is there too.** `deja install` wires these four
   harnesses as well, so a user can end up with both at once — opencode loads the
-  package and the installer's plugin file side by side, dsh composes both into
+  package and the installer's plugin file side by side, Kimi runs a plugin hook
+  next to the one in `config.toml`, dsh composes both into
   one profile, Zed reads both context servers. Whatever the installer writes
   wins, because it is the copy `deja install` keeps current: each package looks
   for those files and drops the part they already cover.

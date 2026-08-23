@@ -263,7 +263,7 @@ keeping those descriptions checked against the parsers.
 
 ### Harnesses with a package of their own
 
-`deja install --auto` wires all three of these like every other harness, and
+`deja install --auto` wires all four of these like every other harness, and
 that stays the shortest path. They also have a package in their own ecosystem,
 for people who install extensions there rather than from a CLI:
 
@@ -272,11 +272,12 @@ for people who install extensions there rather than from a CLI:
 | opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
+| Kimi Code | plugin `deja` | `/plugins install .../releases/latest/download/kimi-deja.zip` |
 
-Either path is enough on its own, and having both is not a problem: the opencode
-and dsh packages read what `deja install` wrote and contribute only what is
-missing, and in Zed both halves use one server id, so there is nothing to have
-twice whichever order you install in.
+Either path is enough on its own, and having both is not a problem: the
+opencode, dsh and Kimi packages read what `deja install` wrote and contribute
+only what is missing, and in Zed both halves use one server id, so there is
+nothing to have twice whichever order you install in.
 
 Each uses the deja you already have; the copy it bundles is only the fallback.
 

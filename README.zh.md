@@ -42,15 +42,17 @@ deja install --auto
 
 也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。
 
-opencode、DeepSeek Harness 和 Zed 也有各自生态里的包，习惯在那边装扩展的人可以直接用：
+opencode、DeepSeek Harness、Zed 和 Kimi Code 也有各自生态里的包，习惯在那边装扩展的人
+可以直接用：
 
 ```sh
 opencode plugin opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed：扩展面板里搜 deja
+# Kimi Code：/plugins install <kimi-deja.zip 的发布地址>
 ```
 
-`deja install --auto` 已经把这三个接好了，两条路走哪条都够。两边都装也没问题：包会看
+`deja install --auto` 已经把这四个接好了，两条路走哪条都够。两边都装也没问题：包会看
 `deja install` 写了什么，只补上缺的部分，不会重复注册工具、也不会重复召回。详见
 [`extensions/`](extensions)。
 

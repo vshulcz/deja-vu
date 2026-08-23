@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A Kimi Code plugin, in `extensions/kimi`. One `/plugins install` gives Kimi the MCP tools, the shared skill, a `/deja:recall` command and recall on every prompt through its `UserPromptSubmit` hook. It stands down where `deja install kimi` already wired the same thing, so having both is not two of anything.
+
 
 ## [0.18.0] - 2026-08-22
 

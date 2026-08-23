@@ -50,6 +50,21 @@ jobs:
           go run ./scripts/mcpb -version "${GITHUB_REF_NAME#v}" -in dist -out dist/mcpb
           go run ./scripts/mcpb -registry -version "${GITHUB_REF_NAME#v}" -out dist/mcpb
 
+      # Kimi Code installs a plugin from a local path, a zip URL or a GitHub
+      # repository — and the repository form looks for the manifest at the root
+      # or in one top-level directory, which a monorepo does not have. The zip
+      # is how extensions/kimi reaches a Kimi user.
+      - name: Pack the Kimi Code plugin
+        run: |
+          cd extensions/kimi
+          zip -qr "$GITHUB_WORKSPACE/dist/kimi-deja.zip" . -x 'test/*' 'package.json'
+          unzip -l "$GITHUB_WORKSPACE/dist/kimi-deja.zip" | grep -q kimi.plugin.json
+
+      - name: Attach the Kimi Code plugin to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/kimi-deja.zip --clobber
+
       # Regenerate the Windows manifests from the checksums this run produced,
       # and attach them so the scoop and winget submissions have a canonical
       # file even before the repository catches up.

@@ -120,6 +120,44 @@ jobs:
             exit 1
           }
 
+  kimi:
+    name: kimi-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/kimi
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The plugin has to parse
+        run: node --check lib.mjs && node --check hooks/recall.mjs && node --check bin/deja-mcp.mjs
+
+      - run: npm test
+
+      - name: The manifest has to stay loadable by Kimi
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const m = JSON.parse(fs.readFileSync("kimi.plugin.json", "utf8"));
+            let bad = 0;
+            // Kimi ignores what it does not know, and reports it as a
+            // diagnostic nobody reads: a typo here is a capability that
+            // silently never arrives.
+            const known = new Set(["name", "version", "description", "keywords", "author", "homepage", "license", "interface", "skills", "agents", "commands", "sessionStart", "skillInstructions", "systemPrompt", "systemPromptPath", "mcpServers", "hooks"]);
+            for (const key of Object.keys(m)) {
+              if (!known.has(key)) { console.error("unknown manifest field: " + key); bad++; }
+            }
+            for (const rel of [m.skills, m.commands, ...(m.hooks ?? []).map((h) => h.command.split(" ").pop()), ...Object.values(m.mcpServers ?? {}).flatMap((s) => s.args ?? [])]) {
+              if (typeof rel !== "string" || !rel.startsWith("./")) { console.error("path must start with ./ : " + rel); bad++; continue; }
+              if (!fs.existsSync(rel)) { console.error("manifest points outside the plugin: " + rel); bad++; }
+            }
+            process.exit(bad ? 1 : 0);
+          '
+
   metadata:
     name: packages point at this repository
     runs-on: ubuntu-latest
