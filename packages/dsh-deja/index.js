@@ -26,16 +26,32 @@ try {
 const PLATFORM = process.platform === "win32" ? "windows" : process.platform;
 const ARCH = process.arch === "x64" ? "amd64" : process.arch;
 
-// resolveDeja finds the binary: an explicit override first, then the platform
-// package npm installed next to this one, then whatever is on PATH.
+// resolveDeja picks the binary in the order a user would expect: what they
+// pointed at, then the deja they installed themselves and keep current with
+// `deja update` or a package manager, and only then the copy npm brought along
+// with this plugin. Each candidate is asked for its version rather than
+// trusted, because a name on PATH that does not run is worse than no name.
 function resolveDeja() {
-  if (process.env.DEJA_BIN) return process.env.DEJA_BIN;
   const exe = PLATFORM === "windows" ? "deja.exe" : "deja";
+  const candidates = [process.env.DEJA_BIN, exe];
   try {
-    return require.resolve(`@vshulcz/deja-vu-${PLATFORM}-${ARCH}/bin/${exe}`);
-  } catch {
-    return exe;
+    candidates.push(require.resolve(`@vshulcz/deja-vu-${PLATFORM}-${ARCH}/bin/${exe}`));
+  } catch {}
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      execFileSync(candidate, ["version"], {
+        encoding: "utf8",
+        timeout: 5000,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      return candidate;
+    } catch {}
   }
+  // Nothing answered. Keep the plain name so the failure a user sees names the
+  // thing that is missing.
+  return exe;
 }
 
 const DEJA = resolveDeja();
