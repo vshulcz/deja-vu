@@ -5,6 +5,9 @@
     "name": "vshulcz",
     "url": "https://github.com/vshulcz"
   },
+  "homepage": "https://github.com/vshulcz/deja-vu",
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT",
   "skills": "./skills/",
   "hooks": {
     "SessionStart": [
