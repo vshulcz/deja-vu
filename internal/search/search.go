@@ -229,7 +229,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			// genuine match as words that never meet.
 			windowText, windowToks := low, qtoks
 			if re != nil {
-				c = len(re.FindAllStringIndex(m.Text, -1))
+				c = countRegex(re, m.Text)
 			} else {
 				c = countIn(m.Text, low, qtoks, phrases, o.FuzzyVariants)
 				// Postings are keyed on Traditional-folded CJK, so a query in
@@ -1436,14 +1436,32 @@ func Recent(ss []model.Session, n int) []model.Session {
 	return out
 }
 
+// A pattern that can match the empty string — `x*`, `foo?`, `(a|)` — matches
+// between every pair of characters. Counting those reported 88 matches in a
+// session that held none of the pattern's characters at all (#1606); a match
+// with no width is not a match.
+func countRegex(re *regexp.Regexp, s string) int {
+	n := 0
+	for _, loc := range re.FindAllStringIndex(s, -1) {
+		if loc[1] > loc[0] {
+			n++
+		}
+	}
+	return n
+}
+
 func snippet(s, q string, re *regexp.Regexp) string {
 	s = proseForSnippet(s)
 	r := []rune(s)
 	idx := 0
 	if re != nil {
-		loc := re.FindStringIndex(s)
-		if loc != nil {
-			idx = utf8.RuneCountInString(s[:loc[0]])
+		// Anchor on the first match that has width; a zero-width one points at
+		// no passage in particular (#1606).
+		for _, loc := range re.FindAllStringIndex(s, -1) {
+			if loc[1] > loc[0] {
+				idx = utf8.RuneCountInString(s[:loc[0]])
+				break
+			}
 		}
 	} else {
 		low := strings.ToLower(s)
@@ -1624,7 +1642,14 @@ func highlight(s, q string, isRe bool, color bool) string {
 	if isRe {
 		re, err := regexp.Compile("(?i)" + q)
 		if err == nil {
-			return re.ReplaceAllStringFunc(s, func(x string) string { return cMatch + x + cReset })
+			return re.ReplaceAllStringFunc(s, func(x string) string {
+				// Zero-width match: colouring it wraps an escape pair around
+				// nothing, once per character (#1606).
+				if x == "" {
+					return x
+				}
+				return cMatch + x + cReset
+			})
 		}
 	}
 	if strings.Contains(strings.ToLower(s), strings.ToLower(q)) {
