@@ -81,8 +81,17 @@ func TestRuneColumnsCoversTheWideEmojiBlocks(t *testing.T) {
 		{'🩺', "stethoscope"},
 		{'🪟', "window"},
 		{'🫠', "melting face"},
-		{'🔥', "fire, already covered"},
-		{'语', "CJK, already covered"},
+		{'🔥', "fire"},
+		{'语', "CJK"},
+		{'✅', "check mark button — the one review found still narrow"},
+		{'✨', "sparkles"},
+		{'❌', "cross mark"},
+		{'⚡', "high voltage"},
+		{'⭐', "star"},
+		{'🆗', "OK button"},
+		{'🟰', "heavy equals sign, next to the block the first fix added"},
+		{'⌚', "watch"},
+		{'♓', "pisces"},
 	} {
 		if got := RuneColumns(tc.r); got != 2 {
 			t.Errorf("RuneColumns(%q) = %d, want 2 (%s)", tc.r, got, tc.name)
@@ -90,7 +99,9 @@ func TestRuneColumnsCoversTheWideEmojiBlocks(t *testing.T) {
 	}
 	// Latin, punctuation and the dingbats terminals draw in one cell stay at
 	// one: widening those would cut titles a character early for everyone.
-	for _, r := range []rune{'a', ' ', '·', '…', '—', '✓'} {
+	// Ambiguous-width and Narrow runes stay at one. `·` and `…` are the
+	// brief's own separators, and widening them would cut every title short.
+	for _, r := range []rune{'a', ' ', '·', '…', '—', '✓', '→', 'é', 'ы'} {
 		if got := RuneColumns(r); got != 1 {
 			t.Errorf("RuneColumns(%q) = %d, want 1", r, got)
 		}
