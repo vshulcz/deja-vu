@@ -191,7 +191,10 @@ var commands = map[string]command{
 func run(args []string) error {
 	dir := index.DefaultDir()
 	if len(args) == 0 {
-		if logoWanted(os.Stdout) {
+		// briefWanted, not logoWanted: a reader who turned colour off still
+		// has an index and a terminal, and the brief is what that reader came
+		// for (#1596).
+		if briefWanted(os.Stdout) {
 			return runBrief(dir, os.Stdout)
 		}
 		printUsage()

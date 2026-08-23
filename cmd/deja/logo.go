@@ -28,6 +28,25 @@ func visibleLen(s string) int { return len([]rune(ansiRE.ReplaceAllString(s, "")
 
 var logoWanted = defaultLogoWanted
 
+// briefWanted answers a narrower question than logoWanted: can this reader take
+// a screen at all? The brief is text — a label, a count, a title — and prints
+// without colour when colour is off. Gating it on the drawing predicate meant
+// NO_COLOR and TERM=dumb got the usage screen instead of their own history,
+// which is not what either variable asks for (#1596).
+func briefWanted(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	if fi.Mode()&os.ModeCharDevice == 0 {
+		return false
+	}
+	// Same exclusion as the drawing predicate, and for the same reason: the
+	// null device is a character device, so `deja >/dev/null` would otherwise
+	// take the interactive branch.
+	return !isNullDevice(fi)
+}
+
 func defaultLogoWanted(f *os.File) bool {
 	// TERM=dumb is a terminal that cannot do any of this: emacs shell-mode, a
 	// CI shell, an editor's built-in console. NO_COLOR was honoured and this
