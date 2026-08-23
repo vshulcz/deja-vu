@@ -334,8 +334,8 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "%sHighlights%s\n", bold, reset)
-	fmt.Fprintf(w, "  Longest session  %d messages · %s · %s\n", r.Longest.Messages, statHarnessTag(r.Longest.Harness, color), valueOrDash(r.Longest.Title))
-	fmt.Fprintf(w, "  Busiest day      %s · %d messages\n", valueOrDash(r.BusiestDay.Date), r.BusiestDay.Messages)
+	fmt.Fprintf(w, "  Longest session  %d message%s · %s · %s\n", r.Longest.Messages, pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), valueOrDash(r.Longest.Title))
+	fmt.Fprintf(w, "  Busiest day      %s · %d message%s\n", valueOrDash(r.BusiestDay.Date), r.BusiestDay.Messages, pluralS(r.BusiestDay.Messages))
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
 	// The log keeps the last 14 days once it passes 1MB, so the count is not a
