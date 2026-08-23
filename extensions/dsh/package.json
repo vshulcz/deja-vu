@@ -1,0 +1,51 @@
+{
+  "name": "dsh-deja",
+  "version": "0.20.1",
+  "description": "Brings the session history of nineteen other coding agents into DeepSeek Harness: recall, session digest and per-file history tools over a local index, plus optional automatic recall before each step.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/dsh"
+  },
+  "homepage": "https://github.com/vshulcz/deja-vu/tree/main/extensions/dsh",
+  "bugs": {
+    "url": "https://github.com/vshulcz/deja-vu/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "recall",
+    "session-history",
+    "migration"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@vshulcz/deja-vu": "^0.18.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

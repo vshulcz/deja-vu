@@ -1,0 +1,45 @@
+{
+  "name": "opencode-deja",
+  "version": "0.1.0",
+  "description": "Brings the session history of nineteen other coding agents into opencode: recall, session digest and per-file history tools over a local index, plus automatic recall on every request.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/opencode"
+  },
+  "homepage": "https://github.com/vshulcz/deja-vu/tree/main/extensions/opencode",
+  "bugs": {
+    "url": "https://github.com/vshulcz/deja-vu/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "memory",
+    "recall",
+    "session-history",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": ">=1.0.0",
+    "@vshulcz/deja-vu": "^0.18.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -63,3 +63,11 @@ deja-stats.svg
 # binaries by anyone who ran one.
 __pycache__/
 *.pyc
+
+# extensions/ builds where its ecosystem builds: cargo in the Zed extension,
+# npm in the two plugin packages. None of it is ours to commit.
+extensions/zed/target/
+extensions/zed/Cargo.lock
+extensions/*/node_modules/
+extensions/*/*.tgz
+extensions/*/package-lock.json

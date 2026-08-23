@@ -261,6 +261,19 @@ variable is honored too. The
 the observed paths, record schemas and role mapping per harness, with synthetic fixtures
 keeping those descriptions checked against the parsers.
 
+### Harnesses with their own package format
+
+Three of them install extensions their own way rather than through `deja
+install`. Those packages live in [`extensions/`](extensions):
+
+| Harness | Package | Install |
+| --- | --- | --- |
+| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
+| Zed | `deja-context-server` | Zed → Extensions → deja |
+
+Each uses the deja you already have; the copy it bundles is only the fallback.
+
 ## Semantic recall (optional)
 
 Point `deja embed` at a local Ollama, LM Studio or OpenAI-compatible endpoint with

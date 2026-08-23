@@ -1,0 +1,155 @@
+# The packages under extensions/ are published into other people's ecosystems
+# — npm for opencode and dsh, the Zed registry for Zed. They break from
+# upstream API changes rather than from our commits, so this also runs weekly.
+name: extensions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'extensions/**'
+      - '.github/workflows/extensions.yml'
+  pull_request:
+    paths:
+      - 'extensions/**'
+      - '.github/workflows/extensions.yml'
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extensions-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  opencode:
+    name: opencode-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/opencode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The plugin has to parse
+        run: node --check index.js && node --check lib.js
+
+      - run: npm test
+
+      - name: The hooks we implement have to still exist in opencode's plugin API
+        run: |
+          npm pack @opencode-ai/plugin --silent >/dev/null
+          tar xzf opencode-ai-plugin-*.tgz
+          node -e '
+            const fs = require("node:fs");
+            const api = fs.readFileSync("package/dist/index.d.ts", "utf8");
+            const plugin = fs.readFileSync("index.js", "utf8");
+            const hooks = [...plugin.matchAll(/hooks\["([a-z.]+)"\]/g)].map((m) => m[1]);
+            if (!hooks.length) throw new Error("no hooks found in index.js");
+            const missing = hooks.filter((h) => !api.includes("\"" + h + "\"?:"));
+            if (missing.length) {
+              console.error("opencode no longer declares: " + missing.join(", "));
+              process.exit(1);
+            }
+            console.log("hooks still declared: " + hooks.join(", "));
+          '
+
+  dsh:
+    name: dsh-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/dsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The plugin has to parse
+        run: node --check index.js
+
+      - run: npm test
+
+      - name: The manifest has to declare a bundle patch, or dsh cannot install it
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const patch = pkg.dsh && pkg.dsh.bundle && pkg.dsh.bundle.patch;
+            if (patch !== "./cordis.patch.yml") {
+              console.error("package.json must declare dsh.bundle.patch = ./cordis.patch.yml");
+              process.exit(1);
+            }
+            const fs = require("node:fs");
+            const rows = fs.readFileSync("cordis.patch.yml", "utf8");
+            if (!rows.includes("name: " + pkg.name)) {
+              console.error("cordis.patch.yml must name the package it loads: " + pkg.name);
+              process.exit(1);
+            }
+          '
+
+  zed:
+    name: zed-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: extensions/zed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install the target Zed compiles extensions to
+        run: rustup target add wasm32-wasip1
+
+      - name: Build
+        run: cargo build --release --target wasm32-wasip1
+
+      - name: The id in extension.toml must match what the registry lists
+        run: |
+          id=$(grep -m1 '^id = ' extension.toml | cut -d'"' -f2)
+          test "$id" = "deja-context-server" || {
+            echo "extension.toml id is '$id'; zed-industries/extensions lists it as deja-context-server"
+            exit 1
+          }
+
+  metadata:
+    name: packages point at this repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Published metadata is what a user follows back to the source. When a
+      # package moves, npm keeps serving the old repository field until someone
+      # notices; this notices.
+      - name: package.json repository and directory have to match where the file lives
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            let bad = 0;
+            for (const dir of ["extensions/opencode", "extensions/dsh"]) {
+              const pkg = JSON.parse(fs.readFileSync(dir + "/package.json", "utf8"));
+              const repo = pkg.repository || {};
+              if (!String(repo.url || "").includes("vshulcz/deja-vu")) {
+                console.error(dir + ": repository.url does not point at vshulcz/deja-vu");
+                bad++;
+              }
+              if (repo.directory !== dir) {
+                console.error(dir + ": repository.directory is " + repo.directory);
+                bad++;
+              }
+              if (!fs.existsSync(dir + "/LICENSE")) {
+                console.error(dir + ": no LICENSE in the published directory");
+                bad++;
+              }
+            }
+            process.exit(bad ? 1 : 0);
+          '

@@ -1,0 +1,45 @@
+# extensions/
+
+deja in the shape each harness expects: its own package, under that
+ecosystem's naming, installable the way that ecosystem installs things. The
+code is thin — every one of these shells out to the same `deja` binary and the
+same local index.
+
+| Directory | Published as | Installed with |
+|---|---|---|
+| [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin add dsh-deja` |
+| [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
+
+Two more integrations live outside this directory because their registries read
+a fixed path in this repository: `claude-plugin/` (Claude Code marketplace) and
+`codex-plugin/` (Codex). Moving them would break manifests that are already
+submitted.
+
+## Publishing
+
+npm packages publish from their own directory, which is why each carries its own
+`LICENSE` and a `repository.directory` field:
+
+```
+cd extensions/opencode && npm publish --access public
+cd extensions/dsh      && npm publish --access public
+```
+
+The Zed extension is not published by us: `zed-industries/extensions` pins this
+repository as a submodule and builds `extensions/zed`. A new version means
+bumping `version` in `extensions/zed/extension.toml` and opening a PR there that
+moves the submodule to the new commit.
+
+## Rules that cost us time once
+
+- **Resolve the binary in this order, everywhere:** an explicit setting or
+  `DEJA_BIN` → a deja the user installed themselves (PATH, then the well-known
+  install locations) → the copy the package shipped. Their own `deja update` or
+  `brew upgrade` has to win over whatever we bundled.
+- **Recall is optional.** A harness must never lose a turn because history was
+  unavailable: every call is wrapped, every failure is silent.
+- **Verify by running.** Each of these had a failure that was invisible in the
+  source and obvious the moment the real host executed it — a peer dependency
+  the host does not install, a hook that accepts input and drops it, a 60-second
+  timeout on `initialize`.

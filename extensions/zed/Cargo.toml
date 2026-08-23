@@ -1,0 +1,21 @@
+[package]
+name = "zed_deja"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+schemars = "0.8"
+serde = "1.0"
+zed_extension_api = "0.7.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
