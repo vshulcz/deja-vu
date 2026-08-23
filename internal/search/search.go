@@ -122,9 +122,14 @@ func countIn(text, low string, qtoks, phrases []string, qlow string, variants ma
 	if !MatchesParts(text, qtoks, phrases, variants) {
 		return 0
 	}
-	if len(qtoks) <= 1 && len(phrases) == 0 && variants == nil {
-		if strings.Contains(low, qlow) {
-			return strings.Count(low, qlow)
+	if len(qtoks) == 1 && len(phrases) == 0 && variants == nil {
+		// The token, not the raw query: `qlow` still carries whatever
+		// punctuation the reader typed, and counting that scored zero for
+		// "retry?" — the shape of a pasted question — on a session
+		// MatchesParts had already accepted (#1603).
+		needle := qtoks[0]
+		if strings.Contains(low, needle) {
+			return strings.Count(low, needle)
 		}
 		return 0
 	}
