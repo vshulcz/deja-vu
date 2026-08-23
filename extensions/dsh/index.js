@@ -7,6 +7,9 @@
 
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -289,9 +292,31 @@ function isHuman(message) {
   return Boolean(message) && (!message.source || message.source.kind === "user");
 }
 
+// cliPluginDir is where `deja install dsh` writes plugins of its own. A user
+// who ran the installer and then added this package has both in the profile:
+// two `/deja` commands and the same recall on the system prompt twice. The
+// files on disk win — the installer keeps them current — and this package then
+// contributes only what they do not: the model-facing tools.
+function cliPluginDir() {
+  const home = process.env.DSH_HOME || join(homedir(), ".dsh");
+  return join(home, "plugins", "deja");
+}
+
+function installedByCLI(file) {
+  try {
+    return existsSync(join(cliPluginDir(), file));
+  } catch {
+    return false;
+  }
+}
+
 function apply(ctx, config) {
   tools(ctx);
-  command(ctx);
+  // Each half stands down on its own: `deja install dsh` writes command.js,
+  // and only `deja install dsh-auto` adds auto.js, so a profile can have the
+  // command from the installer and still want recall from here.
+  if (!installedByCLI("command.js")) command(ctx);
+  if (installedByCLI("auto.js")) return;
   if (!config || config.autoRecall !== false) autoRecall(ctx);
 }
 

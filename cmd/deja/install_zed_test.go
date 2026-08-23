@@ -542,3 +542,48 @@ func TestDoctorListsZed(t *testing.T) {
 		t.Error("doctor lists no zed row, so `deja install zed` cannot be verified")
 	}
 }
+
+// A user who installs the Zed extension and then runs `deja install --auto`
+// would otherwise get two context servers pointing at the same binary: Zed's
+// own entry for the extension and ours. Both start `deja mcp`, and the agent
+// sees every tool twice.
+func TestZedInstallSkipsWhenExtensionIsPresent(t *testing.T) {
+	body := `{
+  "context_servers": {
+    "deja-context-server": {
+      "enabled": true,
+      "settings": {}
+    }
+  }
+}
+`
+	path := zedSettingsFile(t, body)
+	res, err := installZedMCP(path, "deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(res.Action, "skipped") {
+		t.Fatalf("action = %q, want a skip", res.Action)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != body {
+		t.Fatalf("settings were rewritten:\n%s", after)
+	}
+}
+
+// The skip keys off the extension's id, so the id in the manifest Zed reads and
+// the constant here have to be the same string. They are edited in different
+// files, months apart.
+func TestZedExtensionIDMatchesManifest(t *testing.T) {
+	manifest := string(repoFile(t, "extensions/zed/extension.toml"))
+	want := "id = \"" + zedExtensionServerID + "\""
+	if !strings.Contains(manifest, want) {
+		t.Fatalf("extension.toml does not declare %s:\n%s", want, manifest)
+	}
+	if !strings.Contains(manifest, "[context_servers."+zedExtensionServerID+"]") {
+		t.Fatalf("extension.toml does not register the context server under %q:\n%s", zedExtensionServerID, manifest)
+	}
+}

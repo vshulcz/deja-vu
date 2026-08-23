@@ -28,6 +28,14 @@ func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 
+	// The Zed extension declares a context server of its own, and Zed records
+	// it in this same file under its extension id. Adding ours next to it
+	// starts `deja mcp` twice and shows the agent every tool twice, so the
+	// extension wins: it is the thing the user installed from Zed's UI.
+	if !uninstall && zedExtensionPresent(string(old)) {
+		return installResult{Path: path, Action: "skipped: the Zed extension already provides it"}, nil
+	}
+
 	if len(strings.TrimSpace(string(old))) == 0 {
 		// Nothing to preserve. Uninstalling from a file that does not exist
 		// must not create one (#676).
@@ -98,6 +106,26 @@ func zedSettingsWith(text, entry string, uninstall bool) (string, error) {
 	}
 	return text[:inner.valueOpen] + entry + text[inner.valueEnd:], nil
 }
+
+// zedExtensionPresent reports whether Zed's own extension already declares the
+// server. Zed writes the extension's id into context_servers when the user
+// installs it, so the id in the settings is the signal — the extension
+// directory moved between Zed versions, the settings key did not.
+func zedExtensionPresent(text string) bool {
+	open := zedTopLevelOpen(text)
+	if open < 0 {
+		return false
+	}
+	block := zedFindKey(text, open+1, zedServerKey)
+	if block == nil {
+		return false
+	}
+	return zedFindKey(text, block.valueOpen+1, zedExtensionServerID) != nil
+}
+
+// zedExtensionServerID is the id in extensions/zed/extension.toml. Zed keys the
+// settings entry by it, so the two have to stay the same string.
+const zedExtensionServerID = "deja-context-server"
 
 // zedSpan is where a key and its object value sit in the text.
 type zedSpan struct {

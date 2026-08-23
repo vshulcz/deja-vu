@@ -1,3 +1,5 @@
+import { join } from "node:path"
+
 // The pure half of the plugin: everything that reads deja's output or
 // opencode's message shape, with no process and no host. Kept apart from
 // index.js because opencode loads every function a plugin module exports —
@@ -32,6 +34,16 @@ export function lastUserText(messages) {
     return { parts, prompt: parts.map((p) => p.text).join("\n").trim() }
   }
   return { parts: [], prompt: "" }
+}
+
+// cliPluginPath is where `deja install opencode-auto` writes its own plugin.
+// opencode loads that file and this package side by side — both are entries in
+// the resolved `plugin` list — and both push recall onto the system prompt, so
+// whoever finds the other has to stand down. Mirrors opencodeConfigHome() in
+// the installer: XDG_CONFIG_HOME wins, else ~/.config.
+export function cliPluginPath(env, home) {
+  const base = (env && env.XDG_CONFIG_HOME) || join(home || "", ".config")
+  return join(base, "opencode", "plugins", "deja.js")
 }
 
 // clampLimit keeps a model that asks for a hundred sessions from spending the

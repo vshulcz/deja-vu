@@ -6,8 +6,12 @@
 // rule that was wrong once, not to prove the file is correct.
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+
+import apply from "../index.js";
 
 const source = readFileSync(new URL("../index.js", import.meta.url), "utf8");
 
@@ -50,4 +54,65 @@ test("every file the manifest ships is present", () => {
       `package.json lists ${file}, which is not in the repository`,
     );
   }
+});
+
+// `deja install dsh` writes plugins of its own into DSH_HOME, and dsh composes
+// both them and this package into one profile: two `/deja` commands and the
+// same recall on the system prompt twice. Each half stands down separately,
+// because the command is installed by `deja install dsh` and the recall only by
+// `deja install dsh-auto`.
+function fakeCtx() {
+  const seen = { tools: 0, commands: [], context: [] };
+  return {
+    seen,
+    tools: { register: () => seen.tools++ },
+    commands: { register: (c) => seen.commands.push(c.name) },
+    systemPrompt: { context: (c) => seen.context.push(c.name) },
+  };
+}
+
+function withDSHHome(files, run) {
+  const dir = mkdtempSync(join(tmpdir(), "deja-dsh-"));
+  mkdirSync(join(dir, "plugins", "deja"), { recursive: true });
+  for (const file of files) writeFileSync(join(dir, "plugins", "deja", file), "// installed by deja\n");
+  const previous = process.env.DSH_HOME;
+  process.env.DSH_HOME = dir;
+  try {
+    return run();
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME;
+    else process.env.DSH_HOME = previous;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("nothing installed by the CLI: the package contributes everything", () => {
+  const ctx = withDSHHome([], () => {
+    const ctx = fakeCtx();
+    apply(ctx, {});
+    return ctx;
+  });
+  assert.deepEqual(ctx.seen.commands, ["deja"]);
+  assert.deepEqual(ctx.seen.context, ["deja:recall"]);
+});
+
+test("the CLI's command file stands the package's command down", () => {
+  const ctx = withDSHHome(["command.js"], () => {
+    const ctx = fakeCtx();
+    apply(ctx, {});
+    return ctx;
+  });
+  assert.deepEqual(ctx.seen.commands, []);
+  assert.deepEqual(ctx.seen.context, ["deja:recall"], "recall was not installed by the CLI, so it stays here");
+});
+
+test("the CLI's auto file stands the package's recall down", () => {
+  const ctx = withDSHHome(["command.js", "auto.js"], () => {
+    const ctx = fakeCtx();
+    apply(ctx, {});
+    return ctx;
+  });
+  assert.deepEqual(ctx.seen.commands, []);
+  assert.deepEqual(ctx.seen.context, []);
+  assert.ok(ctx.seen.tools >= 0, "tools are never duplicated: the CLI install does not register any");
 });

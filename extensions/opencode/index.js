@@ -11,9 +11,9 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { accessSync, constants } from "node:fs"
+import { accessSync, constants, existsSync } from "node:fs"
 
-import { clampLimit, contextText, lastUserText } from "./lib.js"
+import { clampLimit, cliPluginPath, contextText, lastUserText } from "./lib.js"
 
 const require = createRequire(import.meta.url)
 const run_ = promisify(execFile)
@@ -188,6 +188,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   }
 
   if (config.autoRecall === false) return hooks
+
+  // `deja install opencode-auto` writes a plugin of its own, and opencode loads
+  // it alongside this package: two entries in the resolved plugin list, both
+  // pushing the same recall onto the system prompt and both raising the same
+  // toast. The file on disk wins because the installer keeps it current; this
+  // package keeps its tools and drops only the duplicated recall.
+  try {
+    if (existsSync(cliPluginPath(process.env, homedir()))) return hooks
+  } catch {}
 
   // opencode has no session-start hook. The system prompt is assembled on
   // every request, so the session digest is fetched once and pushed there —

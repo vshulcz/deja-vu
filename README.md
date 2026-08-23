@@ -273,6 +273,9 @@ install`. Those packages live in [`extensions/`](extensions):
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 
 Each uses the deja you already have; the copy it bundles is only the fallback.
+`deja install` also wires all three, so running both is fine: the package finds
+what the installer wrote and drops the part it already covers, rather than
+recalling twice.
 
 ## Semantic recall (optional)
 

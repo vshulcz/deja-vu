@@ -1,6 +1,6 @@
 {
   "name": "opencode-deja",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Brings the session history of nineteen other coding agents into opencode: recall, session digest and per-file history tools over a local index, plus automatic recall on every request.",
   "type": "module",
   "main": "index.js",
