@@ -177,3 +177,54 @@ func TestCodexPluginStandsDownForTheInstaller(t *testing.T) {
 		t.Fatalf("the script's own pattern does not match what the installer writes: %s", written)
 	}
 }
+
+// The plugin directory asks for these before it will list anything, and a
+// missing logo or policy URL is a submission bounced weeks later rather than a
+// build that fails now.
+func TestCodexPluginListingMetadata(t *testing.T) {
+	var manifest struct {
+		Interface struct {
+			DisplayName      string   `json:"displayName"`
+			ShortDescription string   `json:"shortDescription"`
+			LongDescription  string   `json:"longDescription"`
+			DeveloperName    string   `json:"developerName"`
+			Category         string   `json:"category"`
+			WebsiteURL       string   `json:"websiteURL"`
+			PrivacyPolicyURL string   `json:"privacyPolicyUrl"`
+			TermsURL         string   `json:"termsOfServiceUrl"`
+			Logo             string   `json:"logo"`
+			LogoDark         string   `json:"logoDark"`
+			DefaultPrompt    []string `json:"defaultPrompt"`
+		} `json:"interface"`
+	}
+	if err := json.Unmarshal(repoFile(t, "codex-plugin/.codex-plugin/plugin.json"), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	i := manifest.Interface
+	for name, value := range map[string]string{
+		"displayName":       i.DisplayName,
+		"shortDescription":  i.ShortDescription,
+		"longDescription":   i.LongDescription,
+		"developerName":     i.DeveloperName,
+		"category":          i.Category,
+		"websiteURL":        i.WebsiteURL,
+		"privacyPolicyUrl":  i.PrivacyPolicyURL,
+		"termsOfServiceUrl": i.TermsURL,
+	} {
+		if strings.TrimSpace(value) == "" {
+			t.Fatalf("interface.%s is empty", name)
+		}
+	}
+	if len(i.DefaultPrompt) == 0 {
+		t.Fatal("no starter prompts: the listing shows them, and the review asks for realistic ones")
+	}
+	// The logos ship inside the plugin, so a marketplace copy carries them.
+	for _, rel := range []string{i.Logo, i.LogoDark} {
+		if !strings.HasPrefix(rel, "./") {
+			t.Fatalf("logo %q must be a ./ path inside the plugin", rel)
+		}
+		if _, err := os.Stat(filepath.Join("..", "..", "codex-plugin", strings.TrimPrefix(rel, "./"))); err != nil {
+			t.Fatalf("logo %s is not in the plugin: %v", rel, err)
+		}
+	}
+}
