@@ -215,11 +215,20 @@ func runBrief(dir string, w io.Writer) error {
 			// left.
 			// Measure the line with no project in it, so the two separators and
 			// the date are all counted exactly once.
+			// Both separators are counted: the project is measured as if it
+			// were there, because that is the line it has to fit.
 			bare := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, "", search.RelativeDate(s.Updated))
 			project := fitBriefProject(s.Project, barColumns(bare))
-			head := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, project, search.RelativeDate(s.Updated))
+			head := fmt.Sprintf("%s [%s] %s · ", label, s.Harness, search.RelativeDate(s.Updated))
+			if project != "" {
+				head = fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, project, search.RelativeDate(s.Updated))
+			}
 			title = trimBriefTitleTo(title, briefTitleBudget(barColumns(head)))
-			fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, project, dim, search.RelativeDate(s.Updated), reset)
+			if project != "" {
+				fmt.Fprintf(w, "%s %s[%s]%s %s · %s%s%s", label, dim, s.Harness, reset, project, dim, search.RelativeDate(s.Updated), reset)
+			} else {
+				fmt.Fprintf(w, "%s %s[%s]%s %s%s%s", label, dim, s.Harness, reset, dim, search.RelativeDate(s.Updated), reset)
+			}
 			if title != "" {
 				fmt.Fprintf(w, " · %s", title)
 			}
@@ -517,11 +526,16 @@ func printNoHistory(w io.Writer, stale bool) {
 // characters of a long prefix rarely do (#1592).
 func fitBriefProject(project string, rest int) string {
 	room := briefWidth() - rest - briefRecentTitleFloor - 1 // the title's ellipsis
-	if room < briefProjectFloor {
-		room = briefProjectFloor
-	}
 	if barColumns(project) <= room {
 		return project
+	}
+	if room < briefProjectFloor {
+		// Even the floors do not fit — measured with harness `antigravity` and
+		// a date carrying its year, where the rest of the line is 42 columns of
+		// a 60-column pane. An eight-column tail of a path is close to
+		// unreadable anyway, so the project goes and the title keeps its floor,
+		// rather than printing a stub and overflowing regardless (#1592).
+		return ""
 	}
 	return "…" + termwidth.CutRight(project, room-1)
 }

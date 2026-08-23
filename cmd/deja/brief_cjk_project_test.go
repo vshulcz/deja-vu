@@ -74,3 +74,36 @@ func briefCJKProjectStore(t *testing.T) string {
 	}
 	return dir
 }
+
+// The longest harness name and a date carrying its year leave 42 columns of a
+// 60-column pane, and the two floors — eight for a path tail, twelve for a
+// title — do not fit in the remaining eighteen. Review found that combination
+// still printing 62–63 columns, so the project goes rather than the line
+// running past the edge with an unreadable stub of a path on it (#1592).
+func TestBriefProjectGoesWhenTheFloorsCannotFit(t *testing.T) {
+	t.Setenv("COLUMNS", "60")
+
+	// `recent    ` + ` [antigravity] ` + ` · ` + `Jul 20 2025` + ` · `
+	const restWithLongHarness = 42
+	if got := fitBriefProject("work/数据平台/消费者重平衡", restWithLongHarness); got != "" {
+		t.Errorf("project = %q, want it dropped: 60 - 42 - 12 - 1 leaves five columns", got)
+	}
+
+	// With an ordinary harness there is room, and the tail is what survives.
+	const restWithClaude = 36
+	got := fitBriefProject("work/数据平台/消费者重平衡", restWithClaude)
+	if got == "" {
+		t.Fatal("project dropped when there was room for it")
+	}
+	if !strings.HasPrefix(got, "…") || !strings.HasSuffix(got, "重平衡") {
+		t.Errorf("project = %q, want the tail of the path", got)
+	}
+	if w := termwidth.Columns(got); restWithClaude+w+briefRecentTitleFloor+1 > 60 {
+		t.Errorf("project = %q (%d columns): the line would still overflow", got, w)
+	}
+
+	// A project that already fits is untouched, whatever the floors say.
+	if got := fitBriefProject("api", restWithLongHarness); got != "api" {
+		t.Errorf("project = %q, want it left alone", got)
+	}
+}
