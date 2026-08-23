@@ -6,12 +6,10 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
-    "./client": "./client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
-    "client.js",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -42,15 +40,6 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-ui-commands",
-        "@deepseek-ai/dsh-client-ui-conversation"
-      ]
     }
   },
   "dependencies": {

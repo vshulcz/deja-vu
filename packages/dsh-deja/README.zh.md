@@ -6,8 +6,6 @@ DeepSeek Harness 自带的 `session-query` 已经可以检索它自己的会话�
 
 deja 索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等二十个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到。
 
-<p align="center"><img src="assets/panel.png" width="820" alt="DSH 输入框上方的历史条：每个历史会话一行，标出来自哪个智能体、项目、日期和命中数"></p>
-
 ## 安装
 
 ```sh
@@ -27,8 +25,6 @@ dsh plugin --profile web add dsh-deja
 | `deja_blame` | 在修改或删除某个文件之前，讨论过这个文件的历史会话。 |
 
 一个命令：`/deja <要查什么>`。
-
-以及输入框上方的历史条，不必让模型代劳：输入查询，每个历史会话一行——来自哪个智能体、哪个项目、什么时间、命中多少——点开一行看全文。
 
 以及默认开启的自动召回：每一步之前，插件会问 deja 这台机器的历史能否回答当前提问，并把结果加入运行时上下文。多数情况下它保持沉默，只有确实有内容时才开口。
 
