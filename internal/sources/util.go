@@ -290,23 +290,32 @@ func resolvedRoot(root string) string {
 	return target
 }
 
-func walkFiles(root string, pred func(string) bool) []string {
-	var out []string
-	// Walk the target, report paths under the configured root: everything
-	// downstream — the kind predicates that test strings.HasPrefix against the
-	// root, the manifest, the incremental offsets — keys on the path the user
-	// configured, and handing it two spellings of one file loses the file.
+// walkRoot returns the directory to walk for a configured root and a function
+// putting each walked path back under that root. Walking the target is what
+// makes a symlinked store readable; reporting the configured spelling is what
+// keeps it usable, since the kind predicates test strings.HasPrefix against the
+// root and the manifest and the incremental pass key on the same string.
+func walkRoot(root string) (string, func(string) string) {
 	walked := resolvedRoot(root)
-	under := func(p string) string {
-		if walked == root {
-			return p
-		}
+	if walked == root {
+		return root, func(p string) string { return p }
+	}
+	return walked, func(p string) string {
 		rel, err := filepath.Rel(walked, p)
 		if err != nil {
 			return p
 		}
 		return filepath.Join(root, rel)
 	}
+}
+
+func walkFiles(root string, pred func(string) bool) []string {
+	var out []string
+	// Walk the target, report paths under the configured root: everything
+	// downstream — the kind predicates that test strings.HasPrefix against the
+	// root, the manifest, the incremental offsets — keys on the path the user
+	// configured, and handing it two spellings of one file loses the file.
+	walked, under := walkRoot(root)
 	_ = filepath.WalkDir(walked, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			// A directory the process cannot read takes its sessions out of
