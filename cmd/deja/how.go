@@ -42,21 +42,33 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--limit":
-			if i+1 < len(args) {
-				i++
-				n, err := strconv.Atoi(args[i])
-				if err != nil || n <= 0 {
-					return fmt.Errorf("how: --limit wants a positive number, got %q", args[i])
-				}
-				limit = n
+			// What was typed has to do something: a flag with nothing after it,
+			// an unknown flag and an empty argument all used to pass through in
+			// silence, the same holes files had (#1630, #1628).
+			if i+1 >= len(args) {
+				return fmt.Errorf("how: --limit needs value")
 			}
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				return fmt.Errorf("how: --limit wants a positive number, got %q", args[i])
+			}
+			limit = n
 		case "--project":
-			if i+1 < len(args) {
-				i++
-				project = args[i]
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return fmt.Errorf("how: --project needs value")
 			}
+			i++
+			project = args[i]
+		case "--":
+			// A command can start with a dash — `deja how -- -run`.
+			terms = append(terms, args[i+1:]...)
+			i = len(args)
 		default:
-			if !strings.HasPrefix(args[i], "-") {
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("how: unknown flag %q", args[i])
+			}
+			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])
 			}
 		}
@@ -125,7 +137,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 		low := strings.ToLower(cmd)
 		for _, t := range terms {
-			if !strings.Contains(low, strings.ToLower(t)) {
+			if !commandMentions(low, strings.ToLower(t)) {
 				return
 			}
 		}
@@ -174,4 +186,40 @@ func pluralSessions(n int) string {
 		return "1 session"
 	}
 	return fmt.Sprintf("%d sessions", n)
+}
+
+// commandMentions is the membership test for `how`: the term has to appear in
+// the command as a word, not inside a longer one. A raw substring test answered
+// `how go` with `golangci-lint run ./...`, and ranked it first (#1630) — and the
+// short names are exactly the ones people ask about: go, gh, rg, jq, sed, cd.
+//
+// A word here ends at anything that is not a letter, a digit, an underscore or
+// a dash, so `go` matches `go test` and `/usr/local/bin/go` but not `golangci`.
+// A term that itself carries a separator (`go test`, `./x`) is matched as
+// written: it is already more specific than one word.
+func commandMentions(low, term string) bool {
+	if term == "" {
+		return false
+	}
+	if strings.ContainsFunc(term, func(r rune) bool { return !isCommandWordRune(r) }) {
+		return strings.Contains(low, term)
+	}
+	for at := 0; ; {
+		i := strings.Index(low[at:], term)
+		if i < 0 {
+			return false
+		}
+		i += at
+		beforeOK := i == 0 || !isCommandWordRune(rune(low[i-1]))
+		end := i + len(term)
+		afterOK := end == len(low) || !isCommandWordRune(rune(low[end]))
+		if beforeOK && afterOK {
+			return true
+		}
+		at = i + 1
+	}
+}
+
+func isCommandWordRune(r rune) bool {
+	return r == '_' || r == '-' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 }
