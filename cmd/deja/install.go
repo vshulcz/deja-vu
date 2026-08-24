@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -112,8 +114,10 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// choose. Everything else is still done, and what could not be is named at
 	// the end (#902).
 	var refused []string
+	var refusedErrs []error
 	note := func(t string, err error) {
 		refused = append(refused, fmt.Sprintf("%s: %v", t, err))
+		refusedErrs = append(refusedErrs, err)
 	}
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
@@ -189,8 +193,8 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		if uninstall {
 			verb = "uninstall"
 		}
-		return fmt.Errorf("%s finished what it could; %d target%s refused: %s — check those paths' permissions and run it again",
-			verb, len(refused), pluralS(len(refused)), strings.Join(refused, "; "))
+		return fmt.Errorf("%s finished what it could; %d target%s refused: %s — %s",
+			verb, len(refused), pluralS(len(refused)), strings.Join(refused, "; "), refusalRemedy(refusedErrs))
 	}
 	// Every install builds, not only --auto and --all. Installing is the one
 	// moment a person has already accepted a wait — they just ran an installer
@@ -414,6 +418,25 @@ func installIndexHint(dir string) string {
 		}
 	}
 	return fmt.Sprintf("next: run `deja index` to index %d agent stores", detected)
+}
+
+// refusalRemedy picks the sentence that closes an install summary. It was one
+// hardcoded line telling the reader to check permissions, which is the wrong
+// place to send someone whose config merely has a comment in it: five JSON
+// targets refused for a syntax error and every one was blamed on file
+// permissions (#1663). Same shape as #808, #931, #907 and #1116 — an error
+// wearing a permissions label it had not earned.
+func refusalRemedy(errs []error) string {
+	perms := 0
+	for _, err := range errs {
+		if errors.Is(err, fs.ErrPermission) {
+			perms++
+		}
+	}
+	if perms > 0 && perms == len(errs) {
+		return "check those paths' permissions and run it again"
+	}
+	return "fix what each one reports and run it again"
 }
 
 func existingTargets() []string {
