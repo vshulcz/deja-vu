@@ -1363,24 +1363,11 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	// blocks. Collect the kept turns in one ordered pass so the include callback's
 	// prevKept bookkeeping still runs left to right.
 	type chunk struct {
-		// raw is the turn as it arrived; render is deferred until the window
-		// below has chosen which turns are actually printed. Rendering every
-		// turn first — redaction, then the terminal-safety pass — cost 22 s on
-		// a 30000-turn session to print 8 KB of it (#1742).
-		role    string
-		raw     string
-		matched bool
-		// size is what this turn will take once rendered, close enough to
-		// place the window: contextText keeps the first eight lines of an
-		// unmatched turn and the whole of a matched one, and neither pass
-		// changes the byte count of what it keeps by more than a rune here or
-		// there.
-		size int
+		text string
 		// weight is how much of the query this turn carries, so the window can
 		// sit where the matches are rather than where the first one is.
 		weight int
 	}
-	const chunkOverhead = len("\n## assistant\n\n\n")
 	var chunks []chunk
 	for _, m := range s.Messages {
 		if isWorkRecord(m.Role) {
@@ -1390,23 +1377,11 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if !ok {
 			continue
 		}
-		if strings.TrimSpace(m.Text) == "" {
+		text := SafeText(contextText(m.Text, weight > 0))
+		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		chunks = append(chunks, chunk{
-			role:    m.Role,
-			raw:     m.Text,
-			matched: weight > 0,
-			size:    contextTextSize(m.Text, weight > 0) + chunkOverhead,
-			weight:  weight,
-		})
-	}
-	render := func(c chunk) string {
-		text := SafeText(contextText(c.raw, c.matched))
-		if strings.TrimSpace(text) == "" {
-			return ""
-		}
-		return fmt.Sprintf("\n## %s\n\n%s\n", c.role, text)
+		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text), weight})
 	}
 	if len(chunks) == 0 {
 		return 0
@@ -1424,10 +1399,10 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	sum, bytes, left := 0, 0, 0
 	for right, c := range chunks {
 		sum += c.weight
-		bytes += c.size
+		bytes += len(c.text)
 		for left < right && bytes > budget {
 			sum -= chunks[left].weight
-			bytes -= chunks[left].size
+			bytes -= len(chunks[left].text)
 			left++
 		}
 		if sum > best {
@@ -1436,7 +1411,7 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	}
 	// The lead-in is only worth having if it does not push a matched turn back
 	// out of the budget it was just chosen for.
-	if best > 0 && start > 0 && span+chunks[start-1].size <= budget {
+	if best > 0 && start > 0 && span+len(chunks[start-1].text) <= budget {
 		start--
 	}
 	written := 0
@@ -1444,10 +1419,7 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if written >= budget {
 			break
 		}
-		text := render(c)
-		if text == "" {
-			continue
-		}
+		text := c.text
 		if written+len(text) > budget {
 			cut := max(0, budget-written)
 			for cut > 0 && !utf8.RuneStart(text[cut]) {
@@ -1814,14 +1786,79 @@ func collapseTool(s string) string {
 var (
 	lineNumberRE = regexp.MustCompile(`^\s*\d{1,5}[:|]\s+`)
 	toolDumpRE   = regexp.MustCompile(`(?i)(tool_use|tool_result|<local-command|netcat|npm ERR!|panic:|goroutine \d+)`)
+	// The literal each alternative of toolDumpRE begins with, in the same
+	// order. A line holding none of them cannot match, and looksToolDump uses
+	// that to skip the engine entirely.
+	toolDumpLiterals = []string{"tool_use", "tool_result", "<local-command", "netcat", "npm err!", "panic:", "goroutine "}
 )
+
+// containsFold is strings.Contains for a lowercase ASCII needle, without
+// allocating a lowercased copy of the line.
+func containsFold(hay, lowerNeedle string) bool {
+	if len(lowerNeedle) == 0 || len(hay) < len(lowerNeedle) {
+		return len(lowerNeedle) == 0
+	}
+	last := len(hay) - len(lowerNeedle)
+	for i := 0; i <= last; i++ {
+		k := 0
+		for k < len(lowerNeedle) {
+			c := hay[i+k]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != lowerNeedle[k] {
+				break
+			}
+			k++
+		}
+		if k == len(lowerNeedle) {
+			return true
+		}
+	}
+	return false
+}
+
+// looksToolDump is toolDumpRE with the scan the regexp engine spends most of
+// its time on done by hand: every alternative starts with a literal, so a line
+// holding none of them cannot match. Rendering a digest ran this per line over
+// the whole session — 16.5 s of the 17 s a 240 MB render took (#1742).
+func looksToolDump(line string) bool {
+	for _, lit := range toolDumpLiterals {
+		if containsFold(line, lit) {
+			return toolDumpRE.MatchString(line)
+		}
+	}
+	return false
+}
+
+// looksNumbered is lineNumberRE — `^\s*\d{1,5}[:|]\s+` — read directly. It
+// anchors at the start, so the whole line never needs scanning.
+func looksNumbered(line string) bool {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	digits := 0
+	for i < len(line) && line[i] >= '0' && line[i] <= '9' && digits < 6 {
+		i++
+		digits++
+	}
+	if digits == 0 || digits > 5 || i >= len(line) {
+		return false
+	}
+	if line[i] != ':' && line[i] != '|' {
+		return false
+	}
+	i++
+	return i < len(line) && (line[i] == ' ' || line[i] == '\t')
+}
 
 func proseForSnippet(s string) string {
 	s = redact.SafeForDisplay(s)
 	var keep []string
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || lineNumberRE.MatchString(line) || toolDumpRE.MatchString(line) {
+		if line == "" || looksNumbered(line) || looksToolDump(line) {
 			continue
 		}
 		keep = append(keep, line)
@@ -1832,33 +1869,6 @@ func proseForSnippet(s string) string {
 		out = strings.Join(strings.Fields(redact.SafeForDisplay(s)), " ")
 	}
 	return out
-}
-
-// contextTextSize is what contextText will produce, counted without producing
-// it: the window that picks the turns to print needs their sizes, and the
-// rendering is what costs (#1742).
-func contextTextSize(s string, matched bool) int {
-	if matched || strings.Contains(s, "```") {
-		return len(strings.TrimSpace(s))
-	}
-	trimmed := s
-	if i := nthIndex(trimmed, "\n", 8); i >= 0 {
-		trimmed = trimmed[:i]
-	}
-	return len(strings.TrimSpace(trimmed))
-}
-
-// nthIndex returns the index of the nth occurrence of sep, or -1.
-func nthIndex(s, sep string, n int) int {
-	off := 0
-	for range n {
-		i := strings.Index(s[off:], sep)
-		if i < 0 {
-			return -1
-		}
-		off += i + len(sep)
-	}
-	return off - len(sep)
 }
 
 func contextText(s string, matched bool) string {

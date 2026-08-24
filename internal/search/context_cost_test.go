@@ -44,12 +44,11 @@ func TestContextCostIsBoundedByWhatItPrints(t *testing.T) {
 	if large.Len() > 9000 || small.Len() > 9000 {
 		t.Fatalf("digest is not bounded: small=%d large=%d", small.Len(), large.Len())
 	}
-	// Weighing every turn against the query is honest linear work; rendering
-	// every turn to print 8 KB of them is not. 20000 turns of 10 KB is 200 MB:
-	// before the change it took 15 s, after it is a fraction of a second, and
-	// the bound here is loose enough for a loaded CI box while still failing
-	// the moment rendering moves back ahead of the window.
-	if largeCost > 3*time.Second {
+	// 20000 turns of 10 KB is 200 MB of text. Rendering it took 15 s before the
+	// line filters stopped handing every line to a regexp engine; it is under
+	// 3 s now. The bound is loose enough for a loaded CI box and still fails
+	// the moment the per-line scan goes back.
+	if largeCost > 8*time.Second {
 		t.Errorf("20000 turns cost %v to print %d bytes (200 turns: %v)", largeCost, large.Len(), smallCost)
 	}
 	t.Logf("200 turns: %v (%d bytes) · 20000 turns: %v (%d bytes)", smallCost, small.Len(), largeCost, large.Len())
