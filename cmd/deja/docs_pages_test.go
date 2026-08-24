@@ -80,6 +80,10 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 			"find-a-session.html",
 			"parallel-sessions.html",
 			"memory-for-opencode.html",
+			"memory-for-dsh.html",
+			"memory-for-kimi.html",
+			"memory-for-zed.html",
+			"memory-for-grok.html",
 		} {
 			if name == sibling {
 				continue
