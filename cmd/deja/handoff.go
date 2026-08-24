@@ -39,7 +39,10 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			// a scripted `--to "$AGENT"` with the variable unset read like a
 			// handoff to an agent (#1647).
 			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
-				return fmt.Errorf("handoff: --to needs an agent name")
+				// Named targets, like the refusal below: the reader who typed
+				// an empty --to needs the same list as the one who typed a
+				// wrong name.
+				return fmt.Errorf("handoff: --to needs an agent name: %s", strings.Join(handoffTargets(), ", "))
 			}
 			target = args[i+1]
 			i++
