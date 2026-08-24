@@ -17,10 +17,9 @@ disk, and hands the right one back when it is needed.</p>
 
 <p align="center"><b>Every memory tool starts empty and records forward. deja starts full.</b></p>
 
-<p align="center">And nobody has to ask for it. Recall arrives at session start, on every prompt,
-before a file is edited or a command runs, and after a command fails — the moments where the
-answer is worth something. Keys, tokens and private key blocks are stripped as the index is
-built, so what reaches the model is safe to send.</p>
+<p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
+before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as
+the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
 <b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.6%</b> on LoCoMo &middot; <b>sub-millisecond</b> lookups over 5&nbsp;GB of history<br>
