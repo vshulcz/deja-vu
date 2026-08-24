@@ -79,6 +79,9 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if !ok {
 		return nil, -32602, "unknown resource uri"
 	}
+	// The first colon separates the harness from the id, the way the listing
+	// writes it. No harness name carries one, so the first is always the right
+	// one; an id that does keeps everything after it.
 	id := ref
 	if i := strings.IndexByte(ref, ':'); i >= 0 {
 		id = ref[i+1:]

@@ -25,14 +25,16 @@ func TestResourceReadRefusesAnEmptyIDAndBoundsItsError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, uri := range []string{"deja://session/", "deja://session/claude:"} {
+	// The last three are not the empty case: an id of ":" or "%20" is refused
+	// by the prefix lookup instead, and both refusals have to hold.
+	for _, uri := range []string{"deja://session/", "deja://session/claude:", "deja://session/:", "deja://session/claude::", "deja://session/claude:   "} {
 		res, code, msg := mcpResourceRead(dir, uri)
 		if code == 0 {
 			t.Errorf("%q served a session: %v", uri, res)
 			continue
 		}
-		if !strings.Contains(msg, "session id") {
-			t.Errorf("%q said %q, which does not name what was missing", uri, msg)
+		if !strings.Contains(msg, "session id") && !strings.Contains(msg, "no session matches") {
+			t.Errorf("%q said %q, which names neither the missing id nor the failed lookup", uri, msg)
 		}
 	}
 
