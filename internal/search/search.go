@@ -375,6 +375,12 @@ func setTier(o Options) string {
 	switch {
 	case o.Semantic:
 		return TierSemantic
+	// Retrieval reports the coarse "close" for everything below exact and marks
+	// stemming with its own flag. Taking its word overwrote the finer name, so
+	// a word form and a misspelling — two rungs deja narrates differently —
+	// arrived at a consumer as the same tier (#1616).
+	case o.Stemmed && (o.Tier == "" || o.Tier == TierClose):
+		return TierStemmed
 	case o.Tier != "":
 		return o.Tier
 	case o.Stemmed:
