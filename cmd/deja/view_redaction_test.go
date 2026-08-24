@@ -35,7 +35,7 @@ func TestTheViewRedactsWhatTheIndexKept(t *testing.T) {
 	t.Setenv("DEJA_NO_REDACT", "")
 
 	out := filepath.Join(tmp, "view.html")
-	path, masked, err := writeViewHTMLCounted(dir, out)
+	path, masked, err := writeViewHTML(dir, out)
 	if err != nil {
 		t.Fatal(err)
 	}

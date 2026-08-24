@@ -98,7 +98,7 @@ func runView(dir string, args []string) error {
 	if out == "" {
 		out = dir + ".view.html"
 	}
-	path, masked, err := writeViewHTMLCounted(dir, out)
+	path, masked, err := writeViewHTML(dir, out)
 	if err != nil {
 		return err
 	}
@@ -120,16 +120,6 @@ func runView(dir string, args []string) error {
 func redactMask(s string) string {
 	out, _ := redact.Text(s)
 	return out
-}
-
-// writeViewHTMLCounted writes the page and reports how many secrets it took out
-// of it. The other ways out — share, sync export, promote --to — redact what
-// they emit; this one wrote whatever the index held, which is not the same
-// text on an index built by an older deja or before a pattern was fixed, and
-// then counted the markers ingest had written and called them masked here
-// (#1768).
-func writeViewHTMLCounted(dir, out string) (string, int, error) {
-	return writeViewHTML(dir, out)
 }
 
 func writeViewHTML(dir, out string) (string, int, error) {
@@ -234,14 +224,16 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	if err := viewTemplate.Execute(&b, page); err != nil {
 		return "", 0, fmt.Errorf("render view: %w", err)
 	}
+	// The page holds a masked spot for every secret taken out of it, here or at
+	// ingest; counting the rendered page reports both without claiming which,
+	// and counts what a reader will actually find in the file.
+	masked := strings.Count(b.String(), redact.Marker)
 	if err := os.WriteFile(abs, []byte(b.String()), 0o644); err != nil {
 		// A path on a disk that is gone came back as the bare syscall, which
 		// says nothing about what to change (#1036).
 		return "", 0, fmt.Errorf("cannot write the view to %s — %s", abs, writeFailureReason(err))
 	}
-	// The page holds a masked spot for every secret taken out of it, here or at
-	// ingest; counting the finished page reports both without claiming which.
-	return abs, strings.Count(string(page.SessionsJSON)+string(page.RecallsJSON)+string(page.NotesJSON), redact.Marker), nil
+	return abs, masked, nil
 }
 
 // jsonForScript makes embedded JSON safe inside a <script> block.
