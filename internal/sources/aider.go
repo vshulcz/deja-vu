@@ -97,7 +97,11 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 			role, buf = "", nil
 			return
 		}
-		text := strings.TrimSpace(strings.Join(buf, "\n"))
+		// A markdown transcript is bytes, not JSON: nothing on the way in
+		// rejects a sequence that is not UTF-8, which is what every other
+		// parser gets for free from its decoder. Drop them here so the index
+		// holds text (#1740).
+		text := strings.ToValidUTF8(strings.TrimSpace(strings.Join(buf, "\n")), "")
 		if text != "" && role != "" {
 			cur.Messages = append(cur.Messages, model.Message{Role: role, Text: text, Time: cur.Started})
 		}
