@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -1818,6 +1819,11 @@ func containsFold(hay, lowerNeedle string) bool {
 	return false
 }
 
+// toolDumpEngineCalls counts the lines that reach the regexp engine. The point
+// of the prefilter is that ordinary prose does not, and a counter says so in a
+// test without timing anything (#1742).
+var toolDumpEngineCalls atomic.Int64
+
 // looksToolDump is toolDumpRE with the scan the regexp engine spends most of
 // its time on done by hand: every alternative starts with a literal, so a line
 // holding none of them cannot match. Rendering a digest ran this per line over
@@ -1828,11 +1834,13 @@ func looksToolDump(line string) bool {
 			// Case folding is Unicode-wide in the engine (ſ folds to s), and
 			// this prefilter is ASCII. A line with any byte outside ASCII goes
 			// to the engine rather than being decided here.
+			toolDumpEngineCalls.Add(1)
 			return toolDumpRE.MatchString(line)
 		}
 	}
 	for _, lit := range toolDumpLiterals {
 		if containsFold(line, lit) {
+			toolDumpEngineCalls.Add(1)
 			return toolDumpRE.MatchString(line)
 		}
 	}

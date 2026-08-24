@@ -10,14 +10,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// A digest is ~8 KB whatever the session is, so the work it costs has to be
-// bounded by what it shows rather than by what it reads. Rendering every turn
-// before choosing the window spent 22 s on a 279 MB session to print 8 KB
-// (#1742).
-func TestContextCostIsBoundedByWhatItPrints(t *testing.T) {
-	if testing.Short() {
-		t.Skip("timing test")
-	}
+// Rendering a digest ran two regexes over every line of every turn, so a
+// 30000-turn session spent 22.6 s producing 8 KB (#1742). Counting how many
+// lines reach the engine says that directly, and says it the same on any
+// machine — a wall-clock bound does not.
+func TestOrdinaryProseNeverReachesTheRegexpEngine(t *testing.T) {
 	build := func(n int) model.Session {
 		s := model.Session{Harness: "claude", ID: "big", Project: "proj", Updated: time.Now()}
 		for i := range n {
@@ -27,29 +24,30 @@ func TestContextCostIsBoundedByWhatItPrints(t *testing.T) {
 			}
 			s.Messages = append(s.Messages, model.Message{
 				Role: role,
-				Text: fmt.Sprintf("shard %d ", i) + strings.Repeat("payload ", 1200),
+				Text: fmt.Sprintf("shard %d\n", i) + strings.Repeat("payload words here\n", 40),
 			})
 		}
 		return s
 	}
 
-	var small, large bytes.Buffer
-	t0 := time.Now()
-	PrintContext(&small, build(200), "grumbleflux")
-	smallCost := time.Since(t0)
-	t1 := time.Now()
-	PrintContext(&large, build(20000), "grumbleflux")
-	largeCost := time.Since(t1)
+	before := toolDumpEngineCalls.Load()
+	var out bytes.Buffer
+	PrintContext(&out, build(2000), "grumbleflux")
+	if got := toolDumpEngineCalls.Load() - before; got != 0 {
+		t.Errorf("%d lines of ordinary prose were handed to the regexp engine", got)
+	}
+	if out.Len() == 0 || out.Len() > 9000 {
+		t.Fatalf("digest is %d bytes", out.Len())
+	}
 
-	if large.Len() > 9000 || small.Len() > 9000 {
-		t.Fatalf("digest is not bounded: small=%d large=%d", small.Len(), large.Len())
+	// A line that could match still reaches it — the prefilter decides nothing
+	// on its own.
+	s := model.Session{Harness: "claude", ID: "dump", Project: "proj", Updated: time.Now(),
+		Messages: []model.Message{{Role: "user", Text: "goroutine 1 [running]:\nnpm ERR! code E404\nplain line"}}}
+	before = toolDumpEngineCalls.Load()
+	var dump bytes.Buffer
+	PrintContext(&dump, s, "goroutine")
+	if got := toolDumpEngineCalls.Load() - before; got != 2 {
+		t.Errorf("lines carrying a tool-dump literal reached the engine %d times, want 2", got)
 	}
-	// 20000 turns of 10 KB is 200 MB of text. Rendering it took 15 s before the
-	// line filters stopped handing every line to a regexp engine; it is under
-	// 3 s now. The bound is loose enough for a loaded CI box and still fails
-	// the moment the per-line scan goes back.
-	if largeCost > 8*time.Second {
-		t.Errorf("20000 turns cost %v to print %d bytes (200 turns: %v)", largeCost, large.Len(), smallCost)
-	}
-	t.Logf("200 turns: %v (%d bytes) · 20000 turns: %v (%d bytes)", smallCost, small.Len(), largeCost, large.Len())
 }
