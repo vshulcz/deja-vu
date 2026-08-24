@@ -338,7 +338,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
-		ToolFingerprint:    toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())}
+		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -678,7 +678,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
-		ToolFingerprint:    toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())}
+		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -1989,7 +1989,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// those patterns, so claiming today's set would be a lie the reader
 		// cannot check.
 		ExcludeFingerprint: old.ExcludeFingerprint,
-		ToolFingerprint:    toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())}
+		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true

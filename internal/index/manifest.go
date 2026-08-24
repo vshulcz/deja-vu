@@ -282,11 +282,49 @@ func ExclusionsChanged(dir string) bool {
 	return m.ExcludeFingerprint != now
 }
 
-// toolsChanged reports that this machine can read stores it could not when the
-// index was built, or the other way round. Empty means an older deja wrote the
-// manifest: nothing was recorded, so nothing is claimed.
+// toolsChanged reports that this machine can now read stores it could not when
+// the index was built. Gaining a tool is the change worth a pass; losing one is
+// not — nothing new can be read, and what is already indexed stays valid. That
+// asymmetry is what keeps a hook running with a minimal PATH from trading full
+// rebuilds with a terminal that has both tools. Empty means an older deja wrote
+// the manifest: nothing was recorded, so nothing is claimed.
 func toolsChanged(m Manifest) bool {
-	return m.ToolFingerprint != "" && m.ToolFingerprint != toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())
+	if m.ToolFingerprint == "" {
+		return false
+	}
+	hadSQLite, hadZstd := parseToolFingerprint(m.ToolFingerprint)
+	return (sources.SQLite3Available() && !hadSQLite) || (sources.ZstdAvailable() && !hadZstd)
+}
+
+// parseToolFingerprint reads back what toolFingerprint wrote. An unreadable one
+// counts as "both present", so a fingerprint this build does not understand
+// never triggers a rebuild.
+func parseToolFingerprint(s string) (sqlite, zstd bool) {
+	return !strings.Contains(s, "sqlite3=false"), !strings.Contains(s, "zstd=false")
+}
+
+// priorToolFingerprint reads what the index on disk recorded, so a rebuild does
+// not forget a tool this process happens not to see.
+func priorToolFingerprint(dir string) string {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return ""
+	}
+	return m.ToolFingerprint
+}
+
+// mergedToolFingerprint records a tool as available if it is now or was when
+// the index was last built. A hook process with a minimal PATH must not erase
+// what a terminal build knew, or the next terminal run reads it as a tool newly
+// gained and rebuilds — every time.
+func mergedToolFingerprint(prior string) string {
+	sqlite, zstd := sources.SQLite3Available(), sources.ZstdAvailable()
+	if prior != "" {
+		hadSQLite, hadZstd := parseToolFingerprint(prior)
+		sqlite = sqlite || hadSQLite
+		zstd = zstd || hadZstd
+	}
+	return toolFingerprint(sqlite, zstd)
 }
 
 // toolFingerprint names the external CLIs available to this build. Two states

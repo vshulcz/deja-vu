@@ -34,3 +34,27 @@ func TestInstallingTheMissingToolMakesTheIndexStale(t *testing.T) {
 		t.Error("an index built by an older deja is rebuilt for a field it never wrote")
 	}
 }
+
+// A hook runs with whatever PATH its harness has, which is often minimal. If
+// losing sight of a tool counted as a change, that hook and a terminal with
+// both tools would trade full rebuilds forever; and if the hook's build erased
+// what the terminal knew, the next terminal run would read it as a tool newly
+// gained and rebuild again.
+func TestAToolLostDoesNotStartARebuildLoop(t *testing.T) {
+	both := toolFingerprint(true, true)
+	none := toolFingerprint(false, false)
+
+	t.Setenv("PATH", "")
+	if toolsChanged(Manifest{ToolFingerprint: both}) {
+		t.Error("losing a tool counts as a change, so a minimal-PATH hook forces a rebuild")
+	}
+	if got := mergedToolFingerprint(both); got != both {
+		t.Errorf("a build with no tools erased what the index knew: %q", got)
+	}
+	if !toolsChanged(Manifest{ToolFingerprint: none}) == false {
+		t.Error("with no tools at all, nothing is newly readable")
+	}
+	if got := mergedToolFingerprint(""); got != none {
+		t.Errorf("a first build with no tools recorded %q", got)
+	}
+}
