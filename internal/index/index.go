@@ -282,6 +282,14 @@ type Manifest struct {
 	// it decodes with it empty, and an empty one means "not recorded", which
 	// says nothing rather than guessing.
 	ExcludeFingerprint string `json:"exclude_fingerprint,omitempty"`
+	// ToolFingerprint records which external CLIs were available when this
+	// index was built. A store deja could not read for want of sqlite3 or zstd
+	// is not stale by its file state — the transcripts did not change — so
+	// installing the tool and running `deja index`, which is what doctor tells
+	// the reader to do, reported "index is up to date" and left the store out
+	// of recall (#1760). Additive like the field above: empty means "not
+	// recorded", which is what an index from an older deja carries.
+	ToolFingerprint string `json:"tool_fingerprint,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -311,8 +319,9 @@ type manifestCore struct {
 	RecordsSize      int64
 	BucketFiles      int
 	IngestHealth     map[string]HarnessIngest
-	// ExcludeFingerprint: see Manifest.
+	// ExcludeFingerprint, ToolFingerprint: see Manifest.
 	ExcludeFingerprint string
+	ToolFingerprint    string
 }
 
 type RedactionStats struct {

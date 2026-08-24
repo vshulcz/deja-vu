@@ -184,6 +184,13 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if !force && err == nil && notesZoneDrifted(m) {
 		force = true
 	}
+	// A store skipped for a missing CLI has unchanged files, so the
+	// incremental pass has nothing to revisit and the store stays out of the
+	// index. Installing the tool is a change to what deja can read, not to the
+	// transcripts, and only a full pass acts on it (#1760).
+	if !force && err == nil && toolsChanged(m) {
+		force = true
+	}
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
@@ -330,7 +337,8 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// for a rebuild rather than quietly declaring the new list in force (#1307).
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
-		ExcludeFingerprint: sources.ExclusionFingerprint()}
+		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		ToolFingerprint:    toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -669,7 +677,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	lastIngestFiles = len(files)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
-		ExcludeFingerprint: sources.ExclusionFingerprint()}
+		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		ToolFingerprint:    toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())}
 	recPath := filepath.Join(tmp, "records.bin")
 	rf, err := os.OpenFile(recPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -1979,7 +1988,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// Kept from the old index: this build reuses records written under
 		// those patterns, so claiming today's set would be a lie the reader
 		// cannot check.
-		ExcludeFingerprint: old.ExcludeFingerprint}
+		ExcludeFingerprint: old.ExcludeFingerprint,
+		ToolFingerprint:    toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true

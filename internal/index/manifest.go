@@ -1,6 +1,7 @@
 package index
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,6 +206,11 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 	if m.Version != version || len(m.Files) != len(files) {
 		return false
 	}
+	// A store skipped for a missing CLI leaves the transcripts untouched, so
+	// nothing here would notice that the tool has since been installed (#1760).
+	if toolsChanged(m) {
+		return false
+	}
 	if m.Scope != scope {
 		return false
 	}
@@ -221,7 +227,7 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, ExcludeFingerprint: core.ExcludeFingerprint, Sessions: map[string]SessionMeta{}}
+	m := Manifest{Version: core.Version, Files: core.Files, BuiltAt: core.BuiltAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, ExcludeFingerprint: core.ExcludeFingerprint, ToolFingerprint: core.ToolFingerprint, Sessions: map[string]SessionMeta{}}
 	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
 		return Manifest{}, err
 	}
@@ -232,7 +238,7 @@ func readManifest(dir string) (Manifest, error) {
 // for updates that change only core fields (e.g. export watermarks) where the
 // caller has not loaded sessions and must not clobber them.
 func writeManifestOnly(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth, ExcludeFingerprint: m.ExcludeFingerprint}
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint}
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
@@ -248,7 +254,7 @@ func writeManifestOnly(dir string, m Manifest) error {
 // rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
 	mergeIngestDiag(&m)
-	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth, ExcludeFingerprint: m.ExcludeFingerprint}
+	core := manifestCore{Version: m.Version, Files: m.Files, BuiltAt: m.BuiltAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint}
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
@@ -274,6 +280,20 @@ func ExclusionsChanged(dir string) bool {
 		return false
 	}
 	return m.ExcludeFingerprint != now
+}
+
+// toolsChanged reports that this machine can read stores it could not when the
+// index was built, or the other way round. Empty means an older deja wrote the
+// manifest: nothing was recorded, so nothing is claimed.
+func toolsChanged(m Manifest) bool {
+	return m.ToolFingerprint != "" && m.ToolFingerprint != toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable())
+}
+
+// toolFingerprint names the external CLIs available to this build. Two states
+// each, so a machine that gains or loses one is a machine whose stores must be
+// read again.
+func toolFingerprint(sqlite, zstd bool) string {
+	return fmt.Sprintf("sqlite3=%t,zstd=%t", sqlite, zstd)
 }
 
 // hasBucketFile reports whether the postings directory holds anything at all.
