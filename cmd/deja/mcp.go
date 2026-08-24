@@ -911,13 +911,19 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
+	more := ""
 	if left := total - offset - served; left > 0 {
-		fmt.Fprintf(&b, "\n%d more match(es) — call recall again with offset=%d.\n", left, offset+served)
+		more = fmt.Sprintf("\n%d more match(es) — call recall again with offset=%d.\n", left, offset+served)
 	}
+	// The paging line is the instruction, not the evidence: appending it before
+	// the trim made a full page drop the one thing that says how to reach the
+	// rest, exactly where offset is meant to be used (#1726). Trim the excerpts
+	// to leave room for it instead.
 	out := b.String()
-	if len(out) > budget {
-		out = trimUTF8(out, budget)
+	if len(out)+len(more) > budget {
+		out = trimUTF8(out, budget-len(more))
 	}
+	out += more
 	var raw int64
 	var ids []string
 	for i, h := range hits {
