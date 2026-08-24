@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -1943,11 +1944,39 @@ func withFileTouchers(dir string, ss []model.Session, target search.BlameTarget)
 	}
 	return ss
 }
+
+// parseDur is the window a reader asked to look back over, so it has to be one:
+// zero or less used to parse and then disappear, because every caller cuts on
+// `Since > 0` — `--since -1d` searched the whole store and nothing in the answer
+// said the filter had been dropped (#1610). parseDurAny is the raw form, for
+// `forget --before`, which has its own word for the same mistake.
 func parseDur(s string) (time.Duration, error) {
+	d, err := parseDurAny(s)
+	if err != nil {
+		return 0, err
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("%q is not a window — --since counts back from now, so it needs a positive duration like 30d", s)
+	}
+	return d, nil
+}
+
+// maxDurationDays is how many whole days fit in a time.Duration: past it the
+// multiplication wraps, and `--since 365000d` — the way to say "all of it" —
+// came out negative and dropped the filter it was asked for.
+const maxDurationDays = int(math.MaxInt64 / (24 * int64(time.Hour)))
+
+func parseDurAny(s string) (time.Duration, error) {
 	if strings.HasSuffix(s, "d") {
 		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
 		if err != nil {
 			return 0, durationError(s)
+		}
+		if n > maxDurationDays {
+			return time.Duration(math.MaxInt64), nil
+		}
+		if n < -maxDurationDays {
+			return time.Duration(math.MinInt64), nil
 		}
 		return time.Duration(n) * 24 * time.Hour, nil
 	}
@@ -2201,7 +2230,7 @@ func runForget(dir string, args []string) error {
 			case "--unforget":
 				unforget, unforgetGiven = index.PastedSelector(args[i]), true
 			case "--before":
-				if d, err := parseDur(args[i]); err == nil {
+				if d, err := parseDurAny(args[i]); err == nil {
 					// "older than 0 days" is the whole store, and the typo that
 					// produces it is 0 for 30. The neighbouring value behaves
 					// the opposite way — --before 9999d matches nothing — and a
