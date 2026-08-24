@@ -450,7 +450,7 @@ func TestSyncSSHErrorBranches(t *testing.T) {
 		t.Fatalf("sshCapture quote err=%v", err)
 	}
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote", nil
 		}
 		return "boom", os.ErrPermission
@@ -671,7 +671,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "", errors.New("mktemp failed")
 		}
 		return "", nil
@@ -682,7 +682,7 @@ func TestSyncSSHPushMoreErrorBranches(t *testing.T) {
 	// Mark exported so a new fixture is available for the remote-import branch.
 	setupLocalIndex(t)
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote", nil
 		}
 		if name == "ssh" {
@@ -849,13 +849,13 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 	defer func() { sshRunner = old }()
 	var cleaned bool
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote-zero", nil
 		}
-		if name == "ssh" && strings.Contains(args[1], "sync export") {
+		if name == "ssh" && strings.Contains(args[len(args)-1], "sync export") {
 			return "deja: exported 0 records", nil
 		}
-		if name == "ssh" && strings.Contains(args[1], "rm -rf") {
+		if name == "ssh" && strings.Contains(args[len(args)-1], "rm -rf") {
 			cleaned = true
 		}
 		return "", nil
@@ -873,7 +873,7 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote", nil
 		}
 		if name == "scp" {

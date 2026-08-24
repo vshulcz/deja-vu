@@ -42,14 +42,14 @@ func TestSyncSSHPullFullAndScpFailure(t *testing.T) {
 	var exportCmd string
 	var cleanup bool
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote-out", nil
 		}
-		if name == "ssh" && strings.Contains(args[1], "sync export") {
-			exportCmd = args[1]
+		if name == "ssh" && strings.Contains(args[len(args)-1], "sync export") {
+			exportCmd = args[len(args)-1]
 			return "deja: exported 1 records", nil
 		}
-		if name == "ssh" && strings.Contains(args[1], "rm -rf") {
+		if name == "ssh" && strings.Contains(args[len(args)-1], "rm -rf") {
 			cleanup = true
 			return "", nil
 		}
@@ -77,7 +77,7 @@ func TestSyncSSHPush(t *testing.T) {
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) {
 		calls = append(calls, append([]string{name}, args...))
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote-batch\n", nil
 		}
 		if name == "ssh" {
@@ -94,7 +94,8 @@ func TestSyncSSHPush(t *testing.T) {
 	if calls[1][0] != "scp" || !strings.HasSuffix(calls[1][len(calls[1])-1], ":/tmp/remote-batch/") {
 		t.Fatalf("bad scp call: %v", calls[1])
 	}
-	if !strings.Contains(calls[2][2], "sync import") || !strings.Contains(calls[2][2], "/tmp/remote-batch") {
+	last := calls[2][len(calls[2])-1]
+	if !strings.Contains(last, "sync import") || !strings.Contains(last, "/tmp/remote-batch") {
 		t.Fatalf("bad remote import call: %v", calls[2])
 	}
 }
@@ -111,7 +112,7 @@ func TestSyncSSHPushNothingNew(t *testing.T) {
 	// First push exports the one record; run it with a runner that accepts it.
 	full := sshRunner
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote-batch", nil
 		}
 		return "deja: imported 1 records", nil
@@ -136,10 +137,10 @@ func TestSyncSSHPull(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote-out", nil
 		}
-		if name == "ssh" && strings.Contains(args[1], "sync export") {
+		if name == "ssh" && strings.Contains(args[len(args)-1], "sync export") {
 			return "deja: exported 1 records", nil
 		}
 		if name == "scp" {
@@ -213,7 +214,7 @@ func TestSyncSSHIgnoresStderrBanner(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && len(args) > 1 && strings.Contains(args[1], "mktemp") {
+		if name == "ssh" && len(args) > 1 && strings.Contains(args[len(args)-1], "mktemp") {
 			// stdout only — the banner went to stderr, which we now drop.
 			return "/tmp/remote-batch\n", nil
 		}
@@ -232,7 +233,7 @@ func TestSyncSSHTakesLastLineOfRemoteOutput(t *testing.T) {
 	defer func() { sshRunner = old }()
 	var target string
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && len(args) > 1 && strings.Contains(args[1], "mktemp") {
+		if name == "ssh" && len(args) > 1 && strings.Contains(args[len(args)-1], "mktemp") {
 			return "Welcome to prod\n/tmp/remote-batch\n", nil
 		}
 		if name == "scp" {
@@ -255,7 +256,7 @@ func TestSyncSSHRejectsUnusableRemotePath(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && len(args) > 1 && strings.Contains(args[1], "mktemp") {
+		if name == "ssh" && len(args) > 1 && strings.Contains(args[len(args)-1], "mktemp") {
 			return "/tmp/deja sync/tmp.AbCd\n", nil
 		}
 		return "deja: imported 1 records", nil

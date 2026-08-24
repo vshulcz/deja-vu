@@ -29,6 +29,19 @@ var sshRunner = func(name string, args ...string) (string, error) {
 	return stdout.String(), err
 }
 
+// sshConnectTimeout is how long deja waits for a machine to answer. A laptop
+// that is asleep neither answers nor refuses, and ssh's own default left one
+// host waiting 446 seconds with nothing on screen — while `deja sync` walks
+// every machine it knows (#1772).
+const sshConnectTimeout = "10"
+
+// sshOpts are the options every ssh and scp call carries: a connect timeout,
+// and BatchMode so a host that wants a password fails instead of blocking on a
+// prompt nothing is reading.
+func sshOpts() []string {
+	return []string{"-o", "ConnectTimeout=" + sshConnectTimeout, "-o", "BatchMode=yes"}
+}
+
 func runSyncSSH(dir string, args []string) error {
 	host := ""
 	pull, full := false, false
@@ -150,14 +163,14 @@ func syncSSHPush(dir, host string, full bool) error {
 	if err != nil {
 		return err
 	}
-	scpArgs := append([]string{"-q"}, batches...)
+	scpArgs := append(append(sshOpts(), "-q"), batches...)
 	scpArgs = append(scpArgs, host+":"+rtmp+"/")
 	if out, err := sshRunner("scp", scpArgs...); err != nil {
 		return fmt.Errorf("scp: %v: %s", err, strings.TrimSpace(out))
 	}
 	remote := fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" sync import %s; rc=$?; rm -rf %s; exit $rc`,
 		shellQuote(rtmp), shellQuote(rtmp))
-	out, err := sshRunner("ssh", host, "sh -lc "+shellQuote(remote))
+	out, err := sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote(remote))...)
 	out = strings.TrimSpace(out)
 	if err != nil {
 		return fmt.Errorf("remote import: %v: %s", err, out)
@@ -191,14 +204,14 @@ func syncSSHPull(dir, host string, full bool) error {
 	remoteCmd := func(c string) string {
 		return fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" %s %s`, c, shellQuote(rtmp))
 	}
-	out, err := sshRunner("ssh", host, "sh -lc "+shellQuote(remoteCmd(pullCmd)))
+	out, err := sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote(remoteCmd(pullCmd)))...)
 	out = strings.TrimSpace(out)
 	// A deja too old to know --peer refuses the flag rather than ignoring it,
 	// which is the behaviour that stops a typo from exporting nothing (#745).
 	// Upgrading both machines at once is not something a person does, so fall
 	// back to the shared watermark rather than failing the pull.
 	if err != nil && strings.Contains(out, "unknown flag") && pullCmd != exportCmd {
-		out, err = sshRunner("ssh", host, "sh -lc "+shellQuote(remoteCmd(exportCmd)))
+		out, err = sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote(remoteCmd(exportCmd)))...)
 		out = strings.TrimSpace(out)
 	}
 	if err != nil {
@@ -221,7 +234,7 @@ func syncSSHPull(dir, host string, full bool) error {
 		return err
 	}
 	defer os.RemoveAll(ltmp)
-	if out, err := sshRunner("scp", "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/"); err != nil {
+	if out, err := sshRunner("scp", append(sshOpts(), "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/")...); err != nil {
 		cleanup()
 		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, strings.TrimSpace(out), host)
 	}
@@ -242,7 +255,7 @@ func exportBatches(dir, out string, full bool) (int, error) {
 }
 
 func sshCapture(host, cmd string) (string, error) {
-	out, err := sshRunner("ssh", host, cmd)
+	out, err := sshRunner("ssh", append(sshOpts(), host, cmd)...)
 	s := strings.TrimSpace(out)
 	if err != nil {
 		return "", fmt.Errorf("ssh %s: %v: %s", host, err, s)

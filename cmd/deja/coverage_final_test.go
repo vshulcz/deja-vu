@@ -196,7 +196,7 @@ func TestSyncSSHPullMkdirTempFailure(t *testing.T) {
 	old := sshRunner
 	defer func() { sshRunner = old }()
 	sshRunner = func(name string, args ...string) (string, error) {
-		if name == "ssh" && args[1] == "mktemp -d" {
+		if name == "ssh" && args[len(args)-1] == "mktemp -d" {
 			return "/tmp/remote", nil
 		}
 		if name == "ssh" {
