@@ -51,12 +51,13 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	}
 	// A flag deja does not know is named plainly by every other command; here
 	// it fell into the target list, and the refusal then said the target was
-	// missing while printing the target it had been given (#1078).
-	if len(targetArgs) > 1 {
-		for _, a := range targetArgs {
-			if strings.HasPrefix(a, "--") && a != "--all" && a != "--auto" {
-				return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index or --force", verb, a)
-			}
+	// missing while printing the target it had been given (#1078). At one
+	// argument it fell through anyway and `deja install --nosuch` was reported
+	// as an unknown target, with thirty-eight harness names for a remedy
+	// (#1680). No target begins with a dash, so the shape alone settles it.
+	for _, a := range targetArgs {
+		if strings.HasPrefix(a, "-") && a != "--all" && a != "--auto" {
+			return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index or --force", verb, a)
 		}
 	}
 	if len(targetArgs) != 1 {
@@ -434,7 +435,13 @@ func refusalRemedy(errs []error) string {
 		}
 	}
 	if perms > 0 && perms == len(errs) {
+		if len(errs) == 1 {
+			return "check that path's permissions and run it again"
+		}
 		return "check those paths' permissions and run it again"
+	}
+	if len(errs) == 1 {
+		return "fix what it reports and run it again"
 	}
 	return "fix what each one reports and run it again"
 }
