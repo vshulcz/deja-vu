@@ -390,7 +390,9 @@ func TestRunDispatchAdditionalCommands(t *testing.T) {
 	if out, err := captureRun(t, "ctx", "claude"); err != nil || !strings.Contains(out, "# deja context:") {
 		t.Fatalf("ctx prefix out=%q err=%v", out, err)
 	}
-	if out, err := captureRun(t, "last", "bad"); err != nil || !strings.Contains(out, "claude") {
+	// A bare argument that is not a count used to be dropped in silence, which
+	// answered `deja last api-gateway` with every project (#1618).
+	if out, err := captureRun(t, "last", "bad"); err == nil || !strings.Contains(err.Error(), "is not a count") {
 		t.Fatalf("last bad n out=%q err=%v", out, err)
 	}
 	if err := run([]string{"show", "no-such-prefix"}); err == nil || !strings.Contains(err.Error(), "no session matches") {

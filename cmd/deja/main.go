@@ -1637,12 +1637,18 @@ func parseLast(args []string) (int, search.Options, string, error) {
 			if strings.HasPrefix(a, "-") {
 				return n, o, sinceRaw, fmt.Errorf("last: unknown flag %q", a)
 			}
-			if !seenN {
-				if x, err := strconv.Atoi(a); err == nil {
-					n = x
-					seenN = true
-				}
+			// The only bare argument last takes is the count. Dropping anything
+			// else in silence answered `deja last api-gateway` — the filter the
+			// help spells `--project api-gateway` — with ten sessions from every
+			// project and no sign the word did nothing (#1618).
+			x, err := strconv.Atoi(a)
+			if err != nil || x < 1 {
+				return n, o, sinceRaw, fmt.Errorf("last: %q is not a count — use `deja last 5`, or --project/--harness to narrow", a)
 			}
+			if seenN {
+				return n, o, sinceRaw, fmt.Errorf("last takes one count, got %d and %q", n, a)
+			}
+			n, seenN = x, true
 		}
 	}
 	return n, o, sinceRaw, nil

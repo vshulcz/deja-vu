@@ -310,9 +310,11 @@ func TestLastParserAndSourceFilters(t *testing.T) {
 	if raw != "7d" {
 		t.Fatalf("sinceRaw = %q, want the flag as typed", raw)
 	}
-	n, o, raw, err = parseLast([]string{"bad"})
-	if err != nil || n != 10 || o.Harness != "" || o.Project != "" || raw != "" {
-		t.Fatalf("parseLast compatibility = n:%d options:%#v raw:%q err:%v", n, o, raw, err)
+	// The count is the only bare argument last takes. Ignoring anything else
+	// left the reader with the default ten from every project and no sign that
+	// the word they typed did nothing (#1618).
+	if _, _, _, err := parseLast([]string{"bad"}); err == nil || !strings.Contains(err.Error(), "is not a count") {
+		t.Fatalf("parseLast bad count err=%v", err)
 	}
 	if _, _, _, err := parseLast([]string{"--unknown"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("parseLast unknown flag err=%v", err)
