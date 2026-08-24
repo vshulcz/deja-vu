@@ -480,7 +480,7 @@ func TestDoctorDeepCleanAndDrift(t *testing.T) {
 		t.Fatalf("clean deep doctor must exit 0: %v\n%s", err, out.String())
 	}
 	got := out.String()
-	if !strings.Contains(got, "Deep verification:") || !strings.Contains(got, "index matches sources") {
+	if !strings.Contains(got, "Deep verification:") || !strings.Contains(got, "message count matches its source") {
 		t.Fatalf("missing clean deep section:\n%s", got)
 	}
 

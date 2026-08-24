@@ -140,7 +140,12 @@ func doctorDeep(w io.Writer, r index.DeepReport) {
 		fmt.Fprintf(w, "  stale    %s changed since last pass — `deja index` will absorb them\n", doctorCount(len(r.Stale), "source"))
 	}
 	if r.Clean() {
-		fmt.Fprintln(w, "  status   index matches sources — no memory lost")
+		// What this pass actually compares is message counts per session, plus
+		// the structure around them: sizes, magic numbers, postings that
+		// resolve. It cannot see a same-length edit inside a record, which
+		// leaves the count identical and the session unreachable — so the line
+		// says what was checked rather than promising nothing was lost (#1712).
+		fmt.Fprintln(w, "  status   every session's message count matches its source, and the records and postings read cleanly")
 		return
 	}
 	for _, f := range r.Findings {
