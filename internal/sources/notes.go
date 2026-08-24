@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,6 +77,45 @@ func AppendNote(project, text string, now time.Time) error {
 	return AppendNoteTagged(project, text, nil, now)
 }
 
+// maxNoteLine bounds one line of the scan below. A note longer than this is
+// not compared — it is written, and the duplicate check simply does not claim
+// to cover it.
+const maxNoteLine = 4 << 20
+
+// ErrNoteExists says the note is already on file: same project, same text.
+// Appending it again cost the agent a line of every later recall for one fact
+// (#1736), so the write is refused and the caller says so.
+var ErrNoteExists = errors.New("note already remembered")
+
+// noteAlreadyStored reports whether this exact note is on file already. It
+// reads the file rather than an index: a note written a second ago has not
+// been indexed yet, and back-to-back saves are exactly the case this exists
+// for. Promoted notes are skipped — those carry provenance and a lifecycle,
+// and a `remember` is not a correction to one.
+func noteAlreadyStored(path, project, text string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), maxNoteLine)
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var n note
+		if json.Unmarshal(line, &n) != nil || n.Kind != "" {
+			continue
+		}
+		if n.Project == project && strings.TrimSpace(n.Text) == text {
+			return true
+		}
+	}
+	return false
+}
+
 func AppendNoteTagged(project, text string, tags []string, now time.Time) error {
 	project = strings.TrimSpace(project)
 	if project == "" {
@@ -86,6 +127,9 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 	path := NotesFile()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
+	}
+	if noteAlreadyStored(path, project, strings.TrimSpace(text)) {
+		return ErrNoteExists
 	}
 	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("notes file is a symlink")

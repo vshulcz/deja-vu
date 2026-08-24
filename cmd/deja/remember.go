@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -51,6 +52,10 @@ func runRemember(dir string, args []string) error {
 	}
 	now := time.Now()
 	if err := sources.AppendNoteTagged(project, text, tags, now); err != nil {
+		if errors.Is(err, sources.ErrNoteExists) {
+			fmt.Fprintf(os.Stderr, "deja: already remembered under %s\n", project)
+			return nil
+		}
 		return notesWriteError(err)
 	}
 	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {

@@ -423,8 +423,14 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if strings.TrimSpace(a.Project) == "" {
 			a.Project = "notes"
 		}
-		if err := notesWriteError(sources.AppendNoteTagged(a.Project, a.Text, a.Tags, time.Now())); err != nil {
-			return "", err
+		switch err := sources.AppendNoteTagged(a.Project, a.Text, a.Tags, time.Now()); {
+		case errors.Is(err, sources.ErrNoteExists):
+			// Not an error to the agent: the fact it wanted stored is stored.
+			// Saying so stops it retrying, and stops one fact costing a line of
+			// every later recall (#1736).
+			return fmt.Sprintf("Already remembered under %s.", strings.TrimSpace(a.Project)), nil
+		case err != nil:
+			return "", notesWriteError(err)
 		}
 		// The note is on disk either way; what is left is making it findable.
 		// On upgrade day that meant rebuilding the whole index inside the call
