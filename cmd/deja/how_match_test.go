@@ -94,3 +94,27 @@ func TestHowRefusesWhatDoesNothing(t *testing.T) {
 		}
 	}
 }
+
+// A dash or an underscore is a boundary, not part of the word: people ask for
+// the half of a hyphenated tool they remember. Review named this as the cost of
+// the first attempt, where both counted as word characters (#1630).
+func TestHowFindsTheHalfOfAHyphenatedCommand(t *testing.T) {
+	dir := howFixture(t)
+	for _, term := range []string{"lint", "golangci", "golangci-lint"} {
+		var b bytes.Buffer
+		if err := runHow(dir, []string{term}, &b); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "golangci-lint run") {
+			t.Errorf("`how %s` lost golangci-lint:\n%s", term, b.String())
+		}
+	}
+	// The control that started all this: `go` must still not match golangci.
+	var b bytes.Buffer
+	if err := runHow(dir, []string{"go"}, &b); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "golangci") {
+		t.Errorf("`how go` matched inside golangci again:\n%s", b.String())
+	}
+}

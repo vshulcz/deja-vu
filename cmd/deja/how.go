@@ -193,8 +193,11 @@ func pluralSessions(n int) string {
 // `how go` with `golangci-lint run ./...`, and ranked it first (#1630) — and the
 // short names are exactly the ones people ask about: go, gh, rg, jq, sed, cd.
 //
-// A word here ends at anything that is not a letter, a digit, an underscore or
-// a dash, so `go` matches `go test` and `/usr/local/bin/go` but not `golangci`.
+// A word here ends at anything that is not a letter or a digit, so `go` matches
+// `go test` and `/usr/local/bin/go` but not `golangci` — and a dash or an
+// underscore is a boundary like any other, so `lint` still finds
+// `golangci-lint` and `node` still finds `node_modules`, which is how people
+// name the halves of a hyphenated tool.
 // A term that itself carries a separator (`go test`, `./x`) is matched as
 // written: it is already more specific than one word.
 func commandMentions(low, term string) bool {
@@ -221,5 +224,5 @@ func commandMentions(low, term string) bool {
 }
 
 func isCommandWordRune(r rune) bool {
-	return r == '_' || r == '-' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 }
