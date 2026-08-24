@@ -199,10 +199,10 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		if !cut.IsZero() && s.Updated.Before(cut) {
 			continue
 		}
-		tier := o.Tier
-		if tier == "" {
-			tier = TierExact
-		}
+		// The same name the envelope carries: docs/json-output.md calls them the
+		// same idea at two scopes, and an agent reading a hit gets the tier from
+		// here (#1616).
+		tier := setTier(o)
 		doc := bm25Document{hit: Hit{Session: s, Tier: tier}, termCount: make([]int, len(qtoks)), userCount: make([]int, len(qtoks))}
 		if s.Title != "" && len(qtoks) > 0 {
 			titleLow := strings.ToLower(s.Title)
@@ -248,7 +248,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			}
 			if c > 0 {
 				doc.hit.Count += c
-				if doc.hit.Tier == TierClose && doc.hit.TierDetail == "" {
+				if (doc.hit.Tier == TierClose || doc.hit.Tier == TierStemmed) && doc.hit.TierDetail == "" {
 					doc.hit.TierDetail = variantDetail(m.Text, qtoks, o.FuzzyVariants)
 				}
 				// Collect every matching message with its match count; the

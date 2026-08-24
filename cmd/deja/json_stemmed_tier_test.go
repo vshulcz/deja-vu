@@ -47,8 +47,35 @@ func TestStemmedAnswerReportsTheStemmedTier(t *testing.T) {
 		}
 		return env.Tier
 	}
+	hitTierOf := func(q string) string {
+		t.Helper()
+		out, err := captureRun(t, "--json", "--no-embed", q)
+		if err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+		var env struct {
+			Hits []struct {
+				Tier string `json:"tier"`
+			} `json:"hits"`
+		}
+		if err := json.Unmarshal([]byte(out), &env); err != nil {
+			t.Fatalf("%s: %v\n%s", q, err, out)
+		}
+		if len(env.Hits) == 0 {
+			t.Fatalf("%s returned no hits, so the test measured nothing:\n%s", q, out)
+		}
+		return env.Hits[0].Tier
+	}
 	if got := tierOf("retries"); got != "stemmed" {
 		t.Errorf("a word form reports tier %q, not the documented \"stemmed\"", got)
+	}
+	// The envelope's tier and the hit's are the same idea at two scopes, so a
+	// consumer must not read one thing in the envelope and another in the hit.
+	if got := hitTierOf("retries"); got != "stemmed" {
+		t.Errorf("the hit reports tier %q while the envelope says stemmed", got)
+	}
+	if got := hitTierOf("retyr"); got != "close" {
+		t.Errorf("the hit for a misspelling reports tier %q, not \"close\"", got)
 	}
 	// The controls: a misspelling is still close, and an exact hit is exact.
 	if got := tierOf("retyr"); got != "close" {
