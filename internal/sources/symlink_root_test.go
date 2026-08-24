@@ -68,3 +68,34 @@ func TestLinksInsideAStoreAreStillSkipped(t *testing.T) {
 		t.Errorf("walk returned %v, want only the real file", got)
 	}
 }
+
+// The paths that come back are the ones the user configured. Everything
+// downstream keys on them — the kind predicates test strings.HasPrefix against
+// the root, the manifest records them, the incremental pass looks them up — and
+// two spellings of one file lose the file: the first attempt at #1744 walked
+// the target and reported its paths, and the next incremental run indexed the
+// store back down to nothing.
+func TestWalkReportsPathsUnderTheConfiguredRoot(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "real", "proj")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(real, "a.jsonl"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink(filepath.Join(tmp, "real"), link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	got := walkFiles(link, func(p string) bool { return filepath.Ext(p) == ".jsonl" })
+	if len(got) != 1 {
+		t.Fatalf("walk returned %v", got)
+	}
+	if want := filepath.Join(link, "proj", "a.jsonl"); got[0] != want {
+		t.Errorf("walk reported %q, want %q — the configured root", got[0], want)
+	}
+	if _, err := os.Stat(got[0]); err != nil {
+		t.Errorf("the reported path does not open: %v", err)
+	}
+}

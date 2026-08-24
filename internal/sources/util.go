@@ -292,7 +292,22 @@ func resolvedRoot(root string) string {
 
 func walkFiles(root string, pred func(string) bool) []string {
 	var out []string
-	_ = filepath.WalkDir(resolvedRoot(root), func(p string, d os.DirEntry, err error) error {
+	// Walk the target, report paths under the configured root: everything
+	// downstream — the kind predicates that test strings.HasPrefix against the
+	// root, the manifest, the incremental offsets — keys on the path the user
+	// configured, and handing it two spellings of one file loses the file.
+	walked := resolvedRoot(root)
+	under := func(p string) string {
+		if walked == root {
+			return p
+		}
+		rel, err := filepath.Rel(walked, p)
+		if err != nil {
+			return p
+		}
+		return filepath.Join(root, rel)
+	}
+	_ = filepath.WalkDir(walked, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			// A directory the process cannot read takes its sessions out of
 			// recall. Dropping the error here left the index run with nothing
@@ -308,8 +323,8 @@ func walkFiles(root string, pred func(string) bool) []string {
 		// no writer and never returns, so one such file in a scanned store
 		// froze indexing for good. IsRegular already excludes symlinks and
 		// directories, so it subsumes the checks it replaces.
-		if d.Type().IsRegular() && pred(p) {
-			out = append(out, p)
+		if q := under(p); d.Type().IsRegular() && pred(q) {
+			out = append(out, q)
 		}
 		return nil
 	})
