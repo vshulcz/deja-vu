@@ -83,12 +83,22 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if i := strings.IndexByte(ref, ':'); i >= 0 {
 		id = ref[i+1:]
 	}
+	// Every id has the empty string as a prefix, so a URI carrying no id at all
+	// matched the first session and handed back a transcript nobody asked for —
+	// with the requested URI echoed back, so nothing said which one it was
+	// (#1728). resources/list only ever emits a full URI.
+	if strings.TrimSpace(id) == "" {
+		return nil, -32602, "resource uri carries no session id"
+	}
 	s, found, err := index.FindByPrefix(dir, id)
 	if err != nil {
 		return nil, -32603, err.Error()
 	}
 	if !found {
-		return nil, -32602, fmt.Sprintf("no session matches %q", id)
+		// The id came from outside and this text lands in the model's context
+		// beside deja's own, so it is bounded and defanged like the listing
+		// entries above (#1729).
+		return nil, -32602, fmt.Sprintf("no session matches %q", neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
 	}
 	if !policy.Load().Allows(policy.ActivationMCP, s.Project) {
 		return nil, -32602, "blocked by trust policy"
