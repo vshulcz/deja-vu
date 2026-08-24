@@ -102,6 +102,13 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	exe, _ = filepath.Abs(exe)
 	// Remembered so a later upgrade can refresh exactly these and nothing
 	// else: the generators change, the files on disk do not.
+	if uninstall {
+		removingTargets = make(map[string]bool, len(targets))
+		for _, t := range targets {
+			removingTargets[guidanceHarness(t)] = true
+		}
+		defer func() { removingTargets = nil }()
+	}
 	defer recordWiring(targets, uninstall)
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
@@ -717,6 +724,15 @@ func backupOnce(path string) (bool, error) {
 // exist, is an empty config it then creates (#676). The flag is process-wide
 // because the command is: one run, one direction.
 var removingWiring bool
+
+// removingTargets names the targets the current uninstall run is removing.
+// The shared-skill guard asks whether any other harness still reads
+// ~/.agents/skills/deja-history/SKILL.md, and answers from the wiring record —
+// which still lists every harness during `uninstall --all`, because
+// recordWiring runs at the end. So each target in turn found another "still
+// wanting" reader and the file was kept every time (#1683). A harness being
+// removed in this same run is not a reader.
+var removingTargets map[string]bool
 
 // forceGuidance is set by `deja install --force`: replace a skill deja can see
 // has been edited since it wrote it.

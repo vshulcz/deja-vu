@@ -254,7 +254,10 @@ func sharedSkillStillWanted(leaving string) bool {
 	}
 	for _, t := range targets {
 		other := guidanceHarness(t)
-		if other != leaving && sharedSkillHarnesses[other] {
+		if other == leaving || removingTargets[other] {
+			continue
+		}
+		if sharedSkillHarnesses[other] {
 			return true
 		}
 	}
