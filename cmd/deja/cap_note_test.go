@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,7 +76,14 @@ func TestFilesSaysWhenItCutTheList(t *testing.T) {
 		if err := os.WriteFile(name, []byte("package p\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		lines = append(lines, `{"type":"assistant","timestamp":"2026-07-01T10:0`+string(rune('0'+i))+`:00Z","sessionId":"aaaa0001-1111-4000-8000-d6e7f8a9b0c1","cwd":"/api","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"`+name+`"}}]}}`)
+		// The path goes in as JSON, not as text: on Windows it starts `D:\a\`
+		// and a pasted backslash is an invalid escape, so the whole record was
+		// dropped and the test saw an uncut list (#1676).
+		quoted, err := json.Marshal(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, `{"type":"assistant","timestamp":"2026-07-01T10:0`+string(rune('0'+i))+`:00Z","sessionId":"aaaa0001-1111-4000-8000-d6e7f8a9b0c1","cwd":"/api","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":`+string(quoted)+`}}]}}`)
 	}
 	lines = append(lines, `{"type":"user","timestamp":"2026-07-01T10:09:00Z","sessionId":"aaaa0001-1111-4000-8000-d6e7f8a9b0c1","cwd":"/api","message":{"role":"user","content":"the retry loop keeps firing"}}`)
 	if err := os.WriteFile(filepath.Join(store, "aaaa0001.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
