@@ -24,7 +24,7 @@ func TestAnUnpluggedIndexDiskIsNotPermissionsOrAMissingIndex(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	doctorIndex(&out, doctorComponent{State: "missing", Path: dir}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "missing", Path: dir}, dir)
 	if !strings.Contains(out.String(), "not reachable") {
 		t.Errorf("doctor on an unreachable index:\n%s", out.String())
 	}
@@ -45,7 +45,7 @@ func TestAnUnpluggedIndexDiskIsNotPermissionsOrAMissingIndex(t *testing.T) {
 		t.Errorf("a locked directory stopped being a permissions problem: %v", err)
 	}
 	out.Reset()
-	doctorIndex(&out, doctorComponent{State: "missing", Path: real}, real)
+	doctorIndex(&out, doctorIndexReport{State: "missing", Path: real}, real)
 	if !strings.Contains(out.String(), "not built") {
 		t.Errorf("an absent index stopped saying so:\n%s", out.String())
 	}

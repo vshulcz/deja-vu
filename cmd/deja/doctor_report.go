@@ -42,9 +42,21 @@ type doctorStore struct {
 }
 
 type doctorComponent struct {
+	State string `json:"state"`
+	Path  string `json:"path,omitempty"`
+}
+
+// doctorIndexReport is the index component. It carries stale_stores, which
+// docs/json-output.md documents and which the sqlite3 component has no meaning
+// for — sharing one struct put the field in both. omitempty is deliberately
+// absent: the document names the three keys that may be missing and this is
+// not one of them, so with omitempty the zero the example shows was the one
+// value never written, and a script reading it raised on every machine whose
+// index was fresh (#1710).
+type doctorIndexReport struct {
 	State       string `json:"state"`
 	Path        string `json:"path,omitempty"`
-	StaleStores int    `json:"stale_stores,omitempty"`
+	StaleStores int    `json:"stale_stores"`
 }
 
 type doctorVersionReport struct {
@@ -56,7 +68,7 @@ type doctorVersionReport struct {
 type doctorReport struct {
 	SchemaVersion int                            `json:"schema_version"`
 	Stores        []doctorStore                  `json:"stores"`
-	Index         doctorComponent                `json:"index"`
+	Index         doctorIndexReport              `json:"index"`
 	MCP           []doctorMCPStatus              `json:"mcp"`
 	SQLite3       doctorComponent                `json:"sqlite3"`
 	Version       doctorVersionReport            `json:"version"`
@@ -424,8 +436,8 @@ func newestDoctorFile(files []string) (string, time.Time) {
 	return newest, newestMod
 }
 
-func inspectDoctorIndex(dir string, storeMods []time.Time) doctorComponent {
-	result := doctorComponent{State: "missing", Path: dir}
+func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
+	result := doctorIndexReport{State: "missing", Path: dir}
 	if !index.HasManifest(dir) {
 		return result
 	}

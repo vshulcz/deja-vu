@@ -31,7 +31,7 @@ func TestDoctorNamesAnIndexFromAnOlderFormat(t *testing.T) {
 
 	// A current index says nothing about its format.
 	var out bytes.Buffer
-	doctorIndex(&out, doctorComponent{State: "ok", Path: dir}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "ok", Path: dir}, dir)
 	if got := out.String(); strings.Contains(got, "older deja") {
 		t.Errorf("a current index was called old:\n%s", got)
 	}
@@ -41,7 +41,7 @@ func TestDoctorNamesAnIndexFromAnOlderFormat(t *testing.T) {
 	indexFormatDirection = func(string) int { return -1 }
 	t.Cleanup(func() { indexFormatDirection = saved })
 	out.Reset()
-	doctorIndex(&out, doctorComponent{State: "ok", Path: dir}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "ok", Path: dir}, dir)
 	got := out.String()
 	if !strings.Contains(got, "written by an older deja") {
 		t.Errorf("doctor does not mention the format:\n%s", got)
@@ -62,7 +62,7 @@ func TestDoctorTellsAnOldIndexFromANewOne(t *testing.T) {
 	line := func(direction int) string {
 		indexFormatDirection = func(string) int { return direction }
 		var out bytes.Buffer
-		doctorIndex(&out, doctorComponent{State: "ok", Path: dir}, dir)
+		doctorIndex(&out, doctorIndexReport{State: "ok", Path: dir}, dir)
 		for _, l := range strings.Split(out.String(), "\n") {
 			if strings.Contains(l, "format ") {
 				return l

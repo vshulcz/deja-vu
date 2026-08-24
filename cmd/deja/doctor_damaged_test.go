@@ -29,7 +29,7 @@ func TestDoctorReportsADamagedIndex(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	doctorIndex(&buf, doctorComponent{State: "fresh", Path: dir}, dir)
+	doctorIndex(&buf, doctorIndexReport{State: "fresh", Path: dir}, dir)
 	if strings.Contains(buf.String(), "integrity") {
 		t.Errorf("healthy index reported damage:\n%s", buf.String())
 	}
@@ -38,7 +38,7 @@ func TestDoctorReportsADamagedIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	buf.Reset()
-	doctorIndex(&buf, doctorComponent{State: "fresh", Path: dir}, dir)
+	doctorIndex(&buf, doctorIndexReport{State: "fresh", Path: dir}, dir)
 	out := buf.String()
 	if !strings.Contains(out, "integrity damaged") {
 		t.Errorf("damaged index reported as healthy:\n%s", out)

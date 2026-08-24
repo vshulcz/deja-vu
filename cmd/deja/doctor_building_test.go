@@ -29,7 +29,7 @@ func TestDoctorSaysWhenTheIndexIsBeingBuilt(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	doctorIndex(&out, doctorComponent{State: "missing", Path: dir}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "missing", Path: dir}, dir)
 	got := out.String()
 	if !strings.Contains(got, "building now (reading sessions 42%)") {
 		t.Errorf("doctor does not mention the build in flight:\n%s", got)
@@ -43,7 +43,7 @@ func TestDoctorSaysWhenTheIndexIsBeingBuilt(t *testing.T) {
 		t.Fatal(err)
 	}
 	out.Reset()
-	doctorIndex(&out, doctorComponent{State: "missing", Path: dir}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "missing", Path: dir}, dir)
 	if got := out.String(); !strings.Contains(got, "not built (run `deja warmup`)") {
 		t.Errorf("an index that is really missing lost its advice:\n%s", got)
 	}

@@ -176,7 +176,8 @@
   ],
   "index": {
     "state": "missing",
-    "path": "<tmp>/index.db"
+    "path": "<tmp>/index.db",
+    "stale_stores": 0
   },
   "mcp": [
     {

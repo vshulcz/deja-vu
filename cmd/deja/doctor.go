@@ -1019,7 +1019,7 @@ func doctorTOMLWired(path string) bool {
 // index this build cannot read without shipping a manifest writer.
 var indexFormatDirection = index.FormatDirection
 
-func doctorIndex(w io.Writer, idx doctorComponent, dir string) {
+func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	fmt.Fprintln(w, "Index:")
 	loc := idx.Path
 	if loc == "" {

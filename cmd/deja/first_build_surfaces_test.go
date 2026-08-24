@@ -35,7 +35,7 @@ func TestFirstBuildIsNotCalledSilenceOrAbsence(t *testing.T) {
 	}
 
 	var report bytes.Buffer
-	doctorIndex(&report, doctorComponent{State: "missing", Path: dir}, dir)
+	doctorIndex(&report, doctorIndexReport{State: "missing", Path: dir}, dir)
 	if !strings.Contains(report.String(), "building now") {
 		t.Errorf("doctor during the first build:\n%s", report.String())
 	}
@@ -48,7 +48,7 @@ func TestFirstBuildIsNotCalledSilenceOrAbsence(t *testing.T) {
 		t.Fatal(err)
 	}
 	report.Reset()
-	doctorIndex(&report, doctorComponent{State: "missing", Path: dir}, dir)
+	doctorIndex(&report, doctorIndexReport{State: "missing", Path: dir}, dir)
 	if !strings.Contains(report.String(), "not built") {
 		t.Errorf("an idle missing index stopped saying so:\n%s", report.String())
 	}

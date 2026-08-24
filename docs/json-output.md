@@ -304,7 +304,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   },
   "policy": {
     "state": "active",
-    "path": "/home/user/.config/deja/policy.toml",
+    "path": "/home/user/.config/deja/policy.json",
     "indexed_sessions": 240,
     "activations": {
       "search": {"rule": "allow all", "withheld": 0},

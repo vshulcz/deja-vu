@@ -30,7 +30,7 @@ func TestDoctorNamesAnUnreadableIndex(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 
 	var out bytes.Buffer
-	doctorIndex(&out, doctorComponent{State: "missing", Path: dir}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "missing", Path: dir}, dir)
 	got := out.String()
 	if !strings.Contains(got, "unreadable") || !strings.Contains(got, "permission denied") {
 		t.Errorf("a blocked index was not named unreadable:\n%s", got)
@@ -58,7 +58,7 @@ func TestDoctorNamesAnIndexItCannotWrite(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	doctorIndex(&out, doctorComponent{State: "stale-readonly", Path: dir, StaleStores: 2}, dir)
+	doctorIndex(&out, doctorIndexReport{State: "stale-readonly", Path: dir, StaleStores: 2}, dir)
 	got := out.String()
 
 	if !strings.Contains(got, "cannot be written") {
