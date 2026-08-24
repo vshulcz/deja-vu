@@ -42,3 +42,22 @@ func TestLastFlagsRefuseAnEmptyValue(t *testing.T) {
 		t.Errorf("last --harness claude = %q, %v", o.Harness, err)
 	}
 }
+
+// The other four parsers had the same block. Review found them after the first
+// fix landed on `deja` and `deja last` only (#1612).
+func TestEveryFilterParserRefusesAnEmptyValue(t *testing.T) {
+	if _, err := parseShow([]string{"abc", "--harness", ""}); err == nil {
+		t.Error("show --harness \"\" was accepted")
+	}
+	if _, err := parseShow([]string{"abc", "--harness", "claude"}); err != nil {
+		t.Errorf("show --harness claude: %v", err)
+	}
+	for _, flag := range []string{"--harness", "--project"} {
+		if _, _, _, err := parseBlame([]string{"main.go", flag, ""}); err == nil {
+			t.Errorf("blame %s \"\" was accepted", flag)
+		}
+	}
+	if _, _, _, err := parseBlame([]string{"main.go", "--harness", "claude"}); err != nil {
+		t.Errorf("blame --harness claude: %v", err)
+	}
+}

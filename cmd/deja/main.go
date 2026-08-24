@@ -534,6 +534,10 @@ func parseShow(args []string) (showOptions, error) {
 				return o, fmt.Errorf("%s needs value", a)
 			}
 			i++
+			if strings.TrimSpace(args[i]) == "" {
+				// Empty is how "no filter" is spelled inside deja (#1612).
+				return o, fmt.Errorf("%s needs value", a)
+			}
 			if a == "--harness" {
 				o.harness = args[i]
 				continue
@@ -1804,6 +1808,10 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 				return "", o, false, fmt.Errorf("%s needs value", a)
 			}
 			i++
+			if strings.TrimSpace(args[i]) == "" {
+				// Empty is how "no filter" is spelled inside deja (#1612).
+				return "", o, false, fmt.Errorf("%s needs value", a)
+			}
 			switch a {
 			case "--harness":
 				o.Harness = args[i]
@@ -2238,6 +2246,13 @@ func runForget(dir string, args []string) error {
 				return fmt.Errorf("forget: %s needs a value", args[i])
 			}
 			i++
+			// Empty is how "no filter" is spelled inside deja, and here it
+			// would widen a deletion rather than a search (#1612). --unforget
+			// keeps its own refusal, which asks for an id rather than offering
+			// the flags that forget instead of restoring.
+			if strings.TrimSpace(args[i]) == "" && args[i-1] != "--unforget" {
+				return fmt.Errorf("forget: %s needs a value", args[i-1])
+			}
 			switch args[i-1] {
 			case "--session":
 				o.Session = index.PastedSelector(args[i])

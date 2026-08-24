@@ -83,6 +83,10 @@ func runStats(dir string, args []string) error {
 			}
 			v := args[i+1]
 			i++
+			if strings.TrimSpace(v) == "" {
+				// Empty is how "no filter" is spelled inside deja (#1612).
+				return fmt.Errorf("stats: %s needs value", args[i-1])
+			}
 			switch args[i-1] {
 			case "--harness":
 				options.Harness = v
