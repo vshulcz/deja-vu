@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -102,12 +104,12 @@ func TestKimiManifestsAgree(t *testing.T) {
 	if plugin["version"] != kimiPluginVersion {
 		t.Fatalf("kimiPluginVersion is %q, the manifest says %v", kimiPluginVersion, plugin["version"])
 	}
-	for _, key := range []string{"name", "version", "description", "license", "sessionStart"} {
-		a, _ := json.Marshal(plugin[key])
-		b, _ := json.Marshal(root[key])
-		if string(a) != string(b) {
-			t.Fatalf("%s differs between the two manifests: %s vs %s", key, a, b)
-		}
+	// Whole, not key by key: the two differ only in where they point, and a
+	// list of keys to compare is a list of keys someone forgets to extend —
+	// `interface` is what Kimi's /plugins browser shows, and it went unchecked
+	// (#1777).
+	if diff := manifestDiffIgnoringPaths(plugin, root); diff != "" {
+		t.Fatalf("the two manifests disagree beyond their paths: %s", diff)
 	}
 	// The root manifest addresses the same files from one directory up.
 	if root["skills"] != "./extensions/kimi/skills/" || root["commands"] != "./extensions/kimi/commands/" {
@@ -118,4 +120,58 @@ func TestKimiManifestsAgree(t *testing.T) {
 			t.Fatalf("root manifest points at %s, which is not there: %v", rel, err)
 		}
 	}
+}
+
+// manifestDiffIgnoringPaths compares the two Kimi manifests after rewriting the
+// root one's paths to the packaged form. The prefix is the one intended
+// difference: a GitHub install reads the repo, the zip carries the plugin
+// directory itself.
+func manifestDiffIgnoringPaths(plugin, root map[string]any) string {
+	a, err := json.Marshal(plugin)
+	if err != nil {
+		return err.Error()
+	}
+	b, err := json.Marshal(root)
+	if err != nil {
+		return err.Error()
+	}
+	want := strings.ReplaceAll(string(b), "./extensions/kimi/", "./")
+	if want == string(a) {
+		return ""
+	}
+	return diffJSONMaps(string(a), want)
+}
+
+// diffJSONMaps names the keys that differ, so a failure says what to fix rather
+// than printing two manifests.
+func diffJSONMaps(a, b string) string {
+	var ma, mb map[string]json.RawMessage
+	if json.Unmarshal([]byte(a), &ma) != nil || json.Unmarshal([]byte(b), &mb) != nil {
+		return "the manifests are not both objects"
+	}
+	var out []string
+	for k, va := range ma {
+		vb, ok := mb[k]
+		if !ok {
+			out = append(out, k+" is only in the packaged manifest")
+			continue
+		}
+		if string(va) != string(vb) {
+			out = append(out, fmt.Sprintf("%s: packaged %s, root %s", k, clampForDiff(string(va)), clampForDiff(string(vb))))
+		}
+	}
+	for k := range mb {
+		if _, ok := ma[k]; !ok {
+			out = append(out, k+" is only in the root manifest")
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, "; ")
+}
+
+func clampForDiff(s string) string {
+	if len(s) > 80 {
+		return s[:80] + "…"
+	}
+	return s
 }
