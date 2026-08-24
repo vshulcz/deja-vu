@@ -150,6 +150,13 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "cline --id " + s.ID, nil
 	case "roo":
 		return "", "", fmt.Errorf("roo tasks reopen from the extension's history UI, not the terminal")
+	case "zed":
+		// These two used to fall through to "don't know how to resume", which
+		// reads like deja is missing something. Both are settled answers, and
+		// the registry has carried the reason all along.
+		return "", "", fmt.Errorf("zed threads reopen from the editor's own history — no zed flag takes a thread id")
+	case "deepseek":
+		return "", "", fmt.Errorf("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
 	case "qwen":
 		return qwenProjectDirFor(s), "qwen -r " + s.ID, nil
 	case "openclaw":

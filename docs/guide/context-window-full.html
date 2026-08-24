@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The context window is full — deja-vu</title>
+<meta name="description" content="Compaction keeps 77% of decisions and 0.2% of commands — measured. What to do instead of paying for a window that grows until it breaks.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/context-window-full.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The context window is full">
+<meta property="og:description" content="Compaction keeps 77% of decisions and 0.2% of commands — measured. What to do instead of paying for a window that grows until it breaks.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/context-window-full.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="The context window is full">
+<meta name="twitter:description" content="Compaction keeps 77% of decisions and 0.2% of commands — measured. What to do instead of paying for a window that grows until it breaks.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The context window is full","description":"Compaction keeps 77% of decisions and 0.2% of commands — measured. What to do instead of paying for a window that grows until it breaks.","url":"https://vshulcz.github.io/deja-vu/guide/context-window-full.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/context-window-full.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Context window full","item":"https://vshulcz.github.io/deja-vu/guide/context-window-full.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What happens when the context window fills up?","acceptedAnswer":{"@type":"Answer","text":"The agent offers to compact. Measured over 43 compactions, the summary kept 77% of decisions and 0.2% of the commands that had run."}},{"@type":"Question","name":"How do I avoid compaction?","acceptedAnswer":{"@type":"Answer","text":"Fetch context instead of carrying it: recall injections are capped at 1,536 bytes per prompt and about 4 KB per tool call, a fixed cost against a window that otherwise grows."}},{"@type":"Question","name":"Can I get back what compaction dropped?","acceptedAnswer":{"@type":"Answer","text":"Yes. Compaction rewrites the agent's context, not its transcript, so the commands and errors are still on disk and searchable."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html" aria-current="page">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>The context window is full</h1>
+<p class="pagelede">compaction is not the only answer, and it is the lossy one<span class="mins" data-mins></span></p>
+
+<p>The warning arrives in the middle of something: the window is nearly full, and the agent offers to compact. You say yes because the alternative is starting over, and the session continues in a thinner version of itself.</p>
+
+<h2>What the summary keeps, and what it drops</h2>
+<p>Measured over 43 real compactions in this repository's own history: the summary retained <b>77% of the decisions</b> and <b>0.2% of the commands</b> that had actually been run. The reasoning survives because it is prose. The invocation with the flags that worked, the exact error text, the span an edit replaced — those are the parts a summary treats as noise, and they are the parts you cannot reconstruct from memory.</p>
+<p>So the window being full is not really the problem. The problem is that the fix is lossy in a direction nobody chooses on purpose.</p>
+
+<h2>Keeping the window small on purpose</h2>
+<pre>deja install --auto</pre>
+<p>The alternative to carrying everything in context is fetching the part you need when you need it. Recall arrives at session start, on each prompt, before an edit or a command, and after a command fails — each one bounded: an injection is capped at 1,536 bytes per prompt and about 4 KB per tool call. That is a fixed, small cost against a window that otherwise grows until it breaks. <a href="token-cost.html">What memory costs</a> has the measurement.</p>
+
+<h2>After it has already compacted</h2>
+<pre>deja ctx "what we were doing"</pre>
+<p>The pre-compaction turns are still on disk in full — compaction rewrites the agent's context, not its transcript. deja reads the transcript, so the commands and errors the summary dropped are still searchable, and <a href="after-compaction.html">getting them back</a> is one query.</p>
+
+<h2>Why not a bigger window</h2>
+<p>A larger window moves the wall without removing it, and every token in context is paid on every turn of the session. A 5 GB history searched in under a millisecond and returned as a 1.5 KB digest is a different shape of answer than a 200k-token window that holds the same history and charges for it continuously.</p>
+
+<h2>The part that is not about this</h2>
+<p>The index covers every agent's transcripts on the machine — <a href="where-sessions-are-stored.html">each in its own format</a> — including sessions from before deja was installed. Indexing and search are local: no model, no embeddings, nothing leaves the machine (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> &middot; <a href="token-cost.html">What memory costs</a> &middot; <a href="after-compaction.html">What compaction drops</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
