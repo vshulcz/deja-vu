@@ -253,6 +253,28 @@ func cmdWarmup(dir string, _ []string) error {
 	return nil
 }
 
+// countingWriter passes writes through and remembers whether there were any.
+type countingWriter struct {
+	w io.Writer
+	n int
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.n += n
+	return n, err
+}
+
+// indexQuietOutcome is the line an index run ends with when the build itself
+// said nothing — another deja had already done the work. Empty when the build
+// reported, so nothing is said twice.
+func indexQuietOutcome(printed, sessions int) string {
+	if printed > 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja: index is up to date (%d session%s)", sessions, pluralS(sessions))
+}
+
 func cmdIndex(dir string, rest []string) error {
 	force := false
 	for _, a := range rest {
@@ -300,7 +322,12 @@ func cmdIndex(dir string, rest []string) error {
 	prepareFirstIndexGreeting(dir)
 	// The detached warmup publishes its progress so hooks can tell the user
 	// memory is on its way; an interactive run draws the live display.
-	build := func() error { return index.Ensure(dir, "", force, os.Stderr) }
+	// Counted, because a run that waited for another build prints nothing of
+	// its own: Ensure finds the index current under the lock and returns. The
+	// command then owed a closing line and had none, leaving "waiting for it
+	// to finish" as the last thing on screen (#1751).
+	progress := &countingWriter{w: os.Stderr}
+	build := func() error { return index.Ensure(dir, "", force, progress) }
 	if err := withWarmupStatus(dir, func() error { return withBuildProgress(build) }); err != nil {
 		// The command whose whole job is building the index used to pass the
 		// syscall through — `mkdir /…/index.db.tmp: permission denied` names
@@ -309,6 +336,9 @@ func cmdIndex(dir string, rest []string) error {
 		return ensureError(dir, err)
 	}
 	clearWarmupSentinel()
+	if _, n := index.UpToDate(dir, ""); progress.n == 0 {
+		fmt.Fprintln(os.Stderr, indexQuietOutcome(progress.n, n))
+	}
 	// Two transcripts can carry the same harness:id — two files with the same
 	// name in different projects. Both stay searchable, but one manifest row
 	// holds them, so one project name covers both. Silence was the worst part
