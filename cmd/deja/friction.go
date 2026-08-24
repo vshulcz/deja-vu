@@ -52,13 +52,16 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	// imported content from every other browsing surface. Browsing is the search
 	// activation, as in `last` and `stats` (#937, and its friction gap #1120).
 	pol := policy.Load()
-	withheld := 0
+	// Sessions, not records: the note says "hides N matching sessions", and
+	// counting the callback's firings reported one hidden session with ten
+	// error lines as ten (#1639).
+	withheldSessions := map[string]bool{}
 	// One pass over the record log rather than a load per session: loading by
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
 		if !pol.Allows(policy.ActivationSearch, meta.Project) {
-			withheld++
+			withheldSessions[meta.Harness+":"+meta.ID] = true
 			return
 		}
 		key := meta.Harness + ":" + meta.ID
@@ -82,7 +85,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	}); err != nil {
 		return fmt.Errorf("friction: %w", err)
 	}
-	if note := policyHiddenNote(policy.ActivationSearch, withheld); note != "" {
+	if note := policyHiddenNote(policy.ActivationSearch, len(withheldSessions)); note != "" {
 		fmt.Fprintln(os.Stderr, note)
 	}
 
