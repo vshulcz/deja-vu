@@ -396,10 +396,16 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	f, err := os.Open(newest)
 	if err != nil {
 		if os.IsPermission(err) {
-			store.State = "unreadable"
-		} else {
-			store.State = "parsed-zero"
+			// A file deja may not open is the same fault as a directory it may
+			// not list, and has the same answer: name it and say it is
+			// permissions. Calling it "unreadable" told the user their harness
+			// had changed its format and asked them to report it (#1747).
+			store.State = "denied"
+			store.Denied = newest
+			store.Partial = len(check.files) > 1
+			return store, mod
 		}
+		store.State = "parsed-zero"
 		return store, mod
 	}
 	_ = f.Close()
