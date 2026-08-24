@@ -28,6 +28,8 @@ func TestNormalizeFrictionStripsMechanicalPrefixes(t *testing.T) {
 		"Exception: no route to host":         "Exception: no route to host",
 		"zsh:1: command not found: timeout":   "command not found: timeout",
 		"npm ERR! code ELIFECYCLE":            "npm ERR! code ELIFECYCLE",
+		"EACCES: permission denied, open 'x'": "EACCES: permission denied, open 'x'",
+		"E: Unable to locate package golang":  "E: Unable to locate package golang",
 		"2026 is not a year we support":       "2026 is not a year we support",
 	} {
 		if got := normalizeFriction(in); got != keep {

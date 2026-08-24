@@ -57,7 +57,12 @@ import (
 // line written in Russian or Chinese is held to the same length as an English
 // one. A store built before this holds fewer friction signatures, and nothing
 // re-derives them without the bump — the same shape as 22 and 23 (#1319).
-const version = 28
+// 29: the prefixes a runner stamps on a line it did not write — pytest's `E `
+// and a leading timestamp — are stripped before a line is hashed, so one error
+// is one wall however it was printed. A store built before this holds both
+// spellings under different signatures, and nothing re-derives them without
+// the bump — the same shape as 27 and 28 (#1637).
+const version = 29
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

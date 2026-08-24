@@ -90,8 +90,10 @@ func trimLogPrefix(l string) string {
 }
 
 // trimPytestMarker removes the `E` column pytest prints beside the failing
-// line. Only with the spacing pytest uses, so `E2BIG: …` and a sentence
-// starting with `E ` keep their shape.
+// line. `E` must stand alone before the space, so the error codes that begin
+// with it — `E2BIG: …`, `EACCES: …`, apt's `E: …` — keep their shape. A message
+// whose first word really is a bare `E` loses it, which is the price of reading
+// the pytest report people actually paste.
 func trimPytestMarker(l string) string {
 	rest, ok := strings.CutPrefix(l, "E ")
 	if !ok {
