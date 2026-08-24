@@ -42,6 +42,17 @@ func TestHelpNamesEveryDispatchedCommand(t *testing.T) {
 			t.Errorf("deja help does not name %q", name)
 		}
 	}
+	// A hidden name must still be a real command, or helpHidden is excusing a
+	// ghost — the way a stale entry would quietly re-open the gap it was added
+	// to close (#1654).
+	for name := range helpHidden {
+		if name == "help" {
+			continue // answered before dispatch, so it is not in the map
+		}
+		if _, ok := commands[name]; !ok {
+			t.Errorf("helpHidden excuses %q, which is not a command", name)
+		}
+	}
 	// And the reverse: help must not teach a command that no longer exists.
 	for name := range documented {
 		if _, ok := commands[name]; ok {
