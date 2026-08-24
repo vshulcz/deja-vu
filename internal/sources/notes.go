@@ -87,7 +87,12 @@ const maxNoteLine = 4 << 20
 // (#1736), so the write is refused and the caller says so.
 var ErrNoteExists = errors.New("note already remembered")
 
-// noteAlreadyStored reports whether this exact note is on file already. It
+// noteAlreadyStored reports whether this exact note is on file already. The
+// answer is advisory: two processes checking at once can both write, and a
+// read error reads as "not a duplicate" so a save is never lost to one. A
+// duplicate that slips through costs a repeated line, a refused save costs the
+// fact.
+// It
 // reads the file rather than an index: a note written a second ago has not
 // been indexed yet, and back-to-back saves are exactly the case this exists
 // for. Promoted notes are skipped — those carry provenance and a lifecycle,
