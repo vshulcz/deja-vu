@@ -1889,7 +1889,6 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// next run on there was nothing left to compare against and the warning
 	// stopped too. Records that came off a mount point stay in the index while
 	// the volume is away, and the line repeats until it is back.
-	evicted.Add(int64(len(removed)))
 	gone := missingTrees(removed)
 	for i := range gone {
 		gone[i].renamed = renamedMount(gone[i].dir)
@@ -1906,6 +1905,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			}
 		}
 	}
+	// Counted after the keep-back above: records that came off an unmounted
+	// volume are still in the index, so they did not go away.
+	evicted.Add(int64(len(removed)))
 	if progress != nil {
 		for _, g := range gone {
 			verb := "is"

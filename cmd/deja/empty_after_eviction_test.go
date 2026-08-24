@@ -33,3 +33,17 @@ func TestTheEmptyIndexSentenceKnowsSomethingWasLost(t *testing.T) {
 		t.Errorf("plural for a single file: %q", one)
 	}
 }
+
+// Records kept back because their volume is merely unmounted have not gone
+// away, so the counter must not see them — otherwise a reconnectable disk reads
+// as history lost.
+func TestUnmountedRecordsAreNotCountedAsGone(t *testing.T) {
+	if n := index.ReportEvictedFiles(); n != 0 {
+		t.Fatalf("the counter starts at %d", n)
+	}
+	// Two reads in a row: the first clears it, so a later command in the same
+	// process cannot inherit a count that was already spent.
+	if n := index.ReportEvictedFiles(); n != 0 {
+		t.Errorf("the counter did not clear: %d", n)
+	}
+}
