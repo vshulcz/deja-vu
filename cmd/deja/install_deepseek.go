@@ -210,11 +210,25 @@ func autoRow(withAuto bool) string {
 }
 
 // dshPatchWith returns the layer with deja's block present exactly once.
-func dshPatchWith(old, block string) string {
-	if trimmed := stripDSHBlock(old); trimmed != "" {
-		return trimmed + "\n" + block + "\n"
+func dshPatchWith(old, block string) (string, error) {
+	// One marker without the other means the block cannot be bounded. Skipping
+	// from the start marker to end of file deleted a patch the user had written
+	// below it; leaving an unmarked block in place installed deja twice, with
+	// the orphan invisible to every later run (#1701). The first line of the
+	// block says "safe to delete", which is an invitation to edit exactly this.
+	hasStart := strings.Contains(old, dshBlockStart)
+	hasEnd := strings.Contains(old, dshBlockEnd)
+	if hasStart != hasEnd {
+		missing := "end"
+		if hasEnd {
+			missing = "start"
+		}
+		return "", fmt.Errorf("deja's block in cordis.patch.yml has no %s marker — put it back, or delete the block entirely", missing)
 	}
-	return block + "\n"
+	if trimmed := stripDSHBlock(old); trimmed != "" {
+		return trimmed + "\n" + block + "\n", nil
+	}
+	return block + "\n", nil
 }
 
 // stripDSHBlock removes deja's block and the empty-array literal a generated
@@ -302,6 +316,10 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	} else if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
 	}
-	a, err := writeIfChanged(path, old, []byte(dshPatchWith(lfText(old), dshPatchBlock(exe, withAuto))))
+	patched, perr := dshPatchWith(lfText(old), dshPatchBlock(exe, withAuto))
+	if perr != nil {
+		return installResult{}, perr
+	}
+	a, err := writeIfChanged(path, old, []byte(patched))
 	return installResult{Path: path, Action: a}, err
 }

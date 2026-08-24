@@ -11,7 +11,10 @@ import (
 // the literal has to go — otherwise dsh refuses the whole profile and the only
 // symptom is a harness that will not boot.
 func TestDeepSeekPatchReplacesTheEmptyArray(t *testing.T) {
-	got := dshPatchWith("# a comment\n[]\n", dshPatchBlock("/usr/local/bin/deja", false))
+	got, err := dshPatchWith("# a comment\n[]\n", dshPatchBlock("/usr/local/bin/deja", false))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(got, "[]") {
 		t.Errorf("the empty-array literal survived:\n%s", got)
 	}
@@ -30,8 +33,14 @@ func TestDeepSeekPatchReplacesTheEmptyArray(t *testing.T) {
 }
 
 func TestDeepSeekPatchIsRewrittenNotRepeated(t *testing.T) {
-	first := dshPatchWith("[]\n", dshPatchBlock("/old/deja", false))
-	second := dshPatchWith(first, dshPatchBlock("/new/deja", false))
+	first, err := dshPatchWith("[]\n", dshPatchBlock("/old/deja", false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := dshPatchWith(first, dshPatchBlock("/new/deja", false))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Count(second, dshBlockStart) != 1 {
 		t.Errorf("the block was added twice:\n%s", second)
 	}
