@@ -29,6 +29,20 @@ func TestSecretsInEscapedJSONAreRedacted(t *testing.T) {
 		}
 	}
 
+	// The quoted-prose pattern too, in both spellings — and a value that holds
+	// backslashes of its own still counts, which is where narrowing the value
+	// class to fix the escaped case would have cost a redaction.
+	for _, in := range []string{
+		`password is \"hunter2hunter2\"`,
+		`password is "C:\Windows\path\secret"`,
+		`password authentication failed for user "admin" with password "S3cr3tP@ssw0rd!"`,
+	} {
+		got, _ := Text(in)
+		if !strings.Contains(got, "[redacted") {
+			t.Errorf("quoted secret survived: %s -> %s", in, got)
+		}
+	}
+
 	// Plain JSON is unchanged, and the near-misses stay near misses.
 	plain, _ := Text(`{"api_key": "8f14e45fceea167a5a36dedd4bea2543"}`)
 	if !strings.Contains(plain, "[redacted") {
@@ -39,6 +53,8 @@ func TestSecretsInEscapedJSONAreRedacted(t *testing.T) {
 		`the password prompt appeared twice`,
 		`/usr/local/share/token/abcdefghijklmnop`,
 		`password: hunter2`,
+		`C:\Users\token\abcdefghijklmnopqrst`,
+		`the pattern is token\s*[:=]\s*value`,
 	} {
 		if got, _ := Text(keep); got != keep {
 			t.Errorf("a near miss was redacted: %q -> %q", keep, got)

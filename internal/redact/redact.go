@@ -53,7 +53,7 @@ var (
 	//
 	// The quotes are what make it safe to be this loose: "password
 	// authentication failed" has no quoted value and matches nothing.
-	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(\\*["'` + "`" + `])([^"'` + "`" + `\\\n]{6,80})(\\*["'` + "`" + `])`)
+	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(\\*["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(\\*["'` + "`" + `])`)
 	pemPrivateRE   = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
