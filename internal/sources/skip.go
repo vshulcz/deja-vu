@@ -1,5 +1,7 @@
 package sources
 
+import "strings"
+
 // SkipReason says why a harness deja can see on disk produced nothing. That is
 // a missing external tool: six stores are read through the sqlite3 CLI, and an
 // index run that names every harness it read while staying silent about the
@@ -19,7 +21,10 @@ func SkipReason(harness string) string {
 	// tool the files are there and unreadable — the same failure as Zed's, one
 	// layer up: whole sessions rather than thread bodies inside a store.
 	if harness == "deepseek" {
-		if ZstdAvailable() || len(DeepSeekSessionFiles()) == 0 {
+		// Only the framed ones need the tool. A store of plain session.jsonl
+		// reads without it, and saying part of it could not be read there
+		// names a problem the reader does not have (#1758).
+		if ZstdAvailable() || !anyZstdFramed(DeepSeekSessionFiles()) {
 			return ""
 		}
 		return "zstd CLI not found"
@@ -44,6 +49,17 @@ func SkipReason(harness string) string {
 		return ""
 	}
 	return "sqlite3 CLI not found"
+}
+
+// anyZstdFramed reports whether any of these files is a zstd frame rather than
+// plain text — the DeepSeek Harness writes either, depending on its settings.
+func anyZstdFramed(files []string) bool {
+	for _, f := range files {
+		if strings.HasSuffix(f, ".zstd") || strings.HasSuffix(f, ".zst") {
+			return true
+		}
+	}
+	return false
 }
 
 func zedSkipReason() string {

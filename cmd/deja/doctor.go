@@ -358,11 +358,17 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 				what = "store is only partly readable — some sessions are missing from recall"
 			}
 			fmt.Fprintf(w, "  warning      %s %s — permission denied on %s; check its permissions (on macOS, also Full Disk Access for your terminal)\n", store.Name, what, store.Denied)
-		case "needs-sqlite3":
+		case "needs-sqlite3", "needs-zstd":
 			// Not a format change: the parser could not run at all. Saying so
 			// points at installing one package instead of at a bug report
-			// against the harness (#792).
-			fmt.Fprintf(w, "  warning      %s store needs the sqlite3 CLI — install it, then run `deja index`\n", store.Name)
+			// against the harness (#792). Which package depends on the store —
+			// zed and deepseek need zstd (#1758) — and a partly readable one
+			// says so rather than reading as a store that is entirely gone.
+			what := "store"
+			if store.Partial {
+				what = "store is only partly readable — part of it"
+			}
+			fmt.Fprintf(w, "  warning      %s %s needs %s — install it, then run `deja index`\n", store.Name, what, toolFromSkip(store.Skipped))
 		}
 	}
 }
@@ -490,7 +496,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 			// `doctor --json`, which has said `denied` all along while this
 			// row, the one people read, said `found` (#993).
 			switch inspected[name] {
-			case "denied", "unreadable", "parsed-zero", "needs-sqlite3":
+			case "denied", "unreadable", "parsed-zero", "needs-sqlite3", "needs-zstd":
 				status = inspected[name]
 				if status == "denied" {
 					if detail != "" {
@@ -640,6 +646,18 @@ func doctorHarnesses(w io.Writer, dir string) {
 	if n := noteBucketsRegrouped(dir); n > 0 {
 		fmt.Fprintf(w, "  warning      %s of notes in the index %s not what this machine would build now — the zone changed, so the days regrouped; `deja index` renames them\n",
 			doctorCount(n, "day"), verbIs(n))
+	}
+}
+
+// toolFromSkip turns a skip reason into the package to install.
+func toolFromSkip(reason string) string {
+	switch {
+	case strings.Contains(reason, "sqlite3") && strings.Contains(reason, "zstd"):
+		return "the sqlite3 and zstd CLIs"
+	case strings.Contains(reason, "zstd"):
+		return "the zstd CLI"
+	default:
+		return "the sqlite3 CLI"
 	}
 }
 

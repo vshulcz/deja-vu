@@ -1,7 +1,6 @@
 package index
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 
@@ -31,6 +30,4 @@ func TestNarrationNamesAHalfReadStore(t *testing.T) {
 	if n := harnessNarration("deja", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, ""); !strings.HasPrefix(n, "deja: notes:") {
 		t.Errorf("notes narrate as notes: %q", n)
 	}
-	var buf bytes.Buffer
-	_ = buf
 }

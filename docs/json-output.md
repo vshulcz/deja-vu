@@ -322,8 +322,9 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
 when unavailable; `policy` is always present. `index.path` points at the index
 directory; `index.db` is that directory's name, not a file. Store `state`
 values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
-`denied` field naming the unreadable path), and `needs-sqlite3`; an existing but
-empty store directory reports `missing`. A store also carries `indexed_sessions`
+`denied` field naming the unreadable path), `needs-sqlite3` and `needs-zstd`
+(both of which add a `skipped` field saying which CLI is missing); an existing
+but empty store directory reports `missing`. A store also carries `indexed_sessions`
 and, when it holds peer-synced work, `indexed_from_elsewhere`; a store whose
 permission walk was cut short or blocked carries `partial` or `unchecked`.
 Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
