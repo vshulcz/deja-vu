@@ -66,6 +66,12 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			}
 			i++
 			project = args[i]
+		case "--":
+			// The escape `parseSearch` already offers: everything after it is
+			// the topic, dashes and all. Without it, refusing unknown flags
+			// left `--feature-flag` with no way to be asked about.
+			terms = append(terms, args[i+1:]...)
+			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
 				return fmt.Errorf("files: unknown flag %q", args[i])
