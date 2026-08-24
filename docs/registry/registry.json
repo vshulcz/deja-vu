@@ -243,13 +243,7 @@
     "handoff": "exec",
     "prereq": "sqlite3 (grok-dev store)"
    },
-   "gaps": {
-    "plugin_mcp_path": {
-     "state": "unknown",
-     "why": "the plugin ships `.mcp.json` with `${GROK_PLUGIN_ROOT}` in its args, and nothing observed so far shows Grok expanding it there. The binary's only variable-expansion module is `xai-grok-hooks/src/env_expand.rs` and the docs introduce both plugin variables under plugin hooks, so a plugin-only install may be handing the launcher a literal path. Deciding it needs a signed-in session: `grok mcp doctor` and `grok inspect` ignore plugin servers, and `session/new` over ACP stops at `Authentication required` before any plugin server attaches.",
-     "source": "Grok Build 1.0.5 on macOS: mcp doctor, inspect, ACP session/new, binary strings"
-    }
-   }
+   "gaps": {}
   },
   {
    "id": "hermes",

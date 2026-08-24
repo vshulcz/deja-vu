@@ -76,6 +76,14 @@
 <p>working directory, since Grok Build scopes its session list by directory.</p>
 <p>Rows that came out of <code>grok.db</code> belong to the other product and get an error</p>
 <p>instead.</p>
+<ul>
+<li>Grok Build reads deja&#39;s wiring three ways at once: <code>[mcp_servers.deja]</code> in</li>
+</ul>
+<p><code>config.toml</code>, <code>~/.grok/hooks/deja.json</code> in Claude Code&#39;s hook shape, and the</p>
+<p>shared skill in <code>~/.agents/skills</code>. It also scans <code>~/.claude.json</code> and</p>
+<p><code>~/.cursor/mcp.json</code>, so a machine wired for those has deja in Grok already.</p>
+<p><code>~/.grok/GROK.md</code> is the exception: that file is for the other product, and</p>
+<p>Grok Build&#39;s home rules are <code>Agents.md</code>, <code>AGENTS.md</code>, <code>Claude.md</code>, <code>CLAUDE.md</code>.</p>
 <p><strong>Last verified:</strong> 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)</p>
 
 <hr>

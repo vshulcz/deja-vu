@@ -70,16 +70,17 @@ plugin release froze.
 Without deja anywhere, the hook stays silent and the MCP server says what is
 missing instead of pretending the history is empty.
 
-## Unverified here
+## Standing down without looking broken
 
-`${GROK_PLUGIN_ROOT}` is what Grok's own plugin guide documents for hook
-commands, and it is used the same way in `.mcp.json` above. The hook use is
-confirmed on Grok Build 1.0.5; the `.mcp.json` use is not. Grok's plugin guide
-introduces both variables under plugin *hooks*, and neither `grok mcp doctor`
-nor `grok inspect` reports plugin MCP servers, so there is no offline way to
-read back the argv a plugin server would be launched with. If the variable is
-not expanded there, the server fails to start and the CLI-wired path still
-works; say so in an issue and it will be fixed rather than guessed at again.
+`${GROK_PLUGIN_ROOT}` expands in `.mcp.json` as well as in hook commands —
+measured on Grok Build 1.0.5 by launching a plugin server that wrote its own
+argument back to a file, since neither `grok mcp doctor` nor `grok inspect`
+reports plugin MCP servers.
+
+When `deja install grok` already wired the CLI copy, this one answers the
+handshake and lists no tools. Exiting instead would be reported as
+`handshake failed: connection closed` and sit in the plugin UI as a broken
+server, which is a worse thing to leave behind than an idle one.
 
 ## License
 
