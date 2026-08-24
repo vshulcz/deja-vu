@@ -77,3 +77,9 @@ func skillWasEdited(path string, old []byte) bool {
 	}
 	return mark != contentMark(old)
 }
+
+// skillIsMarked reports whether deja has a record of writing this file.
+func skillIsMarked(path string) bool {
+	_, ok := skillMarks()[path]
+	return ok
+}
