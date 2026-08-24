@@ -156,7 +156,7 @@ func lifecycleLine(h search.Hit) string {
 		// note spanning several lines prints a "2. [claude] …" header and a
 		// "- …" snippet that no session in the store produced — the forgery
 		// #1080 fixed for imported project names, here on the note channel.
-		b.WriteString(" " + recallListingLine(h.LifecycleNote))
+		b.WriteString(" " + search.SafeNote(recallListingLine(h.LifecycleNote)))
 	}
 	return b.String()
 }

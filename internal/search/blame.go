@@ -363,7 +363,7 @@ func BlameLifecycleLine(h BlameHit) string {
 		head += " (" + SafeLine(h.LifecycleAt) + ")"
 	}
 	if h.LifecycleNote != "" {
-		head += ": " + SafeLine(h.LifecycleNote)
+		head += ": " + SafeNote(h.LifecycleNote)
 	}
 	return head
 }

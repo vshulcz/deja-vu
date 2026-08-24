@@ -855,7 +855,7 @@ func lifecycleSummary(h Hit) string {
 		head += " (" + SafeLine(h.LifecycleAt) + ")"
 	}
 	if h.LifecycleNote != "" {
-		head += ": " + SafeLine(h.LifecycleNote)
+		head += ": " + SafeNote(h.LifecycleNote)
 	}
 	return head
 }
@@ -2007,6 +2007,16 @@ func SafeText(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// SafeNote is SafeLine bounded to the length of an answer, for the one string
+// on these screens that a person wrote at whatever length they liked. Printed
+// whole, a 4000-character promote note came out as a 4051-column line on a
+// screen budgeted to 80, and as 4074 of the 4347 bytes an agent got back
+// (#1645). The full note stays readable where a whole note belongs: `deja show`
+// on the promoted note prints it as a message.
+func SafeNote(s string) string {
+	return clip(SafeLine(s))
 }
 
 // SafeLine is SafeText confined to a single line, for the places that print
