@@ -204,6 +204,11 @@ func Build(ss []model.Session, now time.Time) Report {
 		out.Harnesses = append(out.Harnesses, *hs)
 	}
 	sort.Slice(out.Harnesses, func(i, j int) bool { return out.Harnesses[i].Harness < out.Harnesses[j].Harness })
+	// Built like Harnesses above rather than appended into a nil slice: on a
+	// fresh machine the nil marshalled as `null` while its sibling marshalled
+	// as `[]`, so a consumer iterating top_projects threw on the first run and
+	// worked ever after (#1649).
+	out.TopProjects = make([]ProjectStats, 0, len(byProject))
 	for project, count := range byProject {
 		out.TopProjects = append(out.TopProjects, ProjectStats{Project: project, Sessions: count})
 	}
