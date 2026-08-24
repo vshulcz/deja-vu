@@ -63,10 +63,10 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 				t.Errorf("%s links to %s, which is not a guide page", name, m[1])
 			}
 		}
-		// Every page has to reach the two problem pages, which are the ones
-		// people arrive on: a sidebar that lists only the product pages sends
-		// a first-time reader back to the search results.
-		for _, sibling := range []string{"forgetting.html", "where-sessions-are-stored.html", "after-compaction.html"} {
+		// Every page has to reach the problem pages, which are the ones people
+		// arrive on: a sidebar that lists only the product pages sends a
+		// first-time reader back to the search results.
+		for _, sibling := range []string{"forgetting.html", "where-sessions-are-stored.html", "after-compaction.html", "repeated-mistakes.html", "switching-agents.html"} {
 			if name == sibling {
 				continue
 			}
