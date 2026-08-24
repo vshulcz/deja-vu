@@ -2690,6 +2690,24 @@ func wrapTargets(names []string, indent string, width int) string {
 	return b.String() + line
 }
 
+// helpHidden names the commands deliberately kept out of `deja help`. They are
+// wired by `deja install` and read by a harness, not typed by a person: the
+// session-start and compaction hooks, goose's two, the refresh worker and the
+// warmup probe. The list exists so the omission is a decision with a reason
+// rather than drift — help listed five hook commands and hid five, including
+// hook-context, because the text is hand-maintained and nothing compared it
+// with the dispatch table (#1654). TestHelpCoversEveryCommand is that
+// comparison.
+var helpHidden = map[string]bool{
+	"help":              true,
+	"hook-context":      true,
+	"hook-goose":        true,
+	"hook-goose-prompt": true,
+	"hook-precompact":   true,
+	"hook-refresh":      true,
+	"warmup-status":     true,
+}
+
 func printUsage() {
 	fmt.Print(usageText())
 }
