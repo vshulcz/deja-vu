@@ -74,6 +74,7 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 			"switching-agents.html",
 			"export-conversations.html",
 			"sync-across-machines.html",
+			"token-cost.html",
 		} {
 			if name == sibling {
 				continue
