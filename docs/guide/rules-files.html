@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When CLAUDE.md and AGENTS.md get too long — deja-vu</title>
+<meta name="description" content="What belongs in CLAUDE.md or AGENTS.md, what does not, and where the facts you keep adding to it should live instead.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/rules-files.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="When your rules file gets too long">
+<meta property="og:description" content="What belongs in CLAUDE.md or AGENTS.md, what does not, and where the facts you keep adding to it should live instead.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/rules-files.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="When your rules file gets too long">
+<meta name="twitter:description" content="What belongs in CLAUDE.md or AGENTS.md, what does not, and where the facts you keep adding to it should live instead.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"When your rules file gets too long","description":"What belongs in CLAUDE.md or AGENTS.md, what does not, and where the facts you keep adding to it should live instead.","url":"https://vshulcz.github.io/deja-vu/guide/rules-files.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/rules-files.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"When CLAUDE.md grows","item":"https://vshulcz.github.io/deja-vu/guide/rules-files.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What belongs in CLAUDE.md or AGENTS.md?","acceptedAnswer":{"@type":"Answer","text":"Standing instructions that apply to every session: the build and test commands, conventions the agent cannot infer, directories it must not touch, and how to run things locally. Not history, and not anything that was true once."}},{"@type":"Question","name":"Why does a long CLAUDE.md make the agent worse?","acceptedAnswer":{"@type":"Answer","text":"It is read in full on every session, so every line costs context on every turn and competes with the instructions that matter. Rules that contradict each other or no longer hold are worse than absent ones."}},{"@type":"Question","name":"Where should the things I remove from it go?","acceptedAnswer":{"@type":"Answer","text":"Facts that were true once belong in searchable history rather than in a file read every session — the transcripts already hold them, and recall can fetch the relevant one when it matters."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html" aria-current="page">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>When your rules file gets too long</h1>
+<p class="pagelede">read in full, every session — so every line is paid for on every turn<span class="mins" data-mins></span></p>
+
+<p>It starts as five lines about the build command. Six months later it is four hundred, half of it describing a migration that finished in spring, and the agent seems to be reading less of it rather than more.</p>
+
+<h2>The cost of a rules file is paid every session</h2>
+<p><code>CLAUDE.md</code>, <code>AGENTS.md</code>, <code>GEMINI.md</code> and the rest are read in full at the start of every session. That is the point of them — and it is also the constraint. Every line competes for context with the actual task, and unlike a search result nothing weighs it against relevance: the paragraph about a database you no longer run arrives with the same authority as the build command.</p>
+<p>Three failure modes follow, in the order people hit them:</p>
+<ul>
+<li><b>Stale rules.</b> Something that was true once and is now wrong. This is the expensive one: the agent follows it confidently.</li>
+<li><b>Contradiction.</b> Two rules added months apart that cannot both hold. The model picks one, usually the later or the longer.</li>
+<li><b>Dilution.</b> Nothing is wrong, there is just too much, and the three lines that mattered are surrounded by two hundred that did not.</li>
+</ul>
+
+<h2>What belongs in it</h2>
+<p>A rule earns its place if it is true on every session and the agent cannot work it out from the repository:</p>
+<ul>
+<li>How to build, test and run locally, with the flags this project actually needs.</li>
+<li>Conventions that are not visible in the code — the reason a pattern is used, not the pattern itself.</li>
+<li>Boundaries: what must not be touched, what must never be committed, what needs a human.</li>
+<li>Where things are, when the layout is surprising.</li>
+</ul>
+<p>If you can imagine a session where the line is irrelevant, it is not a rule; it is a fact about one moment.</p>
+
+<h2>What does not, and where it goes instead</h2>
+<p>Facts about one moment are the bulk of what makes these files grow: the incident in March, the flag that turned out to matter for one service, the approach that was tried and reverted. They are worth keeping — just not in a file the agent re-reads every time.</p>
+<p>They are already kept. The session where you worked it out is on disk, written by the harness itself, and <a href="where-sessions-are-stored.html">it is still there</a>. An index over those transcripts answers the same question at the moment it comes up rather than paying for it every session:</p>
+<pre>deja how "go test"                    # the invocation this project actually uses
+deja fix "pq: too many connections"   # what was run after that error, where it stayed fixed
+deja blame internal/index/ingest.go   # what earlier sessions decided about this file</pre>
+<p>With recall wired in the agent asks those itself, and the block is absent when the history has no answer — which is the property a rules file cannot have.</p>
+
+<h2>A way to shorten one</h2>
+<p>Go through the file line by line and ask two questions. Is this true on every session? Could the agent find it out from the repository in one step? A line that fails the first is history; a line that fails the second is noise. What survives is usually a page, and the rest is not deleted so much as moved to where it can be retrieved on demand.</p>
+<p>One caution: do not convert a rules file into a memory system by hand. Writing down each fact you might need later is the same manual step that made the file long, and the sessions already contain them.</p>
+
+<p><a href="forgetting.html">Why agents forget</a> · <a href="token-cost.html">What memory costs in tokens</a> · <a href="repeated-mistakes.html">When the same wall comes back</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
