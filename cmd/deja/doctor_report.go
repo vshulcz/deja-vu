@@ -291,6 +291,30 @@ func doctorProbeZed(path string) ([]model.Session, error) {
 	return sources.ParseZedDB(path)
 }
 
+// anotherFileOpens reports whether any file besides one already known to be
+// unreadable can be opened. Bounded: a store can hold tens of thousands of
+// files and doctor is not an audit — one that opens is enough to know the store
+// is partly readable, and the bound keeps a wholly locked store from costing a
+// syscall each.
+func anotherFileOpens(files []string, except string) bool {
+	const probe = 64
+	tried := 0
+	for _, p := range files {
+		if p == except {
+			continue
+		}
+		if tried >= probe {
+			return false
+		}
+		tried++
+		if f, err := os.Open(p); err == nil {
+			_ = f.Close()
+			return true
+		}
+	}
+	return false
+}
+
 func presentDoctorFile(path string) []string {
 	// By content: an empty notes file is not a store with something in it, and
 	// counting it made the two forms of this command disagree about the same
@@ -402,7 +426,10 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 			// had changed its format and asked them to report it (#1747).
 			store.State = "denied"
 			store.Denied = newest
-			store.Partial = len(check.files) > 1
+			// "Partly readable" has to mean something did read: a store whose
+			// files are all locked is not partly anything, and saying "some
+			// sessions are missing" there understates it.
+			store.Partial = anotherFileOpens(check.files, newest)
 			return store, mod
 		}
 		store.State = "parsed-zero"
