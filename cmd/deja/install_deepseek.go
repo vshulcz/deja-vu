@@ -216,19 +216,48 @@ func dshPatchWith(old, block string) (string, error) {
 	// below it; leaving an unmarked block in place installed deja twice, with
 	// the orphan invisible to every later run (#1701). The first line of the
 	// block says "safe to delete", which is an invitation to edit exactly this.
-	hasStart := strings.Contains(old, dshBlockStart)
-	hasEnd := strings.Contains(old, dshBlockEnd)
-	if hasStart != hasEnd {
-		missing := "end"
-		if hasEnd {
-			missing = "start"
-		}
-		return "", fmt.Errorf("deja's block in cordis.patch.yml has no %s marker — put it back, or delete the block entirely", missing)
+	if err := checkDSHMarkers(old); err != nil {
+		return "", err
 	}
 	if trimmed := stripDSHBlock(old); trimmed != "" {
 		return trimmed + "\n" + block + "\n", nil
 	}
 	return block + "\n", nil
+}
+
+// checkDSHMarkers reports whether deja's block can be bounded: both markers
+// present, each on a line of its own, the start before the end.
+//
+// One without the other, or the two in the wrong order, sends stripDSHBlock's
+// skip to the end of the file and deletes whatever the user wrote below —
+// which the block's own "safe to delete" invites them to have edited (#1701).
+// Matching whole lines rather than substrings keeps a marker quoted inside a
+// value from counting.
+func checkDSHMarkers(doc string) error {
+	start, end := -1, -1
+	for i, line := range strings.Split(doc, "\n") {
+		switch t := strings.TrimSpace(line); {
+		case strings.HasPrefix(t, dshBlockStart):
+			if start < 0 {
+				start = i
+			}
+		case t == dshBlockEnd:
+			if end < 0 {
+				end = i
+			}
+		}
+	}
+	switch {
+	case start < 0 && end < 0:
+		return nil
+	case start < 0:
+		return fmt.Errorf("deja's block in cordis.patch.yml has no start marker — put it back, or delete the block entirely")
+	case end < 0:
+		return fmt.Errorf("deja's block in cordis.patch.yml has no end marker — put it back, or delete the block entirely")
+	case end < start:
+		return fmt.Errorf("deja's block in cordis.patch.yml has its end marker above its start marker — put them in order, or delete the block entirely")
+	}
+	return nil
 }
 
 // stripDSHBlock removes deja's block and the empty-array literal a generated
@@ -276,6 +305,13 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if uninstall {
 		if len(old) == 0 || !strings.Contains(string(old), dshBlockStart) {
 			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		// The same check the install side makes: skipping from a start marker
+		// with no end runs to end of file and takes the user's own patch with
+		// it, and uninstall is exactly when someone with a hand-edited file
+		// needs their content left alone (#1701).
+		if err := checkDSHMarkers(lfText(old)); err != nil {
+			return installResult{}, err
 		}
 		rest := stripDSHBlock(string(old))
 		if strings.TrimSpace(rest) == "" {

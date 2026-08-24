@@ -1,8 +1,12 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 const dshDejaBlock = dshBlockStart + `
@@ -29,6 +33,44 @@ func TestDSHPatchRefusesAHalfMarkedBlock(t *testing.T) {
 	noStart := strings.ReplaceAll(dshDejaBlock, dshBlockStart, "")
 	if _, err := dshPatchWith(noStart, "BLOCK"); err == nil {
 		t.Error("a block with no start marker was edited anyway")
+	}
+	// Both markers, in the wrong order: the skip still runs to end of file.
+	wrongOrder := dshBlockEnd + "\n- insert:\n    - id: mcp-deja\n" + dshBlockStart + "\n" + dshUserPatch
+	if _, err := dshPatchWith(wrongOrder, "BLOCK"); err == nil {
+		t.Error("a block whose end marker comes first was edited anyway")
+	}
+	// A marker quoted inside a value is not a marker.
+	quoted := dshUserPatch + "\n    - id: note\n      name: \"" + dshBlockEnd + "\"\n"
+	if _, err := dshPatchWith(quoted, "BLOCK"); err != nil {
+		t.Errorf("a marker quoted inside a value was taken for one: %v", err)
+	}
+}
+
+// Uninstall is exactly when someone with a hand-edited file needs their own
+// content left alone, and it called stripDSHBlock with no check at all.
+func TestUninstallDeepSeekRefusesAHalfMarkedBlock(t *testing.T) {
+	hermeticEnv(t)
+	dir := sources.DSHHome()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "cordis.patch.yml")
+	half := strings.ReplaceAll(dshDejaBlock, dshBlockEnd, "") + "\n" + dshUserPatch + "\n"
+	if err := os.WriteFile(path, []byte(half), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "uninstall", "deepseek"); err == nil {
+		t.Error("uninstall edited a file it could not bound")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != half {
+		t.Errorf("uninstall changed the file:\n%s", after)
+	}
+	if !strings.Contains(string(after), "my-plugin") {
+		t.Errorf("uninstall deleted the user's patch:\n%s", after)
 	}
 }
 
