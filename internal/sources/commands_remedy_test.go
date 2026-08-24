@@ -17,6 +17,10 @@ func TestWorthIndexingKeepsTheCommandsThatFixABuild(t *testing.T) {
 		"go generate ./...",
 		"go work sync",
 		"go clean -modcache",
+		// brew belongs here for the same reason, and by the same measurement:
+		// `brew install jq` was in the eleven-command fixture and was dropped
+		// with the rest. "the tool is missing" is an error people paste, and
+		// the remedy is an install.
 		"brew install jq",
 		"brew upgrade",
 		"cd repo && go mod tidy",
