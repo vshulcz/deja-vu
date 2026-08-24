@@ -577,6 +577,32 @@ func parseShow(args []string) (showOptions, error) {
 	return o, nil
 }
 
+// ctxFromIDPrefix answers from the session an id-prefix names, and reports
+// whether it did. Six characters is where cmdCtx starts reading an argument as
+// an id at all — below that a token is far likelier to be a word — so this also
+// runs after the text search comes up empty, where there is no answer left to
+// shadow (#1614).
+func ctxFromIDPrefix(dir, q string) (bool, error) {
+	s, ok, err := findByPrefix(dir, q)
+	if err != nil || !ok {
+		return false, err
+	}
+	// Every other reading surface stops here when a rule denies the session's
+	// origin; ctx handed the whole session over, and it is the command the hook
+	// tells an agent to call (#1026).
+	if kept, hidden := policyFilterSessionsCounted(policy.ActivationSearch, []model.Session{s}); len(kept) == 0 {
+		fmt.Fprint(os.Stderr, policyHiddenNote(policy.ActivationSearch, hidden))
+		return false, fmt.Errorf("no session matches %q", q)
+	}
+	// The one command an agent is told to call — the hook's lead line names
+	// recall_context — answered from one of several sessions behind an elided
+	// id without saying it was a choice, while show, share, resume, promote,
+	// forget and handoff all said so (#923).
+	noteAmbiguousPrefix(dir, q, "answering from")
+	search.PrintContext(os.Stdout, s, "")
+	return true, nil
+}
+
 func cmdCtx(dir string, rest []string) error {
 	if len(rest) < 1 {
 		return idPrefixNeeded(dir, "ctx needs a query or an id-prefix",
@@ -593,25 +619,9 @@ func cmdCtx(dir string, rest []string) error {
 	}
 	q := strings.Join(rest, " ")
 	if !strings.Contains(q, " ") && len(q) >= 6 {
-		s, ok, err := findByPrefix(dir, q)
-		if err != nil {
+		done, err := ctxFromIDPrefix(dir, q)
+		if err != nil || done {
 			return err
-		}
-		if ok {
-			// Every other reading surface stops here when a rule denies the
-			// session's origin; ctx handed the whole session over, and it is
-			// the command the hook tells an agent to call (#1026).
-			if kept, hidden := policyFilterSessionsCounted(policy.ActivationSearch, []model.Session{s}); len(kept) == 0 {
-				fmt.Fprint(os.Stderr, policyHiddenNote(policy.ActivationSearch, hidden))
-				return fmt.Errorf("no session matches %q", q)
-			}
-			// The one command an agent is told to call — the hook's lead line
-			// names recall_context — answered from one of several sessions
-			// behind an elided id without saying it was a choice, while show,
-			// share, resume, promote, forget and handoff all said so (#923).
-			noteAmbiguousPrefix(dir, q, "answering from")
-			search.PrintContext(os.Stdout, s, "")
-			return nil
 		}
 	}
 	o := search.Options{Query: nfcfold.Compose(q), All: true}
@@ -670,6 +680,19 @@ func cmdCtx(dir string, rest []string) error {
 	attachLifecycles(dir, hits)
 	demoteRejected(hits)
 	if len(hits) == 0 {
+		// A prefix shorter than six characters never reached the id branch
+		// above, so a session `deja show` opens on the same argument was
+		// reported as no session at all (#1614). The query has already failed
+		// here, so there is no answer for the id to shadow.
+		if !strings.Contains(q, " ") && len(q) < 6 {
+			done, ferr := ctxFromIDPrefix(dir, q)
+			if ferr != nil {
+				return ferr
+			}
+			if done {
+				return nil
+			}
+		}
 		// Same as #834 in files and restore: an empty store is not a miss on
 		// the query.
 		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
