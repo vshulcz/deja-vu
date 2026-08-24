@@ -27,7 +27,7 @@ func (c Counts) Total() int {
 
 var (
 	awsAccessKeyRE = regexp.MustCompile(`A(?:KIA|SIA)[0-9A-Z]{16}`)
-	awsSecretRE    = regexp.MustCompile(`(?i)\b(aws[_-]?secret[_-]?access[_-]?key)(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=_-]{32,})(['"]?)`)
+	awsSecretRE    = regexp.MustCompile(`(?i)\b(aws[_-]?secret[_-]?access[_-]?key)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=_-]{32,})(\\*['"]?)`)
 	// The key may be embedded in a larger identifier (ANTHROPIC_API_KEY,
 	// x-api-key) and, in JSON, a closing quote can sit between the key and the
 	// delimiter ("api_key": "..."). Tolerate both so env-var and JSON forms are
@@ -36,12 +36,12 @@ var (
 	// only English: a Russian speaker writes "пароль: …" or "токен: …" and the
 	// secret sat in the clear because every pattern here was English-only. The
 	// value class and length floor are the same, so the looseness is unchanged.
-	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
+	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
 	// The same shape in the languages people actually type in. \b is ASCII-only
 	// in RE2, so a Cyrillic or CJK key word can never sit behind it — these get
 	// their own pattern. A Russian speaker writing "пароль: …" had the secret
 	// stored in the clear because every pattern here was English-only.
-	genericKVIntlRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\s*['"]?\s*[:=]\s*)(['"]?)([A-Za-z0-9/+=._-]{16,})(['"]?)`)
+	genericKVIntlRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
 	bearerRE        = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
@@ -53,7 +53,7 @@ var (
 	//
 	// The quotes are what make it safe to be this loose: "password
 	// authentication failed" has no quoted value and matches nothing.
-	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(["'` + "`" + `])`)
+	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(\\*["'` + "`" + `])([^"'` + "`" + `\\\n]{6,80})(\\*["'` + "`" + `])`)
 	pemPrivateRE   = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
@@ -110,7 +110,10 @@ func assignmentFollows(s string, i int) bool {
 	// The pattern uses \s, which is more than a space: a fuzz case of
 	// "passwd\n:" slipped past an earlier version of this that only skipped
 	// spaces and tabs.
-	for i < len(s) && (isSpaceByte(s[i]) || s[i] == '\'' || s[i] == '"') {
+	// The backslash is here for the same reason the quote is: agents paste
+	// nested JSON, where every quote arrives escaped, and `api_key\":` never
+	// reached the pattern because the gate stopped at the backslash (#1765).
+	for i < len(s) && (isSpaceByte(s[i]) || s[i] == '\'' || s[i] == '"' || s[i] == '\\') {
 		i++
 	}
 	return i < len(s) && (s[i] == ':' || s[i] == '=')
