@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -82,6 +83,22 @@ func syncSSHHost(dir, host string, pull, full, both bool) error {
 	return syncOneWay(dir, host, pull, full)
 }
 
+// errNothingToSend says the push had nothing to send, so no connection was
+// opened. It is not a failure and it is not an exchange: stamping it made
+// doctor report a machine deja never contacted as reached a moment ago (#1780).
+var errNothingToSend = errors.New("nothing new to push")
+
+// recordExchange writes what happened to the peer list, which is where doctor
+// and the bare `deja sync` read a machine's history from.
+func recordExchange(host string, pull bool, when time.Time, err error) error {
+	if errors.Is(err, errNothingToSend) {
+		// Remember the machine — it is one deja knows about now — without
+		// claiming an exchange or a failure.
+		return peers.Record(host, pull, time.Time{}, nil)
+	}
+	return peers.Record(host, pull, when, err)
+}
+
 func syncOneWay(dir, host string, pull, full bool) error {
 	var err error
 	if pull {
@@ -92,8 +109,13 @@ func syncOneWay(dir, host string, pull, full bool) error {
 	// Recorded either way: a peer that has been failing for a week is exactly
 	// what the report exists to show, and it is invisible if only successes
 	// are written down.
-	if rerr := peers.Record(host, pull, time.Now(), err); rerr != nil && err == nil {
+	if rerr := recordExchange(host, pull, time.Now(), err); rerr != nil && err == nil {
 		fmt.Fprintf(os.Stderr, "deja: synced with %s, but could not record it: %v\n", host, rerr)
+	}
+	if errors.Is(err, errNothingToSend) {
+		// Nothing to send is a quiet success for the caller: a machine with no
+		// new work is not a machine that could not be reached.
+		return nil
 	}
 	return err
 }
@@ -153,7 +175,7 @@ func syncSSHPush(dir, host string, full bool) error {
 	fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
 	if n == 0 {
 		fmt.Fprintln(os.Stdout, "deja: nothing new to push")
-		return nil
+		return errNothingToSend
 	}
 	batches, err := filepath.Glob(filepath.Join(tmp, "*.jsonl"))
 	if err != nil || len(batches) == 0 {
