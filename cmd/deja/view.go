@@ -208,6 +208,12 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	for i := range notes {
 		notes[i].Title = redactMask(notes[i].Title)
 		notes[i].Text = redactMask(notes[i].Text)
+		// A note's project and tags are what the user typed, so they are text
+		// like the rest rather than structure deja minted.
+		notes[i].Project = redactMask(notes[i].Project)
+		for j := range notes[i].Tags {
+			notes[i].Tags[j] = redactMask(notes[i].Tags[j])
+		}
 	}
 	sj, err := json.Marshal(sessions)
 	if err != nil {
