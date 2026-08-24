@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -59,5 +60,24 @@ func TestEveryFilterParserRefusesAnEmptyValue(t *testing.T) {
 	}
 	if _, _, _, err := parseBlame([]string{"main.go", "--harness", "claude"}); err != nil {
 		t.Errorf("blame --harness claude: %v", err)
+	}
+}
+
+// stats and forget parse their flags inside their run functions, so they need
+// the store to reach the guard. Both were named as untested in review.
+func TestStatsAndForgetRefuseAnEmptyValue(t *testing.T) {
+	hermeticEnv(t)
+	dir := os.Getenv("DEJA_INDEX_DIR")
+	if err := runStats(dir, []string{"--harness", ""}); err == nil {
+		t.Error("stats --harness \"\" was accepted")
+	}
+	if err := runForget(dir, []string{"--project", "", "--dry-run"}); err == nil {
+		t.Error("forget --project \"\" was accepted")
+	}
+	// The control: --unforget keeps its own refusal, which asks for an id
+	// rather than offering the flags that forget instead of restoring.
+	err := runForget(dir, []string{"--unforget", ""})
+	if err == nil || !strings.Contains(err.Error(), "needs an id") {
+		t.Errorf("--unforget \"\" lost its own refusal: %v", err)
 	}
 }
