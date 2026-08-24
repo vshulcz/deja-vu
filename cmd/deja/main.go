@@ -391,7 +391,7 @@ func cmdIndex(dir string, rest []string) error {
 	// a bare "indexing ..." line, and the state (no history anywhere, or a
 	// store behind a permission wall) only surfaced on the next command.
 	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) {
-		fmt.Fprintln(os.Stderr, emptyIndexHint("nothing to index yet"))
+		fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
 	}
 	maybeFirstIndexGreeting(dir)
 	// The live display erases itself on the way out, so a rebuild on a
@@ -2952,6 +2952,18 @@ func idPrefixNeeded(dir, subject, refusal string) error {
 		return errors.New(strings.TrimPrefix(emptyIndexHint(subject+", and nothing is indexed yet"), "deja: "))
 	}
 	return errors.New(refusal)
+}
+
+// emptyIndexReason opens the empty-index sentence. "Nothing to index yet" is
+// for a machine deja has never seen history from; a run that has just evicted a
+// store says what went away instead, because the line above it has already told
+// the reader what was lost and the two must not contradict each other (#1762).
+func emptyIndexReason(b index.BuildSummary, evicted int) string {
+	if evicted > 0 {
+		return emptyIndexHint(fmt.Sprintf("%d indexed file%s went away with the store that held %s, and nothing is left to index",
+			evicted, pluralS(evicted), pluralWhich(evicted)))
+	}
+	return emptyIndexHint("nothing to index yet")
 }
 
 // emptyIndexHint phrases the nothing-here answer the same way everywhere, and
