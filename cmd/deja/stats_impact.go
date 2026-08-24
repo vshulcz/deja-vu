@@ -52,8 +52,8 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 		return nil
 	}
 	fmt.Fprintln(w, "deja impact — measured on this machine, nothing modeled")
-	fmt.Fprintf(w, "  recalls served     %d agent-initiated recalls returned matches\n", r.Recalls)
-	fmt.Fprintf(w, "  memory at start    %d session starts began with project memory\n", r.Injections)
+	fmt.Fprintf(w, "  recalls served     %d agent-initiated recall%s returned matches\n", r.Recalls, pluralS(r.Recalls))
+	fmt.Fprintf(w, "  memory at start    %d session start%s began with project memory\n", r.Injections, pluralS(r.Injections))
 	if r.RawBytes > 0 && r.ServedBytes > 0 {
 		// The frame, the header and the session lines cost more than the text
 		// they wrap when sessions are short — which is exactly the state a new
@@ -77,7 +77,7 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 		fmt.Fprintf(w, "  knowledge re-used  %d session%s recalled 2+ times — fixes that keep paying\n", r.ReusedTwice, pluralS(r.ReusedTwice))
 	}
 	if r.DejaVuMoments > 0 {
-		fmt.Fprintf(w, "  déjà vu moments    %d prompts matched work you had already done\n", r.DejaVuMoments)
+		fmt.Fprintf(w, "  déjà vu moments    %d prompt%s matched work you had already done\n", r.DejaVuMoments, pluralS(r.DejaVuMoments))
 	}
 	served := r.Recalls + r.Injections
 	switch {
