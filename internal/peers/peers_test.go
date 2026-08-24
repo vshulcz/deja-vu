@@ -191,3 +191,28 @@ func TestRecordingNothingKeepsWhatWasThere(t *testing.T) {
 		}
 	}
 }
+
+// A push with nothing to send tells us nothing about the machine, so the last
+// failure stands: clearing it would say the host is fine when deja never
+// contacted it (#1780).
+func TestNothingToSendLeavesAnEarlierFailureStanding(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	if err := Record("mini", false, time.Now(), errors.New("connection refused")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Record("mini", false, time.Time{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	list := Load()
+	if len(list) != 1 || list[0].LastError == "" {
+		t.Errorf("the failure was cleared by a push that never opened a connection: %+v", list)
+	}
+	// A real exchange is what clears it.
+	if err := Record("mini", false, time.Now(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := Load()[0].LastError; got != "" {
+		t.Errorf("a successful exchange left the old failure: %q", got)
+	}
+}
