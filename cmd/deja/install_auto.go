@@ -428,7 +428,16 @@ func removeKimiHookBlock(s string) string {
 		if i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "[[hooks]]") {
 			i++
 		}
-		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[i]), "[") {
+		// deja's block ends at the next table header or the next comment. It
+		// writes no comments inside its own block, so a `#` line is always
+		// someone else's — running past one deleted the note a user had
+		// written above their next hook, and swallowed the marker of a second
+		// deja block, leaving that block behind unmarked and running (#1699).
+		for i < len(lines) {
+			t := strings.TrimSpace(lines[i])
+			if strings.HasPrefix(t, "[") || strings.HasPrefix(t, "#") {
+				break
+			}
 			i++
 		}
 		i-- // the loop's own i++ steps onto the next table header
