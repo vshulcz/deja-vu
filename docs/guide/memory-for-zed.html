@@ -87,7 +87,7 @@
 <p>writes the server into <code>settings.json</code>. Or install the deja extension from Zed's extension list, which brings its own copy of the binary if you have none.</p>
 <p>Both use the same server id — <code>deja-context-server</code> — and Zed keys servers by id, so whichever order you install in there is exactly one server. That was not free: with two different ids, Zed ran two servers and the agent saw every tool twice.</p>
 <p>The extension is <a href="https://github.com/zed-industries/extensions/pull/7307">still in review</a> at the time of writing; until it lands, <code>deja install zed</code> is the path, and it needs the binary:</p>
-<pre>brew install vshulcz/tap/deja-vu</pre>
+<pre>brew install deja-vu</pre>
 
 <h2>What arrives, and what does not</h2>
 <p>The six tools, and a <code>/deja</code> slash command in the agent panel. What Zed cannot give you today is memory that arrives unasked: its extension API covers language servers, slash commands, context servers and debuggers, and there is no lifecycle hook where recall could be injected — no session-start block, nothing before a tool call. Every other harness in the matrix gets that; Zed does not, and it is a limitation of the API rather than something we chose to skip. It becomes work the day Zed ships a hook.</p>

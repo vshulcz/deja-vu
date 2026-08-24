@@ -22,5 +22,5 @@ fi
 
 # No binary: fail loudly here rather than silently registering a server that
 # answers nothing. The client reports it as one server that would not start.
-echo "deja binary not found — install it with: brew install vshulcz/tap/deja" >&2
+echo "deja binary not found — install it with: brew install deja-vu" >&2
 exit 1

@@ -84,7 +84,7 @@
 <h2>Adding recall</h2>
 <pre>/plugins install https://github.com/vshulcz/deja-vu</pre>
 <p>Kimi installs the plugin from the repository — the manifest sits at the root, which is the only reason that file is there. It needs the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary, which is what indexes and searches:</p>
-<pre>brew install vshulcz/tap/deja-vu
+<pre>brew install deja-vu
 # or
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 <p>With the CLI instead, <code>deja install kimi-auto</code> writes the MCP server into <code>mcp.json</code> and a <code>[[hooks]]</code> block into <code>config.toml</code>. Having both is fine: the plugin reads those two files and skips whatever the installer already covers.</p>

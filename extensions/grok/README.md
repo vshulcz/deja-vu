@@ -19,7 +19,7 @@ Install the binary first — plugins deliver files, not runtimes or native
 binaries:
 
 ```sh
-brew install vshulcz/tap/deja-vu
+brew install deja-vu
 ```
 
 or

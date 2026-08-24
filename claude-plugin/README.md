@@ -20,7 +20,7 @@ model and no embeddings, credentials redacted as the index is built.
 The binary is not in the bundle — plugins carry files, not native binaries:
 
 ```sh
-brew install vshulcz/tap/deja-vu
+brew install deja-vu
 ```
 
 or

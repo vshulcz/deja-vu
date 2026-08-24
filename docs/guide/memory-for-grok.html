@@ -86,7 +86,7 @@
 <p>Writes <code>[mcp_servers.deja]</code> into <code>~/.grok/config.toml</code> and a hook file of deja's own into <code>~/.grok/hooks/</code>. Grok reads hooks in the same shape Claude Code uses, which is why all four moments work here: session start, per prompt, before a tool runs, and before compaction.</p>
 <p>A plugin for the official marketplace is <a href="https://github.com/xai-org/plugin-marketplace/pull/332">in review</a>. When it lands, <code>grok plugin install deja</code> is the other path, and the two coexist: each half of the plugin stands down when it finds what the CLI already wired, so nothing is listed or injected twice.</p>
 <p>Either way it needs the binary, since a plugin delivers files rather than runtimes:</p>
-<pre>brew install vshulcz/tap/deja-vu
+<pre>brew install deja-vu
 # or
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 

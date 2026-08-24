@@ -45,7 +45,7 @@ if [ -z "${DEJA:-}" ]; then
 	# Drain stdin so Codex never blocks on the pipe.
 	cat >/dev/null 2>&1 || true
 	if [ "${1:-}" = "hook-context" ]; then
-		printf '{"systemMessage":"the deja-vu plugin is installed but the deja binary is not on PATH — install it with: brew install vshulcz/tap/deja-vu  (or: go install github.com/vshulcz/deja-vu/cmd/deja@latest)"}\n'
+		printf '{"systemMessage":"the deja-vu plugin is installed but the deja binary is not on PATH — install it with: brew install deja-vu  (or: go install github.com/vshulcz/deja-vu/cmd/deja@latest)"}\n'
 	fi
 	exit 0
 fi

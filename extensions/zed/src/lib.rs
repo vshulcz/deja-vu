@@ -108,7 +108,7 @@ impl DejaExtension {
                 "no deja binary was found and the release could not be fetched ({error}). \
                  Install deja — curl -fsSL \
                  https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh, or \
-                 brew install vshulcz/tap/deja-vu — and it will be used from there"
+                 brew install deja-vu — and it will be used from there"
             )
         })?;
 

@@ -57,7 +57,7 @@ solved in that project when the session opens.
 <details>
 <summary>Other ways to install, and what to do if you want less than all of it</summary>
 
-`brew install vshulcz/tap/deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
+`brew install deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
 or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop apps that
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.

@@ -89,7 +89,7 @@
 <p>Hooks are the difference between the two. Gemini runs them only when <code>hooksConfig.enabled</code> is set in your <code>settings.json</code>, and an extension cannot write that file — so the extension gives you recall on demand, and the CLI install adds recall that arrives on its own at session start and on each prompt.</p>
 <p>Both name the extension <code>deja</code>, which is deliberate: Gemini keys extensions by that name and answers a second install with <code>Extension "deja" is already installed</code>. Having both wired is not a state you can reach by accident.</p>
 <p>Either way it needs the binary, since an extension delivers files rather than runtimes:</p>
-<pre>brew install vshulcz/tap/deja-vu
+<pre>brew install deja-vu
 # or
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 
