@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where each coding agent stores its conversation history — deja-vu</title>
+<meta name="description" content="The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where each coding agent stores its conversation history">
+<meta property="og:description" content="The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Where each coding agent stores its conversation history">
+<meta name="twitter:description" content="The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Where each coding agent stores its conversation history","description":"The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.","url":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Where history lives","item":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Where does Claude Code store its conversation history?","acceptedAnswer":{"@type":"Answer","text":"In JSONL files under ~/.claude/projects, one directory per project and one file per session. CLAUDE_CONFIG_DIR moves the whole tree."}},{"@type":"Question","name":"Where does Codex CLI keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.codex: rollout JSONL files in sessions/, plus history.jsonl. CODEX_HOME moves both."}},{"@type":"Question","name":"Can I read those files myself?","acceptedAnswer":{"@type":"Answer","text":"Yes. Most are JSONL you can read with jq; opencode, Hermes and Zed use SQLite, and Zed compresses each thread body with zstd."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="where-sessions-are-stored.html" aria-current="page">Where history lives</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Where each coding agent stores its conversation history</h1>
+<p class="pagelede">twenty agents, twenty formats, one table<span class="mins" data-mins></span></p>
+
+<p>Every coding agent writes what you said and what it did to a file on your machine. The formats differ, the locations differ, and none of them is documented in one place — so here is that place, generated from the same registry deja's parsers are written against.</p>
+
+<h2>Where each one writes</h2>
+<table>
+<thead><tr><th>Agent</th><th>Where the sessions live</th><th>Format</th></tr></thead>
+<tbody>
+<tr><td><a href="../registry/aider.html">aider</a></td><td><code>~/.aider.chat.history.md</code></td><td>one Markdown log</td></tr>
+<tr><td><a href="../registry/antigravity.html">Antigravity</a></td><td><code>~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code></td><td>JSON files</td></tr>
+<tr><td><a href="../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollouts plus a history file</td></tr>
+<tr><td><a href="../registry/copilot.html">Copilot CLI</a></td><td><code>${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code></td><td>SQLite key-value store, or JSONL</td></tr>
+<tr><td><a href="../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl.zstd</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code></td><td>JSON or JSONL</td></tr>
+<tr><td><a href="../registry/goose.html">Goose</a></td><td><code>${GOOSE_PATH_ROOT}/data/sessions/sessions.db</code></td><td>JSONL, with a SQLite index</td></tr>
+<tr><td><a href="../registry/grok.html">Grok Build</a></td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code></td><td>JSONL events with JSON metadata</td></tr>
+<tr><td><a href="../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/profiles/*/state.db</code></td><td>SQLite database</td></tr>
+<tr><td><a href="../registry/kimi.html">Kimi Code</a></td><td><code>${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/omp.html">omp (Oh My Pi)</a></td><td><code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code></td><td>SQLite database</td></tr>
+<tr><td><a href="../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/roo.html">Roo Code</a></td><td><code><vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code></td><td>JSON files</td></tr>
+<tr><td><a href="../registry/zed.html">Zed</a></td><td><code>~/Library/Application Support/Zed/threads/threads.db</code></td><td>SQLite database</td></tr>
+</tbody>
+</table>
+<p>Each row links to that harness's page in the <a href="../registry/README.html">session format registry</a>, which documents the record schema, how roles map, the override variables, and what deja could not verify. Every entry carries the date it was last checked against a real store.</p>
+
+<h2>Reading them yourself</h2>
+<p>Most are JSONL — one JSON object per line, appended as the session runs:</p>
+<pre>ls -t ~/.claude/projects/*/*.jsonl | head -1 | xargs tail -5 | jq -r '.message.content'</pre>
+<p>Three are databases rather than files. opencode keeps <code>opencode.db</code>, Hermes a <code>state.db</code> per profile, and Zed one SQLite store for every thread with each body compressed as a zstd frame — so <code>sqlite3</code> alone will show you rows of binary, and you need <code>zstd</code> to read a thread. Cursor is the awkward one: older versions keep a key-value blob inside <code>state.vscdb</code>, newer builds write JSONL transcripts per project.</p>
+<p>Two practical notes. Paths move: Claude Code honours <code>CLAUDE_CONFIG_DIR</code>, Codex <code>CODEX_HOME</code>, Kimi <code>KIMI_CODE_HOME</code>, Goose and opencode follow <code>XDG_DATA_HOME</code>. And these files hold whatever your session held, including any secret that was pasted or printed — treat them like the logs they are.</p>
+
+<h2>What to do with them</h2>
+<p>Reading one file answers "what did I do in that session". The useful question is usually the other one — "which session was it" — and that needs an index across all of them. That is what <a href="https://github.com/vshulcz/deja-vu">deja</a> builds: one local index over every store above, searchable from the command line and readable by the agents themselves over MCP.</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "connection pool exhausted"</pre>
+<p>No capture step and nothing to switch on first: the files are already there, including the months before you installed anything. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
+
+<p><a href="../registry/README.html">The full registry</a> · <a href="forgetting.html">Why agents forget in the first place</a> · <a href="getting-started.html">Getting started</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

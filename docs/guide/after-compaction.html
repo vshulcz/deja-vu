@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What compaction drops, and how to get it back — deja-vu</title>
+<meta name="description" content="What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/after-compaction.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="What compaction drops, and how to get it back">
+<meta property="og:description" content="What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/after-compaction.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="What compaction drops, and how to get it back">
+<meta name="twitter:description" content="What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"What compaction drops, and how to get it back","description":"What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.","url":"https://vshulcz.github.io/deja-vu/guide/after-compaction.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/after-compaction.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"After compaction","item":"https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does context compaction actually keep?","acceptedAnswer":{"@type":"Answer","text":"Measured over 43 real compactions: 77% of the decisions survived the summary and 0.2% of the commands that had been run. Reasoning is summarised; the exact invocations, error text and edited spans are dropped."}},{"@type":"Question","name":"Can I recover what a compaction dropped?","acceptedAnswer":{"@type":"Answer","text":"Yes, if the full transcript is still on disk. Harnesses write the whole session to a log file; the compaction only shortens what is in the model context, not what was written."}},{"@type":"Question","name":"How do I stop losing work to compaction?","acceptedAnswer":{"@type":"Answer","text":"Index the transcripts and let the agent search them, so the summary stops being the only copy. Indexing before compaction runs keeps the session searchable even after the window collapses."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="after-compaction.html" aria-current="page">After compaction</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>What compaction drops, and how to get it back</h1>
+<p class="pagelede">the summary keeps the reasoning and drops the work<span class="mins" data-mins></span></p>
+
+<p>A long session compacts: the harness replaces earlier turns with a summary so the window keeps fitting. The session continues, the agent sounds like it remembers, and the specific thing you will need in twenty minutes is already gone.</p>
+
+<h2>What survives, measured</h2>
+<p>Over 43 real compactions taken from one machine's history, comparing each summary against the full transcript it replaced:</p>
+<ul>
+<li><b>77%</b> of the decisions survived — the conclusions, the "we went with X because Y".</li>
+<li><b>0.2%</b> of the commands that had actually been run survived.</li>
+</ul>
+<p>The method, the corpus and the script are in the repository under <a href="benchmarks.html">benchmarks</a>, and the ratio holds across harnesses because they all summarise prose the same way.</p>
+<p>That split is the whole problem. A summary is written in the language of intent, and the things that cost you an afternoon are not intent: the invocation with the four flags that finally worked, the error text you pasted, the exact span an edit replaced, the path of the file that turned out to matter. Ask after a compaction and you get a confident paraphrase of the plan with none of the parts you would have copied.</p>
+
+<h2>What compaction does not touch</h2>
+<p>The transcript. Compaction shortens what is in the model's context; it does not go back and rewrite the log the harness has been appending to since the session opened. Every command, every tool result, every edit is still on disk — see <a href="where-sessions-are-stored.html">where each agent keeps it</a>.</p>
+<p>So "lost to compaction" is a retrieval problem, not a data-loss problem. The work is there; nothing reads it back.</p>
+
+<h2>Getting it back</h2>
+<p>Two moments matter, and they are different.</p>
+<h3>During the session</h3>
+<p>Index before the window collapses. Claude Code exposes a <code>PreCompact</code> hook that fires just before summarising, which is exactly when the full transcript is still complete and still the current session's. <code>deja install --auto</code> wires that hook, so the session that is about to be summarised is searchable a moment later — including the parts the summary is about to drop.</p>
+<h3>Afterwards</h3>
+<p>Ask for the specific thing rather than the story:</p>
+<pre>deja how "go test"          # the invocation this project actually uses, with its flags
+deja fix "pq: too many connections"   # what was run after this error, where it stayed fixed
+deja blame internal/index/ingest.go   # which sessions discussed this file, and what they decided</pre>
+<p>Those three questions map onto exactly what a summary drops: commands, failures and file-level decisions. With recall wired in, the agent asks them itself — before it runs a command, after one fails, and when a prompt matches earlier work.</p>
+
+<h2>What this does not fix</h2>
+<p>Compaction is not a defect to be switched off. The window is finite, summarising is the right response, and a memory layer does not change that — it stops the summary from being the only copy. If the harness never wrote the session to disk, none of this applies, and the answer really is gone.</p>
+
+<p><a href="forgetting.html">Why agents forget between sessions</a> · <a href="where-sessions-are-stored.html">Where the transcripts live</a> · <a href="getting-started.html">Getting started</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
