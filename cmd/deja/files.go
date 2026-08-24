@@ -256,7 +256,9 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 		return rows[i].score > rows[j].score
 	})
+	cut := 0
 	if len(rows) > limit {
+		cut = len(rows)
 		rows = rows[:limit]
 	}
 	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s%s\n", q, scanned, plural(scanned), filesReadNote(matched))
@@ -276,6 +278,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// counts stopped lining up in a column of their own.
 		path := filesRowPath(r.path, col)
 		fmt.Fprintf(stdout, "  %s%s %d\n", path, strings.Repeat(" ", max(0, col-termwidth.Columns(path))), r.n)
+	}
+	// Same as `how`: a list cut at the limit without a word reads as the whole
+	// list (#1632).
+	if cut > 0 {
+		fmt.Fprintf(stdout, "showing %d of %d — raise --limit for the rest\n", len(rows), cut)
 	}
 	return nil
 }

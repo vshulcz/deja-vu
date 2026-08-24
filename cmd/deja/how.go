@@ -103,6 +103,11 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "  ran %s in %s%s\n",
 			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
 	}
+	// The cap said nothing, so eight of thirteen ways to run the tests read as
+	// thirteen — the misread the search screen already avoids (#1632).
+	if len(entries) > limit {
+		fmt.Fprintf(stdout, "showing %d of %d — raise --limit for the rest\n", limit, len(entries))
+	}
 	return nil
 }
 
