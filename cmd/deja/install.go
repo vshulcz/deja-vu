@@ -732,7 +732,47 @@ func mentionsDeja(b []byte) bool {
 	return false
 }
 
+// lfText is the text of a config normalised to LF, for the writers that splice
+// blocks by counting newlines. They then work in one convention and
+// writeIfChanged puts the file's own endings back (#1668).
+func lfText(b []byte) string {
+	return strings.ReplaceAll(string(b), "\r\n", "\n")
+}
+
+// matchLineEndings writes back the line endings the file already had. A
+// Windows user's configs are CRLF, and install rewrote the JSON ones LF-only
+// while leaving the TOML and YAML ones half and half — deja's appended block in
+// LF inside a CRLF file (#1668). install_goose.go and guidance.go already did
+// this for their own two files; every other writer comes through here.
+//
+// Only a file whose endings are *all* CRLF is treated as a CRLF file. A mixed
+// one is left alone: converting it whole would rewrite lines deja never touched,
+// which is the thing this exists to avoid.
+func matchLineEndings(old, next []byte) []byte {
+	if len(old) == 0 || !bytes.Contains(old, []byte("\r\n")) {
+		return next
+	}
+	if bytes.Count(old, []byte("\n")) != bytes.Count(old, []byte("\r\n")) {
+		return next
+	}
+	// Only the newlines that are not already CRLF, so a writer that converted
+	// its own output first is not given a second carriage return.
+	var b bytes.Buffer
+	b.Grow(len(next) + bytes.Count(next, []byte("\n")))
+	for i := 0; i < len(next); i++ {
+		if next[i] == '\n' && (i == 0 || next[i-1] != '\r') {
+			b.WriteByte('\r')
+		}
+		b.WriteByte(next[i])
+	}
+	return b.Bytes()
+}
+
 func writeIfChanged(path string, old, next []byte) (string, error) {
+	// Before the comparison, not after: a CRLF config converted afterwards
+	// would differ from `old` on every run, so each repeat install would
+	// rewrite the file and report it changed.
+	next = matchLineEndings(old, next)
 	if bytes.Equal(old, next) {
 		return "unchanged", nil
 	}
@@ -1090,7 +1130,10 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 
 func installTOML(path, block string, uninstall bool) (installResult, error) {
 	old, _ := os.ReadFile(path)
-	s := removeCodexDejaBlock(string(old))
+	// The splicing below counts newlines, so it works in LF and writeIfChanged
+	// puts the file's own endings back. Left as read, a CRLF file grew a blank
+	// line per install: TrimRight("\n") leaves the carriage return behind.
+	s := removeCodexDejaBlock(lfText(old))
 	s = strings.TrimRight(s, "\n")
 	if !uninstall {
 		if s != "" {

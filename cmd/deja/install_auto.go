@@ -399,7 +399,7 @@ const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`
 func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
 	old, _ := os.ReadFile(path)
-	s := strings.TrimRight(removeKimiHookBlock(string(old)), "\n")
+	s := strings.TrimRight(removeKimiHookBlock(lfText(old)), "\n")
 	if !uninstall {
 		block := kimiHookMarker + "\n[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = " +
 			strconv.Quote(exe+" hook-prompt --plain") + "\ntimeout = 30\n"

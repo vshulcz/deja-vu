@@ -148,7 +148,7 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	if err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
 	}
-	next := removeHermesMCPBlock(string(old))
+	next := removeHermesMCPBlock(lfText(old))
 	if !uninstall {
 		entry := "  deja:\n    command: " + yamlQuote(exe) + "\n    args:\n      - mcp\n    enabled: true\n"
 		if i := strings.Index(next, "\nmcp_servers:\n"); i >= 0 {
@@ -201,7 +201,7 @@ func setHermesPluginEnabled(on bool) error {
 			return err
 		}
 	}
-	s := string(old)
+	s := lfText(old)
 	listed := strings.Contains(s, "\n    - deja\n")
 	switch {
 	case on && listed, !on && !listed:
