@@ -23,10 +23,10 @@ func TestSyncPullNamesThisMachineToTheRemote(t *testing.T) {
 	var exportCmd string
 	sshRunner = func(name string, args ...string) (string, error) {
 		switch {
-		case name == "ssh" && args[1] == "mktemp -d":
+		case name == "ssh" && args[len(args)-1] == "mktemp -d":
 			return "/tmp/remote-out", nil
-		case name == "ssh" && strings.Contains(args[1], "sync export"):
-			exportCmd = args[1]
+		case name == "ssh" && strings.Contains(args[len(args)-1], "sync export"):
+			exportCmd = args[len(args)-1]
 			return "deja: exported 0 records", nil
 		}
 		return "", nil
@@ -51,10 +51,10 @@ func TestSyncPullQuotesAnAwkwardMachineName(t *testing.T) {
 	var exportCmd string
 	sshRunner = func(name string, args ...string) (string, error) {
 		switch {
-		case name == "ssh" && args[1] == "mktemp -d":
+		case name == "ssh" && args[len(args)-1] == "mktemp -d":
 			return "/tmp/remote-out", nil
-		case name == "ssh" && strings.Contains(args[1], "sync export"):
-			exportCmd = args[1]
+		case name == "ssh" && strings.Contains(args[len(args)-1], "sync export"):
+			exportCmd = args[len(args)-1]
 			return "deja: exported 0 records", nil
 		}
 		return "", nil
@@ -83,11 +83,11 @@ func TestSyncPullFallsBackWhenTheRemoteIsOlder(t *testing.T) {
 	var commands []string
 	sshRunner = func(name string, args ...string) (string, error) {
 		switch {
-		case name == "ssh" && args[1] == "mktemp -d":
+		case name == "ssh" && args[len(args)-1] == "mktemp -d":
 			return "/tmp/remote-out", nil
-		case name == "ssh" && strings.Contains(args[1], "sync export"):
-			commands = append(commands, args[1])
-			if strings.Contains(args[1], "--peer") {
+		case name == "ssh" && strings.Contains(args[len(args)-1], "sync export"):
+			commands = append(commands, args[len(args)-1])
+			if strings.Contains(args[len(args)-1], "--peer") {
 				return `deja: sync export: unknown flag "--peer" — only --full is accepted`, errors.New("exit status 1")
 			}
 			return "deja: exported 0 records", nil
@@ -115,9 +115,9 @@ func TestSyncPullDoesNotRetryOtherFailures(t *testing.T) {
 	var calls int
 	sshRunner = func(name string, args ...string) (string, error) {
 		switch {
-		case name == "ssh" && args[1] == "mktemp -d":
+		case name == "ssh" && args[len(args)-1] == "mktemp -d":
 			return "/tmp/remote-out", nil
-		case name == "ssh" && strings.Contains(args[1], "sync export"):
+		case name == "ssh" && strings.Contains(args[len(args)-1], "sync export"):
 			calls++
 			return "deja: no sessions indexed yet", errors.New("exit status 1")
 		}
