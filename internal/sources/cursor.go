@@ -82,7 +82,7 @@ func CursorDBs() []string {
 func CursorTranscripts() []string {
 	root := filepath.Join(CursorCLIRoot(), "projects")
 	var out []string
-	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(resolvedRoot(root), func(p string, d os.DirEntry, err error) error {
 		// Regular files only: a FIFO matching the glob would block the
 		// parser's Open forever (same hang walkFiles guards against).
 		if err != nil || !d.Type().IsRegular() {

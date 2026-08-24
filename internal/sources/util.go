@@ -268,9 +268,31 @@ func keepRegular(paths []string) []string {
 	return out
 }
 
+// resolvedRoot follows a store root that is itself a symlink. People keep
+// ~/.claude in a dotfiles repo, on an external disk, in a synced folder;
+// WalkDir lstats its root, so the walk saw a symlink rather than a directory
+// and descended nowhere — the store indexed nothing while every surface called
+// it found and empty (#1744). Only the root: a link inside a store is still
+// skipped, which is what keeps a FIFO from hanging the build and a link from
+// walking out of the store.
+func resolvedRoot(root string) string {
+	fi, err := os.Lstat(root)
+	if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		return root
+	}
+	target, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return root
+	}
+	if st, err := os.Stat(target); err != nil || !st.IsDir() {
+		return root
+	}
+	return target
+}
+
 func walkFiles(root string, pred func(string) bool) []string {
 	var out []string
-	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(resolvedRoot(root), func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			// A directory the process cannot read takes its sessions out of
 			// recall. Dropping the error here left the index run with nothing
