@@ -43,8 +43,11 @@ _deja_completion() {
     if (( COMP_CWORD > 0 )); then
         prev="${COMP_WORDS[COMP_CWORD-1]}"
     fi
-    command="${COMP_WORDS[1]}"
-    action="${COMP_WORDS[2]}"
+    # Defaulted, like prev above: a shell with set -u is one people run, and
+    # reading these bare made the first Tab after "deja " print
+    # "COMP_WORDS[2]: unbound variable" instead of the candidates (#1656).
+    command="${COMP_WORDS[1]-}"
+    action="${COMP_WORDS[2]-}"
 
     local commands="blame bench check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup"
     local harnesses="%HARNESSES%"
