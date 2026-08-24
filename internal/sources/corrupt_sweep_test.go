@@ -32,6 +32,9 @@ func TestCorruptFixturesAcrossParsers(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	checked := 0
+	// Which harnesses this sweep actually reached: a fixture layout that stops
+	// matching would otherwise turn the whole sweep into a silent pass.
+	covered := map[string]bool{}
 	for _, src := range files {
 		orig, err := os.ReadFile(src)
 		if err != nil {
@@ -53,15 +56,24 @@ func TestCorruptFixturesAcrossParsers(t *testing.T) {
 						continue
 					}
 					checked++
+					covered[h.Name] = true
 					ss, err := k.Parse(dst, 0)
 					_ = err
 					for _, s := range ss {
+						// Metadata reaches a reader the same way the body does:
+						// a project name is printed on every row.
+						fields := []struct{ what, text string }{
+							{"project", s.Project}, {"id", s.ID}, {"title", s.Title},
+						}
 						for _, m := range s.Messages {
-							if !utf8.ValidString(m.Text) {
-								t.Errorf("%s %s: %s parsed invalid utf-8 out of %s", h.Name, k.Name, name, filepath.Base(src))
+							fields = append(fields, struct{ what, text string }{"text", m.Text})
+						}
+						for _, f := range fields {
+							if !utf8.ValidString(f.text) {
+								t.Errorf("%s %s: %s parsed invalid utf-8 into %s out of %s", h.Name, k.Name, name, f.what, filepath.Base(src))
 							}
-							if strings.ContainsRune(m.Text, 0) {
-								t.Errorf("%s %s: %s parsed a NUL out of %s", h.Name, k.Name, name, filepath.Base(src))
+							if strings.ContainsRune(f.text, 0) {
+								t.Errorf("%s %s: %s parsed a NUL into %s out of %s", h.Name, k.Name, name, f.what, filepath.Base(src))
 							}
 						}
 					}
@@ -69,7 +81,23 @@ func TestCorruptFixturesAcrossParsers(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("parsed %d damaged fixture/kind pairs", checked)
+	t.Logf("parsed %d damaged fixture/kind pairs across %d harnesses", checked, len(covered))
+	var missed []string
+	for _, h := range Registry() {
+		switch h.Name {
+		case "deja", "opencode", "cursor", "zed", "hermes":
+			// Database-backed or synthesised stores: their fixture is a SQL
+			// script or nothing at all, so there is no transcript to damage
+			// here. Their read paths are covered by their own tests.
+			continue
+		}
+		if !covered[h.Name] {
+			missed = append(missed, h.Name)
+		}
+	}
+	if len(missed) > 0 {
+		t.Errorf("the sweep reached no fixture for %v — it is passing without testing them", missed)
+	}
 }
 
 func harnessDir(name string) string {
