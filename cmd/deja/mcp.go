@@ -704,11 +704,6 @@ func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error
 // needs precisely when the answer was too big to fit.
 const recallCountLineReserve = 160
 
-// futureStampTolerance is how far ahead of the clock a transcript may be
-// stamped before the date stops being usable as "when". Ordinary zone and clock
-// jitter lands inside a day; the same reading readWarmupStatus takes.
-const futureStampTolerance = 48 * time.Hour
-
 func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
 	if limit <= 0 {
 		limit = 5
@@ -841,7 +836,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// transcript wrote it; what is added is that it cannot be trusted for
 		// "newest", which is the one thing the top of a recall page implies
 		// (#1753).
-		if h.Session.Updated.After(time.Now().Add(futureStampTolerance)) {
+		if index.StampedAhead(h.Session.Updated, time.Now()) {
 			fmt.Fprintln(&hb, "[stamped later than this machine's clock — its date cannot place it against the others]")
 		}
 		if h.Tier != search.TierExact {

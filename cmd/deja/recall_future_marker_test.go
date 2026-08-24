@@ -52,3 +52,25 @@ func TestRecallMarksASessionStampedAheadOfTheClock(t *testing.T) {
 		t.Errorf("the marker appears %d times, want 1:\n%s", n, text)
 	}
 }
+
+// One rule, two surfaces: whatever the brief counts as ahead of the clock is
+// what recall marks. They disagreed while the marker carried a tolerance of its
+// own, and the brief's own test pins that three hours out already counts.
+func TestBriefAndRecallAgreeOnWhatIsAheadOfTheClock(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		what  string
+		at    time.Time
+		ahead bool
+	}{
+		{"an hour ago", now.Add(-time.Hour), false},
+		{"a minute ahead", now.Add(time.Minute), true},
+		{"three hours ahead", now.Add(3 * time.Hour), true},
+		{"five years ahead", now.AddDate(5, 0, 0), true},
+		{"exactly now", now, false},
+	} {
+		if got := index.StampedAhead(tc.at, now); got != tc.ahead {
+			t.Errorf("%s: StampedAhead = %v, want %v", tc.what, got, tc.ahead)
+		}
+	}
+}

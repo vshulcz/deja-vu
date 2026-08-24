@@ -452,6 +452,16 @@ func RebuildInProgress(dir string) bool {
 	return true
 }
 
+// StampedAhead reports a session stamped later than this machine's clock, and
+// so unusable for placing it against the others. Anything ahead counts: a
+// session three hours out is still ahead, which is what the brief has counted
+// since #696 and what its test pins. One rule in one place, so the brief's
+// count and the marker recall prints cannot disagree about the same session
+// (#1753).
+func StampedAhead(t, now time.Time) bool {
+	return t.After(now)
+}
+
 // OverviewStats is what the brief needs about a whole store.
 type OverviewStats struct {
 	Sessions      int
@@ -491,7 +501,7 @@ func Overview(dir string) (OverviewStats, error) {
 	for _, meta := range m.Sessions {
 		o.Sessions++
 		hs[meta.Harness] = true
-		if meta.Updated.After(now) {
+		if StampedAhead(meta.Updated, now) {
 			o.Future++
 		}
 		if meta.Updated.After(day) && !meta.Updated.After(now) {
