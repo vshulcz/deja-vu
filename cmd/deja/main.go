@@ -2429,7 +2429,7 @@ func runForget(dir string, args []string) error {
 		// still on this machine. An imported one lives only in the index, so
 		// forget took the last copy — and the undo reported a restore that did
 		// not happen (#967).
-		back, gone, names := restoredSessions(dir, unforget, lifted, lifting)
+		back, gone, names, missing := restoredSessions(dir, unforget, lifted, lifting)
 		restorePromotedTitles(dir, unforget)
 		if back > 0 {
 			// The ids, not just the count: this is the moment someone checks
@@ -2437,8 +2437,13 @@ func runForget(dir string, args []string) error {
 			// the ambiguity refusal name them a step earlier (#1095, #1014).
 			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index — %s\n", back, pluralS(back), joinCapped(names, 5))
 		}
-		if gone > 0 {
-			fmt.Fprintf(os.Stdout, "%d of them came from another machine and deja held the only copy — the tombstone is lifted, but the records are gone; `deja sync import` brings them back\n", gone)
+		for _, line := range unforgetGoneLines(missing) {
+			fmt.Fprintln(os.Stdout, line)
+		}
+		if gone > 0 && len(missing) == 0 {
+			// The selector was a prefix rather than whole keys, so which ones
+			// did not come back is not known by name here.
+			fmt.Fprintf(os.Stdout, "%d of them did not come back — the tombstone is lifted, but the records are not in the index; `deja forget --list` shows what is left\n", gone)
 		}
 		return nil
 	}
@@ -3209,13 +3214,41 @@ func dayWord(n int) string {
 	return fmt.Sprintf("%d days", n)
 }
 
+// unforgetGoneLines says why a lifted tombstone restored nothing. Two causes
+// with two answers: a session deja only ever held in its own index came from
+// another machine and sync import brings it back (#967), while a transcript
+// this machine wrote and then deleted is simply not on disk — telling that
+// reader to import from another machine names one they never had (#1755).
+func unforgetGoneLines(missing []string) []string {
+	var imported, local []string
+	for _, key := range missing {
+		id := key
+		if i := strings.IndexByte(key, ':'); i >= 0 {
+			id = key[i+1:]
+		}
+		if strings.HasPrefix(id, "imported-") {
+			imported = append(imported, key)
+			continue
+		}
+		local = append(local, key)
+	}
+	var out []string
+	if len(imported) > 0 {
+		out = append(out, fmt.Sprintf("%s came from another machine and deja held the only copy — the tombstone is lifted, but the records are gone; `deja sync import` brings them back", joinCapped(imported, 5)))
+	}
+	if len(local) > 0 {
+		out = append(out, fmt.Sprintf("%s is no longer on this machine — the tombstone is lifted, but the transcript it named is gone, so there is nothing to index", joinCapped(local, 5)))
+	}
+	return out
+}
+
 // restoredSessions splits what a lifted tombstone actually returned from what
 // it could not: a session whose transcript is on this machine is re-read by the
 // rebuild, while an imported one existed only in the index that forget rewrote.
-func restoredSessions(dir, selector string, lifted int, lifting []string) (back, gone int, names []string) {
+func restoredSessions(dir, selector string, lifted int, lifting []string) (back, gone int, names, missing []string) {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
-		return lifted, 0, lifting
+		return lifted, 0, lifting, nil
 	}
 	// A session counts as back only if its row is in the manifest again: an
 	// imported one lives only in the index, so forget took the last copy and
@@ -3228,7 +3261,9 @@ func restoredSessions(dir, selector string, lifted int, lifting []string) (back,
 		if here[key] {
 			back++
 			names = append(names, key)
+			continue
 		}
+		missing = append(missing, key)
 	}
 	if back == 0 && lifted > 0 {
 		// Selectors that are not whole keys (a bare id, a prefix) still count
@@ -3242,9 +3277,15 @@ func restoredSessions(dir, selector string, lifted int, lifting []string) (back,
 		if back > lifted {
 			back, names = lifted, names[:lifted]
 		}
+		if back > 0 {
+			// The prefix path found them by manifest row, so nothing here is
+			// missing by name.
+			missing = nil
+		}
 	}
 	sort.Strings(names)
-	return back, lifted - back, names
+	sort.Strings(missing)
+	return back, lifted - back, names, missing
 }
 
 // restorePromotedTitles gives a promoted note back the title it borrowed from a
