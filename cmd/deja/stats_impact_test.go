@@ -62,15 +62,21 @@ func TestStatsImpactEmpty(t *testing.T) {
 // plural nouns, so a usage log holding exactly one of each — the state a new
 // user is in — rendered "1 agent-initiated recalls returned matches".
 func TestStatsImpactAgreesWithCount(t *testing.T) {
+	// Every count is varied, and both directions are asserted. With only the
+	// singular direction covered, hardcoding a noun the other way — dropping
+	// pluralS from a line rather than adding it — was still invisible: the
+	// suite stayed green through that mutation on two of the three lines.
 	tests := []struct {
 		name    string
 		recalls int
+		starts  int
+		dejaVus int
 		want    []string
 		absent  []string
 	}{
 		{
 			name:    "singular",
-			recalls: 1,
+			recalls: 1, starts: 1, dejaVus: 1,
 			want: []string{
 				"1 agent-initiated recall returned matches",
 				"1 session start began with project memory",
@@ -80,12 +86,13 @@ func TestStatsImpactAgreesWithCount(t *testing.T) {
 		},
 		{
 			name:    "plural",
-			recalls: 2,
+			recalls: 2, starts: 2, dejaVus: 2,
 			want: []string{
 				"2 agent-initiated recalls returned matches",
-				"1 session start began with project memory",
-				"1 prompt matched work you had already done",
+				"2 session starts began with project memory",
+				"2 prompts matched work you had already done",
 			},
+			absent: []string{"2 agent-initiated recall ", "2 session start ", "2 prompt "},
 		},
 	}
 
@@ -95,8 +102,12 @@ func TestStatsImpactAgreesWithCount(t *testing.T) {
 			for i := 0; i < tt.recalls; i++ {
 				usage.RecordServedSessions(dir, usage.KindRecall, 100, 1, false, 1000, []string{"s1"})
 			}
-			usage.RecordResultRaw(dir, usage.KindHook, 100, 1, false, 1000)
-			usage.RecordResult(dir, usage.KindDejaVu, 100, 1, false)
+			for i := 0; i < tt.starts; i++ {
+				usage.RecordResultRaw(dir, usage.KindHook, 100, 1, false, 1000)
+			}
+			for i := 0; i < tt.dejaVus; i++ {
+				usage.RecordResult(dir, usage.KindDejaVu, 100, 1, false)
+			}
 
 			var out bytes.Buffer
 			if err := runStatsImpact(&out, dir, false); err != nil {
