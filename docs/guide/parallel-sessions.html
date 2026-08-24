@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Several agents on one repository — deja-vu</title>
+<meta name="description" content="Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Several agents on one repository">
+<meta property="og:description" content="Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Several agents on one repository">
+<meta name="twitter:description" content="Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Several agents on one repository","description":"Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.","url":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Parallel sessions","item":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can two coding agents work on the same repository at once?","acceptedAnswer":{"@type":"Answer","text":"Yes, and most people run them in separate git worktrees so the checkouts do not collide. Each session records its own transcript; nothing shares context between them by default."}},{"@type":"Question","name":"Why does my agent memory treat each worktree as a different project?","acceptedAnswer":{"@type":"Answer","text":"Because project identity is usually keyed on the working directory, and a worktree has a different path from the main checkout. Resolving worktrees back to the repository keeps one project instead of several."}},{"@type":"Question","name":"How do I see what a parallel session already tried?","acceptedAnswer":{"@type":"Answer","text":"Search the shared history rather than the running session: an indexed transcript is readable while the other session is still going, so what it established is available without a live channel between them."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html" aria-current="page">Parallel sessions</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Several agents on one repository</h1>
+<p class="pagelede">same repository, separate worktrees, no idea about each other<span class="mins" data-mins></span></p>
+
+<p>Two agents on one repository is now ordinary: one grinding through a refactor in a worktree, another fixing something small on main, a third reviewing. They do not know about each other. Each writes its own transcript, each starts empty, and the second one cheerfully re-derives what the first worked out an hour ago.</p>
+
+<h2>The worktree trap</h2>
+<p>Parallel work usually means <code>git worktree</code>, and that quietly breaks project identity for anything keyed on the working directory. <code>~/src/api</code> and <code>~/src/api-worktrees/fix-pool</code> are the same repository and different paths, so a memory scoped by path sees two projects, and neither can see the other's history. Claude Code's own auto-memory has the same behaviour — <a href="https://github.com/anthropics/claude-code/issues/81833">anthropics/claude-code#81833</a>.</p>
+<p>The fix is to ask git rather than the path. deja resolves a directory's worktree roots and treats every one of them as the same project, so a session recorded in <code>fix-pool</code> is recalled while you work in <code>api</code>, and two unrelated repositories that happen to share a directory name stay apart because the full path still matches first.</p>
+
+<h2>What one session can see of another</h2>
+<p>Nothing, live — and that is the right default. But "live" is rarely what is needed: the useful thing is what the other session <em>established</em>, and that is already written to its transcript as it goes. Indexed, it is searchable while that session is still running:</p>
+<pre>deja "pool size"            # what the other session concluded, in your session
+deja blame internal/pool.go # what has been decided about this file today
+deja last --project api     # what has been running here, newest first</pre>
+<p>With recall wired in, a fresh session opens already knowing the project's recent decisions, whichever agent made them. That covers most of what people build an inter-agent channel for.</p>
+
+<h2>When you do want to hand work over</h2>
+<p>Moving a live piece of work is a different job from searching, and it does not need a protocol between the two tools: <code>deja handoff --to codex</code> packages what a session established — the problem, the conclusions, where it stopped — as text the next agent starts from. <a href="switching-agents.html">Switching agents</a> covers that case in full.</p>
+
+<h2>What stays hard</h2>
+<p>Two agents editing the same files at the same time is a coordination problem, and no memory layer fixes it — worktrees and small scopes do. Ordering is not guaranteed either: an index sees a session when its transcript is written, so a conclusion reached seconds ago may not be searchable yet. And a session that never wrote its reasoning down cannot be read by anyone, human or agent.</p>
+
+<p><a href="switching-agents.html">Switching between agents</a> · <a href="find-a-session.html">Finding the session you need</a> · <a href="agents.html">Which harness supports what</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

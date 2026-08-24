@@ -77,6 +77,8 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 			"token-cost.html",
 			"rules-files.html",
 			"auditing-agents.html",
+			"find-a-session.html",
+			"parallel-sessions.html",
 		} {
 			if name == sibling {
 				continue
