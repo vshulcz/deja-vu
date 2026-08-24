@@ -43,8 +43,11 @@ const (
 	// the default branch. It had no version field at all until the directory's
 	// own scanner asked for one.
 	claudePlugin = "claude-plugin/.claude-plugin/plugin.json"
-	releaseAPI   = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
-	assetBase    = "https://github.com/vshulcz/deja-vu/releases/download"
+	// The Gemini gallery crawls the manifest at the repository root and shows
+	// its version, and `gemini extensions install` reads the same file.
+	geminiExtension = "gemini-extension.json"
+	releaseAPI      = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+	assetBase       = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
 type pins struct {
@@ -65,7 +68,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "pinmanifests:", err)
 			os.Exit(1)
 		}
-		fmt.Println("scoop, winget and the codex and claude plugins match the newest release")
+		fmt.Println("scoop, winget and the codex, claude and gemini manifests match the newest release")
 		return
 	}
 
@@ -84,7 +87,7 @@ func main() {
 	if err := write(*root, p); err != nil {
 		fail(err)
 	}
-	fmt.Printf("pinned scoop, winget and the codex and claude plugins to %s\n", p.version)
+	fmt.Printf("pinned scoop, winget and the codex, claude and gemini manifests to %s\n", p.version)
 }
 
 // parse pulls the two Windows hashes out of a checksums file. Both must be
@@ -117,12 +120,13 @@ func parse(version, checksums string) (pins, error) {
 
 func write(root string, p pins) error {
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:    renderScoop,
-		versionPath:  renderVersion,
-		localePath:   renderLocale,
-		installer:    renderInstaller,
-		codexPlugin:  renderPluginVersion(codexPlugin),
-		claudePlugin: renderPluginVersion(claudePlugin),
+		scoopPath:       renderScoop,
+		versionPath:     renderVersion,
+		localePath:      renderLocale,
+		installer:       renderInstaller,
+		codexPlugin:     renderPluginVersion(codexPlugin),
+		claudePlugin:    renderPluginVersion(claudePlugin),
+		geminiExtension: renderPluginVersion(geminiExtension),
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -254,12 +258,13 @@ func runCheck(root string) error {
 		return err
 	}
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:    renderScoop,
-		versionPath:  renderVersion,
-		localePath:   renderLocale,
-		installer:    renderInstaller,
-		codexPlugin:  renderPluginVersion(codexPlugin),
-		claudePlugin: renderPluginVersion(claudePlugin),
+		scoopPath:       renderScoop,
+		versionPath:     renderVersion,
+		localePath:      renderLocale,
+		installer:       renderInstaller,
+		codexPlugin:     renderPluginVersion(codexPlugin),
+		claudePlugin:    renderPluginVersion(claudePlugin),
+		geminiExtension: renderPluginVersion(geminiExtension),
 	} {
 		want, err := render(p)
 		if err != nil {

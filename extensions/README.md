@@ -60,6 +60,19 @@ Kimi notifies about updates only for plugins installed from its own
 marketplace, so `deja doctor` reports the installed plugin version against the
 one this deja ships.
 
+Gemini installs this repository itself: `gemini extensions install
+https://github.com/vshulcz/deja-vu` reads `gemini-extension.json` at the
+repository root — the only reason that file is not under `extensions/` — and the
+gallery at geminicli.com crawls repositories tagged `gemini-cli-extension` for
+the same file. It carries the MCP server and `GEMINI.md`; the hooks stay with
+`deja install gemini`, because they only run when `hooksConfig.enabled` is set
+in the user's `settings.json` and an extension cannot write that.
+
+Its `name` is `deja`, the same name the installer's extension uses, and
+`TestGeminiExtensionSharesTheInstallerName` keeps it that way: Gemini keys an
+extension by that name and refuses a second install under a name it already
+has, which is what makes two deja extensions on one machine impossible.
+
 ## Rules that cost us time once
 
 - **Resolve the binary in this order, everywhere:** an explicit setting or
