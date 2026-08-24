@@ -1417,26 +1417,13 @@ func jsoncLastCodeLine(body []string) (idx, end int, code string) {
 	idx = -1
 	inBlock := false
 	for i, line := range body {
-		var c string
-		c, inBlock, end = jsoncCodeOf(line, inBlock)
+		c, nextBlock, e := jsoncCodeOf(line, inBlock)
 		if c != "" {
-			idx, code = i, c
+			idx, end, code = i, e, c
 		}
+		inBlock = nextBlock
 	}
-	if idx < 0 {
-		return -1, 0, ""
-	}
-	_, _, end = jsoncCodeOf(body[idx], jsoncInBlockAt(body, idx))
 	return idx, end, code
-}
-
-// jsoncInBlockAt reports whether line i starts inside a /* … */ block.
-func jsoncInBlockAt(body []string, i int) bool {
-	inBlock := false
-	for _, line := range body[:i] {
-		_, inBlock, _ = jsoncCodeOf(line, inBlock)
-	}
-	return inBlock
 }
 
 // jsoncCodeOf returns the code a parser reads on one line, whether the line
