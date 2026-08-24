@@ -79,6 +79,7 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 			"auditing-agents.html",
 			"find-a-session.html",
 			"parallel-sessions.html",
+			"memory-for-opencode.html",
 		} {
 			if name == sibling {
 				continue

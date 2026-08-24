@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding memory to opencode — deja-vu</title>
+<meta name="description" content="How to give opencode recall over the sessions every coding agent on the machine already wrote — the plugin, the four moments it fires, and how it behaves beside the CLI install.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to opencode">
+<meta property="og:description" content="How to give opencode recall over the sessions every coding agent on the machine already wrote — the plugin, the four moments it fires, and how it behaves beside the CLI install.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to opencode">
+<meta name="twitter:description" content="How to give opencode recall over the sessions every coding agent on the machine already wrote — the plugin, the four moments it fires, and how it behaves beside the CLI install.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to opencode","description":"How to give opencode recall over the sessions every coding agent on the machine already wrote — the plugin, the four moments it fires, and how it behaves beside the CLI install.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for opencode","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does opencode remember previous sessions?","acceptedAnswer":{"@type":"Answer","text":"It keeps its own sessions in a local database and can reopen one, but a new session starts without them, and it cannot read what other agents on the machine recorded."}},{"@type":"Question","name":"How do I add persistent memory to opencode?","acceptedAnswer":{"@type":"Answer","text":"Install the deja binary and either run deja install opencode-auto, or add opencode-deja to the plugin array in opencode.json. Both wire recall over the transcripts every agent on the machine already wrote."}},{"@type":"Question","name":"Will an opencode memory plugin fill the context window?","acceptedAnswer":{"@type":"Answer","text":"Not if it is capped and silent. A per-prompt injection is capped at 1,536 bytes and nothing is added when the history has no answer, which is the common case."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html" aria-current="page">Memory for opencode</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to opencode</h1>
+<p class="pagelede">its own sessions are not the same thing as memory<span class="mins" data-mins></span></p>
+
+<p>opencode keeps its own sessions in a local database and can reopen one. What it cannot do is start a new session already knowing what you worked out last month — and it certainly cannot read what you did in Claude Code, Codex or Cursor on the same machine. This page is about closing both.</p>
+
+<h2>What opencode already has</h2>
+<p>Sessions live in <code>~/.local/share/opencode/opencode.db</code> (or under <code>XDG_DATA_HOME</code>), and the picker reopens them. That is history you can revisit, not memory the agent uses: nothing reads yesterday's session when you ask today's question, and the database holds opencode's sessions only.</p>
+
+<h2>Two ways to add recall</h2>
+<h3>The plugin</h3>
+<pre>{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-deja"]
+}</pre>
+<p>opencode installs the package on start. It needs the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary, which does the indexing — the plugin is the seam, not the engine:</p>
+<pre>brew install vshulcz/tap/deja-vu
+# or
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+<h3>The CLI</h3>
+<pre>deja install opencode-auto</pre>
+<p>Writes the MCP server into <code>opencode.json</code> and a plugin file of its own into <code>~/.config/opencode/plugins/</code>. Shorter if you already have the binary, and it wires every other agent on the machine in the same pass with <code>deja install --auto</code>.</p>
+<p>Having both is fine. The package reads what the installer wrote — the MCP entry, the plugin file — and contributes only what is missing, so nothing is registered or recalled twice.</p>
+
+<h2>What arrives, and when</h2>
+<p>Six tools the model can call — recall past sessions, read one in full, see what a file's history says, ask what fixed an error, ask how a command is really run here, store a decision — and three moments where memory arrives without being asked:</p>
+<ul>
+<li><b>Once per session</b>, the project's recent history is pushed onto the system prompt, with a one-time toast so you know it happened.</li>
+<li><b>Per prompt</b>, a relevance pass on what you just typed. Silent when nothing matches, which is the common case.</li>
+<li><b>Before compaction</b>, the working transcript is indexed, so the session survives the window collapsing — see <a href="after-compaction.html">what compaction drops</a>.</li>
+</ul>
+<p>An injection is capped: 1,536 bytes per prompt, about 4 KB for a tool call. <a href="token-cost.html">What memory costs</a> has the measured numbers against replaying or grepping instead.</p>
+
+<h2>The part that is not opencode-specific</h2>
+<p>The index covers every agent's transcripts on the machine, not opencode's alone — twenty of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
+
+<h2>Turning parts off</h2>
+<pre>{"plugin": [["opencode-deja", {"autoRecall": false, "tools": true}]]}</pre>
+<p><code>autoRecall: false</code> keeps the tools and drops the unasked injections; <code>tools: false</code> does the reverse. The tools also stand down on their own when the MCP server is already wired, so you are not given the same six answers under two names.</p>
+
+<h2>What it does not do</h2>
+<p>It does not write memories or summarise anything, so there is nothing to hallucinate into your history. It does not reach the network: indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). And it does not make opencode's own session list any better — it makes the sessions searchable, which is a different thing.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/opencode">The plugin source</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
