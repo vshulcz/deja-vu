@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -188,6 +190,43 @@ func toolText(text string) map[string]any {
 	return map[string]any{"content": []map[string]string{{"type": "text", "text": text}}}
 }
 
+// decodeToolArgs reads a tool call's arguments. The field is optional in the
+// protocol, so an absent one is an empty object rather than an error, and a
+// decode failure is reported in terms of the argument the caller sent — an
+// agent can fix `"query" must be a string`, it can do nothing with
+// `json: cannot unmarshal number into Go struct field .query` (#1723).
+func decodeToolArgs(tool string, raw json.RawMessage, into any) error {
+	if len(bytes.TrimSpace(raw)) == 0 || string(bytes.TrimSpace(raw)) == "null" {
+		raw = json.RawMessage("{}")
+	}
+	err := json.Unmarshal(raw, into)
+	if err == nil {
+		return nil
+	}
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) && typeErr.Field != "" {
+		return fmt.Errorf("%s: %q must be %s", tool, strings.TrimPrefix(typeErr.Field, "."), jsonTypeName(typeErr.Type.Kind()))
+	}
+	return fmt.Errorf("%s: arguments must be an object", tool)
+}
+
+// jsonTypeName names a Go kind the way the tool schema does, so the message
+// matches what the caller was asked for rather than how it is stored.
+func jsonTypeName(k reflect.Kind) string {
+	switch k {
+	case reflect.String:
+		return "a string"
+	case reflect.Bool:
+		return "a boolean"
+	case reflect.Slice, reflect.Array:
+		return "an array"
+	case reflect.Map, reflect.Struct:
+		return "an object"
+	default:
+		return "a number"
+	}
+}
+
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	switch name {
 	case "recall":
@@ -197,7 +236,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Limit   mcpNumber `json:"limit"`
 			Offset  mcpNumber `json:"offset"`
 		}
-		if err := json.Unmarshal(raw, &a); err != nil {
+		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Query) == "" {
@@ -221,7 +260,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Query   string `json:"query"`
 			Harness string `json:"harness"`
 		}
-		if err := json.Unmarshal(raw, &a); err != nil {
+		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Query) == "" {
@@ -249,7 +288,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Limit   mcpNumber `json:"limit"`
 			All     bool      `json:"all"`
 		}
-		if err := json.Unmarshal(raw, &a); err != nil {
+		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Path) == "" {
@@ -288,7 +327,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Error string    `json:"error"`
 			Limit mcpNumber `json:"limit"`
 		}
-		if err := json.Unmarshal(raw, &a); err != nil {
+		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Error) == "" {
@@ -327,7 +366,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Project string    `json:"project"`
 			Limit   mcpNumber `json:"limit"`
 		}
-		if err := json.Unmarshal(raw, &a); err != nil {
+		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.What) == "" {
@@ -375,7 +414,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			Project string   `json:"project"`
 			Tags    []string `json:"tags"`
 		}
-		if err := json.Unmarshal(raw, &a); err != nil {
+		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Text) == "" {
