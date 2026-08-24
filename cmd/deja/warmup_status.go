@@ -124,14 +124,22 @@ func readWarmupStatus(dir string) *warmupStatus {
 // progress is the bare "phase 42%" fragment, for callers that supply their
 // own sentence.
 func (s *warmupStatus) progress() string {
+	// The status file exists before the first phase is written to it, and every
+	// caller drops this into parentheses or a sentence — so that window read
+	// "indexing this machine's history ()" and, with a count already known,
+	// "( 30%)". The word line() has always used for the same gap (#1731).
+	phase := s.Phase
+	if phase == "" {
+		phase = "starting"
+	}
 	if s.Total <= 0 {
-		return s.Phase
+		return phase
 	}
 	p := 100 * s.Done / s.Total
 	if p > 100 {
 		p = 100
 	}
-	return fmt.Sprintf("%s %d%%", s.Phase, p)
+	return fmt.Sprintf("%s %d%%", phase, p)
 }
 
 // line is the one-sentence status a host can show its user. It names what is
