@@ -18,7 +18,7 @@ how you used it. Say nothing about recalls that did not help.
 
 deja is a binary you install yourself; this extension only points Gemini at it:
 
-    brew install vshulcz/tap/deja-vu
+    brew install deja-vu
 
 or
 

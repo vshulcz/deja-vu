@@ -402,7 +402,7 @@ def scene_cta(t: float):
         centred(d, 274, "one binary  ·  no LLM  ·  no embeddings", font(20), FAINT)
         centred(d, 310, "nothing leaves your machine", font(20), FAINT)
     if t > 1.1:
-        cmd = "brew install vshulcz/tap/deja-vu"
+        cmd = "brew install deja-vu"
         f = font(26)
         w = d.textlength(cmd, font=f)
         d.rounded_rectangle([(W - w) / 2 - 28, 368, (W + w) / 2 + 28, 430], radius=10,
