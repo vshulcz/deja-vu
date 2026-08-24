@@ -23,10 +23,12 @@ func TestAnIndexRunThatBuiltNothingStillSaysWhereItStands(t *testing.T) {
 	if quiet.n != 0 {
 		t.Error("a build that printed nothing counted output")
 	}
-	if line := indexQuietOutcome(quiet.n, 760); !strings.Contains(line, "up to date") || !strings.Contains(line, "760") {
-		t.Errorf("a silent build ends with %q", line)
+	if line := indexQuietOutcome(true, 760); !strings.Contains(line, "up to date") || !strings.Contains(line, "760") {
+		t.Errorf("a silent build over a current index ends with %q", line)
 	}
-	if line := indexQuietOutcome(w.n, 760); line != "" {
-		t.Errorf("a build that reported its work adds a second summary: %q", line)
+	// A store that changed again while the other build was finishing: the run
+	// still says where things stand rather than claiming to be current.
+	if line := indexQuietOutcome(false, 760); strings.Contains(line, "up to date") || !strings.Contains(line, "760") {
+		t.Errorf("a silent build over a stale index ends with %q", line)
 	}
 }

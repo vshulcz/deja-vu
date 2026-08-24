@@ -266,11 +266,12 @@ func (c *countingWriter) Write(p []byte) (int, error) {
 }
 
 // indexQuietOutcome is the line an index run ends with when the build itself
-// said nothing — another deja had already done the work. Empty when the build
-// reported, so nothing is said twice.
-func indexQuietOutcome(printed, sessions int) string {
-	if printed > 0 {
-		return ""
+// said nothing — another deja had already done the work. It reports what is
+// actually on disk: a store can change again in the moment between the build
+// finishing and this line, and claiming "up to date" there would be a guess.
+func indexQuietOutcome(fresh bool, sessions int) string {
+	if !fresh {
+		return fmt.Sprintf("deja: another deja finished the build (%d session%s indexed); newer sessions are not in it yet", sessions, pluralS(sessions))
 	}
 	return fmt.Sprintf("deja: index is up to date (%d session%s)", sessions, pluralS(sessions))
 }
@@ -336,8 +337,8 @@ func cmdIndex(dir string, rest []string) error {
 		return ensureError(dir, err)
 	}
 	clearWarmupSentinel()
-	if _, n := index.UpToDate(dir, ""); progress.n == 0 {
-		fmt.Fprintln(os.Stderr, indexQuietOutcome(progress.n, n))
+	if fresh, n := index.UpToDate(dir, ""); progress.n == 0 {
+		fmt.Fprintln(os.Stderr, indexQuietOutcome(fresh, n))
 	}
 	// Two transcripts can carry the same harness:id — two files with the same
 	// name in different projects. Both stay searchable, but one manifest row
