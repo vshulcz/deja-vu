@@ -66,7 +66,15 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 		// Every page has to reach the problem pages, which are the ones people
 		// arrive on: a sidebar that lists only the product pages sends a
 		// first-time reader back to the search results.
-		for _, sibling := range []string{"forgetting.html", "where-sessions-are-stored.html", "after-compaction.html", "repeated-mistakes.html", "switching-agents.html"} {
+		for _, sibling := range []string{
+			"forgetting.html",
+			"where-sessions-are-stored.html",
+			"after-compaction.html",
+			"repeated-mistakes.html",
+			"switching-agents.html",
+			"export-conversations.html",
+			"sync-across-machines.html",
+		} {
 			if name == sibling {
 				continue
 			}
