@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -141,12 +142,19 @@ func TestCodexPluginHooks(t *testing.T) {
 		}
 	}
 
-	info, err := os.Stat(filepath.Join("..", "..", "codex-plugin", "hooks", "deja.sh"))
-	if err != nil {
+	script := filepath.Join("..", "..", "codex-plugin", "hooks", "deja.sh")
+	if _, err := os.Stat(script); err != nil {
 		t.Fatalf("the script the hooks point at is missing: %v", err)
 	}
-	if info.Mode()&0o111 == 0 {
-		t.Fatalf("codex-plugin/hooks/deja.sh is not executable (%v) — Codex runs it directly", info.Mode())
+	// What ships is the mode git records, not the one this checkout happens to
+	// have: a Windows checkout reports -rw-rw-rw- for every file, so reading it
+	// off the disk failed the whole matrix (#1671).
+	out, err := exec.Command("git", "ls-files", "-s", "--", script).Output()
+	if err != nil {
+		t.Skipf("git is not available to read the recorded mode: %v", err)
+	}
+	if mode, _, ok := strings.Cut(strings.TrimSpace(string(out)), " "); !ok || mode != "100755" {
+		t.Fatalf("codex-plugin/hooks/deja.sh is recorded as %q, not 100755 — Codex runs it directly", mode)
 	}
 
 	var manifest struct {
