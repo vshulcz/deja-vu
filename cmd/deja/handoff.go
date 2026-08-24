@@ -34,7 +34,11 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--to":
-			if i+1 >= len(args) {
+			// Empty as well as absent: an empty value fell through the
+			// `target != ""` gate below and printed the paste-only handoff, so
+			// a scripted `--to "$AGENT"` with the variable unset read like a
+			// handoff to an agent (#1647).
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return fmt.Errorf("handoff: --to needs an agent name")
 			}
 			target = args[i+1]
