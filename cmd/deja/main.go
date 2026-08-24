@@ -1581,6 +1581,14 @@ func parseLast(args []string) (int, search.Options, string, error) {
 			}
 			i++
 			v := args[i]
+			// Empty is how "no filter" is spelled inside deja, so an empty
+			// argument reached the search as no filter at all and a scripted
+			// `--project "$PROJECT"` with the variable unset quietly returned
+			// the whole store (#1612). It is the same mistake as leaving the
+			// value off, so it gets the same sentence.
+			if strings.TrimSpace(v) == "" {
+				return n, o, sinceRaw, fmt.Errorf("%s needs value", a)
+			}
 			switch a {
 			case "--harness":
 				o.Harness = v
@@ -1706,6 +1714,14 @@ func parseSearch(args []string) (search.Options, error) {
 			}
 			i++
 			v := args[i]
+			// Empty is how "no filter" is spelled inside deja, so an empty
+			// argument reached the search as no filter at all and a scripted
+			// `--project "$PROJECT"` with the variable unset quietly returned
+			// the whole store (#1612). It is the same mistake as leaving the
+			// value off, so it gets the same sentence.
+			if strings.TrimSpace(v) == "" {
+				return o, fmt.Errorf("%s needs value", a)
+			}
 			switch a {
 			case "--harness":
 				o.Harness = v
