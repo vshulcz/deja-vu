@@ -22,6 +22,19 @@ import (
 type installResult struct{ Path, Action string }
 
 func runInstall(dir string, args []string, uninstall bool) error {
+	// Every path deja writes hangs off the home directory, and homeDir()
+	// answers "" when it cannot find one. filepath.Join("", ".claude") is
+	// ".claude", so with HOME unset install wrote .claude/, .claude.json and
+	// .config/deja/wiring.json into whatever directory it was run from — a
+	// repository, usually — and reported success (#1690). A config directory
+	// only means anything at an absolute location.
+	if homeDir() == "" {
+		verb := "install"
+		if uninstall {
+			verb = "uninstall"
+		}
+		return fmt.Errorf("%s cannot find your home directory — set HOME to the account deja should wire", verb)
+	}
 	removingWiring = uninstall
 	defer func() { removingWiring = false }()
 	guidance := true
