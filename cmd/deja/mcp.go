@@ -704,6 +704,18 @@ func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error
 // needs precisely when the answer was too big to fit.
 const recallCountLineReserve = 160
 
+// twinSessionsFor pairs each session with the same session as it exists on
+// another machine, so a page holding both copies can say so. One manifest read
+// per page; empty when the index cannot be read, which costs a marker rather
+// than an answer.
+func twinSessionsFor(dir string) map[string]string {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return nil
+	}
+	return index.TwinSessions(metas)
+}
+
 func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
 	if limit <= 0 {
 		limit = 5
@@ -765,6 +777,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	// attempts and none of the 5 clean ones.
 	total := len(hits)
 	attachLifecycles(dir, hits)
+	twins := twinSessionsFor(dir)
 	demoted := demoteRejected(hits)
 	if offset > 0 {
 		if offset >= total {
@@ -826,6 +839,16 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// excerpts show which path was dropped.
 		if h.Session.GaveUp && h.Lifecycle == "" {
 			fmt.Fprintln(&hb, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
+		}
+		// Sync keeps both copies when a session id is on two machines, and
+		// nothing connected them: one session's two histories read as two
+		// unrelated sessions, sometimes disagreeing with each other (#1775).
+		if twin := twins[h.Session.Harness+":"+h.Session.ID]; twin != "" {
+			if strings.HasPrefix(h.Session.ID, "imported-") {
+				fmt.Fprintf(&hb, "[another machine's copy of %s, which this machine has too — the two may not say the same thing]\n", twin)
+			} else {
+				fmt.Fprintf(&hb, "[this machine's copy; %s is the same session as it arrived from another machine — the two may not say the same thing]\n", twin)
+			}
 		}
 		if h.Superseded != "" {
 			fmt.Fprintf(&hb, "[earlier attempt — a newer session in this project covers the same ground, updated %s]\n", h.Superseded)
