@@ -1232,7 +1232,14 @@ func variantDetail(text string, terms []string, variants map[string][]string) st
 	return ""
 }
 
+// FindByPrefix is the fallback the CLI takes when there is no index to read, so
+// it has to answer an empty prefix the same way index.FindByPrefix does: with
+// no match. Otherwise the guard depends on whether a rebuild happens to be
+// running, which is the worst kind of intermittent.
 func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {
+	if p == "" {
+		return model.Session{}, false
+	}
 	for _, s := range mergeSessions(ss) {
 		if strings.HasPrefix(s.ID, p) {
 			return s, true

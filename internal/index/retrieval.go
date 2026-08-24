@@ -1390,6 +1390,15 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	// Every id has "" as a prefix, so an empty one used to resolve to whichever
+	// session sorted first — and PrefixMatches has always answered 0 for it.
+	// That is the disagreement #853 is about, with the sign flipped: the count
+	// says nothing matches and the resolver opens something anyway. It reached a
+	// user through the MCP resource URI (#1728), which is a boundary that can be
+	// guarded, but the shared lookup is where the two answers have to agree.
+	if p == "" {
+		return model.Session{}, false, nil
+	}
 	// Non-blocking: the session-start hook reaches this through the handoff
 	// tip, and a blocking lock made the agent wait out the entire rebuild —
 	// twelve seconds on a real corpus, on the very upgrade that triggers one.
