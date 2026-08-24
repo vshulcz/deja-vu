@@ -87,6 +87,7 @@ func TestInstallCRLFStaysUnchangedOnRepeat(t *testing.T) {
 		".kimi-code/config.toml": "model = \"kimi\"\n",
 		".grok/config.toml":      "[mcp_servers.mine]\ncommand = \"my-server\"\n",
 		".hermes/config.yaml":    "model: hermes-3\n",
+		".dsh/cordis.patch.yml":  "# dsh patch\n- insert:\n    - id: mine\n      name: my-plugin\n",
 	}
 	for rel, text := range seed {
 		p := filepath.Join(home, filepath.FromSlash(rel))

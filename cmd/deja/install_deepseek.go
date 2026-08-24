@@ -302,6 +302,6 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	} else if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
 	}
-	a, err := writeIfChanged(path, old, []byte(dshPatchWith(string(old), dshPatchBlock(exe, withAuto))))
+	a, err := writeIfChanged(path, old, []byte(dshPatchWith(lfText(old), dshPatchBlock(exe, withAuto))))
 	return installResult{Path: path, Action: a}, err
 }
