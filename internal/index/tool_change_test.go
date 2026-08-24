@@ -1,6 +1,7 @@
 package index
 
 import (
+	"os"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -56,5 +57,25 @@ func TestAToolLostDoesNotStartARebuildLoop(t *testing.T) {
 	}
 	if got := mergedToolFingerprint(""); got != none {
 		t.Errorf("a first build with no tools recorded %q", got)
+	}
+}
+
+// An index created by `deja sync import` records the tools too: a blank
+// fingerprint reads as "written by an older deja", and the store skipped for a
+// missing CLI would never be re-read once it was installed.
+func TestAnImportedIndexRecordsTheTools(t *testing.T) {
+	dir := t.TempDir() + "/index.db"
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := initEmptyIndex(dir); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.ToolFingerprint == "" {
+		t.Error("an index built by sync import records no tools, so installing one never re-reads a skipped store")
 	}
 }

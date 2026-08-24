@@ -743,8 +743,12 @@ func initEmptyIndex(dir string) error {
 	// An empty index holds nothing, so whatever the patterns are now, they are
 	// applied to all of it. Leaving this blank would read as "written before
 	// deja recorded this" and keep `deja index` quiet forever after (#1307).
+	// Same reasoning for the tools this build could use: blank reads as "an
+	// older deja wrote this", and a store skipped for a missing CLI would then
+	// never be re-read once it was installed (#1760).
 	m := Manifest{Version: version, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
-		ExcludeFingerprint: sources.ExclusionFingerprint()}
+		ExcludeFingerprint: sources.ExclusionFingerprint(),
+		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	return writeManifest(dir, m)
 }
 
