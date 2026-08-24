@@ -34,7 +34,8 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
 		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
-		{"grok has no resume", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, "", "", "grok has no session resume"},
+		{"grok build session", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, real, "grok --resume 019f-grok", ""},
+		{"grok-dev row", model.Session{Harness: "grok", ID: "019f-dev", Project: "my-app", Path: filepath.Join(tmp, "grok.db")}, "", "", "grok-dev store"},
 		{"imported", model.Session{Harness: "claude", ID: "imported-9f5", Project: "imported:my-app"}, "", "", "another machine"},
 		{"unknown harness", model.Session{Harness: "mystery", ID: "x"}, "", "", "don't know how"},
 	}

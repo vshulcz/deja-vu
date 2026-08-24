@@ -232,22 +232,22 @@
     "fixtures/registry/grok/sessions/workspace%2Fregistry-demo/registry-grok/updates.jsonl"
    ],
    "parser_source": "internal/sources/grok.go",
-   "last_verified": "2026-07-27",
+   "last_verified": "2026-08-24",
    "display_name": "Grok Build",
    "capabilities": {
     "mcp": true,
     "auto": true,
     "skill": true,
     "command": true,
-    "resume": false,
+    "resume": true,
     "handoff": "exec",
     "prereq": "sqlite3 (grok-dev store)"
    },
    "gaps": {
-    "resume": {
+    "plugin_mcp_path": {
      "state": "unknown",
-     "why": "unanswered on purpose: the `grok` on this machine is the community CLI, a different product that shares the name and the ~/.grok directory, and its help has no resume flag. That says nothing about xAI's Grok Build, which is what this row is about, and no second source was available to check.",
-     "source": "community grok 1.0.1 --help; not Grok Build"
+     "why": "the plugin ships `.mcp.json` with `${GROK_PLUGIN_ROOT}` in its args, and nothing observed so far shows Grok expanding it there. The binary's only variable-expansion module is `xai-grok-hooks/src/env_expand.rs` and the docs introduce both plugin variables under plugin hooks, so a plugin-only install may be handing the launcher a literal path. Deciding it needs a signed-in session: `grok mcp doctor` and `grok inspect` ignore plugin servers, and `session/new` over ACP stops at `Authentication required` before any plugin server attaches.",
+     "source": "Grok Build 1.0.5 on macOS: mcp doctor, inspect, ACP session/new, binary strings"
     }
    }
   },

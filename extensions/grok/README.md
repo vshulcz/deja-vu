@@ -73,12 +73,13 @@ missing instead of pretending the history is empty.
 ## Unverified here
 
 `${GROK_PLUGIN_ROOT}` is what Grok's own plugin guide documents for hook
-commands, and it is used the same way in `.mcp.json` above. That second use is
-not something this machine could check against a running Grok Build — the `grok`
-CLI installed here is the community project that shares the name and the
-`~/.grok` directory, not xAI's Grok Build. If the variable is not expanded for
-MCP servers, the server fails to start and the CLI-wired path still works; say
-so in an issue and it will be fixed rather than guessed at again.
+commands, and it is used the same way in `.mcp.json` above. The hook use is
+confirmed on Grok Build 1.0.5; the `.mcp.json` use is not. Grok's plugin guide
+introduces both variables under plugin *hooks*, and neither `grok mcp doctor`
+nor `grok inspect` reports plugin MCP servers, so there is no offline way to
+read back the argv a plugin server would be launched with. If the variable is
+not expanded there, the server fails to start and the CLI-wired path still
+works; say so in an issue and it will be fixed rather than guessed at again.
 
 ## License
 

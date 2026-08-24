@@ -71,8 +71,12 @@
 <li><code>generated_title</code> takes precedence over <code>session_summary</code>.</li>
 <li>Missing summary files fall back to directory IDs and the <code>.cwd</code> or URL-decoded path.</li>
 <li>Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.</li>
+<li><code>deja resume</code> prints <code>grok --resume &lt;id&gt;</code> and runs it in the recovered</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-27</p>
+<p>working directory, since Grok Build scopes its session list by directory.</p>
+<p>Rows that came out of <code>grok.db</code> belong to the other product and get an error</p>
+<p>instead.</p>
+<p><strong>Last verified:</strong> 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)</p>
 
 <hr>
 <p>deja reads this format and nineteen others, and turns what it finds into memory your

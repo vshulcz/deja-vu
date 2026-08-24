@@ -135,7 +135,14 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
-		return "", "", fmt.Errorf("grok has no session resume — start grok in %s to continue", sources.GrokCWDForSession(s.Path))
+		// Grok Build resumes by session id and scopes its session list by the
+		// working directory, so this has to run in the original project. The
+		// grok-dev store is a different product sharing ~/.grok: its rows come
+		// out of grok.db and there is no CLI to hand them to.
+		if !strings.HasSuffix(s.Path, "updates.jsonl") {
+			return "", "", fmt.Errorf("session %s comes from the grok-dev store, which has no terminal resume", digest.Short(s.ID))
+		}
+		return sources.GrokCWDForSession(s.Path), "grok --resume " + s.ID, nil
 	case "cline":
 		if strings.HasPrefix(s.ID, "cline-task-") {
 			return "", "", fmt.Errorf("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
