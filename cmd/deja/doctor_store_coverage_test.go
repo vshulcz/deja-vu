@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -63,4 +65,35 @@ func TestDoctorNamesEveryStoreTheIndexerReads(t *testing.T) {
 			t.Errorf("doctor --json never names the %s store", h.Name)
 		}
 	}
+}
+
+// The two forms have to agree about why a store cannot be read: the text row
+// names the missing sqlite3 CLI, and the JSON said "unreadable" — the split
+// #999 closed for the stores that existed then.
+func TestZedSaysWhySqliteIsWhatIsMissing(t *testing.T) {
+	tmp := hermeticEnv(t)
+	db := sources.ZedDB()
+	if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(db, bytes.Repeat([]byte("x"), 64), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", "")
+	store, _ := inspectDoctorStore(doctorCheckNamed(t, "zed"))
+	if store.State != "needs-sqlite3" {
+		t.Errorf("zed without the sqlite3 CLI reports %q, while the text row names the CLI", store.State)
+	}
+	_ = tmp
+}
+
+func doctorCheckNamed(t *testing.T, name string) doctorStoreCheck {
+	t.Helper()
+	for _, c := range doctorStoreChecks() {
+		if c.name == name {
+			return c
+		}
+	}
+	t.Fatalf("no doctor store check named %q", name)
+	return doctorStoreCheck{}
 }

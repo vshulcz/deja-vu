@@ -216,7 +216,7 @@ func firstDeniedDir(paths []string) (string, bool) {
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
 func storeNeedsSQLite3(name string) bool {
 	switch name {
-	case "opencode", "cursor", "grok", "hermes", "goose":
+	case "opencode", "cursor", "grok", "hermes", "goose", "zed":
 		return true
 	}
 	return false
