@@ -104,9 +104,10 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
 	}
 	// The cap said nothing, so eight of thirteen ways to run the tests read as
-	// thirteen — the misread the search screen already avoids (#1632).
+	// thirteen — the misread the search screen already avoids (#1632). On
+	// stderr, where search puts the same line: stdout stays the list.
 	if len(entries) > limit {
-		fmt.Fprintf(stdout, "showing %d of %d — raise --limit for the rest\n", limit, len(entries))
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", limit, len(entries))
 	}
 	return nil
 }

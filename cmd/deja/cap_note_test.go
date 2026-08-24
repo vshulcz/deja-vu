@@ -35,20 +35,24 @@ func TestHowSaysWhenItCutTheList(t *testing.T) {
 	if err := runHow(dir, []string{"go", "test", "--limit", "3"}, &b); err != nil {
 		t.Fatal(err)
 	}
-	out := b.String()
-	if strings.Count(out, "$ go test") != 3 {
-		t.Fatalf("expected three entries, got:\n%s", out)
+	if n := strings.Count(b.String(), "$ go test"); n != 3 {
+		t.Fatalf("expected three entries, got %d:\n%s", n, b.String())
 	}
-	if !strings.Contains(out, "13") || !strings.Contains(out, "--limit") {
-		t.Errorf("the cut is silent — nothing says how many there were or how to see them:\n%s", out)
-	}
-	// The control: an uncut list says nothing extra.
-	b.Reset()
-	if err := runHow(dir, []string{"go", "test", "--limit", "20"}, &b); err != nil {
+	// The note goes where search puts its own: stderr, so stdout stays the list.
+	note, err := captureRunStderr(t, "how", "go", "test", "--limit", "3")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(b.String(), "--limit") {
-		t.Errorf("a complete answer still advertised the flag:\n%s", b.String())
+	if !strings.Contains(note, "showing 3 of 13") || !strings.Contains(note, "--limit") {
+		t.Errorf("the cut is silent — nothing says how many there were or how to see them:\n%s", note)
+	}
+	// The control: an uncut list says nothing extra.
+	note, err = captureRunStderr(t, "how", "go", "test", "--limit", "20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(note, "showing") {
+		t.Errorf("a complete answer still advertised the flag:\n%s", note)
 	}
 }
 
@@ -82,19 +86,19 @@ func TestFilesSaysWhenItCutTheList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var b bytes.Buffer
-	if err := runFiles(dir, []string{"retry", "--limit", "2"}, &b); err != nil {
+	note, err := captureRunStderr(t, "files", "retry", "--limit", "2")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(b.String(), "--limit") {
-		t.Errorf("files cut the list in silence:\n%s", b.String())
+	if !strings.Contains(note, "showing 2 of 6") {
+		t.Errorf("files cut the list in silence:\n%s", note)
 	}
 	// The control: nothing cut, nothing said.
-	b.Reset()
-	if err := runFiles(dir, []string{"retry", "--limit", "50"}, &b); err != nil {
+	note, err = captureRunStderr(t, "files", "retry", "--limit", "50")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(b.String(), "--limit") {
-		t.Errorf("a complete answer still advertised the flag:\n%s", b.String())
+	if strings.Contains(note, "showing") {
+		t.Errorf("a complete answer still advertised the flag:\n%s", note)
 	}
 }
