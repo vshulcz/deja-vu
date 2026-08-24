@@ -388,6 +388,17 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			}
 		}
 	} else {
+		// grok writes a twin below; check its markers before touching this
+		// file, or a refusal there leaves this one already rewritten (#1705).
+		if harness == "grok" {
+			b, rerr := os.ReadFile(filepath.Join(sources.GrokHome(), "AGENTS.md"))
+			if rerr != nil && !os.IsNotExist(rerr) {
+				return installResult{}, rerr
+			}
+			if cerr := checkGuidanceMarkers(string(b)); cerr != nil {
+				return installResult{}, cerr
+			}
+		}
 		updated, uerr := updateGuidanceBlock(string(old), uninstall)
 		if uerr != nil {
 			return installResult{}, uerr

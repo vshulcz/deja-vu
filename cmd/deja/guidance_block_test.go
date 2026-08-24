@@ -1,8 +1,12 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 const guidanceBlockSample = guidanceStart + "\nsome guidance\n" + guidanceEnd + "\n"
@@ -43,6 +47,35 @@ func TestGuidanceBlockRepairsADuplicate(t *testing.T) {
 	}
 	if !strings.Contains(got, "MY OWN text between") {
 		t.Errorf("the user's text was dropped:\n%s", got)
+	}
+}
+
+// grok writes GROK.md and AGENTS.md from one install. A refusal on the second
+// used to leave the first already rewritten (#1705, found in review).
+func TestGuidanceGrokTwinIsCheckedFirst(t *testing.T) {
+	hermeticEnv(t)
+	dir := sources.GrokHome()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stale := guidanceStart + "\nSTALE\n" + guidanceEnd + "\n"
+	primary := filepath.Join(dir, "GROK.md")
+	if err := os.WriteFile(primary, []byte(stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	half := guidanceStart + "\nsome guidance\n" + "MY OWN in the twin\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(half), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "grok"); err == nil {
+		t.Error("install accepted a twin it could not bound")
+	}
+	b, err := os.ReadFile(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != stale {
+		t.Errorf("the primary file was rewritten while the twin refused:\n%s", b)
 	}
 }
 
