@@ -160,3 +160,34 @@ func TestSaveReplacesTheFileWhole(t *testing.T) {
 		t.Errorf("a second write lost the first host: %+v", list)
 	}
 }
+
+// A push with nothing to send opens no connection: the host is remembered, and
+// what it did last time is left alone rather than overwritten with a zero
+// (#1780).
+func TestRecordingNothingKeepsWhatWasThere(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	when := time.Now().Add(-time.Hour)
+	if err := Record("mini", false, when, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := Record("mini", false, time.Time{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	list := Load()
+	if len(list) != 1 {
+		t.Fatalf("peers = %v", list)
+	}
+	if got := list[0].LastPush; got.Sub(when.UTC()).Abs() > time.Second {
+		t.Errorf("the earlier exchange was overwritten: %v", got)
+	}
+	// A host deja has never reached is remembered with nothing claimed.
+	if err := Record("fresh", false, time.Time{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range Load() {
+		if p.Host == "fresh" && (!p.LastPush.IsZero() || p.LastError != "") {
+			t.Errorf("a host that was never contacted reads as %+v", p)
+		}
+	}
+}

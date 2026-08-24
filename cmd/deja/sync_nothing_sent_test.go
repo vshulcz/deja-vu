@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,5 +45,29 @@ func TestNothingToSendIsNotAnExchange(t *testing.T) {
 		if p.Host == "broken.example" && p.LastError == "" {
 			t.Error("a failure was not recorded")
 		}
+	}
+}
+
+// peers.Forget was written and tested and nothing reached it: a typo'd hostname
+// stayed in the list and every bare `deja sync` retried it, at the cost of the
+// connect timeout each time (#1780).
+func TestSyncForgetRemovesAMachine(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	if err := peers.Record("mini", false, time.Now(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := runSync(t.TempDir(), []string{"forget", "mini"}); err != nil {
+		t.Fatalf("forgetting a known machine: %v", err)
+	}
+	if list := peers.Load(); len(list) != 0 {
+		t.Errorf("peers = %v", list)
+	}
+	err := runSync(t.TempDir(), []string{"forget", "mini"})
+	if err == nil {
+		t.Fatal("forgetting a machine deja does not know said nothing")
+	}
+	if !strings.Contains(err.Error(), "does not know") {
+		t.Errorf("the refusal reads %q", err)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/vshulcz/deja-vu/internal/peers"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -49,6 +50,21 @@ func runSync(dir string, args []string) error {
 	switch args[0] {
 	case "ssh":
 		return runSyncSSH(dir, args[1:])
+	case "forget":
+		// A machine deja knows is retried by every bare `deja sync`, and a
+		// typo'd hostname is one of those forever — at the cost of the connect
+		// timeout each time. peers.Forget did the work already and nothing
+		// reached it (#1780).
+		host := args[1]
+		found, err := peers.Forget(host)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return fmt.Errorf("deja does not know a machine called %q — `deja doctor` lists the ones it does", host)
+		}
+		fmt.Fprintf(os.Stdout, "deja: %s forgotten — bare `deja sync` will not try it again\n", host)
+		return nil
 	case "export":
 		full := false
 		rest := args[1:]

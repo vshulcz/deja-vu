@@ -2778,6 +2778,7 @@ Usage:
   deja sync import <dir>
   deja sync                       (exchange with every machine deja knows, both ways)
   deja sync ssh <host> [--pull] [--both] [--full]
+  deja sync forget <host>
   deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]
   deja sources
   deja completion <bash|zsh|fish>

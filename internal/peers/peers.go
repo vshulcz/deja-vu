@@ -104,6 +104,10 @@ func Record(host string, pulled bool, when time.Time, err error) error {
 		// The failure is recorded, the timestamp is not: "last exchanged
 		// tuesday" has to mean memory actually moved.
 		list[i].LastError = trimError(err.Error())
+	} else if when.IsZero() {
+		// A caller with nothing to report — a push that found nothing to send,
+		// so no connection was opened. The host is remembered; what it did
+		// last time is not overwritten with a zero (#1780).
 	} else {
 		list[i].LastError = ""
 		if pulled {
