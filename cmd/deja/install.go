@@ -860,8 +860,14 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 		// chmod-ed or found (#1686, the shape of #865). Rewriting the path in
 		// place keeps the error a *PathError, so errors.Is still sees the
 		// permission underneath and the remedy still names permissions.
+		//
+		// Only for a permission denial: the destination is the right thing to
+		// name when the directory refuses us, and the wrong thing when the
+		// failure is about the scratch file itself — "config.toml: no such
+		// file or directory" would send the reader after a directory that is
+		// the actual problem.
 		var pe *os.PathError
-		if errors.As(terr, &pe) {
+		if errors.Is(terr, fs.ErrPermission) && errors.As(terr, &pe) {
 			pe.Path = path
 		}
 		return "", terr

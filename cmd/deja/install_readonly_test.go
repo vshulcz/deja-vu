@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -13,8 +14,8 @@ import (
 // ~/.codex/.deja-tmp-4168817699 — the scratch file writeIfChanged creates to
 // write atomically. The reader cannot look at it, chmod it, or find it (#1686).
 func TestInstallNamesTheConfigNotTheTempFile(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root writes through a read-only directory")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("the directory mode is not enforced here")
 	}
 	hermeticEnv(t)
 	home := os.Getenv("HOME")
@@ -50,8 +51,8 @@ func TestInstallNamesTheConfigNotTheTempFile(t *testing.T) {
 // writeIfChanged's own error, checked directly: the path is the config, and
 // errors.Is still sees the permission underneath.
 func TestWriteIfChangedReportsTheDestination(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root writes through a read-only directory")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("the directory mode is not enforced here")
 	}
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o555); err != nil {
