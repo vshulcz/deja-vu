@@ -3214,11 +3214,6 @@ func dayWord(n int) string {
 	return fmt.Sprintf("%d days", n)
 }
 
-// unforgetGoneLines says why a lifted tombstone restored nothing. Two causes
-// with two answers: a session deja only ever held in its own index came from
-// another machine and sync import brings it back (#967), while a transcript
-// this machine wrote and then deleted is simply not on disk — telling that
-// reader to import from another machine names one they never had (#1755).
 // pluralIsLifted and pluralTranscript keep the two sentences readable for one
 // key and for several; joinCapped names up to five.
 func pluralIsLifted(n int) string {
@@ -3235,6 +3230,11 @@ func pluralTranscript(n int) string {
 	return "s they"
 }
 
+// unforgetGoneLines says why a lifted tombstone restored nothing. Two causes
+// with two answers: a session deja only ever held in its own index came from
+// another machine and sync import brings it back (#967), while a transcript
+// this machine wrote and then deleted is simply not on disk — telling that
+// reader to import from another machine names one they never had (#1755).
 func unforgetGoneLines(missing []string) []string {
 	var imported, local []string
 	for _, key := range missing {
