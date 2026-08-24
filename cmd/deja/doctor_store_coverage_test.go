@@ -97,3 +97,45 @@ func doctorCheckNamed(t *testing.T, name string) doctorStoreCheck {
 	t.Fatalf("no doctor store check named %q", name)
 	return doctorStoreCheck{}
 }
+
+// The text row says a store's sqlite half is unreadable — "sqlite3 CLI missing
+// — IDE sessions unavailable" — while the JSON form called the same store ok.
+// Two answers about one store is what #999 closed for the states that existed
+// then (#1758).
+func TestBothFormsAgreeWhenHalfAStoreNeedsSqlite(t *testing.T) {
+	tmp := hermeticEnv(t)
+	ide := filepath.Join(tmp, "cursor-user", "globalStorage")
+	if err := os.MkdirAll(ide, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A file that is not a readable database is enough: the point is the CLI,
+	// and without it deja cannot tell one from the other.
+	if err := os.WriteFile(filepath.Join(ide, "state.vscdb"), bytes.Repeat([]byte("x"), 64), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli := filepath.Join(tmp, "cursor-cli", "projects", "p", "agent-transcripts")
+	if err := os.MkdirAll(cli, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","sessionId":"c1","cwd":"/w","timestamp":"2026-08-08T01:00:00Z","message":{"role":"user","content":"snorklewhip"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(cli, "t.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "cursor-user"))
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", filepath.Join(tmp, "cursor-cli"))
+	t.Setenv("PATH", "")
+
+	var check doctorStoreCheck
+	for _, c := range doctorStoreChecks() {
+		if c.name == "cursor" {
+			check = c
+		}
+	}
+	store, _ := inspectDoctorStore(check)
+	if store.State == "ok" {
+		t.Errorf("the JSON form calls a store ok while its text row says the sqlite3 CLI is missing")
+	}
+	if store.State != "needs-sqlite3" {
+		t.Errorf("state = %q, want needs-sqlite3", store.State)
+	}
+}

@@ -567,19 +567,32 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		}
 		ss = append(ss, r.ss...)
 		if progress != nil && !SuppressHarnessNarration {
-			msgs := 0
-			for _, s := range r.ss {
-				msgs += len(s.Messages)
-			}
-			// "deja" is the notes pseudo-source; it narrates as "notes".
-			label := r.name
-			if label == "deja" {
-				label = "notes"
-			}
-			fmt.Fprintf(progress, "deja: %s: %d session%s, %d message%s\n", label, len(r.ss), pluralS(len(r.ss)), msgs, pluralS(msgs))
+			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name)))
 		}
 	}
 	return ss
+}
+
+// harnessNarration is the line an index run prints for one store. A store can
+// be half-readable — cursor keeps CLI transcripts as JSONL and its IDE sessions
+// in SQLite — and the count alone then reads as the whole story while half of
+// it is missing from recall. The skip reason was printed only for a store that
+// yielded nothing at all (#1758, the shape of #794).
+func harnessNarration(name string, ss []model.Session, skipped string) string {
+	msgs := 0
+	for _, s := range ss {
+		msgs += len(s.Messages)
+	}
+	// "deja" is the notes pseudo-source; it narrates as "notes".
+	label := name
+	if label == "deja" {
+		label = "notes"
+	}
+	line := fmt.Sprintf("deja: %s: %d session%s, %d message%s", label, len(ss), pluralS(len(ss)), msgs, pluralS(msgs))
+	if skipped != "" {
+		line += " — part of this store could not be read: " + skipped
+	}
+	return line
 }
 
 // ReportCollisions returns how many transcripts shared an id with another since

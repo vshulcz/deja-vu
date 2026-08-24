@@ -438,6 +438,15 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	_ = f.Close()
 	sessions, parseErr := check.parse(newest)
 	store.State = "ok"
+	// A store can be half-readable: cursor keeps CLI transcripts as JSONL and
+	// its IDE sessions in SQLite, so the newest file can parse while the other
+	// half cannot be read at all. The text row has said so in its detail all
+	// along; this form called the store ok (#1758).
+	if reason := sources.SkipReason(check.name); reason != "" && storeNeedsSQLite3(check.name) {
+		store.State = "needs-sqlite3"
+		store.Partial = len(check.files) > 1
+		return store, mod
+	}
 	// A parser that could not run is not a store that could not be understood.
 	// Without this, removing the sqlite3 CLI told the user their harness had
 	// changed its format and asked them to report it — two lines above deja
