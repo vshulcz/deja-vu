@@ -57,15 +57,31 @@ type toolAfterInput struct {
 
 func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input toolAfterInput
-	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	raw := readHookPayload(stdin, hookStdinWait)
+	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
 	adoptHookCWD(input.CWD)
 	if !planIndexReady(dir) {
 		return nil
 	}
-	if !isCommandTool(input.ToolName) {
+	// A payload the decoder could not read at all has no tool name either, and
+	// the gate below would drop it before the salvage a few lines down. Only
+	// that case: a payload that decoded and names another tool is still not
+	// ours.
+	truncated := input.ToolName == "" && len(bytes.TrimSpace(raw)) > 0
+	if !truncated && !isCommandTool(input.ToolName) {
 		return nil
 	}
 	out := toolResponseText(input.ToolResponse)
+	if out == "" {
+		// readHookPayload stops at 1 MiB, so a verbose build cuts the JSON
+		// mid-string and the decode yields nothing at all — not a truncated
+		// payload, an empty one. The error is usually the first line of that
+		// output, and this hook exists for exactly the failing `make` or
+		// `pytest -v` whose log runs past a megabyte (#1716). What arrived is
+		// still worth reading: pull the output back out of the cut JSON rather
+		// than throwing away a megabyte that begins with the error.
+		out = clampOutput(salvageToolOutput(string(raw)))
+	}
 	if out == "" {
 		return nil
 	}
@@ -129,6 +145,101 @@ func toolResponseText(raw json.RawMessage) string {
 		}
 	}
 	return clampOutput(b.String())
+}
+
+// salvageToolOutput pulls the tool's output out of a payload the decoder could
+// not read. Scanning the raw bytes does not work: the JSON prefix is glued to
+// the first line of the output, and a line holding a quote is dropped as source
+// rather than error — correctly, for real tool output. So find where the value
+// starts, unescape what follows, and hand back that.
+func salvageToolOutput(raw string) string {
+	for _, key := range []string{`"stderr"`, `"error"`, `"output"`, `"stdout"`, `"content"`, `"result"`} {
+		i := strings.Index(raw, key)
+		if i < 0 {
+			continue
+		}
+		v, ok := jsonStringAfter(raw[i+len(key):])
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// jsonStringAfter reads the string value that follows a key: the colon, any
+// whitespace a pretty-printed payload puts there, then the quoted value. The
+// value ends at the first unescaped quote, or at the end of what arrived when
+// the payload was cut mid-string — which is the case this exists for.
+func jsonStringAfter(s string) (string, bool) {
+	s = strings.TrimLeft(s, " \t\r\n")
+	if !strings.HasPrefix(s, ":") {
+		return "", false
+	}
+	s = strings.TrimLeft(s[1:], " \t\r\n")
+	if !strings.HasPrefix(s, `"`) {
+		return "", false
+	}
+	s = s[1:]
+	if end := unescapedQuote(s); end >= 0 {
+		s = s[:end]
+	}
+	s = unescapeJSONString(s)
+	return s, true
+}
+
+// unescapeJSONString undoes the escapes a tool log actually carries, in one
+// left-to-right pass so an escaped backslash cannot be re-read as an escape.
+// A cut value can end on a lone backslash; that one is dropped.
+func unescapeJSONString(s string) string {
+	if !strings.ContainsRune(s, '\\') {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' || i+1 >= len(s) {
+			if s[i] != '\\' {
+				b.WriteByte(s[i])
+			}
+			continue
+		}
+		i++
+		switch s[i] {
+		case 'n':
+			b.WriteByte('\n')
+		case 't':
+			b.WriteByte('\t')
+		case 'r':
+			b.WriteByte('\r')
+		case '"', '\\', '/':
+			b.WriteByte(s[i])
+		default:
+			b.WriteByte('\\')
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
+}
+
+// unescapedQuote returns the index of the first quote not preceded by an odd
+// number of backslashes, or -1.
+func unescapedQuote(s string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] != '"' {
+			continue
+		}
+		back := 0
+		for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
+			back++
+		}
+		if back%2 == 0 {
+			return i
+		}
+	}
+	return -1
 }
 
 func clampOutput(s string) string {
