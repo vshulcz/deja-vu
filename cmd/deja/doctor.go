@@ -140,12 +140,26 @@ func doctorDeep(w io.Writer, r index.DeepReport) {
 		fmt.Fprintf(w, "  stale    %s changed since last pass — `deja index` will absorb them\n", doctorCount(len(r.Stale), "source"))
 	}
 	if r.Clean() {
-		// What this pass actually compares is message counts per session, plus
-		// the structure around them: sizes, magic numbers, postings that
-		// resolve. It cannot see a same-length edit inside a record, which
-		// leaves the count identical and the session unreachable — so the line
-		// says what was checked rather than promising nothing was lost (#1712).
-		fmt.Fprintln(w, "  status   every session's message count matches its source, and the records and postings read cleanly")
+		// What this pass compares is message counts per session, plus the
+		// structure around them: sizes, magic numbers, postings that resolve.
+		// It cannot see a same-length edit inside a record, which leaves the
+		// count identical and the session unreachable — so the line says what
+		// was checked rather than promising nothing was lost (#1712).
+		//
+		// And only what was actually checked: nothing is sampled when every
+		// source is stale, or when the sampled tokens carry no postings, and a
+		// clean report then means "found nothing wrong", not "compared and
+		// agreed".
+		switch {
+		case r.SampledFiles == 0 && r.SampledPostings == 0:
+			fmt.Fprintln(w, "  status   nothing to compare — no source was in sync to re-parse and no sampled token carried postings")
+		case r.SampledFiles == 0:
+			fmt.Fprintln(w, "  status   the sampled postings resolve; no source was in sync to re-parse, so no message count was compared")
+		case r.SampledPostings == 0:
+			fmt.Fprintln(w, "  status   every sampled session's message count matches its source; no sampled token carried postings")
+		default:
+			fmt.Fprintln(w, "  status   every sampled session's message count matches its source, and the sampled postings resolve")
+		}
 		return
 	}
 	for _, f := range r.Findings {

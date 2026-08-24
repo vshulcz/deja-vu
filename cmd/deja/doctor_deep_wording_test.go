@@ -25,6 +25,38 @@ func TestDeepStatusSaysWhatItCompared(t *testing.T) {
 	}
 }
 
+// A clean report that sampled nothing must not claim a comparison happened:
+// nothing is sampled when every source is stale, or when the sampled tokens
+// carry no postings (found in review on #1713).
+func TestDeepStatusDoesNotClaimAnUnsampledComparison(t *testing.T) {
+	cases := []struct {
+		name    string
+		report  index.DeepReport
+		mustNot string
+		must    string
+	}{
+		{"nothing sampled at all", index.DeepReport{FilesChecked: 3, SessionsIndexed: 3},
+			"matches its source", "nothing to compare"},
+		{"no file re-parsed", index.DeepReport{FilesChecked: 3, SessionsIndexed: 3, SampledPostings: 10},
+			"message count matches", "no source was in sync"},
+		{"no posting carried", index.DeepReport{FilesChecked: 3, SessionsIndexed: 3, SampledFiles: 3},
+			"postings resolve;", "no sampled token carried postings"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			doctorDeep(&buf, c.report)
+			out := buf.String()
+			if strings.Contains(out, c.mustNot) {
+				t.Errorf("claims a comparison that did not happen:\n%s", out)
+			}
+			if !strings.Contains(out, c.must) {
+				t.Errorf("does not say what was skipped:\n%s", out)
+			}
+		})
+	}
+}
+
 // The control: a report with findings still leads with them, unchanged.
 func TestDeepStatusStillLeadsWithFindings(t *testing.T) {
 	var buf bytes.Buffer
