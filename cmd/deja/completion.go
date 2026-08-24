@@ -25,6 +25,9 @@ func runCompletion(args []string) error {
 	script = strings.ReplaceAll(script, "%INSTALL_TARGETS%", strings.Join(installTargetNames(), " "))
 	script = strings.ReplaceAll(script, "%HARNESSES%", strings.Join(sources.HarnessNames(), " "))
 	script = strings.ReplaceAll(script, "%HANDOFF_TARGETS%", strings.Join(handoffTargets(), " "))
+	// The last hand-written list: seven copies of "user assistant tool" while
+	// --role accepted four more (#1658).
+	script = strings.ReplaceAll(script, "%ROLES%", strings.Join(knownRoles, " "))
 	_, err := fmt.Fprint(os.Stdout, script)
 	return err
 }
@@ -106,7 +109,7 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             elif [[ "$prev" == "--role" ]]; then
-                COMPREPLY=( $(compgen -W "user assistant tool" -- "$cur") )
+                COMPREPLY=( $(compgen -W "%ROLES%" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -W "--harness --project --since --role" -- "$cur") )
             fi
@@ -235,7 +238,7 @@ _deja() {
       _arguments '--no-guidance[skip guidance files]' "1:target:($install_targets)"
       ;;
     last)
-      _arguments '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)' '1:count:'
+      _arguments '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '1:count:'
       ;;
     remember)
       _arguments '--project=[note project]:project:' '1:text:'
@@ -244,7 +247,7 @@ _deja() {
       _arguments '--exec[launch the native harness]' '1:session ID prefix:'
       ;;
     stats)
-      _arguments '--json[print JSON]' '--impact[measured impact report]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)'
+      _arguments '--json[print JSON]' '--impact[measured impact report]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
       ;;
     sync)
       if (( CURRENT == 3 )); then
@@ -260,7 +263,7 @@ _deja() {
     check|ctx|embed|hook-precompact|hook-prompt|mcp|share|show|sources|statusline|update|version|warmup)
       ;;
     *)
-      _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(user assistant tool)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]'
+      _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]'
       ;;
   esac
 }
@@ -280,7 +283,7 @@ complete -c deja -n '__deja_needs_command' -l no-embed -d 'Skip semantic reranki
 complete -c deja -n '__deja_needs_command' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__deja_needs_command' -l project -r
 complete -c deja -n '__deja_needs_command' -l since -r
-complete -c deja -n '__deja_needs_command' -l role -r -a 'user assistant tool'
+complete -c deja -n '__deja_needs_command' -l role -r -a '%ROLES%'
 complete -c deja -n '__deja_needs_command' -l session -r
 complete -c deja -n '__deja_needs_command' -l rebuild
 
@@ -313,7 +316,7 @@ complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidan
 complete -c deja -n '__fish_seen_subcommand_from last' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from last' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from last' -l since -r
-complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a 'user assistant tool'
+complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
 complete -c deja -n '__fish_seen_subcommand_from stats' -l json
@@ -324,7 +327,7 @@ complete -c deja -n '__fish_seen_subcommand_from stats' -l card -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from stats' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l since -r
-complete -c deja -n '__fish_seen_subcommand_from stats' -l role -r -a 'user assistant tool'
+complete -c deja -n '__fish_seen_subcommand_from stats' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from export import ssh' -a 'export import ssh'
 complete -c deja -n '__fish_seen_subcommand_from export' -l full
 complete -c deja -n '__fish_seen_subcommand_from export' -F
