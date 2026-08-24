@@ -75,7 +75,11 @@ func TestOwnedGuidanceTargetsAndMarkerBoundaries(t *testing.T) {
 	}
 	old := "prose " + guidanceStart + "\nkeep\n" + guidanceEnd + "\n"
 	want := old + "\n" + guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
-	if got := updateGuidanceBlock(old, false); got != want {
+	got, err := updateGuidanceBlock(old, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
 		t.Fatalf("inline markers were replaced: %q", got)
 	}
 	// grok still shares its file with the user, so it stands in for the
@@ -193,7 +197,10 @@ func TestClaudeGuidanceIsOwnedAndOptOutWorks(t *testing.T) {
 
 func TestGuidanceBlockHandlesCRLFAndUnsupportedResult(t *testing.T) {
 	old := "# Rules\r\n\r\n" + guidanceStart + "\r\nold\r\n" + guidanceEnd + "\r\n"
-	got := updateGuidanceBlock(old, false)
+	got, err := updateGuidanceBlock(old, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Count(got, guidanceStart) != 1 || !strings.Contains(got, "\r\n") || strings.Contains(got, "old") {
 		t.Fatalf("CRLF rewrite = %q", got)
 	}

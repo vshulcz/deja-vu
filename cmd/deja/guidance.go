@@ -226,7 +226,10 @@ func dropRetiredGuidance(harness string) error {
 			}
 			continue
 		}
-		next := updateGuidanceBlock(string(old), true)
+		next, uerr := updateGuidanceBlock(string(old), true)
+		if uerr != nil {
+			return uerr
+		}
 		// A file that held nothing but our block was ours to begin with, so
 		// leaving it behind empty would be litter rather than someone's content.
 		if strings.TrimSpace(next) == "" {
@@ -385,7 +388,11 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			}
 		}
 	} else {
-		next = []byte(updateGuidanceBlock(string(old), uninstall))
+		updated, uerr := updateGuidanceBlock(string(old), uninstall)
+		if uerr != nil {
+			return installResult{}, uerr
+		}
+		next = []byte(updated)
 	}
 	a, err := writeGuidanceFile(path, old, next)
 	if err != nil {
@@ -403,30 +410,75 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		if rerr != nil && !os.IsNotExist(rerr) {
 			return installResult{}, rerr
 		}
-		if _, werr := writeIfChanged(alt, oldAlt, []byte(updateGuidanceBlock(string(oldAlt), uninstall))); werr != nil {
+		updatedAlt, uerr := updateGuidanceBlock(string(oldAlt), uninstall)
+		if uerr != nil {
+			return installResult{}, uerr
+		}
+		if _, werr := writeIfChanged(alt, oldAlt, []byte(updatedAlt)); werr != nil {
 			return installResult{}, werr
 		}
 	}
 	return installResult{Path: path, Action: a}, nil
 }
 
-func updateGuidanceBlock(old string, uninstall bool) string {
+func updateGuidanceBlock(old string, uninstall bool) (string, error) {
 	newline := "\n"
 	if strings.Contains(old, "\r\n") {
 		newline = "\r\n"
 	}
-	start, end := guidanceMarkerLines(old)
-	if start >= 0 && end >= 0 {
+	// A marker without its pair means the block cannot be bounded. Appending a
+	// fresh one left the file with two starts and one end, and the uninstall
+	// after that cut from the first start to the only end — across the user's
+	// own text — and deleted the file, because what was left was empty (#1705).
+	if err := checkGuidanceMarkers(old); err != nil {
+		return "", err
+	}
+	// Every complete block, not just the first: a file carrying two kept both
+	// for ever, since the install removed one and appended one.
+	for {
+		start, end := guidanceMarkerLines(old)
+		if start < 0 || end < 0 {
+			break
+		}
 		old = old[:start] + old[end:]
 	}
 	if uninstall {
-		return old
+		return old, nil
 	}
 	old = strings.TrimRight(old, "\r\n")
 	if old != "" {
 		old += newline + newline
 	}
-	return old + strings.ReplaceAll(guidanceText("append"), "\n", newline)
+	return old + strings.ReplaceAll(guidanceText("append"), "\n", newline), nil
+}
+
+// checkGuidanceMarkers reports whether every start marker has an end marker
+// after it. Only whole-line markers count, which is what guidanceMarkerLines
+// pairs — a marker written inline in a sentence is prose, and deja appends its
+// own block below such a file rather than claiming that text.
+//
+// A lone end marker is left alone for the same reason: it is what an inline
+// start looks like to a line scanner, and appending below it costs nobody
+// anything. A start with no end is different — the block cannot be bounded,
+// and cutting from it to the next end takes whatever the user wrote in
+// between, which is how an uninstall came to delete the file (#1705).
+func checkGuidanceMarkers(doc string) error {
+	open := false
+	for _, line := range strings.Split(doc, "\n") {
+		switch strings.TrimSuffix(line, "\r") {
+		case guidanceStart:
+			if open {
+				return fmt.Errorf("deja's guidance block has a start marker with no end marker after it — put the pair back, or delete the block entirely")
+			}
+			open = true
+		case guidanceEnd:
+			open = false
+		}
+	}
+	if open {
+		return fmt.Errorf("deja's guidance block has no end marker — put it back, or delete the block entirely")
+	}
+	return nil
 }
 
 func guidanceMarkerLines(s string) (start, end int) {
