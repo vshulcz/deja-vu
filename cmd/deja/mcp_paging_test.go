@@ -53,3 +53,14 @@ func TestFullRecallPageKeepsThePagingLine(t *testing.T) {
 		t.Errorf("a full page dropped the paging line (want %q), tail was:\n%q", want, out[max(0, len(out)-200):])
 	}
 }
+
+// A budget smaller than the paging line itself must not trim to a negative
+// length: the page is what there is room for, the instruction is what goes.
+func TestTinyBudgetDropsTheLineRatherThanPanicking(t *testing.T) {
+	if got := trimUTF8("hello world", -5); got != "" {
+		t.Errorf("trimUTF8 with a negative budget = %q", got)
+	}
+	if got := trimUTF8("hello", 0); got != "" {
+		t.Errorf("trimUTF8 with a zero budget = %q", got)
+	}
+}

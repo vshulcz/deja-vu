@@ -921,6 +921,11 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	// to leave room for it instead.
 	out := b.String()
 	if len(out)+len(more) > budget {
+		// A budget smaller than the instruction itself: keep the page and drop
+		// the line rather than trim to a negative length.
+		if len(more) >= budget {
+			more = ""
+		}
 		out = trimUTF8(out, budget-len(more))
 	}
 	out += more
@@ -939,6 +944,9 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 }
 
 func trimUTF8(s string, budget int) string {
+	if budget <= 0 {
+		return ""
+	}
 	if len(s) <= budget {
 		return s
 	}
