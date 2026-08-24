@@ -62,6 +62,9 @@ func TestRecallNamesTheOtherMachinesCopy(t *testing.T) {
 	}
 	// Each copy is named from its own side rather than with one hedged
 	// sentence on both.
+	if n := strings.Count(text, "may not say the same thing"); n != 2 {
+		t.Errorf("the marker appears %d times, want one per copy:\n%s", n, text)
+	}
 	if !strings.Contains(text, "another machine's copy") || !strings.Contains(text, "this machine's copy") {
 		t.Errorf("the two copies are not told apart:\n%s", text)
 	}

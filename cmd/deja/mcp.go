@@ -708,7 +708,7 @@ const recallCountLineReserve = 160
 // another machine, so a page holding both copies can say so. One manifest read
 // per page; empty when the index cannot be read, which costs a marker rather
 // than an answer.
-func twinSessionsFor(dir string) map[string]string {
+func twinSessionsFor(dir string) map[string][]string {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
 		return nil
@@ -843,11 +843,13 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// Sync keeps both copies when a session id is on two machines, and
 		// nothing connected them: one session's two histories read as two
 		// unrelated sessions, sometimes disagreeing with each other (#1775).
-		if twin := twins[h.Session.Harness+":"+h.Session.ID]; twin != "" {
-			if strings.HasPrefix(h.Session.ID, "imported-") {
-				fmt.Fprintf(&hb, "[another machine's copy of %s, which this machine has too — the two may not say the same thing]\n", twin)
+		if twin := twins[h.Session.Harness+":"+h.Session.ID]; len(twin) > 0 {
+			// OrigID is the fact; an "imported-" id is only the convention
+			// sync mints, and a harness could name a local session that way.
+			if h.Session.OrigID != "" {
+				fmt.Fprintf(&hb, "[another machine's copy of %s, which this machine has too — the two may not say the same thing]\n", joinCapped(twin, 3))
 			} else {
-				fmt.Fprintf(&hb, "[this machine's copy; %s is the same session as it arrived from another machine — the two may not say the same thing]\n", twin)
+				fmt.Fprintf(&hb, "[this machine's copy; the same session arrived from elsewhere as %s — they may not say the same thing]\n", joinCapped(twin, 3))
 			}
 		}
 		if h.Superseded != "" {
