@@ -61,7 +61,7 @@ func TestViewHonoursTheTrustPolicy(t *testing.T) {
 	}
 
 	out := filepath.Join(t.TempDir(), "view.html")
-	if _, err := writeViewHTML(dir, out); err != nil {
+	if _, _, err := writeViewHTML(dir, out); err != nil {
 		t.Fatal(err)
 	}
 	before := len(viewSessionsEmbedded(t, readFileString(t, out)))
@@ -75,7 +75,7 @@ func TestViewHonoursTheTrustPolicy(t *testing.T) {
 	}
 	t.Setenv("DEJA_POLICY_FILE", policyPath)
 
-	if _, err := writeViewHTML(dir, out); err != nil {
+	if _, _, err := writeViewHTML(dir, out); err != nil {
 		t.Fatal(err)
 	}
 	page := readFileString(t, out)

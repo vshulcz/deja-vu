@@ -68,7 +68,7 @@ func TestViewStaysQuietWhenNothingIsMasked(t *testing.T) {
 func TestViewGeneratesSelfContainedHTML(t *testing.T) {
 	dir := viewFixtureIndex(t)
 	out := filepath.Join(t.TempDir(), "view.html")
-	path, err := writeViewHTML(dir, out)
+	path, _, err := writeViewHTML(dir, out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestViewSaysWhatIsWrongWithThePath(t *testing.T) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	_, err := writeViewHTML(dir, filepath.Join(tmp, "no-such-dir", "m.html"))
+	_, _, err := writeViewHTML(dir, filepath.Join(tmp, "no-such-dir", "m.html"))
 	if err == nil {
 		t.Fatal("writing into a directory that does not exist did not fail")
 	}

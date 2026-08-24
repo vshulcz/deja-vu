@@ -98,7 +98,7 @@ func runView(dir string, args []string) error {
 	if out == "" {
 		out = dir + ".view.html"
 	}
-	path, err := writeViewHTML(dir, out)
+	path, masked, err := writeViewHTMLCounted(dir, out)
 	if err != nil {
 		return err
 	}
@@ -107,11 +107,8 @@ func runView(dir string, args []string) error {
 	// and passed around, so it carries the same redaction floor the other
 	// outbound paths (share, sync export, promote --to) print — but only when it
 	// actually holds masked content, so local browsing stays quiet (#857).
-	// Redaction happens at index time, so the markers are already in the page.
-	if body, rerr := os.ReadFile(path); rerr == nil {
-		if masked := strings.Count(string(body), redact.Marker); masked > 0 {
-			fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this page. pattern redaction is a floor — review before sharing; rotate anything that leaked.\n", masked, pluralS(masked))
-		}
+	if masked > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this page. pattern redaction is a floor — review before sharing; rotate anything that leaked.\n", masked, pluralS(masked))
 	}
 	if openBrowser {
 		openInBrowser(path)
@@ -119,14 +116,30 @@ func runView(dir string, args []string) error {
 	return nil
 }
 
-func writeViewHTML(dir, out string) (string, error) {
+// redactMask is redact.Text without its counts, for the fields below.
+func redactMask(s string) string {
+	out, _ := redact.Text(s)
+	return out
+}
+
+// writeViewHTMLCounted writes the page and reports how many secrets it took out
+// of it. The other ways out — share, sync export, promote --to — redact what
+// they emit; this one wrote whatever the index held, which is not the same
+// text on an index built by an older deja or before a pattern was fixed, and
+// then counted the markers ingest had written and called them masked here
+// (#1768).
+func writeViewHTMLCounted(dir, out string) (string, int, error) {
+	return writeViewHTML(dir, out)
+}
+
+func writeViewHTML(dir, out string) (string, int, error) {
 	abs, err := filepath.Abs(out)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	metas, err := index.Recent(dir, 0)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	// The page is titles, project names and message previews — the whole of
 	// what the trust policy exists to keep off the screen, and it is written to
@@ -178,31 +191,51 @@ func writeViewHTML(dir, out string) (string, error) {
 			Tags: n.Tags, At: n.At.Format("2006-01-02"),
 		})
 	}
+	// Redact here rather than trusting the index: the page is the artifact
+	// someone opens and passes on, and the index it is built from may have been
+	// written by an older deja or before a pattern was fixed.
+	for i := range sessions {
+		sessions[i].Title = redactMask(sessions[i].Title)
+		sessions[i].Preview = redactMask(sessions[i].Preview)
+		sessions[i].Project = redactMask(sessions[i].Project)
+	}
+	for i := range recalls {
+		recalls[i].Digest = redactMask(recalls[i].Digest)
+		for j := range recalls[i].Terms {
+			recalls[i].Terms[j] = redactMask(recalls[i].Terms[j])
+		}
+	}
+	for i := range notes {
+		notes[i].Title = redactMask(notes[i].Title)
+		notes[i].Text = redactMask(notes[i].Text)
+	}
 	sj, err := json.Marshal(sessions)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	rj, err := json.Marshal(recalls)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	nj, err := json.Marshal(notes)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	page.SessionsJSON = jsonForScript(sj)
 	page.RecallsJSON = jsonForScript(rj)
 	page.NotesJSON = jsonForScript(nj)
 	var b strings.Builder
 	if err := viewTemplate.Execute(&b, page); err != nil {
-		return "", fmt.Errorf("render view: %w", err)
+		return "", 0, fmt.Errorf("render view: %w", err)
 	}
 	if err := os.WriteFile(abs, []byte(b.String()), 0o644); err != nil {
 		// A path on a disk that is gone came back as the bare syscall, which
 		// says nothing about what to change (#1036).
-		return "", fmt.Errorf("cannot write the view to %s — %s", abs, writeFailureReason(err))
+		return "", 0, fmt.Errorf("cannot write the view to %s — %s", abs, writeFailureReason(err))
 	}
-	return abs, nil
+	// The page holds a masked spot for every secret taken out of it, here or at
+	// ingest; counting the finished page reports both without claiming which.
+	return abs, strings.Count(string(page.SessionsJSON)+string(page.RecallsJSON)+string(page.NotesJSON), redact.Marker), nil
 }
 
 // jsonForScript makes embedded JSON safe inside a <script> block.
