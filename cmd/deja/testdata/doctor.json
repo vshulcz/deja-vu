@@ -165,6 +165,24 @@
       "indexed_sessions": 0
     },
     {
+      "name": "deepseek",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.dsh/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "zed",
+      "state": "unplugged",
+      "paths": [
+        "<tmp>/zed/threads/threads.db"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deja",
       "state": "missing",
       "paths": [

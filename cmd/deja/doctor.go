@@ -626,6 +626,16 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printRow("openclaw", openclawRoot, doctorExists(openclawRoot), doctorCount(len(sources.OpenClawSessionFiles()), "file"))
 	copilotRoot := sources.CopilotRoot()
 	printFiles("copilot", copilotRoot, doctorExists(copilotRoot), sources.CopilotSessionFiles())
+	// omp, deepseek and zed are read by the indexer and were named by nothing
+	// here — a user of one of them had no row to check when their sessions did
+	// not come back (#1738). The registry decides what is indexed, and a test
+	// now holds these rows to it.
+	ompRoot := sources.OmpRoot()
+	printFiles("omp", ompRoot, doctorExists(ompRoot), sources.OmpSessionFiles())
+	dshRoot := sources.DeepSeekRoot()
+	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
+	zedDB := sources.ZedDB()
+	printRow("zed", zedDB, doctorFilePresent(zedDB), doctorSQLiteDetail(zedDB, sqlite))
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
 	if n := noteBucketsRegrouped(dir); n > 0 {
 		fmt.Fprintf(w, "  warning      %s of notes in the index %s not what this machine would build now — the zone changed, so the days regrouped; `deja index` renames them\n",
