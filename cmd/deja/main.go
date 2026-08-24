@@ -3219,6 +3219,22 @@ func dayWord(n int) string {
 // another machine and sync import brings it back (#967), while a transcript
 // this machine wrote and then deleted is simply not on disk — telling that
 // reader to import from another machine names one they never had (#1755).
+// pluralIsLifted and pluralTranscript keep the two sentences readable for one
+// key and for several; joinCapped names up to five.
+func pluralIsLifted(n int) string {
+	if n == 1 {
+		return " is"
+	}
+	return "s are"
+}
+
+func pluralTranscript(n int) string {
+	if n == 1 {
+		return " it"
+	}
+	return "s they"
+}
+
 func unforgetGoneLines(missing []string) []string {
 	var imported, local []string
 	for _, key := range missing {
@@ -3234,10 +3250,11 @@ func unforgetGoneLines(missing []string) []string {
 	}
 	var out []string
 	if len(imported) > 0 {
-		out = append(out, fmt.Sprintf("%s came from another machine and deja held the only copy — the tombstone is lifted, but the records are gone; `deja sync import` brings them back", joinCapped(imported, 5)))
+		out = append(out, fmt.Sprintf("%s came from another machine and deja held the only copy — the tombstone%s lifted, but the records are gone; `deja sync import` brings them back", joinCapped(imported, 5), pluralIsLifted(len(imported))))
 	}
 	if len(local) > 0 {
-		out = append(out, fmt.Sprintf("%s is no longer on this machine — the tombstone is lifted, but the transcript it named is gone, so there is nothing to index", joinCapped(local, 5)))
+		out = append(out, fmt.Sprintf("%s %s no longer on this machine — the tombstone%s lifted, but the transcript%s named %s gone, so there is nothing to index",
+			joinCapped(local, 5), verbIs(len(local)), pluralIsLifted(len(local)), pluralTranscript(len(local)), verbIs(len(local))))
 	}
 	return out
 }

@@ -47,4 +47,15 @@ func TestUnforgetSaysWhyNothingCameBack(t *testing.T) {
 	if got := unforgetGoneLines(nil); len(got) != 0 {
 		t.Errorf("nothing missing still said %q", got)
 	}
+
+	// One key and several read as sentences, not as a count with a plural
+	// bolted on.
+	one := strings.Join(unforgetGoneLines([]string{"claude:ts-01"}), " ")
+	many := strings.Join(unforgetGoneLines([]string{"claude:ts-01", "claude:ts-02"}), " ")
+	if !strings.Contains(one, "claude:ts-01 is no longer") || !strings.Contains(one, "the tombstone is lifted") {
+		t.Errorf("one key reads as %q", one)
+	}
+	if !strings.Contains(many, "claude:ts-01, claude:ts-02 are no longer") || !strings.Contains(many, "the tombstones are lifted") {
+		t.Errorf("two keys read as %q", many)
+	}
 }
