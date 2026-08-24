@@ -77,3 +77,32 @@ func TestSalvagedOutputUnescapes(t *testing.T) {
 		}
 	}
 }
+
+// Letting a cut payload past the tool-name gate must not let every tool past
+// it: the name is read out of the raw bytes, and a read of someone else's file
+// is not a command that failed.
+func TestToolAfterStillIgnoresOtherToolsWhenCut(t *testing.T) {
+	const knownErr = "panic: sql: database is closed"
+	seedFixPair(t, knownErr, "make clean && make CGO_ENABLED=0")
+	dir := os.Getenv("DEJA_INDEX_DIR")
+
+	obj := map[string]any{
+		"hook_event_name": "PostToolUse",
+		"tool_name":       "Read",
+		"tool_input":      map[string]string{"file_path": "/work/app/log.txt"},
+		"tool_response":   map[string]string{"content": knownErr + "\n" + strings.Repeat("x", 1200<<10)},
+		"session_id":      "other-tool",
+		"cwd":             "/work/app",
+	}
+	b, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runHookToolAfter(dir, bytes.NewReader(b), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("a cut payload from a non-command tool got answered:\n%q", out.String())
+	}
+}

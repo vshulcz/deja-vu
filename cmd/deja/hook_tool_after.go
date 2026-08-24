@@ -63,12 +63,16 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	if !planIndexReady(dir) {
 		return nil
 	}
-	// A payload the decoder could not read at all has no tool name either, and
-	// the gate below would drop it before the salvage a few lines down. Only
-	// that case: a payload that decoded and names another tool is still not
-	// ours.
-	truncated := input.ToolName == "" && len(bytes.TrimSpace(raw)) > 0
-	if !truncated && !isCommandTool(input.ToolName) {
+	// A payload the decoder could not read has no tool name either, and the
+	// gate below would drop it before the salvage a few lines down. Read the
+	// name straight out of the raw bytes instead — a payload that names another
+	// tool is still not ours, cut or not.
+	name := input.ToolName
+	truncated := name == "" && len(bytes.TrimSpace(raw)) > 0
+	if truncated {
+		name, _ = jsonStringAfter(after(string(raw), `"tool_name"`))
+	}
+	if !isCommandTool(name) {
 		return nil
 	}
 	out := toolResponseText(input.ToolResponse)
@@ -80,7 +84,7 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 		// `pytest -v` whose log runs past a megabyte (#1716). What arrived is
 		// still worth reading: pull the output back out of the cut JSON rather
 		// than throwing away a megabyte that begins with the error.
-		out = clampOutput(salvageToolOutput(string(raw)))
+		out = clampOutput(salvageToolOutput(after(string(raw), `"tool_response"`)))
 	}
 	if out == "" {
 		return nil
@@ -145,6 +149,17 @@ func toolResponseText(raw json.RawMessage) string {
 		}
 	}
 	return clampOutput(b.String())
+}
+
+// after returns what follows key, or "" when the key is not there. Scoping the
+// salvage this way keeps it from mining the command in tool_input, which can
+// hold any of the keys below.
+func after(s, key string) string {
+	i := strings.Index(s, key)
+	if i < 0 {
+		return ""
+	}
+	return s[i+len(key):]
 }
 
 // salvageToolOutput pulls the tool's output out of a payload the decoder could
