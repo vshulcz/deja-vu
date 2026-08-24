@@ -48,21 +48,29 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--limit":
-			if i+1 < len(args) {
-				i++
-				n, err := strconv.Atoi(args[i])
-				if err != nil || n <= 0 {
-					return fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
-				}
-				limit = n
+			// A flag typed with nothing after it used to be dropped in silence,
+			// and so did an unknown one and an empty --project: the answer came
+			// back looking like an answer to what was asked (#1628).
+			if i+1 >= len(args) {
+				return fmt.Errorf("files: --limit needs value")
 			}
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				return fmt.Errorf("files: --limit wants a positive number, got %q", args[i])
+			}
+			limit = n
 		case "--project":
-			if i+1 < len(args) {
-				i++
-				project = args[i]
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return fmt.Errorf("files: --project needs value")
 			}
+			i++
+			project = args[i]
 		default:
-			if !strings.HasPrefix(args[i], "-") {
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("files: unknown flag %q", args[i])
+			}
+			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])
 			}
 		}
