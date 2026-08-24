@@ -42,11 +42,52 @@ type BlameHit struct {
 	LifecycleAt   string `json:"lifecycle_at,omitempty"`
 }
 
+// trimLineSuffix drops the `:266` or `:266:12` an editor, a stack trace or a
+// compiler error leaves on a path. blame works at file granularity, so the line
+// number is precision it cannot use — and taken literally it became part of the
+// basename and matched nothing (#1625).
+//
+// Only trailing digits, and only while something is left in front: a colon is
+// legal in a unix filename, and `C:\src\main.go` carries one that must survive.
+func trimLineSuffix(name string) string {
+	for i := 0; i < 2; i++ {
+		head, tail, ok := lastColon(name)
+		if !ok || tail == "" || !allDigits(tail) || head == "" {
+			return name
+		}
+		if filepath.Base(head) == "" || strings.HasSuffix(head, ":") {
+			return name
+		}
+		name = head
+	}
+	return name
+}
+
+// lastColon splits on the final colon, ignoring one that would leave nothing in
+// front of it.
+func lastColon(name string) (string, string, bool) {
+	i := strings.LastIndexByte(name, ':')
+	if i <= 0 {
+		return "", "", false
+	}
+	return name[:i], name[i+1:], true
+}
+
+func allDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
+}
+
 func ResolveBlamePath(name string) (BlameTarget, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return BlameTarget{}, fmt.Errorf("path required")
 	}
+	name = trimLineSuffix(name)
 	full, err := filepath.Abs(name)
 	if err != nil {
 		return BlameTarget{}, err
