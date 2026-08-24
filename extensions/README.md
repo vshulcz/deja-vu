@@ -73,6 +73,16 @@ Its `name` is `deja`, the same name the installer's extension uses, and
 extension by that name and refuses a second install under a name it already
 has, which is what makes two deja extensions on one machine impossible.
 
+Qwen Code takes the same file. `qwen extensions install <repo>` reads
+`gemini-extension.json` and installs the MCP server, `GEMINI.md` and the
+`deja-search` skill under `~/.qwen/extensions/deja` — checked on Qwen Code
+0.20.0 — and `qwen mcp list` then shows one `deja` server rather than two,
+because MCP servers are keyed by name and `deja install qwen` writes the same
+one into `settings.json`. Qwen also reads Claude-format marketplaces, so
+`qwen extensions sources add <repo>` finds `.claude-plugin/marketplace.json`
+here and lists the plugin. Nothing extra ships for any of that; it is the same
+two files the Gemini install uses.
+
 ## Rules that cost us time once
 
 - **Resolve the binary in this order, everywhere:** an explicit setting or
