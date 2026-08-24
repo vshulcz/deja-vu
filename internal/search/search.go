@@ -1363,11 +1363,24 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	// blocks. Collect the kept turns in one ordered pass so the include callback's
 	// prevKept bookkeeping still runs left to right.
 	type chunk struct {
-		text string
+		// raw is the turn as it arrived; render is deferred until the window
+		// below has chosen which turns are actually printed. Rendering every
+		// turn first — redaction, then the terminal-safety pass — cost 22 s on
+		// a 30000-turn session to print 8 KB of it (#1742).
+		role    string
+		raw     string
+		matched bool
+		// size is what this turn will take once rendered, close enough to
+		// place the window: contextText keeps the first eight lines of an
+		// unmatched turn and the whole of a matched one, and neither pass
+		// changes the byte count of what it keeps by more than a rune here or
+		// there.
+		size int
 		// weight is how much of the query this turn carries, so the window can
 		// sit where the matches are rather than where the first one is.
 		weight int
 	}
+	const chunkOverhead = len("\n## assistant\n\n\n")
 	var chunks []chunk
 	for _, m := range s.Messages {
 		if isWorkRecord(m.Role) {
@@ -1377,11 +1390,23 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if !ok {
 			continue
 		}
-		text := SafeText(contextText(m.Text, weight > 0))
-		if strings.TrimSpace(text) == "" {
+		if strings.TrimSpace(m.Text) == "" {
 			continue
 		}
-		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text), weight})
+		chunks = append(chunks, chunk{
+			role:    m.Role,
+			raw:     m.Text,
+			matched: weight > 0,
+			size:    contextTextSize(m.Text, weight > 0) + chunkOverhead,
+			weight:  weight,
+		})
+	}
+	render := func(c chunk) string {
+		text := SafeText(contextText(c.raw, c.matched))
+		if strings.TrimSpace(text) == "" {
+			return ""
+		}
+		return fmt.Sprintf("\n## %s\n\n%s\n", c.role, text)
 	}
 	if len(chunks) == 0 {
 		return 0
@@ -1399,10 +1424,10 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	sum, bytes, left := 0, 0, 0
 	for right, c := range chunks {
 		sum += c.weight
-		bytes += len(c.text)
+		bytes += c.size
 		for left < right && bytes > budget {
 			sum -= chunks[left].weight
-			bytes -= len(chunks[left].text)
+			bytes -= chunks[left].size
 			left++
 		}
 		if sum > best {
@@ -1411,7 +1436,7 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	}
 	// The lead-in is only worth having if it does not push a matched turn back
 	// out of the budget it was just chosen for.
-	if best > 0 && start > 0 && span+len(chunks[start-1].text) <= budget {
+	if best > 0 && start > 0 && span+chunks[start-1].size <= budget {
 		start--
 	}
 	written := 0
@@ -1419,7 +1444,10 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if written >= budget {
 			break
 		}
-		text := c.text
+		text := render(c)
+		if text == "" {
+			continue
+		}
 		if written+len(text) > budget {
 			cut := max(0, budget-written)
 			for cut > 0 && !utf8.RuneStart(text[cut]) {
@@ -1804,6 +1832,33 @@ func proseForSnippet(s string) string {
 		out = strings.Join(strings.Fields(redact.SafeForDisplay(s)), " ")
 	}
 	return out
+}
+
+// contextTextSize is what contextText will produce, counted without producing
+// it: the window that picks the turns to print needs their sizes, and the
+// rendering is what costs (#1742).
+func contextTextSize(s string, matched bool) int {
+	if matched || strings.Contains(s, "```") {
+		return len(strings.TrimSpace(s))
+	}
+	trimmed := s
+	if i := nthIndex(trimmed, "\n", 8); i >= 0 {
+		trimmed = trimmed[:i]
+	}
+	return len(strings.TrimSpace(trimmed))
+}
+
+// nthIndex returns the index of the nth occurrence of sep, or -1.
+func nthIndex(s, sep string, n int) int {
+	off := 0
+	for range n {
+		i := strings.Index(s[off:], sep)
+		if i < 0 {
+			return -1
+		}
+		off += i + len(sep)
+	}
+	return off - len(sep)
 }
 
 func contextText(s string, matched bool) string {
