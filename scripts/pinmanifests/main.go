@@ -1,4 +1,4 @@
-// Command pinmanifests rewrites the scoop, winget and Codex plugin manifests for a
+// Command pinmanifests rewrites the scoop, winget and plugin manifests for a
 // release.
 //
 // These files carry a version and the SHA-256 of the two Windows zips, and they
@@ -39,8 +39,12 @@ const (
 	// sat at 0.1.0 from July through 0.17.1 because nothing compared it to
 	// anything.
 	codexPlugin = "codex-plugin/.codex-plugin/plugin.json"
-	releaseAPI  = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
-	assetBase   = "https://github.com/vshulcz/deja-vu/releases/download"
+	// Same reasoning for the Claude bundle, which the directory mirrors from
+	// the default branch. It had no version field at all until the directory's
+	// own scanner asked for one.
+	claudePlugin = "claude-plugin/.claude-plugin/plugin.json"
+	releaseAPI   = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+	assetBase    = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
 type pins struct {
@@ -61,7 +65,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "pinmanifests:", err)
 			os.Exit(1)
 		}
-		fmt.Println("scoop, winget and the codex plugin match the newest release")
+		fmt.Println("scoop, winget and the codex and claude plugins match the newest release")
 		return
 	}
 
@@ -80,7 +84,7 @@ func main() {
 	if err := write(*root, p); err != nil {
 		fail(err)
 	}
-	fmt.Printf("pinned scoop, winget and the codex plugin to %s\n", p.version)
+	fmt.Printf("pinned scoop, winget and the codex and claude plugins to %s\n", p.version)
 }
 
 // parse pulls the two Windows hashes out of a checksums file. Both must be
@@ -113,11 +117,12 @@ func parse(version, checksums string) (pins, error) {
 
 func write(root string, p pins) error {
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:   renderScoop,
-		versionPath: renderVersion,
-		localePath:  renderLocale,
-		installer:   renderInstaller,
-		codexPlugin: renderCodexPlugin,
+		scoopPath:    renderScoop,
+		versionPath:  renderVersion,
+		localePath:   renderLocale,
+		installer:    renderInstaller,
+		codexPlugin:  renderPluginVersion(codexPlugin),
+		claudePlugin: renderPluginVersion(claudePlugin),
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -175,20 +180,21 @@ func renderLocale(p pins) ([]byte, error) { return edit(localePath, p) }
 
 func renderInstaller(p pins) ([]byte, error) { return edit(installer, p) }
 
-// renderCodexPlugin rewrites only the version field. The manifest carries
-// descriptions, prompts and pointers that no release derives, so regenerating it
-// from a template here would drop whatever someone adds later — the same reason
-// the winget files are edited rather than rendered.
-func renderCodexPlugin(p pins) ([]byte, error) {
-	b, err := os.ReadFile(codexPlugin)
-	if err != nil {
-		return nil, err
+// renderPluginVersion rewrites only the version field. These manifests carry
+// descriptions, prompts and pointers that no release derives, so regenerating
+// them from a template here would drop whatever someone adds later — the same
+// reason the winget files are edited rather than rendered.
+func renderPluginVersion(path string) func(pins) ([]byte, error) {
+	return func(p pins) ([]byte, error) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if !jsonVersion.MatchString(string(b)) {
+			return nil, fmt.Errorf("%s has no version field to pin", path)
+		}
+		return []byte(jsonVersion.ReplaceAllString(string(b), `${1}"`+p.version+`"`)), nil
 	}
-	s := jsonVersion.ReplaceAllString(string(b), `${1}"`+p.version+`"`)
-	if !jsonVersion.MatchString(string(b)) {
-		return nil, fmt.Errorf("%s has no version field to pin", codexPlugin)
-	}
-	return []byte(s), nil
 }
 
 var (
@@ -248,11 +254,12 @@ func runCheck(root string) error {
 		return err
 	}
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:   renderScoop,
-		versionPath: renderVersion,
-		localePath:  renderLocale,
-		installer:   renderInstaller,
-		codexPlugin: renderCodexPlugin,
+		scoopPath:    renderScoop,
+		versionPath:  renderVersion,
+		localePath:   renderLocale,
+		installer:    renderInstaller,
+		codexPlugin:  renderPluginVersion(codexPlugin),
+		claudePlugin: renderPluginVersion(claudePlugin),
 	} {
 		want, err := render(p)
 		if err != nil {
