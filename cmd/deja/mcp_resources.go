@@ -83,6 +83,15 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if i := strings.IndexByte(ref, ':'); i >= 0 {
 		id = ref[i+1:]
 	}
+	// Every id has the empty string as a prefix, so an empty ref would make
+	// FindByPrefix return whichever session it reaches first — a whole
+	// transcript the agent never asked for, echoed back under the URI it did
+	// send. `deja://session/` and `deja://session/claude:` both land here.
+	// resources/list only ever emits full URIs, so nothing legitimate
+	// arrives empty; refuse it exactly the way an unknown id is refused.
+	if id == "" {
+		return nil, -32602, fmt.Sprintf("no session matches %q", id)
+	}
 	s, found, err := index.FindByPrefix(dir, id)
 	if err != nil {
 		return nil, -32603, err.Error()

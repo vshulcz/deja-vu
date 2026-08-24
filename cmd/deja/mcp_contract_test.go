@@ -376,3 +376,52 @@ func TestMCPUndeclaredMethodStillErrors(t *testing.T) {
 		t.Errorf("prompts/list error code = %v, want -32601", e["code"])
 	}
 }
+
+// TestMCPResourceReadRefusesAnEmptySessionRef covers #1728: FindByPrefix
+// matches on strings.HasPrefix, and every id has "" as a prefix, so a URI
+// carrying no id at all returned a full session digest — a whole transcript
+// the agent never asked for, echoed back under the URI it did send.
+func TestMCPResourceReadRefusesAnEmptySessionRef(t *testing.T) {
+	tmp := hermeticEnv(t)
+	claude := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claude)
+	seedClaude(t, claude, "app", "sess-alpha", "the frobnicator crash in parser.go", "fixed the frobnicator")
+	seedClaude(t, claude, "app", "sess-beta", "another frobnicator regression today", "frobnicator again")
+
+	refused := []struct {
+		name string
+		uri  string
+	}{
+		{name: "no id at all", uri: "deja://session/"},
+		{name: "harness prefix only", uri: "deja://session/claude:"},
+	}
+	for _, tt := range refused {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"`+tt.uri+`"}}`)
+			e, ok := resp[0]["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("%s was served instead of refused: %#v", tt.uri, resp[0])
+			}
+			if code, _ := e["code"].(float64); code != -32602 {
+				t.Errorf("error code = %v, want -32602", e["code"])
+			}
+		})
+	}
+
+	// Control: a real URI from resources/list must still be served, so the
+	// guard cannot be satisfied by refusing everything.
+	t.Run("a full uri is still served", func(t *testing.T) {
+		list := driveMCP(t, `{"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}`)
+		resources := list[0]["result"].(map[string]any)["resources"].([]any)
+		uri := resources[0].(map[string]any)["uri"].(string)
+
+		read := driveMCP(t, `{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"`+uri+`"}}`)
+		if e, ok := read[0]["error"]; ok {
+			t.Fatalf("real uri %q was refused: %#v", uri, e)
+		}
+		contents := read[0]["result"].(map[string]any)["contents"].([]any)
+		if text := contents[0].(map[string]any)["text"].(string); !strings.Contains(text, "frobnicator") {
+			t.Fatalf("resource text wrong:\n%s", text)
+		}
+	})
+}
