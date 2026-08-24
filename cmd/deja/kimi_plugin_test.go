@@ -108,6 +108,14 @@ func TestKimiManifestsAgree(t *testing.T) {
 	// list of keys to compare is a list of keys someone forgets to extend —
 	// `interface` is what Kimi's /plugins browser shows, and it went unchecked
 	// (#1777).
+	// The rewrite below is a string replacement, so it is only honest while the
+	// prefix appears in paths and nowhere else — a description mentioning it
+	// would be rewritten too, and the comparison would pass on a difference.
+	for _, key := range []string{"description", "homepage", "keywords", "interface", "author"} {
+		if b, _ := json.Marshal(root[key]); strings.Contains(string(b), "extensions/kimi") {
+			t.Fatalf("%s mentions the path prefix, which the comparison rewrites: %s", key, b)
+		}
+	}
 	if diff := manifestDiffIgnoringPaths(plugin, root); diff != "" {
 		t.Fatalf("the two manifests disagree beyond their paths: %s", diff)
 	}
@@ -123,7 +131,9 @@ func TestKimiManifestsAgree(t *testing.T) {
 }
 
 // manifestDiffIgnoringPaths compares the two Kimi manifests after rewriting the
-// root one's paths to the packaged form. The prefix is the one intended
+// root one's paths to the packaged form. Key order and number forms do not
+// matter: encoding/json sorts a map's keys and normalises 1.0 to 1, so the two
+// files can be formatted differently and still compare equal. The prefix is the one intended
 // difference: a GitHub install reads the repo, the zip carries the plugin
 // directory itself.
 func manifestDiffIgnoringPaths(plugin, root map[string]any) string {
