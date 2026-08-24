@@ -44,6 +44,43 @@ func TestInstallReportsReplacingAnUnmarkedSkill(t *testing.T) {
 	}
 }
 
+// backupOnce keeps the first .bak it ever wrote, so a second replacement — a
+// machine whose mark record was lost — would have promised a copy of the first
+// file while the one being destroyed went unsaved (#1703, found in review).
+func TestReplacedSkillBackupHoldsWhatWasReplaced(t *testing.T) {
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	dir := filepath.Join(home, ".claude", "skills", "deja-history")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "SKILL.md")
+	if err := os.WriteFile(path, []byte("A: my first file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "claude-code"); err != nil {
+		t.Fatal(err)
+	}
+	// The marks record is lost — a wiped cache — and a different file is there.
+	if err := os.Remove(skillMarksPath()); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	const second = "C: my second file, written later\n"
+	if err := os.WriteFile(path, []byte(second), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "claude-code"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != second {
+		t.Errorf("the backup holds %q, not the file that was just replaced", string(b))
+	}
+}
+
 // The control: a file deja wrote and recorded is updated quietly, and a fresh
 // install with no file says nothing about replacing anything.
 func TestInstallDoesNotCryReplacedForItsOwnSkill(t *testing.T) {
