@@ -142,6 +142,16 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}, "tags": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional navigation tags, searchable as #tag."}}, "required": []string{"text"}},
 			},
 		}}, 0, ""
+	case "ping":
+		// Part of the protocol at the version above, and a keepalive: a host
+		// that gets an error here is entitled to decide the server is gone.
+		// The result is empty by definition.
+		return map[string]any{}, 0, ""
+	case "resources/templates/list":
+		// We declare a resources capability, so clients ask what templates it
+		// has. deja publishes fixed session URIs rather than templates, so the
+		// honest answer is an empty list in the protocol's own shape.
+		return map[string]any{"resourceTemplates": []map[string]any{}}, 0, ""
 	case "resources/list":
 		return mcpResourcesList(dir)
 	case "resources/read":
