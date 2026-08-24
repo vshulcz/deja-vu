@@ -1437,12 +1437,21 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error)
 			}
 		}
 		if !uninstall {
+			// Only the last line that carries content decides whether a comma
+			// is needed. Walking on past it — which is what looking for the
+			// first line not ending in a comma did — runs through an entry
+			// whose every line ends in one, which is what a .jsonc written
+			// with trailing commas looks like, and puts the comma on the line
+			// that opens the entry: `"mine": {,` (#1695).
 			for i := len(body) - 1; i >= 0; i-- {
 				trim := strings.TrimSpace(body[i])
-				if trim != "" && !strings.HasPrefix(trim, "//") && !strings.HasSuffix(trim, ",") {
-					body[i] += ","
-					break
+				if trim == "" || strings.HasPrefix(trim, "//") {
+					continue
 				}
+				if !strings.HasSuffix(trim, ",") && !strings.HasSuffix(trim, "{") && !strings.HasSuffix(trim, "[") {
+					body[i] += ","
+				}
+				break
 			}
 			body = append(body, line)
 		}
