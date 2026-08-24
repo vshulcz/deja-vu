@@ -1170,14 +1170,14 @@ func buildingNowForAgent(dir string) string {
 // inside the call, so for them a refresh in flight is still a reason to say so
 // rather than to hang.
 func buildingNowForBlockingTool(dir string) string {
-	if line := buildingNowForAgent(dir); line != "" {
-		return line
-	}
 	if st := readWarmupStatus(dir); st != nil {
 		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
 	}
 	if index.RebuildInProgress(dir) || warmupJustRequested(dir) {
 		return "deja is indexing this machine's history. Recall comes online in a few seconds; ask again then."
 	}
-	return ""
+	// Everything else these two have to say — an index written by another
+	// version, an index directory nobody can write — is the same sentence the
+	// reading tools get, so it is answered in one place rather than copied.
+	return buildingNowForAgent(dir)
 }
