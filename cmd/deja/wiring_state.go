@@ -35,11 +35,24 @@ type wiringState struct {
 }
 
 func wiringStatePath() string {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		base = filepath.Join(homeDir(), ".config")
+	return filepath.Join(xdgConfigHome(), "deja", "wiring.json")
+}
+
+// xdgConfigHome is the base for the files that are deja's own — the wiring
+// record and the sync timer's unit — not for the ones that mirror a harness's
+// path logic.
+//
+// The XDG spec: "All paths set in these environment variables must be
+// absolute. If an implementation encounters a relative path in any of these
+// variables it should consider the path invalid and ignore it." deja honoured
+// a relative value instead, so `XDG_CONFIG_HOME=relcfg deja install` wrote
+// wiring.json into whatever directory the command ran from, where no later run
+// would look for it (#1693).
+func xdgConfigHome() string {
+	if base := os.Getenv("XDG_CONFIG_HOME"); filepath.IsAbs(base) {
+		return base
 	}
-	return filepath.Join(base, "deja", "wiring.json")
+	return filepath.Join(homeDir(), ".config")
 }
 
 func readWiringState() wiringState {

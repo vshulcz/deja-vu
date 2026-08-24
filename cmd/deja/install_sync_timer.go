@@ -99,11 +99,10 @@ func syncAutoPlist(exe string) string {
 }
 
 func syncAutoUnitDir() string {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		base = filepath.Join(homeDir(), ".config")
-	}
-	return filepath.Join(base, "systemd", "user")
+	// deja's own unit file, so the spec's rule applies: a relative
+	// XDG_CONFIG_HOME is ignored rather than followed into the working
+	// directory, where systemd would never look for it (#1693).
+	return filepath.Join(xdgConfigHome(), "systemd", "user")
 }
 
 func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) {
