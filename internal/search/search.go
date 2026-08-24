@@ -1823,6 +1823,14 @@ func containsFold(hay, lowerNeedle string) bool {
 // holding none of them cannot match. Rendering a digest ran this per line over
 // the whole session — 16.5 s of the 17 s a 240 MB render took (#1742).
 func looksToolDump(line string) bool {
+	for i := 0; i < len(line); i++ {
+		if line[i] >= 0x80 {
+			// Case folding is Unicode-wide in the engine (ſ folds to s), and
+			// this prefilter is ASCII. A line with any byte outside ASCII goes
+			// to the engine rather than being decided here.
+			return toolDumpRE.MatchString(line)
+		}
+	}
 	for _, lit := range toolDumpLiterals {
 		if containsFold(line, lit) {
 			return toolDumpRE.MatchString(line)
@@ -1835,7 +1843,7 @@ func looksToolDump(line string) bool {
 // anchors at the start, so the whole line never needs scanning.
 func looksNumbered(line string) bool {
 	i := 0
-	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+	for i < len(line) && isRegexSpace(line[i]) {
 		i++
 	}
 	digits := 0
@@ -1850,7 +1858,18 @@ func looksNumbered(line string) bool {
 		return false
 	}
 	i++
-	return i < len(line) && (line[i] == ' ' || line[i] == '\t')
+	return i < len(line) && isRegexSpace(line[i])
+}
+
+// isRegexSpace is \s as the regexp engine reads it: [\t\n\f\r ]. Leaving out
+// the ones a caller usually trims is how a fast path drifts from the pattern it
+// stands in for.
+func isRegexSpace(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', '\f', '\r':
+		return true
+	}
+	return false
 }
 
 func proseForSnippet(s string) string {
