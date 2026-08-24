@@ -84,17 +84,17 @@ func TestBareSyncExchangesWithEveryPeerBothWays(t *testing.T) {
 	var pulls, pushes int
 	sshRunner = func(name string, args ...string) (string, error) {
 		if name == "ssh" && len(args) > 1 {
-			hosts = append(hosts, args[0])
+			hosts = append(hosts, sshHostArg(args))
 			switch {
-			case strings.Contains(args[1], "sync export"):
+			case strings.Contains(args[len(args)-1], "sync export"):
 				pulls++
 				return "deja: exported 0 records", nil
-			case strings.Contains(args[1], "sync import"):
+			case strings.Contains(args[len(args)-1], "sync import"):
 				pushes++
 				return "deja: imported 0 records", nil
 			}
 		}
-		if args[len(args)-1] == "mktemp -d" || (len(args) > 1 && args[1] == "mktemp -d") {
+		if args[len(args)-1] == "mktemp -d" || (len(args) > 1 && args[len(args)-1] == "mktemp -d") {
 			return "/tmp/remote-out", nil
 		}
 		return "", nil
@@ -134,8 +134,8 @@ func TestBareSyncKeepsGoingPastAnUnreachableMachine(t *testing.T) {
 	ok := fakeSSHOK()
 	sshRunner = func(name string, args ...string) (string, error) {
 		if len(args) > 0 {
-			reached[args[0]] = true
-			if args[0] == "broken" {
+			reached[sshHostArg(args)] = true
+			if sshHostArg(args) == "broken" {
 				return "no route to host", errors.New("exit status 255")
 			}
 		}
@@ -216,11 +216,11 @@ func fakeSSHOK() func(string, ...string) (string, error) {
 			return "", nil
 		}
 		switch {
-		case args[1] == "mktemp -d":
+		case args[len(args)-1] == "mktemp -d":
 			return "/tmp/remote-out", nil
-		case strings.Contains(args[1], "sync export"):
+		case strings.Contains(args[len(args)-1], "sync export"):
 			return "deja: exported 0 records", nil
-		case strings.Contains(args[1], "sync import"):
+		case strings.Contains(args[len(args)-1], "sync import"):
 			return "deja: imported 0 records", nil
 		}
 		return "", nil

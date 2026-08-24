@@ -221,7 +221,7 @@ func syncSSHPull(dir, host string, full bool) error {
 		fmt.Fprintf(os.Stdout, "%s: %s\n", host, out)
 	}
 	cleanup := func() {
-		_, _ = sshRunner("ssh", host, "sh -lc "+shellQuote("rm -rf "+shellQuote(rtmp)))
+		_, _ = sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote("rm -rf "+shellQuote(rtmp)))...)
 	}
 	if strings.Contains(out, "exported 0 records") {
 		cleanup()
