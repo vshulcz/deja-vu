@@ -1446,11 +1446,30 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 			}
 		}
 	}
+	// Last, and only when every exact form found nothing: the same id in the
+	// other case. A uuid is case-insensitive by RFC 4122 and harnesses print it
+	// either way, so a pasted id was answered with "no session matches" about a
+	// session deja holds (#1620). Kept last because ids elsewhere are not all
+	// uuids — where case carries meaning, the exact match above has already won.
+	if len(matches) == 0 {
+		for _, meta := range m.Sessions {
+			if idFoldMatches(meta.ID, p) || (meta.OrigID != "" && idFoldMatches(meta.OrigID, p)) {
+				matches = append(matches, meta)
+			}
+		}
+	}
 	if len(matches) == 0 {
 		return model.Session{}, false, nil
 	}
 	sort.Slice(matches, func(i, j int) bool { return newestFirstMeta(matches[i], matches[j]) })
 	return loadSessionMeta(dir, m, matches[0])
+}
+
+// idFoldMatches is the prefix and loose tests with case ignored, for the last
+// rung of the ladder in FindByPrefix and PrefixMatches (#1620).
+func idFoldMatches(id, p string) bool {
+	lid, lp := strings.ToLower(id), strings.ToLower(p)
+	return strings.HasPrefix(lid, lp) || idLooselyMatches(lid, lp)
 }
 
 // PrefixMatches counts the sessions a prefix resolves to. FindByPrefix picks
@@ -1488,6 +1507,14 @@ func PrefixMatches(dir, p string) int {
 		// matches nothing and then watches it open (#853).
 		for _, meta := range m.Sessions {
 			if idLooselyMatches(meta.ID, p) {
+				n++
+			}
+		}
+	}
+	if n == 0 {
+		// Same last rung as the resolver: the id in the other case (#1620).
+		for _, meta := range m.Sessions {
+			if idFoldMatches(meta.ID, p) || (meta.OrigID != "" && idFoldMatches(meta.OrigID, p)) {
 				n++
 			}
 		}
