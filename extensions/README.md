@@ -73,6 +73,15 @@ Its `name` is `deja`, the same name the installer's extension uses, and
 extension by that name and refuses a second install under a name it already
 has, which is what makes two deja extensions on one machine impossible.
 
+`plugin.json` and `mcp.json` at the repository root are the [Agent
+Plugins](https://open-plugins.com) manifests — a vendor-neutral format for the
+parts that are the same everywhere, a manifest plus `skills/` plus MCP servers.
+They cost nothing to carry because `skills/deja-search/` was already where the
+standard puts skills, and they are what cursor.directory auto-detects from a
+repository URL. Both documents are closed schemas: an unknown top-level field is
+a violation, so `TestAgentPluginManifestIsPortable` and its two neighbours pin
+the fields, the name grammar and the one-token stdio command.
+
 Qwen Code takes the same file. `qwen extensions install <repo>` reads
 `gemini-extension.json` and installs the MCP server, `GEMINI.md` and the
 `deja-search` skill under `~/.qwen/extensions/deja` — checked on Qwen Code

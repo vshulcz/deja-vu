@@ -46,8 +46,12 @@ const (
 	// The Gemini gallery crawls the manifest at the repository root and shows
 	// its version, and `gemini extensions install` reads the same file.
 	geminiExtension = "gemini-extension.json"
-	releaseAPI      = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
-	assetBase       = "https://github.com/vshulcz/deja-vu/releases/download"
+	// The Agent Plugins manifest at the root: cursor.directory reads it
+	// straight from the default branch, so its version is the one a
+	// listing shows.
+	agentPlugin = "plugin.json"
+	releaseAPI  = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+	assetBase   = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
 type pins struct {
@@ -68,7 +72,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "pinmanifests:", err)
 			os.Exit(1)
 		}
-		fmt.Println("scoop, winget and the codex, claude and gemini manifests match the newest release")
+		fmt.Println("scoop, winget and the plugin manifests match the newest release")
 		return
 	}
 
@@ -87,7 +91,7 @@ func main() {
 	if err := write(*root, p); err != nil {
 		fail(err)
 	}
-	fmt.Printf("pinned scoop, winget and the codex, claude and gemini manifests to %s\n", p.version)
+	fmt.Printf("pinned scoop, winget and the plugin manifests to %s\n", p.version)
 }
 
 // parse pulls the two Windows hashes out of a checksums file. Both must be
@@ -127,6 +131,7 @@ func write(root string, p pins) error {
 		codexPlugin:     renderPluginVersion(codexPlugin),
 		claudePlugin:    renderPluginVersion(claudePlugin),
 		geminiExtension: renderPluginVersion(geminiExtension),
+		agentPlugin:     renderPluginVersion(agentPlugin),
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -265,6 +270,7 @@ func runCheck(root string) error {
 		codexPlugin:     renderPluginVersion(codexPlugin),
 		claudePlugin:    renderPluginVersion(claudePlugin),
 		geminiExtension: renderPluginVersion(geminiExtension),
+		agentPlugin:     renderPluginVersion(agentPlugin),
 	} {
 		want, err := render(p)
 		if err != nil {
