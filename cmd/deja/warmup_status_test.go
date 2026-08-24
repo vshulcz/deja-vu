@@ -249,3 +249,40 @@ func TestOpencodePluginIndexesBeforeCompaction(t *testing.T) {
 		t.Fatalf("compaction hook does not index:\n%s", src)
 	}
 }
+
+// TestWarmupProgressNamesAnUnwrittenPhase covers #1731: a status file that
+// exists but has not had its phase written yet left progress() returning "",
+// and every caller wraps that fragment in a parenthetical — so the sentence
+// handed to an agent was "deja is indexing this machine's history ()."
+func TestWarmupProgressNamesAnUnwrittenPhase(t *testing.T) {
+	tests := []struct {
+		name string
+		st   warmupStatus
+		want string
+	}{
+		{name: "phase not yet written, no total", st: warmupStatus{}, want: "starting"},
+		{name: "phase not yet written, with total", st: warmupStatus{Done: 1, Total: 4}, want: "starting 25%"},
+		{name: "phase written, no total", st: warmupStatus{Phase: "finding transcripts…"}, want: "finding transcripts…"},
+		{name: "phase written, with total", st: warmupStatus{Phase: "indexing messages", Done: 1, Total: 4}, want: "indexing messages 25%"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.st.progress(); got != tt.want {
+				t.Errorf("progress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestWarmupSentencesNeverShowAnEmptyParenthetical is the property the fix
+// exists to protect, asserted on the rendered sentences rather than on the
+// fragment: no surface may hand a user or an agent "()".
+func TestWarmupSentencesNeverShowAnEmptyParenthetical(t *testing.T) {
+	st := &warmupStatus{}
+	for _, got := range []string{st.progress(), st.line()} {
+		if got == "" || strings.Contains(got, "()") {
+			t.Errorf("rendered %q with an unwritten phase, want a named phase", got)
+		}
+	}
+}

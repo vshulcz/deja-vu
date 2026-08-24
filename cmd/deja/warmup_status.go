@@ -121,17 +121,29 @@ func readWarmupStatus(dir string) *warmupStatus {
 	return &st
 }
 
+// phaseName is the phase to show. A status file can exist with its phase not
+// yet written, and every caller wraps this fragment in a parenthetical or a
+// sentence, so an empty phase renders as "()" — a sentence deja wrote about
+// itself, with nothing in it. Both fragments substitute the same word rather
+// than each guarding separately, so they cannot drift apart again.
+func (s *warmupStatus) phaseName() string {
+	if s.Phase == "" {
+		return "starting"
+	}
+	return s.Phase
+}
+
 // progress is the bare "phase 42%" fragment, for callers that supply their
 // own sentence.
 func (s *warmupStatus) progress() string {
 	if s.Total <= 0 {
-		return s.Phase
+		return s.phaseName()
 	}
 	p := 100 * s.Done / s.Total
 	if p > 100 {
 		p = 100
 	}
-	return fmt.Sprintf("%s %d%%", s.Phase, p)
+	return fmt.Sprintf("%s %d%%", s.phaseName(), p)
 }
 
 // line is the one-sentence status a host can show its user. It names what is
@@ -146,11 +158,7 @@ func (s *warmupStatus) line() string {
 		}
 		pct = fmt.Sprintf(" %d%%", p)
 	}
-	phase := s.Phase
-	if phase == "" {
-		phase = "starting"
-	}
-	return fmt.Sprintf("deja: indexing your history (%s%s) — recall comes online in a few seconds", phase, pct)
+	return fmt.Sprintf("deja: indexing your history (%s%s) — recall comes online in a few seconds", s.phaseName(), pct)
 }
 
 // publishBuildProgress installs the file sink for the work that happens before
