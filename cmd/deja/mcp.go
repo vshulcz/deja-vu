@@ -309,7 +309,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// blocks and can run the whole build inside this call. The CLI keeps
 		// that — someone typed it and watches the progress — but an agent gets
 		// the same sentence as every other tool (#1306).
-		if line := buildingNowForAgent(dir); line != "" {
+		if line := buildingNowForBlockingTool(dir); line != "" {
 			return line, nil
 		}
 		text, hits, err := blameTextResult(dir, search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
@@ -430,7 +430,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// On upgrade day that meant rebuilding the whole index inside the call
 		// (#1309), so the agent is told instead — the detached warmup picks it
 		// up with everything else.
-		if line := buildingNowForAgent(dir); line != "" {
+		if line := buildingNowForBlockingTool(dir); line != "" {
 			return "Saved. " + line, nil
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, mcpProgress()); err != nil {
@@ -1126,6 +1126,16 @@ func (n *mcpNumber) UnmarshalJSON(b []byte) error {
 // — an internal path and an errno, handed to a model as a broken tool (#972).
 // Every other surface says the same thing in words.
 func buildingNowForAgent(dir string) string {
+	// A refresh is not an empty index. The snapshot on disk is published by an
+	// atomic swap and stays readable throughout one, which is why readers take
+	// tryLockDir rather than waiting — so answer from it and let recall say a
+	// refresh is running. Sending the agent away for the length of every
+	// refresh cost it the history it has: an agent does not ask again, it
+	// concludes there is none (#1733). The sentence below is for the state it
+	// was written for — nothing to answer from yet.
+	if index.HasManifest(dir) && !indexNeedsRebuild(dir) {
+		return ""
+	}
 	if st := readWarmupStatus(dir); st != nil {
 		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
 	}
@@ -1150,5 +1160,24 @@ func buildingNowForAgent(dir string) string {
 	}
 	// Nothing indexed yet and nothing building: this is a first run, and
 	// building it here is how an install with no hooks ever gets an index.
+	return ""
+}
+
+// buildingNowForBlockingTool is buildingNowForAgent for the two tools that
+// still reach a blocking index.EnsureForSearch — blame and remember. Every
+// other tool reads through the non-blocking path and answers from the snapshot
+// while a refresh runs (#1733); these two would wait out the whole rebuild
+// inside the call, so for them a refresh in flight is still a reason to say so
+// rather than to hang.
+func buildingNowForBlockingTool(dir string) string {
+	if line := buildingNowForAgent(dir); line != "" {
+		return line
+	}
+	if st := readWarmupStatus(dir); st != nil {
+		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
+	}
+	if index.RebuildInProgress(dir) || warmupJustRequested(dir) {
+		return "deja is indexing this machine's history. Recall comes online in a few seconds; ask again then."
+	}
 	return ""
 }
