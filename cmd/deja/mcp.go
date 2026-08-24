@@ -898,6 +898,42 @@ func recallContext(dir, q string) (string, error) {
 	return text, err
 }
 
+// idContext is what contextByID reports alongside the text: the session it
+// opened and what that session weighs, both of which the caller records.
+type idContext struct {
+	session string
+	size    int64
+}
+
+// contextByID answers from the session an id-prefix names, for the tool an
+// agent calls with whatever deja printed at it (#1622). Empty when the string
+// is not an id, when it names nothing, or when this machine's policy withholds
+// what it names.
+func contextByID(dir, q string) (string, idContext, bool) {
+	if strings.ContainsAny(q, " \t\n") {
+		return "", idContext{}, false
+	}
+	// index.FindByPrefix directly, never the CLI's findByPrefix: that one calls
+	// index.Ensure first and blocks on the index lock, and this path serves a
+	// client that cannot wait (mcp_no_block_test.go guards it). The resource
+	// reader resolves an id the same way.
+	s, ok, err := index.FindByPrefix(dir, q)
+	if err != nil || !ok {
+		return "", idContext{}, false
+	}
+	kept, _ := policyFilterSessionsCounted(policy.ActivationMCP, []model.Session{s})
+	if len(kept) == 0 {
+		return "", idContext{}, false
+	}
+	whole := kept[0]
+	if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
+		whole = full
+	}
+	var b bytes.Buffer
+	search.PrintContext(&b, whole, "")
+	return b.String(), idContext{session: whole.ID, size: rawSize([]model.Session{whole})}, true
+}
+
 func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) {
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
@@ -938,6 +974,15 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 		hits, _ = policyFilterHitsCounted(policy.ActivationMCP, hits)
 	}
 	if len(hits) == 0 {
+		// The words found nothing, so try the string as an id. Every line deja
+		// prints carries one, and `deja ctx <id>` opens the session it names —
+		// but the tool an agent is told to call took words only, and answered
+		// "no prior deja sessions matched" about a session deja holds (#1622).
+		// After the search, like the CLI does since #1614: there is no answer
+		// left for the id to shadow.
+		if text, id, ok := contextByID(dir, q); ok {
+			return text, 1, id.size, []string{id.session}, nil
+		}
 		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
 	}
 	// The same order the search screen shows: this handed the agent a session
