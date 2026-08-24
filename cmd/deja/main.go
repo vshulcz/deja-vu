@@ -2794,7 +2794,21 @@ Examples:
   deja install --all
 
 See README.md for the full CLI reference.
-`, wrapTargets(installTargetNames(), "      ", 76))
+`, wrapTargets(installTargetNames(), "      ", usageWidth()))
+}
+
+// usageWidth is the column budget for the one block in help that is laid out
+// rather than typed. It follows the terminal, as the brief, files, restore and
+// search already do — the list was computed to a fixed 76 and so came out the
+// same six lines on a 30-column pane and a 120-column one (#1660).
+//
+// Off a terminal printableWidth answers 0, and the fixed 76 stands: piped and
+// redirected help keeps the byte-identical output that goldens and CI compare.
+func usageWidth() int {
+	if w := printableWidth(os.Stdout); w > 0 {
+		return w
+	}
+	return 76
 }
 
 // helpForCommand answers `deja <cmd> --help`. Every command rejected it as an

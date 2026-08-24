@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -51,4 +52,60 @@ func TestHelpTargetListWraps(t *testing.T) {
 			t.Errorf("target %q did not survive wrapping: %q", n, got)
 		}
 	}
+}
+
+// The list is the one block in help whose layout is computed, and it was
+// computed to a fixed 76 columns — the same six lines came out of a 30-column
+// pane and a 120-column one, while the brief, files, restore and search all
+// tracked the terminal (#1660).
+func TestHelpTargetListFollowsTheTerminal(t *testing.T) {
+	hermeticEnv(t)
+	for _, width := range []int{40, 120} {
+		t.Setenv("COLUMNS", strconv.Itoa(width))
+		out, err := captureRun(t, "help")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var widest int
+		for _, line := range strings.Split(out, "\n") {
+			if !strings.HasPrefix(line, "      ") || !strings.Contains(line, "claude-code") && !strings.Contains(line, ",") {
+				continue
+			}
+			if !isTargetLine(line) {
+				continue
+			}
+			if n := len(line); n > widest {
+				widest = n
+			}
+			if len(line) > width {
+				t.Errorf("COLUMNS=%d: target line is %d columns: %q", width, len(line), line)
+			}
+		}
+		if widest == 0 {
+			t.Fatalf("COLUMNS=%d: found no target lines in help", width)
+		}
+		// A wide pane must actually use it, or "fits" is met by never growing.
+		if width == 120 && widest <= 76 {
+			t.Errorf("COLUMNS=120: widest target line is %d columns, still laid out for 76", widest)
+		}
+	}
+}
+
+// isTargetLine reports whether an indented help line is part of the install
+// target listing rather than some other indented block.
+func isTargetLine(line string) bool {
+	fields := strings.Split(strings.TrimSpace(line), ", ")
+	if len(fields) < 2 {
+		return false
+	}
+	known := map[string]bool{}
+	for _, n := range installTargetNames() {
+		known[n] = true
+	}
+	for _, f := range fields {
+		if !known[strings.TrimSuffix(f, ",")] {
+			return false
+		}
+	}
+	return true
 }
