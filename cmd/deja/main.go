@@ -599,6 +599,14 @@ func ctxFromIDPrefix(dir, q string) (bool, error) {
 	// id without saying it was a choice, while show, share, resume, promote,
 	// forget and handoff all said so (#923).
 	noteAmbiguousPrefix(dir, q, "answering from")
+	// A decision that was taken back must say so here too. The search screen and
+	// ctx's own query path both mark it; the id path handed an agent the whole
+	// transcript of a withdrawn decision, reading like current truth (#1643).
+	hits := []search.Hit{{Session: s}}
+	attachLifecycles(dir, hits)
+	if line := lifecycleLine(hits[0]); line != "" {
+		fmt.Fprintln(os.Stdout, line)
+	}
 	search.PrintContext(os.Stdout, s, "")
 	return true, nil
 }
