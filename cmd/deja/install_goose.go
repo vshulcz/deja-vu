@@ -27,6 +27,22 @@ import (
 // config.yaml is edited textually rather than through a YAML round-trip: it
 // holds provider settings a user wrote by hand, and re-serialising drops the
 // comments and ordering they left there.
+// inlineYAMLValue returns the value written on the same line as a top-level
+// key, or "" when the key is absent or opens a block.
+func inlineYAMLValue(doc, key string) string {
+	for _, line := range strings.Split(doc, "\n") {
+		if !strings.HasPrefix(line, key) {
+			continue
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(line, key))
+		if rest == "" || strings.HasPrefix(rest, "#") {
+			return ""
+		}
+		return rest
+	}
+	return ""
+}
+
 // yamlBlockIsSequence reports whether the block that follows a key opens with
 // a sequence item rather than a mapping entry, skipping blank lines and
 // comments. A block that is empty, or holds mapping entries, is not one.
@@ -76,6 +92,13 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		}
 		b.WriteString("    timeout: 60\n")
 		entry := b.String()
+		// An inline value — `extensions: [a, b]` or `extensions: {…}` — is not
+		// followed by a block, so the insert below missed it and appended a
+		// second `extensions:` key. A parser takes the last of two, which is
+		// deja's, and the user's extensions were gone without a word (#1697).
+		if v := inlineYAMLValue(next, "extensions:"); v != "" {
+			return installResult{}, fmt.Errorf("%s: extensions: %s is on one line, and deja edits the block form — move it to a block and run this again", path, v)
+		}
 		if i := strings.Index("\n"+next, "\nextensions:\n"); i >= 0 {
 			at := i + len("\nextensions:\n") - 1
 			// goose keys extensions by name. Writing our mapping entry under a

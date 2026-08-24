@@ -39,6 +39,36 @@ func TestInstallGooseRefusesAnExtensionsList(t *testing.T) {
 	}
 }
 
+// An inline value is not a block: the insert missed it and appended a second
+// `extensions:` key, and a parser takes the last of two — deja's — so the
+// user's extensions vanished without a word (#1697).
+func TestInstallGooseRefusesAnInlineExtensions(t *testing.T) {
+	hermeticEnv(t)
+	if os.Getenv("DEJA_GOOSE_ROOT") == "" {
+		t.Skip("no goose root in this environment")
+	}
+	for _, inline := range []string{"extensions: [a, b]\n", "extensions: {a: {enabled: true}}\n"} {
+		cfg := filepath.Join(gooseConfigDir(), "config.yaml")
+		if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(cfg, []byte(inline), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := captureRun(t, "install", "goose"); err == nil {
+			after, _ := os.ReadFile(cfg)
+			t.Errorf("install accepted %q:\n%s", inline, after)
+		}
+		after, err := os.ReadFile(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(after) != inline {
+			t.Errorf("install changed a config it could not edit:\n%s", after)
+		}
+	}
+}
+
 // The control: a mapping — the shape goose actually uses — still gets deja's
 // entry, keeps the user's, and survives a second install and an uninstall.
 func TestInstallGooseKeepsAHandWrittenBlock(t *testing.T) {
