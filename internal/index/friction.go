@@ -2,6 +2,7 @@ package index
 
 import (
 	"hash/fnv"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,6 +55,7 @@ func FrictionLine(l string) (string, bool) {
 // alone they land below the threshold separately and none is ever reported.
 func normalizeFriction(l string) string {
 	l = strings.TrimSpace(l)
+	l = strings.TrimSpace(trimLogPrefix(l))
 	// The prefix is `<where>:<line>: `, where <where> is a shell name or an
 	// `(eval)`/`(anon)` marker. Only strip it when the middle field is a
 	// number — `Error: cannot find x: y` must keep its shape.
@@ -71,6 +73,48 @@ func normalizeFriction(l string) string {
 	}
 	return strings.TrimSpace(rest[second+2:])
 }
+
+// trimLogPrefix drops the prefixes a runner puts in front of a line it did not
+// write: pytest's `E   ` marker on the failing line, and the timestamp docker,
+// journalctl and most CI add to everything. They carry nothing about the error,
+// and left in they split one wall into two — the same reasoning that strips the
+// shell's position prefix above (#1637).
+func trimLogPrefix(l string) string {
+	for {
+		trimmed := trimPytestMarker(trimTimestamp(l))
+		if trimmed == l {
+			return l
+		}
+		l = trimmed
+	}
+}
+
+// trimPytestMarker removes the `E` column pytest prints beside the failing
+// line. Only with the spacing pytest uses, so `E2BIG: …` and a sentence
+// starting with `E ` keep their shape.
+func trimPytestMarker(l string) string {
+	rest, ok := strings.CutPrefix(l, "E ")
+	if !ok {
+		return l
+	}
+	rest = strings.TrimLeft(rest, " ")
+	if rest == "" {
+		return l
+	}
+	return rest
+}
+
+// trimTimestamp removes a leading date-and-time, bracketed or bare, in the
+// shapes runners emit: 2026-07-12T10:00:00Z, 2026-07-12 10:00:00.123, and the
+// same inside [].
+func trimTimestamp(l string) string {
+	if m := leadingTimestamp.FindString(l); m != "" {
+		return strings.TrimSpace(l[len(m):])
+	}
+	return l
+}
+
+var leadingTimestamp = regexp.MustCompile(`^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\]?\s+`)
 
 // isFriction keeps the error shapes that name something specific. The generic
 // ones carry no information — every Python failure prints `Traceback (most
