@@ -807,6 +807,7 @@ func doctorPolicy(w io.Writer, dir string) {
 
 func doctorMCP(w io.Writer) {
 	fmt.Fprintln(w, "MCP wiring:")
+	doctorWiredExe(w)
 	for _, c := range doctorMCPConfigs() {
 		status := "config missing"
 		if doctorExists(c.path) {

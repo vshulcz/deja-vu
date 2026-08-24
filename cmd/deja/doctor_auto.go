@@ -188,3 +188,22 @@ func codexHookTrustSection(cfg string) string {
 	}
 	return rest
 }
+
+// doctorWiredExe reports a wiring that points at a binary which is no longer
+// there. Every hook the harnesses run names the executable that installed
+// them, so a deja that moved — a `go install` into a different GOBIN, a brew
+// prefix change, a renamed home — leaves every hook exiting 127 on every
+// prompt while each config file still reads correctly (#1708). The recorded
+// path is checked rather than each harness's own format, which is the one
+// thing all of them have in common.
+func doctorWiredExe(w io.Writer) {
+	st := readWiringState()
+	if st.Exe == "" || len(st.Targets) == 0 {
+		return
+	}
+	if _, err := os.Stat(st.Exe); err == nil {
+		return
+	}
+	fmt.Fprintf(w, "  %-12s the wiring runs %s, which is not there — `deja install --all` re-points it at this binary\n",
+		"binary", shortHome(st.Exe))
+}
