@@ -314,3 +314,65 @@ func TestRecallReturnsTheDecisionNotOnlyTheQuestion(t *testing.T) {
 		t.Fatalf("recall dropped the question:\n%s", got)
 	}
 }
+
+// TestMCPPingAndResourceTemplates covers #1720: neither `ping` nor
+// `resources/templates/list` had a case in handleMCP, so both fell through
+// to -32601. A host that pings for keepalive reads that error as a stale
+// connection and drops the server, and we declare a resources capability,
+// so clients ask for its templates as a matter of course.
+func TestMCPPingAndResourceTemplates(t *testing.T) {
+	hermeticEnv(t)
+
+	resp := driveMCP(t,
+		`{"jsonrpc":"2.0","id":1,"method":"ping"}`,
+		`{"jsonrpc":"2.0","id":2,"method":"resources/templates/list","params":{}}`,
+	)
+	if len(resp) != 2 {
+		t.Fatalf("got %d responses, want 2: %#v", len(resp), resp)
+	}
+
+	for _, r := range resp {
+		if e, ok := r["error"]; ok {
+			t.Fatalf("response %v carried an error: %#v", r["id"], e)
+		}
+	}
+
+	ping, ok := resp[0]["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("ping result is not an object: %#v", resp[0])
+	}
+	if len(ping) != 0 {
+		t.Errorf("ping result = %#v, want an empty object", ping)
+	}
+
+	templates, ok := resp[1]["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("resources/templates/list result is not an object: %#v", resp[1])
+	}
+	list, ok := templates["resourceTemplates"].([]any)
+	if !ok {
+		t.Fatalf("result has no resourceTemplates array: %#v", templates)
+	}
+	if len(list) != 0 {
+		t.Errorf("resourceTemplates = %#v, want an empty array", list)
+	}
+}
+
+// TestMCPUndeclaredMethodStillErrors is the control for the case above: the
+// fix must add exactly the two spec methods, not turn the default branch
+// into a catch-all that answers anything.
+func TestMCPUndeclaredMethodStillErrors(t *testing.T) {
+	hermeticEnv(t)
+
+	resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}`)
+	if len(resp) != 1 {
+		t.Fatalf("got %d responses, want 1", len(resp))
+	}
+	e, ok := resp[0]["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("prompts/list did not error: %#v", resp[0])
+	}
+	if code, _ := e["code"].(float64); code != -32601 {
+		t.Errorf("prompts/list error code = %v, want -32601", e["code"])
+	}
+}

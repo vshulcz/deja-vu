@@ -142,6 +142,18 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}, "tags": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional navigation tags, searchable as #tag."}}, "required": []string{"text"}},
 			},
 		}}, 0, ""
+	case "ping":
+		// Part of the spec at the version we claim, and both sides must
+		// answer it with an empty result. A host that pings for keepalive
+		// is entitled to read an error as a stale connection and drop the
+		// server, so this cannot fall through to -32601.
+		return map[string]any{}, 0, ""
+	case "resources/templates/list":
+		// We declare a resources capability, so clients ask for its
+		// templates. deja exposes concrete session resources and no URI
+		// templates, and the empty list is the shape that says so —
+		// an error here reads as a broken capability.
+		return map[string]any{"resourceTemplates": []map[string]any{}}, 0, ""
 	case "resources/list":
 		return mcpResourcesList(dir)
 	case "resources/read":
