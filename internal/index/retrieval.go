@@ -1834,6 +1834,10 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		}
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	}
+	// Built once: the query side of the check does not change between records,
+	// and this loop runs over every record a query without postings reaches
+	// (#1885).
+	matcher := newRecordMatcher(o, variants)
 	if len(offsets) > 0 {
 		f, err := openIndexFile(filepath.Join(dir, "records.bin"))
 		if err != nil {
@@ -1842,7 +1846,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		defer func() { _ = f.Close() }()
 		offsets = sortedUniqueOffsets(offsets)
 		if err := eachRecordAt(f, offsets, tablesFromManifest(m), func(r Record) {
-			if recordMatchesQueryVariants(r, o, variants) {
+			if matcher.matches(r) {
 				add(r)
 			}
 		}); err != nil {
@@ -1850,7 +1854,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		}
 	} else {
 		if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-			if recordMatchesQueryVariants(r, o, variants) {
+			if matcher.matches(r) {
 				add(r)
 			}
 		}); err != nil {
@@ -3009,23 +3013,68 @@ func recordMatchesQuery(r Record, o query.Options) bool {
 }
 
 func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][]string) bool {
+	return newRecordMatcher(o, variants).matches(r)
+}
+
+// recordMatcher is the query side of the verification check, built once.
+//
+// The check runs per record — for a query with no postings, that is every
+// record in the store — and everything derived from the query is the same
+// every time: the parts, the composed form, the CJK-folded form and their
+// parts. Rebuilding them per record doubled the cost of a decomposed query
+// (4.1 ms against 1.9 ms over 120 sessions, and 49385 allocations against
+// 22984), since such a query takes the retry path on every record (#1885).
+type recordMatcher struct {
+	regex    bool
+	matchAll bool
+	variants map[string][]string
+
+	terms, phrases []string
+
+	// nfc is the query composed, kept apart so a record can be tested against
+	// it without composing the query again.
+	nfc        string
+	nfcDiffers bool
+	nfcTerms   []string
+	nfcPhrases []string
+	cjk        string
+	cjkDiffers bool
+	cjkTerms   []string
+	cjkPhrases []string
+}
+
+func newRecordMatcher(o query.Options, variants map[string][]string) recordMatcher {
+	m := recordMatcher{regex: o.Regex, variants: variants}
 	if o.Regex {
+		return m
+	}
+	m.terms, m.phrases = query.QueryParts(o.Query)
+	if len(m.terms) == 0 && len(m.phrases) == 0 {
+		m.matchAll = true
+		return m
+	}
+	m.nfc = nfcfold.Compose(o.Query)
+	m.nfcDiffers = m.nfc != o.Query
+	m.nfcTerms, m.nfcPhrases = query.QueryParts(m.nfc)
+	m.cjk = cjkfold.String(o.Query)
+	m.cjkDiffers = m.cjk != o.Query
+	m.cjkTerms, m.cjkPhrases = query.QueryParts(m.cjk)
+	return m
+}
+
+func (m recordMatcher) matches(r Record) bool {
+	if m.regex || m.matchAll {
 		return true
 	}
-	terms, phrases := query.QueryParts(o.Query)
-	if len(terms) == 0 && len(phrases) == 0 {
-		return true
-	}
-	if query.MatchesParts(r.Text, terms, phrases, variants) {
+	if query.MatchesParts(r.Text, m.terms, m.phrases, m.variants) {
 		return true
 	}
 	// The postings that pointed here folded NFD to NFC (tokens); this surface
 	// check runs on the raw bytes, where the same accented word in the other
 	// normalization would not substring-match. Retry both composed, mirroring
 	// the CJK retry below (#1098).
-	if nfcfold.Compose(r.Text) != r.Text || nfcfold.Compose(o.Query) != o.Query {
-		nterms, nphrases := query.QueryParts(nfcfold.Compose(o.Query))
-		if query.MatchesParts(nfcfold.Compose(r.Text), nterms, nphrases, variants) {
+	if composed := nfcfold.Compose(r.Text); m.nfcDiffers || composed != r.Text {
+		if query.MatchesParts(composed, m.nfcTerms, m.nfcPhrases, m.variants) {
 			return true
 		}
 	}
@@ -3034,13 +3083,10 @@ func recordMatchesQueryVariants(r Record, o query.Options, variants map[string][
 	// verification step compares surface text, which would then reject the
 	// very record the postings pointed at — retry it on both sides folded.
 	folded := cjkfold.String(r.Text)
-	if folded == r.Text {
-		if q := cjkfold.String(o.Query); q == o.Query {
-			return false
-		}
+	if folded == r.Text && !m.cjkDiffers {
+		return false
 	}
-	fterms, fphrases := query.QueryParts(cjkfold.String(o.Query))
-	return query.MatchesParts(folded, fterms, fphrases, variants)
+	return query.MatchesParts(folded, m.cjkTerms, m.cjkPhrases, m.variants)
 }
 
 // bucket shards a token by its opening characters. It used to slice two
