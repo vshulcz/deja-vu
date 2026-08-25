@@ -9,6 +9,8 @@ package peers
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -78,6 +80,28 @@ func Load() []Peer {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Host < out[j].Host })
 	return out
+}
+
+// Problem reports why the file could not be read, and "" when there is nothing
+// wrong — including when there is no file at all, which is a machine that has
+// never synced rather than a fault.
+//
+// Load deliberately treats every failure as "no peers", so that a malformed
+// config cannot stop a sync; its comment says doctor is where that surfaces.
+// This is the half that lets doctor say it (#1840).
+func Problem() string {
+	b, err := os.ReadFile(Path())
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return ""
+		}
+		return err.Error()
+	}
+	var f file
+	if err := json.Unmarshal(b, &f); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 // Record notes an exchange with a host: which way it went, and whether it

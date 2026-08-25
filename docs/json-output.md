@@ -316,6 +316,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     "claude": {"malformed_lines": 0, "failed_files": 0}
   },
   "sync": {
+    "state": "ok",
     "peers": [
       {
         "host": "laptop",
@@ -350,7 +351,7 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `ignored` and `inert` list policy lines that matched no harness or no import.
 Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
 
-`sync.peers` is every machine this one knows, and it is always present — an
+`sync.state` is `ok` or `unreadable`; `unreadable` adds an `error` saying why the peers file could not be parsed, and its `peers` list is empty because deja could read nothing from it — a sync is never stopped by a malformed config, so the report is the only place that failure shows. `sync.peers` is every machine this one knows, and it is always present — an
 empty list means no machines are configured, which a script can tell apart from
 a deja too old to report. Each row carries `host`, `sessions_from_there` (how
 much of this index arrived from it), and `last_push` / `last_pull` as RFC 3339

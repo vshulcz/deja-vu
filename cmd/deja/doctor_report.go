@@ -93,6 +93,11 @@ type doctorReport struct {
 // Peers is never omitted: a machine with no peers has an empty list, which a
 // script can tell apart from a deja too old to report at all.
 type doctorSyncReport struct {
+	// State is ok or unreadable. A file deja cannot parse used to read exactly
+	// like a machine with no peers, on both surfaces, while sync walked nothing
+	// (#1840) — the same distinction policy.state has drawn since #1027.
+	State string             `json:"state"`
+	Error string             `json:"error,omitempty"`
 	Peers []doctorPeerReport `json:"peers"`
 }
 
@@ -116,7 +121,11 @@ type doctorPeerReport struct {
 func collectDoctorSync(dir string) doctorSyncReport {
 	list := peers.Load()
 	from := index.ImportedByMachine(dir)
-	out := doctorSyncReport{Peers: make([]doctorPeerReport, 0, len(list))}
+	out := doctorSyncReport{State: "ok", Peers: make([]doctorPeerReport, 0, len(list))}
+	if why := peers.Problem(); why != "" {
+		out.State = "unreadable"
+		out.Error = why
+	}
 	for _, p := range list {
 		row := doctorPeerReport{
 			// The name as written, not as printed: JSON is read by something
