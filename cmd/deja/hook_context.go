@@ -248,7 +248,7 @@ func runHookContext(dir string, plain bool) error {
 		// does not depend on the digest having found anything.
 		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
 			out := frameRecall(env)
-			usage.RecordDigestPolicy(dir, usage.KindHook, out, 0, 0, policy.Load().Describe(policy.ActivationAuto))
+			usage.RecordDigestPolicyInto(dir, usage.KindHook, out, input.SessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto))
 			if plain {
 				fmt.Fprintln(os.Stdout, out)
 				return nil
