@@ -56,6 +56,8 @@ func TestNoReportedTypeEmbedsAMarshaller(t *testing.T) {
 		doctorReport{}, stats.Report{}, usage.Summary{}, usage.ImpactReport{},
 		blameSessionJSON{}, blameHitJSON{}, model.Session{}, index.SessionMeta{},
 	}
+	// One map across the roots: a type's fields do not depend on which root
+	// reached it, so inspecting it once inspects it for all of them.
 	seen := map[reflect.Type]bool{}
 	var found []string
 	for _, r := range roots {
