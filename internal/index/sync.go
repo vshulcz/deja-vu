@@ -133,7 +133,7 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		// The import side of the same mistake is worded; this one handed back
 		// `mkdir /…/file: not a directory` (#1112).
 		if fi, statErr := os.Stat(outDir); statErr == nil && !fi.IsDir() {
-			return 0, nil, fmt.Errorf("%s is a file; sync export wants a directory to write the batch into", outDir)
+			return 0, nil, fmt.Errorf("%s is a file; sync export wants a directory to write the batch into", search.SafeLine(outDir))
 		}
 		return 0, nil, err
 	}
@@ -372,14 +372,14 @@ func Import(dir, inDir string) (int, error) {
 		return 0, fmt.Errorf("cannot read %s: %s", search.SafeLine(inDir), search.SafeLine(err.Error()))
 	}
 	if !fi.IsDir() {
-		return 0, fmt.Errorf("%s is a file; sync import wants the directory a `sync export` wrote", inDir)
+		return 0, fmt.Errorf("%s is a file; sync import wants the directory a `sync export` wrote", search.SafeLine(inDir))
 	}
 	// Glob swallows a directory it cannot open, so a locked source imported
 	// "0 records" — the same words an already-imported batch prints, and the
 	// records were there the whole time (#1042).
 	if f, oerr := os.Open(inDir); oerr != nil {
 		if os.IsPermission(oerr) {
-			return 0, fmt.Errorf("cannot read %s — permission denied; check that directory's permissions (on macOS, also Full Disk Access for your terminal)", inDir)
+			return 0, fmt.Errorf("cannot read %s — permission denied; check that directory's permissions (on macOS, also Full Disk Access for your terminal)", search.SafeLine(inDir))
 		}
 		return 0, oerr
 	} else {
