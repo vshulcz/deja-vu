@@ -10,10 +10,10 @@ import (
 )
 
 // A blank line is what two processes leave when both close a truncated tail
-// (#1902), and it is not corruption: the events around it are whole. `read`
-// drops any line that does not parse, which covers it — but nothing said so, and
-// a blank line in a JSON-lines file is exactly the kind of thing a later reader
-// makes fatal.
+// (#1902), and it is not corruption: the events around it are whole. Both
+// readers here drop a line that does not parse, which covers it — an empty line
+// is not valid JSON — but nothing said so, and a blank line in a JSON-lines
+// file is exactly the kind of thing a later reader makes fatal.
 func TestBlankLinesAreReadPast(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DEJA_INDEX_DIR", dir)
@@ -41,6 +41,12 @@ func TestBlankLinesAreReadPast(t *testing.T) {
 	}
 	if imp := Impact(dir); imp.Recalls != 3 {
 		t.Errorf("the impact screen counts %d of the three", imp.Recalls)
+	}
+	// `deja log` reads the same file through its own scanner, which keeps a
+	// line on a different condition (a kind rather than a stamp), so it is
+	// asserted here rather than assumed to follow.
+	if evs := Events(dir, 0); len(evs) != 3 {
+		t.Errorf("deja log reads %d of the three events", len(evs))
 	}
 
 	// And a record appended to such a file lands on its own line, as it would
@@ -90,5 +96,8 @@ func TestRotationSurvivesBlankLines(t *testing.T) {
 	}
 	if strings.Contains(string(rewritten), "\n\n") {
 		t.Errorf("the rotated log carries blank lines forward")
+	}
+	if evs := Events(dir, 0); len(evs) != after {
+		t.Errorf("deja log reads %d events from the rotated log, the counters read %d", len(evs), after)
 	}
 }
