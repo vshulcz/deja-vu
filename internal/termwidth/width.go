@@ -193,6 +193,11 @@ var wideRanges = [...]struct{ lo, hi rune }{
 
 // Cut keeps as much of s as fits in width columns.
 func Cut(s string, width int) string {
+	// Composed for the same reason Columns is, and for one more: cutting a
+	// decomposed string by raw runes can separate a mark from the character it
+	// belongs to, and CutRight then starts a line with an orphan that draws on
+	// whatever precedes it (#1824).
+	s = nfcfold.Compose(s)
 	n := 0
 	for i, r := range s {
 		w := RuneColumns(r)
@@ -208,6 +213,7 @@ func Cut(s string, width int) string {
 // identified by its tail — "…/消费者重平衡" says which project this is, where
 // the first characters of a long prefix rarely do.
 func CutRight(s string, width int) string {
+	s = nfcfold.Compose(s)
 	n := 0
 	runes := []rune(s)
 	for i := len(runes) - 1; i >= 0; i-- {

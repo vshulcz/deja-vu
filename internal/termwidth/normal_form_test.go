@@ -8,10 +8,11 @@ import "testing"
 // (#1824). The decomposed spellings are written as escapes on purpose — an
 // editor that normalises the file would otherwise quietly delete the case.
 func TestTheSameNameMeasuresTheSameInEitherNormalForm(t *testing.T) {
+	const acute, diaeresis = "\u0301", "\u0308"
 	for _, pair := range []struct{ decomposed, precomposed string }{
-		{"écombining", "écombining"},
-		{"über-server", "über-server"},
-		{"naïve", "naïve"},
+		{"e" + acute + "combining", "\u00e9combining"},
+		{"u" + diaeresis + "ber-server", "\u00fcber-server"},
+		{"nai" + diaeresis + "ve", "na\u00efve"},
 	} {
 		d, p := Columns(pair.decomposed), Columns(pair.precomposed)
 		if d != p {
@@ -35,6 +36,32 @@ func TestOverCountingStaysWhereItWasDeliberate(t *testing.T) {
 	}
 	if got := Columns("́"); got != 1 {
 		t.Errorf("a combining mark that composes with nothing measures %d", got)
+	}
+}
+
+// CutRight used to start a line with a mark whose base it had just cut away —
+// a Greek name came back as a lone acute followed by "λφα" — and that mark
+// draws on whatever precedes it, which on these screens is the ellipsis.
+// Composing first makes a mark and its base one rune before anything is
+// counted.
+func TestACutNeverStartsWithAnOrphanedMark(t *testing.T) {
+	// Built from escapes: a literal here has been normalised by an editor
+	// twice already, and a composed literal deletes the case silently.
+	const acute, diaeresis, breve = "\u0301", "\u0308", "\u0306"
+	for _, s := range []string{
+		"\u03b1" + acute + "\u03bb\u03c6\u03b1",             // alpha with tonos, decomposed
+		"u" + diaeresis + "ber-server",                      // u with diaeresis, decomposed
+		"\u0438" + breve + "\u043d\u0434\u0435\u043a\u0441", // Cyrillic short i, decomposed
+	} {
+		for width := 1; width <= 6; width++ {
+			tail := CutRight(s, width)
+			if tail == "" {
+				continue
+			}
+			if r := []rune(tail)[0]; r >= 0x0300 && r <= 0x036F {
+				t.Errorf("CutRight(%q, %d) starts with a combining mark: %q", s, width, tail)
+			}
+		}
 	}
 }
 
