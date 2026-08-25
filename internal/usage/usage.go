@@ -285,7 +285,11 @@ func TodayDemand(indexDir string) (recalls, bytes, injected int) {
 	now := time.Now()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(midnight) || ahead(e.Time, now) || e.Empty {
+		// FoundNothing, not the raw flag: on an injection the flag means no
+		// project session went in, and the environment block goes out with it
+		// — dropping those said "0 B injected" on a day memory had been
+		// arriving since morning (#1962).
+		if e.Time.Before(midnight) || ahead(e.Time, now) || e.FoundNothing() {
 			continue
 		}
 		switch {
@@ -382,7 +386,9 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 	now := time.Now()
 	cut := WeekCut(now)
 	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(cut) || ahead(e.Time, now) || e.Empty {
+		// Same rule as the day: the week that contains today has to contain
+		// today's injected bytes (#1962).
+		if e.Time.Before(cut) || ahead(e.Time, now) || e.FoundNothing() {
 			continue
 		}
 		switch {

@@ -272,6 +272,12 @@ the week would have started at, it starts at the time the clock reached instead.
 A day, where deja counts one, runs from local midnight. Both are the reader's own
 timezone, not UTC.
 
+`week_recalls` and `week_bytes` count what an agent asked for and got, so a
+recall that matched nothing is left out. `week_injected` counts what deja pushed
+unprompted, including a session start that carried only the environment block —
+that injection has no project session in it, which is a different thing from
+having served nothing.
+
 deja had two rules for a week until #1921, and the two numbers on the status bar
 disagreed for one week in each direction, so the definition is worth stating.
 
