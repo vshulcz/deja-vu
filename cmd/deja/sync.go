@@ -114,7 +114,11 @@ func runSync(dir string, args []string) error {
 		if full {
 			n, err = index.ExportFull(dir, out)
 		} else {
-			n, err = index.ExportTo(dir, out, peer)
+			// Folded, so one machine settles under one watermark whichever way
+			// the name was spelled — a pull runs this on the remote with that
+			// machine's hostname, capitalised on macOS, while the alias someone
+			// types by hand usually is not (#1878).
+			n, err = index.ExportTo(dir, out, peers.Identity(peer))
 		}
 		if err != nil {
 			// `open …/deja-sync-b9849e838232-1785639771368128000.jsonl:

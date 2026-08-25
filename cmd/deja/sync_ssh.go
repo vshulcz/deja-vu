@@ -182,7 +182,10 @@ func syncSSHPush(dir, host string, full bool) error {
 		n, err = index.ExportFull(dir, tmp)
 		commit = func() error { return nil }
 	} else {
-		n, commit, err = index.ExportDeferred(dir, tmp, host)
+		// The connection takes the host as stored; the watermark takes the
+		// folded name, so a push and a hand-run `sync export --peer` settle the
+		// same machine rather than two (#1878).
+		n, commit, err = index.ExportDeferred(dir, tmp, peers.Identity(host))
 	}
 	if err != nil {
 		return err
