@@ -354,7 +354,9 @@ Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
 `sync.state` is `ok` or `unreadable`; `unreadable` adds an `error` saying why the peers file could not be parsed, and its `peers` list is empty because deja could read nothing from it — a sync is never stopped by a malformed config, so the report is the only place that failure shows. `sync.peers` is every machine this one knows, and it is always present — an
 empty list means no machines are configured, which a script can tell apart from
 a deja too old to report. Each row carries `host`, `sessions_from_there` (how
-much of this index arrived from it), and `last_push` / `last_pull` as RFC 3339
+much of this index arrived from it — matched by the name the machine calls
+itself, which deja learns from the records a pull brings, since `host` is
+whatever ssh alias was typed), and `last_push` / `last_pull` as RFC 3339
 timestamps, each omitted when that direction has never happened: the two fail
 apart, and a machine that takes what this one sends while sending nothing back
 is a broken sync that reads as a working one. A row carrying neither is a

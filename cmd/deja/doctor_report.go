@@ -144,7 +144,7 @@ func collectDoctorSync(dir string) doctorSyncReport {
 			// which is the reason the text report needs a bound and this does
 			// not.
 			Host:      p.Host,
-			Sessions:  from[peers.Identity(p.Host)],
+			Sessions:  peerSessionCount(from, p),
 			LastError: safeForStatusline(p.LastError, 200),
 		}
 		if !p.LastPush.IsZero() {

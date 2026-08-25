@@ -282,10 +282,14 @@ func syncSSHPull(dir, host string, full bool) error {
 		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, remoteOutputForEcho(out), host)
 	}
 	cleanup()
+	// Taken before the import so only what this exchange brings is attributed
+	// to this host (#1887).
+	before := importsByPeerName(dir)
 	n, err := index.Import(dir, ltmp)
 	if err != nil {
 		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, host)
 	}
+	learnPeerMachine(dir, host, before)
 	fmt.Fprintf(os.Stdout, "deja: imported %d records\n", n)
 	return nil
 }
