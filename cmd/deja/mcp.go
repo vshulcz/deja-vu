@@ -650,9 +650,28 @@ type blameSessionJSON struct {
 	Project string    `json:"project,omitempty"`
 	Path    string    `json:"path,omitempty"`
 	Title   string    `json:"title,omitempty"`
-	Started time.Time `json:"started,omitempty"`
-	Updated time.Time `json:"updated,omitempty"`
+	Started time.Time `json:"-"`
+	Updated time.Time `json:"-"`
 	Touched []string  `json:"touched,omitempty"`
+}
+
+// MarshalJSON drops a stamp the harness never wrote. `omitempty` does nothing
+// to a struct, so a session with no start time told the agent it began in
+// January of year 1 (#1874).
+func (s blameSessionJSON) MarshalJSON() ([]byte, error) {
+	type plain blameSessionJSON
+	out := struct {
+		plain
+		Started *time.Time `json:"started,omitempty"`
+		Updated *time.Time `json:"updated,omitempty"`
+	}{plain: plain(s)}
+	if !s.Started.IsZero() {
+		out.Started = &s.Started
+	}
+	if !s.Updated.IsZero() {
+		out.Updated = &s.Updated
+	}
+	return json.Marshal(out)
 }
 
 func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []byte {

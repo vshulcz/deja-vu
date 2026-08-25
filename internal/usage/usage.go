@@ -80,7 +80,23 @@ type Summary struct {
 	// 1MB keeping the last 14 days, so a count with no period attached reads
 	// as a lifetime total and then falls by orders of magnitude when that
 	// happens (#763).
-	Since time.Time `json:"since,omitempty"`
+	Since time.Time `json:"-"`
+}
+
+// MarshalJSON writes Since only when there is one. `omitempty` does nothing to
+// a struct, and time.Time is one, so the tag alone wrote January of year 1 on
+// every store that had served no recall — a date a reader subtracts from, and
+// one the document says is not there at all (#1874).
+func (s Summary) MarshalJSON() ([]byte, error) {
+	type plain Summary
+	out := struct {
+		plain
+		Since *time.Time `json:"since,omitempty"`
+	}{plain: plain(s)}
+	if !s.Since.IsZero() {
+		out.Since = &s.Since
+	}
+	return json.Marshal(out)
 }
 
 const (

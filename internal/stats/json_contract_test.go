@@ -1,9 +1,13 @@
 package stats
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // collectJSONKeys gathers every json field name a type marshals, recursing
@@ -55,6 +59,21 @@ func TestStatsJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	}
 	emitted := map[string]bool{}
 	collectJSONKeys(reflect.TypeOf(Report{}), emitted)
+	// usage.Summary writes its own JSON so a zero timestamp does not print as
+	// year 1 (#1874), and a key written that way is invisible to the tag walk
+	// above. Marshal a filled one and take the keys from the output.
+	filled := usage.Summary{Since: time.Unix(1, 0).UTC()}
+	b, err := json.Marshal(filled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var written map[string]any
+	if err := json.Unmarshal(b, &written); err != nil {
+		t.Fatal(err)
+	}
+	for k := range written {
+		emitted[k] = true
+	}
 
 	for k := range emitted {
 		if !documented[k] {
