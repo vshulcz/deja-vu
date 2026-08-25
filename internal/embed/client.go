@@ -15,7 +15,7 @@ import (
 type Client struct {
 	URL    string
 	Model  string
-	APIKey string
+	apiKey string
 	HTTP   *http.Client
 }
 
@@ -27,7 +27,7 @@ func New() (*Client, error) {
 		model = "nomic-embed-text"
 	}
 	if endpoint := os.Getenv("DEJA_EMBED_URL"); endpoint != "" {
-		return &Client{URL: endpoint, Model: model, APIKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
+		return &Client{URL: endpoint, Model: model, apiKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
 	}
 	for _, endpoint := range probeURLs {
 		c := &Client{URL: endpoint, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}
@@ -55,8 +55,8 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 		return nil, fmt.Errorf("create embedding request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -93,7 +93,7 @@ func embedAPIKey(endpoint string) string {
 		return key
 	}
 	parsed, err := url.Parse(endpoint)
-	if err == nil && strings.EqualFold(parsed.Hostname(), "api.openai.com") {
+	if err == nil && strings.EqualFold(parsed.Scheme, "https") && strings.EqualFold(parsed.Hostname(), "api.openai.com") {
 		return os.Getenv("OPENAI_API_KEY")
 	}
 	return ""

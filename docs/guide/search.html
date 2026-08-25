@@ -103,9 +103,9 @@
 </ul>
 <p>Each result carries a tier — <code>exact</code>, <code>close</code> (with the variant), or <code>semantic</code> (with the cosine) — in the CLI, JSON and MCP output.</p>
 <h2>Semantic recall</h2>
-<pre>deja embed          # build a vector sidecar from a local embedding endpoint
+<pre>deja embed          # build a vector sidecar from an embedding endpoint
 deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
-<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. No endpoint, no semantic layer — search is unchanged.</p>
+<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. Authenticated endpoints use <code>DEJA_EMBED_KEY</code>; an HTTPS <code>api.openai.com</code> URL also accepts <code>OPENAI_API_KEY</code>. No endpoint, no semantic layer — search is unchanged.</p>
 
 <h2>Natural-language queries</h2>
 <p>Stop words are dropped, word forms bridge morphology in both directions (<code>failing</code> finds <code>fails</code>), and when no session holds every remaining token deja drops up to two — telling you exactly which (<code>ignoring "why" — no session matches it together with the rest</code>). Zero results now mean the content genuinely is not there.</p>

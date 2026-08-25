@@ -297,15 +297,34 @@ Each uses the deja you already have; the copy it bundles is only the fallback.
 
 Point `deja embed` at a local Ollama, LM Studio or OpenAI-compatible endpoint with
 `DEJA_EMBED_URL` and rephrased queries still hit. Without a reachable runtime, lexical
-search and MCP recall continue unchanged.
+search and MCP recall continue unchanged. OpenAI Platform works with its standard key:
+
+```sh
+export OPENAI_API_KEY='sk-...'
+export DEJA_EMBED_URL='https://api.openai.com/v1/embeddings'
+export DEJA_EMBED_MODEL='text-embedding-3-small'
+deja embed
+```
+
+For another authenticated OpenAI-compatible endpoint, set `DEJA_EMBED_KEY` explicitly:
+
+```sh
+export DEJA_EMBED_URL='https://example.com/v1/embeddings'
+export DEJA_EMBED_MODEL='embedding-model'
+export DEJA_EMBED_KEY='...'
+deja embed
+```
+
+`DEJA_EMBED_KEY` takes precedence. `OPENAI_API_KEY` is used automatically only for an
+HTTPS `api.openai.com` URL; it is never implicitly sent to local or third-party endpoints.
 
 <details>
 <summary>Where the vectors live and what they cost</summary>
 
 The sidecar sits beside the index as `.vectors.bin`, not inside `index.db`. Float32 vectors
-cost roughly 4 MB per 1k messages for a 1,024 dimension model. Embedding is local, and it
-never sends raw source files, only the redacted indexed text truncated to about 2k
-characters.
+cost roughly 4 MB per 1k messages for a 1,024 dimension model. A remote endpoint receives
+the redacted indexed text, truncated to about 2k characters, but never raw source files.
+With Ollama or LM Studio, embedding stays local and needs no key.
 
 </details>
 
