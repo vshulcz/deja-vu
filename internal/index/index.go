@@ -359,8 +359,13 @@ type SearchResult struct {
 	Sessions []model.Session
 	Fuzzy    bool
 	Stemmed  bool
-	Variants map[string][]string
-	Tier     string
+	// Neighbour says the swap came from the co-occurrence map rather than from
+	// a word form: "login" answered by "jwks" is not a spelling of it, and
+	// calling it a word form reads as a typo correction the reader did not
+	// make (#1786).
+	Neighbour bool
+	Variants  map[string][]string
+	Tier      string
 	// Total is how many sessions the tier matched before its own window
 	// trimmed them, and Capped whether that trimming withheld any. The
 	// relevance tier is the one that needs them: it ranks and truncates

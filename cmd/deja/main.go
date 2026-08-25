@@ -686,7 +686,11 @@ func cmdCtx(dir string, rest []string) error {
 	// Which rung answered, said out loud on stderr as the search screen says
 	// it — stdout stays the context block an agent parses. ctx served an
 	// answer to a word the caller never typed and said nothing about it.
-	if result.Stemmed {
+	if result.Neighbour {
+		printNeighbour(os.Stderr, result.Variants)
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Stemmed {
 		printStemmed(os.Stderr, result.Variants)
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
@@ -962,7 +966,11 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, result.Sessions)
 	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
-	if result.Stemmed {
+	if result.Neighbour {
+		printNeighbour(os.Stderr, result.Variants)
+		o.Stemmed = true
+		o.FuzzyVariants = result.Variants
+	} else if result.Stemmed {
 		printStemmed(os.Stderr, result.Variants)
 		o.Stemmed = true
 		o.FuzzyVariants = result.Variants
@@ -1082,6 +1090,24 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	o.Width = printableWidth(os.Stdout)
 	search.Print(os.Stdout, hits, o)
 	return nil
+}
+
+// printNeighbour narrates a co-occurrence swap. It is not a word form: the
+// corpus says these two words keep company, which is a different claim and
+// reads as a typo correction if it borrows the other sentence (#1786).
+func printNeighbour(w io.Writer, variants map[string][]string) {
+	keys := make([]string, 0, len(variants))
+	for token := range variants {
+		keys = append(keys, token)
+	}
+	sort.Strings(keys)
+	for _, token := range keys {
+		for _, variant := range variants[token] {
+			if variant != "" && variant != token {
+				fmt.Fprintf(w, "deja: no session has those words together, so deja tried one this corpus keeps beside %q: %s\n", token, variant)
+			}
+		}
+	}
 }
 
 func printStemmed(w io.Writer, variants map[string][]string) {

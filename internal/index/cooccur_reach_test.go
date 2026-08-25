@@ -56,10 +56,22 @@ func TestCooccurRescueRunsWhenThePostingsDoNotIntersect(t *testing.T) {
 	// The branch this is about is the one where the ANDed postings do not
 	// intersect — both words are in the index, no session holds both.
 	o := query.Options{Query: "kerberos renewal", All: true}
+	both := map[string]bool{}
 	for _, tok := range []string{"kerberos", "renewal"} {
 		posts, perr := postingsFor(dir, "t"+tok)
 		if perr != nil || len(posts) == 0 {
 			t.Fatalf("%s has no postings, so this is not the branch under test (%v)", tok, perr)
+		}
+		hits, herr := Search(dir, query.Options{Query: tok, All: true})
+		if herr != nil {
+			t.Fatal(herr)
+		}
+		for _, h := range hits {
+			key := h.Harness + ":" + h.ID
+			if both[key] {
+				t.Fatalf("%s is in a session that holds both words, so the postings do intersect", key)
+			}
+			both[key] = true
 		}
 	}
 	direct, err := func() (SearchResult, error) {
@@ -87,4 +99,15 @@ func TestCooccurRescueRunsWhenThePostingsDoNotIntersect(t *testing.T) {
 		t.Errorf("a query that matches directly returned %d (%v)", len(hit), err)
 	}
 	_ = model.Session{}
+}
+
+// A neighbour swap is not a word form, and the two are narrated differently:
+// "login" answered by "jwks" is the corpus keeping company, not a spelling.
+func TestANeighbourSwapSaysItIsOne(t *testing.T) {
+	if !(SearchResult{Neighbour: true}).Neighbour {
+		t.Fatal("the flag does not survive a copy")
+	}
+	if (SearchResult{Stemmed: true}).Neighbour {
+		t.Error("a stem result claims to be a neighbour swap")
+	}
 }

@@ -243,7 +243,7 @@ func cooccurSearch(dir string, m Manifest, o query.Options) (SearchResult, error
 			if serr != nil || len(ss) == 0 {
 				continue
 			}
-			return SearchResult{Sessions: ss, Stemmed: true, Variants: variants, Tier: query.TierClose}, nil
+			return SearchResult{Sessions: ss, Stemmed: true, Neighbour: true, Variants: variants, Tier: query.TierClose}, nil
 		}
 	}
 	return SearchResult{}, nil
