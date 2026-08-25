@@ -148,7 +148,7 @@ when empty:
 | `lifecycle` | state of an imported promoted note: `accepted`, `rejected`, `superseded` or `stale` |
 | `lifecycle_note` | the note left with that state |
 | `lifecycle_at` | when that state was set |
-| `kind` | the harness's own word for a session an agent spawned (`subagent`, `subagent_fork`); absent for sessions a person started |
+| `kind` | the harness's own word for a session an agent spawned — `sidechain` from Claude, `subagent` or `subagent_fork` from Grok, and whatever a harness deja has not met yet calls it; absent for sessions a person started |
 | `parent` | the session this one was spawned from, where the harness records the edge itself — deja never infers one |
 | `agent` | name of the agent that ran a spawned session |
 
