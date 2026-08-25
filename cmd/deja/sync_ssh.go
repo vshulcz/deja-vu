@@ -195,7 +195,7 @@ func syncSSHPush(dir, host string, full bool) error {
 	out, err := sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote(remote))...)
 	out = strings.TrimSpace(out)
 	if err != nil {
-		return fmt.Errorf("remote import: %v: %s", err, out)
+		return fmt.Errorf("remote import: %v: %s", err, remoteOutputForEcho(out))
 	}
 	if err := commit(); err != nil {
 		return fmt.Errorf("delivered, but recording watermarks failed (next push may resend; harmless — import dedupes): %w", err)
@@ -237,7 +237,7 @@ func syncSSHPull(dir, host string, full bool) error {
 		out = strings.TrimSpace(out)
 	}
 	if err != nil {
-		return fmt.Errorf("remote export: %v: %s", err, out)
+		return fmt.Errorf("remote export: %v: %s", err, remoteOutputForEcho(out))
 	}
 	if out != "" {
 		fmt.Fprintf(os.Stdout, "%s: %s\n", hostForEcho(host), remoteOutputForEcho(out))
