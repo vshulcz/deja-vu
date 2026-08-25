@@ -314,6 +314,22 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   },
   "ingest_health": {
     "claude": {"malformed_lines": 0, "failed_files": 0}
+  },
+  "sync": {
+    "peers": [
+      {
+        "host": "laptop",
+        "last_push": "2026-08-22T10:00:00Z",
+        "last_pull": "2026-08-22T10:00:00Z",
+        "sessions_from_there": 12
+      },
+      {
+        "host": "build-box",
+        "last_push": "2026-08-20T10:00:00Z",
+        "sessions_from_there": 0,
+        "last_error": "ssh build-box: exit status 255"
+      }
+    ]
   }
 }
 ```
@@ -333,6 +349,17 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `auto`, each with the rule in force and how many sessions it withheld;
 `ignored` and `inert` list policy lines that matched no harness or no import.
 Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
+
+`sync.peers` is every machine this one knows, and it is always present — an
+empty list means no machines are configured, which a script can tell apart from
+a deja too old to report. Each row carries `host`, `sessions_from_there` (how
+much of this index arrived from it), and `last_push` / `last_pull` as RFC 3339
+timestamps, each omitted when that direction has never happened: the two fail
+apart, and a machine that takes what this one sends while sending nothing back
+is a broken sync that reads as a working one. `last_error` is why the most
+recent exchange failed and is absent once one succeeds. Both `host` and
+`last_error` are written elsewhere — a config file, another machine — so they
+are bounded and stripped of control characters before they are reported.
 
 ## `deja blame <path> --json`
 

@@ -51,6 +51,9 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// doctorPolicyReport / doctorPolicyRule
 		"error": true, "activations": true, "ignored": true, "inert": true,
 		"rule": true, "withheld": true,
+		// doctorSyncReport / doctorPeerReport
+		"sync": true, "peers": true, "host": true,
+		"last_push": true, "last_pull": true, "sessions_from_there": true,
 		// index.HarnessIngest
 		"malformed_lines": true, "clipped_messages": true,
 		"failed_files": true, "last_error": true,

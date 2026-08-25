@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/peers"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -79,7 +80,58 @@ type doctorReport struct {
 	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
 	Policy        doctorPolicyReport             `json:"policy"`
 	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
+	Sync          doctorSyncReport               `json:"sync"`
 	Deep          *index.DeepReport              `json:"deep,omitempty"`
+}
+
+// doctorSyncReport is the Sync section in the machine form. The text report has
+// had it since sync landed — "a sync that stops does not announce itself" is
+// the whole reason it exists — while `--json` had no key at all, so the one
+// reader that could watch it unattended could not see a peer that had been
+// failing for a week (#1838). The same gap the policy block had in #1027.
+//
+// Peers is never omitted: a machine with no peers has an empty list, which a
+// script can tell apart from a deja too old to report at all.
+type doctorSyncReport struct {
+	Peers []doctorPeerReport `json:"peers"`
+}
+
+// doctorPeerReport is one machine, carrying what the text line carries.
+type doctorPeerReport struct {
+	Host string `json:"host"`
+	// The two directions fail apart, and a host that takes what this machine
+	// sends while sending nothing back is a broken sync that reads as a
+	// working one — so they are separate keys rather than one "last exchange".
+	LastPush string `json:"last_push,omitempty"`
+	LastPull string `json:"last_pull,omitempty"`
+	// Sessions is how much of this index came from there, the number the text
+	// line prints as "N sessions from there".
+	Sessions int `json:"sessions_from_there"`
+	// LastError is why the most recent exchange failed, bounded the way the
+	// text report bounds it: the value is written by another machine (#1808).
+	LastError string `json:"last_error,omitempty"`
+}
+
+// collectDoctorSync reads the peers file and what arrived from each machine.
+func collectDoctorSync(dir string) doctorSyncReport {
+	list := peers.Load()
+	from := index.ImportedByMachine(dir)
+	out := doctorSyncReport{Peers: make([]doctorPeerReport, 0, len(list))}
+	for _, p := range list {
+		row := doctorPeerReport{
+			Host:      hostForEcho(p.Host),
+			Sessions:  from[p.Host],
+			LastError: safeForStatusline(p.LastError, 200),
+		}
+		if !p.LastPush.IsZero() {
+			row.LastPush = p.LastPush.UTC().Format(time.RFC3339)
+		}
+		if !p.LastPull.IsZero() {
+			row.LastPull = p.LastPull.UTC().Format(time.RFC3339)
+		}
+		out.Peers = append(out.Peers, row)
+	}
+	return out
 }
 
 // doctorPolicyReport is the trust policy in the machine form. The text report
@@ -164,6 +216,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 		report.SQLite3.State = "ok"
 	}
 	report.Policy = collectDoctorPolicy(dir)
+	report.Sync = collectDoctorSync(dir)
 	report.Version = collectDoctorVersion(lookup)
 	report.Embed = collectDoctorEmbed(dir)
 	return report

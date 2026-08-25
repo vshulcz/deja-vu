@@ -310,5 +310,8 @@
         "withheld": 0
       }
     }
+  },
+  "sync": {
+    "peers": []
   }
 }
