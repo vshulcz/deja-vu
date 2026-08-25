@@ -47,7 +47,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// doctorVersionReport
 		"current": true, "latest": true,
 		// doctorEmbedReport
-		"model": true, "dim": true, "coverage": true,
+		"model": true, "dim": true, "coverage": true, "sidecar": true,
 		// doctorPolicyReport / doctorPolicyRule
 		"error": true, "activations": true, "ignored": true, "inert": true,
 		"rule": true, "withheld": true,

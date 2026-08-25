@@ -52,8 +52,8 @@ func TestDoctorNamesASidecarItCannotRead(t *testing.T) {
 	if got == nil {
 		t.Fatal("the report has no embedding section at all, so a corrupt sidecar is invisible")
 	}
-	if got.State != "unreadable" {
-		t.Errorf("state = %q, want unreadable — the file is there and deja cannot parse it", got.State)
+	if got.Sidecar != "unreadable" {
+		t.Errorf("sidecar = %q, want unreadable — the file is there and deja cannot parse it", got.Sidecar)
 	}
 	if got.Error == "" {
 		t.Error("nothing says why the sidecar could not be read")
@@ -61,8 +61,14 @@ func TestDoctorNamesASidecarItCannotRead(t *testing.T) {
 
 	var out bytes.Buffer
 	doctorEmbed(&out, *got)
-	if !strings.Contains(out.String(), "unreadable") {
-		t.Errorf("the text report does not say the sidecar is unreadable:\n%s", out.String())
+	// Named as the sidecar, with the reason. "endpoint unreadable" would carry
+	// the same word and send the reader after the endpoint instead.
+	line := out.String()
+	if !strings.Contains(line, "sidecar    unreadable") || !strings.Contains(line, got.Error) {
+		t.Errorf("the text report does not name the sidecar and why it failed:\n%s", line)
+	}
+	if !strings.Contains(line, "endpoint") {
+		t.Errorf("the endpoint line is gone, and it is what says whether re-embedding can fix this:\n%s", line)
 	}
 }
 
@@ -74,7 +80,9 @@ func TestDoctorSaysNothingWhenThereIsNoSidecarAtAll(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := collectDoctorEmbed(dir); got != nil && got.State == "unreadable" {
-		t.Errorf("a missing sidecar was reported as unreadable: %#v", got)
+	// Nothing embedded and no endpoint is not a fault: the section is left out
+	// entirely, which is what the caller checks for.
+	if got := collectDoctorEmbed(dir); got != nil {
+		t.Errorf("a deja that was never asked to embed anything reported: %#v", got)
 	}
 }
