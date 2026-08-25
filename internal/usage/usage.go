@@ -48,6 +48,33 @@ const (
 	KindTool = "tool"
 )
 
+// servedKinds are the events that hand an agent memory it asked for: the two
+// recall tools, a blame — "the largest thing the server hands over", which is
+// why #682 gave it a kind of its own — and a read of deja://session/…, which
+// hands over a whole session in the same frame recall_context uses.
+//
+// Named once because the counters drifted: #1569 aligned five of them and left
+// Impact behind, so a blame was a recall on `deja stats` and nothing on
+// `deja stats --impact`, whose distilled ratio was then short by its bytes
+// (#1907).
+func servedKind(kind string) bool {
+	switch kind {
+	case KindRecall, KindContext, KindBlame, KindResource:
+		return true
+	}
+	return false
+}
+
+// injectedKinds are the events where deja offers memory unasked: the
+// session-start hook, the per-prompt recall and the PreToolUse line.
+func injectedKind(kind string) bool {
+	switch kind {
+	case KindHook, KindDejaVu, KindTool:
+		return true
+	}
+	return false
+}
+
 type Event struct {
 	Time     time.Time `json:"t"`
 	Kind     string    `json:"kind"`
@@ -206,11 +233,11 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 		if e.Time.Before(midnight) || ahead(e.Time, now) {
 			continue
 		}
-		switch e.Kind {
-		case KindRecall, KindContext, KindBlame:
+		switch {
+		case servedKind(e.Kind):
 			recalls++
 			bytes += e.Bytes
-		case KindHook, KindDejaVu, KindTool:
+		case injectedKind(e.Kind):
 			recalls++
 			bytes += e.Bytes
 			injected += e.Bytes
@@ -234,11 +261,11 @@ func TodayDemand(indexDir string) (recalls, bytes, injected int) {
 		if e.Time.Before(midnight) || ahead(e.Time, now) || e.Empty {
 			continue
 		}
-		switch e.Kind {
-		case KindRecall, KindContext, KindBlame:
+		switch {
+		case servedKind(e.Kind):
 			recalls++
 			bytes += e.Bytes
-		case KindHook, KindDejaVu, KindTool:
+		case injectedKind(e.Kind):
 			injected += e.Bytes
 		}
 	}
@@ -268,8 +295,7 @@ func TodayRaw(indexDir string) int64 {
 		if e.Time.Before(midnight) || ahead(e.Time, now) {
 			continue
 		}
-		switch e.Kind {
-		case KindRecall, KindContext, KindBlame, KindHook, KindDejaVu, KindTool:
+		if servedKind(e.Kind) || injectedKind(e.Kind) {
 			raw += e.RawBytes
 		}
 	}
@@ -284,8 +310,8 @@ func Totals(indexDir string) Summary {
 		if out.Since.IsZero() || (!e.Time.IsZero() && e.Time.Before(out.Since)) {
 			out.Since = e.Time
 		}
-		switch e.Kind {
-		case KindRecall, KindContext, KindBlame:
+		switch {
+		case servedKind(e.Kind):
 			out.Recalls++
 			out.RecallSessions += e.Sessions
 			out.Bytes += e.Bytes
@@ -293,7 +319,7 @@ func Totals(indexDir string) Summary {
 			if e.Empty {
 				empty++
 			}
-		case KindHook, KindDejaVu, KindTool:
+		case injectedKind(e.Kind):
 			out.Injections++
 			out.InjectedSessions += e.Sessions
 			out.InjectedBytes += e.Bytes
@@ -321,11 +347,11 @@ func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 		if e.Time.Before(cut) || ahead(e.Time, now) || e.Empty {
 			continue
 		}
-		switch e.Kind {
-		case KindRecall, KindContext, KindBlame:
+		switch {
+		case servedKind(e.Kind):
 			recalls++
 			bytes += e.Bytes
-		case KindHook, KindDejaVu, KindTool:
+		case injectedKind(e.Kind):
 			injected++
 			injectedBytes += e.Bytes
 		}
@@ -470,8 +496,8 @@ func Impact(indexDir string) ImpactReport {
 		if r.Since.IsZero() || e.Time.Before(r.Since) {
 			r.Since = e.Time
 		}
-		switch e.Kind {
-		case KindRecall, KindContext:
+		switch {
+		case servedKind(e.Kind):
 			if e.Empty {
 				continue
 			}
@@ -481,7 +507,7 @@ func Impact(indexDir string) ImpactReport {
 			for _, id := range e.SessionIDs {
 				worn[id]++
 			}
-		case KindHook:
+		case e.Kind == KindHook:
 			// A session start with no project session to show still injects
 			// the environment block, and that event is logged empty. Counting
 			// it made "N session starts began with project memory" claim
@@ -492,7 +518,7 @@ func Impact(indexDir string) ImpactReport {
 			r.Injections++
 			r.ServedBytes += e.Bytes
 			r.RawBytes += e.RawBytes
-		case KindDejaVu:
+		case e.Kind == KindDejaVu:
 			r.DejaVuMoments++
 		}
 	}
