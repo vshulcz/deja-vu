@@ -51,3 +51,28 @@ func TestTheRepeatedHourSaysWhichSideItIsOn(t *testing.T) {
 		t.Errorf("an ordinary session gained an offset:\n%s", pb.String())
 	}
 }
+
+// Two turns at the same instant are not a repeated hour — a burst of messages
+// in one minute is ordinary — and a minute that comes back three times still
+// says which is which.
+func TestRepeatedStampDetection(t *testing.T) {
+	base, err := time.Parse(time.RFC3339, "2026-11-01T05:30:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := repeatedStamps([]model.Message{{Time: base}, {Time: base}, {Time: base}})
+	if len(same) != 0 {
+		t.Errorf("messages at one instant were called a repeated hour: %v", same)
+	}
+	// The same wall-clock minute from three different instants: one entry, and
+	// every one of them gets the offset when it prints.
+	thrice := repeatedStamps([]model.Message{
+		{Time: base}, {Time: base.Add(time.Hour)}, {Time: base.Add(2 * time.Hour)},
+	})
+	if len(thrice) != 0 {
+		t.Errorf("UTC has no repeated hour here: %v", thrice)
+	}
+	if none := repeatedStamps([]model.Message{{}, {}}); len(none) != 0 {
+		t.Errorf("sessions without stamps produced %v", none)
+	}
+}
