@@ -130,12 +130,12 @@ func syncOneWay(dir, host string, pull, full bool) error {
 // travel through a third machine — an export never forwards what arrived by
 // sync — so every pair has to meet directly, and that is what this does.
 func runSyncAll(dir string, full bool) error {
-	list := peers.Load()
+	list, why := peers.Snapshot()
 	if len(list) == 0 {
 		// Load reports a malformed file as no peers, so without this the
 		// sentence below tells someone whose file is broken to name their
 		// first machine — which they already did (#1840).
-		if why := peers.Problem(); why != "" {
+		if why != "" {
 			return fmt.Errorf("%s could not be read — %s", peers.Path(), remoteOutputForEcho(why))
 		}
 		return fmt.Errorf("no machines to sync with yet — name one once with `deja sync ssh <host>` and deja will remember it")

@@ -63,13 +63,26 @@ func Path() string {
 // not break because a config file is malformed, and doctor is where that gets
 // reported.
 func Load() []Peer {
+	list, _ := Snapshot()
+	return list
+}
+
+// Snapshot is Load and Problem from one read of the file, for a caller that
+// reports both. Asking twice re-read a file that a sync may be rewriting
+// between the two calls, so the list and the reason could describe different
+// states of it.
+func Snapshot() ([]Peer, string) {
 	var f file
 	b, err := os.ReadFile(Path())
 	if err != nil {
-		return nil
+		if errors.Is(err, fs.ErrNotExist) {
+			// Never synced is not a fault.
+			return nil, ""
+		}
+		return nil, err.Error()
 	}
-	if json.Unmarshal(b, &f) != nil {
-		return nil
+	if err := json.Unmarshal(b, &f); err != nil {
+		return nil, err.Error()
 	}
 	out := f.Peers[:0:0]
 	for _, p := range f.Peers {
@@ -79,7 +92,7 @@ func Load() []Peer {
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Host < out[j].Host })
-	return out
+	return out, ""
 }
 
 // Problem reports why the file could not be read, and "" when there is nothing
@@ -88,20 +101,11 @@ func Load() []Peer {
 //
 // Load deliberately treats every failure as "no peers", so that a malformed
 // config cannot stop a sync; its comment says doctor is where that surfaces.
-// This is the half that lets doctor say it (#1840).
+// This is the half that lets doctor say it (#1840). A caller that wants both
+// takes Snapshot, which reads the file once.
 func Problem() string {
-	b, err := os.ReadFile(Path())
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return ""
-		}
-		return err.Error()
-	}
-	var f file
-	if err := json.Unmarshal(b, &f); err != nil {
-		return err.Error()
-	}
-	return ""
+	_, why := Snapshot()
+	return why
 }
 
 // Record notes an exchange with a host: which way it went, and whether it

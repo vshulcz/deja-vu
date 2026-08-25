@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/peers"
 )
 
 // A peers file that cannot be parsed used to read exactly like a machine with
@@ -146,5 +147,66 @@ func TestThePeersFileShapesAreClassified(t *testing.T) {
 				t.Errorf("peers is null rather than an empty list, which a consumer has to special-case")
 			}
 		})
+	}
+}
+
+// The two failure modes the shape table cannot write as a file body: no
+// permission to read, and a directory where the file should be.
+func TestAFileDejaCannotOpenIsReportedToo(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads anything, so the denied case cannot be built")
+	}
+	t.Run("permission denied", func(t *testing.T) {
+		tmp := hermeticEnv(t)
+		path := filepath.Join(tmp, "peers.json")
+		t.Setenv("DEJA_PEERS_FILE", path)
+		if err := os.WriteFile(path, []byte(`{"peers":[]}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, 0o000); err != nil {
+			t.Skipf("cannot drop permissions here: %v", err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+		got := collectDoctorSync(t.TempDir())
+		if got.State != "unreadable" || !strings.Contains(got.Error, "permission denied") {
+			t.Errorf("a file deja may not read reports %#v", got)
+		}
+	})
+	t.Run("a directory in its place", func(t *testing.T) {
+		tmp := hermeticEnv(t)
+		path := filepath.Join(tmp, "peers.json")
+		t.Setenv("DEJA_PEERS_FILE", path)
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		got := collectDoctorSync(t.TempDir())
+		if got.State != "unreadable" || got.Error == "" {
+			t.Errorf("a directory where the file should be reports %#v", got)
+		}
+	})
+}
+
+// Snapshot is one read: the list and the reason describe the same state of the
+// file, which two calls could not promise while a sync rewrites it.
+func TestSnapshotAnswersBothFromOneRead(t *testing.T) {
+	tmp := hermeticEnv(t)
+	path := filepath.Join(tmp, "peers.json")
+	t.Setenv("DEJA_PEERS_FILE", path)
+	if err := os.WriteFile(path, []byte(`{"peers":[{"host":"laptop"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	list, why := peers.Snapshot()
+	if why != "" || len(list) != 1 {
+		t.Fatalf("a readable file gave %d peers and %q", len(list), why)
+	}
+	if err := os.WriteFile(path, []byte(`{"peers":[{"host":`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	list, why = peers.Snapshot()
+	if why == "" {
+		t.Error("a broken file gave no reason")
+	}
+	if len(list) != 0 {
+		t.Errorf("a broken file still produced %d peers", len(list))
 	}
 }

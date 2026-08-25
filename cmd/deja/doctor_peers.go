@@ -19,9 +19,9 @@ import (
 // laptop that has not been opened in a fortnight look exactly like a week with
 // nothing to send. This is the screen where that shows.
 func doctorPeers(w io.Writer, dir string, now time.Time) {
-	list := peers.Load()
+	list, why := peers.Snapshot()
 	fmt.Fprintln(w, "Sync:")
-	if why := peers.Problem(); why != "" {
+	if why != "" {
 		// Load treats a malformed file as "no peers" so a sync cannot be
 		// stopped by one, and says doctor is where that surfaces. Without this
 		// line it surfaced nowhere, and a broken file read as a machine that

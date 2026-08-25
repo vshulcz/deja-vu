@@ -119,12 +119,15 @@ type doctorPeerReport struct {
 
 // collectDoctorSync reads the peers file and what arrived from each machine.
 func collectDoctorSync(dir string) doctorSyncReport {
-	list := peers.Load()
+	list, why := peers.Snapshot()
 	from := index.ImportedByMachine(dir)
 	out := doctorSyncReport{State: "ok", Peers: make([]doctorPeerReport, 0, len(list))}
-	if why := peers.Problem(); why != "" {
-		out.State = "unreadable"
-		out.Error = why
+	if why != "" {
+		// Error is unbounded on purpose, unlike a peer's LastError beside it:
+		// this string is deja's own — a parse failure, or an OS error naming
+		// the file — while that one is written by another machine and can be
+		// made arbitrarily long. The encoder escapes either.
+		out.State, out.Error = "unreadable", why
 	}
 	for _, p := range list {
 		row := doctorPeerReport{
