@@ -1257,6 +1257,28 @@ func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {
 	return model.Session{}, false
 }
 
+// repeatedStamps names the minutes this session renders more than once from
+// different instants — what the fall-back hour does twice a year. Nothing else
+// is affected: an ordinary transcript keeps its narrower column.
+func repeatedStamps(ms []model.Message) map[string]bool {
+	seen := map[string]time.Time{}
+	repeated := map[string]bool{}
+	for _, m := range ms {
+		if m.Time.IsZero() {
+			continue
+		}
+		stamp := m.Time.Format("2006-01-02 15:04")
+		if first, ok := seen[stamp]; ok {
+			if !first.Equal(m.Time) {
+				repeated[stamp] = true
+			}
+			continue
+		}
+		seen[stamp] = m.Time
+	}
+	return repeated
+}
+
 func PrintSession(w io.Writer, s model.Session) {
 	// Project and id are transcript text a harness wrote, and this is one
 	// line: an escape byte in either recolours the transcript that follows, a
@@ -1264,6 +1286,7 @@ func PrintSession(w io.Writer, s model.Session) {
 	// lines of what reads as deja's own output. PrintContext below has said
 	// this since #1090; this header was missed by it.
 	fmt.Fprintf(w, "# %s · %s · %s\n", s.Harness, SafeLine(s.Project), SafeLine(s.ID))
+	repeated := repeatedStamps(s.Messages)
 	for _, m := range s.Messages {
 		txt := redact.SafeForDisplay(collapseTool(m.Text))
 		if strings.TrimSpace(txt) == "" {
@@ -1271,7 +1294,14 @@ func PrintSession(w io.Writer, s model.Session) {
 		}
 		t := ""
 		if !m.Time.IsZero() {
-			t = m.Time.Format("2006-01-02 15:04") + " "
+			stamp := m.Time.Format("2006-01-02 15:04")
+			if repeated[stamp] {
+				// The clocks went back and this minute happened twice. Both
+				// stamps are right, which is why an hour of conversation reads
+				// as a duplicated message without the offset (#1788).
+				stamp = m.Time.Format("2006-01-02 15:04 -07:00")
+			}
+			t = stamp + " "
 		}
 		fmt.Fprintf(w, "\n%s%s:\n%s\n", t, m.Role, SafeText(txt))
 	}
