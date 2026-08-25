@@ -213,6 +213,34 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 		return err
 	}
 	defer unlock()
+	return ensureLocked(dir, o, force, progress)
+}
+
+// EnsureForSearchNoWait is EnsureForSearch for a caller that must answer inside
+// somebody's tool call: it takes the lock or reports that another process holds
+// it, in one attempt. Checking RebuildInProgress and then calling the blocking
+// Ensure asked the same question twice, a lock acquisition apart, and a rebuild
+// starting in that window was waited out inside the call (#1804).
+func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (busy bool, err error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		if errors.Is(err, fs.ErrPermission) && HasManifest(dir) {
+			return false, nil
+		}
+		return false, err
+	}
+	if !ok {
+		return true, nil
+	}
+	defer unlock()
+	return false, ensureLocked(dir, o, false, progress)
+}
+
+// ensureLocked is the body of an Ensure, with the lock already held.
+func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) error {
 	sweepStaleTmp(dir)
 	prior, priorErr := readManifest(dir)
 	want := currentFilesReusing("", priorFiles(prior, priorErr))

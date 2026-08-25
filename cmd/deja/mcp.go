@@ -491,11 +491,27 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// On upgrade day that meant rebuilding the whole index inside the call
 		// (#1309), so the agent is told instead — the detached warmup picks it
 		// up with everything else.
+		// The note is on disk either way; what is left is making it findable.
+		// On upgrade day that meant rebuilding the whole index inside the call
+		// (#1309), so the agent is told instead — the detached warmup picks it
+		// up with everything else.
 		if line := buildingNowForBlockingTool(dir); line != "" {
 			return "Saved. " + line, nil
 		}
-		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, mcpProgress()); err != nil {
+		// The check above cannot cover a rebuild that starts after it: it and a
+		// blocking Ensure ask the same lock a moment apart, and what began in
+		// between was waited out inside the client's call (#1804). One attempt
+		// at the lock decides both.
+		busy, err := index.EnsureForSearchNoWait(dir, search.Options{All: true}, mcpProgress())
+		if err != nil {
 			return "", err
+		}
+		if busy {
+			requestWarmup(dir)
+			if line := buildingNowForBlockingTool(dir); line != "" {
+				return "Saved. " + line, nil
+			}
+			return "Saved. deja is refreshing its index; this note becomes findable when that finishes, in a few seconds.", nil
 		}
 		// The journal is where the user sees what the agent did with their
 		// store; a write belongs there at least as much as a read.
