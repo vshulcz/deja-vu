@@ -124,14 +124,20 @@ jobs:
       # A floor per package, set at where each stands today. Raise them as
       # coverage improves; lowering one to make a build pass is the move this
       # gate exists to prevent.
+      #
+      # Some have no room. bench and policy sit exactly on 100, so one uncovered
+      # line fails the build, and usage has half a point — an exported one-line
+      # wrapper with no caller was enough to trip it (#1921). If you are adding
+      # a helper to one of those, add its test in the same commit.
       - name: Per-package coverage floor
         if: runner.os == 'Linux'
         shell: bash
         run: |
           declare -A floor=(
             [cmd/deja]=88 [internal/bench]=100 [internal/digest]=90 [internal/embed]=93
-            [internal/index]=90 [internal/policy]=100 [internal/redact]=94
-            [internal/search]=93 [internal/sources]=87 [internal/usage]=95
+            [internal/index]=90 [internal/peers]=76 [internal/policy]=100
+            [internal/redact]=94 [internal/search]=93 [internal/sources]=87
+            [internal/stats]=91 [internal/usage]=95
           )
           fail=0
           while read -r pkg cov; do
