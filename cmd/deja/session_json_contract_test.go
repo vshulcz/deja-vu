@@ -11,6 +11,21 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
+// docSection is one heading's text, up to the next heading of the same level.
+func docSection(t *testing.T, doc, heading string) string {
+	t.Helper()
+	i := strings.Index(doc, heading)
+	if i < 0 {
+		t.Fatalf("docs/json-output.md has no %q", heading)
+	}
+	rest := doc[i+len(heading):]
+	level := strings.Repeat("#", strings.Count(strings.SplitN(heading, " ", 2)[0], "#"))
+	if end := strings.Index(rest, "\n"+level+" "); end > 0 {
+		rest = rest[:end]
+	}
+	return rest
+}
+
 // jsonKeys is every key a value emits, nested ones included, once each.
 func jsonKeys(v any, into map[string]bool) {
 	switch t := v.(type) {
@@ -32,9 +47,10 @@ func jsonKeys(v any, into map[string]bool) {
 // three commands' output at once, so this is the check that a document entry
 // comes with it.
 //
-// Against the whole document rather than the two sections: the keys those
-// sections do not name are the ones the shared "session object" table describes
-// for search, last and show together, which is where they belong.
+// Each command is checked against its own section plus the shared "session
+// object" table, which is where the keys their sections do not name live. Not
+// the whole document: a key documented for `search` alone would otherwise pass
+// as documented here.
 //
 // It pins what this corpus emits, which is the always-present half. The
 // optional keys — agent_title, touched, gave_up, orig_id, from, lifecycle,
@@ -70,11 +86,14 @@ func TestSessionJSONKeysAreDocumented(t *testing.T) {
 	documented := string(doc)
 
 	for _, c := range []struct {
-		name string
-		args []string
+		name    string
+		args    []string
+		section string
+		least   int
 	}{
-		{"show", []string{"show", "sess1", "--harness", "claude", "--json"}},
-		{"last", []string{"last", "3", "--json"}},
+		{"show", []string{"show", "sess1", "--harness", "claude", "--json"},
+			"## `deja show <exact-id> --harness <name> --json`", 18},
+		{"last", []string{"last", "3", "--json"}, "## `deja last --json`", 10},
 	} {
 		out, err := captureRun(t, c.args...)
 		if err != nil {
@@ -86,18 +105,24 @@ func TestSessionJSONKeysAreDocumented(t *testing.T) {
 		}
 		keys := map[string]bool{}
 		jsonKeys(body, keys)
-		if len(keys) < 8 {
-			t.Fatalf("%s emitted %d keys, so the corpus is too thin to say anything: %v", c.name, len(keys), keys)
+		if len(keys) < c.least {
+			t.Fatalf("%s emitted %d keys, fewer than the %d this corpus should produce: %v",
+				c.name, len(keys), c.least, keys)
 		}
+		// The command's own section plus the shared table, not the whole
+		// document: a key documented for `search` alone would otherwise read as
+		// documented here.
+		where := docSection(t, documented, c.section) + docSection(t, documented, "### The session object")
 		var missing []string
 		for k := range keys {
-			if !strings.Contains(documented, "`"+k+"`") && !strings.Contains(documented, `"`+k+`"`) {
+			if !strings.Contains(where, "`"+k+"`") && !strings.Contains(where, `"`+k+`"`) {
 				missing = append(missing, k)
 			}
 		}
 		sort.Strings(missing)
 		if len(missing) > 0 {
-			t.Errorf("deja %s --json emits %v, absent from docs/json-output.md", c.name, missing)
+			t.Errorf("deja %s --json emits %v, absent from its section of docs/json-output.md and from the session object table",
+				c.name, missing)
 		}
 	}
 }
