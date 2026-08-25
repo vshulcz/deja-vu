@@ -2006,6 +2006,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return nil
 	}
 	var replacements []model.Session
+	// This pass's counts, like every other build path (#1850).
+	emptied.Store(0)
+	collisions.Store(0)
 	lastIngestFiles = len(changed)
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
@@ -2292,6 +2295,11 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 }
 
 func appendIncremental(dir, harness, scope string, old Manifest, files map[string]FileState, changed map[string]FileState) (int, int, error) {
+	// This pass's counts, like the two full paths: an incremental that nobody
+	// read between builds otherwise reported its own colliding ids plus the
+	// ones before it (#1850).
+	emptied.Store(0)
+	collisions.Store(0)
 	lastIngestFiles = len(changed)
 	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {

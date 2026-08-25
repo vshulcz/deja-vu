@@ -96,3 +96,53 @@ func TestTheCollisionCounterBelongsToTheLastBuild(t *testing.T) {
 		t.Errorf("a build with no collisions reported %d", n)
 	}
 }
+
+// An incremental pass is a build too. Two of them with nobody reading in
+// between used to report the first one's colliding ids alongside the second's
+// (#1850) — the reviewer of #1851 found this path after the two full ones were
+// fixed.
+func TestAnIncrementalPassCountsOnlyItsOwn(t *testing.T) {
+	home := t.TempDir()
+	setHome(t, home)
+	t.Setenv("USERPROFILE", home)
+	root := filepath.Join(home, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	proj := filepath.Join(root, "-tmp-c")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := func(id string) string {
+		return `{"type":"user","sessionId":"` + id + `","cwd":"/tmp/c","timestamp":"2026-08-01T10:00:00Z","message":{"role":"user","content":"pool exhausted"}}` + "\n"
+	}
+	pair := func(id string) {
+		t.Helper()
+		for _, half := range []string{"-one.jsonl", "-two.jsonl"} {
+			if err := os.WriteFile(filepath.Join(proj, id+half), []byte(line(id)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	dir := filepath.Join(home, "idx")
+
+	pair("dupa")
+	pair("dupb")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := ReportCollisions(); n != 2 {
+		t.Fatalf("the full build found %d colliding ids, want the 2 it was given", n)
+	}
+
+	// Two incremental passes, and nothing reads between them.
+	pair("dupc")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	pair("dupd")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := ReportCollisions(); n != 1 {
+		t.Errorf("the last incremental reported %d colliding ids, want its own 1", n)
+	}
+}
