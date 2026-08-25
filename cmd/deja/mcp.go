@@ -302,9 +302,14 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
 		}
-		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), 4096-recallFrameOverhead)
+		// The block goes out once per session and lands after the frame, so it
+		// has to come out of the same budget: appended afterwards it put the
+		// first recall of every session — the one an agent plans against — over
+		// the cap by its own length (#1806).
+		env := environmentOnce(dir)
+		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env))
 		if err == nil {
-			text = frameRecall(text) + environmentOnce(dir)
+			text = frameRecall(text) + env
 			usage.RecordServedSessions(dir, usage.KindRecall, len(text), sessions, sessions == 0, raw, ids)
 			usage.SnapshotPolicy(dir, usage.KindRecall, text, sessions, policy.Load().Describe(policy.ActivationMCP))
 		}
@@ -565,6 +570,10 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	}
 	return string(body), len(hits), nil
 }
+
+// recallMCPBudget is the whole recall reply: the framed page and, on the first
+// call of a session, the environment block after it.
+const recallMCPBudget = 4096
 
 // contextDigestCut is the line that admits a digest was cut. Without it the
 // reply ends mid-word and reads as the whole session, which is what an agent
