@@ -40,8 +40,8 @@ func withLock(fn func() error) error {
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
-			f.Close()
-			defer os.Remove(path)
+			_ = f.Close()
+			defer func() { _ = os.Remove(path) }()
 			return fn()
 		}
 		if !errors.Is(err, fs.ErrExist) {
