@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +15,7 @@ import (
 // made doctor say a machine that does not exist was reached a moment ago, in
 // the same line that reported the failure (#1780).
 func TestNothingToSendIsNotAnExchange(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(t.TempDir(), "peers.json"))
 
 	if err := recordExchange("quiet.example", false, time.Now(), errNothingToSend); err != nil {
 		t.Fatal(err)
@@ -52,8 +52,7 @@ func TestNothingToSendIsNotAnExchange(t *testing.T) {
 // stayed in the list and every bare `deja sync` retried it, at the cost of the
 // connect timeout each time (#1780).
 func TestSyncForgetRemovesAMachine(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(t.TempDir(), "peers.json"))
 	if err := peers.Record("mini", false, time.Now(), nil); err != nil {
 		t.Fatal(err)
 	}

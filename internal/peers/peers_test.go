@@ -165,8 +165,10 @@ func TestSaveReplacesTheFileWhole(t *testing.T) {
 // what it did last time is left alone rather than overwritten with a zero
 // (#1780).
 func TestRecordingNothingKeepsWhatWasThere(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("USERPROFILE", t.TempDir())
+	// The package's own convention: XDG_CONFIG_HOME decides this path on Linux,
+	// so setting HOME alone leaves every test in the package sharing one real
+	// file — which is how this one first failed on CI and passed here.
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(t.TempDir(), "peers.json"))
 	when := time.Now().Add(-time.Hour)
 	if err := Record("mini", false, when, nil); err != nil {
 		t.Fatal(err)
@@ -196,8 +198,7 @@ func TestRecordingNothingKeepsWhatWasThere(t *testing.T) {
 // failure stands: clearing it would say the host is fine when deja never
 // contacted it (#1780).
 func TestNothingToSendLeavesAnEarlierFailureStanding(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(t.TempDir(), "peers.json"))
 	if err := Record("mini", false, time.Now(), errors.New("connection refused")); err != nil {
 		t.Fatal(err)
 	}
