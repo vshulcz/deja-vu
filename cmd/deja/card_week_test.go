@@ -67,3 +67,26 @@ func renderPage(t *testing.T, r stats.Report) string {
 	}
 	return string(body)
 }
+
+// The plain-text surface, which the test above leaves out because it renders
+// through a different path. It also renders the figure differently — %d rather
+// than the grouped form the card and the page use — so a four-figure week reads
+// "1234" here and "1,234" there. Pinned as it is rather than changed: what a
+// count looks like on the screen is not a thing to alter in a test's name.
+func TestThePlainTextStatsPrintsTheWeekItWasHanded(t *testing.T) {
+	var out strings.Builder
+	printStats(&out, stats.Report{TotalSessions: 40, TotalMessages: 400, WeekRecalls: 37})
+	if !strings.Contains(out.String(), "This week        37 recalls") {
+		t.Errorf("the line does not show the week it was given:\n%s", out.String())
+	}
+
+	out.Reset()
+	printStats(&out, stats.Report{TotalSessions: 40, TotalMessages: 400, WeekRecalls: 1234})
+	if !strings.Contains(out.String(), "1234 recalls") {
+		t.Errorf("the four-figure week is not printed as %%d here:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "1,234 recalls") {
+		t.Errorf("this surface has started grouping thousands; the card and page already do, " +
+			"so make them agree deliberately rather than by accident")
+	}
+}
