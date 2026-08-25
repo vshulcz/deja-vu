@@ -35,3 +35,25 @@ func TestComposeFoldsLettersCarryingTwoMarks(t *testing.T) {
 		}
 	}
 }
+
+// A standalone diacritic is not a letter, and the generator asked for one — so
+// the three Greek marks written as a spacing diaeresis plus a combining mark
+// folded to nothing, and a text quoting one matched only in the form it was
+// typed (#1894). The table is about text, not about letters.
+func TestComposeFoldsAStandaloneDiacritic(t *testing.T) {
+	cases := []struct {
+		name, nfd, nfc string
+	}{
+		{"greek dialytika tonos", "\u00a8\u0301", "\u0385"},
+		{"greek dialytika perispomeni", "\u00a8\u0342", "\u1fc1"},
+		{"greek dialytika varia", "\u00a8\u0300", "\u1fed"},
+	}
+	for _, c := range cases {
+		if c.nfd == c.nfc {
+			t.Fatalf("%s: nfd and nfc are identical bytes — test is trivial", c.name)
+		}
+		if got := Compose(c.nfd); got != c.nfc {
+			t.Errorf("%s: Compose(NFD %+q) = %+q, want NFC %+q", c.name, c.nfd, got, c.nfc)
+		}
+	}
+}

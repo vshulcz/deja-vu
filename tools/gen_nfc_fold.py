@@ -37,6 +37,13 @@ def is_composable_base(c):
         return unicodedata.category(c).startswith('L')
     if 0x1F00 <= o <= 0x1FFF:                        # Greek Extended
         return unicodedata.category(c).startswith('L')
+    # A spacing diaeresis is not a letter, and three Greek marks are written
+    # with it: ¨ + U+0301 is U+0385, and the same for U+1FC1 and U+1FED. The
+    # table is about text a corpus can carry in either normal form, not about
+    # letters, and a text quoting a bare diacritic matched only in the form it
+    # was typed (#1894).
+    if o == 0x00A8:
+        return True
     return False
 
 pairs = []
