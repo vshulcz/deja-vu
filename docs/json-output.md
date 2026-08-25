@@ -262,6 +262,17 @@ digests distilled and `since` is the oldest event still in the usage log; both
 are omitted when zero, so a store with no recall history yet shows neither.
 
 
+`week_recalls`, `week_bytes`, `week_injected` and `week_agent_credits` cover
+seven calendar days back from now, at the same wall clock — not a fixed 168
+hours. Across a clock change that means the week runs an hour longer in autumn
+and an hour shorter in spring, and in the hour a spring-forward removes it opens
+at the time the clock actually reached. A day, where deja counts one, runs from
+local midnight. Both are the reader's own timezone, not UTC.
+
+The distinction is not pedantry: deja itself had two rules for a week until
+#1921, and the two numbers on the status bar disagreed for one week in each
+direction.
+
 Optional fields are omitted when zero or empty — `sidecar_size`, for one,
 appears only after `deja embed` has built a semantic sidecar. The heatmap grid used by
 `--card` is intentionally excluded from `--json` output.
