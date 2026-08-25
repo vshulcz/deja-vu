@@ -44,6 +44,8 @@ def is_composable_base(c):
     # was typed (#1894).
     if o == 0x00A8:
         return True
+    if 0x0620 <= o <= 0x06FF:                        # Arabic
+        return unicodedata.category(c).startswith('L')
     return False
 
 pairs = []
@@ -56,7 +58,11 @@ for cp in range(0x00C0, 0x2130):
     if len(parts) != 2:
         continue
     base, mark = chr(int(parts[0], 16)), chr(int(parts[1], 16))
-    if not (0x0300 <= ord(mark) <= 0x036F):
+    # The combining block the three scripts use, plus Arabic's hamza and madda,
+    # which sit just past it at U+0653..U+0655 — eight pairs, none of them a
+    # composition exclusion, and without them an Arabic word typed decomposed
+    # keyed apart from the same word stored composed (#1913).
+    if not (0x0300 <= ord(mark) <= 0x036F or 0x0653 <= ord(mark) <= 0x0655):
         continue
     if not is_composable_base(base):
         continue

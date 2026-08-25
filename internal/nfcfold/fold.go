@@ -9,7 +9,11 @@ package nfcfold
 // overwhelming common case pays one scan and no allocation.
 func hasCombining(s string) bool {
 	for _, r := range s {
-		if r >= 0x0300 && r <= 0x036F {
+		// One test guards both ranges, so ordinary text pays a single
+		// comparison per rune: the marks all sit above U+0300, and Arabic's
+		// hamza and madda sit just past the block the other scripts use
+		// (#1913).
+		if r >= 0x0300 && (r <= 0x036F || (r >= 0x0653 && r <= 0x0655)) {
 			return true
 		}
 	}

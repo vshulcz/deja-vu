@@ -57,3 +57,31 @@ func TestComposeFoldsAStandaloneDiacritic(t *testing.T) {
 		}
 	}
 }
+
+// Arabic writes hamza and madda as marks at U+0653–U+0655, just past the block
+// the scan looks at, so an Arabic word typed decomposed folded to nothing and
+// keyed apart from the same word stored composed (#1913). Eight pairs, none of
+// them a composition exclusion.
+func TestComposeFoldsArabicHamzaAndMadda(t *testing.T) {
+	cases := []struct {
+		name, nfd, nfc string
+	}{
+		{"alef with madda", "\u0627\u0653", "\u0622"},
+		{"alef with hamza above", "\u0627\u0654", "\u0623"},
+		{"waw with hamza", "\u0648\u0654", "\u0624"},
+		{"alef with hamza below", "\u0627\u0655", "\u0625"},
+		{"yeh with hamza", "\u064a\u0654", "\u0626"},
+		{"heh with yeh above", "\u06d5\u0654", "\u06c0"},
+	}
+	for _, c := range cases {
+		if c.nfd == c.nfc {
+			t.Fatalf("%s: nfd and nfc are identical bytes — test is trivial", c.name)
+		}
+		if got := Compose(c.nfd); got != c.nfc {
+			t.Errorf("%s: Compose(NFD %+q) = %+q, want NFC %+q", c.name, c.nfd, got, c.nfc)
+		}
+		if got := Compose(c.nfc); got != c.nfc {
+			t.Errorf("%s: Compose(NFC) changed it to %+q", c.name, got)
+		}
+	}
+}
