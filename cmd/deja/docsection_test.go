@@ -60,6 +60,34 @@ func TestAnEmptySectionTakesNothingFromTheNextOne(t *testing.T) {
 	}
 }
 
+// A `#` inside a fenced example is a comment, not a heading. `deja log` prints
+// its rows starting with one, and an example of that output in this document
+// would have ended every section it appeared in.
+func TestAHashInsideAnExampleIsNotAHeading(t *testing.T) {
+	doc := strings.Join([]string{
+		"## `deja log --json`",
+		"",
+		"```",
+		"# hook · 2026-08-24 11:00 · 2 sessions",
+		"```",
+		"",
+		"Log says `bytes`.",
+		"",
+		"## `deja blame --json`",
+		"",
+		"Blame says `occurrences`.",
+		"",
+	}, "\n")
+
+	got := docSection(t, doc, "## `deja log --json`")
+	if !strings.Contains(got, "`bytes`") {
+		t.Errorf("a comment line inside an example ended the section: %q", got)
+	}
+	if strings.Contains(got, "occurrences") {
+		t.Errorf("the section still reached into the next command: %q", got)
+	}
+}
+
 // Prose that names a heading is not the heading. The match was on the raw text
 // anywhere, so a sentence pointing at a section started the section there — mid
 // paragraph, and short by everything up to the real heading.
@@ -84,7 +112,9 @@ func TestTheSessionObjectSectionIsNotMostOfTheDocument(t *testing.T) {
 	if strings.Contains(sec, "## `deja last --json`") {
 		t.Errorf("the session-object section runs past `deja search --json` into the commands after it")
 	}
-	if lines, total := strings.Count(sec, "\n"), strings.Count(doc, "\n"); lines*2 > total {
-		t.Errorf("the session-object section is %d of %d lines, which is not a section", lines, total)
+	// The table is 25 lines today. A cap rather than a share of the document:
+	// half of a growing file is a bound that loosens as the file grows.
+	if lines := strings.Count(sec, "\n"); lines > 40 {
+		t.Errorf("the session-object section is %d lines, which is more than the table it names", lines)
 	}
 }

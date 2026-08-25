@@ -32,14 +32,25 @@ func docSection(t *testing.T, doc, heading string) string {
 	}
 	rest := doc[i+len(heading):]
 	level := strings.Count(strings.SplitN(heading, " ", 2)[0], "#")
+	fenced := false
 	for at := 0; ; {
 		nl := strings.IndexByte(rest[at:], '\n')
 		if nl < 0 {
 			return rest
 		}
 		at += nl + 1
-		hashes := len(rest[at:]) - len(strings.TrimLeft(rest[at:], "#"))
-		if hashes > 0 && hashes <= level && strings.HasPrefix(rest[at+hashes:], " ") {
+		line := rest[at:]
+		// A `#` inside an example is a comment, not a heading — `deja log`
+		// output starts its rows with one. Sections here end on headings only.
+		if strings.HasPrefix(line, "```") {
+			fenced = !fenced
+			continue
+		}
+		if fenced {
+			continue
+		}
+		hashes := len(line) - len(strings.TrimLeft(line, "#"))
+		if hashes > 0 && hashes <= level && strings.HasPrefix(line[hashes:], " ") {
 			return rest[:at-1]
 		}
 	}
