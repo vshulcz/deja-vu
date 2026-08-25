@@ -491,10 +491,6 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// On upgrade day that meant rebuilding the whole index inside the call
 		// (#1309), so the agent is told instead — the detached warmup picks it
 		// up with everything else.
-		// The note is on disk either way; what is left is making it findable.
-		// On upgrade day that meant rebuilding the whole index inside the call
-		// (#1309), so the agent is told instead — the detached warmup picks it
-		// up with everything else.
 		if line := buildingNowForBlockingTool(dir); line != "" {
 			return "Saved. " + line, nil
 		}
