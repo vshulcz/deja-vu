@@ -320,7 +320,7 @@ func runHookContext(dir string, plain bool) error {
 	}
 	digest = frameRecall(digest)
 	polName := policy.Load().Describe(policy.ActivationAuto)
-	usage.RecordDigestPolicy(dir, usage.KindHook, digest, sessions, raw, polName)
+	usage.RecordDigestPolicyInto(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil

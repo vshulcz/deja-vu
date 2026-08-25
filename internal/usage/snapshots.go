@@ -74,8 +74,17 @@ func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int
 // RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
 // the injection, kept with the snapshot for `deja log`.
 func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, policyName string) {
+	RecordDigestPolicyInto(indexDir, kind, digest, "", sessions, raw, policyName)
+}
+
+// RecordDigestPolicyInto is RecordDigestPolicy for a caller that knows which
+// agent session received the digest. Without it the log says what was injected
+// and never to whom, which is the whole reason Into exists — and the
+// session-start hook, the commonest injection there is, was recording nothing
+// while holding the id (#1949).
+func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
 	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
-	snapshotWrite(indexDir, kind, digest, sessions, policyName)
+	snapshotWriteInto(indexDir, kind, digest, into, sessions, policyName, nil)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
