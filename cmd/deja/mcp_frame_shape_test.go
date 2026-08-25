@@ -112,15 +112,22 @@ func TestAMissingJSONRPCVersionIsStillServed(t *testing.T) {
 func TestOnlyARealArrayCountsAsABatch(t *testing.T) {
 	hermeticEnv(t)
 	for frame, want := range map[string]int{
-		"[":                          -32700,
-		`"[not a batch"`:             -32700,
-		"[]":                         -32600,
-		"[1,2,3]":                    -32600,
-		`[{"jsonrpc":"2.0","id":7}]`: -32600,
+		"[":                                   -32700,
+		`"[not a batch"`:                      -32700,
+		"[]":                                  -32600,
+		"[1,2,3]":                             -32600,
+		`[{"jsonrpc":"2.0","id":7}]`:          -32600,
+		`[{"jsonrpc":"2.0","method":"ping"}]`: 0,
 	} {
 		var out bytes.Buffer
 		if err := serveMCP(t.TempDir(), strings.NewReader(frame+"\n"), &out); err != nil {
 			t.Fatal(err)
+		}
+		if want == 0 {
+			if strings.TrimSpace(out.String()) != "" {
+				t.Errorf("%s was answered: %s", frame, out.String())
+			}
+			continue
 		}
 		frames := decodeRPCFrames(t, out.String())
 		if len(frames) != 1 {
@@ -145,5 +152,33 @@ func TestABatchRefusalCarriesAStringID(t *testing.T) {
 	frames := decodeRPCFrames(t, out.String())
 	if id, _ := frames[0]["id"].(string); id != "abc" {
 		t.Errorf("refusal came back with id %v, want \"abc\"", frames[0]["id"])
+	}
+}
+
+// The spec forbids replying to a notification, inside a batch or out of it, so
+// a batch of nothing but notifications is answered with silence. A batch that
+// mixes them still gets the refusal, on the id of the first real request.
+func TestABatchOfNotificationsIsAnsweredWithSilence(t *testing.T) {
+	hermeticEnv(t)
+	quiet := `[{"jsonrpc":"2.0","method":"ping"},{"jsonrpc":"2.0","method":"ping"}]` + "\n"
+	var out bytes.Buffer
+	if err := serveMCP(t.TempDir(), strings.NewReader(quiet), &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(out.String()) != "" {
+		t.Errorf("a batch of notifications was answered: %s", out.String())
+	}
+
+	mixed := `[{"jsonrpc":"2.0","method":"ping"},{"jsonrpc":"2.0","id":"b","method":"ping"}]` + "\n"
+	out.Reset()
+	if err := serveMCP(t.TempDir(), strings.NewReader(mixed), &out); err != nil {
+		t.Fatal(err)
+	}
+	frames := decodeRPCFrames(t, out.String())
+	if len(frames) != 1 {
+		t.Fatalf("want one reply to a mixed batch, got %d", len(frames))
+	}
+	if id, _ := frames[0]["id"].(string); id != "b" {
+		t.Errorf("the refusal came back with id %v, want the request that asked for an answer", frames[0]["id"])
 	}
 }

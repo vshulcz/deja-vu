@@ -55,18 +55,27 @@ func parseBatch(frame string) ([]json.RawMessage, bool) {
 	return elems, true
 }
 
-// batchID returns the id of the first request in a batch, so the refusal can
-// be matched to something the client sent rather than coming back as null.
-// A batch whose first element carries no id gets a null id, as before.
-func batchID(elems []json.RawMessage) json.RawMessage {
-	if len(elems) == 0 {
-		return nil
+// batchReply says whether a batch is owed an answer and which id to put on it.
+// The id is the first request in the array that carries one, so the refusal can
+// be matched to something the client sent. A batch of nothing but notifications
+// is owed no answer — the spec forbids replying to one, inside a batch or out
+// of it — while an empty or malformed array is an invalid request like any
+// other and gets the refusal with a null id.
+func batchReply(elems []json.RawMessage) (json.RawMessage, bool) {
+	notificationsOnly := len(elems) > 0
+	for _, elem := range elems {
+		var req rpcRequest
+		if !bytes.HasPrefix(bytes.TrimSpace(elem), []byte("{")) || json.Unmarshal(elem, &req) != nil {
+			// Not a request object at all, so it asked for nothing and is not
+			// a notification either: the array is malformed and says so.
+			notificationsOnly = false
+			continue
+		}
+		if !isNotification(req.ID) {
+			return req.ID, true
+		}
 	}
-	var first rpcRequest
-	if err := json.Unmarshal(elems[0], &first); err != nil || isNotification(first.ID) {
-		return nil
-	}
-	return first.ID
+	return nil, !notificationsOnly
 }
 
 const mcpMaxFrame = 10 * 1024 * 1024
@@ -86,8 +95,13 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 				// A batch is valid JSON, and answering -32700 told a client its
 				// bytes were corrupt when they were not — with a null id, so it
 				// could not tell which of its requests died either. deja serves
-				// one request per frame; the refusal says so (#1795).
-				writeRPCError(enc, batchID(batch), -32600, "batch requests are not supported — send one request per line")
+				// one request per frame; the refusal says so (#1795). A batch
+				// carrying nothing but notifications gets no reply at all, as a
+				// notification does on its own line: the spec forbids answering
+				// one, inside a batch or out of it.
+				if id, answer := batchReply(batch); answer {
+					writeRPCError(enc, id, -32600, "batch requests are not supported — send one request per line")
+				}
 			} else if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
 				writeRPCError(enc, nil, -32700, "parse error")
 			} else if req.JSONRPC != "" && req.JSONRPC != "2.0" {
