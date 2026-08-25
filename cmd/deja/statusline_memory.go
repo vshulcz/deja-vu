@@ -283,23 +283,22 @@ func memorySegment(m fileMemory, width int) string {
 	line := func(title, name int) string {
 		return prefix + statuslineMemoryLineWithin(m, title, name)
 	}
-	mem := line(statuslineMaxTitle, statuslineMaxName)
-	if barColumns(mem) <= width {
-		return mem
+	title, name := statuslineMaxTitle, statuslineMaxName
+	mem := line(title, name)
+	// A column of budget is not a column of line: a title shorter than its
+	// budget gives nothing back when the budget is cut, so subtracting the
+	// overflow in one step left 57 of 2496 measured bars over-width while both
+	// parts were still above their floors. Stepping down converges on the
+	// narrowest form the floors allow, and the loop is bounded by the budgets.
+	for barColumns(mem) > width && title > statuslineMinTitle {
+		title--
+		mem = line(title, name)
 	}
-	title := statuslineMaxTitle - (barColumns(mem) - width)
-	if title < statuslineMinTitle {
-		title = statuslineMinTitle
+	for barColumns(mem) > width && name > statuslineMinName {
+		name--
+		mem = line(title, name)
 	}
-	mem = line(title, statuslineMaxName)
-	if barColumns(mem) <= width {
-		return mem
-	}
-	name := statuslineMaxName - (barColumns(mem) - width)
-	if name < statuslineMinName {
-		name = statuslineMinName
-	}
-	return line(title, name)
+	return mem
 }
 
 // withFileMemory puts the memory ahead of the usage numbers when there is

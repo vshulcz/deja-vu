@@ -66,3 +66,29 @@ func TestAnOrdinaryMemorySegmentIsNotTrimmed(t *testing.T) {
 		t.Errorf("a segment that fits carries an ellipsis: %q", got)
 	}
 }
+
+// The budgets are columns of allowance, not columns of line: a title shorter
+// than its budget gives nothing back when the budget is cut. Subtracting the
+// overflow in one step therefore left bars over-width while both parts were
+// still above their floors — 57 of 2496 measured. This walks the grid and
+// allows an over-width segment only where even both floors would not fit.
+func TestNoBarIsLeftOverWidthWhileThePartsCanStillGiveWay(t *testing.T) {
+	when := time.Date(2026, 8, 20, 10, 0, 0, 0, time.UTC)
+	titles := []string{"retry", strings.Repeat("word ", 12), strings.Repeat("計", 30)}
+	for width := 20; width <= 120; width += 4 {
+		for nameLen := 5; nameLen <= 80; nameLen += 5 {
+			for _, title := range titles {
+				m := fileMemory{Path: "/p/" + strings.Repeat("n", nameLen) + ".go", Sessions: 3, Title: title, Last: when}
+				got := memorySegment(m, width)
+				if barColumns(got) <= width {
+					continue
+				}
+				atFloor := "deja · " + statuslineMemoryLineWithin(m, statuslineMinTitle, statuslineMinName)
+				if barColumns(atFloor) <= width {
+					t.Fatalf("width=%d name=%d: %d columns, though the floors fit in %d: %q",
+						width, nameLen, barColumns(got), barColumns(atFloor), got)
+				}
+			}
+		}
+	}
+}
