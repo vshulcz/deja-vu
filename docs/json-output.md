@@ -449,8 +449,9 @@ writes rather than serves; `search` and `handoff` are the reader's own commands.
 A kind this list does not name may still appear: another version of deja may
 have written it, and the log keeps what it was given.
 
-`bytes` is what was served and `raw` the size of the transcripts behind it, both
-omitted when zero. `sessions` counts what the digest held, `ids` names them for a
+`bytes` is the size of the text that changed hands — what deja served, or, for
+`remember`, the note the agent wrote — and `raw` the size of the transcripts
+behind a served digest, both omitted when zero. `sessions` counts what the digest held, `ids` names them for a
 recall, and `empty` marks an answer that found nothing — a recall that returned
 no sessions is still a recall, and the count of those is what
 `empty_result_rate` is made of.
