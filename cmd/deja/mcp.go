@@ -554,9 +554,6 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	return string(body), len(hits), nil
 }
 
-// blameMCPBudget bounds one blame answer. Higher than recall's ~4 KB because a
-// hit is a whole session rather than a snippet, and well under what an agent
-// can absorb from one tool call.
 // contextDigestCut is the line that admits a digest was cut. Without it the
 // reply ends mid-word and reads as the whole session, which is what an agent
 // then tells the user it saw.
@@ -590,6 +587,9 @@ func fitContextDigest(text string, budget int) string {
 // 8335 (#1797).
 const contextMCPBudget = 8192
 
+// blameMCPBudget bounds one blame answer. Higher than recall's ~4 KB because a
+// hit is a whole session rather than a snippet, and well under what an agent
+// can absorb from one tool call.
 const blameMCPBudget = 8192
 
 // blameHitJSON is what the MCP blame tool returns: the same shape as the CLI's
