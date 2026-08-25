@@ -145,7 +145,7 @@ jobs:
         shell: bash
         run: |
           declare -A floor=(
-            [cmd/deja]=88 [internal/atomicfile]=47 [internal/bench]=100
+            [cmd/deja]=88 [internal/atomicfile]=77 [internal/bench]=100
             [internal/cjkfold]=100 [internal/digest]=90 [internal/embed]=93
             [internal/index]=90 [internal/mark]=98 [internal/model]=100
             [internal/nfcfold]=100 [internal/peers]=76 [internal/policy]=100
