@@ -41,6 +41,9 @@ const (
 	// statuslineMaxName bounds the filename for the same reason: a 200-char
 	// path put a 226-rune line on a bar that has no horizontal scroll.
 	statuslineMaxName = 28
+	// statuslineMinName is how far the filename gives way on a narrow bar
+	// before the segment is cut outright. Below this a name says nothing.
+	statuslineMinName = 10
 )
 
 // readStatuslineInput consumes the payload without ever blocking. An
@@ -196,14 +199,22 @@ func statuslineMemoryLine(m fileMemory) string {
 	return statuslineMemoryLineTo(m, statuslineMaxTitle)
 }
 
-// statuslineMemoryLineTo bounds the title to maxTitle runes. maxTitle <= 0
-// drops the title and falls through to the count form, which is what a bar too
-// narrow to hold any of it gets.
+// statuslineMemoryLineTo bounds the title to maxTitle columns — the unit
+// safeForStatusline works in, since the bound exists to keep the bar inside the
+// terminal. maxTitle <= 0 drops the title and falls through to the count form,
+// which is what a bar too narrow to hold any of it gets.
 func statuslineMemoryLineTo(m fileMemory, maxTitle int) string {
+	return statuslineMemoryLineWithin(m, maxTitle, statuslineMaxName)
+}
+
+// statuslineMemoryLineWithin is that with the filename bounded too. The
+// filename is the second elastic part: at 28 columns it alone could put the
+// segment past a narrow bar however far the title was cut (#1880).
+func statuslineMemoryLineWithin(m fileMemory, maxTitle, maxName int) string {
 	// The path comes from a tool call and is recorded verbatim, exactly like
 	// the title: a filename can carry a carriage return or an escape just as
 	// easily, and it reaches the same bar.
-	name := safeForStatusline(filepath.Base(m.Path), statuslineMaxName)
+	name := safeForStatusline(filepath.Base(m.Path), maxName)
 	when := ""
 	if !m.Last.IsZero() {
 		// A meta with no timestamp would otherwise put "Jan 1 0001" on the bar.
@@ -254,6 +265,43 @@ func safeForStatusline(s string, max int) string {
 	return s
 }
 
+// memorySegment renders the memory half to fit a bar of the given width.
+//
+// The title gives way first, down to statuslineMinTitle: it is the longest
+// elastic part and the one a reader can lose the tail of and still recognise.
+// Then the filename, down to statuslineMinName — it was fixed at 28 columns,
+// so a long path put the segment past a narrow bar however far the title had
+// been cut (#1880).
+//
+// A bar too narrow for both floors still gets an over-width segment, and that
+// is the older decision this keeps: the title has a floor because a stub in
+// quotation marks says less than the count form, and
+// TestStatuslineNarrowBarKeepsAReadableTitle pins it. What changes here is that
+// the segment is no wider than those floors require.
+func memorySegment(m fileMemory, width int) string {
+	const prefix = "deja · "
+	line := func(title, name int) string {
+		return prefix + statuslineMemoryLineWithin(m, title, name)
+	}
+	mem := line(statuslineMaxTitle, statuslineMaxName)
+	if barColumns(mem) <= width {
+		return mem
+	}
+	title := statuslineMaxTitle - (barColumns(mem) - width)
+	if title < statuslineMinTitle {
+		title = statuslineMinTitle
+	}
+	mem = line(title, statuslineMaxName)
+	if barColumns(mem) <= width {
+		return mem
+	}
+	name := statuslineMaxName - (barColumns(mem) - width)
+	if name < statuslineMinName {
+		name = statuslineMinName
+	}
+	return line(title, name)
+}
+
 // withFileMemory puts the memory ahead of the usage numbers when there is
 // one. The numbers are about deja; the memory is about the reader's own work,
 // and on a line that gets truncated the useful half should survive.
@@ -277,14 +325,7 @@ func withFileMemory(dir string, in transcriptSource, usage string) string {
 	// The memory segment is fitted first, because the comment above is the
 	// rule: it is the half that has to survive. The title is its elastic part,
 	// with a floor so a long filename cannot cut it to a stub.
-	mem := "deja · " + statuslineMemoryLineTo(m, statuslineMaxTitle)
-	if over := barColumns(mem) - width; over > 0 {
-		budget := statuslineMaxTitle - over
-		if budget < statuslineMinTitle {
-			budget = statuslineMinTitle
-		}
-		mem = "deja · " + statuslineMemoryLineTo(m, budget)
-	}
+	mem := memorySegment(m, width)
 	// Then as much of the usage as still fits. Appending it whole is what put
 	// it past the edge; dropping it is the trade this function already
 	// documents, and half of it beats a line that runs off.
