@@ -135,6 +135,13 @@ func rotateSnapshots(p string) {
 	_ = atomicfile.Write(p, buf.Bytes(), 0o600)
 }
 
+// usable reports whether a snapshot is one deja could have written: a stamp so
+// it can be placed in time, a kind so it can be named, and the digest it exists
+// to carry.
+func (s Snapshot) usable() bool {
+	return !s.Time.IsZero() && s.Kind != "" && s.Digest != ""
+}
+
 // snapshotsFrom reads a snapshot file and returns up to n entries, newest
 // first. n <= 0 means all.
 func snapshotsFrom(p string, n int) []Snapshot {
@@ -148,7 +155,11 @@ func snapshotsFrom(p string, n int) []Snapshot {
 	sc.Buffer(make([]byte, 0, 64<<10), 4<<20)
 	for sc.Scan() {
 		var s Snapshot
-		if json.Unmarshal(sc.Bytes(), &s) == nil && s.Digest != "" {
+		// The same question the usage log asks — a stamp and a kind (#1917) —
+		// plus the digest, which is the whole point of this file. Without it a
+		// half-written line could print a heading with no kind, or a digest
+		// dated the year 1 (#1946).
+		if json.Unmarshal(sc.Bytes(), &s) == nil && s.usable() {
 			out = append(out, s)
 		}
 	}
