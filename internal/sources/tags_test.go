@@ -3,6 +3,7 @@ package sources
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // A tag is a short handle someone searches for. A control byte in one is not a
@@ -39,5 +40,24 @@ func TestNormalizeTagsBoundsOneTag(t *testing.T) {
 	// A tag that fits is untouched, so the bound is not paid by ordinary use.
 	if same := NormalizeTags([]string{"retry-budget"}); same[0] != "retry-budget" {
 		t.Errorf("an ordinary tag was cut: %q", same[0])
+	}
+}
+
+// A tag with a space in it was never a handle anything could match — the tags
+// are folded into "#tag" tokens in the indexed text, and half a tag matches
+// nothing. Folding the space to a hyphen makes it one, and makes it the same
+// handle as the hyphenated spelling someone else typed.
+func TestATagWithASpaceBecomesOneHandle(t *testing.T) {
+	got := NormalizeTags([]string{"retry budget", "retry-budget"})
+	if len(got) != 1 || got[0] != "retry-budget" {
+		t.Errorf("the two spellings did not fold into one handle: %q", got)
+	}
+	// Multibyte tags survive the cut as valid text, not as half a character.
+	long := NormalizeTags([]string{strings.Repeat("резервирование", 8)})[0]
+	if !utf8.ValidString(long) {
+		t.Errorf("the cut split a character: %q", long)
+	}
+	if len(long) > maxTagLen {
+		t.Errorf("a Cyrillic tag is %d bytes, cap is %d", len(long), maxTagLen)
 	}
 }
