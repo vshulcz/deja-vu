@@ -130,3 +130,51 @@ func TestAnEmptyPullLearnsNothing(t *testing.T) {
 		t.Fatalf("a pull that brought nothing wrote a name: %#v", list)
 	}
 }
+
+// A pull that brings records from two origins teaches nothing: a batch can
+// carry a third machine's work, and another process can import while this
+// runs, so the safe answer is the count that was there before.
+func TestAnAmbiguousPullLearnsNothing(t *testing.T) {
+	tmp := hermeticEnv(t)
+	peersFile := filepath.Join(tmp, "peers.json")
+	t.Setenv("DEJA_PEERS_FILE", peersFile)
+	if err := os.WriteFile(peersFile, []byte(`{"peers":[{"host":"work"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+
+	before := importsByPeerName(dir)
+	if _, err := index.Import(dir, seedPeerBatch(t, tmp, "build-box", 3)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.Import(dir, seedPeerBatch(t, tmp, "someone-else", 2)); err != nil {
+		t.Fatal(err)
+	}
+	learnPeerMachine(dir, "work", before)
+
+	if list := peers.Load(); len(list) != 1 || list[0].Machine != "" {
+		t.Fatalf("a pull carrying two origins wrote a name: %#v", list)
+	}
+}
+
+// A machine renamed, or an alias repointed at another host, is corrected by
+// the next pull rather than kept forever.
+func TestARepointedAliasIsRelearned(t *testing.T) {
+	tmp := hermeticEnv(t)
+	peersFile := filepath.Join(tmp, "peers.json")
+	t.Setenv("DEJA_PEERS_FILE", peersFile)
+	if err := os.WriteFile(peersFile, []byte(`{"peers":[{"host":"work","machine":"build-box"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+
+	before := importsByPeerName(dir)
+	if _, err := index.Import(dir, seedPeerBatch(t, tmp, "test-machine", 2)); err != nil {
+		t.Fatal(err)
+	}
+	learnPeerMachine(dir, "work", before)
+
+	if list := peers.Load(); len(list) != 1 || list[0].Machine != "test-machine" {
+		t.Fatalf("the stale pairing survived: %#v", list)
+	}
+}

@@ -236,12 +236,23 @@ func recordLocked(host string, pulled bool, when time.Time, err error) error {
 	return save(list)
 }
 
+// machineNameMax bounds a learned name. A hostname's own limit is 253 bytes;
+// this is the same figure deja bounds an exported field to.
+const machineNameMax = 120
+
 // Learn notes what a host calls itself, so what arrived from it can be counted
 // against its row. Nothing is written when the name is empty or already there.
 func Learn(host, machine string) error {
 	host, machine = strings.TrimSpace(host), strings.TrimSpace(machine)
 	if host == "" || machine == "" {
 		return nil
+	}
+	// The name is another machine's word for itself. Import already bounds it,
+	// but this file outlives any one index and is read by every sync, so the
+	// bound is applied where the value is written rather than trusted from
+	// upstream. A name longer than this is not one.
+	if r := []rune(machine); len(r) > machineNameMax {
+		machine = string(r[:machineNameMax])
 	}
 	return withLock(func() error {
 		list := Load()

@@ -170,13 +170,19 @@ func peerSessionCount(from map[string]int, p peers.Peer) int {
 // attributed — a batch from a third machine already in the index must not
 // rename the peer.
 func learnPeerMachine(dir, host string, before map[string]int) {
-	best, grew := "", 0
+	best, grown := "", 0
 	for name, n := range importsByPeerName(dir) {
-		if d := n - before[peers.Identity(name)]; d > grew {
-			best, grew = name, d
+		if n > before[peers.Identity(name)] {
+			best = name
+			grown++
 		}
 	}
-	if best == "" || peers.Identity(best) == peers.Identity(host) {
+	// Only when one machine grew. A batch can carry records from more than one
+	// origin — a machine that itself imported from a third — and another
+	// process can import while this runs, so picking the largest of several
+	// would sometimes write down a machine this host never sent. Learning
+	// nothing leaves the count at zero, which is what it was.
+	if grown != 1 || peers.Identity(best) == peers.Identity(host) {
 		return
 	}
 	// Best effort: a sync that worked must not fail because a name could not be
