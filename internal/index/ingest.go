@@ -355,6 +355,8 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 }
 
 func rebuildWithTombstones(dir string, harness string, scope string, files map[string]FileState, progress io.Writer, dead map[string]bool) error {
+	// This build's count, not the process's: see writeSessionsWithSync (#1850).
+	emptied.Store(0)
 	lastIngestFiles = len(files)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
@@ -704,8 +706,10 @@ func dropEmptySessions(m *Manifest, wrote map[string]bool) {
 	}
 }
 
-// ReportEmptySessions returns how many transcripts held nothing to index since
-// the last build, and clears the counter. The parse count and the indexed
+// ReportEmptySessions returns how many transcripts held nothing to index in the
+// last build, and clears the counter. The build zeroes it as it starts writing,
+// so a caller reads that build's number whether or not anyone read the one
+// before (#1850). The parse count and the indexed
 // count differ by exactly this, and the run is where someone is looking at
 // both numbers.
 func ReportEmptySessions() int {
@@ -717,6 +721,12 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 }
 
 func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string]FileState, scope string, imp importedState) error {
+	// The counter belongs to this build. Draining it only on read made
+	// "since the last build" true only when the last read was the last build:
+	// a second build in one process reported its own empty transcripts plus
+	// whatever an earlier one left behind (#1850). One process is one build
+	// for the CLI, which is why it showed in the test binary first.
+	emptied.Store(0)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
 	lastIngestFiles = len(files)
