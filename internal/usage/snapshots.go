@@ -115,7 +115,9 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 		return
 	}
 	rotateSnapshots(p)
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
+	// the reason the usage log opens the same way (#1901).
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
@@ -124,6 +126,13 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
 	if err != nil {
 		return
+	}
+	// A process killed between a record and its newline costs that record. It
+	// cost every later one too: appended onto the partial line, the new digest
+	// parsed as nothing either, and `deja log --last` reported no injection at
+	// all on a machine that had just served two (#1965).
+	if endsMidLine(f) {
+		b = append([]byte{'\n'}, b...)
 	}
 	_, _ = f.Write(append(b, '\n'))
 }
