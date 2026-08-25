@@ -385,6 +385,20 @@ deja uninstall --all
 rm -rf ~/.cache/deja
 ```
 
+## Guides
+
+Written for the situation rather than the feature:
+
+- [The agent lost the context you had](https://vshulcz.github.io/deja-vu/guide/lost-context.html) — after a crash, a clear, or a session that came back empty
+- [The context window is full](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) — what compaction keeps, measured, and what to do instead
+- [Resuming yesterday's session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) — find it across every agent, reopen it in the one that owns it
+- [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
+- [Finding the session where you solved it](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
+- [Why agents forget between sessions](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [Where each agent keeps its history](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
+- [What compaction drops](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+
+Per harness: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
+
 ## Try it on your own history
 
 ```sh
