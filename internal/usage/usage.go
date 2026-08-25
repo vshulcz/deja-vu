@@ -131,11 +131,10 @@ const (
 	rotateAt   = 1 << 20 // rewrite the log when it grows past 1MB
 	keepWindow = 14 * 24 * time.Hour
 	// keepAtLeast is how many events survive when every one of them is older
-	// than the window — a fortnight away from the machine, and the first recall
-	// on return used to leave the file empty and the impact screen saying no
-	// recall had ever happened (#1922). Bounding the file is the job; erasing
-	// the record is not, and a few hundred events are tens of kilobytes against
-	// a megabyte.
+	// than the window. Without it, a fortnight away emptied the log on the
+	// first recall back and the impact screen said no recall had ever happened
+	// (#1922). Measured at 59.8 KB, against the megabyte that triggers a
+	// rewrite.
 	keepAtLeast = 200
 )
 
