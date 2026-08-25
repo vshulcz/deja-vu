@@ -99,9 +99,14 @@ case ":$PATH:" in
       *) rc="$HOME/.profile" ;;
     esac
     line="export PATH=$dest_dir:\$PATH"
-    if [ "$yes" -eq 0 ] && [ -t 0 ] && [ -t 1 ]; then
+    # stdin is the script itself under the documented `curl … | sh`, so a
+    # guard on stdin being a terminal can never be true for anyone following
+    # the README. The controlling terminal is still there, and reading the
+    # answer from it is what makes the offer reachable at all. No terminal
+    # (CI, a Dockerfile) falls through to the message and never blocks.
+    if [ "$yes" -eq 0 ] && [ -t 1 ] && [ -r /dev/tty ]; then
       printf 'deja install: append %s to %s? [y/N] ' "$line" "$rc"
-      read -r answer
+      read -r answer < /dev/tty
       case "$answer" in
         y|Y|yes|YES)
           printf '%s\n' "$line" >> "$rc"
