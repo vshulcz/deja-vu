@@ -414,7 +414,27 @@ type ImpactReport struct {
 	ServedBytes   int   `json:"served_bytes"`   // digest bytes actually returned
 	RawBytes      int64 `json:"raw_bytes"`      // source transcripts those digests distilled
 	ReusedTwice   int   `json:"reused_twice"`   // sessions agents recalled 2+ times
-	DejaVuMoments int   `json:"dejavu_moments"` // prompts matched to prior work, all time
+	DejaVuMoments int   `json:"dejavu_moments"` // prompts matched to prior work
+	// Since is the oldest event still in the log. The log is rewritten past
+	// 1MB keeping the last 14 days, so every count above is a window and not a
+	// lifetime — one rotation over a 30-day log halved them (#1889). The same
+	// fact `deja stats` has carried since #763.
+	Since time.Time `json:"-"`
+}
+
+// MarshalJSON writes Since only when there is one, for the reason Summary's
+// does: `omitempty` does nothing to a struct, so the tag alone would print
+// January of year 1 on a machine with no recall history (#1874).
+func (r ImpactReport) MarshalJSON() ([]byte, error) {
+	type plain ImpactReport
+	out := struct {
+		plain
+		Since *time.Time `json:"since,omitempty"`
+	}{plain: plain(r)}
+	if !r.Since.IsZero() {
+		out.Since = &r.Since
+	}
+	return json.Marshal(out)
 }
 
 // Impact counts across the whole usage log.
@@ -422,6 +442,9 @@ func Impact(indexDir string) ImpactReport {
 	var r ImpactReport
 	worn := map[string]int{}
 	for _, e := range read(Path(indexDir)) {
+		if r.Since.IsZero() || e.Time.Before(r.Since) {
+			r.Since = e.Time
+		}
 		switch e.Kind {
 		case KindRecall, KindContext:
 			if e.Empty {

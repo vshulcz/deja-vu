@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -40,18 +41,30 @@ func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
 
 func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) error {
 	if jsonOut {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(struct {
-			usage.ImpactReport
-			CreditedAloud int `json:"credited_aloud"`
-		}{r, credits})
+		// Marshalled apart and joined rather than embedded: ImpactReport writes
+		// its own JSON (so a window it never opened is absent rather than year
+		// 1), and an embedded type's marshaller answers for the whole outer
+		// struct — which silently dropped credited_aloud.
+		b, err := json.MarshalIndent(r, "", "  ")
+		if err != nil {
+			return err
+		}
+		body := strings.TrimRight(string(b), "}\n")
+		_, err = fmt.Fprintf(w, "%s,\n  \"credited_aloud\": %d\n}\n", body, credits)
+		return err
 	}
 	if r.Recalls == 0 && r.Injections == 0 {
 		fmt.Fprintln(w, "deja: no recall activity recorded yet — impact numbers appear once agents start recalling")
 		return nil
 	}
-	fmt.Fprintln(w, "deja impact — measured on this machine, nothing modeled")
+	// The window, not a lifetime: the usage log is rewritten past 1MB keeping
+	// 14 days, so these counts drop by half when that happens and nothing here
+	// said why (#1889). `deja stats` has named its window since #763.
+	if r.Since.IsZero() {
+		fmt.Fprintln(w, "deja impact — measured on this machine, nothing modeled")
+	} else {
+		fmt.Fprintf(w, "deja impact — measured on this machine since %s, nothing modeled\n", r.Since.Local().Format("Jan 2"))
+	}
 	// pluralS on all three counts: n=1 is this screen's commonest state — the
 	// first recall on a machine — and it read "1 agent-initiated recalls"
 	// (#1652). The verbs are already invariant.
