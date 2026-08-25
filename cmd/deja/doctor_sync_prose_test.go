@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // The Sync section of docs/json-output.md described both strings a peer row
@@ -57,13 +58,24 @@ func TestTheSyncSectionDescribesWhatTheRowsCarry(t *testing.T) {
 	if row.Host != host {
 		t.Errorf("the host was altered, so what the JSON hands back is not a name to sync with: %q", row.Host)
 	}
-	if len(row.LastError) > 260 {
-		t.Errorf("the error is unbounded at %d bytes; a remote writes it", len(row.LastError))
+	// In columns, which is the bound safeForStatusline applies: a byte count
+	// would call a 200-column line of CJK unbounded and a bound written in
+	// bytes correct.
+	if cols := termwidth.Columns(row.LastError); cols > 201 {
+		t.Errorf("the error is unbounded at %d columns; a remote writes it", cols)
 	}
 	// The escape reaches the reader as an escape sequence in the JSON string,
 	// never as a raw byte a terminal would act on.
 	if strings.Contains(out.String(), "\x1b") {
 		t.Error("a control byte was written into the JSON unescaped")
+	}
+
+	// The same bound with a wide script: two columns to the rune, so a bound
+	// that counted bytes or runes would cut in the wrong place — and a test
+	// fed only ASCII could not tell the three apart.
+	wide := strings.Repeat("計", 400)
+	if got := termwidth.Columns(safeForStatusline(wide, 200)); got > 201 {
+		t.Errorf("a wide-script error came back %d columns wide", got)
 	}
 
 	doc, err := os.ReadFile("../../docs/json-output.md")
