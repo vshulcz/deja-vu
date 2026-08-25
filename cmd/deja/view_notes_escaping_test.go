@@ -10,11 +10,29 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// The page carries promoted notes in their own array beside the sessions, and
-// a note's project, title, text and tags are all text the user typed. Session
-// text has been pinned against closing the page's script block since the view
-// landed; the notes array had no such test, and notes written before #1811 can
-// still hold a tag with anything in it.
+// notesPayload returns the page's notes array as it was written into the
+// script, before any JSON decoding — the notes are their own array beside the
+// sessions, and reading the whole page instead would be satisfied by the same
+// text appearing in a session preview.
+func notesPayload(t *testing.T, page string) string {
+	t.Helper()
+	const marker = ",N="
+	i := strings.Index(page, marker)
+	if i < 0 {
+		t.Fatalf("the view page no longer embeds a notes array; this test reads the wrong thing now")
+	}
+	rest := page[i+len(marker):]
+	if j := strings.Index(rest, "];"); j >= 0 {
+		return rest[:j+1]
+	}
+	return rest
+}
+
+// The page carries promoted notes in their own array, and a note's project,
+// title, text and tags are all text the user typed. Session text has been
+// pinned against closing the page's script block since the view landed; the
+// notes array had no such test, and notes written before #1811 can still hold
+// a tag with anything in it (#1817).
 func TestNoteTagsCannotCloseThePagesScript(t *testing.T) {
 	tmp := hermeticEnv(t)
 	root := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
@@ -54,16 +72,19 @@ func TestNoteTagsCannotCloseThePagesScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(page)
-	if strings.Contains(s, "</script><script>alert(1)") {
-		t.Errorf("a note's tag closed the page's script block:\n%s", s[max(0, strings.Index(s, "alert(1)")-160):])
+	notesJSON := notesPayload(t, string(page))
+
+	if strings.Contains(notesJSON, "</script>") {
+		t.Errorf("a note's tag closed the page's script block:\n%s", notesJSON)
 	}
-	// The control: the tag is on the page, escaped — so the assertion above is
-	// not passing because the note never arrived.
-	if !strings.Contains(s, `</script>`) {
-		t.Errorf("the note's tags are not on the page at all, so this proves nothing")
+	// The control names the escaped form the page actually writes: looking for
+	// "</script>" anywhere on the page would be satisfied by the template's own
+	// closing tag, and looking at the whole page would be satisfied by the same
+	// tag appearing in a session preview.
+	if !strings.Contains(notesJSON, `alert(1)`) {
+		t.Errorf("the hostile tag never reached the notes array, so the assertion above proves nothing:\n%s", notesJSON)
 	}
-	if !strings.Contains(s, `"ok"`) {
-		t.Errorf("the ordinary tag beside it is missing too:\n%s", s[:min(len(s), 400)])
+	if !strings.Contains(notesJSON, `"ok"`) {
+		t.Errorf("the ordinary tag beside it is missing too:\n%s", notesJSON)
 	}
 }
