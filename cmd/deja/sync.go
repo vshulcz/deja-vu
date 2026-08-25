@@ -63,7 +63,7 @@ func runSync(dir string, args []string) error {
 		if !found {
 			return fmt.Errorf("deja does not know a machine called %q — `deja doctor` lists the ones it does", host)
 		}
-		fmt.Fprintf(os.Stdout, "deja: %s forgotten — bare `deja sync` will not try it again\n", host)
+		fmt.Fprintf(os.Stdout, "deja: %s forgotten — bare `deja sync` will not try it again\n", hostForEcho(host))
 		return nil
 	case "export":
 		full := false

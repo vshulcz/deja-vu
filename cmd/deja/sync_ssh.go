@@ -132,11 +132,11 @@ func runSyncAll(dir string, full bool) error {
 	}
 	var failed int
 	for _, p := range list {
-		fmt.Fprintf(os.Stdout, "deja: %s\n", p.Host)
+		fmt.Fprintf(os.Stdout, "deja: %s\n", hostForEcho(p.Host))
 		if err := syncSSHHost(dir, p.Host, false, full, true); err != nil {
 			// One unreachable laptop must not stop the server from getting
 			// what the desktop did.
-			fmt.Fprintf(os.Stderr, "deja: %s: %v\n", p.Host, err)
+			fmt.Fprintf(os.Stderr, "deja: %s: %s\n", hostForEcho(p.Host), safeForStatusline(err.Error(), 200))
 			failed++
 		}
 	}

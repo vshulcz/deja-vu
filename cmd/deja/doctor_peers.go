@@ -25,7 +25,7 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 	}
 	from := index.ImportedByMachine(dir)
 	for _, p := range list {
-		fmt.Fprintf(w, "  %-12s %s\n", p.Host, peerLine(p, from[p.Host], now))
+		fmt.Fprintf(w, "  %-12s %s\n", hostForEcho(p.Host), peerLine(p, from[p.Host], now))
 	}
 }
 
@@ -51,7 +51,9 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 		line += fmt.Sprintf(", %s from there", doctorCount(sessions, "session"))
 	}
 	if p.LastError != "" {
-		line += " — last attempt failed: " + p.LastError
+		// The stored error usually quotes the host back, so it carries whatever
+		// the name carried.
+		line += " — last attempt failed: " + safeForStatusline(p.LastError, 200)
 	}
 	return line
 }
