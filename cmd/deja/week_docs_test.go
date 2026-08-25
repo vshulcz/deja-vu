@@ -38,9 +38,9 @@ func TestTheStatsSectionSaysWhatAWeekIs(t *testing.T) {
 		t.Skip("no tzdata: ", err)
 	}
 	now := time.Date(2026, 11, 3, 12, 0, 0, 0, ny)
-	if cut := usage.WeekCut(now); cut.Hour() != now.Hour() {
+	if cut := usage.WeekCut(now); cut.Format("15:04:05") != now.Format("15:04:05") {
 		t.Errorf("WeekCut no longer keeps the wall clock (%s from %s), so the documented sentence is wrong",
-			cut.Format("15:04 MST"), now.Format("15:04 MST"))
+			cut.Format("15:04:05 MST"), now.Format("15:04:05 MST"))
 	}
 	if cut, fixed := usage.WeekCut(now), now.Add(-7*24*time.Hour); cut.Equal(fixed) {
 		t.Error("WeekCut and a fixed 168 hours agree here, so this test proves nothing about the rule")
