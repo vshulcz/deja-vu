@@ -110,7 +110,7 @@ func syncOneWay(dir, host string, pull, full bool) error {
 	// what the report exists to show, and it is invisible if only successes
 	// are written down.
 	if rerr := recordExchange(host, pull, time.Now(), err); rerr != nil && err == nil {
-		fmt.Fprintf(os.Stderr, "deja: synced with %s, but could not record it: %v\n", host, rerr)
+		fmt.Fprintf(os.Stderr, "deja: synced with %s, but could not record it: %v\n", hostForEcho(host), rerr)
 	}
 	if errors.Is(err, errNothingToSend) {
 		// Nothing to send is a quiet success for the caller: a machine with no
@@ -201,7 +201,7 @@ func syncSSHPush(dir, host string, full bool) error {
 		return fmt.Errorf("delivered, but recording watermarks failed (next push may resend; harmless — import dedupes): %w", err)
 	}
 	if out != "" {
-		fmt.Fprintf(os.Stdout, "%s: %s\n", host, out)
+		fmt.Fprintf(os.Stdout, "%s: %s\n", hostForEcho(host), remoteOutputForEcho(out))
 	}
 	return nil
 }
@@ -240,7 +240,7 @@ func syncSSHPull(dir, host string, full bool) error {
 		return fmt.Errorf("remote export: %v: %s", err, out)
 	}
 	if out != "" {
-		fmt.Fprintf(os.Stdout, "%s: %s\n", host, out)
+		fmt.Fprintf(os.Stdout, "%s: %s\n", hostForEcho(host), remoteOutputForEcho(out))
 	}
 	cleanup := func() {
 		_, _ = sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote("rm -rf "+shellQuote(rtmp)))...)

@@ -69,3 +69,22 @@ func TestForgetStillMatchesTheHostAsWritten(t *testing.T) {
 }
 
 func peersLoadForTest() []peers.Peer { return peers.Load() }
+
+// The other machine's deja writes on this screen, and it is a machine this one
+// does not control: its output reached the terminal raw.
+func TestRemoteOutputCannotRewriteTheLocalScreen(t *testing.T) {
+	hostile := "deja: exported 3 records\x1b[31m\rHACKED" + strings.Repeat(" padding", 400)
+	got := remoteOutputForEcho(hostile)
+	if strings.ContainsAny(got, "\x1b\r") {
+		t.Errorf("remote output carried an escape or a rewind: %q", got[:60])
+	}
+	if len(got) > remoteEchoMax+8 {
+		t.Errorf("remote output printed %d bytes", len(got))
+	}
+	if !strings.Contains(got, "exported 3 records") {
+		t.Errorf("the report itself was lost: %q", got[:60])
+	}
+	if short := remoteOutputForEcho("deja: exported 3 records"); short != "deja: exported 3 records" {
+		t.Errorf("an ordinary report was altered: %q", short)
+	}
+}
