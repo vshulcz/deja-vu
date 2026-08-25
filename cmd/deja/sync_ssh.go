@@ -295,10 +295,10 @@ func sshCapture(host, cmd string) (string, error) {
 	// it bare is safe for a path with shell metacharacters. Reject it with a
 	// message that points at the cause instead of failing obscurely later.
 	if s == "" || strings.ContainsAny(s, "'\"\n") {
-		return "", fmt.Errorf("ssh %s: unexpected output %q", host, s)
+		return "", fmt.Errorf("ssh %s: unexpected output %q", hostForEcho(host), s)
 	}
 	if strings.ContainsAny(s, " \t*?$;`&|<>()") {
-		return "", fmt.Errorf("ssh %s: remote temp path %q contains characters scp cannot carry — set TMPDIR on %s to a plain path", host, s, host)
+		return "", fmt.Errorf("ssh %s: remote temp path %q contains characters scp cannot carry — set TMPDIR on %s to a plain path", hostForEcho(host), s, hostForEcho(host))
 	}
 	return s, nil
 }
