@@ -19,10 +19,21 @@ func TestTheBriefSpliceSurvivesADecomposedProjectName(t *testing.T) {
 		"cafe" + acute + "-deploy-pipeline-project-name-here",
 	} {
 		line := "worked in " + project + " · last worked 3 days ago"
-		for _, room := range []int{20, 30, 40, 60} {
+		// Below 55 the guard keeps the line whole (there would be nothing
+		// readable left of the name); 55 and up are the widths that actually
+		// splice, which is what this test is about.
+		for _, room := range []int{30, 55, 60, 65, 70, 75, 80} {
 			got := fitBriefWhen(line, room)
 			if !utf8.ValidString(got) {
 				t.Errorf("the splice produced invalid UTF-8 at room=%d: %q", room, got)
+			}
+			// The facts after the name are what the line exists for, so the
+			// splice must hand them back whole however the middle was cut.
+			if !strings.HasSuffix(got, " · last worked 3 days ago") {
+				t.Errorf("room=%d: the splice damaged the tail of the line: %q", room, got)
+			}
+			if !strings.HasPrefix(got, "worked in ") {
+				t.Errorf("room=%d: the splice damaged the head of the line: %q", room, got)
 			}
 			if strings.Contains(got, "�") {
 				t.Errorf("the splice produced a replacement character at room=%d: %q", room, got)
