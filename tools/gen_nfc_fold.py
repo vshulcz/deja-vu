@@ -27,6 +27,14 @@ def is_composable_base(c):
         return unicodedata.category(c).startswith('L')
     if 0x0400 <= o <= 0x04FF:                        # Cyrillic
         return unicodedata.category(c).startswith('L')
+    # A letter carrying two marks composes in two steps, and the intermediate
+    # is a letter of these blocks: e + U+0323 is U+1EB9, which then takes
+    # U+0302 to become U+1EC7. Without them the fold stopped halfway and a
+    # Vietnamese word typed NFD matched nothing (#1872).
+    if 0x1E00 <= o <= 0x1EFF:                        # Latin Extended Additional
+        return unicodedata.category(c).startswith('L')
+    if 0x1F00 <= o <= 0x1FFF:                        # Greek Extended
+        return unicodedata.category(c).startswith('L')
     return False
 
 pairs = []

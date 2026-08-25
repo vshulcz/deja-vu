@@ -1,0 +1,36 @@
+package nfcfold
+
+import "testing"
+
+// A letter carrying two marks composes in two steps, and the intermediate is a
+// letter of its own: e + U+0323 is U+1EB9, which then takes U+0302 to become
+// U+1EC7. The generator accepted a base only up to U+024F, so the second step
+// had no entry and the fold stopped halfway — a Vietnamese word typed NFD, the
+// form a macOS path hands back, matched nothing (#1872). Greek Extended is the
+// same shape, and both scripts are named in this package's doc comment.
+//
+// Written as escapes: a decomposed literal typed into a Go file is normalised
+// on the way in, which once made a test pass against unfixed code.
+func TestComposeFoldsLettersCarryingTwoMarks(t *testing.T) {
+	cases := []struct {
+		name, nfd, nfc string
+	}{
+		{"vietnamese e circumflex dot below", "\u0065\u0323\u0302", "\u1ec7"},
+		{"vietnamese o horn dot below", "\u006f\u031b\u0323", "\u1ee3"},
+		{"vietnamese a breve dot below", "\u0061\u0323\u0306", "\u1eb7"},
+		{"latin s dot below dot above", "\u0073\u0323\u0307", "\u1e69"},
+		{"greek alpha psili oxia", "\u03b1\u0313\u0301", "\u1f04"},
+		{"greek eta perispomeni ypogegrammeni", "\u03b7\u0342\u0345", "\u1fc7"},
+	}
+	for _, c := range cases {
+		if c.nfd == c.nfc {
+			t.Fatalf("%s: nfd and nfc are identical bytes — test is trivial", c.name)
+		}
+		if got := Compose(c.nfd); got != c.nfc {
+			t.Errorf("%s: Compose(NFD %+q) = %+q, want NFC %+q", c.name, c.nfd, got, c.nfc)
+		}
+		if got := Compose(c.nfc); got != c.nfc {
+			t.Errorf("%s: Compose(NFC) changed it to %+q", c.name, got)
+		}
+	}
+}
