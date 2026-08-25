@@ -1125,6 +1125,11 @@ func markCut(s string) string {
 	if strings.HasSuffix(s, "\n") {
 		return s
 	}
+	// A trim landing between an excerpt's own ellipsis and its newline already
+	// says the line was shortened; a second one reads as "… …".
+	if strings.HasSuffix(strings.TrimRight(s, " "), "…") {
+		return s + "\n"
+	}
 	return s + cutMarker
 }
 

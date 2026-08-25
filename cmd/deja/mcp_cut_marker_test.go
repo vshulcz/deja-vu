@@ -100,3 +100,20 @@ func TestTheCutMarkerNeverBreaksTheBudget(t *testing.T) {
 		}
 	}
 }
+
+// A trim landing between an excerpt's own ellipsis and its newline must not
+// mark the same cut twice.
+func TestACutOnAnEllipsisIsNotMarkedTwice(t *testing.T) {
+	for _, in := range []string{"- a shortened excerpt …", "- a shortened excerpt … ", "- an ordinary excerpt"} {
+		out := markCut(in)
+		if strings.Contains(out, "… …") {
+			t.Errorf("%q was marked twice: %q", in, out)
+		}
+		if !strings.HasSuffix(out, "\n") {
+			t.Errorf("%q did not end the line: %q", in, out)
+		}
+	}
+	if got := markCut("- an ordinary excerpt"); got != "- an ordinary excerpt"+cutMarker {
+		t.Errorf("an unmarked cut lost its marker: %q", got)
+	}
+}
