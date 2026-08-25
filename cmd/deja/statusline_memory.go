@@ -298,6 +298,17 @@ func memorySegment(m fileMemory, width int) string {
 		name--
 		mem = line(title, name)
 	}
+	if barColumns(mem) <= width {
+		return mem
+	}
+	// Below both floors, the count form — which statuslineMinTitle's comment
+	// has always named as the answer there: a title cut to three words and an
+	// ellipsis says less than "3 earlier sessions". Only when it actually fits,
+	// since for a short title the count form is the wider of the two, and a bar
+	// too narrow for either keeps the title (#1903).
+	if counted := line(0, name); barColumns(counted) <= width {
+		return counted
+	}
 	return mem
 }
 
