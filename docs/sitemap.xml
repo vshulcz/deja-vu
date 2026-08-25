@@ -31,25 +31,25 @@
   <url><loc>https://vshulcz.github.io/deja-vu/guide/privacy.html</loc><lastmod>2026-07-21</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</loc><lastmod>2026-07-23</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/compare.html</loc><lastmod>2026-07-23</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/README.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/aider.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/antigravity.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/claude-code.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/cline.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/codex.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/copilot.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/cursor.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/gemini.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/goose.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/grok.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/hermes.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/kimi.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/openclaw.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/opencode.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/pi.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/qwen.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/roo.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/zed.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/deepseek.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/omp.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/README.html</loc><lastmod>2026-08-24</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/aider.html</loc><lastmod>2026-07-27</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/antigravity.html</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/claude-code.html</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/cline.html</loc><lastmod>2026-07-28</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/codex.html</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/copilot.html</loc><lastmod>2026-08-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/cursor.html</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/gemini.html</loc><lastmod>2026-07-24</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/goose.html</loc><lastmod>2026-07-28</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/grok.html</loc><lastmod>2026-08-24</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/hermes.html</loc><lastmod>2026-07-28</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/kimi.html</loc><lastmod>2026-07-28</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/openclaw.html</loc><lastmod>2026-07-23</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/opencode.html</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/pi.html</loc><lastmod>2026-07-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/qwen.html</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/roo.html</loc><lastmod>2026-07-27</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/zed.html</loc><lastmod>2026-08-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/deepseek.html</loc><lastmod>2026-08-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/registry/omp.html</loc><lastmod>2026-08-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
 </urlset>

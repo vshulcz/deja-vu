@@ -52,12 +52,15 @@ func run() error {
 		return err
 	}
 	name := map[string]string{}
+	verified := map[string]string{}
 	for _, h := range reg.Harnesses {
 		name[h.ID] = h.DisplayName
+		verified[h.ID] = h.LastVerified
 	}
 	// One page is filed under a different name than its registry entry.
 	// Everything else matches, and the check below keeps it that way.
 	name["claude-code"] = name["claude"]
+	verified["claude-code"] = verified["claude"]
 
 	paths, err := filepath.Glob(filepath.Join("docs", "registry", "*.md"))
 	if err != nil {
@@ -110,7 +113,7 @@ func run() error {
 		}
 		written = append(written, "registry/"+id+".html")
 	}
-	if err := writeSitemap(written); err != nil {
+	if err := writeSitemap(written, verified); err != nil {
 		return err
 	}
 	fmt.Printf("wrote %d registry pages and the sitemap\n", len(written))
@@ -203,6 +206,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 <meta name="twitter:image" content="{{.Site}}/assets/og.png">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="{{.Site}}/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="{{.Site}}/llms.txt">
 <script type="application/ld+json">{{.Article}}</script>
 <script type="application/ld+json">{{.Crumbs}}</script>
 </head>
@@ -288,7 +292,7 @@ func render(m meta, body string, others []link) string {
 // writeSitemap adds the registry pages to the sitemap, keeping every entry
 // already in it as it stands. The lastmod and priority on the existing pages
 // are hand-set; regenerating the file would quietly drop them.
-func writeSitemap(registryPages []string) error {
+func writeSitemap(registryPages []string, verified map[string]string) error {
 	path := filepath.Join("docs", "sitemap.xml")
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -302,8 +306,15 @@ func writeSitemap(registryPages []string) error {
 			continue
 		}
 		// A format page changes when the harness changes its files, which is
-		// rare and unannounced; monthly is what the guide pages use.
-		add.WriteString("  <url><loc>" + loc + "</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>\n")
+		// rare and unannounced; monthly is what the guide pages use. The date
+		// is the registry's own last_verified — the day someone last checked
+		// that page against a real store, which is what lastmod means.
+		id := strings.TrimSuffix(strings.TrimPrefix(p, "registry/"), ".html")
+		lastmod := ""
+		if d := verified[id]; d != "" {
+			lastmod = "<lastmod>" + d + "</lastmod>"
+		}
+		add.WriteString("  <url><loc>" + loc + "</loc>" + lastmod + "<changefreq>monthly</changefreq><priority>0.6</priority></url>\n")
 	}
 	if add.Len() == 0 {
 		return nil
