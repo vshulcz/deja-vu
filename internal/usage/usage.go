@@ -280,8 +280,9 @@ func TodayDemand(indexDir string) (recalls, bytes, injected int) {
 	return recalls, bytes, injected
 }
 
-// WeekCut is when "this week" opens: seven calendar days back, the same wall
-// time. Not 168 hours — in a zone with daylight saving those differ by an hour
+// WeekCut is when "this week" opens: seven calendar days back, at the same wall
+// time — or, in the hour a spring-forward removes, at the time the clock
+// actually reached, since 02:30 did not happen that day. Not 168 hours — in a zone with daylight saving those differ by an hour
 // for one week in each direction, and the status bar prints the week counters
 // beside the déjà-vu count, so one of them counted an event the other did not
 // (#1920). The day counters here cut at local midnight and the brief cuts at
