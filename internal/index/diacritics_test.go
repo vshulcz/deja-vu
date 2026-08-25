@@ -44,10 +44,14 @@ func seedOneWord(t *testing.T, word string) string {
 // them.
 //
 // What does join them, for Latin, is the close tier: café and cafe are one edit
-// apart, inside its limit of one for a short word. Arabic harakat are separate
-// runes, so the two Arabic forms are three edits apart and the same tier does not
-// reach — one rule, two outcomes, and this records which is which rather than
-// leaving it to be discovered.
+// apart, inside its limit of one for a short word. The Arabic pair is out of
+// reach twice over — the candidate walk only visits tokens within the limit of
+// the query's length, so a three-rune query never sees the six-rune stored form,
+// and even if it did the two are three edits apart. One rule, two outcomes.
+//
+// This records which is which. Note what it cannot tell you: raising the tier's
+// edit limit alone would not change the Arabic rows, because the length bucket
+// excludes the candidate before any distance is computed.
 func TestWhichTierJoinsAWordToItsMarkedForm(t *testing.T) {
 	const (
 		vowelled = "\u0643\u064e\u062a\u064e\u0628\u064e" // a fatha on each letter
