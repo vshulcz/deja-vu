@@ -124,22 +124,52 @@ func noteAlreadyStored(path, project, text string) bool {
 		return false
 	}
 	defer func() { _ = f.Close() }()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), maxNoteLine)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
+	br := bufio.NewReaderSize(f, 64*1024)
+	for {
+		line, tooLong, err := readNoteLine(br, maxNoteLine)
+		if tooLong {
+			// A note past the cap is not compared — that is what the cap says
+			// — but it used to end the scan, so every note after it went
+			// uncompared too and one oversized note turned the check off for
+			// the whole store (#1812). notes.jsonl is append-only, so that
+			// oversized line sits in front of everything written later.
+			if err != nil {
+				return false
+			}
 			continue
 		}
-		var n note
-		if json.Unmarshal(line, &n) != nil || n.Kind != "" {
-			continue
+		line = bytes.TrimSpace(line)
+		if len(line) > 0 {
+			var n note
+			if json.Unmarshal(line, &n) == nil && n.Kind == "" &&
+				n.Project == project && strings.TrimSpace(n.Text) == text {
+				return true
+			}
 		}
-		if n.Project == project && strings.TrimSpace(n.Text) == text {
-			return true
+		if err != nil {
+			return false
 		}
 	}
-	return false
+}
+
+// readNoteLine reads one line, reporting a line past max rather than buffering
+// it: the caller skips it and carries on down the file.
+func readNoteLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
+	var buf []byte
+	for {
+		chunk, e := br.ReadSlice('\n')
+		if len(buf)+len(chunk) > max {
+			tooLong = true
+			buf = nil
+		}
+		if !tooLong {
+			buf = append(buf, chunk...)
+		}
+		if e == bufio.ErrBufferFull {
+			continue
+		}
+		return buf, tooLong, e
+	}
 }
 
 func AppendNoteTagged(project, text string, tags []string, now time.Time) error {
