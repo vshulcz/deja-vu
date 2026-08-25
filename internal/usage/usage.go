@@ -76,6 +76,14 @@ func injectedKind(kind string) bool {
 	return false
 }
 
+// FoundNothing reports whether a lookup came back with nothing, which is what
+// `deja log` marks. Not the same as the Empty flag: on an injection the flag
+// says no project session went in, and a session start on a checkout with no
+// sessions of its own still injects the environment block — bytes and all
+// (#1954). On a lookup the flag does mean the answer found nothing, which is
+// why an empty recall still serves the sentence that says so.
+func (e Event) FoundNothing() bool { return e.Empty && !injectedKind(e.Kind) }
+
 type Event struct {
 	Time     time.Time `json:"t"`
 	Kind     string    `json:"kind"`

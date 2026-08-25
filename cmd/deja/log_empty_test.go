@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -38,17 +39,25 @@ func TestTheLogDoesNotCallAnInjectionWithBytesEmpty(t *testing.T) {
 	}
 }
 
-// The mark still belongs on the event it was written for: a recall that found
-// nothing serves nothing, and saying so is the whole point of the flag.
-func TestTheLogStillMarksAResultThatServedNothing(t *testing.T) {
-	dir := t.TempDir()
-	usage.RecordResultRaw(dir, usage.KindSearch, 0, 0, true, 0)
+// The mark still belongs on the event it was written for, and that event is
+// not a zero-byte one: a recall that matched nothing serves the sentence saying
+// so, so it carries bytes and the flag together. A rule reading the bytes
+// instead of the kind would drop the mark exactly where it is the point.
+func TestTheLogStillMarksARecallThatMatchedNothing(t *testing.T) {
+	dir := seedWalls(t, index.FrictionMinSessions)
+	text, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"nothing here matches this at all"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text == "" {
+		t.Fatal("an empty recall answers with the sentence saying so; it answered with nothing")
+	}
 
 	var b strings.Builder
 	if err := runLogTo(&b, dir, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(b.String(), "(empty result)") {
-		t.Errorf("a search that served nothing is no longer marked:\n%s", b.String())
+		t.Errorf("a recall that matched nothing is no longer marked:\n%s", b.String())
 	}
 }

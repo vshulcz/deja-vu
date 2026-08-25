@@ -31,10 +31,7 @@ func TestLogListsEventsAndLastDigest(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
 	usage.RecordDigest(dir, usage.KindHook, "the injected context body", 3, 1024)
-	// A recall that found nothing serves nothing: 42 bytes and empty together
-	// is a shape no caller writes, and the log now takes the bytes at their
-	// word (#1954).
-	usage.RecordResult(dir, usage.KindRecall, 0, 0, true)
+	usage.RecordResult(dir, usage.KindRecall, 42, 0, true)
 
 	var out bytes.Buffer
 	if err := runLogTo(&out, dir, nil); err != nil {
