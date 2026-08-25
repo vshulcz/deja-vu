@@ -75,17 +75,27 @@ func TestDamagedRereadsAPairThatDisagreed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer unlock()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		time.Sleep(5 * time.Millisecond)
-		_ = os.WriteFile(path, body, 0o600)
-	}()
+	// The store agrees with its manifest again by the time the second read
+	// happens. Standing where the wait is rather than racing a goroutine
+	// against it: on a loaded runner a 5 ms sleep can land after the 20 ms
+	// window and the test failed on a store that behaved exactly as designed
+	// (#1782).
+	restored := false
+	old := waitOutSwapWindow
+	waitOutSwapWindow = func() {
+		restored = true
+		if err := os.WriteFile(path, body, 0o600); err != nil {
+			t.Error(err)
+		}
+	}
+	defer func() { waitOutSwapWindow = old }()
+
 	if Damaged(dir) {
 		t.Error("a store that agrees with its manifest a moment later was called damaged")
 	}
-	wg.Wait()
+	if !restored {
+		t.Error("the second read never happened, so this proved nothing")
+	}
 }
 
 // And a store that is really short stays damaged: the second read is a second

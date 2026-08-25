@@ -481,7 +481,7 @@ func Damaged(dir string) bool {
 	if !RebuildInProgress(dir) {
 		return true
 	}
-	time.Sleep(swapWindowWait)
+	waitOutSwapWindow()
 	m2, err := readManifest(dir)
 	if err != nil {
 		// The manifest went away under us, which is the swap itself rather than

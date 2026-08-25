@@ -24,6 +24,12 @@ const (
 	swapWindowWait  = 20 * time.Millisecond
 )
 
+// waitOutSwapWindow is the pause a reader takes before looking again. It is a
+// variable so a test can stand where the pause is instead of racing a
+// goroutine against it: the point of those tests is what the second read sees,
+// not which goroutine the scheduler picks (#1782).
+var waitOutSwapWindow = func() { time.Sleep(swapWindowWait) }
+
 // openIndexFile is os.Open for a file inside the index directory.
 func openIndexFile(path string) (*os.File, error) {
 	f, err := os.Open(path)
@@ -47,7 +53,7 @@ func openIndexFile(path string) (*os.File, error) {
 		if !inFlight {
 			return nil, err
 		}
-		time.Sleep(swapWindowWait)
+		waitOutSwapWindow()
 	}
 	return nil, err
 }
