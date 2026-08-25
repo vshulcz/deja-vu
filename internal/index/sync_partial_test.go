@@ -46,7 +46,9 @@ func TestImportKeepsGoingPastAFileItCannotRead(t *testing.T) {
 		t.Error("the good file was held hostage to the broken one")
 	}
 	got := err.Error()
-	if !strings.Contains(got, "a-broken.jsonl line 2") {
+	// The name is quoted since #1847, so one carrying "; " cannot read as
+	// several files under a sentence that says one.
+	if !strings.Contains(got, `"a-broken.jsonl" line 2`) {
 		t.Errorf("error does not say where: %q", got)
 	}
 	if !strings.Contains(got, "nothing was imported from 1 file") {
