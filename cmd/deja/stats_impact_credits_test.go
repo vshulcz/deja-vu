@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -94,5 +95,30 @@ func TestStatsCreditLineSingular(t *testing.T) {
 			}
 		}
 		t.Fatalf("no credit line in:\n%s", out)
+	}
+}
+
+// The report and the credit count are marshalled apart and joined, because an
+// embedded type's MarshalJSON answers for the whole outer struct. Joining is
+// string surgery, so this pins the result: valid JSON, both keys, and no stray
+// whitespace where the comma goes.
+func TestImpactJSONIsWellFormedAfterTheJoin(t *testing.T) {
+	var out strings.Builder
+	r := usage.ImpactReport{Recalls: 3, Injections: 1, ServedBytes: 100, RawBytes: 1000, Since: time.Date(2026, 8, 12, 9, 0, 0, 0, time.UTC)}
+	if err := printImpact(&out, r, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid([]byte(out.String())) {
+		t.Fatalf("not valid JSON:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "\n,") {
+		t.Errorf("the join left a comma on its own line:\n%s", out.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(out.String()), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["credited_aloud"] != float64(2) || got["since"] == nil || got["recalls"] != float64(3) {
+		t.Errorf("keys lost in the join: %v", got)
 	}
 }

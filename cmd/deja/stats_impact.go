@@ -49,7 +49,9 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 		if err != nil {
 			return err
 		}
-		body := strings.TrimRight(string(b), "}\n")
+		// Exactly one closing brace, not every trailing one: a cutset would eat
+		// the brace of a nested value too, the day this report grows one.
+		body := strings.TrimRight(strings.TrimSuffix(strings.TrimRight(string(b), " \n\t"), "}"), " \n\t")
 		_, err = fmt.Fprintf(w, "%s,\n  \"credited_aloud\": %d\n}\n", body, credits)
 		return err
 	}
