@@ -118,8 +118,9 @@ type doctorPeerReport struct {
 	// Ahead marks a stamp later than this machine's clock. The age of such a
 	// stamp is negative, and everything under a minute reads as "just now", so
 	// a peer seventy years out looked like the healthiest machine on the
-	// screen that exists to show a stopped sync (#1855). Same rule as sessions
-	// (index.StampedAhead, #1753).
+	// screen that exists to show a stopped sync (#1855). Not the session rule:
+	// a peer gets peerClockSlack first, for the reason peerStampedAhead gives
+	// (#1865).
 	Ahead bool `json:"stamped_ahead,omitempty"`
 }
 

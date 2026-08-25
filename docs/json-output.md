@@ -364,11 +364,15 @@ old to report peers at all: that one has no `sync` key. `last_error` is why the 
 recent exchange failed and is absent once one succeeds. Both `host` and
 `last_error` are written elsewhere — a config file, another machine — so they
 are bounded and stripped of control characters before they are reported.
-`stamped_ahead` appears only when the newer of the two timestamps is later than
-this machine's clock: the age would be negative and the row would otherwise read
-as a sync that just happened, so a consumer should treat that peer's dates as
-unusable for "how long since" rather than as healthy — the rule recall applies
-to sessions stamped ahead.
+`stamped_ahead` appears when the newer of the two timestamps is more than a
+minute later than this machine's clock: the age would be negative and the row
+would otherwise read as a sync that just happened, so a consumer should treat
+that peer's dates as unusable for "how long since" rather than as healthy. The
+minute is the difference from what recall says about a session stamped ahead,
+where anything ahead counts: a peers file is written by deja itself, so a copy
+from a machine a moment ahead — or an NTP step landing between the write and the
+read — is not a clock worth reporting, while a session's stamp comes from a
+transcript deja did not write.
 
 ## `deja blame <path> --json`
 
