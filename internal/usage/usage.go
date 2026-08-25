@@ -154,7 +154,9 @@ func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int6
 		return
 	}
 	rotate(p)
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	// O_RDWR rather than O_WRONLY: the append needs to read the last byte to
+	// know whether the previous record finished (#1901).
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
@@ -163,7 +165,30 @@ func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int6
 	if err != nil {
 		return
 	}
+	// A process killed between a record and its newline costs that record, which
+	// is the trade this log makes for writing without a lock. It cost the next
+	// one too: appended onto the partial line, so that line no longer parsed
+	// either and a recall deja had just served went missing from every count
+	// (#1901). One byte of reading closes the line first.
+	if endsMidLine(f) {
+		b = append([]byte{'\n'}, b...)
+	}
 	_, _ = f.Write(append(b, '\n'))
+}
+
+// endsMidLine reports whether the log's last byte is anything but a newline.
+// A file that cannot be read is treated as ending cleanly: a usage event must
+// never be the reason a recall fails.
+func endsMidLine(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil || fi.Size() == 0 {
+		return false
+	}
+	var last [1]byte
+	if _, err := f.ReadAt(last[:], fi.Size()-1); err != nil {
+		return false
+	}
+	return last[0] != '\n'
 }
 
 // InjectedToday returns session-start context bytes injected since local midnight.
