@@ -29,9 +29,12 @@ func TestTheStatuslineCountsTheBlockItInjected(t *testing.T) {
 	if err := runStatusline(dir, strings.NewReader(""), &line); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(line.String(), "0 B injected") {
-		t.Errorf("the statusline reports nothing injected on a day it injected %d bytes:\n%s",
-			len(out), line.String())
+	// Asserted positively: runStatusline returns early on a warmup, a policy
+	// rule or a quiet week, and every one of those lines would satisfy "does
+	// not say 0 B injected" while saying nothing about the block at all.
+	got := strings.TrimSpace(line.String())
+	if want := "deja · no agent recalls today · 501 B injected"; got != want {
+		t.Errorf("statusline = %q,\n                 want %q", got, want)
 	}
 }
 
