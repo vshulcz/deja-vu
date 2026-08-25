@@ -106,3 +106,44 @@ func TestAMissingJSONRPCVersionIsStillServed(t *testing.T) {
 		t.Fatalf("a frame without the version member was refused: %s", out.String())
 	}
 }
+
+// A frame that only starts like an array is truncated JSON, not a batch, and
+// keeps its parse error; an array of anything else is still a batch.
+func TestOnlyARealArrayCountsAsABatch(t *testing.T) {
+	hermeticEnv(t)
+	for frame, want := range map[string]int{
+		"[":                          -32700,
+		`"[not a batch"`:             -32700,
+		"[]":                         -32600,
+		"[1,2,3]":                    -32600,
+		`[{"jsonrpc":"2.0","id":7}]`: -32600,
+	} {
+		var out bytes.Buffer
+		if err := serveMCP(t.TempDir(), strings.NewReader(frame+"\n"), &out); err != nil {
+			t.Fatal(err)
+		}
+		frames := decodeRPCFrames(t, out.String())
+		if len(frames) != 1 {
+			t.Fatalf("%s: want one reply, got %d", frame, len(frames))
+		}
+		e, _ := frames[0]["error"].(map[string]any)
+		if code, _ := e["code"].(float64); int(code) != want {
+			t.Errorf("%s answered %v, want %d", frame, e["code"], want)
+		}
+	}
+}
+
+// The refusal carries the first request's id whatever type it is, so a client
+// with string ids can match it too.
+func TestABatchRefusalCarriesAStringID(t *testing.T) {
+	hermeticEnv(t)
+	var out bytes.Buffer
+	in := `[{"jsonrpc":"2.0","id":"abc","method":"ping"},{"jsonrpc":"2.0","id":"def","method":"ping"}]` + "\n"
+	if err := serveMCP(t.TempDir(), strings.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	frames := decodeRPCFrames(t, out.String())
+	if id, _ := frames[0]["id"].(string); id != "abc" {
+		t.Errorf("refusal came back with id %v, want \"abc\"", frames[0]["id"])
+	}
+}
