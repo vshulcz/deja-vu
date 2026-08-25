@@ -55,7 +55,9 @@ func runSync(dir string, args []string) error {
 		// typo'd hostname is one of those forever — at the cost of the connect
 		// timeout each time. peers.Forget did the work already and nothing
 		// reached it (#1780).
-		host := args[1]
+		// Under the spelling deja stored, not the one typed: the line reports
+		// which row is gone, and "LAPTOP forgotten" names no row (#1867).
+		host := peers.Canonical(args[1])
 		found, err := peers.Forget(host)
 		if err != nil {
 			return err

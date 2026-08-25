@@ -78,6 +78,11 @@ func runSyncSSH(dir string, args []string) error {
 // syncSSHHost runs one exchange and records it, so the next `deja sync` knows
 // this host without being told again.
 func syncSSHHost(dir, host string, pull, full, both bool) error {
+	// One machine, one spelling, for the whole run: the watermark is keyed by
+	// this string, and a second spelling of a known host pushed it everything
+	// it already had (#1867). ssh matches a host without regard to case, so
+	// this connects to the same machine either way.
+	host = peers.Canonical(host)
 	if both {
 		if err := syncOneWay(dir, host, false, full); err != nil {
 			return err

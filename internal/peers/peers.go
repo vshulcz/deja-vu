@@ -94,12 +94,15 @@ func Snapshot() ([]Peer, string) {
 		// the first: the other showed a months-old failure beside the same
 		// machine reporting a sync this morning, and a bare `deja sync` opened
 		// two connections to it (#1853). A file can hold the same host twice
-		// through a hand-edit or a restored backup; deja never writes one.
-		if at, ok := seen[p.Host]; ok {
+		// through a hand-edit or a restored backup, and — until #1867 — through
+		// deja's own writes, when the two syncs spelled the host differently.
+		// The row keeps the spelling it was written with: that is what the
+		// report prints and what sessions_from_there is counted against.
+		if at, ok := seen[identity(p.Host)]; ok {
 			out[at] = mergePeers(out[at], p)
 			continue
 		}
-		seen[p.Host] = len(out)
+		seen[identity(p.Host)] = len(out)
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Host < out[j].Host })
@@ -117,6 +120,34 @@ func Snapshot() ([]Peer, string) {
 func Problem() string {
 	_, why := Snapshot()
 	return why
+}
+
+// identity is what makes two names one machine. ssh lowercases a host before
+// it matches it and a DNS name is case-insensitive (RFC 4343), so `Laptop` and
+// `laptop` are one machine — comparing byte for byte gave it two rows, two
+// connections from a bare `deja sync`, and a watermark each, so the second
+// pushed everything the first had already delivered (#1867).
+//
+// Only the part after the last @: the half before it is an account name, and
+// `Root@box` and `root@box` are two logins.
+func identity(host string) string {
+	at := strings.LastIndex(host, "@")
+	return host[:at+1] + strings.ToLower(host[at+1:])
+}
+
+// Canonical is how a host named on the command line should be spelled for the
+// rest of a run: the spelling deja already stored for that machine, if it knows
+// it. Watermarks are namespaced by the peer string, so `deja sync ssh laptop`
+// against a row written `Laptop` had a watermark of its own and pushed
+// everything the machine already had (#1867).
+func Canonical(host string) string {
+	host = strings.TrimSpace(host)
+	for _, p := range Load() {
+		if identity(p.Host) == identity(host) {
+			return p.Host
+		}
+	}
+	return host
 }
 
 // mergePeers folds two rows for one machine. Each direction keeps its newest
@@ -147,7 +178,7 @@ func Record(host string, pulled bool, when time.Time, err error) error {
 	list := Load()
 	i := -1
 	for k := range list {
-		if list[k].Host == host {
+		if identity(list[k].Host) == identity(host) {
 			i = k
 			break
 		}
@@ -182,7 +213,7 @@ func Forget(host string) (bool, error) {
 	out := list[:0:0]
 	found := false
 	for _, p := range list {
-		if p.Host == host {
+		if identity(p.Host) == identity(host) {
 			found = true
 			continue
 		}
