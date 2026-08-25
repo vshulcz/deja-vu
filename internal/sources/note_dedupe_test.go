@@ -69,9 +69,14 @@ func TestTheLineCapCountsTheNoteNotItsNewline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "notes.jsonl")
 			t.Setenv("DEJA_NOTES_FILE", path)
+			// A fixed stamp, because the record carries it: RFC3339Nano trims
+			// trailing zeros, so time.Now() changes the stored line's length
+			// between the measuring write and the one being measured, and the
+			// "exactly the cap" case then lands a byte or two off.
+			stamp := time.Date(2026, 8, 25, 9, 30, 0, 123456789, time.UTC)
 			// A note whose JSON line lands exactly on the cap.
 			body := strings.Repeat("z", 64)
-			if err := AppendNote("proj", body, time.Now()); err != nil {
+			if err := AppendNote("proj", body, stamp); err != nil {
 				t.Fatal(err)
 			}
 			line, err := os.ReadFile(path)
@@ -85,10 +90,10 @@ func TestTheLineCapCountsTheNoteNotItsNewline(t *testing.T) {
 			grown := strings.Repeat("z", 64+pad)
 			path2 := filepath.Join(t.TempDir(), "notes2.jsonl")
 			t.Setenv("DEJA_NOTES_FILE", path2)
-			if err := AppendNote("proj", grown, time.Now()); err != nil {
+			if err := AppendNote("proj", grown, stamp); err != nil {
 				t.Fatal(err)
 			}
-			err = AppendNote("proj", grown, time.Now())
+			err = AppendNote("proj", grown, stamp)
 			if tc.compare && err != ErrNoteExists {
 				t.Errorf("a line at the cap was not compared: %v", err)
 			}
