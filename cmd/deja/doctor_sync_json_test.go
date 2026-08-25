@@ -99,3 +99,125 @@ func reportKeys(m map[string]any) []string {
 	}
 	return out
 }
+
+// A script reads this to act on it — `deja sync ssh <host>` — so the name goes
+// out as written. The encoder escapes a control byte by itself, which is why
+// the text report needs a bound here and the JSON does not (#1838).
+func TestTheJSONReportNamesThePeerExactly(t *testing.T) {
+	tmp := hermeticEnv(t)
+	peersFile := filepath.Join(tmp, "peers.json")
+	t.Setenv("DEJA_PEERS_FILE", peersFile)
+	long := strings.Repeat("w", 300) + ".example.net"
+	body, err := json.Marshal(map[string]any{"peers": []map[string]any{
+		{"host": long, "last_push": "2026-08-22T10:00:00Z"},
+		{"host": "red\x1b[31malert", "last_push": "2026-08-22T10:00:00Z"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(peersFile, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := runDoctor(&out, []string{"--json", "--offline"}, stubLookup("1.0.0", false), index.DefaultDir()); err != nil {
+		t.Fatal(err)
+	}
+	// The bytes on the wire carry no raw escape: the encoder wrote .
+	if strings.ContainsAny(out.String(), "\x1b\r") {
+		t.Errorf("the encoded report carries a raw escape or rewind")
+	}
+	var report struct {
+		Sync struct {
+			Peers []struct {
+				Host string `json:"host"`
+			} `json:"peers"`
+		} `json:"sync"`
+	}
+	if err := json.Unmarshal([]byte(out.String()), &report); err != nil {
+		t.Fatal(err)
+	}
+	var hosts []string
+	for _, p := range report.Sync.Peers {
+		hosts = append(hosts, p.Host)
+	}
+	if len(hosts) != 2 {
+		t.Fatalf("want two peers, got %d", len(hosts))
+	}
+	found := map[string]bool{hosts[0]: true, hosts[1]: true}
+	if !found[long] {
+		t.Errorf("the long host came back changed, so a script cannot address it: %q", hosts)
+	}
+	if !found["red\x1b[31malert"] {
+		t.Errorf("the host with an escape byte came back changed: %q", hosts)
+	}
+}
+
+// sessions_from_there is the number that says whether anything ever actually
+// arrived from a machine, so it has to be the real count rather than a key.
+func TestTheJSONReportCountsWhatArrivedFromEachPeer(t *testing.T) {
+	tmp := hermeticEnv(t)
+	// A name wider than the column the text report bounds to, so that keying
+	// the count on the displayed name instead of the stored one shows up as a
+	// zero rather than passing by luck.
+	const machine = "mini-with-a-name-longer-than-the-eighty-columns-the-text-report-bounds-a-host-to.example.net"
+	t.Setenv("DEJA_MACHINE", machine)
+	src := filepath.Join(tmp, "src.db")
+	root := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","sessionId":"fromMini","cwd":"/proj","timestamp":"2026-08-22T01:00:00Z","message":{"role":"user","content":"the pool keeps running dry on staging"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "a.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(src, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	batch := filepath.Join(tmp, "batch")
+	if _, err := index.ExportFull(src, batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// A different machine reads that batch in.
+	t.Setenv("DEJA_MACHINE", "laptop")
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	dst := index.DefaultDir()
+	if _, err := index.Import(dst, batch); err != nil {
+		t.Fatal(err)
+	}
+	peersFile := filepath.Join(tmp, "peers.json")
+	t.Setenv("DEJA_PEERS_FILE", peersFile)
+	peersBody, err := json.Marshal(map[string]any{"peers": []map[string]any{
+		{"host": machine, "last_pull": "2026-08-22T10:00:00Z"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(peersFile, peersBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var out strings.Builder
+	if err := runDoctor(&out, []string{"--json", "--offline"}, stubLookup("1.0.0", false), dst); err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		Sync struct {
+			Peers []struct {
+				Host     string `json:"host"`
+				Sessions int    `json:"sessions_from_there"`
+			} `json:"peers"`
+		} `json:"sync"`
+	}
+	if err := json.Unmarshal([]byte(out.String()), &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Sync.Peers) != 1 {
+		t.Fatalf("want one peer, got %#v", report.Sync.Peers)
+	}
+	if got := report.Sync.Peers[0].Sessions; got != 1 {
+		t.Errorf("sessions_from_there = %d, want the one session that arrived from that machine", got)
+	}
+}

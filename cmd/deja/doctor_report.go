@@ -107,8 +107,8 @@ type doctorPeerReport struct {
 	// Sessions is how much of this index came from there, the number the text
 	// line prints as "N sessions from there".
 	Sessions int `json:"sessions_from_there"`
-	// LastError is why the most recent exchange failed, bounded the way the
-	// text report bounds it: the value is written by another machine (#1808).
+	// LastError is why the most recent exchange failed. Bounded, unlike Host:
+	// nothing acts on this string, and a remote can make it arbitrarily long.
 	LastError string `json:"last_error,omitempty"`
 }
 
@@ -119,7 +119,12 @@ func collectDoctorSync(dir string) doctorSyncReport {
 	out := doctorSyncReport{Peers: make([]doctorPeerReport, 0, len(list))}
 	for _, p := range list {
 		row := doctorPeerReport{
-			Host:      hostForEcho(p.Host),
+			// The name as written, not as printed: JSON is read by something
+			// that may act on it — `deja sync ssh <host>` — and a bounded name
+			// names no machine. The encoder escapes a control byte on its own,
+			// which is the reason the text report needs a bound and this does
+			// not.
+			Host:      p.Host,
 			Sessions:  from[p.Host],
 			LastError: safeForStatusline(p.LastError, 200),
 		}
