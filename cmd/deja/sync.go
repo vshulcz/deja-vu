@@ -127,21 +127,21 @@ func runSync(dir string, args []string) error {
 			if p := deniedPath(err); p != "" && !strings.HasPrefix(p, out) &&
 				(errors.Is(err, fs.ErrPermission) || writeFailureReason(err) != err.Error()) {
 				if n > 0 {
-					return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, out, ensureError(dir, err))
+					return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, search.SafeLine(out), ensureError(dir, err))
 				}
 				return ensureError(dir, err)
 			}
 			if parent := filepath.Dir(out); !dirExists(out) && !dirExists(parent) {
-				return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", out, parent)
+				return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", search.SafeLine(out), search.SafeLine(parent))
 			}
 			if errors.Is(err, fs.ErrPermission) {
-				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", out)
+				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", search.SafeLine(out))
 			}
 			// A full or vanished disk in the same words as everywhere else
 			// (#906); anything deja does not recognise still comes through
 			// whole rather than being guessed at.
 			if reason := writeFailureReason(err); reason != err.Error() {
-				return fmt.Errorf("cannot write the export into %s — %s", out, reason)
+				return fmt.Errorf("cannot write the export into %s — %s", search.SafeLine(out), reason)
 			}
 			return err
 		}
@@ -149,6 +149,9 @@ func runSync(dir string, args []string) error {
 		// A watermark is per machine, not per destination: the second peer you
 		// hand memory to gets an empty folder and the same "exported 0
 		// records" that means "you are up to date" at the first one (#982).
+		// The path stays as written in the next line: it hands over a command
+		// to paste, and a collapsed path names no directory. Same tension as
+		// the recovery sentence in #1820 and the tombstone id in #1794.
 		if n == 0 && !full && !hasSyncBatches(out) {
 			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", out)
 		}
