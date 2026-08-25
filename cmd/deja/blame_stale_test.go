@@ -43,18 +43,23 @@ func TestBlameReadsWithoutWaitingForARebuild(t *testing.T) {
 	_ = tmp
 	// And the tool no longer declines while a rebuild is in flight: that is
 	// what buildingNowForBlockingTool is for, and blame is not one of those
-	// any more.
+	// any more. The case has to be there for this to mean anything.
 	src, err := os.ReadFile("mcp.go")
 	if err != nil {
 		t.Fatal(err)
 	}
+	found := false
 	for _, block := range strings.Split(string(src), "case \"") {
 		if !strings.HasPrefix(block, "blame\"") {
 			continue
 		}
+		found = true
 		if strings.Contains(block, "buildingNowForBlockingTool") {
 			t.Error("blame still declines while a rebuild runs")
 		}
+	}
+	if !found {
+		t.Fatal("no blame case in mcp.go, so this proved nothing")
 	}
 }
 
@@ -85,6 +90,11 @@ func TestTheRefreshNoteDoesNotCostASession(t *testing.T) {
 	noisy := countBlameSessions(t, blameBodyFor(hits, true))
 	if noisy != quiet {
 		t.Errorf("the note cost %d session(s): %d against %d", quiet-noisy, noisy, quiet)
+	}
+	// What it does cost is its own length, and no more.
+	over := len(blameBodyFor(hits, true)) - blameMCPBudget
+	if note := len(`{"note":"index refresh running in the background — the very newest sessions may not appear yet"},`); over > note {
+		t.Errorf("the payload is %d bytes over the budget, more than the note's %d", over, note)
 	}
 }
 

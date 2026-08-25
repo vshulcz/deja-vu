@@ -480,7 +480,9 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	// 300 sessions touched one file (#1071); a cap that an argument can turn
 	// off is not a cap.
 	// Trimmed without the note, then rebuilt with it: a session must not be
-	// dropped to make room for a sentence about the index.
+	// dropped to make room for a sentence about the index. The answer can end
+	// up the note's length over the budget, which is about a hundred bytes and
+	// worth more than the session it would otherwise cost.
 	body := mustMarshalBlame(hits, 0, false)
 	for len(body) > blameMCPBudget && len(hits) > 1 {
 		hits = hits[:max(len(hits)*3/4, 1)]
