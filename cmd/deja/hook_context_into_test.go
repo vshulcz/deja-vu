@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,22 +13,35 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-// snapshotsInto is every receiver the injection log recorded, by kind.
-func snapshotsInto(t *testing.T, dir string) map[string]string {
+// snapshotOnlyInto is the one receiver a kind recorded. Every row of that kind
+// has to agree: keeping the last would let a good row cover a bad one written
+// before it.
+func snapshotOnlyInto(t *testing.T, dir, kind string) string {
 	t.Helper()
 	b, err := os.ReadFile(usage.SnapshotPath(dir))
 	if err != nil {
 		t.Fatalf("nothing was written to the injection log: %v", err)
 	}
-	got := map[string]string{}
+	seen := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		var snap usage.Snapshot
 		if json.Unmarshal([]byte(line), &snap) != nil {
-			continue
+			t.Fatalf("the injection log has a line deja cannot read back: %s", line)
 		}
-		got[snap.Kind] = snap.Into
+		if snap.Kind == kind {
+			seen[snap.Into] = true
+		}
 	}
-	return got
+	switch len(seen) {
+	case 0:
+		t.Fatalf("the injection log has no %s row at all:\n%s", kind, b)
+	case 1:
+		for into := range seen {
+			return into
+		}
+	}
+	t.Fatalf("%s rows disagree on where they went: %v", kind, seen)
+	return ""
 }
 
 // The session-start hook is the commonest injection there is, and it recorded
@@ -53,13 +65,17 @@ func TestHookContextRecordsTheSessionItStarted(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
+	// The hook exports the payload's cwd into the process, so without pinning it
+	// here every later test in this package inherits a project directory that no
+	// longer exists — and the second run below would keep this one's.
+	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 
 	withHookStdin(t, `{"source":"startup","session_id":"ses_from_harness","cwd":"`+cwd+`"}`)
-	if out := runHookContextPlain(t); !strings.Contains(out, "transaction mode") {
+	if out := captureStdout(t, func() { runHookContextPlain(t) }); !strings.Contains(out, "transaction mode") {
 		t.Fatalf("the hook injected nothing, so there is no record to check:\n%q", out)
 	}
 
-	if into := snapshotsInto(t, index.DefaultDir())[usage.KindHook]; into != "ses_from_harness" {
+	if into := snapshotOnlyInto(t, index.DefaultDir(), usage.KindHook); into != "ses_from_harness" {
 		t.Errorf("the session-start injection went to %q, not to the session in the payload", into)
 	}
 }
@@ -85,9 +101,10 @@ func TestBothHooksRecordTheSameSessionForOneSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
+	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 
 	withHookStdin(t, `{"source":"startup","session_id":"ses_both","cwd":"`+cwd+`"}`)
-	if out := runHookContextPlain(t); !strings.Contains(out, "transaction mode") {
+	if out := captureStdout(t, func() { runHookContextPlain(t) }); !strings.Contains(out, "transaction mode") {
 		t.Fatalf("the session-start hook injected nothing:\n%q", out)
 	}
 	var prompt bytes.Buffer
@@ -99,33 +116,22 @@ func TestBothHooksRecordTheSameSessionForOneSession(t *testing.T) {
 		t.Fatalf("the prompt hook injected nothing:\n%q", prompt.String())
 	}
 
-	into := snapshotsInto(t, index.DefaultDir())
-	if into[usage.KindHook] != into[usage.KindDejaVu] {
-		t.Errorf("one session was recorded under two names: session start wrote %q, deja vu wrote %q",
-			into[usage.KindHook], into[usage.KindDejaVu])
+	start := snapshotOnlyInto(t, index.DefaultDir(), usage.KindHook)
+	dejaVu := snapshotOnlyInto(t, index.DefaultDir(), usage.KindDejaVu)
+	if start != dejaVu {
+		t.Errorf("one session was recorded under two names: session start wrote %q, deja vu wrote %q", start, dejaVu)
 	}
-	if into[usage.KindHook] != "ses_both" {
-		t.Errorf("neither hook recorded the session the harness named: %q", into[usage.KindHook])
+	if start != "ses_both" {
+		t.Errorf("neither hook recorded the session the harness named: %q", start)
 	}
 }
 
-// runHookContextPlain runs the session-start hook with stdout captured.
-func runHookContextPlain(t *testing.T) string {
+// runHookContextPlain runs the session-start hook. Stdout is captured by
+// captureStdout around it, which drains the pipe while the hook writes — a
+// digest larger than the pipe buffer would otherwise wedge the test.
+func runHookContextPlain(t *testing.T) {
 	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+	if err := runHookContext(index.DefaultDir(), true); err != nil {
+		t.Error(err)
 	}
-	old := os.Stdout
-	os.Stdout = w
-	runErr := runHookContext(index.DefaultDir(), true)
-	os.Stdout = old
-	_ = w.Close()
-	var out bytes.Buffer
-	_, _ = io.Copy(&out, r)
-	_ = r.Close()
-	if runErr != nil {
-		t.Fatal(runErr)
-	}
-	return out.String()
 }
