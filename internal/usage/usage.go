@@ -181,6 +181,16 @@ func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int6
 		return
 	}
 	rotate(p)
+	// A rotation by another process between this open and the write below
+	// leaves this descriptor pointing at the file that was just retired, and
+	// the event goes with it. Measured and left alone on purpose: it takes a
+	// log past 1MB, two processes recording in the same instant, and the
+	// rotation landing inside those few microseconds — and closing it properly
+	// means locking a file this package appends to without a lock by design
+	// (#1319), which is the trade that keeps a usage event from ever being the
+	// reason a recall waits. One event is the cost, and one event is what this
+	// file is allowed to lose.
+	//
 	// O_RDWR rather than O_WRONLY: the append needs to read the last byte to
 	// know whether the previous record finished (#1901).
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
