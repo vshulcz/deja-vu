@@ -12,6 +12,16 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// projectForEcho is how a project name is written back to whoever named it.
+// The value is theirs and reaches a terminal or a model unchanged otherwise:
+// an escape byte recoloured the confirmation and a carriage return rewound it,
+// and a 5000-character name printed whole. The listing surfaces have bounded
+// both since #1090; this is the same bound on the line that says a note was
+// stored (#1792).
+func projectForEcho(project string) string {
+	return neutralizeFrameMarkers(safeForStatusline(project, mcpResourceNameMax))
+}
+
 func runRemember(dir string, args []string) error {
 	var text, project string
 	var tags []string
@@ -53,7 +63,7 @@ func runRemember(dir string, args []string) error {
 	now := time.Now()
 	if err := sources.AppendNoteTagged(project, text, tags, now); err != nil {
 		if errors.Is(err, sources.ErrNoteExists) {
-			fmt.Fprintf(os.Stderr, "deja: already remembered under %s\n", project)
+			fmt.Fprintf(os.Stderr, "deja: already remembered under %s\n", projectForEcho(project))
 			return nil
 		}
 		return notesWriteError(err)
@@ -73,6 +83,6 @@ func runRemember(dir string, args []string) error {
 	if norm := sources.NormalizeTags(tags); len(norm) > 0 {
 		suffix = " #" + strings.Join(norm, " #")
 	}
-	fmt.Fprintf(os.Stdout, "deja: remembered under %s%s\n", strings.TrimSpace(project), suffix)
+	fmt.Fprintf(os.Stdout, "deja: remembered under %s%s\n", projectForEcho(project), suffix)
 	return nil
 }

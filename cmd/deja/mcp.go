@@ -429,7 +429,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// Not an error to the agent: the fact it wanted stored is stored.
 			// Saying so stops it retrying, and stops one fact costing a line of
 			// every later recall (#1736).
-			return fmt.Sprintf("Already remembered under %s.", strings.TrimSpace(a.Project)), nil
+			return fmt.Sprintf("Already remembered under %s.", projectForEcho(a.Project)), nil
 		case err != nil:
 			return "", notesWriteError(err)
 		}
@@ -446,7 +446,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// The journal is where the user sees what the agent did with their
 		// store; a write belongs there at least as much as a read.
 		usage.RecordResult(dir, usage.KindRemember, len(a.Text), 1, false)
-		return fmt.Sprintf("Remembered under %s.", strings.TrimSpace(a.Project)), nil
+		return fmt.Sprintf("Remembered under %s.", projectForEcho(a.Project)), nil
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
 	}
