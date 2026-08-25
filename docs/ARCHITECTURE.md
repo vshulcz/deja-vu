@@ -106,9 +106,19 @@ counts are blended with recency and an absolute project-root match receives a bo
 {"harness":"claude","session_id":"abc123","project":"api","role":"assistant","text":"fixed by ...","time":"2026-07-14T12:00:00Z"}
 ```
 
-The export watermark is per source path (falling back to session key for synthetic records) and is stored in `manifest.gob` as the max exported record timestamp. Re-running export emits only records with a newer timestamp for that source. Text is redacted again during export.
+The export watermark is per peer and source path (falling back to session key for synthetic records) and is stored in `manifest.gob` as the max exported record timestamp. Re-running export emits only records with a newer timestamp for that source and that peer, so what one machine has already received says nothing about what another still needs. An export with no peer named keeps the bare source key, which is what manifests written before per-peer watermarks carry. Text is redacted again during export.
 
 `deja sync import <dir>` reads all `*.jsonl` batches, appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time`, making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin.
+
+### Which machines are one machine
+
+The machines this one syncs with live in `peers.json` beside `policy.json`, outside the index, since who you sync with outlives any one rebuild. A bare `deja sync` walks that file and exchanges with every row, both ways.
+
+A host is matched the way ssh matches it: case-insensitively, but only after the last `@`. `box` and `BOX` are one machine; `Root@box` and `root@box` are two logins on it. That rule decides three things at once — which row an exchange is recorded against, which rows a `deja sync forget` removes, and which watermark an export advances, so one machine cannot be sent its whole history twice under two spellings.
+
+A run uses the spelling already stored for a host rather than the one typed, for the same reason.
+
+The name a machine calls itself is not the alias you type at it, and an imported session is stamped with the former. A pull learns the pairing and records it on the peer's row, and `deja doctor` then counts what arrived from a machine under either name. A machine only ever pushed to has nothing to learn from, so it counts nothing — which is honest: nothing has arrived from it.
 
 `deja sync ssh <host>` wraps the same export/import in one command: export to a temp dir, scp the batches, run the remote import (system ssh/scp, remote binary from PATH or `~/.local/bin/deja`).
 
