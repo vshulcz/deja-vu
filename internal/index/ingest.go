@@ -358,6 +358,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// This build's counts, not the process's: see writeSessionsWithSync (#1850).
 	emptied.Store(0)
 	collisions.Store(0)
+	// A rebuild evicts nothing, but a number left by an earlier build must not
+	// outlive it (#1861).
+	evicted.Store(0)
 	lastIngestFiles = len(files)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
@@ -1910,6 +1913,11 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 }
 
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
+	// Cleared here rather than beside the other two: this build counts what
+	// went away further down, before the incremental paths reset theirs, so a
+	// reset down there would zero the number this build is about to report
+	// (#1861).
+	evicted.Store(0)
 	old, err := readManifest(dir)
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
