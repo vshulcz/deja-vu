@@ -479,10 +479,15 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	// used to skip the truncation above and hand back 162 KB from a store where
 	// 300 sessions touched one file (#1071); a cap that an argument can turn
 	// off is not a cap.
-	body := mustMarshalBlame(hits, 0, refreshing)
+	// Trimmed without the note, then rebuilt with it: a session must not be
+	// dropped to make room for a sentence about the index.
+	body := mustMarshalBlame(hits, 0, false)
 	for len(body) > blameMCPBudget && len(hits) > 1 {
 		hits = hits[:max(len(hits)*3/4, 1)]
-		body = mustMarshalBlame(hits, 0, refreshing)
+		body = mustMarshalBlame(hits, 0, false)
+	}
+	if refreshing {
+		body = mustMarshalBlame(hits, 0, true)
 	}
 	if omitted := found - len(hits); omitted > 0 {
 		// Silently returning the top slice let an agent conclude it had seen

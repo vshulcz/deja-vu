@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,4 +68,50 @@ func TestBlameSaysWhenItServedASnapshot(t *testing.T) {
 	if quiet := string(mustMarshalBlame(nil, 0, false)); strings.Contains(quiet, "refresh") {
 		t.Errorf("an ordinary answer carries the note: %s", quiet)
 	}
+}
+
+// The note must not cost a session: the payload is trimmed to its budget on the
+// hits alone, and the note is added afterwards.
+func TestTheRefreshNoteDoesNotCostASession(t *testing.T) {
+	hits := make([]search.BlameHit, 0, 40)
+	for i := range 40 {
+		hits = append(hits, search.BlameHit{
+			Session:  model.Session{ID: "s", Harness: "claude", Project: "proj", Title: strings.Repeat("x", 300)},
+			Count:    i,
+			Snippets: []string{strings.Repeat("y", 300)},
+		})
+	}
+	quiet := countBlameSessions(t, blameBodyFor(hits, false))
+	noisy := countBlameSessions(t, blameBodyFor(hits, true))
+	if noisy != quiet {
+		t.Errorf("the note cost %d session(s): %d against %d", quiet-noisy, noisy, quiet)
+	}
+}
+
+// blameBodyFor runs the same trim-then-note sequence blameTextResult does.
+func blameBodyFor(hits []search.BlameHit, refreshing bool) []byte {
+	body := mustMarshalBlame(hits, 0, false)
+	for len(body) > blameMCPBudget && len(hits) > 1 {
+		hits = hits[:max(len(hits)*3/4, 1)]
+		body = mustMarshalBlame(hits, 0, false)
+	}
+	if refreshing {
+		body = mustMarshalBlame(hits, 0, true)
+	}
+	return body
+}
+
+func countBlameSessions(t *testing.T, body []byte) int {
+	t.Helper()
+	var rows []map[string]any
+	if err := json.Unmarshal(body, &rows); err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, r := range rows {
+		if _, ok := r["session"]; ok {
+			n++
+		}
+	}
+	return n
 }
