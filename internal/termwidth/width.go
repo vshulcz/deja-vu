@@ -7,11 +7,20 @@
 // rather than reflowed.
 package termwidth
 
+import "github.com/vshulcz/deja-vu/internal/nfcfold"
+
 // Columns is how wide a string prints. A CJK character is one rune and two
 // columns.
+//
+// The string is composed first, so the same name measures the same however it
+// was typed: macOS hands paths back decomposed and project names come from
+// paths, so "über-server" measured 12 columns there and 11 everywhere else, and
+// every aligned screen padded it a column short (#1824). Composing is a scan
+// and no allocation for text with no combining mark in it, which is nearly all
+// of what these screens print.
 func Columns(s string) int {
 	n := 0
-	for _, r := range s {
+	for _, r := range nfcfold.Compose(s) {
 		n += RuneColumns(r)
 	}
 	return n
