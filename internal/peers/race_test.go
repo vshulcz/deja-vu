@@ -75,10 +75,15 @@ func TestARecordDoesNotDropTheRowsItDidNotWrite(t *testing.T) {
 
 // The lock waits two seconds and then writes anyway, so that a sync is never
 // failed for want of it (#1884) — which is the old lost-update behaviour if
-// contention ever reaches that far. Measured: the lock is held about 300µs, so
-// sixteen writers queue a few milliseconds in front of each other and nothing
-// comes close. This holds that shape: many writers, many records each, every
-// machine still on the list.
+// contention ever reaches that far. It does not: one uncontended Record takes
+// 298–322µs whether the file holds one row or sixteen, so the writers here
+// queue a few milliseconds in front of each other, and 128 of them measured
+// ~40ms. Reaching two seconds would take thousands at once, on a file deja
+// writes once per exchange.
+//
+// Goroutines rather than processes, which is what a test can do here: this
+// pins that the read-modify-write is serialised, not that the lock file works
+// between processes.
 func TestSustainedContentionKeepsEveryMachine(t *testing.T) {
 	writePeers(t, `{"peers":[]}`)
 	const writers, each = 16, 20
