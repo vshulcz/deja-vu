@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/peers"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // doctorPeers reports the machines this one exchanges memory with, and when
@@ -24,10 +26,39 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 		return
 	}
 	from := index.ImportedByMachine(dir)
-	for _, p := range list {
-		fmt.Fprintf(w, "  %-12s %s\n", hostForEcho(p.Host), peerLine(p, from[p.Host], now))
+	// The column is padded by what the terminal draws, not by how many runes
+	// the name has: %-12s gave a 32-character name no padding at all and
+	// treated a CJK name as one column per character (#1821). A name wider
+	// than the column keeps its whole self and puts its state on the next
+	// line, indented to where every other state starts.
+	names := make([]string, len(list))
+	width := doctorPeerColumn
+	for i, p := range list {
+		names[i] = hostForEcho(p.Host)
+		if c := termwidth.Columns(names[i]); c > width && c <= doctorPeerColumnMax {
+			width = c
+		}
+	}
+	for i, p := range list {
+		state := peerLine(p, from[p.Host], now)
+		pad := width - termwidth.Columns(names[i])
+		if pad < 0 {
+			fmt.Fprintf(w, "  %s\n  %s %s\n", names[i], strings.Repeat(" ", width), state)
+			continue
+		}
+		fmt.Fprintf(w, "  %s%s %s\n", names[i], strings.Repeat(" ", pad), state)
 	}
 }
+
+const (
+	// doctorPeerColumn is the narrowest the name column gets, so a machine
+	// called "laptop" does not sit alone against the left margin.
+	doctorPeerColumn = 12
+	// doctorPeerColumnMax is how far the column may grow for a long name
+	// before that name gets a line of its own: past this the state would be
+	// pushed off an ordinary terminal.
+	doctorPeerColumnMax = 32
+)
 
 // peerLine is one machine's state in one line: how long since memory moved,
 // which way it has not moved, and how much of this index came from there.
