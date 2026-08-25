@@ -77,3 +77,24 @@ func holdIndexLock(t *testing.T, dir string) func() {
 		_ = f.Close()
 	}
 }
+
+// A read-only index answers every question asked of it. The non-blocking
+// Ensure must not read "cannot write the lock file" as "a rebuild is running",
+// or remember tells the agent to come back later, forever.
+func TestRememberOnAReadOnlyIndexDoesNotPromiseARefresh(t *testing.T) {
+	dir := seedRecallPage(t)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Skipf("cannot make the index read-only here: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if os.Geteuid() == 0 {
+		t.Skip("root writes anywhere, so the read-only case cannot be built")
+	}
+	out, err := callMCPTool(dir, "remember", []byte(`{"text":"the wobble pool cap is 12","project":"proj"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "refreshing its index") {
+		t.Errorf("a read-only index was reported as a refresh in flight: %q", out)
+	}
+}

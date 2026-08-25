@@ -227,16 +227,33 @@ func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (bus
 	}
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		if errors.Is(err, fs.ErrPermission) && HasManifest(dir) {
-			return false, nil
-		}
 		return false, err
 	}
 	if !ok {
+		// tryLockDir reports "no lock" for two different things: someone else
+		// holds it, and this machine cannot write the lock file at all. Only
+		// the first is a refresh to wait for. A read-only index — a container
+		// mount, a locked-down machine — answers every question asked of it,
+		// and telling the caller to come back later would be a wait that never
+		// ends.
+		if lockUnwritable(dir) && HasManifest(dir) {
+			return false, nil
+		}
 		return true, nil
 	}
 	defer unlock()
 	return false, ensureLocked(dir, o, false, progress)
+}
+
+// lockUnwritable reports an index whose lock file cannot be created or opened
+// for writing, which is how a read-only store presents itself.
+func lockUnwritable(dir string) bool {
+	f, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return errors.Is(err, fs.ErrPermission)
+	}
+	_ = f.Close()
+	return false
 }
 
 // ensureLocked is the body of an Ensure, with the lock already held.
