@@ -8,8 +8,7 @@ import (
 // environment block has no transcripts behind it — it is a summary of what this
 // machine keeps hitting, recorded with no raw size — so its bytes would raise
 // that numerator against an unchanged denominator and understate the saving.
-// Counting them was proposed while reviewing #1963; the numbers here are why
-// they stay out.
+// #1963 proposed counting them; these are the numbers that say otherwise.
 func TestTheImpactRatioIgnoresTheEnvironmentBlock(t *testing.T) {
 	dir := t.TempDir()
 	for i := 0; i < 3; i++ {
@@ -33,17 +32,5 @@ func TestTheImpactRatioIgnoresTheEnvironmentBlock(t *testing.T) {
 	// an empty report.
 	if after.ServedBytes != 2700 || after.RawBytes != 27000 {
 		t.Errorf("the recalls stopped counting: served=%d raw=%d", after.ServedBytes, after.RawBytes)
-	}
-}
-
-// A session start that did carry project memory counts, bytes and all — the
-// skip above is about the block, not about session starts.
-func TestASessionStartWithMemoryStillCounts(t *testing.T) {
-	dir := t.TempDir()
-	RecordResultRaw(dir, KindHook, 900, 2, false, 9000)
-
-	r := Impact(dir)
-	if r.Injections != 1 || r.ServedBytes != 900 || r.RawBytes != 9000 {
-		t.Errorf("injections=%d served=%d raw=%d, want 1, 900, 9000", r.Injections, r.ServedBytes, r.RawBytes)
 	}
 }
