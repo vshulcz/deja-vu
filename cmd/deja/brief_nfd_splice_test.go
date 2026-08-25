@@ -47,3 +47,29 @@ func TestTheBriefSpliceSurvivesADecomposedProjectName(t *testing.T) {
 		}
 	}
 }
+
+// The other two brief helpers that cut had the same split: a value that fits
+// kept its stored spelling, a cut one came back composed. All three compose
+// now, so one screen shows one spelling (#1844).
+func TestEveryBriefHelperShowsOneSpelling(t *testing.T) {
+	const diaeresis, acute = "̈", "́"
+	decomposed := "u" + diaeresis + "ber-server-project"
+	long := decomposed + strings.Repeat("-and-more", 8)
+
+	for _, tc := range []struct {
+		name string
+		got  string
+	}{
+		{"a title that fits", trimBriefTitleTo("cafe"+acute+" deploy", 60)},
+		{"a title that is cut", trimBriefTitleTo("cafe"+acute+" deploy "+strings.Repeat("x", 200), 20)},
+		{"a project that fits", fitBriefProject(decomposed, 10)},
+		{"a project that is cut", fitBriefProject(long, 40)},
+	} {
+		if strings.Contains(tc.got, diaeresis) || strings.Contains(tc.got, acute) {
+			t.Errorf("%s: the decomposed spelling reached the screen: %q", tc.name, tc.got)
+		}
+		if tc.got == "" {
+			t.Errorf("%s: nothing came back, so this proves nothing", tc.name)
+		}
+	}
+}

@@ -376,7 +376,10 @@ func trimBriefTitleTo(t string, max int) string {
 		}
 		return r
 	}, t)
-	t = strings.Join(strings.Fields(t), " ")
+	// Composed with the whitespace: the cut composes what it returns, so
+	// without this a title that fits keeps its stored spelling and a cut one
+	// does not — the same title, two ways, depending on the width (#1844).
+	t = nfcfold.Compose(strings.Join(strings.Fields(t), " "))
 	// Columns rather than runes: the budget is what is left of the terminal,
 	// and a Chinese title is one rune and two columns per character, so a
 	// 44-rune cap printed 88 columns and the line the budget exists to fit
@@ -539,6 +542,10 @@ func printNoHistory(w io.Writer, stale bool) {
 // the path: "…/消费者重平衡" says which project this is, where the first
 // characters of a long prefix rarely do (#1592).
 func fitBriefProject(project string, rest int) string {
+	// Composed before the measurement, for the reason fitBriefWhen is: the cut
+	// composes what it returns, so the two paths otherwise print the same name
+	// two ways (#1844).
+	project = nfcfold.Compose(project)
 	room := briefWidth() - rest - briefRecentTitleFloor - 1 // the title's ellipsis
 	if barColumns(project) <= room {
 		return project
