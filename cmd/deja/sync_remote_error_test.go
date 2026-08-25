@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -158,5 +159,32 @@ func TestAFailingSSHCaptureCannotWriteOnThisTerminal(t *testing.T) {
 	// The control: what the remote said is still in it.
 	if !strings.Contains(msg, "no space") {
 		t.Errorf("the remote's own report is gone: %q", msg[:min(len(msg), 120)])
+	}
+}
+
+// ssh writes host-key notices and server banners to stderr — text the machine
+// at the other end controls — and the runner folds stderr into its error, so it
+// reaches this terminal too (#1833).
+func TestTheRunnersStderrIsBoundedToo(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture runs a POSIX shell")
+	}
+	// The redirection wraps the whole group: applying it to the last command
+	// only sends the banner to stdout, where the runner drops it, and the test
+	// then passes against unfixed code.
+	hostile := `{ printf 'banner\033[31m\rHACKED '; i=0; while [ $i -lt 400 ]; do printf 'padding '; i=$((i+1)); done; } >&2; exit 1`
+	_, err := sshRunner("sh", "-c", hostile)
+	if err == nil {
+		t.Fatal("the fixture did not fail")
+	}
+	msg := err.Error()
+	if strings.ContainsAny(msg, "\x1b\r") {
+		t.Errorf("the runner's error carries an escape or a rewind: %q", msg[:min(len(msg), 90)])
+	}
+	if len(msg) > remoteEchoMax+200 {
+		t.Errorf("the runner's error is %d bytes", len(msg))
+	}
+	if !strings.Contains(msg, "banner") {
+		t.Errorf("what the other end said is gone: %q", msg[:min(len(msg), 120)])
 	}
 }

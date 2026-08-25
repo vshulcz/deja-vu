@@ -25,7 +25,11 @@ var sshRunner = func(name string, args ...string) (string, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil && strings.TrimSpace(stderr.String()) != "" {
-		return stdout.String(), fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+		// The comment above says what stderr holds — host-key notices and
+		// server banners — which is text the machine at the other end writes.
+		// It reaches this terminal through the error, so it takes the same
+		// bound as the remote's stdout (#1833).
+		return stdout.String(), fmt.Errorf("%w: %s", err, remoteOutputForEcho(strings.TrimSpace(stderr.String())))
 	}
 	return stdout.String(), err
 }
