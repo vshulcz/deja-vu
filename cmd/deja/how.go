@@ -99,7 +99,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		if !e.Last.IsZero() {
 			when = " · last " + e.Last.Local().Format("2006-01-02")
 		}
-		fmt.Fprintf(stdout, "%s\n", search.SafeText(e.Command))
+		fmt.Fprintf(stdout, "%s\n", search.SafeLine(e.Command))
 		fmt.Fprintf(stdout, "  ran %s in %s%s\n",
 			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
 	}

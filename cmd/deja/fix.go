@@ -84,8 +84,8 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		if !p.When.IsZero() {
 			when = " · " + p.When.Local().Format("2006-01-02")
 		}
-		fmt.Fprintf(stdout, "%s%s\n", search.SafeText(p.Error), when)
-		fmt.Fprintf(stdout, "  ran next: %s\n", search.SafeText(p.Command))
+		fmt.Fprintf(stdout, "%s%s\n", search.SafeLine(p.Error), when)
+		fmt.Fprintf(stdout, "  ran next: %s\n", search.SafeLine(p.Command))
 	}
 	return nil
 }

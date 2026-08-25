@@ -304,7 +304,10 @@ func fileHookLine(dir, path string) string {
 	if !last.IsZero() {
 		when = ", last " + last.Local().Format("2006-01-02")
 	}
-	name := search.SafeText(baseName(path))
+	// The line-safe form: the name lands inside the hook's own sentence, and a
+	// newline in it would end that sentence and start one that reads as deja
+	// speaking to the agent (#1863).
+	name := search.SafeLine(baseName(path))
 	head := fmt.Sprintf("%s has been worked on in %s%s", name, toolSessionCount(sessions), when)
 	// The measured difference between a nudge that changes what an agent does
 	// and one it ignores is whether it carries the decision or only points at
