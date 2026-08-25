@@ -75,6 +75,12 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 	switch {
 	case p.Last().IsZero():
 		line = "never exchanged"
+	case index.StampedAhead(p.Last(), now):
+		// The age would be negative, and everything under a minute reads as
+		// "just now" — so the peer that most needs looking at read as the one
+		// that just synced (#1855).
+		line = "last exchange stamped " + p.Last().Local().Format("2006-01-02") +
+			", later than this machine's clock — one of the two is wrong"
 	default:
 		line = "last exchange " + doctorAgo(now.Sub(p.Last()))
 	}

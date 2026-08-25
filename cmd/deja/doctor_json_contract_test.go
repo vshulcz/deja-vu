@@ -54,6 +54,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// doctorSyncReport / doctorPeerReport
 		"sync": true, "peers": true, "host": true,
 		"last_push": true, "last_pull": true, "sessions_from_there": true,
+		"stamped_ahead": true,
 		// index.HarnessIngest
 		"malformed_lines": true, "clipped_messages": true,
 		"failed_files": true, "last_error": true,

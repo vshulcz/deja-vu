@@ -361,6 +361,11 @@ is a broken sync that reads as a working one. `last_error` is why the most
 recent exchange failed and is absent once one succeeds. Both `host` and
 `last_error` are written elsewhere — a config file, another machine — so they
 are bounded and stripped of control characters before they are reported.
+`stamped_ahead` appears only when the newer of the two timestamps is later than
+this machine's clock: the age would be negative and the row would otherwise read
+as a sync that just happened, so a consumer should treat that peer's dates as
+unusable for "how long since" rather than as healthy — the rule recall applies
+to sessions stamped ahead.
 
 ## `deja blame <path> --json`
 

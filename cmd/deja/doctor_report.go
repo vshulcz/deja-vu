@@ -115,6 +115,12 @@ type doctorPeerReport struct {
 	// LastError is why the most recent exchange failed. Bounded, unlike Host:
 	// nothing acts on this string, and a remote can make it arbitrarily long.
 	LastError string `json:"last_error,omitempty"`
+	// Ahead marks a stamp later than this machine's clock. The age of such a
+	// stamp is negative, and everything under a minute reads as "just now", so
+	// a peer seventy years out looked like the healthiest machine on the
+	// screen that exists to show a stopped sync (#1855). Same rule as sessions
+	// (index.StampedAhead, #1753).
+	Ahead bool `json:"stamped_ahead,omitempty"`
 }
 
 // collectDoctorSync reads the peers file and what arrived from each machine.
@@ -146,6 +152,7 @@ func collectDoctorSync(dir string) doctorSyncReport {
 		if !p.LastPull.IsZero() {
 			row.LastPull = p.LastPull.UTC().Format(time.RFC3339)
 		}
+		row.Ahead = index.StampedAhead(p.Last(), time.Now())
 		out.Peers = append(out.Peers, row)
 	}
 	return out
