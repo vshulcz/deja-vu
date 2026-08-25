@@ -97,6 +97,13 @@ func TestASentenceNamingASectionIsNotTheSection(t *testing.T) {
 	if got := docSection(t, doc, "## `deja last --json`"); !strings.Contains(got, "`id`") {
 		t.Errorf("the section started at a sentence about it, not at the heading: %q", got)
 	}
+
+	// And a sentence that opens the line with the heading's own text is still a
+	// sentence.
+	opens := "## `deja last --json` is the shape below.\n\n## `deja last --json`\n\nLast says `id`.\n"
+	if got := docSection(t, opens, "## `deja last --json`"); !strings.Contains(got, "`id`") {
+		t.Errorf("a line beginning with the heading text started the section: %q", got)
+	}
 }
 
 // The reach measured on the real document, not a fixture: the session object is
