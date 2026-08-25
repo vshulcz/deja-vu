@@ -357,7 +357,10 @@ a deja too old to report. Each row carries `host`, `sessions_from_there` (how
 much of this index arrived from it), and `last_push` / `last_pull` as RFC 3339
 timestamps, each omitted when that direction has never happened: the two fail
 apart, and a machine that takes what this one sends while sending nothing back
-is a broken sync that reads as a working one. `last_error` is why the most
+is a broken sync that reads as a working one. A row carrying neither is a
+machine named once and never reached — the text report says "never exchanged"
+for it — and it is still a row, which is what distinguishes it from a deja too
+old to report peers at all: that one has no `sync` key. `last_error` is why the most
 recent exchange failed and is absent once one succeeds. Both `host` and
 `last_error` are written elsewhere — a config file, another machine — so they
 are bounded and stripped of control characters before they are reported.
