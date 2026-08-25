@@ -283,7 +283,7 @@ func sshCapture(host, cmd string) (string, error) {
 	out, err := sshRunner("ssh", append(sshOpts(), host, cmd)...)
 	s := strings.TrimSpace(out)
 	if err != nil {
-		return "", fmt.Errorf("ssh %s: %v: %s", host, err, s)
+		return "", fmt.Errorf("ssh %s: %v: %s", hostForEcho(host), err, remoteOutputForEcho(s))
 	}
 	// A remote that still prints something conversational on stdout (motd,
 	// profile chatter) leaves the useful value on the last line.

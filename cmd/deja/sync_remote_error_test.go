@@ -120,3 +120,43 @@ func TestAFailingScpCannotWriteOnThisTerminalEither(t *testing.T) {
 		t.Errorf("what the remote said is gone: %q", err.Error())
 	}
 }
+
+// sshCapture is the first thing a pull does, so a remote whose mktemp fails is
+// the most likely of the three failures — and it built its error from the raw
+// host and the raw output (#1833).
+func TestAFailingSSHCaptureCannotWriteOnThisTerminal(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(tmp, "peers.json"))
+	root := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","sessionId":"v1","cwd":"/proj","timestamp":"2026-08-22T01:00:00Z","message":{"role":"user","content":"the retry budget question"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "a.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	old := sshRunner
+	t.Cleanup(func() { sshRunner = old })
+	sshRunner = func(name string, args ...string) (string, error) {
+		return "mktemp: no space\x1b[31m\rHACKED " + strings.Repeat("padding ", 300), errors.New("exit status 1")
+	}
+	err := syncSSHHost(dir, "peer\x1b[31mX", true, false, false)
+	if err == nil {
+		t.Fatal("the fixture did not fail, so there is no error to inspect")
+	}
+	msg := err.Error()
+	if strings.ContainsAny(msg, "\x1b\r") {
+		t.Errorf("the error carries an escape or a rewind: %q", msg[:min(len(msg), 100)])
+	}
+	if len(msg) > remoteEchoMax+200 {
+		t.Errorf("the error is %d bytes of remote output", len(msg))
+	}
+	// The control: what the remote said is still in it.
+	if !strings.Contains(msg, "no space") {
+		t.Errorf("the remote's own report is gone: %q", msg[:min(len(msg), 120)])
+	}
+}
