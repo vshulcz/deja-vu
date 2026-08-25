@@ -804,9 +804,9 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 			// file is still refused whole: a half-imported transfer is worse
 			// than one the reader can retry (#891).
 			if !next && torn {
-				return fmt.Errorf("%s looks truncated at line %d — the transfer may have been cut off; fetch the batch again", batchName(path), line)
+				return fmt.Errorf("%q looks truncated at line %d — the transfer may have been cut off; fetch the batch again", batchName(path), line)
 			}
-			return fmt.Errorf("%s line %d is not a record deja wrote: %w", batchName(path), line, err)
+			return fmt.Errorf("%q line %d is not a record deja wrote: %w", batchName(path), line, err)
 		}
 		// Metadata from a batch is another machine's text: it lands in the
 		// project label and the harness tag, which are rendered into result

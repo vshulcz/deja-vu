@@ -55,3 +55,33 @@ func TestAnOrdinaryBatchNameIsReportedAsItIs(t *testing.T) {
 		t.Errorf("an ordinary name was altered: %q", err.Error())
 	}
 }
+
+// The count and the list have to agree: one file whose name carries the
+// separator used to read as three entries under a sentence that said one
+// (#1847).
+func TestOneFileCannotReadAsSeveral(t *testing.T) {
+	dir := t.TempDir()
+	batch := filepath.Join(dir, "batch")
+	if err := os.MkdirAll(batch, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const name = "one.jsonl; two.jsonl; three.jsonl"
+	if err := os.WriteFile(filepath.Join(batch, name), []byte("{not a record}\n"), 0o644); err != nil {
+		t.Skipf("the filesystem refused the name: %v", err)
+	}
+	_, err := Import(filepath.Join(dir, "index.db"), batch)
+	if err == nil {
+		t.Fatal("a batch of nonsense imported cleanly")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "from 1 file") {
+		t.Fatalf("the fixture did not produce the single-file sentence: %q", msg)
+	}
+	// One quoted name, whatever it contains.
+	if strings.Count(msg, `"`) != 2 {
+		t.Errorf("the name is not delimited, so it can read as several: %q", msg)
+	}
+	if !strings.Contains(msg, `"one.jsonl; two.jsonl; three.jsonl"`) {
+		t.Errorf("the name was altered rather than delimited: %q", msg)
+	}
+}
