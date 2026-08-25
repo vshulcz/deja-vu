@@ -200,8 +200,13 @@ func collectDoctorPolicy(dir string) doctorPolicyReport {
 	return r
 }
 
+// doctorEmbedReport is the Embedding section. State is unavailable, reachable
+// or unreadable — the last one meaning the sidecar is on disk and deja cannot
+// parse it, which used to read exactly like never having embedded anything
+// (#1960). Error carries the reason, as it does for sync and policy.
 type doctorEmbedReport struct {
 	State    string  `json:"state"`
+	Error    string  `json:"error,omitempty"`
 	Model    string  `json:"model,omitempty"`
 	Dim      int     `json:"dim,omitempty"`
 	Coverage float64 `json:"coverage"`
@@ -312,6 +317,13 @@ func collectDoctorEmbed(dir string) *doctorEmbedReport {
 	}
 	s, err := embed.Read(dir)
 	if err != nil {
+		// A sidecar that is there and will not parse is a fault to report even
+		// when no endpoint is configured: the file is the evidence, and the
+		// endpoint is not what broke it.
+		if _, statErr := os.Stat(embed.Path(dir)); statErr == nil {
+			r.State, r.Error = "unreadable", err.Error()
+			return r
+		}
 		if !reachable {
 			return nil
 		}

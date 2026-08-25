@@ -301,6 +301,13 @@ func hookEventWired(hooks map[string]any, event, command string) bool {
 
 func doctorEmbed(w io.Writer, r doctorEmbedReport) {
 	fmt.Fprintln(w, "Embedding:")
+	// The sidecar's own line, not the endpoint's: the endpoint may be fine and
+	// the file still unparseable, and saying "endpoint unreadable" would send
+	// the reader after the wrong thing (#1960).
+	if r.State == "unreadable" {
+		fmt.Fprintf(w, "  sidecar    unreadable — %s\n", r.Error)
+		return
+	}
 	if r.Model == "" {
 		fmt.Fprintf(w, "  endpoint   %s\n", r.State)
 		return
