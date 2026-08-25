@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -184,6 +185,15 @@ func Record(host string, pulled bool, when time.Time, err error) error {
 	if host == "" {
 		return nil
 	}
+	// Locked around the read, the edit and the write: without it two syncs
+	// finishing at once each wrote back the list they had read, and the second
+	// one dropped the first one's machine (#1883).
+	return withLock(func() error {
+		return recordLocked(host, pulled, when, err)
+	})
+}
+
+func recordLocked(host string, pulled bool, when time.Time, err error) error {
 	list := Load()
 	i := -1
 	for k := range list {
@@ -218,6 +228,17 @@ func Record(host string, pulled bool, when time.Time, err error) error {
 // Forget drops a host from the list. Reports whether it was there.
 func Forget(host string) (bool, error) {
 	host = strings.TrimSpace(host)
+	var found bool
+	err := withLock(func() error {
+		var ferr error
+		found, ferr = forgetLocked(host)
+		return ferr
+	})
+	return found, err
+}
+
+// forgetLocked is Forget with the list already held.
+func forgetLocked(host string) (bool, error) {
 	list := Load()
 	out := list[:0:0]
 	found := false
@@ -246,11 +267,11 @@ func save(list []Peer) error {
 	}
 	// Written whole through a temp file: a sync interrupted midway must not
 	// leave a half-written list that Load then silently reads as no peers.
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	// atomicfile rather than a temp of our own, because ours was named for the
+	// file rather than for the writer — two syncs wrote into the one temp and
+	// renamed it in turn, so one of them could publish a list holding half of
+	// each, or fail outright on a temp the other had already renamed (#1883).
+	return atomicfile.Write(path, append(b, '\n'), 0o600)
 }
 
 // trimError keeps a failure short enough to sit on one line of a report. The
