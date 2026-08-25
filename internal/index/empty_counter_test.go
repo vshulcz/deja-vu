@@ -56,3 +56,43 @@ func TestTheEmptyCounterBelongsToTheLastBuild(t *testing.T) {
 		t.Errorf("a build with nothing empty reported %d", n)
 	}
 }
+
+// The collision counter sits beside the empty one and had the same flaw: a
+// second build in one process reported its own colliding ids plus the ones an
+// earlier build had counted (#1850).
+func TestTheCollisionCounterBelongsToTheLastBuild(t *testing.T) {
+	build := func(pairs int) {
+		home := t.TempDir()
+		setHome(t, home)
+		t.Setenv("USERPROFILE", home)
+		root := filepath.Join(home, "claude")
+		t.Setenv("DEJA_CLAUDE_ROOT", root)
+		proj := filepath.Join(root, "-tmp-c")
+		if err := os.MkdirAll(proj, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for i := range pairs {
+			id := "dup" + string(rune('a'+i))
+			line := `{"type":"user","sessionId":"` + id + `","cwd":"/tmp/c","timestamp":"2026-08-01T10:00:00Z","message":{"role":"user","content":"pool exhausted"}}` + "\n"
+			// One id in two files is what makes a collision.
+			for _, half := range []string{"-one.jsonl", "-two.jsonl"} {
+				if err := os.WriteFile(filepath.Join(proj, id+half), []byte(line), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		if err := Ensure(filepath.Join(home, "idx"), "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	build(2)
+	// Deliberately not read.
+	build(1)
+	if n := ReportCollisions(); n != 1 {
+		t.Errorf("the second build reported %d collisions, want its own 1", n)
+	}
+	build(0)
+	if n := ReportCollisions(); n != 0 {
+		t.Errorf("a build with no collisions reported %d", n)
+	}
+}
