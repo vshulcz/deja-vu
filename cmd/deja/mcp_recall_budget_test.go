@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -62,7 +61,7 @@ func TestTheFirstRecallOfASessionFitsItsBudget(t *testing.T) {
 	// The block is served once per process and once per 15 minutes per store;
 	// another test in this package may have spent either. Both are reset so the
 	// call under test is a session's first one.
-	environmentServed = sync.Once{}
+	resetEnvironmentOnce()
 	_ = os.Remove(filepath.Join(filepath.Dir(dir), filepath.Base(dir)+".envblock"))
 	out, err := callMCPTool(dir, "recall", []byte(`{"query":"quibblectl retry budget"}`))
 	if err != nil {
@@ -79,5 +78,27 @@ func TestTheFirstRecallOfASessionFitsItsBudget(t *testing.T) {
 	}
 	if !strings.Contains(out, "quibblectl retry budget") {
 		t.Errorf("the page lost its excerpts to make room for the block:\n%s", out)
+	}
+}
+
+// The block is spent on delivery, not on being asked for: a recall that fails
+// must not cost the session its one block.
+func TestAFailedRecallDoesNotSpendTheEnvironmentBlock(t *testing.T) {
+	dir := seedFrictionCorpus(t)
+	resetEnvironmentOnce()
+	_ = os.Remove(filepath.Join(filepath.Dir(dir), filepath.Base(dir)+".envblock"))
+
+	env, _ := environmentOnce(dir)
+	if env == "" {
+		t.Fatal("the fixture has no block, so this proves nothing")
+	}
+	// Asked for and not delivered: the next caller still gets it.
+	again, deliver := environmentOnce(dir)
+	if again == "" {
+		t.Error("a block that was never delivered was counted as served")
+	}
+	deliver()
+	if after, _ := environmentOnce(dir); after != "" {
+		t.Error("the block was served twice in one process")
 	}
 }

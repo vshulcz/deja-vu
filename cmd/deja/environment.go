@@ -85,9 +85,12 @@ func environmentBlock(dir, activation string) string {
 	return b.String()
 }
 
-// environmentServed is per process, which is what makes "once" countable on
+// environmentSpent is per process, which is what makes "once" countable on
 // this side: an MCP server lives for the whole session.
-var environmentServed sync.Once
+var (
+	environmentMu    sync.Mutex
+	environmentSpent bool
+)
 
 // environmentTTL is how long a delivered block suppresses the next one.
 //
@@ -99,37 +102,64 @@ var environmentServed sync.Once
 // which gets its own copy from the hook.
 const environmentTTL = 15 * time.Minute
 
-// environmentServedRecently reports whether a block went out within the TTL,
-// and stamps the marker when it has not.
+// environmentServedRecently reports whether a block went out within the TTL.
+// Reading and stamping are separate because the block is spent on delivery: a
+// caller that asks and then fails must leave the next one its turn (#1806).
 func environmentServedRecently(dir string) bool {
-	p := filepath.Join(filepath.Dir(dir), filepath.Base(dir)+".envblock")
-	if b, err := os.ReadFile(p); err == nil {
+	if b, err := os.ReadFile(environmentMarker(dir)); err == nil {
 		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil {
 			if time.Since(time.Unix(ts, 0)) < environmentTTL {
 				return true
 			}
 		}
 	}
-	_ = os.MkdirAll(filepath.Dir(p), 0o700)
-	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 	return false
 }
 
+// stampEnvironmentServed records that a block went out, so the hook and the
+// server do not both send one.
+func stampEnvironmentServed(dir string) {
+	p := environmentMarker(dir)
+	_ = os.MkdirAll(filepath.Dir(p), 0o700)
+	_ = os.WriteFile(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+}
+
+func environmentMarker(dir string) string {
+	return filepath.Join(filepath.Dir(dir), filepath.Base(dir)+".envblock")
+}
+
 // environmentOnce appends the block to the first recall an MCP session serves.
-//
-// The session-start injection reaches the thirteen harnesses deja can wire a
-// hook into. The rest — and every agent whose user declined the hook — reach
-// deja only through MCP. Appending the block to every recall would spend a
-// tenth of the response budget repeating a fact the model already has.
-func environmentOnce(dir string) string {
-	out := ""
-	environmentServed.Do(func() {
-		if environmentServedRecently(dir) {
-			return
-		}
-		if env := environmentBlock(dir, policy.ActivationMCP); env != "" {
-			out = "\n\n" + env
-		}
-	})
-	return out
+// It is spent on delivery: the caller asks for it, and says so once the reply
+// carrying it is built. Spending it up front lost the block for a whole session
+// when the recall that asked for it then failed (#1806).
+func environmentOnce(dir string) (block string, deliver func()) {
+	environmentMu.Lock()
+	defer environmentMu.Unlock()
+	if environmentSpent {
+		return "", func() {}
+	}
+	if environmentServedRecently(dir) {
+		environmentSpent = true
+		return "", func() {}
+	}
+	env := environmentBlock(dir, policy.ActivationMCP)
+	if env == "" {
+		environmentSpent = true
+		return "", func() {}
+	}
+	return "\n\n" + env, func() {
+		environmentMu.Lock()
+		environmentSpent = true
+		environmentMu.Unlock()
+		stampEnvironmentServed(dir)
+	}
+}
+
+// resetEnvironmentOnce lets a test ask for a session's first block again. The
+// marker file is per store and a test's store is its own; the process flag is
+// shared, so it is reset under the same lock the server takes.
+func resetEnvironmentOnce() {
+	environmentMu.Lock()
+	environmentSpent = false
+	environmentMu.Unlock()
 }

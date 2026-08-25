@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -104,7 +103,7 @@ func TestEnvironmentReachesTheSessionStartInjection(t *testing.T) {
 // the whole session — so it is served once and not on every recall.
 func TestEnvironmentServedOncePerMCPSession(t *testing.T) {
 	dir := seedWalls(t, index.FrictionMinSessions)
-	environmentServed = sync.Once{}
+	resetEnvironmentOnce()
 	first, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"checks","limit":2}`))
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +169,12 @@ func TestEnvironmentBlockIsNotDeliveredTwice(t *testing.T) {
 	if environmentServedRecently(dir) {
 		t.Fatal("a fresh store must not claim a recent delivery")
 	}
-	// The stamp is written by the first call, so the second sees it.
+	// Asking does not record anything — a caller that never delivers leaves the
+	// next one its turn (#1806). The stamp is written when the block goes out.
+	if environmentServedRecently(dir) {
+		t.Fatal("merely asking recorded a delivery that never happened")
+	}
+	stampEnvironmentServed(dir)
 	if !environmentServedRecently(dir) {
 		t.Fatal("the delivery was not recorded, so both paths will send it")
 	}

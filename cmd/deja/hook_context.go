@@ -799,6 +799,9 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 	if !environmentServedRecently(dir) {
 		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
 			text += "\n" + env + "\n"
+			// Stamped on the way out rather than by the check: the check is
+			// also made by callers that may not deliver (#1806).
+			stampEnvironmentServed(dir)
 		}
 	}
 	mark("environment")

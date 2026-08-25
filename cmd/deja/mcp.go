@@ -306,10 +306,11 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// has to come out of the same budget: appended afterwards it put the
 		// first recall of every session — the one an agent plans against — over
 		// the cap by its own length (#1806).
-		env := environmentOnce(dir)
+		env, deliverEnv := environmentOnce(dir)
 		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env))
 		if err == nil {
 			text = frameRecall(text) + env
+			deliverEnv()
 			usage.RecordServedSessions(dir, usage.KindRecall, len(text), sessions, sessions == 0, raw, ids)
 			usage.SnapshotPolicy(dir, usage.KindRecall, text, sessions, policy.Load().Describe(policy.ActivationMCP))
 		}
