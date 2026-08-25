@@ -135,6 +135,15 @@ func identity(host string) string {
 	return host[:at+1] + strings.ToLower(host[at+1:])
 }
 
+// Identity is that rule for a caller outside this package: anything keyed by a
+// machine name has to agree with the list about which names are one machine.
+// `deja doctor` counts imported sessions by the name the sending machine calls
+// itself, which is a hostname — capitalised on macOS — against an ssh alias
+// that usually is not (#1876).
+func Identity(host string) string {
+	return identity(strings.TrimSpace(host))
+}
+
 // Canonical is how a host named on the command line should be spelled for the
 // rest of a run: the spelling deja already stored for that machine, if it knows
 // it. Watermarks are namespaced by the peer string, so `deja sync ssh laptop`

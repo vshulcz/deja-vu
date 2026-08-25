@@ -33,7 +33,7 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 		fmt.Fprintf(w, "  %-12s no other machines yet — `deja sync ssh <host>` once, then `deja sync` keeps them all in step\n", "peers")
 		return
 	}
-	from := index.ImportedByMachine(dir)
+	from := importsByPeerName(dir)
 	// The column is padded by what the terminal draws, not by how many runes
 	// the name has: %-12s gave a 32-character name no padding at all and
 	// treated a CJK name as one column per character (#1821). A name wider
@@ -48,7 +48,7 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 		}
 	}
 	for i, p := range list {
-		state := peerLine(p, from[p.Host], now)
+		state := peerLine(p, from[peers.Identity(p.Host)], now)
 		pad := width - termwidth.Columns(names[i])
 		if pad < 0 {
 			fmt.Fprintf(w, "  %s\n  %s %s\n", names[i], strings.Repeat(" ", width), state)
@@ -132,4 +132,19 @@ func doctorAgo(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%s ago", doctorCount(int(d.Hours()/24), "day"))
 	}
+}
+
+// importsByPeerName counts imported sessions under the same rule the peers
+// list uses for identity. The stamp on an imported session is what the sending
+// machine calls itself — a hostname, capitalised on macOS — while the row it
+// belongs to is an ssh alias someone typed, so an exact lookup reported none of
+// the sessions a machine had sent (#1876). A genuinely different name — alias
+// `work`, hostname `build-box` — is still a miss, and nothing here can fix
+// that.
+func importsByPeerName(dir string) map[string]int {
+	out := map[string]int{}
+	for name, n := range index.ImportedByMachine(dir) {
+		out[peers.Identity(name)] += n
+	}
+	return out
 }

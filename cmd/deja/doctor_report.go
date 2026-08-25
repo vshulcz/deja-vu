@@ -127,7 +127,7 @@ type doctorPeerReport struct {
 // collectDoctorSync reads the peers file and what arrived from each machine.
 func collectDoctorSync(dir string) doctorSyncReport {
 	list, why := peers.Snapshot()
-	from := index.ImportedByMachine(dir)
+	from := importsByPeerName(dir)
 	out := doctorSyncReport{State: "ok", Peers: make([]doctorPeerReport, 0, len(list))}
 	if why != "" {
 		// Error is unbounded on purpose, unlike a peer's LastError beside it:
@@ -144,7 +144,7 @@ func collectDoctorSync(dir string) doctorSyncReport {
 			// which is the reason the text report needs a bound and this does
 			// not.
 			Host:      p.Host,
-			Sessions:  from[p.Host],
+			Sessions:  from[peers.Identity(p.Host)],
 			LastError: safeForStatusline(p.LastError, 200),
 		}
 		if !p.LastPush.IsZero() {
