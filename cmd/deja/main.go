@@ -1955,18 +1955,41 @@ func runBlame(dir string, args []string) error {
 }
 
 func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, error) {
+	hits, hidden, _, err := blameHits(dir, target, o, activation, progress, false)
+	return hits, hidden, err
+}
+
+// findBlameHitsStale is findBlameHits for a caller that must not wait: it
+// serves the snapshot on disk while a rebuild runs, the way recall does, and
+// hands the rebuild to the detached warmup. blame is the tool an agent calls
+// before editing a file, so declining for the length of a refresh means the
+// edit happens without the history (#1784). The CLI keeps the blocking path —
+// someone typed it and is watching the progress (#1306).
+func findBlameHitsStale(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, bool, error) {
+	return blameHits(dir, target, o, activation, progress, true)
+}
+
+func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer, stale bool) ([]search.BlameHit, int, bool, error) {
 	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
-	if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
-		return nil, 0, err
+	refreshing := false
+	if stale {
+		var err error
+		if refreshing, err = index.EnsureForSearchStale(dir, query, progress); err != nil {
+			return nil, 0, false, err
+		} else if refreshing {
+			requestWarmup(dir)
+		}
+	} else if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
+		return nil, 0, false, err
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, query, progress)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 	all := search.Blame(withFileTouchers(dir, result.Sessions, target), target, o)
 	hits := policyFilterBlame(activation, all)
 	attachBlameLifecycles(hits)
-	return hits, len(all) - len(hits), nil
+	return hits, len(all) - len(hits), refreshing, nil
 }
 
 // blameToucherCap bounds how many extra sessions a blame reads from the

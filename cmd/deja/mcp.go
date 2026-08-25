@@ -305,11 +305,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 				return "", err
 			}
 		}
-		// blame reaches index.EnsureForSearch through findBlameHits, which
-		// blocks and can run the whole build inside this call. The CLI keeps
-		// that — someone typed it and watches the progress — but an agent gets
-		// the same sentence as every other tool (#1306).
-		if line := buildingNowForBlockingTool(dir); line != "" {
+		// The agent-facing blame reads without waiting, the way recall does:
+		// it is the tool called before editing a file, so declining for the
+		// length of a refresh means the edit happens without the history
+		// (#1784). Only a store deja cannot answer from at all still gets the
+		// sentence (#1306).
+		if line := buildingNowForAgent(dir); line != "" {
 			return line, nil
 		}
 		text, hits, err := blameTextResult(dir, search.BlameOptions{Harness: a.Harness, Project: a.Project, Since: since, All: a.All}, a.Path, int(a.Limit))
@@ -457,7 +458,7 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	if err != nil {
 		return "", 0, err
 	}
-	hits, _, err := findBlameHits(dir, target, o, policy.ActivationMCP, mcpProgress())
+	hits, _, refreshing, err := findBlameHitsStale(dir, target, o, policy.ActivationMCP, mcpProgress())
 	if err != nil {
 		return "", 0, err
 	}
@@ -478,16 +479,16 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	// used to skip the truncation above and hand back 162 KB from a store where
 	// 300 sessions touched one file (#1071); a cap that an argument can turn
 	// off is not a cap.
-	body := mustMarshalBlame(hits, 0)
+	body := mustMarshalBlame(hits, 0, refreshing)
 	for len(body) > blameMCPBudget && len(hits) > 1 {
 		hits = hits[:max(len(hits)*3/4, 1)]
-		body = mustMarshalBlame(hits, 0)
+		body = mustMarshalBlame(hits, 0, refreshing)
 	}
 	if omitted := found - len(hits); omitted > 0 {
 		// Silently returning the top slice let an agent conclude it had seen
 		// every session that touched the file. Say what was left out and what
 		// to do about it.
-		body = mustMarshalBlame(hits, omitted)
+		body = mustMarshalBlame(hits, omitted, refreshing)
 	}
 	return string(body), len(hits), nil
 }
@@ -519,8 +520,14 @@ type blameSessionJSON struct {
 	Touched []string  `json:"touched,omitempty"`
 }
 
-func mustMarshalBlame(hits []search.BlameHit, omitted int) []byte {
-	out := make([]any, 0, len(hits)+1)
+func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []byte {
+	out := make([]any, 0, len(hits)+2)
+	if refreshing {
+		// The answer is the snapshot on disk while a rebuild adds to it — the
+		// same thing recall says in prose, said here in the shape this tool
+		// answers in (#1784).
+		out = append(out, map[string]any{"note": "index refresh running in the background — the very newest sessions may not appear yet"})
+	}
 	for _, h := range hits {
 		out = append(out, blameHitJSON{
 			Session: blameSessionJSON{
