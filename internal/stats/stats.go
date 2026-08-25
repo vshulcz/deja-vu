@@ -483,7 +483,8 @@ func questionStemFor(text string) string {
 // only signal that separates memory that was used from memory that was merely
 // served, so the impact panel reads it too (#1062).
 func AgentCredits(ss []model.Session, now time.Time) (total, week int) {
-	weekCut := now.Add(-7 * 24 * time.Hour)
+	// The same week the status bar and the brief mean (#1920).
+	weekCut := usage.WeekCut(now)
 	for _, s := range ss {
 		for _, msg := range s.Messages {
 			if msg.Role != "assistant" || !strings.Contains(msg.Text, "deja-vu recalled") {
