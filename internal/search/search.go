@@ -7,8 +7,10 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unicode"
@@ -1385,6 +1387,52 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	printContextChunks(w, s, budget, func(m model.Message) (bool, int) { return true, 0 })
 }
 
+// contextTurn is a turn the digest keeps, before it is rendered.
+type contextTurn struct {
+	role   string
+	raw    string
+	weight int
+}
+
+// renderContextTurnsWorkers is how many turns render at once. One worker per
+// core; a session small enough that the goroutines cost more than the work
+// renders in place.
+var renderContextTurnsWorkers = runtime.NumCPU
+
+// renderContextTurns renders each kept turn, in parallel when there are enough
+// of them to pay for it. Results are written by index, so the digest is the
+// same bytes in the same order however many cores run it.
+func renderContextTurns(turns []contextTurn) []string {
+	out := make([]string, len(turns))
+	workers := renderContextTurnsWorkers()
+	if workers > len(turns) {
+		workers = len(turns)
+	}
+	if workers < 2 || len(turns) < 32 {
+		for i, t := range turns {
+			out[i] = SafeText(contextText(t.raw, t.weight > 0))
+		}
+		return out
+	}
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= len(turns) {
+					return
+				}
+				out[i] = SafeText(contextText(turns[i].raw, turns[i].weight > 0))
+			}
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
 func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, weight int)) int {
 	// A digest is what someone pipes into a prompt, so it carries the
 	// conversation. The work records — tool output, the files a turn touched, the
@@ -1399,7 +1447,15 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		// sit where the matches are rather than where the first one is.
 		weight int
 	}
-	var chunks []chunk
+	// The include callback carries state from turn to turn (prevKept), so which
+	// turns are kept is decided in one ordered pass. Rendering them is not:
+	// redaction and prose collapsing are the bulk of the command's time — 3.5 s
+	// of a 4.5 s run on a 30001-message session — and every turn is rendered
+	// before the 8 KB window can say which ones get printed (#1790). Rendering
+	// only the window was tried and reverted (#1742): collapsed sizes differ
+	// from predicted ones and the window moves. Spreading the same renders
+	// across cores keeps the output identical by construction.
+	var kept []contextTurn
 	for _, m := range s.Messages {
 		if isWorkRecord(m.Role) {
 			continue
@@ -1408,11 +1464,16 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if !ok {
 			continue
 		}
-		text := SafeText(contextText(m.Text, weight > 0))
+		kept = append(kept, contextTurn{role: m.Role, raw: m.Text, weight: weight})
+	}
+	rendered := renderContextTurns(kept)
+	var chunks []chunk
+	for i, k := range kept {
+		text := rendered[i]
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", m.Role, text), weight})
+		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", k.role, text), k.weight})
 	}
 	if len(chunks) == 0 {
 		return 0
