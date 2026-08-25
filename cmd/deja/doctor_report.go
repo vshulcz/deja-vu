@@ -152,7 +152,7 @@ func collectDoctorSync(dir string) doctorSyncReport {
 		if !p.LastPull.IsZero() {
 			row.LastPull = p.LastPull.UTC().Format(time.RFC3339)
 		}
-		row.Ahead = index.StampedAhead(p.Last(), time.Now())
+		row.Ahead = peerStampedAhead(p.Last(), time.Now())
 		out.Peers = append(out.Peers, row)
 	}
 	return out

@@ -68,6 +68,22 @@ const (
 	doctorPeerColumnMax = 32
 )
 
+// peerStampedAhead reports a stamp this machine's clock cannot account for.
+//
+// A minute of slack rather than the bare `t.After(now)` the session side uses:
+// a peer's timestamps are written by deja itself from time.Now(), so a file
+// copied from a machine a few hundred milliseconds ahead — or an NTP step
+// landing between the write and the read — would otherwise put "one of the two
+// clocks is wrong" against a peer that is perfectly healthy. A minute is also
+// the granularity the line already speaks in, since everything under it reads
+// as "just now" (#1855).
+func peerStampedAhead(t, now time.Time) bool {
+	return index.StampedAhead(t, now.Add(peerClockSlack))
+}
+
+// peerClockSlack is how far ahead a stamp may be before it is worth a sentence.
+const peerClockSlack = time.Minute
+
 // peerLine is one machine's state in one line: how long since memory moved,
 // which way it has not moved, and how much of this index came from there.
 func peerLine(p peers.Peer, sessions int, now time.Time) string {
@@ -75,7 +91,7 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 	switch {
 	case p.Last().IsZero():
 		line = "never exchanged"
-	case index.StampedAhead(p.Last(), now):
+	case peerStampedAhead(p.Last(), now):
 		// The age would be negative, and everything under a minute reads as
 		// "just now" — so the peer that most needs looking at read as the one
 		// that just synced (#1855).

@@ -83,3 +83,27 @@ func TestAnOrdinaryPeerIsNotFlaggedAsAhead(t *testing.T) {
 		t.Errorf("an ordinary peer is flagged in --json: %#v", got.Peers)
 	}
 }
+
+// The slack: a peers file written by a machine a moment ahead, or an NTP step
+// landing between the write and the read, must not put "one of the two clocks
+// is wrong" against a healthy peer. A real skew still does (#1855).
+func TestTheClockSentenceHasSlackForJitter(t *testing.T) {
+	now := time.Date(2026, 8, 25, 9, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name  string
+		delta time.Duration
+		want  bool
+	}{
+		{"a second behind", -time.Second, false},
+		{"exactly now", 0, false},
+		{"a millisecond ahead", time.Millisecond, false},
+		{"thirty seconds ahead", 30 * time.Second, false},
+		{"a minute ahead", time.Minute, false},
+		{"two minutes ahead", 2 * time.Minute, true},
+		{"two days ahead", 48 * time.Hour, true},
+	} {
+		if got := peerStampedAhead(now.Add(tc.delta), now); got != tc.want {
+			t.Errorf("%s: flagged=%v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
