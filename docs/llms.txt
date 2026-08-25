@@ -1,0 +1,54 @@
+# deja-vu
+
+> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and fifteen more agents wrote on this machine — including the months before it was installed — and answers from them over MCP or the command line. BM25 over the transcripts: no model, no embeddings, nothing leaves the machine.
+
+Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, and after a command fails. Credentials are stripped as the index is built.
+
+Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh`, or `brew install deja-vu`), followed by `deja install --auto` to wire the agents found on the machine.
+
+## Start here
+
+- [Getting started](https://vshulcz.github.io/deja-vu/guide/getting-started.html): install, wire an agent, and the first query
+- [Why agents forget](https://vshulcz.github.io/deja-vu/guide/forgetting.html): what ends with a session and what survives on disk
+- [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the twenty agents writes, and its format
+- [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
+- [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the six MCP tools, and what each harness supports
+
+## Problems it answers
+
+- [The agent lost the context you had](https://vshulcz.github.io/deja-vu/guide/lost-context.html): after a crash, a clear, or a restart
+- [The context window is full](https://vshulcz.github.io/deja-vu/guide/context-window-full.html): what compaction keeps (77% of decisions, 0.2% of commands, measured) and what to do instead
+- [Resuming a session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html): find it across every agent, reopen it in the one that owns it
+- [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): the same error again, in a repository that solved it before
+- [Finding a session](https://vshulcz.github.io/deja-vu/guide/find-a-session.html): search chat history across every agent at once
+- [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
+- [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped
+- [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes when the diff cannot say what was tried
+- [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable page
+- [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): sync between machines with no server
+- [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html): the measured token cost of recall
+
+## Per-harness setup
+
+- [Claude Code, Codex and the rest](https://vshulcz.github.io/deja-vu/guide/harnesses.html): the full support matrix
+- [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html)
+- [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html)
+- [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html)
+- [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html)
+- [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html)
+- [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html)
+- [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
+
+## Evidence
+
+- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 85.3% hit@1 on LongMemEval-S, 69.6% on LoCoMo, both harnesses in the repository
+- [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem and agentmemory
+- [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the twenty agents stores its sessions, with fixtures
+- [Privacy](https://vshulcz.github.io/deja-vu/guide/privacy.html): what is read, what is redacted, what never leaves
+
+## Optional
+
+- [Architecture](https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md)
+- [Security model](https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md)
+- [Installing deja for an agent](https://github.com/vshulcz/deja-vu/blob/main/llms-install.md): the install page written for an agent doing it on a user's behalf
+- [JSON output](https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md): the shape of every `--json` result
