@@ -410,10 +410,12 @@ distilled from, so the ratio is how much reading deja saved. `reused_twice` is
 sessions agents recalled two or more times, `dejavu_moments` prompts matched to
 prior work, and `credited_aloud` the recalls an agent said out loud.
 
-`since` is the oldest event still in the usage log, and it is the period every
-count above belongs to: the log is rewritten past 1MB keeping the last 14 days,
-so these are a window and not a lifetime total. It is absent when the log holds
-nothing, which is the one case where the counts are all zero anyway.
+`since` is the oldest event still in the usage log, so no count above covers
+more than the period from then to now. On a quiet machine that is every event
+there has ever been; once the log grows past 1MB it is rewritten keeping the
+last 14 days, and from then on the figures are a window whose start moves. Read
+`since` rather than assuming either. It is absent when the log holds nothing,
+which is the one case where the counts are all zero anyway.
 
 ## `deja blame <path> --json`
 
