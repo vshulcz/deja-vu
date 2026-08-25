@@ -27,7 +27,7 @@ func TestTheSameNameMeasuresTheSameInEitherNormalForm(t *testing.T) {
 // nothing, a zero-width space, and the CJK marks the wide table finds. Over-
 // counting shortens a line; under-counting runs it past the edge.
 func TestOverCountingStaysWhereItWasDeliberate(t *testing.T) {
-	if got := Columns("a​b"); got != 3 {
+	if got := Columns("a\u200bb"); got != 3 {
 		t.Errorf("a zero-width space now measures differently: %d", got)
 	}
 	if got := Columns("が"); got != 4 {
