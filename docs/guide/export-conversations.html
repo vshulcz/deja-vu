@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Export a Claude Code, Codex or Cursor conversation — deja-vu</title>
-<meta name="description" content="How to export or read a coding-agent session — the raw transcript, one readable Markdown session, the whole index as JSONL, or a local page to browse it all.">
+<meta name="description" content="How to export a conversation from Claude Code, Codex, Cursor or opencode — as markdown, as JSON, or as a link.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/export-conversations.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Getting a conversation out of your coding agent">
-<meta property="og:description" content="How to export or read a coding-agent session — the raw transcript, one readable Markdown session, the whole index as JSONL, or a local page to browse it all.">
+<meta property="og:description" content="How to export a conversation from Claude Code, Codex, Cursor or opencode — as markdown, as JSON, or as a link.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/export-conversations.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,12 +26,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Getting a conversation out of your coding agent">
-<meta name="twitter:description" content="How to export or read a coding-agent session — the raw transcript, one readable Markdown session, the whole index as JSONL, or a local page to browse it all.">
+<meta name="twitter:description" content="How to export a conversation from Claude Code, Codex, Cursor or opencode — as markdown, as JSON, or as a link.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Getting a conversation out of your coding agent","description":"How to export or read a coding-agent session — the raw transcript, one readable Markdown session, the whole index as JSONL, or a local page to browse it all.","url":"https://vshulcz.github.io/deja-vu/guide/export-conversations.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/export-conversations.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Getting a conversation out of your coding agent","description":"How to export a conversation from Claude Code, Codex, Cursor or opencode — as markdown, as JSON, or as a link.","url":"https://vshulcz.github.io/deja-vu/guide/export-conversations.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/export-conversations.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Exporting sessions","item":"https://vshulcz.github.io/deja-vu/guide/export-conversations.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I export a Claude Code conversation?","acceptedAnswer":{"@type":"Answer","text":"The transcript is already a file — JSONL under ~/.claude/projects. For something readable, deja share <id> prints one session as Markdown with the problem, what was tried and what was decided, and re-applies redaction on the way out."}},{"@type":"Question","name":"Can I export sessions from every agent at once?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja sync export <dir> writes the whole index as JSONL — every harness it read, one file per shard — and re-runs redaction on export rather than trusting what was stored."}},{"@type":"Question","name":"Is it safe to share an exported session?","acceptedAnswer":{"@type":"Answer","text":"Credentials are masked at index time and again on export, but pattern redaction is a floor, not a guarantee. Read an export before it leaves the machine and rotate anything that did leak."}}]}</script>
 </head>

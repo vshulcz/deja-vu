@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sync coding-agent history between machines — deja-vu</title>
-<meta name="description" content="Move indexed coding-agent sessions between your own machines over SSH — append-only, no service in the middle — and decide what synced memory is allowed to do.">
+<meta name="description" content="How to sync between machines without a server: one person, two laptops, one history their agents can all read.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Keeping agent history in sync across machines">
-<meta property="og:description" content="Move indexed coding-agent sessions between your own machines over SSH — append-only, no service in the middle — and decide what synced memory is allowed to do.">
+<meta property="og:description" content="How to sync between machines without a server: one person, two laptops, one history their agents can all read.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,12 +26,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Keeping agent history in sync across machines">
-<meta name="twitter:description" content="Move indexed coding-agent sessions between your own machines over SSH — append-only, no service in the middle — and decide what synced memory is allowed to do.">
+<meta name="twitter:description" content="How to sync between machines without a server: one person, two laptops, one history their agents can all read.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Keeping agent history in sync across machines","description":"Move indexed coding-agent sessions between your own machines over SSH — append-only, no service in the middle — and decide what synced memory is allowed to do.","url":"https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Keeping agent history in sync across machines","description":"How to sync between machines without a server: one person, two laptops, one history their agents can all read.","url":"https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Across machines","item":"https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can I share coding-agent history between my laptop and my desktop?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja sync ssh <host> exchanges indexed sessions over your own SSH connection, append-only and with no service in the middle."}},{"@type":"Question","name":"Does syncing agent history need a cloud account?","acceptedAnswer":{"@type":"Answer","text":"No. The transport is ssh and scp with the credentials you already use; the remote runs its own deja to import the batch."}},{"@type":"Question","name":"Can I keep synced memory searchable but stop it being injected automatically?","acceptedAnswer":{"@type":"Answer","text":"Yes. A trust policy can allow imported memory for search and MCP while denying it on auto-recall, per origin or per peer machine."}}]}</script>
 </head>
@@ -79,7 +79,7 @@
 <h1>Keeping agent history in sync across machines</h1>
 <p class="pagelede">two machines, one person, one history<span class="mins" data-mins></span></p>
 
-<p>Two machines, one person. The fix you worked out on the laptop is on the laptop, and the desktop's agent has never heard of it. Neither has the work laptop you use three days a week.</p>
+<p>Two machines, one person, and no way to sync between machines. The fix you worked out on the laptop is on the laptop, and the desktop's agent has never heard of it. Neither has the work laptop you use three days a week.</p>
 
 <h2>What moves, and how</h2>
 <pre>deja sync ssh desktop           # push what this machine has learned

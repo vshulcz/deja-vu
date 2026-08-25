@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Auditing what a coding agent actually did — deja-vu</title>
-<meta name="description" content="How to find which sessions touched a file, what commands an agent ran, what an edit replaced, and exactly what memory it was handed.">
+<meta name="description" content="How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Auditing what an agent actually did">
-<meta property="og:description" content="How to find which sessions touched a file, what commands an agent ran, what an edit replaced, and exactly what memory it was handed.">
+<meta property="og:description" content="How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,12 +26,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Auditing what an agent actually did">
-<meta name="twitter:description" content="How to find which sessions touched a file, what commands an agent ran, what an edit replaced, and exactly what memory it was handed.">
+<meta name="twitter:description" content="How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Auditing what an agent actually did","description":"How to find which sessions touched a file, what commands an agent ran, what an edit replaced, and exactly what memory it was handed.","url":"https://vshulcz.github.io/deja-vu/guide/auditing-agents.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Auditing what an agent actually did","description":"How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.","url":"https://vshulcz.github.io/deja-vu/guide/auditing-agents.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Auditing an agent","item":"https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How can I see what a coding agent actually did in a session?","acceptedAnswer":{"@type":"Answer","text":"The transcript records more than the conversation: the files each turn opened, the commands it ran with their exit status, and the exact spans an edit replaced. Indexing those makes them searchable after the fact."}},{"@type":"Question","name":"Which sessions touched this file?","acceptedAnswer":{"@type":"Answer","text":"deja blame <path> lists the sessions that discussed or changed a file, with what was decided and when — session history rather than git authorship."}},{"@type":"Question","name":"Can I see what memory was given to the agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja log lists every recall and injection with its size and the sessions it served, and deja log --last prints the exact text most recently handed over."}}]}</script>
 </head>
@@ -79,7 +79,7 @@
 <h1>Auditing what an agent actually did</h1>
 <p class="pagelede">the diff says what changed; the transcript says what was tried<span class="mins" data-mins></span></p>
 
-<p>An agent changed something a week ago and you want to know what and why. Or a build broke and the last person to touch it was a session, not a person. Or a review asks a question the diff cannot answer: what else did it try first.</p>
+<p>You want to review agent changes from a week ago: what was touched, and why. Or a build broke and the last person to touch it was a session, not a person. Or a review asks a question the diff cannot answer: what else did it try first.</p>
 
 <h2>The transcript records more than the conversation</h2>
 <p>What the harness writes is not only the words. Each turn carries the files it opened, the commands it ran and what they exited with, and the exact text an edit replaced. That is the part every summary throws away and the part an audit needs — a summary can tell you it "fixed the pool exhaustion"; only the record tells you which file, which command, and what the code said before.</p>

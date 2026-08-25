@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where each coding agent stores its conversation history — deja-vu</title>
-<meta name="description" content="The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.">
+<meta name="description" content="Where each coding agent keeps its conversation history file, in twenty formats, and how to read them without the tool that wrote them.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Where each coding agent stores its conversation history">
-<meta property="og:description" content="The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.">
+<meta property="og:description" content="Where each coding agent keeps its conversation history file, in twenty formats, and how to read them without the tool that wrote them.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,12 +26,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Where each coding agent stores its conversation history">
-<meta name="twitter:description" content="The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.">
+<meta name="twitter:description" content="Where each coding agent keeps its conversation history file, in twenty formats, and how to read them without the tool that wrote them.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Where each coding agent stores its conversation history","description":"The on-disk location and format of session history for twenty coding agents — Claude Code, Codex, Cursor, opencode, Zed and more — with how to read them.","url":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Where each coding agent stores its conversation history","description":"Where each coding agent keeps its conversation history file, in twenty formats, and how to read them without the tool that wrote them.","url":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Where history lives","item":"https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Where does Claude Code store its conversation history?","acceptedAnswer":{"@type":"Answer","text":"In JSONL files under ~/.claude/projects, one directory per project and one file per session. CLAUDE_CONFIG_DIR moves the whole tree."}},{"@type":"Question","name":"Where does Codex CLI keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.codex: rollout JSONL files in sessions/, plus history.jsonl. CODEX_HOME moves both."}},{"@type":"Question","name":"Can I read those files myself?","acceptedAnswer":{"@type":"Answer","text":"Yes. Most are JSONL you can read with jq; opencode, Hermes and Zed use SQLite, and Zed compresses each thread body with zstd."}}]}</script>
 </head>

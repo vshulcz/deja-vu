@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Several agents on one repository — deja-vu</title>
-<meta name="description" content="Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.">
+<meta name="description" content="What breaks when you run agents in parallel on one repository, and what each of them can still know about the others.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Several agents on one repository">
-<meta property="og:description" content="Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.">
+<meta property="og:description" content="What breaks when you run agents in parallel on one repository, and what each of them can still know about the others.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,12 +26,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Several agents on one repository">
-<meta name="twitter:description" content="Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.">
+<meta name="twitter:description" content="What breaks when you run agents in parallel on one repository, and what each of them can still know about the others.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Several agents on one repository","description":"Running coding agents in parallel on one repository: the worktree trap in project identity, what one session can know of another, and what stays hard.","url":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Several agents on one repository","description":"What breaks when you run agents in parallel on one repository, and what each of them can still know about the others.","url":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Parallel sessions","item":"https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can two coding agents work on the same repository at once?","acceptedAnswer":{"@type":"Answer","text":"Yes, and most people run them in separate git worktrees so the checkouts do not collide. Each session records its own transcript; nothing shares context between them by default."}},{"@type":"Question","name":"Why does my agent memory treat each worktree as a different project?","acceptedAnswer":{"@type":"Answer","text":"Because project identity is usually keyed on the working directory, and a worktree has a different path from the main checkout. Resolving worktrees back to the repository keeps one project instead of several."}},{"@type":"Question","name":"How do I see what a parallel session already tried?","acceptedAnswer":{"@type":"Answer","text":"Search the shared history rather than the running session: an indexed transcript is readable while the other session is still going, so what it established is available without a live channel between them."}}]}</script>
 </head>

@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Find the coding session where you solved it — deja-vu</title>
-<meta name="description" content="How to find an old coding-agent session by the error, the file or the flag you remember — across every agent on the machine — and reopen it where it ran.">
+<meta name="description" content="How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/find-a-session.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Finding the session where you solved it">
-<meta property="og:description" content="How to find an old coding-agent session by the error, the file or the flag you remember — across every agent on the machine — and reopen it where it ran.">
+<meta property="og:description" content="How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/find-a-session.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,12 +26,12 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Finding the session where you solved it">
-<meta name="twitter:description" content="How to find an old coding-agent session by the error, the file or the flag you remember — across every agent on the machine — and reopen it where it ran.">
+<meta name="twitter:description" content="How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Finding the session where you solved it","description":"How to find an old coding-agent session by the error, the file or the flag you remember — across every agent on the machine — and reopen it where it ran.","url":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Finding the session where you solved it","description":"How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.","url":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Finding a session","item":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I find the session where I fixed something?","acceptedAnswer":{"@type":"Answer","text":"Search the transcripts by the most specific thing you remember — an exact error string, a function name, a file path or a flag. Those match a session even when you have forgotten which tool, project or month it was."}},{"@type":"Question","name":"Can I reopen an old session in the agent that ran it?","acceptedAnswer":{"@type":"Answer","text":"For fifteen of the twenty harnesses deja reads, yes: deja resume <id> hands the id back to that harness and it continues the conversation. The rest have no resume path of their own."}},{"@type":"Question","name":"What if I only remember roughly when it was?","acceptedAnswer":{"@type":"Answer","text":"Time is a hint rather than a filter: a date in the query weighs recent sessions up without hiding older ones, and deja last lists the most recent sessions by project, role or harness."}}]}</script>
 </head>
@@ -79,7 +79,7 @@
 <h1>Finding the session where you solved it</h1>
 <p class="pagelede">search by the token you remember, not the topic you half-remember<span class="mins" data-mins></span></p>
 
-<p>You fixed it. You remember the error, roughly. You do not remember whether it was Claude Code or Codex, which project it was under, or whether it was three weeks or three months ago — and the harness's own history list is a wall of titles, in one tool, in reverse order.</p>
+<p>You fixed it. You remember the error, roughly. You do not remember whether it was Claude Code or Codex, which project it was under, or whether it was three weeks or three months ago — and the harness's own history list is a wall of titles, in one tool, in reverse order. Nothing on the machine lets you search chat history across all of them at once.</p>
 
 <h2>Search by the most specific thing you remember</h2>
 <p>Not the topic — the token. An exact error string, a function name, a file path, a flag. Those survive in a transcript verbatim, and they are what separates the session you want from forty that discuss the same subject:</p>
