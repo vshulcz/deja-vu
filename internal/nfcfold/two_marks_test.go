@@ -72,6 +72,8 @@ func TestComposeFoldsArabicHamzaAndMadda(t *testing.T) {
 		{"alef with hamza below", "\u0627\u0655", "\u0625"},
 		{"yeh with hamza", "\u064a\u0654", "\u0626"},
 		{"heh with yeh above", "\u06d5\u0654", "\u06c0"},
+		{"heh goal with hamza", "\u06c1\u0654", "\u06c2"},
+		{"yeh barree with hamza", "\u06d2\u0654", "\u06d3"},
 	}
 	for _, c := range cases {
 		if c.nfd == c.nfc {
