@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -68,6 +69,44 @@ func TestARecordDoesNotDropTheRowsItDidNotWrite(t *testing.T) {
 	for _, want := range []string{"laptop", "server", "mini"} {
 		if !seen[want] {
 			t.Errorf("%s is gone from the list", want)
+		}
+	}
+}
+
+// The lock waits two seconds and then writes anyway, so that a sync is never
+// failed for want of it (#1884) — which is the old lost-update behaviour if
+// contention ever reaches that far. Measured: the lock is held about 300µs, so
+// sixteen writers queue a few milliseconds in front of each other and nothing
+// comes close. This holds that shape: many writers, many records each, every
+// machine still on the list.
+func TestSustainedContentionKeepsEveryMachine(t *testing.T) {
+	writePeers(t, `{"peers":[]}`)
+	const writers, each = 16, 20
+	when := time.Date(2026, 8, 25, 10, 0, 0, 0, time.UTC)
+
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		host := fmt.Sprintf("host-%02d", i)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for k := 0; k < each; k++ {
+				if err := Record(host, k%2 == 0, when, nil); err != nil {
+					t.Errorf("%s: %v", host, err)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	list := Load()
+	if len(list) != writers {
+		t.Fatalf("%d machines survived %d records from %d writers", len(list), writers*each, writers)
+	}
+	for _, p := range list {
+		if p.LastPush.IsZero() || p.LastPull.IsZero() {
+			t.Errorf("%s lost one of its two directions: %#v", p.Host, p)
 		}
 	}
 }
