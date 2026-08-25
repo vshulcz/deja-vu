@@ -53,7 +53,15 @@ func TestCooccurRescueRunsWhenThePostingsDoNotIntersect(t *testing.T) {
 	if n := readCooccur(dir)["kerberos"]; len(n) == 0 {
 		t.Fatalf("the fixture did not teach the map: %v", readCooccur(dir))
 	}
+	// The branch this is about is the one where the ANDed postings do not
+	// intersect — both words are in the index, no session holds both.
 	o := query.Options{Query: "kerberos renewal", All: true}
+	for _, tok := range []string{"kerberos", "renewal"} {
+		posts, perr := postingsFor(dir, "t"+tok)
+		if perr != nil || len(posts) == 0 {
+			t.Fatalf("%s has no postings, so this is not the branch under test (%v)", tok, perr)
+		}
+	}
 	direct, err := func() (SearchResult, error) {
 		m, merr := readManifest(dir)
 		if merr != nil {
