@@ -130,24 +130,28 @@ jobs:
       # wrapper with no caller was enough to trip it (#1921). If you are adding
       # a helper to one of those, add its test in the same commit.
       #
-      # The list covers every package deja ships. Eight had no floor at all,
-      # five of them fully covered — the case where an untested helper costs
-      # nothing to notice, and the total floor of 87.5% would not have: prompt
-      # sat at 84.8% under it. The fully covered ones are pinned at 99 rather
-      # than 100 so a single defensive branch does not stop a build; the whole
-      # point is to catch a package sliding, not to freeze it.
+      # Every package with coverable statements is listed. The exception is
+      # internal/jsonout, one const and no statements, which prints no coverage
+      # line at all and so cannot be floored.
+      #
+      # Eight packages had no floor until #1956, five of them fully covered.
+      # The total floor of 87.5% is not a substitute: prompt sat at 84.8% under
+      # it for months without a word. Every floor here is set at today's number
+      # rounded down, which in a small package means one uncovered statement
+      # fails the build — cjkfold is 74 statements, model is 10. Adding a
+      # helper to any of these means adding its test in the same commit.
       - name: Per-package coverage floor
         if: runner.os == 'Linux'
         shell: bash
         run: |
           declare -A floor=(
             [cmd/deja]=88 [internal/atomicfile]=47 [internal/bench]=100
-            [internal/cjkfold]=99 [internal/digest]=90 [internal/embed]=93
-            [internal/index]=90 [internal/mark]=98 [internal/model]=99
-            [internal/nfcfold]=99 [internal/peers]=76 [internal/policy]=100
-            [internal/prompt]=84 [internal/query]=99 [internal/redact]=94
+            [internal/cjkfold]=100 [internal/digest]=90 [internal/embed]=93
+            [internal/index]=90 [internal/mark]=98 [internal/model]=100
+            [internal/nfcfold]=100 [internal/peers]=76 [internal/policy]=100
+            [internal/prompt]=84 [internal/query]=100 [internal/redact]=94
             [internal/search]=93 [internal/sources]=87 [internal/stats]=91
-            [internal/termwidth]=99 [internal/usage]=95
+            [internal/termwidth]=100 [internal/usage]=95
           )
           fail=0
           while read -r pkg cov; do
