@@ -36,22 +36,46 @@ func TestTheWeekIsSevenCalendarDays(t *testing.T) {
 	}
 }
 
-// And the two counters that read it agree, which is the thing that was wrong.
-func TestTheWeekCountersShareOneCut(t *testing.T) {
+// The hour the two rules disagreed about, asserted rather than skipped past.
+// After the autumn change the fixed-hours cut lands an hour later than the
+// calendar one, so an event in between is inside this week by the rule deja
+// keeps and outside it by the rule it dropped — which is the event that used to
+// be in one counter and not the other.
+func TestTheHourTheOldRuleWouldHaveMissed(t *testing.T) {
 	ny, err := time.LoadLocation("America/New_York")
 	if err != nil {
 		t.Skip("no tzdata: ", err)
 	}
 	now := time.Date(2026, 11, 3, 12, 0, 0, 0, ny)
-	if !WeekCut(now).Equal(WeekCut(now)) {
-		t.Fatal("WeekCut is not a function of its argument")
+	fixed := now.Add(-7 * 24 * time.Hour)
+	cut := WeekCut(now)
+	if !cut.Before(fixed) {
+		t.Fatalf("this week has no clock change in it: cut=%s fixed=%s", cut, fixed)
 	}
-	// An event in the hour the two rules disagreed about.
-	inTheGap := now.AddDate(0, 0, -7).Add(30 * time.Minute)
-	if inTheGap.Before(WeekCut(now)) {
+	event := cut.Add(30 * time.Minute)
+	if event.Before(cut) {
 		t.Errorf("an event half an hour into the week is outside it")
 	}
-	if fixed := now.Add(-7 * 24 * time.Hour); !inTheGap.Before(fixed) {
-		t.Skip("this week has no clock change, so there is no gap to test")
+	if !event.Before(fixed) {
+		t.Errorf("the event is not in the hour the two rules disagreed about: %s", event)
+	}
+}
+
+// And in spring the disagreement runs the other way: the fixed-hours cut opens
+// an hour early, so it counted an event from the week before.
+func TestTheHourTheOldRuleWouldHaveAdded(t *testing.T) {
+	ny, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skip("no tzdata: ", err)
+	}
+	now := time.Date(2026, 3, 10, 12, 0, 0, 0, ny)
+	fixed := now.Add(-7 * 24 * time.Hour)
+	cut := WeekCut(now)
+	if !fixed.Before(cut) {
+		t.Fatalf("this week has no clock change in it: cut=%s fixed=%s", cut, fixed)
+	}
+	event := fixed.Add(30 * time.Minute)
+	if !event.Before(cut) {
+		t.Errorf("an event before this week's start is counted inside it: %s", event)
 	}
 }
