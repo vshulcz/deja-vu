@@ -39,16 +39,25 @@ func seedCleanWord(t *testing.T, word string) string {
 	return dir
 }
 
-// The close tier walks only the length buckets within its edit limit of the
-// query's length, which is what puts an Arabic word's marked form out of reach
-// (#1941). This is what that bucket does to ordinary English: nearly nothing.
-// Suffixes, hyphens and a mistyped long word all still meet.
+// `close` is what deja reports for three different mechanisms, and the rows
+// below use all three. Worth knowing before reading them as one thing:
 //
-// The one direction it closes is a query token longer than the stored one by
-// more than the limit — `parser.go` against `parser`. The reverse works through
-// a different door: the index splits a filename into its parts, so a query for
-// the stem meets a sub-token on the exact tier.
-func TestWhatTheCloseTierStillReaches(t *testing.T) {
+//   - suffixes reach through the stem tier — "ies" to "y" and the rest of
+//     oneSuffixStep — which reports itself as close (retrieval.go:2310);
+//   - hyphens and a mistyped long word reach through the fuzzy tier, which is
+//     the edit-distance walk that reports the same tier (retrieval.go:2293);
+//   - the two exact rows reach because the index tokeniser breaks a run at any
+//     rune that is not a letter, a digit, `_` or `-` (retrieval.go:2858), so
+//     `parser.go` is stored as `parser` and `go`, and identifier parts are
+//     added on top of that — while query.Tokens keeps `parser.go` as one token.
+//
+// The point of the table is the last row. The edit-distance walk visits only
+// the length buckets within its limit of the query's length, which is what puts
+// an Arabic word's marked form out of reach (#1941), and in ordinary English it
+// closes exactly one direction: a query token longer than the stored one by
+// more than that limit. `parser.go` is nine runes, `parser` is six, the buckets
+// are seven to eleven, and the two are never compared.
+func TestWhatAQueryStillReaches(t *testing.T) {
 	for _, c := range []struct {
 		name, stored, query string
 		hits                int
