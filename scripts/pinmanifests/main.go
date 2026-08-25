@@ -144,29 +144,59 @@ func write(root string, p pins) error {
 	return nil
 }
 
+// scoopManifest is a struct rather than a map because Scoop's own bucket
+// tooling formats manifests in this key order, and a map marshals alphabetical.
+// A submission that arrives sorted differently comes back from their formatter
+// as a diff on every line.
+type scoopManifest struct {
+	Version      string               `json:"version"`
+	Description  string               `json:"description"`
+	Homepage     string               `json:"homepage"`
+	License      string               `json:"license"`
+	Architecture map[string]scoopArch `json:"architecture"`
+	Bin          string               `json:"bin"`
+	Checkver     string               `json:"checkver"`
+	Autoupdate   scoopAutoupdate      `json:"autoupdate"`
+}
+
+type scoopArch struct {
+	URL  string `json:"url"`
+	Hash string `json:"hash,omitempty"`
+}
+
+type scoopAutoupdate struct {
+	Architecture map[string]scoopArch `json:"architecture"`
+	// Without this the updater can raise the version but has nothing to put in
+	// the hash fields. goreleaser publishes checksums.txt beside the archives,
+	// which is $baseurl here, and that is the shape the bucket's own manifests
+	// use.
+	Hash map[string]string `json:"hash"`
+}
+
 func renderScoop(p pins) ([]byte, error) {
-	m := map[string]any{
-		"version":     p.version,
-		"description": "Persistent memory for coding agents",
-		"homepage":    "https://github.com/vshulcz/deja-vu",
-		"license":     "MIT",
-		"architecture": map[string]any{
-			"64bit": map[string]any{
-				"url":  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_amd64.zip", assetBase, p.version, p.version),
-				"hash": p.amd64,
+	m := scoopManifest{
+		Version:     p.version,
+		Description: "Persistent memory for coding agents",
+		Homepage:    "https://github.com/vshulcz/deja-vu",
+		License:     "MIT",
+		Architecture: map[string]scoopArch{
+			"64bit": {
+				URL:  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_amd64.zip", assetBase, p.version, p.version),
+				Hash: p.amd64,
 			},
-			"arm64": map[string]any{
-				"url":  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_arm64.zip", assetBase, p.version, p.version),
-				"hash": p.arm64,
+			"arm64": {
+				URL:  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_arm64.zip", assetBase, p.version, p.version),
+				Hash: p.arm64,
 			},
 		},
-		"bin":      "deja.exe",
-		"checkver": "github",
-		"autoupdate": map[string]any{
-			"architecture": map[string]any{
-				"64bit": map[string]any{"url": assetBase + "/v$version/deja-vu_$version_windows_amd64.zip"},
-				"arm64": map[string]any{"url": assetBase + "/v$version/deja-vu_$version_windows_arm64.zip"},
+		Bin:      "deja.exe",
+		Checkver: "github",
+		Autoupdate: scoopAutoupdate{
+			Architecture: map[string]scoopArch{
+				"64bit": {URL: assetBase + "/v$version/deja-vu_$version_windows_amd64.zip"},
+				"arm64": {URL: assetBase + "/v$version/deja-vu_$version_windows_arm64.zip"},
 			},
+			Hash: map[string]string{"url": "$baseurl/checksums.txt"},
 		},
 	}
 	b, err := json.MarshalIndent(m, "", "    ")
