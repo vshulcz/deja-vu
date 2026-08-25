@@ -419,6 +419,51 @@ rewrite that would leave nothing keeps the newest few hundred events instead of
 emptying the file. It is absent only when the log holds nothing at all, which is
 the one case where the counts are all zero anyway.
 
+## `deja log --json`
+
+What deja actually fed the agents, newest first:
+
+```json
+[
+  { "t": "2026-08-24T12:00:00Z", "kind": "recall", "bytes": 0, "empty": true },
+  { "t": "2026-08-24T11:00:00Z", "kind": "hook", "bytes": 400, "sessions": 1, "raw": 4000 },
+  {
+    "t": "2026-08-24T10:00:00Z",
+    "kind": "recall",
+    "bytes": 900,
+    "sessions": 2,
+    "raw": 9000,
+    "ids": ["s1", "s2"]
+  }
+]
+```
+
+A top-level array, so no `schema_version`, on the same terms as `blame`. It is
+`[]` and never `null` when there is nothing to report: this is the output a
+script polls, and `null` raises where an empty list iterates zero times.
+
+`t` is when it happened and `kind` is what deja did — `recall`, `recall_context`
+and `blame` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
+memory offered unasked; `resource` is a read of `deja://session/…`; `remember`
+writes rather than serves; `search` and `handoff` are the reader's own commands.
+A kind this list does not name may still appear: another version of deja may
+have written it, and the log keeps what it was given.
+
+`bytes` is what was served and `raw` the size of the transcripts behind it, both
+omitted when zero. `sessions` counts what the digest held, `ids` names them for a
+recall, and `empty` marks an answer that found nothing — a recall that returned
+no sessions is still a recall, and the count of those is what
+`empty_result_rate` is made of.
+
+A line needs both `t` and `kind` to appear here at all: a half-written line, or
+one from something that is not deja, is skipped rather than shown with a missing
+half. The same rule decides what the counters in `stats --json` read, so the two
+never disagree about whether something happened.
+
+`deja log --last --json` is a different shape: one object, the most recent
+injected digest itself, with `kind`, `time`, `sessions`, `bytes`, `policy` and
+the `digest` text.
+
 ## `deja blame <path> --json`
 
 Returns a JSON array of blame hits (same stability rules as exact search):
