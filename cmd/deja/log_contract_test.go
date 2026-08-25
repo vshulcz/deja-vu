@@ -22,11 +22,9 @@ func TestLogJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(usage.Path(dir)), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	when := time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC)
 	usage.RecordServedSessions(dir, usage.KindRecall, 900, 2, false, 9000, []string{"s1", "s2"})
 	usage.RecordResultRaw(dir, usage.KindHook, 400, 1, false, 4000)
 	usage.RecordResult(dir, usage.KindRecall, 0, 0, true)
-	_ = when
 	_ = tmp
 
 	out, err := captureRun(t, "log", "--json")

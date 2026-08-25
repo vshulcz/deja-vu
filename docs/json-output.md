@@ -451,7 +451,9 @@ have written it, and the log keeps what it was given.
 
 `bytes` is the size of the text that changed hands — what deja served, or, for
 `remember`, the note the agent wrote — and `raw` the size of the transcripts
-behind a served digest, both omitted when zero. `sessions` counts what the digest held, `ids` names them for a
+behind a served digest, which is omitted when there is none. `bytes` is always
+there, zero included: a recall that served nothing is a fact, not a missing
+field. `sessions` counts what the digest held, `ids` names them for a
 recall, and `empty` marks an answer that found nothing — a recall that returned
 no sessions is still a recall, and the count of those is what
 `empty_result_rate` is made of.
