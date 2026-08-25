@@ -70,3 +70,27 @@ func TestMCPRememberReplyBoundsTheProject(t *testing.T) {
 		t.Errorf("the reply is %d bytes of project name: %q", len(result), result[:120])
 	}
 }
+
+// A project of nothing but control bytes bounds down to nothing, and the
+// confirmation used to trail off after "under".
+func TestRememberEchoNamesAProjectThatBoundsToNothing(t *testing.T) {
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(t.TempDir(), "notes.jsonl"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
+	out := captureStdout(t, func() {
+		if err := runRemember(index.DefaultDir(), []string{"--project", "\x00\x01\x02", "the shard limit is 64"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	line := ""
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "remembered under") {
+			line = l
+		}
+	}
+	if strings.HasSuffix(strings.TrimSpace(line), "under") || strings.TrimSpace(line) == "deja: remembered under" {
+		t.Errorf("the confirmation names no project: %q", line)
+	}
+	if !strings.Contains(line, "no printable characters") {
+		t.Errorf("the line does not say why the name is missing: %q", line)
+	}
+}

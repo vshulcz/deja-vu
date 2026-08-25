@@ -19,7 +19,14 @@ import (
 // both since #1090; this is the same bound on the line that says a note was
 // stored (#1792).
 func projectForEcho(project string) string {
-	return neutralizeFrameMarkers(safeForStatusline(project, mcpResourceNameMax))
+	out := neutralizeFrameMarkers(safeForStatusline(project, mcpResourceNameMax))
+	// A name of nothing but control bytes bounds down to nothing, and
+	// "remembered under " names no project at all. The note is stored either
+	// way, so the line says what happened instead of trailing off.
+	if out == "" && strings.TrimSpace(project) != "" {
+		return "a name with no printable characters"
+	}
+	return out
 }
 
 func runRemember(dir string, args []string) error {
