@@ -8,7 +8,7 @@ same local index.
 | Directory | Published as | Installed with |
 |---|---|---|
 | [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin opencode-deja` |
-| [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin add dsh-deja` |
+| [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |

@@ -274,7 +274,7 @@ for people who install extensions there rather than from a CLI:
 | Harness | Package | Install |
 | --- | --- | --- |
 | opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
-| DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
+| DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
