@@ -467,9 +467,12 @@ have written it, and the log keeps what it was given.
 behind a served digest, which is omitted when there is none. `bytes` is always
 there, zero included: a recall that served nothing is a fact, not a missing
 field. `sessions` counts what the digest held, `ids` names them for a
-recall, and `empty` marks an answer that found nothing — a recall that returned
+recall, and `empty` marks an event no session went into — a recall that returned
 no sessions is still a recall, and the count of those is what
-`empty_result_rate` is made of.
+`empty_result_rate` is made of. It does not mean nothing was served: a session
+start on a checkout with no sessions of its own injects the environment block,
+which is about the machine rather than the project, so that event is `empty`
+and carries its `bytes`.
 
 A line needs both `t` and `kind` to appear here at all: a half-written line, or
 one from something that is not deja, is skipped rather than shown with a missing

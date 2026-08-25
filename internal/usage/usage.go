@@ -81,7 +81,11 @@ type Event struct {
 	Kind     string    `json:"kind"`
 	Bytes    int       `json:"bytes"`
 	Sessions int       `json:"sessions,omitempty"`
-	Empty    bool      `json:"empty,omitempty"`
+	// Empty means no session went into the event, which is not the same as
+	// serving nothing: a session start on a checkout with no sessions of its
+	// own still injects the environment block, and that event carries its
+	// bytes (#1954).
+	Empty bool `json:"empty,omitempty"`
 	// RawBytes is the size of the source transcripts the served digest was
 	// distilled from — what the agent would have had to replay without deja.
 	RawBytes int64 `json:"raw,omitempty"`

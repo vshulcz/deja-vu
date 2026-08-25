@@ -78,7 +78,11 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 	}
 	for _, e := range events {
 		mark := ""
-		if e.Empty {
+		// Empty means no session went into the event, not that nothing was
+		// served: a session start on a checkout with no sessions of its own
+		// still injects the environment block, and marking that row put
+		// "(empty result)" beside the bytes it sent (#1954).
+		if e.Empty && e.Bytes == 0 {
 			mark = "  (empty result)"
 		}
 		sess := ""
