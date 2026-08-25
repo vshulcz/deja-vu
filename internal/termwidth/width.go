@@ -192,6 +192,11 @@ var wideRanges = [...]struct{ lo, hi rune }{
 }
 
 // Cut keeps as much of s as fits in width columns.
+//
+// It returns composed text: for a decomposed input the bytes out are not the
+// bytes in, which is what lets the cut and the measurement agree about where a
+// character ends. Every caller prints the result — one that compared it with
+// its input, or used it as a key, would see that difference (#1842).
 func Cut(s string, width int) string {
 	// Composed for the same reason Columns is, and for one more: cutting a
 	// decomposed string by raw runes can separate a mark from the character it
@@ -209,8 +214,8 @@ func Cut(s string, width int) string {
 	return s
 }
 
-// CutRight keeps as much of the end of s as fits in width columns. A path is
-// identified by its tail — "…/消费者重平衡" says which project this is, where
+// CutRight keeps as much of the end of s as fits in width columns, composed the
+// way Cut composes. A path is identified by its tail — "…/消费者重平衡" says which project this is, where
 // the first characters of a long prefix rarely do.
 func CutRight(s string, width int) string {
 	s = nfcfold.Compose(s)
