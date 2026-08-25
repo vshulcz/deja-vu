@@ -191,6 +191,8 @@ return redacted index content in a bounded message window; the default limit is
     "harness": "codex",
     "id": "abc123",
     "project": "myapp",
+    "started": "2026-01-02T03:04:05Z",
+    "updated": "2026-01-02T03:10:00Z",
     "source": {"origin": "local", "instance": "workstation"},
     "messages": [
       {"role": "user", "text": "bounded redacted text", "time": "2026-01-02T03:04:05Z"}

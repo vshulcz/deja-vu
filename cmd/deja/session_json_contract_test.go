@@ -11,7 +11,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// docSection is one heading's text, up to the next heading of the same level.
+// docSection is one heading's text, up to the next heading of the same or a
+// shallower level — a subsection ends where its parent does. That is what makes
+// these tests a check on where a key is documented rather than on the document
+// as a whole: cutting at the same level only, the last `###` in a file ran to
+// the end of it (#1951).
 func docSection(t *testing.T, doc, heading string) string {
 	t.Helper()
 	i := strings.Index(doc, heading)
@@ -19,11 +23,18 @@ func docSection(t *testing.T, doc, heading string) string {
 		t.Fatalf("docs/json-output.md has no %q", heading)
 	}
 	rest := doc[i+len(heading):]
-	level := strings.Repeat("#", strings.Count(strings.SplitN(heading, " ", 2)[0], "#"))
-	if end := strings.Index(rest, "\n"+level+" "); end > 0 {
-		rest = rest[:end]
+	level := strings.Count(strings.SplitN(heading, " ", 2)[0], "#")
+	for at := 0; ; {
+		nl := strings.IndexByte(rest[at:], '\n')
+		if nl < 0 {
+			return rest
+		}
+		at += nl + 1
+		hashes := len(rest[at:]) - len(strings.TrimLeft(rest[at:], "#"))
+		if hashes > 0 && hashes <= level && strings.HasPrefix(rest[at+hashes:], " ") {
+			return rest[:at-1]
+		}
 	}
-	return rest
 }
 
 // jsonKeys is every key a value emits, nested ones included, once each.
