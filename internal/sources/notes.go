@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
@@ -57,13 +58,33 @@ func NotesFile() string {
 	return filepath.Join(Home(), ".local", "share", "deja", "notes.jsonl")
 }
 
+// cleanTag removes what a tag cannot carry and cuts it to maxTagLen. A control
+// byte in a tag reached notes.jsonl and every surface reading it, and an escape
+// sequence is not something anyone meant to file a note under.
+func cleanTag(t string) string {
+	t = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, t)
+	t = strings.Join(strings.Fields(t), "-")
+	return truncateRunes(t, maxTagLen)
+}
+
+// maxTagLen bounds one tag. The count has been capped at 8 since tags landed;
+// one tag's length was not bounded at all, so a 400-character tag was stored
+// and printed whole (#1810). A handle someone types and searches for is short,
+// and 64 bytes is well past anything anyone writes by hand.
+const maxTagLen = 64
+
 // NormalizeTags lowercases, trims a leading '#', drops empties/dupes and
 // caps the count — tags are navigation handles, not prose.
 func NormalizeTags(tags []string) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, t := range tags {
-		t = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(t), "#"))
+		t = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(cleanTag(t)), "#"))
 		if t == "" || seen[t] || len(out) >= 8 {
 			continue
 		}

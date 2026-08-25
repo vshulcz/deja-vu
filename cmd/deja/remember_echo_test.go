@@ -94,3 +94,34 @@ func TestRememberEchoNamesAProjectThatBoundsToNothing(t *testing.T) {
 		t.Errorf("the line does not say why the name is missing: %q", line)
 	}
 }
+
+// The project name has been bounded since #1792; the tags printed beside it
+// were not, so a tag with an escape byte in it still rewrote the line (#1810).
+func TestRememberEchoBoundsTheTagsToo(t *testing.T) {
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(t.TempDir(), "notes.jsonl"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
+	out := captureStdout(t, func() {
+		err := runRemember(index.DefaultDir(), []string{
+			"--project", "proj",
+			"--tag", "ok",
+			"--tag", "red\x1b[31mALERT\x1b[0m\rrewound",
+			"--tag", strings.Repeat("w", 400),
+			"the shard limit is 64",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if strings.ContainsAny(out, "\x1b\r") {
+		t.Errorf("the confirmation carried an escape or a rewind: %q", out)
+	}
+	if len(out) > 200 {
+		t.Errorf("the confirmation is %d bytes of tags: %q", len(out), out[:120])
+	}
+	if !strings.Contains(out, "#ok") {
+		t.Errorf("the tags the note was filed under are gone: %q", out)
+	}
+	if !strings.Contains(out, "under proj ") {
+		t.Errorf("the project and its tags ran together: %q", out)
+	}
+}

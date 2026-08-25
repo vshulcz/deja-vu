@@ -88,7 +88,10 @@ func runRemember(dir string, args []string) error {
 	}
 	suffix := ""
 	if norm := sources.NormalizeTags(tags); len(norm) > 0 {
-		suffix = " #" + strings.Join(norm, " #")
+		// Cleaned at the source now, but the echo is the line a user checks
+		// what was filed against, and it is one line: bound it the way the
+		// project name beside it is bounded (#1810).
+		suffix = " " + safeForStatusline("#"+strings.Join(norm, " #"), mcpResourceNameMax)
 	}
 	fmt.Fprintf(os.Stdout, "deja: remembered under %s%s\n", projectForEcho(project), suffix)
 	return nil
