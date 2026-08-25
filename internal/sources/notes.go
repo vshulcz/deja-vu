@@ -158,7 +158,10 @@ func readNoteLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err err
 	var buf []byte
 	for {
 		chunk, e := br.ReadSlice('\n')
-		if len(buf)+len(chunk) > max {
+		// The cap is on the line's content; the newline that ends it is not
+		// part of the note, and counting it made a line of exactly max bytes
+		// look one byte too long.
+		if len(buf)+len(bytes.TrimSuffix(chunk, []byte("\n"))) > max {
 			tooLong = true
 			buf = nil
 		}
