@@ -100,3 +100,41 @@ func TestLogJSONIsAnArrayNewestFirst(t *testing.T) {
 		t.Errorf("the array is oldest first: %s then %s", events[0].Time, events[1].Time)
 	}
 }
+
+// `--last` is a different shape and the document describes it in prose; that
+// prose named Go field names rather than JSON keys until this test existed.
+func TestLogLastJSONKeysMatchTheDocumentedContract(t *testing.T) {
+	hermeticEnv(t)
+	dir := index.DefaultDir()
+	if err := os.MkdirAll(filepath.Dir(usage.Path(dir)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	usage.SnapshotPolicy(dir, usage.KindHook, "a digest of earlier work", 2, "local-only")
+
+	out, err := captureRun(t, "log", "--last", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap map[string]any
+	if err := json.Unmarshal([]byte(out), &snap); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	doc, err := os.ReadFile("../../docs/json-output.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	section := docSection(t, string(doc), "## `deja log --json`")
+	var missing []string
+	for k := range snap {
+		if !strings.Contains(section, "`"+k+"`") {
+			missing = append(missing, k)
+		}
+	}
+	sort.Strings(missing)
+	if len(missing) > 0 {
+		t.Errorf("deja log --last --json emits %v, absent from the section", missing)
+	}
+	if len(snap) < 4 {
+		t.Errorf("the snapshot emitted %d keys, too few to say anything: %v", len(snap), snap)
+	}
+}
