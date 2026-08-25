@@ -18,9 +18,17 @@ import (
 // the end of it (#1951).
 func docSection(t *testing.T, doc, heading string) string {
 	t.Helper()
-	i := strings.Index(doc, heading)
-	if i < 0 {
-		t.Fatalf("docs/json-output.md has no %q", heading)
+	// A heading starts a line. Matching anywhere would let prose that names a
+	// heading — a pointer to it, a sentence about the format — start the
+	// section somewhere in the middle of a paragraph.
+	i := strings.Index(doc, "\n"+heading)
+	switch {
+	case i >= 0:
+		i++
+	case strings.HasPrefix(doc, heading):
+		i = 0
+	default:
+		t.Fatalf("docs/json-output.md has no %q at the start of a line", heading)
 	}
 	rest := doc[i+len(heading):]
 	level := strings.Count(strings.SplitN(heading, " ", 2)[0], "#")

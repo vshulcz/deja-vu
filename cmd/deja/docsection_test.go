@@ -60,6 +60,17 @@ func TestAnEmptySectionTakesNothingFromTheNextOne(t *testing.T) {
 	}
 }
 
+// Prose that names a heading is not the heading. The match was on the raw text
+// anywhere, so a sentence pointing at a section started the section there — mid
+// paragraph, and short by everything up to the real heading.
+func TestASentenceNamingASectionIsNotTheSection(t *testing.T) {
+	doc := "# Contract\n\nSee ## `deja last --json` for the shape.\n\n## `deja last --json`\n\nLast says `id`.\n"
+
+	if got := docSection(t, doc, "## `deja last --json`"); !strings.Contains(got, "`id`") {
+		t.Errorf("the section started at a sentence about it, not at the heading: %q", got)
+	}
+}
+
 // The reach measured on the real document, not a fixture: the session object is
 // a subsection of `deja search --json`, so it cannot outlive it.
 func TestTheSessionObjectSectionIsNotMostOfTheDocument(t *testing.T) {
