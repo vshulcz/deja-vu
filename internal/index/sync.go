@@ -709,6 +709,16 @@ func restoreMap[V any](live, saved map[string]V) {
 	}
 }
 
+// batchName is how a batch file is named on screen. The name comes from the
+// machine that sent it — scp copies whatever matched over there — and these
+// sentences reach a terminal through main, which prints an error as it is, so
+// an escape byte in a name rewrote the line of whoever was watching a sync
+// fail (#1847). The directory beside it has been sanitised since it was first
+// printed; the file was not.
+func batchName(path string) string {
+	return search.SafeLine(filepath.Base(path))
+}
+
 // skippedError reports the files an import could not read, after the ones it
 // could are already in. Callers print the count they imported and this
 // alongside it.
@@ -717,9 +727,9 @@ func skippedError(skipped []string) error {
 		return nil
 	}
 	if len(skipped) == 1 {
-		return fmt.Errorf("nothing was imported from 1 file: %s", skipped[0])
+		return fmt.Errorf("nothing was imported from 1 file: %s", search.SafeLine(skipped[0]))
 	}
-	return fmt.Errorf("nothing was imported from %d files: %s", len(skipped), strings.Join(skipped, "; "))
+	return fmt.Errorf("nothing was imported from %d files: %s", len(skipped), search.SafeLine(strings.Join(skipped, "; ")))
 }
 
 func initEmptyIndex(dir string) error {
@@ -794,9 +804,9 @@ func readSyncFile(path string, fn func(SyncRecord) error) error {
 			// file is still refused whole: a half-imported transfer is worse
 			// than one the reader can retry (#891).
 			if !next && torn {
-				return fmt.Errorf("%s looks truncated at line %d — the transfer may have been cut off; fetch the batch again", filepath.Base(path), line)
+				return fmt.Errorf("%s looks truncated at line %d — the transfer may have been cut off; fetch the batch again", batchName(path), line)
 			}
-			return fmt.Errorf("%s line %d is not a record deja wrote: %w", filepath.Base(path), line, err)
+			return fmt.Errorf("%s line %d is not a record deja wrote: %w", batchName(path), line, err)
 		}
 		// Metadata from a batch is another machine's text: it lands in the
 		// project label and the harness tag, which are rendered into result
