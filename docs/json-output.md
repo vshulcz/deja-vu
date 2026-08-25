@@ -461,8 +461,10 @@ half. The same rule decides what the counters in `stats --json` read, so the two
 never disagree about whether something happened.
 
 `deja log --last --json` is a different shape: one object, the most recent
-injected digest itself, with `kind`, `time`, `sessions`, `bytes`, `policy` and
-the `digest` text.
+injected digest itself. It carries `t` and `kind` as above, the `digest` text,
+`bytes`, and — each omitted when empty — `sessions`, the `policy` that allowed
+the injection, the `terms` behind a déjà vu firing, and `into`, the agent session
+it went to.
 
 ## `deja blame <path> --json`
 
