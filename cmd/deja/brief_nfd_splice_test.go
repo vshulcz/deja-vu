@@ -38,13 +38,11 @@ func TestTheBriefSpliceSurvivesADecomposedProjectName(t *testing.T) {
 			if strings.Contains(got, "�") {
 				t.Errorf("the splice produced a replacement character at room=%d: %q", room, got)
 			}
-			// Where a cut happened, the name comes back composed — that is
-			// what the measurement and the cut now agree on. Where none did,
-			// the line is the original and keeps whatever spelling it had:
-			// this function does not normalise what it passes through.
-			if strings.Contains(got, "…") &&
-				(strings.Contains(got, "u\u0308") || strings.Contains(got, "e\u0301")) {
-				t.Errorf("room=%d: a cut name kept its decomposed spelling: %q", room, got)
+			// One spelling at every width: a line that fits used to come back
+			// as stored while a cut one came back composed, so the same
+			// project appeared two ways in one screen (#1844).
+			if strings.Contains(got, "u\u0308") || strings.Contains(got, "e\u0301") {
+				t.Errorf("room=%d: the decomposed spelling reached the screen: %q", room, got)
 			}
 		}
 	}

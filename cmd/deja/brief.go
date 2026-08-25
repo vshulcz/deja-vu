@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
@@ -567,6 +568,11 @@ const briefProjectFloor = 8
 // the span. A project name is the only part of this line that grows without
 // bound (#1588).
 func fitBriefWhen(when string, room int) string {
+	// Composed first, not only on the cut path: the cut composes what it
+	// returns (#1842), so a line that happened to fit came back as stored
+	// while a cut one came back composed, and the same project showed two
+	// spellings in one screen depending on the terminal's width (#1844).
+	when = nfcfold.Compose(when)
 	room -= briefLabelColumns
 	if room <= 0 || barColumns(when) <= room {
 		return when
