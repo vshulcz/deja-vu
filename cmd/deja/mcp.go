@@ -41,6 +41,20 @@ func isNotification(id json.RawMessage) bool {
 	return len(id) == 0 || string(id) == "null"
 }
 
+// batchID returns the id of the first request in a batch, so the refusal can
+// be matched to something the client sent rather than coming back as null.
+// A batch whose first element carries no id gets a null id, as before.
+func batchID(frame string) json.RawMessage {
+	var reqs []rpcRequest
+	if err := json.Unmarshal([]byte(frame), &reqs); err != nil || len(reqs) == 0 {
+		return nil
+	}
+	if isNotification(reqs[0].ID) {
+		return nil
+	}
+	return reqs[0].ID
+}
+
 const mcpMaxFrame = 10 * 1024 * 1024
 
 func serveMCP(dir string, r io.Reader, w io.Writer) error {
@@ -54,8 +68,20 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 			writeRPCError(enc, nil, -32700, "parse error")
 		} else if trimmed := strings.TrimSpace(string(line)); trimmed != "" {
 			var req rpcRequest
-			if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
+			if strings.HasPrefix(trimmed, "[") {
+				// A batch is valid JSON, and answering -32700 told a client its
+				// bytes were corrupt when they were not — with a null id, so it
+				// could not tell which of its requests died either. deja serves
+				// one request per frame; the refusal says so (#1795).
+				writeRPCError(enc, batchID(trimmed), -32600, "batch requests are not supported — send one request per line")
+			} else if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
 				writeRPCError(enc, nil, -32700, "parse error")
+			} else if req.JSONRPC != "" && req.JSONRPC != "2.0" {
+				// The member that says which protocol the frame speaks. An
+				// absent one is still served — clients in the wild omit it and
+				// the request is unambiguous — but "1.0" asks for a protocol
+				// this server does not speak and used to be answered anyway.
+				writeRPCError(enc, req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
 			} else if !isNotification(req.ID) {
 				result, code, msg := handleMCP(dir, req)
 				if code != 0 {
