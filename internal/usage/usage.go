@@ -460,12 +460,15 @@ func rotate(p string) {
 	}
 	if len(keep) == 0 && len(all) > 0 {
 		// Newest first, then back into the order the file is read in.
+		// Stable, so two events written in the same second keep the order they
+		// were written in — that order is the only thing separating them, and
+		// `deja log` prints it.
 		byTime := append([]Event(nil), all...)
-		sort.Slice(byTime, func(i, j int) bool { return byTime[i].Time.After(byTime[j].Time) })
+		sort.SliceStable(byTime, func(i, j int) bool { return byTime[i].Time.After(byTime[j].Time) })
 		if len(byTime) > keepAtLeast {
 			byTime = byTime[:keepAtLeast]
 		}
-		sort.Slice(byTime, func(i, j int) bool { return byTime[i].Time.Before(byTime[j].Time) })
+		sort.SliceStable(byTime, func(i, j int) bool { return byTime[i].Time.Before(byTime[j].Time) })
 		keep = byTime
 	}
 	// One buffer, then one atomic replace. The temp name used to be derived
