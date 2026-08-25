@@ -85,10 +85,21 @@ func Snapshot() ([]Peer, string) {
 		return nil, err.Error()
 	}
 	out := f.Peers[:0:0]
+	seen := map[string]int{}
 	for _, p := range f.Peers {
 		if p.Host = strings.TrimSpace(p.Host); p.Host == "" {
 			continue
 		}
+		// One machine named twice was two rows, and Record only ever updated
+		// the first: the other showed a months-old failure beside the same
+		// machine reporting a sync this morning, and a bare `deja sync` opened
+		// two connections to it (#1853). A file can hold the same host twice
+		// through a hand-edit or a restored backup; deja never writes one.
+		if at, ok := seen[p.Host]; ok {
+			out[at] = mergePeers(out[at], p)
+			continue
+		}
+		seen[p.Host] = len(out)
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Host < out[j].Host })
@@ -106,6 +117,23 @@ func Snapshot() ([]Peer, string) {
 func Problem() string {
 	_, why := Snapshot()
 	return why
+}
+
+// mergePeers folds two rows for one machine. Each direction keeps its newest
+// timestamp, and the error belongs to whichever exchange happened last: an old
+// failure is not news about a machine that has synced since.
+func mergePeers(a, b Peer) Peer {
+	out := a
+	if b.LastPush.After(out.LastPush) {
+		out.LastPush = b.LastPush
+	}
+	if b.LastPull.After(out.LastPull) {
+		out.LastPull = b.LastPull
+	}
+	if b.Last().After(a.Last()) {
+		out.LastError = b.LastError
+	}
+	return out
 }
 
 // Record notes an exchange with a host: which way it went, and whether it
