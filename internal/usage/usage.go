@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -129,6 +130,13 @@ func (s Summary) MarshalJSON() ([]byte, error) {
 const (
 	rotateAt   = 1 << 20 // rewrite the log when it grows past 1MB
 	keepWindow = 14 * 24 * time.Hour
+	// keepAtLeast is how many events survive when every one of them is older
+	// than the window — a fortnight away from the machine, and the first recall
+	// on return used to leave the file empty and the impact screen saying no
+	// recall had ever happened (#1922). Bounding the file is the job; erasing
+	// the record is not, and a few hundred events are tens of kilobytes against
+	// a megabyte.
+	keepAtLeast = 200
 )
 
 // ahead reports a timestamp past the end of the reader's day — a clock that
@@ -449,6 +457,16 @@ func rotate(p string) {
 	}
 	if len(keep) == len(all) {
 		return
+	}
+	if len(keep) == 0 && len(all) > 0 {
+		// Newest first, then back into the order the file is read in.
+		byTime := append([]Event(nil), all...)
+		sort.Slice(byTime, func(i, j int) bool { return byTime[i].Time.After(byTime[j].Time) })
+		if len(byTime) > keepAtLeast {
+			byTime = byTime[:keepAtLeast]
+		}
+		sort.Slice(byTime, func(i, j int) bool { return byTime[i].Time.Before(byTime[j].Time) })
+		keep = byTime
 	}
 	// One buffer, then one atomic replace. The temp name used to be derived
 	// from the log's own path, and this is the one writer in deja with no lock
