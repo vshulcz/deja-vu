@@ -132,6 +132,12 @@ func syncOneWay(dir, host string, pull, full bool) error {
 func runSyncAll(dir string, full bool) error {
 	list := peers.Load()
 	if len(list) == 0 {
+		// Load reports a malformed file as no peers, so without this the
+		// sentence below tells someone whose file is broken to name their
+		// first machine — which they already did (#1840).
+		if why := peers.Problem(); why != "" {
+			return fmt.Errorf("%s could not be read — %s", peers.Path(), remoteOutputForEcho(why))
+		}
 		return fmt.Errorf("no machines to sync with yet — name one once with `deja sync ssh <host>` and deja will remember it")
 	}
 	var failed int

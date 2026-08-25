@@ -83,3 +83,68 @@ func TestAReadablePeersFileReportsOK(t *testing.T) {
 		t.Errorf("a machine with no peers lost its own line:\n%s", text.String())
 	}
 }
+
+// The sentence a broken file used to get from `deja sync` told the reader to
+// name their first machine — which is what they had already done (#1840).
+func TestBareSyncSaysThePeersFileIsBrokenRatherThanEmpty(t *testing.T) {
+	tmp := hermeticEnv(t)
+	path := filepath.Join(tmp, "peers.json")
+	t.Setenv("DEJA_PEERS_FILE", path)
+	if err := os.WriteFile(path, []byte(`{"peers":[{"host":"laptop"`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := runSyncAll(index.DefaultDir(), false)
+	if err == nil {
+		t.Fatal("a broken peers file did not stop the sync")
+	}
+	if strings.Contains(err.Error(), "no machines to sync with yet") {
+		t.Errorf("a broken file reads as a machine that never synced: %v", err)
+	}
+	if !strings.Contains(err.Error(), path) {
+		t.Errorf("the error does not say which file to look at: %v", err)
+	}
+
+	// The control: with no file at all, the invitation is still the right
+	// sentence.
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(tmp, "absent.json"))
+	err = runSyncAll(index.DefaultDir(), false)
+	if err == nil || !strings.Contains(err.Error(), "no machines to sync with yet") {
+		t.Errorf("a machine that never synced lost its invitation: %v", err)
+	}
+}
+
+// Every odd shape of the file, and what deja calls it. An empty file is not
+// "nothing configured": deja never writes one, so it means a write that did not
+// finish, and the reader should look at it.
+func TestThePeersFileShapesAreClassified(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, want string
+	}{
+		{"empty file", "", "unreadable"},
+		{"whitespace only", "  \n", "unreadable"},
+		{"no peers key", "{}", "ok"},
+		{"null peers", `{"peers":null}`, "ok"},
+		{"a peer with no host", `{"peers":[{"last_push":"2026-08-24T10:00:00Z"}]}`, "ok"},
+		{"top-level array", "[]", "unreadable"},
+		{"top-level string", `"x"`, "unreadable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := hermeticEnv(t)
+			path := filepath.Join(tmp, "peers.json")
+			t.Setenv("DEJA_PEERS_FILE", path)
+			if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got := collectDoctorSync(t.TempDir())
+			if got.State != tc.want {
+				t.Errorf("state = %q, want %q (error %q)", got.State, tc.want, got.Error)
+			}
+			if got.State == "unreadable" && got.Error == "" {
+				t.Errorf("unreadable with no reason")
+			}
+			if got.Peers == nil {
+				t.Errorf("peers is null rather than an empty list, which a consumer has to special-case")
+			}
+		})
+	}
+}
