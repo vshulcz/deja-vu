@@ -328,7 +328,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		text, sessions, raw, ids, err := recallContextResult(dir, a.Query, a.Harness)
 		if err == nil {
-			text = frameRecall(fitContextDigest(text, contextMCPBudget-recallFrameOverhead))
+			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead))
 			usage.RecordServedSessions(dir, usage.KindContext, len(text), sessions, sessions == 0, raw, ids)
 			usage.SnapshotPolicy(dir, usage.KindContext, text, sessions, policy.Load().Describe(policy.ActivationMCP))
 		}
@@ -563,7 +563,7 @@ const contextDigestCut = "\n[digest trimmed to fit the ~8KB budget — call reca
 // one is near enough and saying that it cut. The marker is reserved before the
 // trim, the way recall reserves its paging line (#1726), so the thing that
 // explains the cut is not itself the thing that gets cut.
-func fitContextDigest(text string, budget int) string {
+func fitContextDigest(text, query string, budget int) string {
 	if len(text) <= budget {
 		return text
 	}
@@ -572,11 +572,30 @@ func fitContextDigest(text string, budget int) string {
 	}
 	body := trimUTF8(text, budget-len(contextDigestCut))
 	// Back up to the last line break if one is close, so the digest does not
-	// end in the middle of a sentence it will not finish.
+	// end in the middle of a sentence it will not finish — but never at the
+	// cost of the words the digest was asked for. A match sitting in that last
+	// line is the answer; ending mid-word is only untidy.
 	if i := strings.LastIndexByte(body, '\n'); i > len(body)-400 && i > 0 {
-		body = body[:i]
+		if shorter := body[:i]; keepsQuery(shorter, body, query) {
+			body = shorter
+		}
 	}
 	return body + contextDigestCut
+}
+
+// keepsQuery reports whether the shorter body still carries a query word that
+// the longer one did. A query whose words are nowhere in either is no reason to
+// keep the ragged ending.
+func keepsQuery(shorter, longer, query string) bool {
+	for _, word := range strings.Fields(strings.ToLower(query)) {
+		if len(word) < 3 {
+			continue
+		}
+		if strings.Contains(strings.ToLower(longer), word) && !strings.Contains(strings.ToLower(shorter), word) {
+			return false
+		}
+	}
+	return true
 }
 
 // contextMCPBudget is the whole framed recall_context reply, matching the

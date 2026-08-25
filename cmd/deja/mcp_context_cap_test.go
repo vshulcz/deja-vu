@@ -129,3 +129,29 @@ func shortContextSession(t *testing.T) string {
 	}
 	return dir
 }
+
+// The backup to a line break is tidiness; the matched turn is the answer. A
+// digest whose only match sits in the last line must not lose it to the cut.
+func TestTheBackupNeverDropsTheMatch(t *testing.T) {
+	filler := strings.Repeat("filler line that says nothing\n", 300)
+	// One long last line whose match sits near its start: the trim keeps the
+	// match, and the backup to the previous line break would throw it away.
+	tail := "the wobbleshard verdict is that it holds " + strings.Repeat("and then some more words about it ", 14) + "\n"
+	full := filler + tail
+	budget := len(full) - 200
+
+	out := fitContextDigest(full, "wobbleshard verdict", budget)
+	if !strings.Contains(out, "wobbleshard") {
+		t.Errorf("the backup dropped the line carrying the query:\n%s", out[max(0, len(out)-160):])
+	}
+	if len(out) > budget {
+		t.Errorf("the guard broke the budget: %d > %d", len(out), budget)
+	}
+
+	// The control: nothing at stake in that last line, so it is still tidied
+	// away at the line break rather than left ragged.
+	plain := fitContextDigest(filler+strings.Repeat("another filler line ", 25)+"\n", "wobbleshard", budget)
+	if !strings.HasSuffix(plain, contextDigestCut) || strings.Contains(strings.TrimSuffix(plain, contextDigestCut), "another filler") {
+		t.Errorf("the line-break backup stopped happening when nothing was at stake:\n%q", plain[max(0, len(plain)-200):])
+	}
+}
