@@ -124,6 +124,10 @@ func rotateSnapshots(p string) {
 	if err != nil || fi.Size() < snapshotRotateAt {
 		return
 	}
+	// Rewritten from what the reader accepts, so a rotation also drops a line
+	// deja could not have written — a side effect worth naming rather than
+	// discovering: the file shrinks by more than the rotation alone would
+	// explain (#1946).
 	snaps := snapshotsFrom(p, snapshotsToKeep) // newest first
 	var buf bytes.Buffer
 	for i := len(snaps) - 1; i >= 0; i-- {
