@@ -79,7 +79,7 @@ func statIndexFile(path string) (os.FileInfo, error) {
 		if !inFlight {
 			return nil, err
 		}
-		time.Sleep(swapWindowWait)
+		waitOutSwapWindow()
 	}
 	return nil, err
 }

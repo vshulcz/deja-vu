@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -140,4 +141,24 @@ func damagedFixture(t *testing.T) (dir string, records []byte) {
 		t.Fatal(err)
 	}
 	return dir, body
+}
+
+// Both retry loops take the same pause by the same name: a test that stands
+// where the wait is has to see every path that waits, or the next one to grow a
+// direct time.Sleep is the one that goes back to racing the scheduler (#1782).
+func TestEveryRetryLoopTakesTheSamePause(t *testing.T) {
+	src, err := os.ReadFile("swap_window.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The definition of the pause is allowed to sleep; nothing else is.
+	for i, line := range strings.Split(string(src), "\n") {
+		if !strings.Contains(line, "time.Sleep(swapWindowWait)") {
+			continue
+		}
+		if strings.Contains(line, "var waitOutSwapWindow") {
+			continue
+		}
+		t.Errorf("swap_window.go:%d sleeps directly instead of going through waitOutSwapWindow: %s", i+1, strings.TrimSpace(line))
+	}
 }
