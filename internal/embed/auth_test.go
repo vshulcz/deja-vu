@@ -28,7 +28,7 @@ func TestEmbedAuthorizationHeader(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if got := r.Header.Get("Authorization"); got != tc.wantHeader {
-					t.Fatalf("Authorization = %q, want %q", got, tc.wantHeader)
+					t.Errorf("Authorization = %q, want %q", got, tc.wantHeader)
 				}
 				_, _ = w.Write([]byte(`{"data":[{"embedding":[1]}]}`))
 			}))
