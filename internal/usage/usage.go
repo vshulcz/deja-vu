@@ -280,26 +280,21 @@ func TodayDemand(indexDir string) (recalls, bytes, injected int) {
 	return recalls, bytes, injected
 }
 
-// weekCut is when "this week" opens: seven calendar days back, the same wall
+// WeekCut is when "this week" opens: seven calendar days back, the same wall
 // time. Not 168 hours — in a zone with daylight saving those differ by an hour
 // for one week in each direction, and the status bar prints the week counters
 // beside the déjà-vu count, so one of them counted an event the other did not
 // (#1920). The day counters here cut at local midnight and the brief cuts at
 // seven calendar days, so this is the rule the rest of deja already speaks.
-func weekCut(now time.Time) time.Time {
-	return now.AddDate(0, 0, -7)
-}
-
-// WeekCut is that rule for the other packages measuring the same week.
 func WeekCut(now time.Time) time.Time {
-	return weekCut(now)
+	return now.AddDate(0, 0, -7)
 }
 
 // DejaVuWeek counts this week's déjà vu moments — prompts the user's own
 // history already answered.
 func DejaVuWeek(indexDir string) int {
 	now := time.Now()
-	cut := weekCut(now)
+	cut := WeekCut(now)
 	n := 0
 	for _, e := range read(Path(indexDir)) {
 		if e.Kind == KindDejaVu && e.Time.After(cut) && !ahead(e.Time, now) && e.Sessions > 0 {
@@ -365,7 +360,7 @@ func Totals(indexDir string) Summary {
 // deliveries deja pushed unprompted.
 func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
 	now := time.Now()
-	cut := weekCut(now)
+	cut := WeekCut(now)
 	for _, e := range read(Path(indexDir)) {
 		if e.Time.Before(cut) || ahead(e.Time, now) || e.Empty {
 			continue

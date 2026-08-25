@@ -24,7 +24,7 @@ func TestTheWeekIsSevenCalendarDays(t *testing.T) {
 		{"after the spring change", time.Date(2026, 3, 10, 12, 0, 0, 0, ny)},
 		{"an ordinary week", time.Date(2026, 8, 25, 12, 0, 0, 0, ny)},
 	} {
-		cut := weekCut(c.now)
+		cut := WeekCut(c.now)
 		if got, want := cut.Format("2006-01-02 15:04"), c.now.AddDate(0, 0, -7).Format("2006-01-02 15:04"); got != want {
 			t.Errorf("%s: week opens at %s, want the same wall time seven days back (%s)", c.what, got, want)
 		}
@@ -43,12 +43,12 @@ func TestTheWeekCountersShareOneCut(t *testing.T) {
 		t.Skip("no tzdata: ", err)
 	}
 	now := time.Date(2026, 11, 3, 12, 0, 0, 0, ny)
-	if !weekCut(now).Equal(weekCut(now)) {
-		t.Fatal("weekCut is not a function of its argument")
+	if !WeekCut(now).Equal(WeekCut(now)) {
+		t.Fatal("WeekCut is not a function of its argument")
 	}
 	// An event in the hour the two rules disagreed about.
 	inTheGap := now.AddDate(0, 0, -7).Add(30 * time.Minute)
-	if inTheGap.Before(weekCut(now)) {
+	if inTheGap.Before(WeekCut(now)) {
 		t.Errorf("an event half an hour into the week is outside it")
 	}
 	if fixed := now.Add(-7 * 24 * time.Hour); !inTheGap.Before(fixed) {
