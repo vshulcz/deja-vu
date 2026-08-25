@@ -2617,7 +2617,7 @@ Usage:
   deja sync ssh <host> [--pull] [--both] [--full]
   deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]
   deja sources
-  deja completion <bash|zsh|fish>
+  deja completion <bash|zsh|fish|powershell>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
   deja forget --list | --unforget <id>
   deja doctor [--json] [--deep] [--offline]

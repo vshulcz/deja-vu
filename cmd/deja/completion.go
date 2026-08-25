@@ -11,11 +11,11 @@ import (
 // runCompletion writes a shell-specific script so the binary stays dependency-free.
 func runCompletion(args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("completion needs bash, zsh, or fish")
+		return fmt.Errorf("completion needs bash, zsh, fish, or powershell")
 	}
 	script, ok := completionScripts[args[0]]
 	if !ok {
-		return fmt.Errorf("unknown shell %q; want bash, zsh, or fish", args[0])
+		return fmt.Errorf("unknown shell %q; want bash, zsh, fish, powershell, or pwsh", args[0])
 	}
 	// Every list a shell offers is substituted rather than duplicated per shell:
 	// three hand-maintained copies is how this one fell seven harnesses behind.
@@ -30,9 +30,11 @@ func runCompletion(args []string) error {
 }
 
 var completionScripts = map[string]string{
-	"bash": bashCompletion,
-	"zsh":  zshCompletion,
-	"fish": fishCompletion,
+	"bash":       bashCompletion,
+	"zsh":        zshCompletion,
+	"fish":       fishCompletion,
+	"powershell": powershellCompletion,
+	"pwsh":       powershellCompletion,
 }
 
 const bashCompletion = `# bash completion for deja
@@ -75,7 +77,7 @@ _deja_completion() {
             fi
             ;;
         completion)
-            COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
+            COMPREPLY=( $(compgen -W "bash zsh fish powershell pwsh" -- "$cur") )
             ;;
         doctor)
             COMPREPLY=( $(compgen -W "--json --offline --deep" -- "$cur") )
@@ -211,7 +213,7 @@ _deja() {
       fi
       ;;
     completion)
-      _values 'shell' bash zsh fish
+      _values 'shell' bash zsh fish powershell pwsh
       ;;
     doctor)
       _arguments '--json[print JSON]' '--offline[skip version check]' '--deep[verify index against sources]'
@@ -281,7 +283,7 @@ complete -c deja -n '__deja_needs_command' -l role -r -a 'user assistant tool'
 complete -c deja -n '__deja_needs_command' -l session -r
 complete -c deja -n '__deja_needs_command' -l rebuild
 
-complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
+complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l all
 complete -c deja -n '__fish_seen_subcommand_from blame' -l json
 complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNESSES%'
@@ -328,4 +330,97 @@ complete -c deja -n '__fish_seen_subcommand_from export' -F
 complete -c deja -n '__fish_seen_subcommand_from import' -F
 complete -c deja -n '__fish_seen_subcommand_from ssh' -l pull
 complete -c deja -n '__fish_seen_subcommand_from ssh' -l full
+`
+
+const powershellCompletion = `# PowerShell completion for deja
+Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $commands = @(
+        'blame', 'bench', 'check', 'completion', 'ctx', 'doctor', 'embed',
+        'files', 'fix', 'forget', 'friction', 'handoff', 'help', 'how',
+        'index', 'install', 'last', 'log', 'mcp', 'promote', 'remember',
+        'restore', 'resume', 'search', 'share', 'show', 'sources', 'stats',
+        'statusline', 'sync', 'uninstall', 'update', 'version', 'view', 'warmup'
+    )
+    $harnesses = @('%HARNESSES%' -split ' ' | Where-Object { $_ })
+    $installTargets = @('%INSTALL_TARGETS%' -split ' ' | Where-Object { $_ }) + @('--all', '--auto')
+    $handoffTargets = @('%HANDOFF_TARGETS%' -split ' ' | Where-Object { $_ })
+    $defaultOptions = @(
+        '--json', '--re', '--all', '--no-embed', '--harness', '--project',
+        '--since', '--role', '--session', '--rebuild'
+    )
+
+    $elements = @($commandAst.CommandElements | ForEach-Object { $_.Extent.Text })
+    $hasCurrentWord = -not [string]::IsNullOrEmpty($wordToComplete)
+    $completingCommand = $elements.Count -le 1 -or ($elements.Count -eq 2 -and $hasCurrentWord)
+
+    if ($completingCommand) {
+        $candidates = $commands + @('--version', '-version') + $defaultOptions
+    } else {
+        $command = $elements[1]
+        $action = if ($elements.Count -gt 2) { $elements[2] } else { '' }
+        $argumentPosition = if ($hasCurrentWord) { $elements.Count - 2 } else { $elements.Count - 1 }
+        $previous = if ($hasCurrentWord -and $elements.Count -gt 1) {
+            $elements[$elements.Count - 2]
+        } elseif ($elements.Count -gt 0) {
+            $elements[$elements.Count - 1]
+        } else {
+            ''
+        }
+
+        $candidates = switch ($command) {
+            'blame' {
+                if ($previous -eq '--harness') { $harnesses }
+                else { @('--all', '--json', '--harness', '--project', '--since') }
+            }
+            'bench' {
+                if ($argumentPosition -eq 1) { @('recall', 'context') }
+                elseif ($action -eq 'recall') { @('--json') }
+                else { @('--json', '--seed') }
+            }
+            'completion' { @('bash', 'zsh', 'fish', 'powershell', 'pwsh') }
+            'doctor' { @('--json', '--offline', '--deep') }
+            'forget' { @('--list', '--dry-run', '--session', '--project', '--before', '--unforget') }
+            'handoff' {
+                if ($previous -eq '--to') { $handoffTargets }
+                else { @('--to', '--exec') }
+            }
+            'hook-context' { @('--plain') }
+            'index' { @('--rebuild', '-rebuild') }
+            { $_ -in @('install', 'uninstall') } { $installTargets + @('--no-guidance') }
+            'last' {
+                if ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -eq '--role') { @('user', 'assistant', 'tool') }
+                else { @('--harness', '--project', '--since', '--role') }
+            }
+            'remember' { @('--project') }
+            'resume' { @('--exec') }
+            'stats' {
+                if ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -eq '--role') { @('user', 'assistant', 'tool') }
+                else { @('--json', '--impact', '--html', '--redaction', '--card', '--harness', '--project', '--since', '--role') }
+            }
+            'sync' {
+                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh') }
+                elseif ($action -eq 'export') { @('--full') }
+                elseif ($action -eq 'ssh') { @('--pull', '--full') }
+                else { @() }
+            }
+            { $_ -in @('check', 'ctx', 'embed', 'hook-precompact', 'hook-prompt', 'mcp', 'share', 'show', 'sources', 'statusline', 'update', 'version', 'warmup') } { @() }
+            default { $defaultOptions }
+        }
+    }
+
+    $candidates |
+        Where-Object {
+            $_ -and $_.StartsWith($wordToComplete, [System.StringComparison]::OrdinalIgnoreCase)
+        } |
+        Sort-Object -Unique |
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_, $_, [System.Management.Automation.CompletionResultType]::ParameterValue, $_
+            )
+        }
+}
 `

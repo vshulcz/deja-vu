@@ -18,9 +18,10 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 		"warmup-status": true, "mcp": true,
 	}
 	shells := map[string]string{
-		"bash": bashCompletion,
-		"zsh":  zshCompletion,
-		"fish": fishCompletion,
+		"bash":       bashCompletion,
+		"zsh":        zshCompletion,
+		"fish":       fishCompletion,
+		"powershell": powershellCompletion,
 	}
 	names := make([]string, 0, len(commands))
 	for name := range commands {
