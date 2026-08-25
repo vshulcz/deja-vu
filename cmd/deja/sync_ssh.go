@@ -188,7 +188,7 @@ func syncSSHPush(dir, host string, full bool) error {
 	scpArgs := append(append(sshOpts(), "-q"), batches...)
 	scpArgs = append(scpArgs, host+":"+rtmp+"/")
 	if out, err := sshRunner("scp", scpArgs...); err != nil {
-		return fmt.Errorf("scp: %v: %s", err, strings.TrimSpace(out))
+		return fmt.Errorf("scp: %v: %s", err, remoteOutputForEcho(out))
 	}
 	remote := fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" sync import %s; rc=$?; rm -rf %s; exit $rc`,
 		shellQuote(rtmp), shellQuote(rtmp))
@@ -258,7 +258,10 @@ func syncSSHPull(dir, host string, full bool) error {
 	defer os.RemoveAll(ltmp)
 	if out, err := sshRunner("scp", append(sshOpts(), "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/")...); err != nil {
 		cleanup()
-		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, strings.TrimSpace(out), host)
+		// The host stays as written here: the sentence hands over a command to
+		// paste, and a bounded name would name no machine. Same tension as the
+		// tombstone id in #1794.
+		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, remoteOutputForEcho(out), host)
 	}
 	cleanup()
 	n, err := index.Import(dir, ltmp)

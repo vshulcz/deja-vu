@@ -80,3 +80,43 @@ func TestAFailingRemoteCannotWriteOnThisTerminal(t *testing.T) {
 		t.Errorf("peers.json holds an escape or a rewind: %q", list[0].LastError)
 	}
 }
+
+// scp fails against a machine this one does not control either, and what it
+// prints is the remote's as much as deja's own output is.
+func TestAFailingScpCannotWriteOnThisTerminalEither(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_PEERS_FILE", filepath.Join(tmp, "peers.json"))
+	root := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","sessionId":"v1","cwd":"/proj","timestamp":"2026-08-22T01:00:00Z","message":{"role":"user","content":"the retry budget question"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "a.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	old := sshRunner
+	t.Cleanup(func() { sshRunner = old })
+	sshRunner = func(name string, args ...string) (string, error) {
+		if name == "scp" {
+			return "scp: permission denied\x1b[31m\rHACKED", errors.New("exit status 1")
+		}
+		if name == "ssh" && len(args) > 0 && args[len(args)-1] == "mktemp -d" {
+			return "/tmp/remote", nil
+		}
+		return "", nil
+	}
+	err := syncSSHHost(dir, "peer1", false, false, false)
+	if err == nil {
+		t.Skip("this fixture never reaches the scp path")
+	}
+	if strings.ContainsAny(err.Error(), "\x1b\r") {
+		t.Errorf("an scp failure carried an escape or a rewind: %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "denied") && !strings.Contains(err.Error(), "nothing new") {
+		t.Errorf("what the remote said is gone: %q", err.Error())
+	}
+}
