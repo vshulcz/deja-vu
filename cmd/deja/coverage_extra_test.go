@@ -869,7 +869,7 @@ func TestSyncSSHAdditionalBranches(t *testing.T) {
 	if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := exportBatches(index.DefaultDir(), t.TempDir(), true); err != nil {
+	if _, err := index.ExportFull(index.DefaultDir(), t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
 	sshRunner = func(name string, args ...string) (string, error) {

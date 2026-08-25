@@ -294,13 +294,6 @@ func syncSSHPull(dir, host string, full bool) error {
 	return nil
 }
 
-func exportBatches(dir, out string, full bool) (int, error) {
-	if full {
-		return index.ExportFull(dir, out)
-	}
-	return index.Export(dir, out)
-}
-
 func sshCapture(host, cmd string) (string, error) {
 	out, err := sshRunner("ssh", append(sshOpts(), host, cmd)...)
 	s := strings.TrimSpace(out)
