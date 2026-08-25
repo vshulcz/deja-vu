@@ -1090,7 +1090,14 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 		// page budget cut ended mid-word saying nothing, so the last line an
 		// agent reads was the one line it could not tell was a fragment
 		// (#1799). Reserved before the trim, like the paging line above.
-		out = markCut(trimUTF8(out, budget-len(more)-len(cutMarker)))
+		room := budget - len(more)
+		if room <= len(cutMarker) {
+			// No room to say it was cut without eating what was cut from:
+			// keep the bytes, drop the marker.
+			out = trimUTF8(out, room)
+		} else {
+			out = markCut(trimUTF8(out, room-len(cutMarker)))
+		}
 	}
 	out += more
 	var raw int64

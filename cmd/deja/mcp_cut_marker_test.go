@@ -81,3 +81,22 @@ func TestAShortPageIsNotMarkedAsCut(t *testing.T) {
 		t.Errorf("a page inside its budget was marked as cut:\n%s", text)
 	}
 }
+
+// The marker is reserved out of the budget, never added on top of it: a budget
+// too small to hold both the page and the marker keeps the bytes and drops the
+// marker.
+func TestTheCutMarkerNeverBreaksTheBudget(t *testing.T) {
+	dir := seedRecallPage(t)
+	for _, budget := range []int{1, 5, 10, 60, 200, 1000, 4096 - recallFrameOverhead} {
+		text, _, _, _, err := recallTextResult(dir, "grumblewidget retry budget", "", 0, 0, budget)
+		if err != nil {
+			t.Fatalf("budget %d: %v", budget, err)
+		}
+		if len(text) > budget {
+			t.Errorf("budget %d produced %d bytes", budget, len(text))
+		}
+		if strings.Contains(text, "… …") {
+			t.Errorf("budget %d marked the same cut twice:\n%s", budget, text)
+		}
+	}
+}
