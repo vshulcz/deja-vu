@@ -24,6 +24,12 @@ func TestDocsNameTheWindowsInstall(t *testing.T) {
 		if !strings.Contains(text, "unsupported os") {
 			t.Errorf("%s does not say what the install script does on windows", name)
 		}
+		// deja-vu is in ScoopInstaller/Main, so `scoop install deja-vu` needs no
+		// bucket added first. A page that names only the zip sends a quarter of
+		// our downloads through manual PATH editing for no reason.
+		if !strings.Contains(text, "scoop install deja-vu") {
+			t.Errorf("%s does not name the scoop install, which is the short path on windows", name)
+		}
 	}
 }
 
