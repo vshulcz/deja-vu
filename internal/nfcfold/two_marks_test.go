@@ -21,6 +21,7 @@ func TestComposeFoldsLettersCarryingTwoMarks(t *testing.T) {
 		{"latin s dot below dot above", "\u0073\u0323\u0307", "\u1e69"},
 		{"greek alpha psili oxia", "\u03b1\u0313\u0301", "\u1f04"},
 		{"greek eta perispomeni ypogegrammeni", "\u03b7\u0342\u0345", "\u1fc7"},
+		{"latin ezh caron", "\u0292\u030c", "\u01ef"},
 	}
 	for _, c := range cases {
 		if c.nfd == c.nfc {
