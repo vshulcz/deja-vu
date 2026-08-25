@@ -414,8 +414,10 @@ prior work, and `credited_aloud` the recalls an agent said out loud.
 more than the period from then to now. On a quiet machine that is every event
 there has ever been; once the log grows past 1MB it is rewritten keeping the
 last 14 days, and from then on the figures are a window whose start moves. Read
-`since` rather than assuming either. It is absent when the log holds nothing,
-which is the one case where the counts are all zero anyway.
+`since` rather than assuming either — it can also be older than 14 days, since a
+rewrite that would leave nothing keeps the newest few hundred events instead of
+emptying the file. It is absent only when the log holds nothing at all, which is
+the one case where the counts are all zero anyway.
 
 ## `deja blame <path> --json`
 
