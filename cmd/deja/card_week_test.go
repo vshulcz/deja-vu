@@ -27,6 +27,18 @@ func TestTheCardAndThePagePrintTheWeekTheyWereHanded(t *testing.T) {
 		t.Errorf("the page does not show the week it was given")
 	}
 
+	// A four-figure week, since formatStatNumber groups thousands: the
+	// renderers must still be showing what they were handed, and a test that
+	// only ever passes two-digit numbers would not notice a renderer that
+	// formatted its own.
+	r.WeekRecalls = 1234
+	if card := renderStatsCard(r); !strings.Contains(card, ">1,234</text>") {
+		t.Errorf("the card does not group thousands the way the report's other figures are grouped")
+	}
+	if page := renderPage(t, r); !strings.Contains(page, "1,234 times this week") {
+		t.Errorf("the page does not group thousands")
+	}
+
 	// A different figure in, a different figure out — so neither row above can
 	// be a constant that happens to match.
 	r.WeekRecalls = 2
