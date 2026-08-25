@@ -86,15 +86,7 @@ func TestWriteLeavesNoTempAndKeepsTheMode(t *testing.T) {
 	if err := Write(path, []byte("one\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if strings.Contains(e.Name(), ".tmp") {
-			t.Errorf("a temp file survived the write: %s", e.Name())
-		}
-	}
+	leftTemps(t, dir)
 	fi, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
@@ -132,15 +124,7 @@ func TestAFailedRenameLeavesNoTemp(t *testing.T) {
 	if err := Write(path, []byte("x"), 0o600); err == nil {
 		t.Fatal("replacing a non-empty directory reported success")
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if strings.Contains(e.Name(), ".tmp") {
-			t.Errorf("the failed rename left %s behind", e.Name())
-		}
-	}
+	leftTemps(t, dir)
 }
 
 // A destination whose directory does not exist fails and leaves nothing: the
@@ -229,8 +213,9 @@ func TestWriteStreamPublishesWhatItWroteAndKeepsTheMode(t *testing.T) {
 }
 
 // A writer that gives up halfway must leave the old file alone. This is the
-// whole reason the sidecar is written through this package: a half-written one
-// is worse than yesterday's, because it parses as a shorter index.
+// whole reason the sidecar is written through this package: its header carries
+// the vector count, so a half-written one decodes as nothing at all — worse
+// than yesterday's, which decodes.
 func TestWriteStreamPublishesNothingWhenTheWriterFails(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sidecar.bin")
@@ -275,20 +260,6 @@ func TestWriteStreamLeavesNoTempWhenTheRenameFails(t *testing.T) {
 	leftTemps(t, dir)
 }
 
-// leftTemps fails if this package left one of its temp files behind.
-func leftTemps(t *testing.T, dir string) {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if strings.Contains(e.Name(), ".tmp") {
-			t.Errorf("left %s behind", e.Name())
-		}
-	}
-}
-
 // And the same on a directory that is not there: the caller decides whether to
 // make it, so nothing is created on the way.
 func TestWriteStreamToAMissingDirectoryFailsCleanly(t *testing.T) {
@@ -306,5 +277,19 @@ func TestWriteStreamToAMissingDirectoryFailsCleanly(t *testing.T) {
 	}
 	if entries, err := os.ReadDir(dir); err == nil && len(entries) != 0 {
 		t.Errorf("the failed write left %d entries behind", len(entries))
+	}
+}
+
+// leftTemps fails if this package left one of its temp files behind.
+func leftTemps(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.Contains(e.Name(), ".tmp") {
+			t.Errorf("left %s behind", e.Name())
+		}
 	}
 }
