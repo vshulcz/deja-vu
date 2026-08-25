@@ -373,6 +373,20 @@ func Today(indexDir string) (recalls int, bytes int) {
 	return recalls, bytes
 }
 
+// usable reports whether a line is an event at all: a stamp, so it can be
+// placed in time, and a kind, so it can be counted or named. The two readers
+// asked for one each — the counters for a stamp, `deja log` for a kind — so a
+// half-written line was a row on one surface and nothing on the other, and a
+// line with no kind, which no counter has a case for, still set `since`, the
+// window every figure on the impact screen is measured from (#1917).
+//
+// An unrecognised kind stays an event: deja may have written it, an older or a
+// newer version of itself, and it belongs in the log the reader browses even
+// though no counter has a case for it.
+func (e Event) usable() bool {
+	return !e.Time.IsZero() && e.Kind != ""
+}
+
 func read(p string) []Event {
 	f, err := os.Open(p)
 	if err != nil {
@@ -384,7 +398,7 @@ func read(p string) []Event {
 	s.Buffer(make([]byte, 4096), 1<<20)
 	for s.Scan() {
 		var e Event
-		if json.Unmarshal(s.Bytes(), &e) == nil && !e.Time.IsZero() {
+		if json.Unmarshal(s.Bytes(), &e) == nil && e.usable() {
 			out = append(out, e)
 		}
 	}

@@ -178,7 +178,9 @@ func Events(indexDir string, n int) []Event {
 	sc.Buffer(make([]byte, 0, 64<<10), 4<<20)
 	for sc.Scan() {
 		var e Event
-		if json.Unmarshal(sc.Bytes(), &e) == nil && e.Kind != "" {
+		// The same rule the counters read by, so a line is an event on both
+		// surfaces or on neither (#1917).
+		if json.Unmarshal(sc.Bytes(), &e) == nil && e.usable() {
 			out = append(out, e)
 		}
 	}
