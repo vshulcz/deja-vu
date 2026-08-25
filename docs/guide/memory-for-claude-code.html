@@ -4,13 +4,13 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Adding memory to Qwen Code — deja-vu</title>
-<meta name="description" content="How to give Qwen Code recall over every coding agent's sessions on this machine — the Gemini extension format, and Claude-format marketplaces.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html">
+<title>Adding memory to Claude Code — deja-vu</title>
+<meta name="description" content="How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Adding memory to Qwen Code">
-<meta property="og:description" content="How to give Qwen Code recall over every coding agent's sessions on this machine — the Gemini extension format, and Claude-format marketplaces.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html">
+<meta property="og:title" content="Adding memory to Claude Code">
+<meta property="og:description" content="How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
@@ -25,16 +25,16 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Adding memory to Qwen Code">
-<meta name="twitter:description" content="How to give Qwen Code recall over every coding agent's sessions on this machine — the Gemini extension format, and Claude-format marketplaces.">
+<meta name="twitter:title" content="Adding memory to Claude Code">
+<meta name="twitter:description" content="How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to Qwen Code","description":"How to give Qwen Code recall over every coding agent's sessions on this machine — the Gemini extension format, and Claude-format marketplaces.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Qwen Code","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to Qwen Code?","acceptedAnswer":{"@type":"Answer","text":"Run qwen extensions install https://github.com/vshulcz/deja-vu, or deja install qwen-auto to wire the MCP server and the skill directly."}},{"@type":"Question","name":"Where does Qwen Code keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.qwen/projects/<project>/chats as JSONL, which is what deja indexes."}},{"@type":"Question","name":"Does Qwen Code read Claude-format marketplaces?","acceptedAnswer":{"@type":"Answer","text":"Yes. qwen extensions sources add takes a Claude-format marketplace, and this repository is one."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to Claude Code","description":"How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Claude Code","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to Claude Code?","acceptedAnswer":{"@type":"Answer","text":"Run deja install claude-auto to write the MCP server, the /deja command and the SessionStart hook, or add this repository as a plugin marketplace with claude plugin marketplace add vshulcz/deja-vu."}},{"@type":"Question","name":"Where does Claude Code keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ${CLAUDE_CONFIG_DIR:-~/.claude}/projects/ as JSONL, one file per session, which is what deja indexes."}},{"@type":"Question","name":"Will installing both the MCP server and the plugin duplicate the tools?","acceptedAnswer":{"@type":"Answer","text":"No. Claude keys MCP servers by name and every manifest deja ships names this one deja, so the two collapse into a single server."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -55,8 +55,8 @@
 <a href="memory-for-zed.html">Memory for Zed</a>
 <a href="memory-for-grok.html">Memory for Grok Build</a>
 <a href="memory-for-gemini.html">Memory for Gemini CLI</a>
-<a href="memory-for-qwen.html" aria-current="page">Memory for Qwen Code</a>
-<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html" aria-current="page">Memory for Claude Code</a>
 <a href="memory-for-codex.html">Memory for Codex</a>
 <a href="memory-for-cursor.html">Memory for Cursor</a>
 <a href="memory-for-copilot.html">Memory for Copilot CLI</a>
@@ -81,32 +81,35 @@
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
-<h1>Adding memory to Qwen Code</h1>
-<p class="pagelede">it takes the Gemini extension, and Claude-format marketplaces<span class="mins" data-mins></span></p>
+<h1>Adding memory to Claude Code</h1>
+<p class="pagelede">the MCP server, the hook, and the plugin marketplace<span class="mins" data-mins></span></p>
 
-<p>Qwen Code keeps every session on disk and opens the next one empty. What you worked out last week is still there, and so is the work you did in whichever other agent you had open at the time.</p>
+<p>Claude Code writes every session to disk and starts the next one empty. The work is still there — and so is whatever you did that week in Cursor, Codex or any other agent you had open.</p>
 
-<h2>What Qwen already has</h2>
-<p>Sessions live under <code>~/.qwen/projects/&lt;project&gt;/chats</code> as JSONL. Complete, and unread by anything — including by Qwen's next session.</p>
+<h2>What Claude Code already has</h2>
+<p>Transcripts live under <code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/</code> as JSONL, one file per session, complete down to the tool calls. Nothing reads them back, including Claude Code's own next session. <a href="../registry/claude-code.html">How Claude's store is read</a> has the format, the quirks and the date it was last checked against a real store.</p>
 
 <h2>Adding recall</h2>
-<pre>qwen extensions install https://github.com/vshulcz/deja-vu</pre>
-<p>Qwen Code shares Gemini CLI's extension format, so the <code>gemini-extension.json</code> at the root of the repository is the whole install. Checked on Qwen Code 0.20.0: it reports the deja MCP server, the context file and the <code>deja-search</code> skill, and installs them under <code>~/.qwen/extensions/deja</code>.</p>
-<p>The CLI install is the other path, and the one that also writes guidance where Qwen reads it:</p>
-<pre>deja install qwen-auto</pre>
-<p>Running both is safe rather than doubled: MCP servers are keyed by name, so the extension's <code>deja</code> and the one in <code>settings.json</code> collapse into a single server rather than listing every tool twice.</p>
-<p>Qwen also reads Claude-format marketplaces, which this repository is:</p>
-<pre>qwen extensions sources add https://github.com/vshulcz/deja-vu</pre>
-<p>Either way it needs the binary, since an extension delivers files rather than runtimes:</p>
+<pre>deja install claude-auto</pre>
+<p>That writes three things: the deja MCP server into <code>~/.claude.json</code>, a <code>/deja</code> command at <code>~/.claude/commands/deja.md</code>, and a SessionStart hook in <code>~/.claude/settings.json</code> so a new session opens already carrying what the last ones settled. The MCP server on its own is <code>deja install claude-code</code>.</p>
+<p>This repository is also a Claude plugin marketplace, if you would rather install it the way Claude Code installs everything else:</p>
+<pre>claude plugin marketplace add vshulcz/deja-vu
+claude plugin install deja-vu@deja-vu</pre>
+<p>Running both is safe rather than doubled. Claude keys MCP servers by name, and every manifest we ship names this one <code>deja</code>, so the two collapse into a single server instead of listing every tool twice.</p>
+<p>Either path needs the binary — a plugin ships files, not runtimes:</p>
 <pre>brew install deja-vu
 # or
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+
+<h2>What the hook actually changes</h2>
+<p>Without it, recall depends on the agent deciding to search. The hook moves the decision earlier: the session opens with what this project already settled, so the first exchange is not spent re-deriving it. <a href="after-compaction.html">After compaction</a> covers the other half — the moment a long session is summarised and the details go.</p>
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — twenty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
 <p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
 
-<p><a href="getting-started.html">Getting started</a> · <a href="../registry/qwen.html">How Qwen's store is read</a> · <a href="memory-for-gemini.html">Memory for Gemini CLI</a></p>
+<p><a href="getting-started.html">Getting started</a> · <a href="../registry/claude-code.html">How Claude's store is read</a> · <a href="rules-files.html">When CLAUDE.md grows</a></p>
+
 </article>
 </div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>

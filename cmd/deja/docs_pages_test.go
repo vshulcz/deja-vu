@@ -84,6 +84,12 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 			"memory-for-kimi.html",
 			"memory-for-zed.html",
 			"memory-for-grok.html",
+			// The four biggest audiences arrive on these, so a sidebar that
+			// omits one strands the reader who came from a search for it.
+			"memory-for-claude-code.html",
+			"memory-for-codex.html",
+			"memory-for-cursor.html",
+			"memory-for-copilot.html",
 		} {
 			if name == sibling {
 				continue
