@@ -35,6 +35,11 @@ func jsonKeys(v any, into map[string]bool) {
 // Against the whole document rather than the two sections: the keys those
 // sections do not name are the ones the shared "session object" table describes
 // for search, last and show together, which is where they belong.
+//
+// It pins what this corpus emits, which is the always-present half. The
+// optional keys — agent_title, touched, gave_up, orig_id, from, lifecycle,
+// kind, parent, agent — are in that table today and a fixture would have to
+// grow a case each to hold them there.
 func TestSessionJSONKeysAreDocumented(t *testing.T) {
 	tmp := hermeticEnv(t)
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
