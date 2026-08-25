@@ -13,7 +13,7 @@
     "lib.js",
     "cordis.patch.yml",
     "README.md",
-    "README.zh.md",
+    "docs/zh.md",
     "LICENSE"
   ],
   "license": "MIT",
