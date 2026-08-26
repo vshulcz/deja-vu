@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
@@ -450,6 +451,14 @@ func rotate(p string) {
 		return
 	}
 	cutoff := time.Now().UTC().Add(-keepWindow)
+	// A log over the trigger because it is busy rather than old drops nothing,
+	// and the read that decides that costs the whole file — on every event, for
+	// as long as the busy fortnight lasts: 6.4 ms against 28 µs on a fresh log,
+	// climbing (#1972). What the last read found is enough to skip the next
+	// one: nothing ages out until the oldest event does.
+	if skipRotation(p) {
+		return
+	}
 	all := read(p)
 	var keep []Event
 	for _, e := range all {
@@ -458,6 +467,7 @@ func rotate(p string) {
 		}
 	}
 	if len(keep) == len(all) {
+		rememberNothingToDrop(p, all, fi.Size())
 		return
 	}
 	if len(keep) == 0 && len(all) > 0 {
@@ -592,4 +602,57 @@ func Impact(indexDir string) ImpactReport {
 		}
 	}
 	return r
+}
+
+// nothingToDrop remembers, per log, what the last full read found: the oldest
+// event in it, and the size the file had then. Both are needed — the stamp says
+// when a rotation could next drop something, the size says the file is still
+// the one that was read.
+var nothingToDrop sync.Map // path -> rotationMemo
+
+type rotationMemo struct {
+	oldest time.Time
+	size   int64
+}
+
+// skipRotation reports whether the last read of this log already established
+// that nothing would age out, and nothing has happened since to change that.
+//
+// It is only worth anything to a process that records more than once — the MCP
+// server answering recalls all day. A hook runs once and exits, so it pays the
+// read the first time either way.
+func skipRotation(p string) bool {
+	v, ok := nothingToDrop.Load(p)
+	if !ok {
+		return false
+	}
+	m := v.(rotationMemo)
+	if !m.oldest.After(time.Now().UTC().Add(-keepWindow)) {
+		return false // the oldest event has aged out since
+	}
+	fi, err := os.Stat(p)
+	if err != nil {
+		return false
+	}
+	// Only growth is expected: a file that shrank was rewritten by someone
+	// else, and what this process remembers about it is about the old one.
+	return fi.Size() >= m.size
+}
+
+// rememberNothingToDrop records what a full read found, so the next append does
+// not repeat it.
+func rememberNothingToDrop(p string, all []Event, size int64) {
+	oldest := time.Time{}
+	for _, e := range all {
+		if e.Time.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || e.Time.Before(oldest) {
+			oldest = e.Time
+		}
+	}
+	if oldest.IsZero() {
+		return
+	}
+	nothingToDrop.Store(p, rotationMemo{oldest: oldest, size: size})
 }
