@@ -175,14 +175,27 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	if out2.Len() != 0 {
 		t.Fatalf("repeat injection for same session: %q", out2.String())
 	}
-	// A different agent session still gets it.
+	// A different agent session in the same project does not get it again.
+	//
+	// This assertion used to read the other way, and that is what #2038
+	// measured: the cooldown was keyed on the agent session id alone, so every
+	// new session started blank and asked for the same memory. Six weeks of a
+	// real log showed 937 per-prompt injections drawn from 74 distinct
+	// sessions — 92% repeats, one session served 110 times. The agent is told
+	// to say nothing about a recall that did not help, so those servings bought
+	// silence.
 	var out3 bytes.Buffer
 	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(`{"prompt":"exporter_batch utc_midnight rows again","session_id":"agent-2"}`), &out3); err != nil {
 		t.Fatal(err)
 	}
-	if out3.Len() == 0 {
-		t.Fatal("fresh session should still receive the memory")
+	if out3.Len() != 0 {
+		t.Fatalf("a second agent session in the same project was handed the same memory: %q", out3.String())
 	}
+
+	// The cooldown not reaching into another project is pinned as a unit in
+	// TestTheCooldownOutlivesTheAgentSession; it cannot be shown here, because
+	// per-prompt recall is project-scoped and a different directory has no
+	// matching history to withhold in the first place.
 }
 
 func TestAgentCreditsCountedFromIndex(t *testing.T) {

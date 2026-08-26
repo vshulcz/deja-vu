@@ -176,8 +176,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// questions in a day, and what stops it repeating itself is the block
 	// fingerprint below, not a ban on where it came from.
 	recent := recentlyInjected(dir, input.SessionID, injectionCooldown)
-	skip := make(map[string]bool, len(recent)+1)
+	// The same cooldown across agent sessions in this project. Without it the
+	// window reset every time a new agent session opened, which is how one
+	// marathon reached 110 servings (#2038).
+	projectKey := ""
+	if cands := digest.ProjectNameCandidates(cwd); len(cands) > 0 {
+		projectKey = cands[0]
+	}
+	inProject := recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+	skip := make(map[string]bool, len(recent)+len(inProject)+1)
 	for id := range recent {
+		skip[id] = true
+	}
+	for id := range inProject {
 		skip[id] = true
 	}
 	if input.SessionID != "" {
@@ -342,7 +353,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
-	rememberInjected(dir, input.SessionID, ss)
+	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
 	usage.RecordDigestInto(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
 		terms, sessionIDs(ss)...)
 	if plain {
@@ -496,6 +507,45 @@ func blockFingerprint(body string) string {
 // again. Ten is the length of a short stretch of work.
 const injectionCooldown = 10
 
+// recentlyInjectedInProject is the same cooldown counted across agent sessions
+// rather than inside one, because the cooldown above only ever saw the session
+// it was called from and every new agent session started blank.
+//
+// Measured over six weeks of a real log: per-prompt recall made 937 injections
+// drawn from 74 distinct sessions, 92% of them repeats, with ten sessions
+// carrying 80% of the total — the two commonest being marathons of 2.6M and
+// 1.4M words, which match nearly any prompt. The agent is told to say nothing
+// about a recall that did not help, so the hundredth serving of the same
+// session is correctly met with silence, and `stats --impact` counts that
+// silence against us (#2038).
+//
+// Scoped to the project on purpose: the same session answering the same
+// question in a different repository is not the repetition being fixed here.
+func recentlyInjectedInProject(dir, project string, window int) map[string]bool {
+	out := map[string]bool{}
+	if project == "" || window <= 0 {
+		return out
+	}
+	b, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		return out
+	}
+	lines := strings.Split(string(b), "\n")
+	kept := 0
+	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
+		// Four fields since this cooldown was added; lines written before it
+		// carry no project and match nothing, which is the right answer for
+		// them rather than a guess.
+		parts := strings.Fields(lines[i])
+		if len(parts) < 4 || parts[3] != project {
+			continue
+		}
+		kept++
+		out[parts[1]] = true
+	}
+	return out
+}
+
 // recentlyInjected is alreadyInjected narrowed to the last few things this
 // agent session was shown.
 func recentlyInjected(dir, sid string, window int) map[string]bool {
@@ -553,6 +603,14 @@ func forgetInjected(dir, sid string) {
 }
 
 func rememberInjected(dir, sid string, ss []model.Session) {
+	rememberInjectedFor(dir, sid, "", ss)
+}
+
+// rememberInjectedFor is rememberInjected with the project the injection went
+// to, so recentlyInjectedInProject can count across agent sessions. Callers
+// that have no project pass the empty string and write the old three-field
+// line.
+func rememberInjectedFor(dir, sid, project string, ss []model.Session) {
 	if sid == "" {
 		return
 	}
@@ -579,7 +637,13 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 	}
 	stamp := time.Now().UTC().Format(time.RFC3339)
 	for _, s := range ss {
-		fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
+		if project == "" {
+			fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
+			continue
+		}
+		// The project has no spaces by the time it gets here — it is one
+		// candidate name, not a path — so the line stays field-separated.
+		fmt.Fprintf(f, "%s %s %s %s\n", sid, s.ID, stamp, project)
 	}
 }
 
