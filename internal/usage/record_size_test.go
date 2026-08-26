@@ -27,7 +27,12 @@ func TestWhatARecordWeighs(t *testing.T) {
 		{"cyrillic", strings.Repeat("отладка ", 1024), true},
 		{"angle brackets, as code has them", strings.Repeat("<T> & Vec<U> ", 630), true},
 		{"a shell pipeline", strings.Repeat("cat a.txt | grep x > out.txt && ", 256), true},
-		{"bytes that are not valid UTF-8", strings.Repeat("\xff", budget), true},
+		// One run of invalid bytes is one replacement character — ToValidUTF8
+		// collapses it — so a solid block measures nothing. Alternating is what
+		// costs three per byte, and 2.51x is the worst a body reaches.
+		{"invalid bytes in one run", strings.Repeat("\xff", budget), true},
+		{"invalid bytes alternating with text", strings.Repeat("\xffa", budget/2), true},
+		{"invalid bytes alternating with newlines", strings.Repeat("\xff\n", budget/2), true},
 		// The one class the bound does not cover, kept so the reason is on the
 		// record: six bytes each, and RecordSize would be wrong by twice.
 		{"control bytes, which cannot reach here", strings.Repeat("\x01", budget), false},

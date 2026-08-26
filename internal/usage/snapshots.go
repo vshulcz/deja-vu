@@ -54,10 +54,12 @@ const RecordRoom = snapshotRotateAt / snapshotsToKeep
 // Escaping is a multiplier rather than a constant, which is what makes this a
 // function. Measured against a budget of 8192: plain text costs 168 bytes, a
 // real digest with its newlines 558, and text that is all newlines or all
-// quotes doubles, since each is two bytes in JSON. Three, not two, because a
-// byte that is not valid UTF-8 is written as the replacement character and
-// costs three — a truncated binary paste in a transcript is enough, and nothing
-// strips it.
+// quotes doubles, since each is two bytes in JSON. Three, not two, because of
+// what a truncated binary paste does: an invalid byte becomes the replacement
+// character, three bytes, and the worst shape is invalid bytes alternating with
+// newlines — measured at 2.51 times the body. A solid run of invalid bytes is
+// not the worst case and looks like the best one, since ToValidUTF8 collapses a
+// run to a single character.
 //
 // Two things are kept out of the multiplier rather than allowed for. Control
 // bytes would cost six each as \u00XX escapes, and SafeText strips them before
