@@ -162,7 +162,14 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	sec := t.Unix()
 	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
-	where := fmt.Sprintf(" and (m.created_timestamp > %d or s.updated_at > '%s')", sec, rfc)
+	// Compared through datetime() because the two sides are written in
+	// different formats: a real store keeps updated_at as sqlite's own
+	// "2026-07-27 15:29:47", and a space sorts below the T of an RFC3339
+	// string, so a plain text comparison missed every session touched later the
+	// same day — including a turn goose stored without a timestamp of its own,
+	// which is reachable only through its session — and matched every session
+	// touched on a later date, handing back all of it (#2030).
+	where := fmt.Sprintf(" and (m.created_timestamp > %d or datetime(s.updated_at) > datetime('%s'))", sec, rfc)
 	return parseGooseDBWhere(db, where, 0)
 }
 
