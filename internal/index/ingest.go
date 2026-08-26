@@ -356,6 +356,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 
 func rebuildWithTombstones(dir string, harness string, scope string, files map[string]FileState, progress io.Writer, dead map[string]bool) error {
 	// This build's counts, not the process's: see writeSessionsWithSync (#1850).
+	beginPass()
 	emptied.Store(0)
 	collisions.Store(0)
 	// A rebuild evicts nothing, but a number left by an earlier build must not
@@ -1954,9 +1955,10 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 // before writing left its count for the next one to report: one bad line on
 // disk, "2 lines skipped" on screen, with the manifest agreeing (#2010).
 //
-// Called at both places a pass parses — this one and rebuildForSearch, which a
-// recall reaches directly after an index is found damaged, without passing
-// through updateIndex at all.
+// Called at every place a pass parses: this one, rebuildForSearch — which a
+// recall reaches directly once an index is found damaged, without passing
+// through updateIndex at all — and rebuildWithTombstones, which forget and
+// unforget call for themselves.
 func beginPass() {
 	sources.DiagSnapshot()
 }
