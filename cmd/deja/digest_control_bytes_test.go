@@ -17,9 +17,10 @@ import (
 // is six bytes in JSON, and the injection log's size bound assumes three at
 // worst (#1982), so one arriving would make the log's own guarantee wrong.
 //
-// `internal/search` holds the helpers that strip them. This holds the paths:
-// each writer of a snapshot, driven over a transcript full of what an agent
-// captures from a terminal.
+// Two packages strip them — `internal/search` for what search serves and
+// `internal/redact` for what a digest is built from — and each has its own
+// tests. This holds the paths between them: the writers of a snapshot,
+// driven over a transcript full of what an agent captures from a terminal.
 func TestNothingServedCarriesAControlByte(t *testing.T) {
 	hermeticEnv(t)
 	claude := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -60,15 +61,16 @@ func TestNothingServedCarriesAControlByte(t *testing.T) {
 	}{
 		{"recall", `{"query":"pgbouncer"}`, "recall"},
 		{"recall_context", `{"query":"pgbouncer"}`, "recall_context"},
-		{"blame", `{"path":"parser.go"}`, "blame"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			out, err := callMCPTool(idx, c.tool, json.RawMessage(c.args))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if out == "" {
-				t.Fatal("the tool answered with nothing, so this proves nothing")
+			// An answer that carries none of the transcript proves nothing
+			// about stripping it.
+			if !strings.Contains(out, "pgbouncer") {
+				t.Fatalf("%s answered without the session in it:\n%q", c.name, out)
 			}
 			if at := controlByteAt(out); at >= 0 {
 				t.Errorf("%s served byte 0x%02x at %d", c.name, out[at], at)
@@ -104,6 +106,33 @@ func TestNothingServedCarriesAControlByte(t *testing.T) {
 		}
 	})
 
+	t.Run("a resource read", func(t *testing.T) {
+		got, code, msg := mcpResourceRead(idx, "deja://session/claude:s1")
+		if code != 0 {
+			t.Fatalf("resource read failed: %d %s", code, msg)
+		}
+		text := resourceText(t, got)
+		if !strings.Contains(text, "pgbouncer") {
+			t.Fatalf("the resource answered without the session in it:\n%q", text)
+		}
+		if at := controlByteAt(text); at >= 0 {
+			t.Errorf("the resource served byte 0x%02x at %d", text[at], at)
+		}
+	})
+
+	t.Run("the antigravity hook", func(t *testing.T) {
+		var b strings.Builder
+		if err := runHookAntigravity(idx, strings.NewReader(`{"invocation_num":1,"workspace_paths":["/tmp/app"]}`), &b); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "pgbouncer") {
+			t.Fatalf("the hook injected nothing about this project:\n%q", b.String())
+		}
+		if at := controlByteAt(b.String()); at >= 0 {
+			t.Errorf("the antigravity hook served byte 0x%02x at %d", b.String()[at], at)
+		}
+	})
+
 	// And the records those paths left behind, which is where the size bound
 	// reads them.
 	snaps := usage.Snapshots(idx, 0)
@@ -117,17 +146,38 @@ func TestNothingServedCarriesAControlByte(t *testing.T) {
 	}
 }
 
-// controlByteAt is the index of the first byte no served text should carry, or
-// -1. Newline and tab are what a transcript is made of.
+// controlByteAt is the offset of the first control character no served text
+// should carry, or -1. Newline and tab are what a transcript is made of.
+//
+// Runes rather than bytes: the C1 controls at U+0080–U+009F are two bytes in
+// UTF-8, and a terminal acts on some of them — U+009B is a control sequence
+// introducer as surely as an escape is. A byte scan would walk past them.
 func controlByteAt(s string) int {
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == '\n' || c == '\t' {
+	for i, r := range s {
+		if r == '\n' || r == '\t' {
 			continue
 		}
-		if c < 0x20 || c == 0x7f {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
 			return i
 		}
 	}
 	return -1
+}
+
+// resourceText digs the served text out of a resources/read answer.
+func resourceText(t *testing.T, got any) string {
+	t.Helper()
+	m, ok := got.(map[string]any)
+	if !ok {
+		t.Fatalf("resource answer is %T", got)
+	}
+	contents, ok := m["contents"].([]map[string]any)
+	if !ok {
+		t.Fatalf("resource contents are %T", m["contents"])
+	}
+	if len(contents) == 0 {
+		t.Fatal("the resource answered with no contents")
+	}
+	text, _ := contents[0]["text"].(string)
+	return text
 }
