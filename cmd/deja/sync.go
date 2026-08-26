@@ -133,21 +133,21 @@ func runSync(dir string, args []string) error {
 			if p := deniedPath(err); p != "" && !strings.HasPrefix(p, out) &&
 				(errors.Is(err, fs.ErrPermission) || writeFailureReason(err) != err.Error()) {
 				if n > 0 {
-					return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, search.SafeLine(out), ensureError(dir, err))
+					return fmt.Errorf("%d records are written into %s, but deja could not record that they went: %w; the next export sends them again", n, search.SafePath(out), ensureError(dir, err))
 				}
 				return ensureError(dir, err)
 			}
 			if parent := filepath.Dir(out); !dirExists(out) && !dirExists(parent) {
-				return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", search.SafeLine(out), search.SafeLine(parent))
+				return fmt.Errorf("cannot write the export into %s — %s is not there; the disk it lives on may have been unmounted", search.SafePath(out), search.SafePath(parent))
 			}
 			if errors.Is(err, fs.ErrPermission) {
-				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", search.SafeLine(out))
+				return fmt.Errorf("cannot write the export into %s — check that directory's permissions, or choose one you can write", search.SafePath(out))
 			}
 			// A full or vanished disk in the same words as everywhere else
 			// (#906); anything deja does not recognise still comes through
 			// whole rather than being guessed at.
 			if reason := writeFailureReason(err); reason != err.Error() {
-				return fmt.Errorf("cannot write the export into %s — %s", search.SafeLine(out), reason)
+				return fmt.Errorf("cannot write the export into %s — %s", search.SafePath(out), reason)
 			}
 			return err
 		}

@@ -369,22 +369,38 @@ func blameSnippet(text, role string, target BlameTarget) string {
 // vendored copy does not stand in for the file itself.
 func pathLineFor(text string, target BlameTarget) string {
 	base := strings.ToLower(target.Base)
-	full := strings.ToLower(filepath.ToSlash(target.FullPath))
+	full := crossSlash(target.FullPath)
 	fallback := ""
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		slashed := strings.ToLower(filepath.ToSlash(trimmed))
+		slashed := crossSlash(trimmed)
 		if full != "" && slashed == full {
 			return line
 		}
-		if strings.ToLower(filepath.Base(trimmed)) == base && fallback == "" {
+		if crossBase(trimmed) == base && fallback == "" {
 			fallback = line
 		}
 	}
 	return fallback
+}
+
+// crossSlash and crossBase read a path the way the rest of deja does: a store
+// synced from Windows holds "C:\\src\\app\\x.go", and on a unix host
+// filepath sees one segment — which made the picker miss the line and fall back
+// to the prose renderer, quietly bringing the collapsing back (#2044).
+func crossSlash(p string) string {
+	return strings.ToLower(strings.ReplaceAll(p, "\\", "/"))
+}
+
+func crossBase(p string) string {
+	s := crossSlash(p)
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		return s[i+1:]
+	}
+	return s
 }
 
 // BlameLifecycleLine words a withdrawn decision for blame the way search words

@@ -19,6 +19,10 @@ func TestBlameSnippetNamesTheFileThatWasAskedAbout(t *testing.T) {
 			"/tmp/app/Pool.go", "/tmp/app/Pool.go"},
 		{"its own spaces kept",
 			"/tmp/app/two  spaces.go\n/tmp/app/pool.go", "/tmp/app/pool.go"},
+		// A store synced from Windows: on a unix host filepath sees one
+		// segment, and missing the line here drops back to the renderer that
+		// collapses the spaces.
+		{"a windows path", `C:\src\app\pool.go`, `C:\src\app\pool.go`},
 	} {
 		if got := blameSnippet(c.text, "files", target); got != c.want {
 			t.Errorf("%s: blameSnippet = %q, want %q", c.name, got, c.want)
@@ -27,6 +31,10 @@ func TestBlameSnippetNamesTheFileThatWasAskedAbout(t *testing.T) {
 
 	// An edit record is "path\nspan": the path is a path, the span is prose.
 	spaces := BlameTarget{Base: "two  spaces.go", FullPath: "/tmp/app/two  spaces.go"}
+	if got := blameSnippet(`C:\src\app\two  spaces.go`, "files", BlameTarget{Base: "two  spaces.go"}); got != `C:\src\app\two  spaces.go` {
+		t.Errorf("a windows path lost its spaces: %q", got)
+	}
+
 	got := blameSnippet("/tmp/app/two  spaces.go\nsize = 20", "edit", spaces)
 	if !strings.HasPrefix(got, "/tmp/app/two  spaces.go") {
 		t.Errorf("an edit snippet lost the file's spaces: %q", got)
