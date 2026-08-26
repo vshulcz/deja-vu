@@ -419,7 +419,7 @@ var repoCheck sync.Map
 // and those bytes print as nothing, so measuring the path with them still in
 // it spends the budget the file name needs.
 func filesRowPath(p string, col int) string {
-	return trimPathTo(search.SafeLine(trimPath(p)), col)
+	return trimPathTo(search.SafePath(trimPath(p)), col)
 }
 
 // trimPathTo bounds a path to a column width, cutting from the left so the

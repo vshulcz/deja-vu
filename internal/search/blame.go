@@ -138,6 +138,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			text  string
 			count int
 			level float64
+			role  string
 		}
 		var mentions []mention
 		for _, message := range session.Messages {
@@ -149,7 +150,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			if level > specificity {
 				specificity = level
 			}
-			mentions = append(mentions, mention{message.Text, count, level})
+			mentions = append(mentions, mention{message.Text, count, level, message.Role})
 		}
 		// A path-shaped mention outranks a bare filename however often the bare
 		// name is repeated; among equally specific ones, the message that keeps
@@ -161,7 +162,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			return mentions[i].count > mentions[j].count
 		})
 		for i := 0; i < len(mentions) && i < 2; i++ {
-			hit.Snippets = append(hit.Snippets, snippet(mentions[i].text, target.Base, nil))
+			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target.Base))
 		}
 		if hit.Count == 0 {
 			continue
@@ -337,6 +338,23 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 			}
 		}
 	}
+}
+
+// blameSnippet renders one mention. The prose path collapses runs of whitespace
+// — right for a sentence, wrong for a file whose name holds two spaces, which
+// came back with one and then found nothing when it was pasted into restore
+// (#2044). A files record is a list of paths, so the line that names the file is
+// printed as a path instead.
+func blameSnippet(text, role, base string) string {
+	if role != "files" {
+		return snippet(text, base, nil)
+	}
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, base) {
+			return SafePath(line)
+		}
+	}
+	return snippet(text, base, nil)
 }
 
 // BlameLifecycleLine words a withdrawn decision for blame the way search words

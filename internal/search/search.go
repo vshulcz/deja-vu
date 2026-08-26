@@ -2215,6 +2215,24 @@ func SafeLine(s string) string {
 	return strings.Join(strings.Fields(SafeText(s)), " ")
 }
 
+// SafePath is SafeLine for a path, which is an identifier rather than prose: it
+// strips what a terminal would obey and keeps the result on one line, but the
+// spaces inside a name are part of the name. Collapsing them made blame print
+// "/tmp/app/two spaces.go" for a file with two, and restoring that printed path
+// found nothing (#2044).
+func SafePath(s string) string {
+	if s == "" {
+		return ""
+	}
+	cleaned := strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' || r == '\r' {
+			return ' '
+		}
+		return r
+	}, SafeText(s))
+	return strings.Trim(cleaned, " ")
+}
+
 func unsafeForTerminal(r rune) bool {
 	if r == '\n' || r == '\t' {
 		return false

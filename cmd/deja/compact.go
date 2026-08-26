@@ -54,7 +54,7 @@ func compactEvidence(dir, sessionID, cwd string) string {
 	// wrote into the payload, escape bytes included (#2000).
 	files := lastDistinct(s.Messages, "files", compactEvidenceFiles,
 		func(text string) []string { return strings.Split(text, "\n") },
-		func(p string) string { return search.SafeLine(trimPath(p)) })
+		func(p string) string { return search.SafePath(trimPath(p)) })
 	commands := lastDistinct(s.Messages, "command", compactEvidenceCommands,
 		func(text string) []string {
 			// A multi-line command is a heredoc or a pasted script. Truncated to
