@@ -536,9 +536,9 @@ func printNoHistory(w io.Writer, stale bool) {
 	// emptyIndexHint; this screen is written as an introduction rather than an
 	// answer, so it says it in its own shape (#1979).
 	if denied := deniedStoreCount(); denied > 0 {
-		fmt.Fprintf(w, "Nothing was found on this machine — but %d store%s could not be read\n",
+		fmt.Fprintf(w, "Nothing was found on this machine, but %d store%s could not be\n",
 			denied, pluralS(denied))
-		fmt.Fprintln(w, "(permission denied); `deja doctor` names it.")
+		fmt.Fprintf(w, "read (permission denied) — `deja doctor` names %s.\n", pluralWhich(denied))
 	} else {
 		fmt.Fprintln(w, "Nothing was found on this machine, which usually means no agent has")
 		fmt.Fprintln(w, "run here yet, or its store lives somewhere else.")
