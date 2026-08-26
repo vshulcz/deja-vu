@@ -3024,12 +3024,16 @@ func emptyIndexReason(b index.BuildSummary, evicted int) string {
 // so telling someone to run `deja index` sends them to do again what just
 // happened, and they are left where they started. When no agent history was
 // found at all, the useful next step is finding out where deja looked.
-// Both questions below walk every store — stat each path, list each directory,
-// and open the newest file (doctor_report.go:530) — and on a machine with
-// history the first returns at the first store that has some, which is why
-// answering them from one shared walk is slower rather than faster: measured on
-// 21 stores, 0.4 ms as it stands against 1.0 ms for a walk that always
-// completes. The two walks only both happen when there is no history at all.
+// Both questions below enumerate every store and then inspect them — a stat per
+// path, a listing per directory, and the newest file opened when nothing
+// refused (doctor_report.go:530). The first stops at the first store that has
+// any history, so answering both from one completed walk trades that
+// short-circuit away and measured slower rather than faster.
+//
+// The whole path is a fraction of a millisecond on 21 stores, and the spread
+// between runs is wider than the difference, so it is not worth restructuring
+// in either direction — which is the thing worth writing down, since the
+// obvious tidy-up is the slower one.
 func emptyIndexHint(what string) string {
 	if noAgentHistoryFound() {
 		// "no agent history was found" is a claim about the machine, and it
