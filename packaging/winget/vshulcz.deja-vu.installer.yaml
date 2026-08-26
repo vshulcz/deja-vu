@@ -1,5 +1,5 @@
 PackageIdentifier: vshulcz.deja-vu
-PackageVersion: 0.18.0
+PackageVersion: 0.19.0
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
@@ -8,10 +8,10 @@ NestedInstallerFiles:
 UpgradeBehavior: install
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.18.0/deja-vu_0.18.0_windows_amd64.zip
-  InstallerSha256: E2C5A442AFB3F208AA1389BE031B2AC595DE3C79B1179856FB843A1F1B042391
+  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.19.0/deja-vu_0.19.0_windows_amd64.zip
+  InstallerSha256: C37DE2F355A51DAAFB97D7667A1786DFDD954816F81011175F8A5757F9F996CE
 - Architecture: arm64
-  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.18.0/deja-vu_0.18.0_windows_arm64.zip
-  InstallerSha256: F814FE2117F69AE1D2CC2202E6C3D37E90EF7CDE705C3E3C6DE1DFDFA4743B25
+  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.19.0/deja-vu_0.19.0_windows_arm64.zip
+  InstallerSha256: 2534207EFAEAD35DCA0B899C8EB32A9DD13B6CBAD8436BF68C2313FC8A03ADFC
 ManifestType: installer
 ManifestVersion: 1.12.0
