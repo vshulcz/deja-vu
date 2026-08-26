@@ -316,7 +316,7 @@ func printStats(w io.Writer, r stats.Report) {
 		}
 	}
 	for _, p := range r.TopProjects {
-		fmt.Fprintf(w, "  %-18s %s %d\n", stats.TrimRunes(p.Project, 18), strings.Repeat(barGlyph, stats.ScaledBar(p.Sessions, maxProject, 18)), p.Sessions)
+		fmt.Fprintf(w, "  %-18s %s %d\n", stats.TrimRunes(search.SafeLine(p.Project), 18), strings.Repeat(barGlyph, stats.ScaledBar(p.Sessions, maxProject, 18)), p.Sessions)
 	}
 	fmt.Fprintln(w)
 
