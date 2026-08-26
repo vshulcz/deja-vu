@@ -288,12 +288,22 @@ func firstLine(s string) string {
 // how many secrets the redaction pass replaced on the way out — the same floor
 // `share` and `sync export` print, on the path that had none (#848).
 func exportPromoted(path, title, text, src, state string, updated time.Time) (int, error) {
-	body, counts := redact.Text(title + "\n" + text)
-	masked := strings.Count(body, redact.Marker)
-	for _, n := range counts {
+	// Separately, not packed and cut apart on the first newline: a title can
+	// hold one — a note's is exempt from the bound every other title gets, and
+	// the notes file is the one store a person writes by hand — and its tail
+	// then arrived at the head of the body, beside deja's own "- state:" and
+	// "- source:" lines (#2056).
+	title, titleCounts := redact.Text(title)
+	text, textCounts := redact.Text(text)
+	masked := strings.Count(title, redact.Marker) + strings.Count(text, redact.Marker)
+	for _, n := range titleCounts {
 		masked += n
 	}
-	title, text, _ = strings.Cut(body, "\n")
+	for _, n := range textCounts {
+		masked += n
+	}
+	// One line, because it is written as a heading.
+	title = strings.Join(strings.Fields(title), " ")
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
 	if err != nil {
 		return 0, err
