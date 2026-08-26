@@ -11,20 +11,19 @@ import (
 )
 
 // The wording that separates a locked store from an empty machine lives in
-// `emptyIndexHint`, and #1020 pinned the helper. What was not pinned is the two
-// surfaces a person actually types: a query and `deja last` both answer from
-// that helper, and a wiring change would let either call a machine empty while
-// its sessions sit behind a wall doctor can see.
+// `emptyIndexHint`. #1020 pinned the helper, and friction is pinned through a
+// command — but a query and `deja last` each return through
+// `hiddenByOwnSettings` before reaching the helper, a branch friction does not
+// have, and nothing held either of them to it.
 func TestAQueryAndLastNameAStoreTheyCouldNotRead(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("directory permissions do not deny reads here")
 	}
-	tmp := t.TempDir()
-	claude := filepath.Join(tmp, "claude")
-	t.Setenv("DEJA_CLAUDE_ROOT", claude)
-	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
-	t.Setenv("HOME", tmp)
-	t.Setenv("USERPROFILE", tmp)
+	// hermeticEnv rather than four Setenvs: XDG_CONFIG_HOME leaking from the
+	// machine is enough to fail both cases, because a `deja/exclude` file there
+	// sends the answer through hiddenByOwnSettings before the hint is reached.
+	tmp := hermeticEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
 
 	seedClaude(t, claude, "app", "s1", "the pgbouncer pool kept timing out", "we fixed the retry")
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
