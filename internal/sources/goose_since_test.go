@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -64,11 +65,17 @@ func TestGooseSinceStillFindsATurnWithNoTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := 0
+	// The turn itself, not just something: a clause that handed back the
+	// session's other message and stopped would answer this with the wrong one.
+	found := false
 	for _, s := range got {
-		n += len(s.Messages)
+		for _, msg := range s.Messages {
+			if strings.Contains(msg.Text, "the pool is too small") {
+				found = true
+			}
+		}
 	}
-	if n == 0 {
-		t.Errorf("a turn with no timestamp of its own is reachable only through its session, and nothing came back")
+	if !found {
+		t.Errorf("a turn with no timestamp of its own is reachable only through its session, and it did not come back")
 	}
 }
