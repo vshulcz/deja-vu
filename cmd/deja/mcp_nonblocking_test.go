@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -58,23 +57,6 @@ func TestRememberAnswersWhileTheIndexIsLocked(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "wobble pool cap") {
 		t.Errorf("the note is missing from %s:\n%s", notes, body)
-	}
-}
-
-// holdIndexLock takes the index lock the way another deja process would, so a
-// tool that waits for it waits for this test instead.
-func holdIndexLock(t *testing.T, dir string) func() {
-	t.Helper()
-	f, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		t.Fatal(err)
-	}
-	return func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
 	}
 }
 
