@@ -73,6 +73,12 @@ func mergeIngestDiag(m *Manifest) {
 	// Whatever this pass read, it read whole: its files start from nothing and
 	// take what the parsers just reported.
 	for p := range passParsed {
+		// The clip count for this pass was recorded during redaction, which
+		// runs before this fold, so it is not something to start over.
+		if e, ok := m.IngestFiles[p]; ok && e.Clipped > 0 {
+			m.IngestFiles[p] = FileIngest{Clipped: e.Clipped}
+			continue
+		}
 		delete(m.IngestFiles, p)
 	}
 	for p, n := range malformed {
@@ -93,7 +99,7 @@ func mergeIngestDiag(m *Manifest) {
 		}
 		if e, ok := m.IngestFiles[p]; ok && e.Error != "" {
 			e.Error = ""
-			if e.Malformed == 0 {
+			if e.Malformed == 0 && e.Clipped == 0 {
 				delete(m.IngestFiles, p)
 			} else {
 				m.IngestFiles[p] = e
@@ -113,23 +119,16 @@ func mergeIngestDiag(m *Manifest) {
 	if len(m.IngestFiles) == 0 {
 		m.IngestFiles = nil
 	}
-	m.IngestHealth = healthFromFiles(m.IngestFiles, m.IngestHealth)
+	m.IngestHealth = healthFromFiles(m.IngestFiles)
 	// The set belongs to the pass that recorded it. Left standing, it deleted
 	// those files' entries again on the next manifest write in the process —
 	// and `deja sync` writes one, from Import, right after a pass.
 	passParsed, passRead = nil, nil
 }
 
-// healthFromFiles sums the per-file counts per harness. The clip count is not
-// per file — it is recorded during redaction, before this fold — so it is
-// carried from what the pass already put there.
-func healthFromFiles(files map[string]FileIngest, prior map[string]HarnessIngest) map[string]HarnessIngest {
+// healthFromFiles sums the per-file counts per harness.
+func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 	out := map[string]HarnessIngest{}
-	for h, e := range prior {
-		if e.ClippedMessages > 0 {
-			out[h] = HarnessIngest{ClippedMessages: e.ClippedMessages}
-		}
-	}
 	for p, e := range files {
 		h := harnessForPath(p)
 		if h == "" {
@@ -137,6 +136,7 @@ func healthFromFiles(files map[string]FileIngest, prior map[string]HarnessIngest
 		}
 		cur := out[h]
 		cur.MalformedLines += e.Malformed
+		cur.ClippedMessages += e.Clipped
 		if e.Error != "" {
 			cur.FailedFiles++
 			cur.LastError = e.Error
@@ -1997,9 +1997,15 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 
 // copyIngestFiles hands the new manifest its own map: the old one belongs to
 // the manifest this build read, which is still in use while the build runs.
-func copyIngestFiles(old map[string]FileIngest) map[string]FileIngest {
+// The files this pass will re-read arrive with their clip count zeroed: the
+// pass records its own as it goes, and adding it to what the last pass found
+// counted one long message twice.
+func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState) map[string]FileIngest {
 	out := make(map[string]FileIngest, len(old))
 	for p, e := range old {
+		if _, ok := reread[p]; ok {
+			e.Clipped = 0
+		}
 		out[p] = e
 	}
 	return out
@@ -2229,7 +2235,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// doctor forgot a store's unreadable file because an unrelated
 		// transcript changed (#2015). A store this pass re-read starts over,
 		// because a file rewritten clean has to be able to clear its count.
-		IngestFiles: copyIngestFiles(old.IngestFiles)}
+		IngestFiles: copyIngestFiles(old.IngestFiles, changed)}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true
@@ -3055,25 +3061,30 @@ func filePrefixHash(path string, n int64) uint64 {
 	return h.Sum64()
 }
 
-// countClipped records messages stored short of the transcript. The caller
-// holds the lock where one is needed; redactForIngest runs single-threaded.
+// countClipped records messages stored short of the transcript, against the
+// file that holds them. The caller holds the lock where one is needed;
+// redactForIngest runs single-threaded.
 func countClipped(m *Manifest, sourcePath string, n int) {
 	if m == nil || n == 0 {
 		return
 	}
-	h := harnessForPath(sourcePath)
-	if h == "" {
-		if _, ok := m.Files[sources.OpencodeDB()]; ok {
-			h = "opencode"
+	p := sourcePath
+	if harnessForPath(p) == "" {
+		// opencode sessions carry their project dir as Path; the store on
+		// record is the database file.
+		if db := sources.OpencodeDB(); db != "" {
+			if _, ok := m.Files[db]; ok {
+				p = db
+			}
 		}
 	}
-	if h == "" {
+	if harnessForPath(p) == "" {
 		return
 	}
-	if m.IngestHealth == nil {
-		m.IngestHealth = map[string]HarnessIngest{}
+	if m.IngestFiles == nil {
+		m.IngestFiles = map[string]FileIngest{}
 	}
-	e := m.IngestHealth[h]
-	e.ClippedMessages += n
-	m.IngestHealth[h] = e
+	e := m.IngestFiles[p]
+	e.Clipped += n
+	m.IngestFiles[p] = e
 }
