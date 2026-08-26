@@ -60,4 +60,17 @@ func TestHowPrintsTheCommandThatRan(t *testing.T) {
 	if !strings.Contains(out, cmd) {
 		t.Errorf("how printed a command that is not the one that ran:\n%s\nwanted: %s", out, cmd)
 	}
+
+	// The same answer through MCP, which is the half an agent runs without a
+	// person reading it first.
+	got, err := callMCPTool(os.Getenv("DEJA_INDEX_DIR"), "how", json.RawMessage(`{"what":"test"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "go test") {
+		t.Fatalf("the MCP tool found no command to print:\n%s", got)
+	}
+	if !strings.Contains(got, cmd) {
+		t.Errorf("the MCP tool handed back a command that is not the one that ran:\n%s\nwanted: %s", got, cmd)
+	}
 }

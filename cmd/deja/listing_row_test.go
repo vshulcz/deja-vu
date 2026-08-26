@@ -36,7 +36,7 @@ func TestSafeLineIsTheOneThatCannotStartALine(t *testing.T) {
 // (#1863).
 func TestTheListingRowsUseTheLineSafeForm(t *testing.T) {
 	rows := regexp.MustCompile(`Fprintf\((?:stdout|w),\s*"[^"]*\\n"[^)]*search\.SafeText\(`)
-	for _, file := range []string{"fix.go", "how.go"} {
+	for _, file := range []string{"fix.go", "how.go", "mcp.go"} {
 		src, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
