@@ -6,6 +6,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // What a compaction actually costs, measured on 58 transcripts and 43
@@ -45,8 +46,14 @@ func compactEvidence(dir, sessionID string) string {
 	if err != nil || !ok {
 		return ""
 	}
+	// Both lists come from the session's own records, and a record can be a path
+	// or a command the parser lifted out of a tool call — whatever the harness
+	// wrote into the payload, escape bytes included (#2000). Cleaned where the
+	// entry is normalised, so the dedup sees one entry rather than two
+	// spellings of it.
 	files := lastDistinct(s.Messages, "files", compactEvidenceFiles,
-		func(text string) []string { return strings.Split(text, "\n") }, trimPath)
+		func(text string) []string { return strings.Split(text, "\n") },
+		func(p string) string { return search.SafeLine(trimPath(p)) })
 	commands := lastDistinct(s.Messages, "command", compactEvidenceCommands,
 		func(text string) []string {
 			// A multi-line command is a heredoc or a pasted script. Truncated to
@@ -55,7 +62,7 @@ func compactEvidence(dir, sessionID string) string {
 				return nil
 			}
 			return []string{text}
-		}, func(c string) string { return c })
+		}, search.SafeLine)
 	if len(files) == 0 && len(commands) == 0 {
 		return ""
 	}
