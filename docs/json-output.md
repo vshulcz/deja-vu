@@ -494,7 +494,9 @@ one from something that is not deja, is skipped rather than shown with a missing
 half. The same rule decides what the counters in `stats --json` read, so the two
 never disagree about whether something happened.
 
-`deja log --last --json` is a different shape: one object, the most recent
+`deja log --last --json` is `null` when no digest has been recorded — one object
+is the shape, and that is how a missing one is spelled. It is a different shape
+from the array above: one object, the most recent
 injected digest itself. It carries `t` and `kind` as above, the `digest` text,
 `bytes`, and — each omitted when empty — `sessions`, the `policy` that allowed
 the injection, the `terms` behind a déjà vu firing, and `into`, the agent session

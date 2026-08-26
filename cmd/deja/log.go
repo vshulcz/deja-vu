@@ -42,6 +42,14 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 	if last {
 		snaps := usage.Snapshots(dir, 1)
 		if len(snaps) == 0 {
+			// `--json` answers in JSON, including when the answer is that
+			// there is nothing: this shape is one object, and null is how a
+			// missing object is spelled. The sentence went out under the flag
+			// too, so a script polling this got a parse error (#1975).
+			if jsonOut {
+				fmt.Fprintln(w, "null")
+				return nil
+			}
 			fmt.Fprintln(w, "deja: no injected digests recorded yet — they appear after a hook or MCP recall fires")
 			return nil
 		}
