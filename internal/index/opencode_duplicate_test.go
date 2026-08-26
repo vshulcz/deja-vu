@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // seedTimelessOpencodeSession writes a session with nothing for the index to
@@ -82,5 +85,65 @@ func TestAnOpencodeSessionReadAgainDoesNotDouble(t *testing.T) {
 		if got := messages(); got != 1 {
 			t.Fatalf("one turn on disk, %d in the index after pass %d", got, i+1)
 		}
+	}
+}
+
+// The other side of the same rule: a store read from a watermark hands back the
+// new turns alone, so dropping its old records by key would take the rest of the
+// session with them. This is the common case — every continued opencode session.
+func TestAContinuedOpencodeSessionKeepsItsEarlierTurns(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 CLI not available")
+	}
+	tmp := t.TempDir()
+	setHome(t, tmp)
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_GOOSE_DB", filepath.Join(tmp, "none-goose.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+	db := filepath.Join(tmp, "opencode.db")
+	t.Setenv("DEJA_OPENCODE_DB", db)
+
+	seedOpencodeSession(t, db, "s1", "the first turn is about pgbouncer", 1785166187000)
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The premise, and the difference from the case above: this store has a
+	// watermark, so the next pass reads only what is newer than it.
+	if m.Files[db].LastUpdated == 0 {
+		t.Fatal("the store has no watermark, so the pass below reads it whole and measures the other case")
+	}
+
+	stmts := `insert into message values ('m2-s1','s1','{"role":"assistant","time":{"created":1785166787000}}',1785166787000);
+insert into part values ('p2-s1','m2-s1',json_object('type','text','text','the second turn is the answer','time',json_object('start',1785166787000)));
+update session set time_updated=1785166787000 where id='s1';`
+	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite3: %v %s", err, out)
+	}
+	var said strings.Builder
+	if err := Ensure(dir, "", false, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "incremental index") {
+		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said.String())
+	}
+	s, ok, err := FindByIdentity(dir, "opencode", "s1")
+	if err != nil || !ok {
+		t.Fatalf("the session did not come back: %v %v", ok, err)
+	}
+	if len(s.Messages) != 2 {
+		texts := []string{}
+		for _, msg := range s.Messages {
+			texts = append(texts, msg.Text)
+		}
+		t.Errorf("the session continued and came back with %d turns: %v", len(s.Messages), texts)
+	}
+	if hits, err := Search(dir, search.Options{Query: "pgbouncer", All: true}); err != nil || len(hits) == 0 {
+		t.Errorf("the first turn is no longer searchable (%d hits, %v)", len(hits), err)
 	}
 }
