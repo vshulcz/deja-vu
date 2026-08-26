@@ -535,6 +535,14 @@ func editSpansIn(v any, d toolDialect) []string {
 		if path == "" {
 			continue
 		}
+		// The record is "path\nspan" and restore splits it on the first
+		// newline, so a path carrying one puts the rest of itself at the head
+		// of the span — handed back as the exact bytes that stopped existing
+		// (#2042). The format cannot hold such a path, so the span is not
+		// recorded rather than recorded wrong.
+		if strings.ContainsAny(path, "\n\r") {
+			continue
+		}
 		old, _ := in[d.oldSpanKey()].(string)
 		spans := []string{old}
 		if edits, ok := in["edits"].([]any); ok {

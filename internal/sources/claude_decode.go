@@ -436,6 +436,12 @@ func claudeEditSpans(raw json.RawMessage) []string {
 		if path == "" {
 			continue
 		}
+		// "path\nspan" cannot hold a path with a newline in it, and restore
+		// hands the overflow back as file content (#2042). editSpansIn, the
+		// reference parser this one must agree with, drops the same edits.
+		if strings.ContainsAny(path, "\n\r") {
+			continue
+		}
 		spans := []string{part.Input.OldString}
 		for _, e := range part.Input.Edits {
 			spans = append(spans, e.OldString)
