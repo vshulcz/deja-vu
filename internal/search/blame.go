@@ -138,6 +138,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			text  string
 			count int
 			level float64
+			role  string
 		}
 		var mentions []mention
 		for _, message := range session.Messages {
@@ -149,7 +150,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			if level > specificity {
 				specificity = level
 			}
-			mentions = append(mentions, mention{message.Text, count, level})
+			mentions = append(mentions, mention{message.Text, count, level, message.Role})
 		}
 		// A path-shaped mention outranks a bare filename however often the bare
 		// name is repeated; among equally specific ones, the message that keeps
@@ -161,7 +162,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			return mentions[i].count > mentions[j].count
 		})
 		for i := 0; i < len(mentions) && i < 2; i++ {
-			hit.Snippets = append(hit.Snippets, snippet(mentions[i].text, target.Base, nil))
+			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target))
 		}
 		if hit.Count == 0 {
 			continue
@@ -337,6 +338,69 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 			}
 		}
 	}
+}
+
+// blameSnippet renders one mention. The prose path collapses runs of whitespace
+// — right for a sentence, wrong for a file whose name holds two spaces, which
+// came back with one and then found nothing when it was pasted into restore
+// (#2044). A files record is a list of paths, so the line that names the file is
+// printed as a path instead.
+func blameSnippet(text, role string, target BlameTarget) string {
+	switch role {
+	case "files":
+		if line := pathLineFor(text, target); line != "" {
+			return SafePath(line)
+		}
+	case "edit":
+		// An edit is "path\nspan": the first line is the file, the rest is what
+		// stopped existing and is prose as far as a snippet goes.
+		path, span, _ := strings.Cut(text, "\n")
+		if pathLineFor(path, target) != "" {
+			return strings.TrimSpace(SafePath(path) + " " + snippet(span, target.Base, nil))
+		}
+	}
+	return snippet(text, target.Base, nil)
+}
+
+// pathLineFor picks the line of a record that names the file blame was asked
+// about. By the file's own name, not by containing it: "mypool.go" contains
+// "pool.go", and printing a sibling as the answer is the same wrong-path bug
+// this renderer exists to fix. The full path wins over a bare match, so a
+// vendored copy does not stand in for the file itself.
+func pathLineFor(text string, target BlameTarget) string {
+	base := strings.ToLower(target.Base)
+	full := crossSlash(target.FullPath)
+	fallback := ""
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		slashed := crossSlash(trimmed)
+		if full != "" && slashed == full {
+			return line
+		}
+		if crossBase(trimmed) == base && fallback == "" {
+			fallback = line
+		}
+	}
+	return fallback
+}
+
+// crossSlash and crossBase read a path the way the rest of deja does: a store
+// synced from Windows holds "C:\\src\\app\\x.go", and on a unix host
+// filepath sees one segment — which made the picker miss the line and fall back
+// to the prose renderer, quietly bringing the collapsing back (#2044).
+func crossSlash(p string) string {
+	return strings.ToLower(strings.ReplaceAll(p, "\\", "/"))
+}
+
+func crossBase(p string) string {
+	s := crossSlash(p)
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		return s[i+1:]
+	}
+	return s
 }
 
 // BlameLifecycleLine words a withdrawn decision for blame the way search words

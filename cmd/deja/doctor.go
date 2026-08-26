@@ -570,7 +570,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		// A store path can come from the environment (DEJA_NOTES_FILE) or from
 		// disk. On a fixed-width row a newline in it prints a line of its own
 		// that reads as one of doctor's.
-		line := fmt.Sprintf("  %-12s %-9s %s", name, status, search.SafeLine(path))
+		line := fmt.Sprintf("  %-12s %-9s %s", name, status, search.SafePath(path))
 		if detail != "" {
 			line += "  (" + detail + ")"
 		}

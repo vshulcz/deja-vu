@@ -716,7 +716,7 @@ func restoreMap[V any](live, saved map[string]V) {
 // fail (#1847). The directory beside it has been sanitised since it was first
 // printed; the file was not.
 func batchName(path string) string {
-	return search.SafeLine(filepath.Base(path))
+	return search.SafePath(filepath.Base(path))
 }
 
 // skippedError reports the files an import could not read, after the ones it

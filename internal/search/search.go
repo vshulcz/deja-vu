@@ -2215,6 +2215,41 @@ func SafeLine(s string) string {
 	return strings.Join(strings.Fields(SafeText(s)), " ")
 }
 
+// SafePath is SafeLine for a path, which is an identifier rather than prose: it
+// strips what a terminal would obey and keeps the result on one line, but the
+// spaces inside a name are part of the name. Collapsing them made blame print
+// "/tmp/app/two spaces.go" for a file with two, and restoring that printed path
+// found nothing (#2044).
+func SafePath(s string) string {
+	if s == "" {
+		return ""
+	}
+	// SafeText leaves only newline and tab standing, and both have to go: this
+	// is one row of something structured. One space each rather than a run
+	// collapsed, which is the whole point.
+	cleaned := strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return ' '
+		}
+		return r
+	}, SafeText(s))
+	return clipPath(strings.Trim(cleaned, " "))
+}
+
+// pathCap bounds a printed path. Long enough for any real one, short enough
+// that a transcript-supplied string cannot fill a terminal or an MCP payload.
+const pathCap = 300
+
+// clipPath bounds a path the way clip bounds an answer, from the left: a path
+// is recognised by its tail, and the head is what a reader gives up first.
+func clipPath(s string) string {
+	r := []rune(s)
+	if len(r) <= pathCap {
+		return s
+	}
+	return "…" + string(r[len(r)-pathCap+1:])
+}
+
 func unsafeForTerminal(r rune) bool {
 	if r == '\n' || r == '\t' {
 		return false

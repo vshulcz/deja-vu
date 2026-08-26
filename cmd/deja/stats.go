@@ -185,7 +185,7 @@ func runStats(dir string, args []string) error {
 			return err
 		}
 		base := filepath.Base(path)
-		fmt.Fprintf(os.Stdout, "saved %s\n\nshare it — paste into a README or post:\n  ![deja](%s)\n", search.SafeLine(path), search.SafeLine(base))
+		fmt.Fprintf(os.Stdout, "saved %s\n\nshare it — paste into a README or post:\n  ![deja](%s)\n", search.SafePath(path), search.SafePath(base))
 		return nil
 	}
 	if htmlPath != "" {
@@ -193,7 +193,7 @@ func runStats(dir string, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, search.SafeLine(path))
+		fmt.Fprintln(os.Stdout, search.SafePath(path))
 		return nil
 	}
 	if jsonOut {
