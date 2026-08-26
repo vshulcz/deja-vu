@@ -297,14 +297,27 @@ func gitWorktreeRoots(cwd string) []string {
 	if err != nil {
 		return nil
 	}
+	// Every root, including a lone one. It used to be dropped as "nothing
+	// beyond cwd's own names", which holds only when the caller is standing at
+	// that root: from a package directory inside it the root is the one name
+	// the caller does not have, and it is the project recall is scoped by — so
+	// an agent started anywhere but the top of its repository had no memory at
+	// all (#2037). At the root itself the names are the same computation on the
+	// same path and dedupe away, and a root spelled differently — through a
+	// symlink — is a spelling recall wants to see.
 	var roots []string
 	for _, line := range strings.Split(string(out), "\n") {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok && strings.TrimSpace(p) != "" {
-			roots = append(roots, strings.TrimSpace(p))
+		p, ok := strings.CutPrefix(line, "worktree ")
+		p = strings.TrimSpace(p)
+		if !ok || p == "" {
+			continue
 		}
-	}
-	if len(roots) < 2 {
-		return nil // a single worktree adds nothing beyond cwd's own names
+		// Inside a submodule git names the gitdir rather than the working tree,
+		// and ".git/modules/sub" is not a project anybody worked in.
+		if strings.Contains(filepath.ToSlash(p), "/.git/") {
+			continue
+		}
+		roots = append(roots, p)
 	}
 	return roots
 }
