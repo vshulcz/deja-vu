@@ -32,7 +32,9 @@ func TestEverySentenceAboutTheDirectoryIsSafeToPrint(t *testing.T) {
 		}
 		dir := filepath.Join(base, odd+"-dir")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
+			// The sibling case above already skips on a refused name; this one
+			// called it fatal, and Windows refuses an escape byte in a path.
+			t.Skipf("the filesystem refused the name: %v", err)
 		}
 		if err := os.Chmod(dir, 0o000); err != nil {
 			t.Skipf("cannot drop permissions: %v", err)
