@@ -1995,6 +1995,89 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 }
 
+// fromDatabase reports whether a record came out of a shared store rather than
+// a file of its own, which is what exempts it from the changed-file rule: the
+// database changes whenever any session in it does, and dropping every record
+// that names it would take the untouched sessions along.
+//
+// The path settles it for goose and cursor, which name the database as the
+// session's path. opencode names the project directory, so nothing about its
+// path says "database" — the key names the harness, and opencode has no
+// per-file kind to confuse it with (#2033).
+func fromDatabase(r Record) bool {
+	// The key first, and only for opencode: it has one store and no per-file
+	// kind, so nothing else carries an "opencode:" key and no path can
+	// contradict it. Asking the path first got this wrong for an opencode
+	// project that lives inside another harness's root — a versioned ~/.claude,
+	// say — where harnessForPath answers with that harness's kind.
+	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
+		return true
+	}
+	switch h := harnessForPath(r.SourcePath); h {
+	case "cursor-db", "goose-db":
+		return true
+	default:
+		// A path that names a per-file kind settles it: two transcripts in
+		// different projects can share a filename-derived id, and judging those
+		// by key erased the sibling that was never re-read (#699).
+		return false
+	}
+}
+
+// readWholeThisPass reports whether the pass re-read this record's store in
+// full. Only then may an old record be dropped because its key came back: a
+// store read from a watermark hands back the new turns alone, and dropping the
+// rest by key would take the earlier turns of a continued session with them.
+//
+// By store rather than by harness where the record names one: cursor keeps a
+// database per workspace as well as the global one, and a first sight of a new
+// workspace — opening a project — has no watermark, so a harness-wide flag let
+// that pass replace sessions in the store it had only read the tail of.
+func readWholeThisPass(r Record) bool {
+	if len(passWholeStores) == 0 {
+		return false
+	}
+	switch harnessForPath(r.SourcePath) {
+	case "cursor-db", "goose-db":
+		return passWholeStores[r.SourcePath]
+	}
+	harness, _, ok := strings.Cut(r.Key, ":")
+	return ok && passWholeStores[harness]
+}
+
+// passWholeStores names the database-backed stores this pass read whole, by
+// harness. Package state for the same reason passParsed is: a pass holds the
+// directory lock.
+var passWholeStores map[string]bool
+
+// wholeStoresThisPass records them, under both the store path and the harness:
+// a record names the first where it can and the second otherwise.
+//
+// Only these three stores are stamped with a watermark (setStoreLastUpdated).
+// Everything else is read whole on every pass and judged by its path, which is
+// why it needs none of this — a watermark added to another database later would
+// have to join fromDatabase and this function in the same change.
+func wholeStoresThisPass(changed, old map[string]FileState) {
+	passWholeStores = map[string]bool{}
+	for p := range changed {
+		harness := ""
+		switch harnessForPath(p) {
+		case "opencode":
+			harness = "opencode"
+		case "cursor-db":
+			harness = "cursor"
+		case "goose-db":
+			harness = "goose"
+		default:
+			continue
+		}
+		if old[p].LastUpdated == 0 || rereadsWholeSessions(p) {
+			passWholeStores[harness] = true
+			passWholeStores[p] = true
+		}
+	}
+}
+
 // rereadsWholeSessions marks a store whose cursor selects sessions rather than
 // messages: goose asks for every message of any session touched since the
 // stamp, so a continued session hands back turns already counted, and adding
@@ -2050,6 +2133,7 @@ func beginPass() {
 	sources.DiagSnapshot()
 	passParsed = nil
 	passRead = nil
+	passWholeStores = nil
 }
 
 // passParsed is the set of files the pass in progress re-read. Package state
@@ -2229,6 +2313,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// append path's — a db's counts can only grow until a full rebuild.
 	reread := fullyReadFiles(changed, old.Files)
 	parsedThisPass(reread)
+	wholeStoresThisPass(changed, old.Files)
 	// A file the pass read is a file that opens, whether or not it read all of
 	// it, so an error recorded when it did not has to go.
 	readThisPass(changed)
@@ -2337,8 +2422,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// watermark, so their untouched sessions are NOT re-emitted on a
 		// change — they must be retained, not dropped, or they vanish.
 		// Superseded sessions are handled by replaceKeys.
-		h := harnessForPath(r.SourcePath)
-		sharedStore := h == "opencode" || h == "cursor-db" || h == "goose-db"
+		fromStore := fromDatabase(r)
 		// replaceKeys is scoped to shared stores. A shared store is parsed since
 		// a watermark, so a superseded session's old record is not re-read and
 		// clause two never reaches it — replaceKeys is what drops it. For a
@@ -2347,7 +2431,11 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// hurts: two transcripts in different projects can share a filename-derived
 		// id, and dropping by key alone erased the sibling that was never re-read
 		// (#699). The record's own SourcePath decides its fate for those.
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !sharedStore) || (sharedStore && replaceKeys[r.Key]) {
+		//
+		// And only when the pass read that store whole: a store read from its
+		// watermark hands back the new turns alone, so dropping the rest by key
+		// would take the earlier turns of every continued session (#2033).
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore) || (fromStore && readWholeThisPass(r) && replaceKeys[r.Key]) {
 			return
 		}
 		recErr = addRec(r)
