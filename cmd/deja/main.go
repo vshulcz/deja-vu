@@ -963,7 +963,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	// Before ranking, not after: the cap is applied while ranking, so a rule
 	// that runs later still lets denied sessions occupy the result slots and
 	// the allowed ones never reach the page (#1060).
-	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutScratch(result.Sessions))
+	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(result.Sessions))
 	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
 	if result.Neighbour {

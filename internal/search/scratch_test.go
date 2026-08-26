@@ -38,7 +38,7 @@ func TestAScratchTranscriptDoesNotOutrankTheAnswer(t *testing.T) {
 		},
 	}
 
-	hits, err := Run(WithoutScratch([]model.Session{echo, answered}), Options{Query: "who should send the claudeworkshop email", All: true})
+	hits, err := Run(WithoutIgnored([]model.Session{echo, answered}), Options{Query: "who should send the claudeworkshop email", All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestOrdinaryWorkIsNotMistakenForScratch(t *testing.T) {
 					{Role: "assistant", Text: "Root cause was the batch cutoff timezone. We pinned it to UTC.", Time: now},
 				},
 			}
-			hits, err := Run(WithoutScratch([]model.Session{s}), Options{Query: "exporter drops rows midnight", All: true})
+			hits, err := Run(WithoutIgnored([]model.Session{s}), Options{Query: "exporter drops rows midnight", All: true})
 			if err != nil {
 				t.Fatal(err)
 			}
