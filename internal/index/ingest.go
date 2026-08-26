@@ -658,6 +658,16 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 	return line
 }
 
+// totalMalformed is malformedByHarness summed: the incremental line names the
+// pass, not a store.
+func totalMalformed() int {
+	n := 0
+	for _, c := range malformedByHarness() {
+		n += c
+	}
+	return n
+}
+
 // malformedByHarness folds the per-file malformed counts the parsers reported
 // this run into per-store totals, without draining them: the manifest fold that
 // doctor reads from runs later and takes the same numbers.
@@ -2024,7 +2034,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return nil
 	}
 	if len(removed) == 0 && canAppendIncremental(changed, old.Files) {
-		filesTouched, messages, err := appendIncremental(dir, harness, scope, old, files, changed)
+		filesTouched, messages, unreadable, err := appendIncremental(dir, harness, scope, old, files, changed)
 		if IsCorrupt(err) {
 			if progress != nil {
 				fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
@@ -2035,7 +2045,15 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			return fmt.Errorf("append: %w", err)
 		}
 		if progress != nil {
-			fmt.Fprintf(progress, "deja: updated %d file%s (%d new message%s)\n", filesTouched, pluralS(filesTouched), messages, pluralS(messages))
+			line := fmt.Sprintf("deja: updated %d file%s (%d new message%s)", filesTouched, pluralS(filesTouched), messages, pluralS(messages))
+			// After the first build every run a person sees is this one, so a
+			// clause that lives only in the full pass is a clause nobody reads
+			// (#2007). Same counters, summed across the stores this pass
+			// touched — the line is about the pass rather than one store.
+			if unreadable > 0 {
+				line += fmt.Sprintf(" — %d line%s skipped, deja could not read %s", unreadable, pluralS(unreadable), pluralThem(unreadable))
+			}
+			fmt.Fprintln(progress, line)
 		}
 		return nil
 	}
@@ -2328,7 +2346,7 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 	return true
 }
 
-func appendIncremental(dir, harness, scope string, old Manifest, files map[string]FileState, changed map[string]FileState) (int, int, error) {
+func appendIncremental(dir, harness, scope string, old Manifest, files map[string]FileState, changed map[string]FileState) (filesTouched, messages, unreadable int, err error) {
 	// This pass's counts, like the two full paths: an incremental that nobody
 	// read between builds otherwise reported its own colliding ids plus the
 	// ones before it (#1850).
@@ -2337,7 +2355,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	lastIngestFiles = len(changed)
 	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	// The log is being APPENDED to, so ids must continue where the existing
 	// records left off. Starting a fresh table would hand id 0 to a new
@@ -2346,7 +2364,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	rw, err := newRecordWriter(rf, tbl)
 	if err != nil {
 		_ = rf.Close()
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	defer func() { _ = rw.Close() }()
 	buckets := bucketPostings{}
@@ -2376,7 +2394,6 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if m.Sessions == nil {
 		m.Sessions = map[string]SessionMeta{}
 	}
-	filesTouched, messages := 0, 0
 	// Sorted, not map order: two sessions can claim the same harness:id, and
 	// which one wins decided the project a whole conversation was filed under
 	// — differently on every run (#698).
@@ -2460,7 +2477,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				}
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
 				if err != nil {
-					return filesTouched, messages, err
+					return filesTouched, messages, 0, err
 				}
 				messages++
 				seen := map[string]bool{}
@@ -2471,7 +2488,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					seen[tok] = true
 					data, err := loadBucket(tok)
 					if err != nil {
-						return filesTouched, messages, err
+						return filesTouched, messages, 0, err
 					}
 					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
 				}
@@ -2479,17 +2496,20 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		}
 	}
 	if err := rw.Close(); err != nil {
-		return filesTouched, messages, err
+		return filesTouched, messages, 0, err
 	}
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
-		return filesTouched, messages, err
+		return filesTouched, messages, 0, err
 	}
 	setOpencodeLastUpdated(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
+	// Read before writeManifest: the fold in there drains the counters, and the
+	// caller prints its line after this returns (#2007).
+	unreadable = totalMalformed()
 	if err := writeManifest(dir, m); err != nil {
-		return filesTouched, messages, err
+		return filesTouched, messages, unreadable, err
 	}
-	return filesTouched, messages, nil
+	return filesTouched, messages, unreadable, nil
 }
 
 func sameFile(a, b FileState) bool {

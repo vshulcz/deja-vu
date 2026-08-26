@@ -153,7 +153,7 @@ func TestAppendIncrementalDirectDefensiveBranches(t *testing.T) {
 	old := Manifest{Files: map[string]FileState{}, Sessions: nil}
 	changed := map[string]FileState{unknown: {Path: unknown, Size: 1}}
 	files := map[string]FileState{unknown: {Path: unknown, Size: 1}}
-	if _, _, err := appendIncremental(filepath.Join(tmp, "idx"), "", "", old, files, changed); err != nil {
+	if _, _, _, err := appendIncremental(filepath.Join(tmp, "idx"), "", "", old, files, changed); err != nil {
 		t.Fatalf("appendIncremental defensive branches err=%v", err)
 	}
 	if _, ok := files[unknown]; ok {
