@@ -68,7 +68,7 @@ func TestAnIncrementalRunSaysWhatItCouldNotRead(t *testing.T) {
 		t.Fatalf("the pass counted %d unreadable lines, so there is nothing for the run to report", got)
 	}
 
-	if !strings.Contains(said, "1 line") {
+	if !strings.Contains(said, "— 1 line skipped") {
 		t.Errorf("the run that read the loss never mentioned it:\n%s", said)
 	}
 }
