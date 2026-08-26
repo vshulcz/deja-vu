@@ -49,6 +49,16 @@ func TestCompactEvidenceStripsControlBytes(t *testing.T) {
 				"input": map[string]any{"file_path": "/tmp/app/pool" + esc + ".go"}},
 			map[string]any{"type": "tool_use", "name": "Bash",
 				"input": map[string]any{"command": "psql -c 'show pool" + esc + "'"}},
+			// The same path twice, once with a stray byte on the end. Cleaning
+			// the entry without deduping on the cleaned spelling printed it as
+			// two identical rows out of a block budgeted at eight. A bare
+			// control byte, not an escape sequence: SafeText replaces the ESC
+			// and leaves the "[31m" behind, which is a different path and
+			// should stay a different row.
+			map[string]any{"type": "tool_use", "name": "Read",
+				"input": map[string]any{"file_path": "/tmp/app/retry.go\u0007"}},
+			map[string]any{"type": "tool_use", "name": "Read",
+				"input": map[string]any{"file_path": "/tmp/app/retry.go"}},
 		}},
 	})
 	if err := os.WriteFile(filepath.Join(dir, "s1.jsonl"), []byte(user+"\n"+asst+"\n"), 0o644); err != nil {
@@ -63,6 +73,9 @@ func TestCompactEvidenceStripsControlBytes(t *testing.T) {
 	// here means the records never arrived rather than that they were stripped.
 	if !strings.Contains(got, "files it touched:") || !strings.Contains(got, "psql") {
 		t.Fatalf("the block is missing the rows this is about:\n%q", got)
+	}
+	if n := strings.Count(got, "retry.go"); n != 1 {
+		t.Errorf("the same path with and without a stray byte is one row, printed %d times:\n%q", n, got)
 	}
 	for _, r := range got {
 		if r != '\n' && r != '\t' && unicode.IsControl(r) {

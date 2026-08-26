@@ -48,9 +48,7 @@ func compactEvidence(dir, sessionID string) string {
 	}
 	// Both lists come from the session's own records, and a record can be a path
 	// or a command the parser lifted out of a tool call — whatever the harness
-	// wrote into the payload, escape bytes included (#2000). Cleaned where the
-	// entry is normalised, so the dedup sees one entry rather than two
-	// spellings of it.
+	// wrote into the payload, escape bytes included (#2000).
 	files := lastDistinct(s.Messages, "files", compactEvidenceFiles,
 		func(text string) []string { return strings.Split(text, "\n") },
 		func(p string) string { return search.SafeLine(trimPath(p)) })
@@ -94,11 +92,18 @@ func lastDistinct(ms []model.Message, role string, limit int, split func(string)
 		}
 		for _, p := range split(ms[i].Text) {
 			p = strings.TrimSpace(p)
-			if p == "" || seen[p] || isScratch(p) {
+			if p == "" || isScratch(p) {
 				continue
 			}
-			seen[p] = true
-			out = append(out, format(p))
+			// Distinct as printed, not as stored: format trims a path to its
+			// last segments and strips control bytes, so two records that
+			// differ only in what it removes are one row, printed twice.
+			f := format(p)
+			if f == "" || seen[f] {
+				continue
+			}
+			seen[f] = true
+			out = append(out, f)
 			if len(out) >= limit {
 				break
 			}
