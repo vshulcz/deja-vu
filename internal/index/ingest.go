@@ -85,6 +85,21 @@ func mergeIngestDiag(m *Manifest) {
 		e.Error = msg
 		m.IngestFiles[p] = e
 	}
+	// A file this pass read is a file that opens. Only the error goes: the bad
+	// lines it counted are still in the part already indexed.
+	for p := range passRead {
+		if failed[p] != "" {
+			continue
+		}
+		if e, ok := m.IngestFiles[p]; ok && e.Error != "" {
+			e.Error = ""
+			if e.Malformed == 0 {
+				delete(m.IngestFiles, p)
+			} else {
+				m.IngestFiles[p] = e
+			}
+		}
+	}
 	// A file deja no longer walks has nothing left to report. Kept for a file
 	// that failed to open, which is exactly the file a walk may not see.
 	for p, e := range m.IngestFiles {
@@ -102,7 +117,7 @@ func mergeIngestDiag(m *Manifest) {
 	// The set belongs to the pass that recorded it. Left standing, it deleted
 	// those files' entries again on the next manifest write in the process —
 	// and `deja sync` writes one, from Import, right after a pass.
-	passParsed = nil
+	passParsed, passRead = nil, nil
 }
 
 // healthFromFiles sums the per-file counts per harness. The clip count is not
@@ -2002,12 +2017,29 @@ func copyIngestFiles(old map[string]FileIngest) map[string]FileIngest {
 func beginPass() {
 	sources.DiagSnapshot()
 	passParsed = nil
+	passRead = nil
 }
 
 // passParsed is the set of files the pass in progress re-read. Package state
 // for the same reason lastIngestFiles is: a pass holds the directory lock, so
 // only one is ever in flight.
 var passParsed map[string]bool
+
+// passRead is the files a pass read without the open failing. The append path
+// cannot use parsedThisPass — it reads a tail, so its counts add — but a file
+// it read is a file that opens, and an error recorded when it did not has to
+// go, or a permission blip stayed in doctor until a forced rebuild (#2015).
+var passRead map[string]bool
+
+// readThisPass records a file a pass opened and parsed.
+func readThisPass(files map[string]FileState) {
+	if passRead == nil {
+		passRead = map[string]bool{}
+	}
+	for p := range files {
+		passRead[p] = true
+	}
+}
 
 // parsedThisPass records which files a pass read, so the fold can start their
 // counts over rather than adding to what an earlier pass left (#2015).
@@ -2433,6 +2465,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	emptied.Store(0)
 	collisions.Store(0)
 	lastIngestFiles = len(changed)
+	readThisPass(changed)
 	// Deliberately not parsedThisPass: this path reads the appended tail, not
 	// the file, so what it finds adds to the file's count instead of replacing
 	// it. Marking the file re-read dropped every bad line in the part already

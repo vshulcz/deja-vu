@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -230,5 +231,58 @@ func TestAClippedMessageIsCountedOncePerPass(t *testing.T) {
 		if got := clipped(); got != 1 {
 			t.Fatalf("one long message in the file, rewrite %d says %d clipped", i+1, got)
 		}
+	}
+}
+
+// A file that failed to open once and then reads fine has to stop being
+// reported: transcripts are append-only, so the append path is the one that
+// reads it again, and it is the path that cannot clear an entry by re-reading.
+// Left alone, a permission blip stayed in doctor until a forced rebuild.
+func TestAFileThatOpensAgainStopsBeingReportedUnreadable(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("file permissions do not stop a read here")
+	}
+	dir, proj, turn := healthFixture(t)
+	path := filepath.Join(proj, "s1.jsonl")
+	if err := os.WriteFile(path, []byte(turn("s1", "2026-01-02T03:04:05Z", "user", "why does pgbouncer time out")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	failed := func() int {
+		t.Helper()
+		m, err := readManifest(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.IngestHealth["claude"].FailedFiles
+	}
+	if got := failed(); got != 1 {
+		t.Fatalf("the unreadable file was reported %d times, so this measures nothing", got)
+	}
+
+	// The blip passes and the session carries on, which is an append.
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(turn("s1", "2026-01-02T03:05:00Z", "assistant", "raised the pool to 40")); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := failed(); got != 0 {
+		t.Errorf("deja read the file and still reports %d unreadable", got)
 	}
 }
