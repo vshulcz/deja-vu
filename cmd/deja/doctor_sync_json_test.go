@@ -122,7 +122,9 @@ func TestTheJSONReportNamesThePeerExactly(t *testing.T) {
 	if err := runDoctor(&out, []string{"--json", "--offline"}, stubLookup("1.0.0", false), index.DefaultDir()); err != nil {
 		t.Fatal(err)
 	}
-	// The bytes on the wire carry no raw escape: the encoder wrote .
+	// The bytes on the wire carry no raw escape or rewind: an escape byte is
+	// written as the six characters of a \u001b sequence, and this asserts on
+	// the bytes rather than on what a terminal would make of them.
 	if strings.ContainsAny(out.String(), "\x1b\r") {
 		t.Errorf("the encoded report carries a raw escape or rewind")
 	}
