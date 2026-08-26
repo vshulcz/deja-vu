@@ -131,7 +131,7 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 	// cost every later one too: appended onto the partial line, the new digest
 	// parsed as nothing either, and `deja log --last` reported no injection at
 	// all on a machine that had just served two (#1965).
-	if endsMidLine(f) {
+	if atomicfile.EndsMidLine(f) {
 		b = append([]byte{'\n'}, b...)
 	}
 	_, _ = f.Write(append(b, '\n'))

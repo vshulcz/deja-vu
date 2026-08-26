@@ -224,25 +224,10 @@ func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int6
 	// one too: appended onto the partial line, so that line no longer parsed
 	// either and a recall deja had just served went missing from every count
 	// (#1901). One byte of reading closes the line first.
-	if endsMidLine(f) {
+	if atomicfile.EndsMidLine(f) {
 		b = append([]byte{'\n'}, b...)
 	}
 	_, _ = f.Write(append(b, '\n'))
-}
-
-// endsMidLine reports whether the log's last byte is anything but a newline.
-// A file that cannot be read is treated as ending cleanly: a usage event must
-// never be the reason a recall fails.
-func endsMidLine(f *os.File) bool {
-	fi, err := f.Stat()
-	if err != nil || fi.Size() == 0 {
-		return false
-	}
-	var last [1]byte
-	if _, err := f.ReadAt(last[:], fi.Size()-1); err != nil {
-		return false
-	}
-	return last[0] != '\n'
 }
 
 // InjectedToday returns session-start context bytes injected since local midnight.

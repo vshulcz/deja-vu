@@ -565,11 +565,18 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 	if fi, err := os.Stat(p); err == nil && fi.Size() > 1<<20 {
 		rotateHookseen(p, sid)
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	// O_RDWR so the append can read the last byte first: a hook killed before
+	// its newline leaves half a line, and writing onto it costs the record
+	// written after — a session deja then does not know it has shown, which is
+	// this file's whole job (#1967).
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
 	defer f.Close()
+	if atomicfile.EndsMidLine(f) {
+		_, _ = f.WriteString("\n")
+	}
 	stamp := time.Now().UTC().Format(time.RFC3339)
 	for _, s := range ss {
 		fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
@@ -610,13 +617,16 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 	if sid == "" {
 		return
 	}
-	f, err := os.OpenFile(dir+".hookseen", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	f, err := os.OpenFile(dir+".hookseen", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
 	defer f.Close()
 	if fi, err := f.Stat(); err == nil && fi.Size() > 1<<20 {
 		return
+	}
+	if atomicfile.EndsMidLine(f) {
+		_, _ = f.WriteString("\n")
 	}
 	for _, id := range ids {
 		fmt.Fprintf(f, "%s %s\n", sid, id)
