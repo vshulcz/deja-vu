@@ -11,11 +11,14 @@ func TestTheExitMarkerIsReadAsASuffix(t *testing.T) {
 		name, cmd, want string
 		ok              bool
 	}{
+		// Neither writer emits a zero — both guard on code > 0 — so this row
+		// pins the reader's rule rather than a shape found on disk.
 		{"a recorded success", "go test ./...  → exit 0", "go test ./...", true},
 		{"a recorded failure", "go test ./...  → exit 1", "go test ./...", false},
 		{"nothing recorded", "go test ./...", "go test ./...", true},
 		{"the command says it", `echo "→ exit 0"`, `echo "→ exit 0"`, true},
 		{"and says it while failing", `echo "→ exit 0"  → exit 1`, `echo "→ exit 0"`, false},
+		// This one held before the fix too: LastIndex already found the suffix.
 		{"a grep for the marker", `grep -n "→ exit " log.txt  → exit 0`, `grep -n "→ exit " log.txt`, true},
 		{"a code that is not a number", "go test ./...  → exit later", "go test ./...  → exit later", true},
 		{"a many-digit code", "go test ./...  → exit 130", "go test ./...", false},
