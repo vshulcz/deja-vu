@@ -488,13 +488,13 @@ func measurePrompt(seed int64) (promptReport, error) {
 // opening line came from the top of a long transcript does not, and that line
 // is the whole frame an agent reads before deciding to ignore the rest.
 func shownLineCarriesATerm(dir, project string, terms []string) bool {
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
 	var keep []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, s)
@@ -526,7 +526,7 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 // and reports whether its first quoted line carries the subject rather than an
 // ordinary word the question shares with the same session.
 func firstShownLineCarries(dir, project string, terms []string, topic string) bool {
-	ranked, matched, _, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return false
 	}
@@ -535,7 +535,7 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, ranked[i])
@@ -557,14 +557,14 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 // blockCarries builds the block the hook would inject and reports whether it
 // holds a distinctive word of what the session concluded.
 func blockCarries(dir, project string, terms []string, fact, topic string) bool {
-	ranked, matched, _, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return false
 	}
 	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, ranked[i])
@@ -603,7 +603,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}
@@ -611,7 +611,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 		// The same bar the hook applies, from the same function — kept in one
 		// place because the two drifted: this one asked whether the query held
 		// an identifier, the hook asked whether the session did.
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		if len(s.Messages) > dejaVuMaxMessages {
@@ -643,13 +643,13 @@ func finishPromptArm(arm *promptArmReport, terms []int) {
 // blockOpensOnEcho reports whether the first line the agent would read is the
 // question it just asked, handed back.
 func blockOpensOnEcho(dir, project string, terms []string, question string) bool {
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
 	var keep []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, s)

@@ -13,7 +13,21 @@ import "unicode/utf8"
 // Measured by hand on ten real prompts against a frozen index: five were
 // answered with plainly unrelated work, none with silence, and every one of
 // those five rested on words that live in the project but never met.
-func RecallWorthShowing(terms []string, matched int) bool {
+// strong is how many of the terms this session matched are rare ones. It is
+// what the hook has always had and the benchmark always discarded, which is how
+// the two came to measure different rules twice. Taking it here makes that
+// impossible rather than merely noticeable.
+//
+// It is taken and not yet read, on purpose. The obvious first use —
+// "a session that matched a rare term is worth showing" — looked equivalent to
+// the rule below and is not: strong counts rareness by corpus frequency and
+// HasIdentifierTerm judges the shape of the word, so a short ordinary-looking
+// word can be rare in a small corpus. Wired in as a shortcut it put two false
+// fires on the benchmark's negative controls. Threading it changes nothing
+// today; using it is the next rule's decision, and it will now land in every
+// instrument at once.
+func RecallWorthShowing(terms []string, matched, strong int) bool {
+	_ = strong // see the note above: taken so the instruments cannot drift
 	if matched < 1 {
 		return false
 	}

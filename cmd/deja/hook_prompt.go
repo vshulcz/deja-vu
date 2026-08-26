@@ -234,7 +234,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// hook pays its cost on every message the user sends. Measured on
 		// cross-paired prompts whose answer is absent, the old bar injected on
 		// 94% of them; half of those rested on one ordinary word.
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		// A word rare enough to identify something is a real match on its own —
