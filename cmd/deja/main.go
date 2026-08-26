@@ -377,14 +377,18 @@ func cmdIndex(dir string, rest []string) error {
 	}
 	if n := index.ReportCollisions(); n > 0 {
 		fmt.Fprintf(os.Stderr, "deja: %d session%s %s an id with another transcript — each pair is filed under one project, the one whose file sorts first\n", n, pluralS(n), verbShare(n))
-		// The per-harness lines above count transcripts, so once any of them
-		// merged, those lines add up to more than the index holds — and the
-		// reconciling line below is TTY-only, which is not where anyone is
-		// counting. Say the real totals whenever the sums have parted (#1091).
-		if b := index.LastBuild; b.Messages > 0 {
-			fmt.Fprintf(os.Stderr, "deja: indexed %d session%s, %d message%s — the per-harness lines above count transcripts, not rows\n",
-				b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
-		}
+	}
+	// The per-harness lines above count transcripts, so once any of them
+	// merged, those lines add up to more than the index holds — and the
+	// reconciling line below is TTY-only, which is not where anyone is
+	// counting. Say the real totals whenever the sums have parted (#1091).
+	//
+	// Every merge, not only the ones deja warns about: a goose session that
+	// came back from both of that harness's stores is one conversation and
+	// gets no warning, but it is still two transcripts against one row (#2066).
+	if b := index.LastBuild; index.ReportMerged() > 0 && b.Messages > 0 {
+		fmt.Fprintf(os.Stderr, "deja: indexed %d session%s, %d message%s — the per-harness lines above count transcripts, not rows\n",
+			b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 	}
 	// A machine with no agent history built an empty index and said nothing:
 	// the step whose whole job is filling memory returned to the prompt after

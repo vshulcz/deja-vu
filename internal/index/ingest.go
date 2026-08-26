@@ -402,6 +402,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	beginPass()
 	emptied.Store(0)
 	collisions.Store(0)
+	merged.Store(0)
 	// A rebuild evicts nothing, but a number left by an earlier build must not
 	// outlive it (#1861).
 	evicted.Store(0)
@@ -734,6 +735,11 @@ func ReportCollisions() int {
 	return int(collisions.Swap(0))
 }
 
+// ReportMerged is ReportCollisions plus the pairs deja merges without warning.
+func ReportMerged() int {
+	return int(merged.Swap(0))
+}
+
 // markShared records that a manifest row covers more than one conversation, so
 // a later forget can say what it is about to take (#970).
 func markShared(sessions map[string]SessionMeta, key string) {
@@ -806,6 +812,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	// why it showed in the test binary first.
 	emptied.Store(0)
 	collisions.Store(0)
+	merged.Store(0)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
 	lastIngestFiles = len(files)
@@ -1699,6 +1706,14 @@ func sortedKeys[V any](m map[string]V) []string {
 // current build. The two full-build paths index sessions in parallel, so the
 // counter is atomic.
 var collisions atomic.Int64
+
+// merged counts every pair of transcripts that became one row, including the
+// ones deja does not warn about — a goose session present in both of that
+// harness's stores is a migration, not a clash, but the per-harness lines
+// still count it twice. The reconciling totals key on this, so they appear
+// whenever the sums have parted rather than only when there is a warning
+// (#1091, #2066).
+var merged atomic.Int64
 var emptied atomic.Int64
 
 // evicted counts the indexed files that left because their store went away —
@@ -1720,7 +1735,29 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 	if held.Path == "" || s.Path == "" || held.Path == s.Path {
 		return true, false
 	}
+	merged.Add(1)
+	// goose 1.10 moved its sessions into sessions.db and left the JSONL files
+	// where they were, so after a migration the same conversation is in both
+	// stores under one id — the db row keeps the id the file was named after.
+	// That is one conversation across two storage generations, not two
+	// transcripts clashing, and sort order decided it: `<stamp>.jsonl` sorts
+	// below `sessions.db`, so every migrated session was filed under the
+	// superseded copy and counted as a collision the reader can do nothing
+	// about (#2066). The live store owns the row and the pair is not reported.
+	if s.Harness == "goose" {
+		if newIsDB, heldIsDB := isGooseStore(s.Path), isGooseStore(held.Path); newIsDB != heldIsDB {
+			return newIsDB, false
+		}
+	}
 	return s.Path < held.Path, true
+}
+
+// isGooseStore reports whether a path is goose's database rather than one of
+// the JSONL files beside it. Named, not compared against sources.GooseDB(),
+// because the row deja already holds was written by an earlier pass that may
+// have read a differently configured root.
+func isGooseStore(path string) bool {
+	return strings.EqualFold(filepath.Base(path), "sessions.db")
 }
 
 // pluralS keeps "1 sessions" off the first line anyone sees from deja (#737).
@@ -2282,6 +2319,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// This pass's counts, like every other build path (#1850).
 	emptied.Store(0)
 	collisions.Store(0)
+	merged.Store(0)
 	lastIngestFiles = len(changed)
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
@@ -2596,6 +2634,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// ones before it (#1850).
 	emptied.Store(0)
 	collisions.Store(0)
+	merged.Store(0)
 	lastIngestFiles = len(changed)
 	readThisPass(changed)
 	// Deliberately not parsedThisPass: this path reads the appended tail, not
