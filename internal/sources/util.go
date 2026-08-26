@@ -476,7 +476,11 @@ func toolPathsIn(v any, d toolDialect) string {
 			continue
 		}
 		for _, p := range toolPathStrings(in, d) {
-			if seen[p] {
+			// The record is one path per line and the index splits it back on
+			// the newline, so a path carrying one arrives as two files the
+			// session never touched — which reaches the files listing, blame,
+			// and the project a session is filed under (#2042).
+			if seen[p] || strings.ContainsAny(p, "\n\r") {
 				continue
 			}
 			seen[p] = true
@@ -533,6 +537,14 @@ func editSpansIn(v any, d toolDialect) []string {
 		}
 		path, _ := in[d.pathKey].(string)
 		if path == "" {
+			continue
+		}
+		// The record is "path\nspan" and restore splits it on the first
+		// newline, so a path carrying one puts the rest of itself at the head
+		// of the span — handed back as the exact bytes that stopped existing
+		// (#2042). The format cannot hold such a path, so the span is not
+		// recorded rather than recorded wrong.
+		if strings.ContainsAny(path, "\n\r") {
 			continue
 		}
 		old, _ := in[d.oldSpanKey()].(string)

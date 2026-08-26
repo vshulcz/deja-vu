@@ -378,7 +378,9 @@ func claudeToolPaths(raw json.RawMessage) string {
 		if part.Type != "tool_use" || !pathTools[part.Name] || part.Input.FilePath == "" {
 			continue
 		}
-		if seen[part.Input.FilePath] {
+		// One path per line, split back apart by the index: a path carrying a
+		// newline arrives as two files the session never touched (#2042).
+		if seen[part.Input.FilePath] || strings.ContainsAny(part.Input.FilePath, "\n\r") {
 			continue
 		}
 		seen[part.Input.FilePath] = true
@@ -434,6 +436,12 @@ func claudeEditSpans(raw json.RawMessage) []string {
 		}
 		path := part.Input.FilePath
 		if path == "" {
+			continue
+		}
+		// "path\nspan" cannot hold a path with a newline in it, and restore
+		// hands the overflow back as file content (#2042). editSpansIn, the
+		// reference parser this one must agree with, drops the same edits.
+		if strings.ContainsAny(path, "\n\r") {
 			continue
 		}
 		spans := []string{part.Input.OldString}
