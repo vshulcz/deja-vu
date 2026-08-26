@@ -1995,6 +1995,30 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 }
 
+// fromSharedStore reports whether a record came out of a database rather than a
+// file of its own. The source path answers that for goose and cursor, which name
+// the database as the session's path — but opencode names the project directory,
+// so its records looked like a per-file harness whose file had not changed and
+// were kept beside the ones the pass had just re-read. A store read whole then
+// grew by a copy of every session on every pass (#2033).
+func fromSharedStore(r Record) bool {
+	switch harnessForPath(r.SourcePath) {
+	case "opencode", "cursor-db", "goose-db":
+		return true
+	}
+	// The key names the harness the session belongs to, which settles it when
+	// the path cannot.
+	harness, _, ok := strings.Cut(r.Key, ":")
+	if !ok {
+		return false
+	}
+	switch harness {
+	case "opencode", "cursor", "goose":
+		return true
+	}
+	return false
+}
+
 // rereadsWholeSessions marks a store whose cursor selects sessions rather than
 // messages: goose asks for every message of any session touched since the
 // stamp, so a continued session hands back turns already counted, and adding
@@ -2337,8 +2361,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// watermark, so their untouched sessions are NOT re-emitted on a
 		// change — they must be retained, not dropped, or they vanish.
 		// Superseded sessions are handled by replaceKeys.
-		h := harnessForPath(r.SourcePath)
-		sharedStore := h == "opencode" || h == "cursor-db" || h == "goose-db"
+		sharedStore := fromSharedStore(r)
 		// replaceKeys is scoped to shared stores. A shared store is parsed since
 		// a watermark, so a superseded session's old record is not re-read and
 		// clause two never reaches it — replaceKeys is what drops it. For a
