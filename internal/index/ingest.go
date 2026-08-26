@@ -1995,6 +1995,17 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 }
 
+// rereadsWholeSessions marks a store whose cursor selects sessions rather than
+// messages: goose asks for every message of any session touched since the
+// stamp, so a continued session hands back turns already counted, and adding
+// them again grew the count on every pass. Starting the file over is the lesser
+// wrong — it loses what an untouched session held, which is #2025 again for
+// this one store, rather than a number that only climbs. Narrowing the clause
+// instead costs the session its earlier turns (#2033), so the re-reading stays.
+func rereadsWholeSessions(p string) bool {
+	return harnessForPath(p) == "goose-db"
+}
+
 // fullyReadFiles drops the files a pass reads only part of. LastUpdated is
 // stamped for database-backed stores alone (setStoreLastUpdated), and it is
 // exactly what makes their parse partial: parseChangedFile hands it to the kind
@@ -2008,16 +2019,6 @@ func fullyReadFiles(changed, old map[string]FileState) map[string]FileState {
 		out[p] = f
 	}
 	return out
-}
-
-// rereadsWholeSessions marks a store whose cursor selects sessions rather than
-// messages: goose asks for every message of any session touched since the
-// stamp, so a continued session hands back turns already counted, and adding
-// them again grew the count on every pass. Starting the file over is the lesser
-// wrong of the two — it loses what an untouched session held, which is #2025
-// again for this one store, rather than reporting a number that only climbs.
-func rereadsWholeSessions(p string) bool {
-	return harnessForPath(p) == "goose-db"
 }
 
 // copyIngestFiles hands the new manifest its own map: the old one belongs to

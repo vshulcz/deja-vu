@@ -13,6 +13,12 @@ import (
 
 // A goose session untouched since the watermark must survive an incremental
 // pass triggered by a change to the shared sessions.db.
+//
+// The timestamps are written the way a real store writes them: sqlite's own
+// format for updated_at, agreeing with the message timestamps to the second,
+// because goose writes both from the same turn commit. The fixture used to put
+// updated_at a week ahead of its messages and in RFC3339, a shape goose does not
+// produce, and that gap decided what the since clause could be (#2032).
 func TestGooseIncrementalKeepsUntouchedSessions(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not available")
@@ -27,7 +33,7 @@ func TestGooseIncrementalKeepsUntouchedSessions(t *testing.T) {
 	seed := func(extra string) {
 		schema := `create table if not exists sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table if not exists messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
-insert or replace into sessions values ('20250724_old','old','Old chat','/w/app','2026-07-24T10:00:00Z','2026-07-24T10:00:01Z');
+insert or replace into sessions values ('20250724_old','old','Old chat','/w/app',datetime(1784278801,'unixepoch'),datetime(1784278802,'unixepoch'));
 insert or replace into messages values (1,'20250724_old','user','[{"type":"text","text":"oldgoosefact about the pager"}]',1784278801);
 insert or replace into messages values (2,'20250724_old','assistant','[{"type":"text","text":"oldgoose reply"}]',1784278802)` + extra + `;`
 		if out, err := exec.Command("sqlite3", db, schema).CombinedOutput(); err != nil {
@@ -42,7 +48,7 @@ insert or replace into messages values (2,'20250724_old','assistant','[{"type":"
 		t.Fatal("old goose session not indexed on first pass")
 	}
 	seed(`;
-insert or replace into sessions values ('20250724_new','new','New chat','/w/app','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z');
+insert or replace into sessions values ('20250724_new','new','New chat','/w/app',datetime(1784282401,'unixepoch'),datetime(1784282402,'unixepoch'));
 insert or replace into messages values (3,'20250724_new','user','[{"type":"text","text":"newgoosefact about caching"}]',1784282401);
 insert or replace into messages values (4,'20250724_new','assistant','[{"type":"text","text":"newgoose reply"}]',1784282402)`)
 	future := time.Now().Add(time.Hour)
