@@ -315,6 +315,10 @@ type HarnessIngest struct {
 type FileIngest struct {
 	Malformed int    `json:"malformed,omitempty"`
 	Error     string `json:"error,omitempty"`
+	// Clipped counts messages stored short of what this file holds. Here for
+	// the same reason as the other two: a pass that reads one transcript must
+	// not speak for what another one holds (#2022).
+	Clipped int `json:"clipped,omitempty"`
 }
 
 type manifestCore struct {

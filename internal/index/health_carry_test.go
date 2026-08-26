@@ -286,3 +286,64 @@ func TestAFileThatOpensAgainStopsBeingReportedUnreadable(t *testing.T) {
 		t.Errorf("deja read the file and still reports %d unreadable", got)
 	}
 }
+
+func clippedFor(t *testing.T, dir, harness string) int {
+	t.Helper()
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.IngestHealth[harness].ClippedMessages
+}
+
+// Clips were the last ingest number kept per harness, so a pass over some other
+// file reset them to what it found — nothing — while the long message sat where
+// it always had (#2022).
+func TestAClipSurvivesAPassOverAnotherFile(t *testing.T) {
+	dir, proj, turn := healthFixture(t)
+	long := strings.Repeat("pgbouncer pool timed out and the retry took a second ", 1600)
+	if len(long) < maxIndexedText {
+		t.Fatalf("the fixture message is %d bytes, under the %d that gets it clipped", len(long), maxIndexedText)
+	}
+	a := filepath.Join(proj, "a.jsonl")
+	b := filepath.Join(proj, "b.jsonl")
+	if err := os.WriteFile(a, []byte(turn("a", "2026-01-02T03:04:05Z", "user", long)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b, []byte(turn("b", "2026-01-02T03:04:05Z", "user", "a short question")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := clippedFor(t, dir, "claude"); got != 1 {
+		t.Fatalf("the build clipped %d messages, so this measures nothing", got)
+	}
+
+	// b rewritten shorter. A rewrite that only grows is still an append, and
+	// the append path keeps the old manifest — this is the path that does not.
+	if err := os.WriteFile(b, []byte(turn("b", "2026-01-02T03:04:05Z", "user", "short")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := Ensure(dir, "", false, &out); err != nil {
+		t.Fatal(err)
+	}
+	if said := out.String(); !strings.Contains(said, "incremental index") {
+		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said)
+	}
+	if got := clippedFor(t, dir, "claude"); got != 1 {
+		t.Errorf("the long message is still in the other file and the count is %d", got)
+	}
+
+	// And the file that holds it, re-read: counted once, not once more.
+	if err := os.WriteFile(a, []byte(turn("a", "2026-01-02T03:04:05Z", "user", long)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := clippedFor(t, dir, "claude"); got != 1 {
+		t.Errorf("one long message, count says %d", got)
+	}
+}
