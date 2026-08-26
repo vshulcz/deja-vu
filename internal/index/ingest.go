@@ -1995,11 +1995,36 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 }
 
+// fullyReadFiles drops the files a pass reads only part of. LastUpdated is
+// stamped for database-backed stores alone (setStoreLastUpdated), and it is
+// exactly what makes their parse partial: parseChangedFile hands it to the kind
+// as the since cursor.
+func fullyReadFiles(changed, old map[string]FileState) map[string]FileState {
+	out := make(map[string]FileState, len(changed))
+	for p, f := range changed {
+		if old[p].LastUpdated > 0 && !rereadsWholeSessions(p) {
+			continue
+		}
+		out[p] = f
+	}
+	return out
+}
+
+// rereadsWholeSessions marks a store whose cursor selects sessions rather than
+// messages: goose asks for every message of any session touched since the
+// stamp, so a continued session hands back turns already counted, and adding
+// them again grew the count on every pass. Starting the file over is the lesser
+// wrong of the two — it loses what an untouched session held, which is #2025
+// again for this one store, rather than reporting a number that only climbs.
+func rereadsWholeSessions(p string) bool {
+	return harnessForPath(p) == "goose-db"
+}
+
 // copyIngestFiles hands the new manifest its own map: the old one belongs to
-// the manifest this build read, which is still in use while the build runs.
-// The files this pass will re-read arrive with their clip count zeroed: the
-// pass records its own as it goes, and adding it to what the last pass found
-// counted one long message twice.
+// the manifest this build read, which is still in use while the build runs. The
+// files this pass will re-read arrive with their clip count zeroed — the pass
+// records its own as it goes, and adding it to what the last pass found counted
+// one long message twice.
 func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState) map[string]FileIngest {
 	out := make(map[string]FileIngest, len(old))
 	for p, e := range old {
@@ -2173,7 +2198,6 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	emptied.Store(0)
 	collisions.Store(0)
 	lastIngestFiles = len(changed)
-	parsedThisPass(changed)
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
 		if err != nil {
@@ -2194,6 +2218,19 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
 		files[p] = f
 	}
+	// After the loop, because a file whose parse failed is dropped from
+	// `changed` there and keeps what it already held — starting it over would
+	// throw the counts away on the one pass that could not read it.
+	//
+	// A database-backed store reads only what is newer than the cursor the last
+	// pass stamped, so this pass cannot speak for the rest of it either: it adds
+	// to what the store holds, the way an append does (#2025). The trade is the
+	// append path's — a db's counts can only grow until a full rebuild.
+	reread := fullyReadFiles(changed, old.Files)
+	parsedThisPass(reread)
+	// A file the pass read is a file that opens, whether or not it read all of
+	// it, so an error recorded when it did not has to go.
+	readThisPass(changed)
 	replaceKeys := map[string]bool{}
 	for _, s := range replacements {
 		replaceKeys[s.Harness+":"+s.ID] = true
@@ -2235,7 +2272,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// doctor forgot a store's unreadable file because an unrelated
 		// transcript changed (#2015). A store this pass re-read starts over,
 		// because a file rewritten clean has to be able to clear its count.
-		IngestFiles: copyIngestFiles(old.IngestFiles, changed)}
+		IngestFiles: copyIngestFiles(old.IngestFiles, reread)}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true
