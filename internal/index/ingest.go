@@ -1674,8 +1674,8 @@ func pluralS(n int) string {
 	return "s"
 }
 
-// pluralThem keeps "1 line skipped, deja could not read them" off the same
-// first line.
+// pluralThem is pluralS for the pronoun that follows it, so a run never says
+// "1 line skipped, deja could not read them".
 func pluralThem(n int) string {
 	if n == 1 {
 		return "it"
