@@ -1,7 +1,6 @@
 package search
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -9,6 +8,8 @@ import (
 // on that. The one this file was written for: a control byte is six bytes in
 // JSON, so a digest carrying them would weigh three times what
 // `usage.RecordSize` says, and the injection log's own bound would be wrong.
+// This holds SafeText and SafeLine to it; that every digest is built through
+// one of them is about two dozen call sites and is not what this proves.
 // The older one is why the stripping is there at all — an escape byte
 // recolours a terminal and a carriage return rewinds a line.
 func TestControlBytesDoNotSurviveIntoServedText(t *testing.T) {
@@ -44,5 +45,5 @@ func hasControlByte(s string) bool {
 			return true
 		}
 	}
-	return strings.Contains(s, "\x00")
+	return false
 }

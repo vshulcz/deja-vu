@@ -54,14 +54,21 @@ const RecordRoom = snapshotRotateAt / snapshotsToKeep
 // Escaping is a multiplier rather than a constant, which is what makes this a
 // function. Measured against a budget of 8192: plain text costs 168 bytes, a
 // real digest with its newlines 558, and text that is all newlines or all
-// quotes doubles — each of those is two bytes in JSON. A control byte costs six
-// (), but SafeText and SafeLine strip control bytes before any of this
-// text becomes a digest, so the doubling is the bound that applies.
+// quotes doubles, since each is two bytes in JSON. Three, not two, because a
+// byte that is not valid UTF-8 is written as the replacement character and
+// costs three — a truncated binary paste in a transcript is enough, and nothing
+// strips it.
+//
+// Two things are kept out of the multiplier rather than allowed for. Control
+// bytes would cost six each as \u00XX escapes, and SafeText strips them before
+// any of this text becomes a digest. So would <, > and & under encoding/json's
+// default HTML escaping — and those are ordinary text nobody should strip, so
+// the writer turns that escaping off instead (#1982).
 //
 // The envelope is the record's own fields — the stamp, the kind, the policy
-// name, the terms, the receiving session — and 512 covers them with room for
-// the longest of each.
-func RecordSize(n int) int { return 2*n + 512 }
+// name, the terms, the receiving session — measured at 168 typical and 344 with
+// a long policy name, eight terms and a 128-character session id.
+func RecordSize(n int) int { return 3*n + 512 }
 
 // SnapshotPath returns the injection-snapshot log for an index dir; a sibling
 // file like the usage log, so it survives full rebuilds.
@@ -137,7 +144,7 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
 	}
-	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
+	b, err := marshalSnapshot(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
 		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
 	if err != nil {
 		return
@@ -182,7 +189,7 @@ func rotateSnapshots(p string, incoming int) {
 	for {
 		buf.Reset()
 		for i := len(snaps) - 1; i >= 0; i-- {
-			if b, err := json.Marshal(snaps[i]); err == nil {
+			if b, err := marshalSnapshot(snaps[i]); err == nil {
 				buf.Write(append(b, '\n'))
 			}
 		}
@@ -264,4 +271,20 @@ func Events(indexDir string, n int) []Event {
 		out = out[:n]
 	}
 	return out
+}
+
+// marshalSnapshot writes one record without encoding/json's HTML escaping. That
+// escaping turns <, > and & into six bytes each, and a digest is often code: an
+// answer at the widest budget made of angle brackets weighed 49 kB against the
+// 26 kB this log holds, which is the state #1971 is about. The escaping exists
+// so a document can be embedded in HTML; this file is read by deja (#1982).
+func marshalSnapshot(s Snapshot) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(s); err != nil {
+		return nil, err
+	}
+	// Encode appends a newline; the callers add their own.
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }

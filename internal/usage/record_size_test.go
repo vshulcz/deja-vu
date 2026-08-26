@@ -1,17 +1,18 @@
 package usage
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 )
 
-// `RecordSize` says an answer doubles at worst. That rests on escaping being
-// two bytes per character, which holds for the newlines and quotes a digest is
-// full of — and not for a control byte, which costs six. The bound is only true
-// because control bytes never reach a digest, and this is the arithmetic half
-// of that claim: the sanitising half lives in internal/search.
+// `RecordSize` says a record is three times its answer at worst. Two of those
+// bytes are the newlines and quotes a digest is full of; the third is a byte
+// that is not valid UTF-8, written as the replacement character, which nothing
+// strips. Two classes are kept out of the multiplier instead of allowed for:
+// control bytes, which SafeText removes, and the angle brackets and ampersands
+// encoding/json would escape to six bytes each — the writer turns that escaping
+// off, because they are ordinary text (#1982).
 func TestWhatARecordWeighs(t *testing.T) {
 	const budget = 8192
 	for _, c := range []struct {
@@ -24,12 +25,15 @@ func TestWhatARecordWeighs(t *testing.T) {
 		{"every byte a newline", strings.Repeat("\n", budget), true},
 		{"every byte a quote", strings.Repeat(`"`, budget), true},
 		{"cyrillic", strings.Repeat("отладка ", 1024), true},
-		// The case the bound does not cover, kept here so the reason is on the
-		// record: six bytes each, and RecordSize would be wrong by 3x.
+		{"angle brackets, as code has them", strings.Repeat("<T> & Vec<U> ", 630), true},
+		{"a shell pipeline", strings.Repeat("cat a.txt | grep x > out.txt && ", 256), true},
+		{"bytes that are not valid UTF-8", strings.Repeat("\xff", budget), true},
+		// The one class the bound does not cover, kept so the reason is on the
+		// record: six bytes each, and RecordSize would be wrong by twice.
 		{"control bytes, which cannot reach here", strings.Repeat("\x01", budget), false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			b, err := json.Marshal(Snapshot{
+			b, err := marshalSnapshot(Snapshot{
 				Time: time.Now().UTC(), Kind: KindBlame, Sessions: 3,
 				Bytes: len(c.body), Policy: "local+imported",
 				Terms: []string{"pgbouncer", "pool"}, Into: "agent-session-1",
