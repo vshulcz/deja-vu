@@ -18,6 +18,12 @@ import (
 // the end of it (#1951).
 func docSection(t *testing.T, doc, heading string) string {
 	t.Helper()
+	// A heading is matched as a whole line, and a Windows checkout ends every
+	// line with a carriage return, so the boundary test below never held and
+	// eleven of these tests failed at once without naming the reason (#2081).
+	// `.gitattributes` keeps a fresh clone at LF; this keeps an existing
+	// working tree that already has CRLF from failing the same way.
+	doc = strings.ReplaceAll(doc, "\r\n", "\n")
 	// A heading is a whole line. Matching anywhere would let prose that names a
 	// heading — a pointer to it, a sentence about the format — start the
 	// section somewhere in the middle of a paragraph, and matching only its
