@@ -380,7 +380,12 @@ func TestLowLevelIndexHelpers(t *testing.T) {
 		t.Fatalf("carryRedactions=%#v", m)
 	}
 	files := map[string]FileState{"db": {Path: "db"}}
-	setStoreLastUpdated(files, map[string]SessionMeta{"x": {Harness: "h", Updated: time.Unix(0, 7)}}, "h", "db")
+	// Path names the store the row came from, which is what the stamp is
+	// about: a row from another store must not raise this one's watermark.
+	setStoreLastUpdated(files, map[string]SessionMeta{
+		"x":     {Harness: "h", Path: "db", Updated: time.Unix(0, 7)},
+		"other": {Harness: "h", Path: "another-db", Updated: time.Unix(0, 900)},
+	}, "h", "db")
 	if files["db"].LastUpdated != 7 {
 		t.Fatalf("LastUpdated=%d", files["db"].LastUpdated)
 	}

@@ -2872,8 +2872,25 @@ func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]Sess
 	}
 }
 
+// sessionInStore reports whether a row came from the store being stamped.
+//
+// Cursor keeps one database per workspace, and both it and goose record the
+// store path in Path, so the row says which one it came from. opencode records
+// the project directory instead (#2033) — and has a single database, so there
+// the harness is the store.
+func sessionInStore(s SessionMeta, harness, db string) bool {
+	if harness == "opencode" {
+		return true
+	}
+	return s.Path == db
+}
+
 // setStoreLastUpdated stamps a database-backed store with the newest session
 // time so incremental passes can query only newer content.
+//
+// The newest session in THAT store: taking the newest across the harness
+// stamped a quiet Cursor workspace with the busy one's time, and a turn the
+// quiet store gained below that line was never asked for again (#2071).
 func setStoreLastUpdated(files map[string]FileState, sessions map[string]SessionMeta, harness, db string) {
 	f, ok := files[db]
 	if !ok {
@@ -2881,7 +2898,10 @@ func setStoreLastUpdated(files map[string]FileState, sessions map[string]Session
 	}
 	var latest int64
 	for _, s := range sessions {
-		if s.Harness == harness && s.Updated.UnixNano() > latest {
+		if s.Harness != harness || !sessionInStore(s, harness, db) {
+			continue
+		}
+		if s.Updated.UnixNano() > latest {
 			latest = s.Updated.UnixNano()
 		}
 	}
