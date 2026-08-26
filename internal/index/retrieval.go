@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -1683,6 +1684,18 @@ func ChildrenOf(dir, id string) ([]model.Session, error) {
 // one without naming the harness, and the id is unique in practice: the
 // harnesses that generate them use uuids or their own prefixed ids.
 func FindByID(dir, id string) (model.Session, bool, error) {
+	return FindByIDPreferProject(dir, id, "")
+}
+
+// FindByIDPreferProject is FindByID for a caller that knows where it is
+// standing. A preference, not a filter: a session outside the project still
+// answers when nothing inside it does.
+// The freshest match is the right guess only while the copies are the same
+// conversation; two projects can hold a session with one id, and then the
+// freshest is whichever was touched last, which has nothing to do with the one
+// asking (#1999). A project that names one of them settles it, and the rest of
+// the rule is unchanged.
+func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1702,18 +1715,74 @@ func FindByID(dir, id string) (model.Session, bool, error) {
 	}
 	var best SessionMeta
 	var found bool
+	bestNear := -1
 	for _, meta := range m.Sessions {
 		if meta.ID != id {
 			continue
 		}
-		if !found || betterIDMatch(meta, best) {
-			best, found = meta, true
+		near := -1
+		if project != "" {
+			near = projectDistance(meta.Project, project)
+		}
+		switch {
+		case !found, nearerProject(near, bestNear):
+			best, found, bestNear = meta, true, near
+		case near == bestNear && betterIDMatch(meta, best):
+			best = meta
 		}
 	}
 	if !found {
 		return model.Session{}, false, nil
 	}
 	return loadSessionMeta(dir, m, best)
+}
+
+// projectDistance measures a session's project against the directory the caller
+// is standing in. A project is recorded as the directory's own name, sometimes
+// with its parent — "app" or "w/app" — so the caller's path is matched by its
+// last segments rather than whole.
+//
+// And by its ancestors' too: a session started in a subdirectory is re-projected
+// onto the repository root once it has touched enough files under it
+// (projectFromPaths), so the recorded name can be two segments the cwd only
+// reaches by walking up. Bare names match at the leaf alone, where the caller
+// actually is — an ancestor matching by base would make every worktree named
+// "wt" the same project.
+//
+// It answers with how far up the match was found — 0 where the caller stands —
+// so a session recorded against this very directory outranks one recorded
+// against a directory three levels above it. Without that, an agent someone ran
+// from their home directory could outrank the project's own session by being
+// the fresher of the two.
+func projectDistance(recorded, cwd string) int {
+	if recorded == "" || cwd == "" {
+		return -1
+	}
+	cwd = path.Clean(filepath.ToSlash(cwd))
+	if strings.EqualFold(recorded, path.Base(cwd)) {
+		return 0
+	}
+	for dir, up := cwd, 0; ; dir, up = path.Dir(dir), up+1 {
+		parent, base := path.Base(path.Dir(dir)), path.Base(dir)
+		if parent == "." || parent == "/" || base == "." || base == "/" {
+			return -1
+		}
+		if strings.EqualFold(recorded, parent+"/"+base) {
+			return up
+		}
+	}
+}
+
+func sameProject(recorded, cwd string) bool { return projectDistance(recorded, cwd) >= 0 }
+
+// nearerProject reports whether a match this far from the caller beats the one
+// already held. A match at any distance beats none; among matches the nearer
+// wins, and equals fall through to betterIDMatch.
+func nearerProject(near, held int) bool {
+	if near < 0 {
+		return false
+	}
+	return held < 0 || near < held
 }
 
 // betterIDMatch picks between two sessions carrying the same id (#1997). The

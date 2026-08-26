@@ -68,7 +68,7 @@ func TestCompactEvidenceStripsControlBytes(t *testing.T) {
 		t.Fatalf("index: %v %s", err, out)
 	}
 
-	got := compactEvidence(os.Getenv("DEJA_INDEX_DIR"), "s1")
+	got := compactEvidence(os.Getenv("DEJA_INDEX_DIR"), "s1", "/tmp/app")
 	// The premise: the block has to hold both kinds of row, or a clean answer
 	// here means the records never arrived rather than that they were stripped.
 	if !strings.Contains(got, "files it touched:") || !strings.Contains(got, "psql") {
