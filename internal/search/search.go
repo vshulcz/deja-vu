@@ -1330,6 +1330,11 @@ func isWorkRecord(role string) bool {
 	return false
 }
 
+// ContextBudget is how much of a session PrintContext prints. The whole
+// transcript would be tens of times an answer's size, and it is one
+// recall_context away when an agent genuinely needs it.
+const ContextBudget = 8000
+
 func PrintContext(w io.Writer, s model.Session, query string) {
 	// Project and id are transcript text a harness wrote, and this is one line:
 	// an escape byte in either recolours the header and a carriage return
@@ -1352,7 +1357,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	fmt.Fprintln(w)
 	qlow := strings.ToLower(query)
 	terms, phrases := QueryParts(query)
-	budget := 8000
+	budget := ContextBudget
 	// The reply to an included turn comes with it. Every user turn was kept
 	// and every assistant turn had to match, but the decision lives in the
 	// answer and is worded nothing like the question: `ctx "http client"`

@@ -40,6 +40,14 @@ const (
 	snapshotRotateAt = 512 << 10
 )
 
+// RecordRoom is the largest record this log holds without rotating on every
+// write: the rotation keeps a fixed count, so the count and the threshold
+// together decide the size. Above it the file sits over the threshold for good,
+// and half of two concurrent injections is rewritten away (#1971). Exported so
+// the packages that set the budgets — none of which this one can import — can
+// be held to it.
+const RecordRoom = snapshotRotateAt / snapshotsToKeep
+
 // SnapshotPath returns the injection-snapshot log for an index dir; a sibling
 // file like the usage log, so it survives full rebuilds.
 func SnapshotPath(indexDir string) string {
