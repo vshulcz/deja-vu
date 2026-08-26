@@ -650,7 +650,7 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 	}
 	line := fmt.Sprintf("deja: %s: %d session%s, %d message%s", label, len(ss), pluralS(len(ss)), msgs, pluralS(msgs))
 	if unreadable > 0 {
-		line += fmt.Sprintf(" — %d line%s could not be read and were skipped", unreadable, pluralS(unreadable))
+		line += fmt.Sprintf(" — %d line%s skipped, deja could not read %s", unreadable, pluralS(unreadable), pluralThem(unreadable))
 	}
 	if skipped != "" {
 		line += " — part of this store could not be read: " + skipped
@@ -1672,6 +1672,15 @@ func pluralS(n int) string {
 		return ""
 	}
 	return "s"
+}
+
+// pluralThem keeps "1 line skipped, deja could not read them" off the same
+// first line.
+func pluralThem(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
 }
 
 func sessionTitle(s model.Session) string {

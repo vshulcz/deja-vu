@@ -262,6 +262,11 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		text, _ := m["text"].(string)
 		t, parseErr := time.Parse(time.RFC3339Nano, ts)
 		if parseErr != nil || strings.TrimSpace(text) == "" {
+			// Counted, not just skipped: this is the one store a person writes
+			// by hand, holding the one thing deja cannot re-derive, and a
+			// hand-written "2026-01-03" parses as nothing. The promoted branch
+			// below has counted its own refusals since #814 (#2005).
+			diagMalformedLine(path)
 			return
 		}
 		// A note written before deja recorded a project — or by a caller that
