@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -49,4 +50,49 @@ func has(names []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// Inside a submodule git names the gitdir rather than the working tree, so the
+// root it reports is ".git/modules/<name>" — a path nobody worked in. Dropping
+// the single root used to hide that; keeping it made the junk a candidate.
+func TestProjectNameCandidatesSkipTheSubmoduleGitdir(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	tmp := t.TempDir()
+	parent := filepath.Join(tmp, "work", "parent")
+	child := filepath.Join(tmp, "work", "child")
+	for _, d := range []string{parent, child} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, args := range [][]string{{"init", "-q"}, {"config", "user.email", "t@t"}, {"config", "user.name", "t"}} {
+			if out, err := exec.Command("git", append([]string{"-C", d}, args...)...).CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v %s", args, err, out)
+			}
+		}
+	}
+	if err := os.WriteFile(filepath.Join(child, "f.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "f.txt"}, {"commit", "-q", "-m", "seed"}} {
+		if out, err := exec.Command("git", append([]string{"-C", child}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	add := exec.Command("git", "-C", parent, "-c", "protocol.file.allow=always", "submodule", "add", "-q", child, "sub")
+	if out, err := add.CombinedOutput(); err != nil {
+		t.Skipf("submodules unavailable here: %v %s", err, out)
+	}
+
+	got := ProjectNameCandidates(filepath.Join(parent, "sub"))
+	for _, n := range got {
+		if strings.Contains(n, "modules/") {
+			t.Errorf("the gitdir reached the candidates as a project: %v", got)
+		}
+	}
+	// The submodule is still a place someone works in, under its own name.
+	if !has(got, "parent/sub") {
+		t.Errorf("the submodule lost its own name: %v", got)
+	}
 }

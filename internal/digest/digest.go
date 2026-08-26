@@ -297,38 +297,29 @@ func gitWorktreeRoots(cwd string) []string {
 	if err != nil {
 		return nil
 	}
+	// Every root, including a lone one. It used to be dropped as "nothing
+	// beyond cwd's own names", which holds only when the caller is standing at
+	// that root: from a package directory inside it the root is the one name
+	// the caller does not have, and it is the project recall is scoped by — so
+	// an agent started anywhere but the top of its repository had no memory at
+	// all (#2037). At the root itself the names are the same computation on the
+	// same path and dedupe away, and a root spelled differently — through a
+	// symlink — is a spelling recall wants to see.
 	var roots []string
 	for _, line := range strings.Split(string(out), "\n") {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok && strings.TrimSpace(p) != "" {
-			roots = append(roots, strings.TrimSpace(p))
+		p, ok := strings.CutPrefix(line, "worktree ")
+		p = strings.TrimSpace(p)
+		if !ok || p == "" {
+			continue
 		}
-	}
-	// A single worktree adds nothing beyond cwd's own names only when cwd is
-	// that worktree. From a package directory inside it, the root is the one
-	// name the caller does not already have — and it is the project recall is
-	// scoped by, so dropping it left an agent started anywhere but the top of
-	// its repository with no memory at all (#2037).
-	if len(roots) == 1 && sameDir(roots[0], cwd) {
-		return nil
+		// Inside a submodule git names the gitdir rather than the working tree,
+		// and ".git/modules/sub" is not a project anybody worked in.
+		if strings.Contains(filepath.ToSlash(p), "/.git/") {
+			continue
+		}
+		roots = append(roots, p)
 	}
 	return roots
-}
-
-// sameDir compares two paths as directories, so a symlinked or unclean spelling
-// of the same place does not read as a different one.
-func sameDir(a, b string) bool {
-	if a == b {
-		return true
-	}
-	ra, err := filepath.EvalSymlinks(a)
-	if err != nil {
-		ra = filepath.Clean(a)
-	}
-	rb, err := filepath.EvalSymlinks(b)
-	if err != nil {
-		rb = filepath.Clean(b)
-	}
-	return ra == rb
 }
 
 // agentArtifactMarkers flag transcript entries that are tool output or
