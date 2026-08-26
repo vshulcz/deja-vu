@@ -17,10 +17,15 @@ a `schema_version` field so consumers can detect breaking changes.
   element shapes are stable; only additive fields inside them are permitted.
 - **`deja stats --impact --json`** returns one flat object of counters and
   carries no `schema_version` either, on the same terms.
-- **`deja log --last --json`** returns one record of the same shape `deja log
-  --json` returns in its array, so it carries no `schema_version` either: a
-  version on the single form and none on the array would be two answers about
-  one record.
+- **`deja log --last --json`** carries no `schema_version` for two reasons of
+  its own. The object it prints is the record deja stores in
+  `.injections.jsonl`, marshalled from the same struct, so a version field on it
+  would be written into every line of that file. And the surface answers `null`
+  when no digest has been recorded: a shape that is sometimes absent cannot be
+  relied on to carry a version.
+- **`deja bench recall|context|prompt --json`** are object-shaped and carry no
+  `schema_version` either. They report a benchmark run to whoever asked for it,
+  not a contract anything downstream parses on a schedule.
 
 ### What changed in version 2
 
