@@ -1,1 +1,6 @@
 packaging/** text eol=lf
+# Tests read these files and match whole lines, so a CRLF checkout fails them:
+# the section scanner asks whether the byte after a heading is '\n' and finds
+# '\r'. Seven tests went red on windows-latest for that reason alone, and only
+# after a build failure stopped hiding them.
+*.md text eol=lf
