@@ -28,9 +28,12 @@ func TestWhatARecordWeighs(t *testing.T) {
 		{"angle brackets, as code has them", strings.Repeat("<T> & Vec<U> ", 630), true},
 		{"a shell pipeline", strings.Repeat("cat a.txt | grep x > out.txt && ", 256), true},
 		// One run of invalid bytes is one replacement character — ToValidUTF8
-		// collapses it — so a solid block measures nothing. Alternating is what
-		// costs three per byte, and 2.51x is the worst a body reaches.
+		// collapses it — so a solid block measures nothing. What costs is an
+		// invalid byte beside a character JSON escapes: three out for the one,
+		// two for the other, and 2.5 is the ceiling that gives.
 		{"invalid bytes in one run", strings.Repeat("\xff", budget), true},
+		// A plain letter costs one byte out, so this is 2x — the same as a
+		// newline on its own, and here to show what the neighbour has to be.
 		{"invalid bytes alternating with text", strings.Repeat("\xffa", budget/2), true},
 		{"invalid bytes alternating with newlines", strings.Repeat("\xff\n", budget/2), true},
 		// The one class the bound does not cover, kept so the reason is on the

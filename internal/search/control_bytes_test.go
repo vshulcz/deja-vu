@@ -6,8 +6,8 @@ import (
 
 // Control bytes never reach the text deja hands an agent, and two things rest
 // on that. The one this file was written for: a control byte is six bytes in
-// JSON, so a digest carrying them would weigh three times what
-// `usage.RecordSize` says, and the injection log's own bound would be wrong.
+// JSON, so a digest carrying them would weigh twice what
+// `usage.RecordSize` says — six bytes against the three it allows — and the log's own bound would be wrong.
 // This holds SafeText and SafeLine to it; that every digest is built through
 // one of them is about two dozen call sites and is not what this proves.
 // The older one is why the stripping is there at all — an escape byte
