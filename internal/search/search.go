@@ -2220,7 +2220,17 @@ func SafeLine(s string) string {
 // spaces inside a name are part of the name. Collapsing them made blame print
 // "/tmp/app/two spaces.go" for a file with two, and restoring that printed path
 // found nothing (#2044).
-func SafePath(s string) string {
+func SafePath(s string) string { return safeVerbatim(s) }
+
+// SafeCommand is the same treatment for a command, which is the other thing on
+// these screens that a person copies and runs rather than reads. `deja how`
+// printed `-run "Pool Size"` for a command that ran `-run "Pool  Size"`, which
+// is a different test filter (#2052).
+func SafeCommand(s string) string { return safeVerbatim(s) }
+
+// safeVerbatim keeps what was recorded, minus what a terminal would obey and
+// minus the line breaks that would let one row become two.
+func safeVerbatim(s string) string {
 	if s == "" {
 		return ""
 	}

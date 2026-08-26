@@ -28,6 +28,21 @@ import (
 
 const howCommandMax = 200
 
+// firstCommandLine is firstLine for a command: the first line, bounded, and
+// otherwise left alone. firstLine collapses runs of whitespace, which is right
+// for the note titles it was written for and wrong here — `-run "Pool  Size"`
+// came back as a different test filter (#2052).
+func firstCommandLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i > 0 {
+		s = s[:i]
+	}
+	r := []rune(s)
+	if len(r) <= 80 {
+		return s
+	}
+	return string(r[:80]) + "…"
+}
+
 type howEntry struct {
 	Command  string
 	Runs     int
@@ -99,7 +114,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		if !e.Last.IsZero() {
 			when = " · last " + e.Last.Local().Format("2006-01-02")
 		}
-		fmt.Fprintf(stdout, "%s\n", search.SafeLine(e.Command))
+		fmt.Fprintf(stdout, "%s\n", search.SafeCommand(e.Command))
 		fmt.Fprintf(stdout, "  ran %s in %s%s\n",
 			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
 	}
@@ -137,7 +152,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
 			return
 		}
-		cmd := strings.TrimSpace(firstLine(r.Text))
+		cmd := strings.TrimSpace(firstCommandLine(r.Text))
 		if cmd == "" || len(cmd) > howCommandMax {
 			return
 		}
