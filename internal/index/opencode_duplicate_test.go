@@ -206,7 +206,9 @@ insert or replace into cursorDiskKV values
  ('composerData:cu1', json('{"composerId":"cu1","name":"Chat","createdAt":1752600000000,"lastUpdatedAt":1752600200000,"fullConversationHeadersOnly":[{"bubbleId":"b1","type":1},{"bubbleId":"b2","type":2}]}')),
  ('bubbleId:cu1:b2', json('{"type":2,"text":"the second turn is the answer","timestamp":1752600150000,"workspaceProjectDir":"/w/app"}'));`)
 	future := time.Now().Add(time.Hour)
-	_ = os.Chtimes(global, future, future)
+	if err := os.Chtimes(global, future, future); err != nil {
+		t.Fatal(err)
+	}
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -227,5 +229,71 @@ insert or replace into cursorDiskKV values
 	}
 	if hits, err := Search(dir, search.Options{Query: "caching", All: true}); err != nil || len(hits) == 0 {
 		t.Errorf("the new workspace store was not indexed (%d hits, %v)", len(hits), err)
+	}
+}
+
+// opencode names the project directory as the session's path, and a project can
+// live inside another harness's root — a versioned ~/.claude is the obvious one.
+// Asking the path what store a record came from answers with that harness there,
+// which put opencode's records back among the per-file ones and brought #2033
+// back with them.
+func TestAnOpencodeProjectInsideAnotherHarnessRootStillCounts(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 CLI not available")
+	}
+	tmp := t.TempDir()
+	setHome(t, tmp)
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_GOOSE_DB", filepath.Join(tmp, "none-goose.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+	db := filepath.Join(tmp, "opencode.db")
+	t.Setenv("DEJA_OPENCODE_DB", db)
+	project := filepath.Join(claudeRoot, "myconfig")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	seed := func(id, text string) {
+		t.Helper()
+		stmts := fmt.Sprintf(`
+create table if not exists session (id text primary key, directory text, time_created integer, time_updated integer);
+create table if not exists message (id text primary key, session_id text, data text, time_created integer);
+create table if not exists part (id text primary key, message_id text, data text);
+insert into session values ('%[1]s','%[3]s',0,0);
+insert into message values ('m-%[1]s','%[1]s','{"role":"user"}',0);
+insert into part values ('p-%[1]s','m-%[1]s',json_object('type','text','text','%[2]s'));
+`, id, text, project)
+		if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
+			t.Fatalf("sqlite3 seed: %v %s", err, out)
+		}
+	}
+	seed("s1", "why does pgbouncer time out")
+
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	messages := func() int {
+		t.Helper()
+		s, ok, err := FindByIdentity(dir, "opencode", "s1")
+		if err != nil || !ok {
+			t.Fatalf("the session is not in the index: %v %v", ok, err)
+		}
+		return len(s.Messages)
+	}
+	if got := messages(); got != 1 {
+		t.Fatalf("the build indexed %d messages for a one-turn session, so this measures nothing", got)
+	}
+
+	for i, id := range []string{"s2", "s3"} {
+		seed(id, "an unrelated session")
+		if err := Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := messages(); got != 1 {
+			t.Fatalf("one turn on disk, %d in the index after pass %d", got, i+1)
+		}
 	}
 }

@@ -2005,19 +2005,23 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 // path says "database" — the key names the harness, and opencode has no
 // per-file kind to confuse it with (#2033).
 func fromDatabase(r Record) bool {
+	// The key first, and only for opencode: it has one store and no per-file
+	// kind, so nothing else carries an "opencode:" key and no path can
+	// contradict it. Asking the path first got this wrong for an opencode
+	// project that lives inside another harness's root — a versioned ~/.claude,
+	// say — where harnessForPath answers with that harness's kind.
+	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
+		return true
+	}
 	switch h := harnessForPath(r.SourcePath); h {
-	case "opencode", "cursor-db", "goose-db":
+	case "cursor-db", "goose-db":
 		return true
 	default:
-		if h != "" {
-			// A path that names a per-file kind settles it: two transcripts in
-			// different projects can share a filename-derived id, and judging
-			// those by key erased the sibling that was never re-read (#699).
-			return false
-		}
+		// A path that names a per-file kind settles it: two transcripts in
+		// different projects can share a filename-derived id, and judging those
+		// by key erased the sibling that was never re-read (#699).
+		return false
 	}
-	harness, _, ok := strings.Cut(r.Key, ":")
-	return ok && harness == "opencode"
 }
 
 // readWholeThisPass reports whether the pass re-read this record's store in
@@ -2418,7 +2422,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// watermark, so their untouched sessions are NOT re-emitted on a
 		// change — they must be retained, not dropped, or they vanish.
 		// Superseded sessions are handled by replaceKeys.
-		sharedStore := fromDatabase(r)
+		fromStore := fromDatabase(r)
 		// replaceKeys is scoped to shared stores. A shared store is parsed since
 		// a watermark, so a superseded session's old record is not re-read and
 		// clause two never reaches it — replaceKeys is what drops it. For a
@@ -2427,7 +2431,11 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// hurts: two transcripts in different projects can share a filename-derived
 		// id, and dropping by key alone erased the sibling that was never re-read
 		// (#699). The record's own SourcePath decides its fate for those.
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !sharedStore) || (sharedStore && readWholeThisPass(r) && replaceKeys[r.Key]) {
+		//
+		// And only when the pass read that store whole: a store read from its
+		// watermark hands back the new turns alone, so dropping the rest by key
+		// would take the earlier turns of every continued session (#2033).
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore) || (fromStore && readWholeThisPass(r) && replaceKeys[r.Key]) {
 			return
 		}
 		recErr = addRec(r)
