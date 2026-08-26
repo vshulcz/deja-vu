@@ -149,6 +149,12 @@ const (
 	// (#1922). Measured at 59.8 KB, against the megabyte that triggers a
 	// rewrite.
 	keepAtLeast = 200
+	// EventRoom is how large one event may be for the fallback above to leave
+	// the file under its threshold: keepAtLeast of them have to fit in
+	// rotateAt, with room to spare. Measured, a widest answer's ids come to
+	// about 1.4 kB, so this is set where the check is meaningful rather than
+	// where today's events happen to sit.
+	EventRoom = 4096
 	// memoWindow is how long a read's finding answers for later appends. Short
 	// enough that an event arriving with an old stamp waits minutes rather than
 	// a fortnight, long enough that a busy process pays the read rarely.
