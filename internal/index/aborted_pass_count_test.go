@@ -6,20 +6,14 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
-// The malformed-line counters used to be drained in one place: the manifest
-// fold, inside writeManifest. A pass that died before it left its count behind
-// for whoever parsed next, so one bad line on disk was reported as two — with
-// the manifest agreeing, which is the worst shape for a number a person is
-// meant to act on (#2010).
-func TestAnAbortedPassDoesNotLendItsCountToTheNextOne(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("directory permissions do not stop a write on windows")
-	}
-	if os.Geteuid() == 0 {
-		t.Skip("root writes through a read-only directory")
-	}
+// abortedPassIndex leaves an index behind whose last pass died between the
+// parse and the manifest write, with exactly one unreadable line on disk.
+func abortedPassIndex(t *testing.T) string {
+	t.Helper()
 	tmp := t.TempDir()
 	setHome(t, tmp)
 	t.Setenv("USERPROFILE", tmp)
@@ -70,15 +64,35 @@ func TestAnAbortedPassDoesNotLendItsCountToTheNextOne(t *testing.T) {
 	if err := os.Chmod(buckets, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	return dir
+}
+
+func skipWhereADirectoryCannotBeMadeUnwritable(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions do not stop a write on windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root writes through a read-only directory")
+	}
+}
+
+// The malformed-line counters used to be cleared in one place: the manifest
+// fold, inside writeManifest. A pass that died before it left its count behind
+// for whoever parsed next, so one bad line on disk was reported as two — with
+// the manifest agreeing, which is the worst shape for a number a person is
+// meant to act on (#2010).
+func TestAnAbortedPassDoesNotLendItsCountToTheNextOne(t *testing.T) {
+	skipWhereADirectoryCannotBeMadeUnwritable(t)
+	dir := abortedPassIndex(t)
 
 	var out strings.Builder
 	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
 	}
 	said := out.String()
-
-	if strings.Contains(said, "2 lines") {
-		t.Errorf("one unreadable line on disk, and the run reports the dead pass's count as well:\n%s", said)
+	if !strings.Contains(said, "— 1 line skipped") {
+		t.Errorf("one unreadable line on disk, and the run does not report exactly one:\n%s", said)
 	}
 	m, err := readManifest(dir)
 	if err != nil {
@@ -86,5 +100,25 @@ func TestAnAbortedPassDoesNotLendItsCountToTheNextOne(t *testing.T) {
 	}
 	if got := m.IngestHealth["claude"].MalformedLines; got != 1 {
 		t.Errorf("one unreadable line on disk, manifest says %d", got)
+	}
+}
+
+// The same leak by the path a recall takes. An aborted pass leaves records.bin
+// short, so the next search finds the index damaged and rebuilds — through
+// rebuildForSearch, which never passes through updateIndex, which is where the
+// first fix for this put the drain.
+func TestASearchRebuildDoesNotInheritADeadPassCount(t *testing.T) {
+	skipWhereADirectoryCannotBeMadeUnwritable(t)
+	dir := abortedPassIndex(t)
+
+	if err := EnsureForSearch(dir, query.Options{}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.IngestHealth["claude"].MalformedLines; got != 1 {
+		t.Errorf("one unreadable line on disk, the search rebuild recorded %d", got)
 	}
 }
