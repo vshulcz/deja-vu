@@ -40,8 +40,8 @@ func TestAnIncrementalRunSaysWhatItCouldNotRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := f.WriteString(
-		`{"type":"user","sessionId":"s1","cwd":"/tmp/app","timestamp":"2026-01-02T03:04:06Z","message":{"role":"user","content":"the pool `+"\x1b"+`[31mtimed out"}}`+"\n"+
-			`{"type":"assistant","sessionId":"s1","cwd":"/tmp/app","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":"raised it to 40"}}`+"\n"); err != nil {
+		`{"type":"user","sessionId":"s1","cwd":"/tmp/app","timestamp":"2026-01-02T03:04:06Z","message":{"role":"user","content":"the pool ` + "\x1b" + `[31mtimed out"}}` + "\n" +
+			`{"type":"assistant","sessionId":"s1","cwd":"/tmp/app","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":"raised it to 40"}}` + "\n"); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
