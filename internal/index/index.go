@@ -275,6 +275,11 @@ type Manifest struct {
 	// that last touched it: malformed JSONL lines and files that failed to
 	// parse. Silent loss must be diagnosable (`deja doctor --json`).
 	IngestHealth map[string]HarnessIngest `json:"ingest_health,omitempty"`
+	// IngestFiles is the same story per file, and it is the one that survives:
+	// a store's counts are the sum of its files, so a pass that re-reads one
+	// transcript cannot forget what a different one could not read (#2015).
+	// Sparse — only files with something to report are in it.
+	IngestFiles map[string]FileIngest `json:"ingest_files,omitempty"`
 	// ExcludeFingerprint identifies the exclusion patterns in force when this
 	// index was built. They apply at ingest, so a pattern added later leaves
 	// what is already indexed searchable and exportable — silently, until this
@@ -304,6 +309,14 @@ type HarnessIngest struct {
 	LastError       string `json:"last_error,omitempty"`
 }
 
+// FileIngest is what one file cost the last pass that read it: lines it could
+// not parse, and the error if the file itself would not open. Held per file so
+// that re-reading one transcript cannot erase what another one reported.
+type FileIngest struct {
+	Malformed int    `json:"malformed,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
 type manifestCore struct {
 	Version          int
 	Files            map[string]FileState
@@ -319,6 +332,7 @@ type manifestCore struct {
 	RecordsSize      int64
 	BucketFiles      int
 	IngestHealth     map[string]HarnessIngest
+	IngestFiles      map[string]FileIngest
 	// ExcludeFingerprint, ToolFingerprint: see Manifest.
 	ExcludeFingerprint string
 	ToolFingerprint    string

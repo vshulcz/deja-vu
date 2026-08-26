@@ -60,50 +60,93 @@ func IngestHealth(dir string) map[string]HarnessIngest {
 	return m.IngestHealth
 }
 
-// mergeIngestDiag folds the sources side-channel counters into the manifest,
-// keyed by harness. Harnesses untouched this pass keep their previous entry.
+// mergeIngestDiag folds the sources side-channel counters into the manifest.
+// The counts live per file, because that is what they are about: a pass that
+// re-reads one transcript must not erase what a different one reported, and a
+// file rewritten without its bad line must be able to clear its own count
+// (#2015). The per-harness map every reader asks for is the sum.
 func mergeIngestDiag(m *Manifest) {
 	malformed, failed := sources.DiagSnapshot()
-	if len(malformed) == 0 && len(failed) == 0 {
-		return
+	if m.IngestFiles == nil {
+		m.IngestFiles = map[string]FileIngest{}
 	}
-	if m.IngestHealth == nil {
-		m.IngestHealth = map[string]HarnessIngest{}
-	}
-	touched := map[string]bool{}
-	for p := range malformed {
-		touched[harnessForPath(p)] = true
-	}
-	for p := range failed {
-		touched[harnessForPath(p)] = true
-	}
-	for h := range touched {
-		if h == "" {
-			continue
-		}
-		// The clip count for this pass is recorded during redaction, which
-		// runs before this fold; resetting the whole entry threw it away.
-		m.IngestHealth[h] = HarnessIngest{ClippedMessages: m.IngestHealth[h].ClippedMessages}
+	// Whatever this pass read, it read whole: its files start from nothing and
+	// take what the parsers just reported.
+	for p := range passParsed {
+		delete(m.IngestFiles, p)
 	}
 	for p, n := range malformed {
-		h := harnessForPath(p)
-		if h == "" {
-			continue
-		}
-		e := m.IngestHealth[h]
-		e.MalformedLines += n
-		m.IngestHealth[h] = e
+		e := m.IngestFiles[p]
+		e.Malformed += n
+		m.IngestFiles[p] = e
 	}
 	for p, msg := range failed {
+		e := m.IngestFiles[p]
+		e.Error = msg
+		m.IngestFiles[p] = e
+	}
+	// A file this pass read is a file that opens. Only the error goes: the bad
+	// lines it counted are still in the part already indexed.
+	for p := range passRead {
+		if failed[p] != "" {
+			continue
+		}
+		if e, ok := m.IngestFiles[p]; ok && e.Error != "" {
+			e.Error = ""
+			if e.Malformed == 0 {
+				delete(m.IngestFiles, p)
+			} else {
+				m.IngestFiles[p] = e
+			}
+		}
+	}
+	// A file deja no longer walks has nothing left to report. Kept for a file
+	// that failed to open, which is exactly the file a walk may not see.
+	for p, e := range m.IngestFiles {
+		if e.Error != "" {
+			continue
+		}
+		if _, ok := m.Files[p]; !ok {
+			delete(m.IngestFiles, p)
+		}
+	}
+	if len(m.IngestFiles) == 0 {
+		m.IngestFiles = nil
+	}
+	m.IngestHealth = healthFromFiles(m.IngestFiles, m.IngestHealth)
+	// The set belongs to the pass that recorded it. Left standing, it deleted
+	// those files' entries again on the next manifest write in the process —
+	// and `deja sync` writes one, from Import, right after a pass.
+	passParsed, passRead = nil, nil
+}
+
+// healthFromFiles sums the per-file counts per harness. The clip count is not
+// per file — it is recorded during redaction, before this fold — so it is
+// carried from what the pass already put there.
+func healthFromFiles(files map[string]FileIngest, prior map[string]HarnessIngest) map[string]HarnessIngest {
+	out := map[string]HarnessIngest{}
+	for h, e := range prior {
+		if e.ClippedMessages > 0 {
+			out[h] = HarnessIngest{ClippedMessages: e.ClippedMessages}
+		}
+	}
+	for p, e := range files {
 		h := harnessForPath(p)
 		if h == "" {
 			continue
 		}
-		e := m.IngestHealth[h]
-		e.FailedFiles++
-		e.LastError = msg
-		m.IngestHealth[h] = e
+		cur := out[h]
+		cur.MalformedLines += e.Malformed
+		if e.Error != "" {
+			cur.FailedFiles++
+			cur.LastError = e.Error
+		}
+		out[h] = cur
 	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // UpToDate reports whether Ensure would do nothing, and how many sessions the
@@ -363,6 +406,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// outlive it (#1861).
 	evicted.Store(0)
 	lastIngestFiles = len(files)
+	parsedThisPass(files)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
 	imported := importedSessions(dir)
@@ -765,6 +809,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
 	lastIngestFiles = len(files)
+	parsedThisPass(files)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -1950,6 +1995,16 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 }
 
+// copyIngestFiles hands the new manifest its own map: the old one belongs to
+// the manifest this build read, which is still in use while the build runs.
+func copyIngestFiles(old map[string]FileIngest) map[string]FileIngest {
+	out := make(map[string]FileIngest, len(old))
+	for p, e := range old {
+		out[p] = e
+	}
+	return out
+}
+
 // beginPass clears the parsers' skip counters, which belong to the pass that
 // parsed. They used to be cleared only by the manifest fold, so a pass that died
 // before writing left its count for the next one to report: one bad line on
@@ -1961,6 +2016,40 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 // unforget call for themselves.
 func beginPass() {
 	sources.DiagSnapshot()
+	passParsed = nil
+	passRead = nil
+}
+
+// passParsed is the set of files the pass in progress re-read. Package state
+// for the same reason lastIngestFiles is: a pass holds the directory lock, so
+// only one is ever in flight.
+var passParsed map[string]bool
+
+// passRead is the files a pass read without the open failing. The append path
+// cannot use parsedThisPass — it reads a tail, so its counts add — but a file
+// it read is a file that opens, and an error recorded when it did not has to
+// go, or a permission blip stayed in doctor until a forced rebuild (#2015).
+var passRead map[string]bool
+
+// readThisPass records a file a pass opened and parsed.
+func readThisPass(files map[string]FileState) {
+	if passRead == nil {
+		passRead = map[string]bool{}
+	}
+	for p := range files {
+		passRead[p] = true
+	}
+}
+
+// parsedThisPass records which files a pass read, so the fold can start their
+// counts over rather than adding to what an earlier pass left (#2015).
+func parsedThisPass(files map[string]FileState) {
+	if passParsed == nil {
+		passParsed = map[string]bool{}
+	}
+	for p := range files {
+		passParsed[p] = true
+	}
 }
 
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
@@ -2078,6 +2167,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	emptied.Store(0)
 	collisions.Store(0)
 	lastIngestFiles = len(changed)
+	parsedThisPass(changed)
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
 		if err != nil {
@@ -2133,7 +2223,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// those patterns, so claiming today's set would be a lie the reader
 		// cannot check.
 		ExcludeFingerprint: old.ExcludeFingerprint,
-		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
+		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir)),
+		// What deja could not read is about the files, not about the pass that
+		// happened to notice: the lines are still there. Dropping the map meant
+		// doctor forgot a store's unreadable file because an unrelated
+		// transcript changed (#2015). A store this pass re-read starts over,
+		// because a file rewritten clean has to be able to clear its count.
+		IngestFiles: copyIngestFiles(old.IngestFiles)}
 	skipRedactions := map[string]bool{}
 	for p := range changed {
 		skipRedactions[p] = true
@@ -2369,6 +2465,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	emptied.Store(0)
 	collisions.Store(0)
 	lastIngestFiles = len(changed)
+	readThisPass(changed)
+	// Deliberately not parsedThisPass: this path reads the appended tail, not
+	// the file, so what it finds adds to the file's count instead of replacing
+	// it. Marking the file re-read dropped every bad line in the part already
+	// indexed — which is every live session.
 	rf, err := os.OpenFile(filepath.Join(dir, "records.bin"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return 0, 0, 0, err
