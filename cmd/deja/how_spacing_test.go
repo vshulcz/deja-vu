@@ -61,6 +61,16 @@ func TestHowPrintsTheCommandThatRan(t *testing.T) {
 		t.Errorf("how printed a command that is not the one that ran:\n%s\nwanted: %s", out, cmd)
 	}
 
+	// A quoted phrase still finds it: the record keeps the spacing that ran, and
+	// matching folds its own copy rather than the record's (#2052).
+	quoted, err := captureRun(t, "how", "pool size")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(quoted, cmd) {
+		t.Errorf("a quoted phrase no longer finds the command it names:\n%s", quoted)
+	}
+
 	// The same answer through MCP, which is the half an agent runs without a
 	// person reading it first.
 	got, err := callMCPTool(os.Getenv("DEJA_INDEX_DIR"), "how", json.RawMessage(`{"what":"test"}`))

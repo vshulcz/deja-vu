@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -221,12 +222,24 @@ func pluralSessions(n int) string {
 // name the halves of a hyphenated tool.
 // A term that itself carries a separator (`go test`, `./x`) is matched as
 // written: it is already more specific than one word.
+func fold(s string) string { return strings.Join(strings.Fields(s), " ") }
+
 func commandMentions(low, term string) bool {
 	if term == "" {
 		return false
 	}
 	if strings.ContainsFunc(term, func(r rune) bool { return !isCommandWordRune(r) }) {
-		return strings.Contains(low, term)
+		if strings.Contains(low, term) {
+			return true
+		}
+		// Matching folds the whitespace the command keeps. The record holds
+		// what ran, spacing and all (#2052), so `deja how "pool size"` stopped
+		// finding a command written `"Pool  Size"` — the answer is to compare a
+		// folded copy, not to print one.
+		if strings.ContainsFunc(term, unicode.IsSpace) {
+			return strings.Contains(fold(low), fold(term))
+		}
+		return false
 	}
 	for at := 0; ; {
 		i := strings.Index(low[at:], term)
