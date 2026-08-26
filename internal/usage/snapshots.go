@@ -114,7 +114,13 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
 	}
-	rotateSnapshots(p)
+	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
+		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
+	if err != nil {
+		return
+	}
+	// The record's own size decides how much room the rotation has to leave.
+	rotateSnapshots(p, len(b)+1)
 	// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
 	// the reason the usage log opens the same way (#1901).
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
@@ -122,11 +128,6 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
-		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
-	if err != nil {
-		return
-	}
 	// A process killed between a record and its newline costs that record. It
 	// cost every later one too: appended onto the partial line, the new digest
 	// parsed as nothing either, and `deja log --last` reported no injection at
@@ -137,7 +138,7 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 	_, _ = f.Write(append(b, '\n'))
 }
 
-func rotateSnapshots(p string) {
+func rotateSnapshots(p string, incoming int) {
 	fi, err := os.Stat(p)
 	if err != nil || fi.Size() < snapshotRotateAt {
 		return
@@ -147,11 +148,27 @@ func rotateSnapshots(p string) {
 	// discovering: the file shrinks by more than the rotation alone would
 	// explain (#1946).
 	snaps := snapshotsFrom(p, snapshotsToKeep) // newest first
+	// Keeping a fixed count says nothing about the size that triggered this. A
+	// read of `deja://session/…` records a whole session here, unbudgeted, and
+	// twenty of those sit above the threshold for good: the file then rotates on
+	// every write, and every record appended while a rotation rebuilds is
+	// rewritten away — measured at half of two concurrent injections (#1971).
+	// Dropping the oldest until the rebuild fits leaves the next write with
+	// nothing to do.
 	var buf bytes.Buffer
-	for i := len(snaps) - 1; i >= 0; i-- {
-		if b, err := json.Marshal(snaps[i]); err == nil {
-			buf.Write(append(b, '\n'))
+	for {
+		buf.Reset()
+		for i := len(snaps) - 1; i >= 0; i-- {
+			if b, err := json.Marshal(snaps[i]); err == nil {
+				buf.Write(append(b, '\n'))
+			}
 		}
+		// One record over the threshold is kept anyway: a log holding the last
+		// digest and nothing else is still a log, and holding none is not.
+		if buf.Len()+incoming < snapshotRotateAt || len(snaps) <= 1 {
+			break
+		}
+		snaps = snaps[:len(snaps)-1] // drop the oldest
 	}
 	// Same shared-temp-name defect as the usage log above (#1319).
 	_ = atomicfile.Write(p, buf.Bytes(), 0o600)
