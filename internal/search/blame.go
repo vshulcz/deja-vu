@@ -162,7 +162,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			return mentions[i].count > mentions[j].count
 		})
 		for i := 0; i < len(mentions) && i < 2; i++ {
-			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target.Base))
+			hit.Snippets = append(hit.Snippets, blameSnippet(mentions[i].text, mentions[i].role, target))
 		}
 		if hit.Count == 0 {
 			continue
@@ -345,16 +345,46 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 // came back with one and then found nothing when it was pasted into restore
 // (#2044). A files record is a list of paths, so the line that names the file is
 // printed as a path instead.
-func blameSnippet(text, role, base string) string {
-	if role != "files" {
-		return snippet(text, base, nil)
-	}
-	for _, line := range strings.Split(text, "\n") {
-		if strings.Contains(line, base) {
+func blameSnippet(text, role string, target BlameTarget) string {
+	switch role {
+	case "files":
+		if line := pathLineFor(text, target); line != "" {
 			return SafePath(line)
 		}
+	case "edit":
+		// An edit is "path\nspan": the first line is the file, the rest is what
+		// stopped existing and is prose as far as a snippet goes.
+		path, span, _ := strings.Cut(text, "\n")
+		if pathLineFor(path, target) != "" {
+			return strings.TrimSpace(SafePath(path) + " " + snippet(span, target.Base, nil))
+		}
 	}
-	return snippet(text, base, nil)
+	return snippet(text, target.Base, nil)
+}
+
+// pathLineFor picks the line of a record that names the file blame was asked
+// about. By the file's own name, not by containing it: "mypool.go" contains
+// "pool.go", and printing a sibling as the answer is the same wrong-path bug
+// this renderer exists to fix. The full path wins over a bare match, so a
+// vendored copy does not stand in for the file itself.
+func pathLineFor(text string, target BlameTarget) string {
+	base := strings.ToLower(target.Base)
+	full := strings.ToLower(filepath.ToSlash(target.FullPath))
+	fallback := ""
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		slashed := strings.ToLower(filepath.ToSlash(trimmed))
+		if full != "" && slashed == full {
+			return line
+		}
+		if strings.ToLower(filepath.Base(trimmed)) == base && fallback == "" {
+			fallback = line
+		}
+	}
+	return fallback
 }
 
 // BlameLifecycleLine words a withdrawn decision for blame the way search words

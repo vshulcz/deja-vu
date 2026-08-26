@@ -413,7 +413,7 @@ var repoCheck sync.Map
 // filesRowPath is what one row shows: the head removed, what the terminal acts
 // on removed, and the rest bounded to the column.
 //
-// SafeLine comes before the bound, not after. A file name can hold an escape
+// SafePath comes before the bound, not after. A file name can hold an escape
 // or a carriage return — recorded from the tool call verbatim, and #1090
 // stripped them from the other reading surfaces while this row was missed —
 // and those bytes print as nothing, so measuring the path with them still in

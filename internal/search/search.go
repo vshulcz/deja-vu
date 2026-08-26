@@ -2224,13 +2224,30 @@ func SafePath(s string) string {
 	if s == "" {
 		return ""
 	}
+	// SafeText leaves only newline and tab standing, and both have to go: this
+	// is one row of something structured. One space each rather than a run
+	// collapsed, which is the whole point.
 	cleaned := strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\t' || r == '\r' {
+		if r == '\n' || r == '\t' {
 			return ' '
 		}
 		return r
 	}, SafeText(s))
-	return strings.Trim(cleaned, " ")
+	return clipPath(strings.Trim(cleaned, " "))
+}
+
+// pathCap bounds a printed path. Long enough for any real one, short enough
+// that a transcript-supplied string cannot fill a terminal or an MCP payload.
+const pathCap = 300
+
+// clipPath bounds a path the way clip bounds an answer, from the left: a path
+// is recognised by its tail, and the head is what a reader gives up first.
+func clipPath(s string) string {
+	r := []rune(s)
+	if len(r) <= pathCap {
+		return s
+	}
+	return "…" + string(r[len(r)-pathCap+1:])
 }
 
 func unsafeForTerminal(r rune) bool {

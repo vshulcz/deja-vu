@@ -1,0 +1,58 @@
+package search
+
+import (
+	"strings"
+	"testing"
+)
+
+// The line a blame snippet shows has to be the file that was asked about. A
+// substring match printed a sibling — "mypool.go" contains "pool.go" — as the
+// answer, and pasted into restore that is a different file's spans (#2044).
+func TestBlameSnippetNamesTheFileThatWasAskedAbout(t *testing.T) {
+	target := BlameTarget{Base: "pool.go", FullPath: "/tmp/app/pool.go"}
+	for _, c := range []struct{ name, text, want string }{
+		{"a sibling whose name contains it",
+			"/tmp/app/mypool.go\n/tmp/app/pool.go", "/tmp/app/pool.go"},
+		{"the full path beats a bare match",
+			"/tmp/app/vendor/pool.go\n/tmp/app/pool.go", "/tmp/app/pool.go"},
+		{"spelled in another case",
+			"/tmp/app/Pool.go", "/tmp/app/Pool.go"},
+		{"its own spaces kept",
+			"/tmp/app/two  spaces.go\n/tmp/app/pool.go", "/tmp/app/pool.go"},
+	} {
+		if got := blameSnippet(c.text, "files", target); got != c.want {
+			t.Errorf("%s: blameSnippet = %q, want %q", c.name, got, c.want)
+		}
+	}
+
+	// An edit record is "path\nspan": the path is a path, the span is prose.
+	spaces := BlameTarget{Base: "two  spaces.go", FullPath: "/tmp/app/two  spaces.go"}
+	got := blameSnippet("/tmp/app/two  spaces.go\nsize = 20", "edit", spaces)
+	if !strings.HasPrefix(got, "/tmp/app/two  spaces.go") {
+		t.Errorf("an edit snippet lost the file's spaces: %q", got)
+	}
+	if !strings.Contains(got, "size = 20") {
+		t.Errorf("an edit snippet lost the span: %q", got)
+	}
+
+	// Anything else is prose, and prose is what snippet() is for.
+	if got := blameSnippet("we changed pool.go twice today", "user", target); got == "" {
+		t.Error("a prose mention produced no snippet")
+	}
+}
+
+// A path is bounded like anything else that reaches a terminal or an MCP
+// payload, and bounded from the left: the tail is what names the file.
+func TestSafePathIsBoundedFromTheLeft(t *testing.T) {
+	long := "/tmp/" + strings.Repeat("deep/", 200) + "pool.go"
+	got := SafePath(long)
+	if len([]rune(got)) > pathCap {
+		t.Errorf("SafePath returned %d runes, over the %d cap", len([]rune(got)), pathCap)
+	}
+	if !strings.HasSuffix(got, "pool.go") {
+		t.Errorf("the clip dropped the file's own name: %q", got)
+	}
+	if !strings.HasPrefix(got, "…") {
+		t.Errorf("a clipped path does not say it was clipped: %q", got)
+	}
+}

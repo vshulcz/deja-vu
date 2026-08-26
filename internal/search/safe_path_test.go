@@ -18,6 +18,8 @@ func TestSafePathKeepsTheSpacesInAName(t *testing.T) {
 		{"/tmp/app/pool\x1b[31m.go", "/tmp/app/pool [31m.go"},
 		{"/tmp/app/a\nb.go", "/tmp/app/a b.go"},
 		{"/tmp/app/a\tb.go", "/tmp/app/a b.go"},
+		// SafeText has already turned the carriage return into a space by the
+		// time SafePath maps the newline, so a CRLF costs two.
 		{"/tmp/app/a\r\nb.go", "/tmp/app/a  b.go"},
 		{"  /tmp/app/pool.go  ", "/tmp/app/pool.go"},
 		{"", ""},

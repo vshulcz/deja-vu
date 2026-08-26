@@ -193,7 +193,7 @@ func runStats(dir string, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, search.SafeLine(path))
+		fmt.Fprintln(os.Stdout, search.SafePath(path))
 		return nil
 	}
 	if jsonOut {
