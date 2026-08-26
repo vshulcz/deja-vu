@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -27,6 +28,21 @@ import (
 // the command text, ordered by how many separate sessions ran it.
 
 const howCommandMax = 200
+
+// firstCommandLine is firstLine for a command: the first line, bounded, and
+// otherwise left alone. firstLine collapses runs of whitespace, which is right
+// for the note titles it was written for and wrong here — `-run "Pool  Size"`
+// came back as a different test filter (#2052).
+func firstCommandLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i > 0 {
+		s = s[:i]
+	}
+	r := []rune(s)
+	if len(r) <= 80 {
+		return s
+	}
+	return string(r[:80]) + "…"
+}
 
 type howEntry struct {
 	Command  string
@@ -99,7 +115,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		if !e.Last.IsZero() {
 			when = " · last " + e.Last.Local().Format("2006-01-02")
 		}
-		fmt.Fprintf(stdout, "%s\n", search.SafeLine(e.Command))
+		fmt.Fprintf(stdout, "%s\n", search.SafeCommand(e.Command))
 		fmt.Fprintf(stdout, "  ran %s in %s%s\n",
 			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
 	}
@@ -137,7 +153,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
 			return
 		}
-		cmd := strings.TrimSpace(firstLine(r.Text))
+		cmd := strings.TrimSpace(firstCommandLine(r.Text))
 		if cmd == "" || len(cmd) > howCommandMax {
 			return
 		}
@@ -194,6 +210,10 @@ func pluralSessions(n int) string {
 	return fmt.Sprintf("%d sessions", n)
 }
 
+// fold collapses runs of whitespace, for comparing a query against a command
+// without touching the command itself.
+func fold(s string) string { return strings.Join(strings.Fields(s), " ") }
+
 // commandMentions is the membership test for `how`: the term has to appear in
 // the command as a word, not inside a longer one. A raw substring test answered
 // `how go` with `golangci-lint run ./...`, and ranked it first (#1630) — and the
@@ -211,7 +231,17 @@ func commandMentions(low, term string) bool {
 		return false
 	}
 	if strings.ContainsFunc(term, func(r rune) bool { return !isCommandWordRune(r) }) {
-		return strings.Contains(low, term)
+		if strings.Contains(low, term) {
+			return true
+		}
+		// Matching folds the whitespace the command keeps. The record holds
+		// what ran, spacing and all (#2052), so `deja how "pool size"` stopped
+		// finding a command written `"Pool  Size"` — the answer is to compare a
+		// folded copy, not to print one.
+		if strings.ContainsFunc(term, unicode.IsSpace) {
+			return strings.Contains(fold(low), fold(term))
+		}
+		return false
 	}
 	for at := 0; ; {
 		i := strings.Index(low[at:], term)

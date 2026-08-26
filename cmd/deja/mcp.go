@@ -418,7 +418,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if !p.When.IsZero() {
 				when = " (" + p.When.Local().Format("2006-01-02") + ")"
 			}
-			fmt.Fprintf(&fb, "%s%s\n  ran next: %s\n", recallListingLine(p.Error), when, recallListingLine(p.Command))
+			fmt.Fprintf(&fb, "%s%s\n  ran next: %s\n", recallListingLine(p.Error), when, commandListingLine(p.Command))
 		}
 		return strings.TrimRight(fb.String(), "\n"), nil
 	case "how":
@@ -466,7 +466,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if !e.Last.IsZero() {
 				when = ", last " + e.Last.Local().Format("2006-01-02")
 			}
-			fmt.Fprintf(&hb, "%s\n  ran %s in %s%s\n", recallListingLine(e.Command), pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
+			fmt.Fprintf(&hb, "%s\n  ran %s in %s%s\n", commandListingLine(e.Command), pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
 		}
 		return strings.TrimRight(hb.String(), "\n"), nil
 	case "remember":
@@ -833,6 +833,10 @@ const sameFactFloor = 40
 // row of a numbered list: a project name or an answer spanning two lines
 // forges a second result, which is the shape #1080 fixed on the sync path.
 func recallListingLine(s string) string { return search.SafeLine(s) }
+
+// commandListingLine is recallListingLine for a command, which an agent runs
+// rather than reads: the spacing inside it is part of it (#2052).
+func commandListingLine(s string) string { return search.SafeCommand(s) }
 
 func recallText(dir, q, harness string, limit, budget int) (string, error) {
 	text, _, _, _, err := recallTextResult(dir, q, harness, limit, 0, budget)

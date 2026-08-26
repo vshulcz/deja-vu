@@ -2220,7 +2220,20 @@ func SafeLine(s string) string {
 // spaces inside a name are part of the name. Collapsing them made blame print
 // "/tmp/app/two spaces.go" for a file with two, and restoring that printed path
 // found nothing (#2044).
-func SafePath(s string) string {
+func SafePath(s string) string { return safeVerbatim(s, clipPath) }
+
+// SafeCommand is the same treatment for a command, which is the other thing on
+// these screens that a person copies and runs rather than reads. `deja how`
+// printed `-run "Pool Size"` for a command that ran `-run "Pool  Size"`, which
+// is a different test filter (#2052).
+//
+// Clipped from the other end than a path: a path is recognised by its tail, a
+// command by the program it runs.
+func SafeCommand(s string) string { return safeVerbatim(s, clipCommand) }
+
+// safeVerbatim keeps what was recorded, minus what a terminal would obey and
+// minus the line breaks that would let one row become two.
+func safeVerbatim(s string, clip func(string) string) string {
 	if s == "" {
 		return ""
 	}
@@ -2233,15 +2246,25 @@ func SafePath(s string) string {
 		}
 		return r
 	}, SafeText(s))
-	return clipPath(strings.Trim(cleaned, " "))
+	return clip(strings.Trim(cleaned, " "))
 }
 
 // pathCap bounds a printed path. Long enough for any real one, short enough
 // that a transcript-supplied string cannot fill a terminal or an MCP payload.
 const pathCap = 300
 
-// clipPath bounds a path the way clip bounds an answer, from the left: a path
-// is recognised by its tail, and the head is what a reader gives up first.
+// clipCommand bounds a command from the right: what identifies a command is the
+// program it runs, so the head is the part a reader cannot give up.
+func clipCommand(s string) string {
+	r := []rune(s)
+	if len(r) <= pathCap {
+		return s
+	}
+	return string(r[:pathCap-1]) + "…"
+}
+
+// clipPath bounds a path from the left: a path is recognised by its tail, and
+// the head is what a reader gives up first.
 func clipPath(s string) string {
 	r := []rune(s)
 	if len(r) <= pathCap {

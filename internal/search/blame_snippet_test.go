@@ -64,3 +64,23 @@ func TestSafePathIsBoundedFromTheLeft(t *testing.T) {
 		t.Errorf("a clipped path does not say it was clipped: %q", got)
 	}
 }
+
+// A command is clipped from the other end than a path: what identifies it is
+// the program it runs, so the head is what survives (#2052).
+func TestSafeCommandIsClippedFromTheRight(t *testing.T) {
+	long := "go test ./internal/index -run " + strings.Repeat("A", 400)
+	got := SafeCommand(long)
+	if len([]rune(got)) > pathCap {
+		t.Errorf("SafeCommand returned %d runes, over the %d cap", len([]rune(got)), pathCap)
+	}
+	if !strings.HasPrefix(got, "go test ./internal/index -run ") {
+		t.Errorf("the clip dropped the command itself: %q", got[:40])
+	}
+	if !strings.HasSuffix(got, "…") {
+		t.Errorf("a clipped command does not say it was clipped: %q", got[len(got)-10:])
+	}
+	// A path keeps the other end, and both stay under the cap.
+	if p := SafePath("/tmp/" + strings.Repeat("deep/", 200) + "pool.go"); !strings.HasSuffix(p, "pool.go") {
+		t.Errorf("a path lost its own name: %q", p)
+	}
+}

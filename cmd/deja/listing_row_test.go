@@ -36,7 +36,7 @@ func TestSafeLineIsTheOneThatCannotStartALine(t *testing.T) {
 // (#1863).
 func TestTheListingRowsUseTheLineSafeForm(t *testing.T) {
 	rows := regexp.MustCompile(`Fprintf\((?:stdout|w),\s*"[^"]*\\n"[^)]*search\.SafeText\(`)
-	for _, file := range []string{"fix.go", "how.go"} {
+	for _, file := range []string{"fix.go", "how.go", "mcp.go"} {
 		src, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
@@ -45,8 +45,11 @@ func TestTheListingRowsUseTheLineSafeForm(t *testing.T) {
 		if m := rows.FindString(body); m != "" {
 			t.Errorf("%s prints a row with SafeText, so a newline in the value forges a line: %s", file, m)
 		}
-		if !strings.Contains(body, "search.SafeLine(") {
-			t.Errorf("%s no longer uses the line-safe form at all", file)
+		// SafeLine for prose, SafeCommand for the command itself — the second
+		// keeps the spacing a person copies (#2052) and folds a newline the
+		// same way, which is what this guard is about.
+		if !strings.Contains(body, "search.SafeLine(") && !strings.Contains(body, "search.SafeCommand(") {
+			t.Errorf("%s no longer uses a line-safe form at all", file)
 		}
 	}
 }
