@@ -3,6 +3,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -12,7 +13,13 @@ import (
 // reaches a terminal through main, which prints an error as it is (#1857).
 func TestEverySentenceAboutTheDirectoryIsSafeToPrint(t *testing.T) {
 	base := t.TempDir()
-	const odd = "batch\x1b[31mHACK\rrewound"
+	// Windows refuses every control character in a name, so the odd name there
+	// is the other half of what assertPrintable guards: a bidi override, which
+	// the filesystem accepts and a terminal obeys (#2081).
+	odd := "batch\x1b[31mHACK\rrewound"
+	if runtime.GOOS == "windows" {
+		odd = "batch\u202eHACK-rewound"
+	}
 
 	t.Run("a file where the directory should be", func(t *testing.T) {
 		path := filepath.Join(base, odd)
@@ -31,8 +38,11 @@ func TestEverySentenceAboutTheDirectoryIsSafeToPrint(t *testing.T) {
 			t.Skip("root reads anything")
 		}
 		dir := filepath.Join(base, odd+"-dir")
+		// The name carries an escape and a carriage return on purpose, and not
+		// every filesystem takes one — Windows refuses the whole class. Its
+		// siblings above already skip on that; this one failed instead (#2081).
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
+			t.Skipf("the filesystem refused the name: %v", err)
 		}
 		if err := os.Chmod(dir, 0o000); err != nil {
 			t.Skipf("cannot drop permissions: %v", err)
