@@ -299,12 +299,12 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) (in
 	// start of the next, and the patterns for those allow a newline between the
 	// two. That line is one line by construction, so the split below is exact
 	// however many the title has.
-	title, titleCounts := redact.Text(title)
+	title, _ = redact.Text(title)
 	context := title
 	if i := strings.LastIndex(context, "\n"); i >= 0 {
 		context = context[i+1:]
 	}
-	withContext, textCounts := redact.Text(context + "\n" + text)
+	withContext, _ := redact.Text(context + "\n" + text)
 	if head, rest, ok := strings.Cut(withContext, "\n"); ok && head == context {
 		text = rest
 	} else {
@@ -313,13 +313,11 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) (in
 		// nothing: by then the context line is inside the marker.
 		text = withContext
 	}
+	// The masked spots in what is about to be written, and nothing else: a
+	// secret redacted at ingest is already a marker here, and one this pass
+	// replaces became one too. Adding the pass's own tally on top counted the
+	// second kind twice (#2061). deja view counts the same way.
 	masked := strings.Count(title, redact.Marker) + strings.Count(text, redact.Marker)
-	for _, n := range titleCounts {
-		masked += n
-	}
-	for _, n := range textCounts {
-		masked += n
-	}
 	// One line, because it is written as a heading.
 	title = strings.Join(strings.Fields(title), " ")
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
