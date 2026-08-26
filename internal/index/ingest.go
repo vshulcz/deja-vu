@@ -2188,11 +2188,6 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	emptied.Store(0)
 	collisions.Store(0)
 	lastIngestFiles = len(changed)
-	// A database-backed store reads only what is newer than the cursor the last
-	// pass stamped, so this pass cannot speak for the rest of it: it adds to
-	// what the store holds, the way an append does (#2025).
-	reread := fullyReadFiles(changed, old.Files)
-	parsedThisPass(reread)
 	for p, f := range changed {
 		ss, err := parseChangedFile(harness, p, old.Files[p])
 		if err != nil {
@@ -2213,6 +2208,19 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
 		files[p] = f
 	}
+	// After the loop, because a file whose parse failed is dropped from
+	// `changed` there and keeps what it already held — starting it over would
+	// throw the counts away on the one pass that could not read it.
+	//
+	// A database-backed store reads only what is newer than the cursor the last
+	// pass stamped, so this pass cannot speak for the rest of it either: it adds
+	// to what the store holds, the way an append does (#2025). The trade is the
+	// append path's — a db's counts can only grow until a full rebuild.
+	reread := fullyReadFiles(changed, old.Files)
+	parsedThisPass(reread)
+	// A file the pass read is a file that opens, whether or not it read all of
+	// it, so an error recorded when it did not has to go.
+	readThisPass(changed)
 	replaceKeys := map[string]bool{}
 	for _, s := range replacements {
 		replaceKeys[s.Harness+":"+s.ID] = true

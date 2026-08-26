@@ -35,7 +35,6 @@ func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	setHome(t, tmp)
-	t.Setenv("USERPROFILE", tmp)
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))

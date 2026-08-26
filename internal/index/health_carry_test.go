@@ -357,3 +357,45 @@ func TestAClipSurvivesAPassOverAnotherFile(t *testing.T) {
 		t.Errorf("one long message, count says %d", got)
 	}
 }
+
+// A pass that could not read a file keeps what that file already held: it is
+// the one pass with nothing to say about it. The merge branch decides which
+// files it re-read after the parse loop for this reason — the loop drops the
+// ones it failed on.
+func TestAFileThePassCouldNotReadKeepsItsCounts(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("file permissions do not stop a read here")
+	}
+	dir, proj, turn := healthFixture(t)
+	long := strings.Repeat("pgbouncer pool timed out and the retry took a second ", 1600)
+	a := filepath.Join(proj, "a.jsonl")
+	if err := os.WriteFile(a, []byte(turn("a", "2026-01-02T03:04:05Z", "user", long)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := clippedFor(t, dir, "claude"); got != 1 {
+		t.Fatalf("the build clipped %d messages, so this measures nothing", got)
+	}
+
+	// The file changes and becomes unreadable in the same breath, which is what
+	// a store being rewritten under a lock looks like.
+	if err := os.WriteFile(a, []byte(turn("a", "2026-01-02T03:04:05Z", "user", long+" and more")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(a, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(a, 0o644) })
+	var out strings.Builder
+	if err := Ensure(dir, "", false, &out); err != nil {
+		t.Fatal(err)
+	}
+	if said := out.String(); !strings.Contains(said, "skipping") {
+		t.Fatalf("the pass read the file after all, so it does not measure what it is about: %q", said)
+	}
+	if got := clippedFor(t, dir, "claude"); got != 1 {
+		t.Errorf("the pass could not read the file and dropped its count anyway: %d", got)
+	}
+}
