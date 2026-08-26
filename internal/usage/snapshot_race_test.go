@@ -2,6 +2,7 @@ package usage
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -59,6 +60,12 @@ func TestConcurrentWritersNeverInterleaveASnapshot(t *testing.T) {
 			sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
 			lines := 0
 			for sc.Scan() {
+				// Two writers can each close the same truncated tail, and each
+				// prepends its own newline (#1967): the blank line between them
+				// is not a record, and every reader of this file skips it.
+				if len(bytes.TrimSpace(sc.Bytes())) == 0 {
+					continue
+				}
 				lines++
 				var s Snapshot
 				if err := json.Unmarshal(sc.Bytes(), &s); err != nil {

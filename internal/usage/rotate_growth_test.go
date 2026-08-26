@@ -33,8 +33,8 @@ func TestAWriteDoesNotPayForTheWholeLog(t *testing.T) {
 	}
 	full := time.Since(start)
 
-	// Ten times is far below the 224× measured before the fix and far above any
-	// ordinary noise between two runs of the same loop.
+	// Ten times is far below the 135× this same test measures on the branch
+	// before the fix, and far above the noise between two runs of one loop.
 	if full > base*10 {
 		t.Errorf("writing to a full log took %v against %v on a fresh one", full, base)
 	}

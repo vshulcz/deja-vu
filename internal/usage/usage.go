@@ -149,6 +149,10 @@ const (
 	// (#1922). Measured at 59.8 KB, against the megabyte that triggers a
 	// rewrite.
 	keepAtLeast = 200
+	// memoWindow is how long a read's finding answers for later appends. Short
+	// enough that an event arriving with an old stamp waits minutes rather than
+	// a fortnight, long enough that a busy process pays the read rarely.
+	memoWindow = 5 * time.Minute
 )
 
 // ahead reports a timestamp past the end of the reader's day — a clock that
@@ -440,8 +444,10 @@ func read(p string) []Event {
 // recall rewrote the whole thing and left it exactly as long. Measured on a
 // 10k-session store, per-recall cost went 123ms at an empty log to 342ms at
 // 1.2MB and 870ms at 5.8MB, none of those rewrites dropping a single event.
-// Reading the log to find that out is nearly free; writing it back is not, so
-// the write is what gets skipped when every event survives the cutoff. Which
+// The write is what gets skipped when every event survives the cutoff. The read
+// that decides it is not free either — on a busy fortnight it is the whole file
+// on every event, 6.4 ms against 28 µs — so what one read found answers for the
+// next few minutes (#1972). Which
 // event is oldest cannot be assumed from the order — a clock that steps back
 // appends an older event behind a newer one, and dropping on that assumption
 // would leave stale recalls weighing on ranking forever.
@@ -450,15 +456,10 @@ func rotate(p string) {
 	if err != nil || fi.Size() < rotateAt {
 		return
 	}
-	cutoff := time.Now().UTC().Add(-keepWindow)
-	// A log over the trigger because it is busy rather than old drops nothing,
-	// and the read that decides that costs the whole file — on every event, for
-	// as long as the busy fortnight lasts: 6.4 ms against 28 µs on a fresh log,
-	// climbing (#1972). What the last read found is enough to skip the next
-	// one: nothing ages out until the oldest event does.
-	if skipRotation(p) {
+	if skipRotation(p, fi.Size()) {
 		return
 	}
+	cutoff := time.Now().UTC().Add(-keepWindow)
 	all := read(p)
 	var keep []Event
 	for _, e := range all {
@@ -613,6 +614,7 @@ var nothingToDrop sync.Map // path -> rotationMemo
 type rotationMemo struct {
 	oldest time.Time
 	size   int64
+	at     time.Time // when this was learned
 }
 
 // skipRotation reports whether the last read of this log already established
@@ -621,22 +623,26 @@ type rotationMemo struct {
 // It is only worth anything to a process that records more than once — the MCP
 // server answering recalls all day. A hook runs once and exits, so it pays the
 // read the first time either way.
-func skipRotation(p string) bool {
+func skipRotation(p string, size int64) bool {
 	v, ok := nothingToDrop.Load(p)
 	if !ok {
 		return false
 	}
 	m := v.(rotationMemo)
-	if !m.oldest.After(time.Now().UTC().Add(-keepWindow)) {
-		return false // the oldest event has aged out since
-	}
-	fi, err := os.Stat(p)
-	if err != nil {
+	now := time.Now().UTC()
+	// A memo is about the events one read saw. An event stamped in the past —
+	// a clock that stepped back, a log carried from another machine — arrives
+	// behind it and would otherwise wait out the whole window before anything
+	// looked again. A few minutes bounds that without giving back the cost.
+	if now.Sub(m.at) > memoWindow {
 		return false
+	}
+	if !m.oldest.After(now.Add(-keepWindow)) {
+		return false // the oldest event has aged out since
 	}
 	// Only growth is expected: a file that shrank was rewritten by someone
 	// else, and what this process remembers about it is about the old one.
-	return fi.Size() >= m.size
+	return size >= m.size
 }
 
 // rememberNothingToDrop records what a full read found, so the next append does
@@ -644,9 +650,6 @@ func skipRotation(p string) bool {
 func rememberNothingToDrop(p string, all []Event, size int64) {
 	oldest := time.Time{}
 	for _, e := range all {
-		if e.Time.IsZero() {
-			continue
-		}
 		if oldest.IsZero() || e.Time.Before(oldest) {
 			oldest = e.Time
 		}
@@ -654,5 +657,5 @@ func rememberNothingToDrop(p string, all []Event, size int64) {
 	if oldest.IsZero() {
 		return
 	}
-	nothingToDrop.Store(p, rotationMemo{oldest: oldest, size: size})
+	nothingToDrop.Store(p, rotationMemo{oldest: oldest, size: size, at: time.Now().UTC()})
 }
