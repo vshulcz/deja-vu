@@ -321,6 +321,14 @@ func runHookContext(dir string, plain bool) error {
 	digest = frameRecall(digest)
 	polName := policy.Load().Describe(policy.ActivationAuto)
 	usage.RecordDigestPolicySessions(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs)
+	// What this project was told, so the next session start can say something
+	// else. Without this the novelty ordering has nothing to read and every
+	// start serves the same three sessions (#2038).
+	// The agent session id is prefixed too, not just the project: the
+	// per-prompt path bans a session it already showed *this* agent session,
+	// and unprefixed rows made a session-start block count as that — the first
+	// prompt about what the start just mentioned got nothing back.
+	rememberInjectedIDsFor(dir, sessionStartKeyPrefix+input.SessionID, hookProjectKey(), servedIDs)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -790,6 +798,7 @@ func hookDigestResult(dir string) (string, int, int64, []string, int, []string) 
 	// block listed the correction as a separate item and left the session it
 	// corrects unmarked (#761).
 	ss, rejectedWarning := orderForInjection(ss)
+	ss = leadWithUnseen(dir, names, ss)
 	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names, TaskScores: scores})
 	mark("build-digest")
 	if result.Sessions == 0 {

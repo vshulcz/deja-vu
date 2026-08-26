@@ -611,6 +611,17 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 // that have no project pass the empty string and write the old three-field
 // line.
 func rememberInjectedFor(dir, sid, project string, ss []model.Session) {
+	ids := make([]string, 0, len(ss))
+	for _, s := range ss {
+		ids = append(ids, s.ID)
+	}
+	rememberInjectedIDsFor(dir, sid, project, ids)
+}
+
+// rememberInjectedIDsFor is rememberInjectedFor for a caller that has the ids
+// rather than the sessions — the session-start hook, which serves out of a
+// cached digest and knows only what went into it.
+func rememberInjectedIDsFor(dir, sid, project string, ids []string) {
 	if sid == "" {
 		return
 	}
@@ -636,14 +647,17 @@ func rememberInjectedFor(dir, sid, project string, ss []model.Session) {
 		_, _ = f.WriteString("\n")
 	}
 	stamp := time.Now().UTC().Format(time.RFC3339)
-	for _, s := range ss {
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
 		if project == "" {
-			fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
+			fmt.Fprintf(f, "%s %s %s\n", sid, id, stamp)
 			continue
 		}
 		// The project has no spaces by the time it gets here — it is one
 		// candidate name, not a path — so the line stays field-separated.
-		fmt.Fprintf(f, "%s %s %s %s\n", sid, s.ID, stamp, project)
+		fmt.Fprintf(f, "%s %s %s %s\n", sid, id, stamp, project)
 	}
 }
 
