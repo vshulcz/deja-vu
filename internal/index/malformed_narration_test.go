@@ -56,6 +56,20 @@ func TestAnIndexRunSaysWhatItCouldNotRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// A second store, all of it readable. The count belongs to the store that
+	// lost the lines: a fold that hands every store the run-wide total reads
+	// the same on a one-store fixture, which is what this store is here to
+	// stop.
+	rollout := filepath.Join(tmp, "codex", "sessions", "2026", "01", "01")
+	if err := os.MkdirAll(rollout, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rollout, "rollout-2026-01-01T12-00-00-c1.jsonl"),
+		[]byte(`{"type":"session_meta","timestamp":"2026-01-01T12:00:00Z","payload":{"session_id":"c1","cwd":"/p/app"}}`+"\n"+
+			`{"timestamp":"2026-01-01T12:00:01Z","payload":{"role":"user","content":"a clean codex turn"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	dir := filepath.Join(tmp, "index.db")
 	var out strings.Builder
 	if err := Ensure(dir, "", true, &out); err != nil {
@@ -81,5 +95,13 @@ func TestAnIndexRunSaysWhatItCouldNotRead(t *testing.T) {
 	// unable to tell one bad write from half the store.
 	if !strings.Contains(said, "4 line") {
 		t.Errorf("an index run that dropped 4 unreadable lines never said so:\n%s", said)
+	}
+	if !strings.Contains(said, "deja: codex:") {
+		t.Fatalf("the clean store never narrated, so nothing here checks attribution:\n%s", said)
+	}
+	for _, line := range strings.Split(said, "\n") {
+		if strings.HasPrefix(line, "deja: codex:") && strings.Contains(line, "could not be read") {
+			t.Errorf("the claude store's loss was charged to codex too: %q", line)
+		}
 	}
 }
