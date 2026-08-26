@@ -36,7 +36,9 @@ func TestTheIndexKeepsWhatTheTranscriptBrought(t *testing.T) {
 	// string is not valid JSON at all, and the line would be dropped before any
 	// of this: that is what made the first version of this fixture index
 	// nothing.
-	dirty := "the build failed: \x1b[31mERROR\x1b[0m\x07 pgbouncer timed out"
+	// The same string the serving-path cases use, carriage return included: a
+	// fixture that drops one of the bytes leaves that byte unguarded there.
+	dirty := "the build failed: \x1b[31mERROR\x1b[0m\x07 pgbouncer pool timed out\r and retried"
 	line := func(role string) string {
 		b, err := json.Marshal(map[string]any{
 			"type": role, "sessionId": "s1", "cwd": "/tmp/app",
@@ -66,15 +68,18 @@ func TestTheIndexKeepsWhatTheTranscriptBrought(t *testing.T) {
 	if !ok {
 		t.Fatal("the session did not come back from the index")
 	}
-	var text string
+	if len(got.Messages) < 2 {
+		t.Fatalf("the session came back with %d messages, so this measures nothing", len(got.Messages))
+	}
+	// Per message and per byte: concatenating them would let a strip that
+	// touches one role through, and "any of these bytes" would let a strip that
+	// touches one byte through. Both pass a laxer version of this test.
 	for _, m := range got.Messages {
-		text += m.Text
-	}
-	if text == "" {
-		t.Fatal("the session came back with no messages, so this measures nothing")
-	}
-	if !strings.ContainsAny(text, "\x1b\x07") {
-		t.Errorf("the index stripped the transcript's control bytes on the way in, so the "+
-			"serving-path cases in cmd/deja now prove nothing and need a dirty record of their own: %q", text)
+		for _, b := range []string{"\x1b", "\x07", "\r"} {
+			if !strings.Contains(m.Text, b) {
+				t.Errorf("the index stripped %q from a %s message on the way in, so the serving-path "+
+					"cases in cmd/deja prove nothing about it: %q", b, m.Role, m.Text)
+			}
+		}
 	}
 }
