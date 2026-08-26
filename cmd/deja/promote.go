@@ -305,7 +305,14 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) (in
 		context = context[i+1:]
 	}
 	withContext, textCounts := redact.Text(context + "\n" + text)
-	_, text, _ = strings.Cut(withContext, "\n")
+	if head, rest, ok := strings.Cut(withContext, "\n"); ok && head == context {
+		text = rest
+	} else {
+		// The pass swallowed the boundary — a private key spans it, and its
+		// marker replaces the newline too. Keeping the joined text loses
+		// nothing: by then the context line is inside the marker.
+		text = withContext
+	}
 	masked := strings.Count(title, redact.Marker) + strings.Count(text, redact.Marker)
 	for _, n := range titleCounts {
 		masked += n

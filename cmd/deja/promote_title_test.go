@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
 // The export packed the title and the body into one string for the redaction
@@ -58,7 +60,7 @@ func TestExportRedactsASecretSplitAcrossTheFields(t *testing.T) {
 	for _, c := range []struct{ name, title, text, leaked string }{
 		{"a password under its key", "the db password:", "hunter2hunter2hunter2A9", "hunter2hunter2hunter2A9"},
 		{"a bearer token", "auth header Bearer", "abcdefghijklmnopqrstu", "abcdefghijklmnopqrstu"},
-		{"a private key", "-----BEGIN PRIVATE KEY-----", "MIIBVgIBADANBgkqhkiG9w0\n-----END PRIVATE KEY-----", "MIIBVgIBADANBgkqhkiG9w0"},
+		{"a private key", "-----BEGIN PRIVATE KEY-----", "MIIBVgIBADANBgkqhkiG9w0\n-----END PRIVATE KEY-----\nand the rest of the note survives", "MIIBVgIBADANBgkqhkiG9w0"},
 	} {
 		path := filepath.Join(t.TempDir(), "notes.md")
 		masked, err := exportPromoted(path, c.title, c.text, "claude:s9", "accepted", time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
@@ -75,6 +77,14 @@ func TestExportRedactsASecretSplitAcrossTheFields(t *testing.T) {
 		}
 		if masked == 0 {
 			t.Errorf("%s: the export reported nothing masked", c.name)
+		}
+		// Masked, not deleted: a marker says something was taken out, and an
+		// empty body says nothing at all.
+		if !strings.Contains(got, redact.Marker) {
+			t.Errorf("%s: the value left no marker behind:\n%s", c.name, got)
+		}
+		if strings.Contains(c.text, "survives") && !strings.Contains(got, "and the rest of the note survives") {
+			t.Errorf("%s: the rest of the note went with it:\n%s", c.name, got)
 		}
 	}
 }
