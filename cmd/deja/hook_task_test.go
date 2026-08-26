@@ -161,16 +161,51 @@ func TestChangedTaskFilesRespectsItsBudget(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
-	old := taskGitBudget
-	taskGitBudget = time.Nanosecond
-	t.Cleanup(func() { taskGitBudget = old })
+	// A repo with something to find. An empty temp dir is not one: git fails
+	// there on its own, so the answer is empty whatever the budget says and
+	// the case passes with the budget deleted (#1995, the shape of #1991).
+	repo := taskRepoWithAChange(t)
 
+	old := taskGitBudget
+	taskGitBudget = 20 * time.Second
+	t.Cleanup(func() { taskGitBudget = old })
+	if got := changedTaskFiles(repo); len(got) == 0 {
+		t.Fatalf("the fixture has changed files, so an expired budget below proves nothing: %v", got)
+	}
+
+	taskGitBudget = time.Nanosecond
 	started := time.Now()
-	got := changedTaskFiles(t.TempDir())
+	got := changedTaskFiles(repo)
 	if len(got) != 0 {
 		t.Fatalf("expired budget returned %v", got)
 	}
 	if d := time.Since(started); d > 5*time.Second {
 		t.Fatalf("took %v — the budget did not bound the call", d)
 	}
+}
+
+// taskRepoWithAChange is a repo holding one committed file and one uncommitted
+// one, which is the smallest fixture changedTaskFiles can answer from.
+func taskRepoWithAChange(t *testing.T) string {
+	t.Helper()
+	repo := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "pgbouncer.go"), []byte("package a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", ".")
+	run("commit", "-q", "-m", "seed")
+	if err := os.WriteFile(filepath.Join(repo, "retry.go"), []byte("package a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return repo
 }
