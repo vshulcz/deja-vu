@@ -612,6 +612,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		}(i, hr.Name, hr.Load)
 	}
 	wg.Wait()
+	unreadable := malformedByHarness()
 	var ss []model.Session
 	for _, r := range results {
 		if len(r.ss) == 0 {
@@ -626,7 +627,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		}
 		ss = append(ss, r.ss...)
 		if progress != nil && !SuppressHarnessNarration {
-			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name)))
+			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name]))
 		}
 	}
 	return ss
@@ -637,7 +638,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 // in SQLite — and the count alone then reads as the whole story while half of
 // it is missing from recall. The skip reason was printed only for a store that
 // yielded nothing at all (#1758, the shape of #794).
-func harnessNarration(name string, ss []model.Session, skipped string) string {
+func harnessNarration(name string, ss []model.Session, skipped string, unreadable int) string {
 	msgs := 0
 	for _, s := range ss {
 		msgs += len(s.Messages)
@@ -648,10 +649,26 @@ func harnessNarration(name string, ss []model.Session, skipped string) string {
 		label = "notes"
 	}
 	line := fmt.Sprintf("deja: %s: %d session%s, %d message%s", label, len(ss), pluralS(len(ss)), msgs, pluralS(msgs))
+	if unreadable > 0 {
+		line += fmt.Sprintf(" — %d line%s could not be read and were skipped", unreadable, pluralS(unreadable))
+	}
 	if skipped != "" {
 		line += " — part of this store could not be read: " + skipped
 	}
 	return line
+}
+
+// malformedByHarness folds the per-file malformed counts the parsers reported
+// this run into per-store totals, without draining them: the manifest fold that
+// doctor reads from runs later and takes the same numbers.
+func malformedByHarness() map[string]int {
+	out := map[string]int{}
+	for p, n := range sources.DiagMalformedCounts() {
+		if h := harnessForPath(p); h != "" {
+			out[h] += n
+		}
+	}
+	return out
 }
 
 // ReportCollisions returns how many transcripts shared an id with another since

@@ -26,6 +26,19 @@ func diagFileError(path string, err error) {
 	diagMu.Unlock()
 }
 
+// DiagMalformedCounts returns the malformed-line counts accumulated so far
+// without clearing them. The index narrates each store as it lands, which is
+// before the manifest fold that drains these counters (#1993).
+func DiagMalformedCounts() map[string]int {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	out := make(map[string]int, len(diagMalformed))
+	for p, n := range diagMalformed {
+		out[p] = n
+	}
+	return out
+}
+
 // DiagSnapshot returns and clears the counters accumulated since the last
 // snapshot: malformed JSONL lines per file, and files whose parse failed
 // outright with the error text.

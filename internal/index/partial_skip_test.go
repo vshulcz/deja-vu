@@ -12,7 +12,7 @@ import (
 // other does not. The run narrated what it got and said nothing about the rest,
 // while the same run names a store it could not read at all (#1758).
 func TestNarrationNamesAHalfReadStore(t *testing.T) {
-	got := harnessNarration("cursor", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, "sqlite3 CLI not found")
+	got := harnessNarration("cursor", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, "sqlite3 CLI not found", 0)
 	if !strings.Contains(got, "1 session") {
 		t.Errorf("the line lost its count: %q", got)
 	}
@@ -21,13 +21,13 @@ func TestNarrationNamesAHalfReadStore(t *testing.T) {
 	}
 
 	// Nothing skipped: the line is what it always was.
-	plain := harnessNarration("claude", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, "")
+	plain := harnessNarration("claude", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, "", 0)
 	if strings.Contains(plain, "—") {
 		t.Errorf("a fully read store gained a caveat: %q", plain)
 	}
 
 	// The notes pseudo-source keeps its label.
-	if n := harnessNarration("deja", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, ""); !strings.HasPrefix(n, "deja: notes:") {
+	if n := harnessNarration("deja", []model.Session{{ID: "a", Messages: []model.Message{{Text: "x"}}}}, "", 0); !strings.HasPrefix(n, "deja: notes:") {
 		t.Errorf("notes narrate as notes: %q", n)
 	}
 }
