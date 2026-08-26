@@ -63,3 +63,24 @@ func TestTheLargestAnswerFitsTheRoomWithEscaping(t *testing.T) {
 		t.Errorf("a budget of %d would still pass, so this bound constrains nothing", 2*largest)
 	}
 }
+
+// A record's size must not depend on which Go release built deja. An invalid
+// byte is written as the replacement character, and 1.25 escapes that as six
+// bytes where 1.27 writes it raw as three — so the digest is coerced to valid
+// UTF-8 before it is marshalled, and the answer is three either way (#1982).
+func TestARecordIsTheSameSizeOnEveryToolchain(t *testing.T) {
+	body := strings.Repeat("\xff", 8192)
+	b, err := marshalSnapshot(Snapshot{
+		Time: time.Now().UTC(), Kind: KindBlame, Sessions: 1,
+		Bytes: len(body), Digest: body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `\ufffd`) {
+		t.Errorf("the record carries escaped replacement characters, which cost six bytes each")
+	}
+	if len(b) > RecordSize(len(body)) {
+		t.Errorf("record is %d bytes for a body of %d; the bound says %d", len(b), len(body), RecordSize(len(body)))
+	}
+}

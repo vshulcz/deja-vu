@@ -279,6 +279,12 @@ func Events(indexDir string, n int) []Event {
 // 26 kB this log holds, which is the state #1971 is about. The escaping exists
 // so a document can be embedded in HTML; this file is read by deja (#1982).
 func marshalSnapshot(s Snapshot) ([]byte, error) {
+	// Coerced to valid UTF-8 first, and not only for tidiness: an invalid byte
+	// is written as the replacement character, and whether that costs three
+	// bytes or six depends on the Go release — 1.25 escapes it, 1.27 writes it
+	// raw. A record whose size depends on the toolchain is not a record with a
+	// bound, and a transcript picks up invalid bytes from any truncated paste.
+	s.Digest = strings.ToValidUTF8(s.Digest, "\ufffd")
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
