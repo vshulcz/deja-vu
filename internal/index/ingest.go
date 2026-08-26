@@ -2002,12 +2002,22 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 func fullyReadFiles(changed, old map[string]FileState) map[string]FileState {
 	out := make(map[string]FileState, len(changed))
 	for p, f := range changed {
-		if old[p].LastUpdated > 0 {
+		if old[p].LastUpdated > 0 && !rereadsWholeSessions(p) {
 			continue
 		}
 		out[p] = f
 	}
 	return out
+}
+
+// rereadsWholeSessions marks a store whose cursor selects sessions rather than
+// messages: goose asks for every message of any session touched since the
+// stamp, so a continued session hands back turns already counted, and adding
+// them again grew the count on every pass. Starting the file over is the lesser
+// wrong of the two — it loses what an untouched session held, which is #2025
+// again for this one store, rather than reporting a number that only climbs.
+func rereadsWholeSessions(p string) bool {
+	return harnessForPath(p) == "goose-db"
 }
 
 // copyIngestFiles hands the new manifest its own map: the old one belongs to
