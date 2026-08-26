@@ -151,9 +151,15 @@ const (
 	keepAtLeast = 200
 	// EventRoom is how large one event may be for the fallback above to leave
 	// the file under its threshold: keepAtLeast of them have to fit in
-	// rotateAt, with room to spare. Measured, a widest answer's ids come to
-	// about 1.4 kB, so this is set where the check is meaningful rather than
-	// where today's events happen to sit.
+	// rotateAt. A recall over short sessions with filename-length ids writes
+	// 2.9 kB of it, which is the widest a writer produces today.
+	//
+	// It bounds that fallback and not the ordinary rotation, which keeps
+	// whatever is inside the window and can leave the file over the threshold
+	// with no size rule at all. That state is transient — the next write finds
+	// nothing to drop and stops re-reading (#1972) — and closing it properly is
+	// the retention question that issue leaves open. The injection log took the
+	// other road in #1971 and drops the oldest until the rebuild fits.
 	EventRoom = 4096
 	// memoWindow is how long a read's finding answers for later appends. Short
 	// enough that an event arriving with an old stamp waits minutes rather than

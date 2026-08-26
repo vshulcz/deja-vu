@@ -16,7 +16,11 @@ import (
 // it: how much an event can carry. Only `ids` grows, and it grows with the
 // sessions an answer holds, which its own byte budget bounds. This states the
 // room each event has; `TestARealEventFitsItsRoom` in cmd/deja holds the
-// writers to it.
+// writers to it, measured at 2.9 kB for the widest a writer produces.
+//
+// The fallback is the branch this bounds. The ordinary rotation — keep what is
+// inside the window — has no size rule, and the comment on EventRoom says what
+// that leaves open.
 func TestTheKeptEventsFitTheLogTheyAreKeptIn(t *testing.T) {
 	if keepAtLeast*EventRoom >= rotateAt {
 		t.Errorf("%d events of %d bytes is %d, and the log rotates at %d: a rotation would leave it over its own threshold",
@@ -28,8 +32,8 @@ func TestTheKeptEventsFitTheLogTheyAreKeptIn(t *testing.T) {
 // written, not on the fields before they are marshalled.
 func TestAnEventAtItsRoomIsWithinIt(t *testing.T) {
 	dir := t.TempDir()
-	// A widest answer's worth of session ids, at the longest a real store
-	// produces: 70 characters, which is a codex or gemini transcript name.
+	// Wider than any writer produces: a filename's worth of id, twenty times
+	// over, against the eleven a real recall carried.
 	ids := make([]string, 20)
 	for i := range ids {
 		ids[i] = strings.Repeat("a", 70)

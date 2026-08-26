@@ -23,12 +23,13 @@ func TestARealEventFitsItsRoom(t *testing.T) {
 	t.Setenv("HOME", tmp)
 	t.Setenv("USERPROFILE", tmp)
 
-	// Sixty sessions, each with a name as long as the longest a real store
-	// produces — a codex or gemini transcript filename.
-	long := strings.Repeat("the pgbouncer pool kept timing out in transaction mode ", 4)
+	// Shaped for the worst case rather than around it: an event grows with the
+	// number of ids, an answer holds more sessions when each says less, and an
+	// id is as long as a filename may be. Long turns would cut the answer to a
+	// handful of sessions and measure nothing.
 	for i := 0; i < 60; i++ {
-		id := strings.Repeat("a", 60) + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26))
-		seedClaude(t, claude, "app", id, "turn "+long, "reply "+long)
+		id := strings.Repeat("a", 246) + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26))
+		seedClaude(t, claude, "app", id, "pgbouncer timed out", "we retried")
 	}
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
@@ -43,17 +44,27 @@ func TestARealEventFitsItsRoom(t *testing.T) {
 		t.Fatal(err)
 	}
 	var widest int
+	var carried int
 	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		var e usage.Event
+		if json.Unmarshal([]byte(line), &e) != nil {
+			continue
+		}
 		if len(line) > widest {
-			widest = len(line)
+			widest, carried = len(line), len(e.SessionIDs)
 		}
 	}
 	if widest == 0 {
 		t.Fatal("nothing was recorded, so this proves nothing")
 	}
-	if widest > usage.EventRoom {
-		t.Errorf("a recall wrote an event of %d bytes against %d of room: %d ids at 62 characters",
-			widest, usage.EventRoom, 60)
+	// The ids are what grows, so the count is what the failure has to name: the
+	// number of sessions seeded says nothing about how many the answer held.
+	if carried < 2 {
+		t.Fatalf("the widest event carried %d ids, so it measures nothing", carried)
 	}
-	t.Logf("widest event: %d bytes of %d", widest, usage.EventRoom)
+	if widest > usage.EventRoom {
+		t.Errorf("a recall wrote an event of %d bytes against %d of room, carrying %d ids of 248 characters",
+			widest, usage.EventRoom, carried)
+	}
+	t.Logf("widest event: %d bytes of %d, carrying %d ids", widest, usage.EventRoom, carried)
 }
