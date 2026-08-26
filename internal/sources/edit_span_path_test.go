@@ -60,3 +60,41 @@ func quote(t *testing.T, s string) string {
 	}
 	return string(b)
 }
+
+// The files a session touched are recorded one per line and split back apart by
+// the index, so the same newline that corrupted a span makes a session claim it
+// touched a file it never opened — which reaches the files listing, blame, and
+// the project the session is filed under (#2042).
+func TestATouchedPathTheRecordCannotHoldIsNotRecorded(t *testing.T) {
+	t.Setenv("DEJA_INDEX_TOOL_PATHS", "1")
+	content := func(path string) (any, []byte) {
+		raw := `[{"type":"tool_use","name":"Read","input":{"file_path":` + quote(t, path) + `}}]`
+		var v any
+		if err := json.Unmarshal([]byte(raw), &v); err != nil {
+			t.Fatal(err)
+		}
+		return v, []byte(raw)
+	}
+
+	// The premise: an ordinary path is recorded, by both parsers.
+	ref, raw := content("/tmp/app/pool.go")
+	if got := toolPathsFromContent(ref); got != "/tmp/app/pool.go" {
+		t.Fatalf("an ordinary read records %q, so this measures nothing", got)
+	}
+	if got := claudeToolPaths(raw); got != "/tmp/app/pool.go" {
+		t.Fatalf("the fast parser records %q for an ordinary read", got)
+	}
+
+	for _, path := range []string{
+		"/tmp/app/pool.go\n/etc/passwd",
+		"/tmp/app/pool.go\r/etc/passwd",
+	} {
+		ref, raw := content(path)
+		if got := toolPathsFromContent(ref); got != "" {
+			t.Errorf("a path the record cannot hold was recorded as %q", got)
+		}
+		if got := claudeToolPaths(raw); got != "" {
+			t.Errorf("the fast parser recorded %q", got)
+		}
+	}
+}

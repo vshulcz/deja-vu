@@ -378,7 +378,9 @@ func claudeToolPaths(raw json.RawMessage) string {
 		if part.Type != "tool_use" || !pathTools[part.Name] || part.Input.FilePath == "" {
 			continue
 		}
-		if seen[part.Input.FilePath] {
+		// One path per line, split back apart by the index: a path carrying a
+		// newline arrives as two files the session never touched (#2042).
+		if seen[part.Input.FilePath] || strings.ContainsAny(part.Input.FilePath, "\n\r") {
 			continue
 		}
 		seen[part.Input.FilePath] = true

@@ -476,7 +476,11 @@ func toolPathsIn(v any, d toolDialect) string {
 			continue
 		}
 		for _, p := range toolPathStrings(in, d) {
-			if seen[p] {
+			// The record is one path per line and the index splits it back on
+			// the newline, so a path carrying one arrives as two files the
+			// session never touched — which reaches the files listing, blame,
+			// and the project a session is filed under (#2042).
+			if seen[p] || strings.ContainsAny(p, "\n\r") {
 				continue
 			}
 			seen[p] = true
