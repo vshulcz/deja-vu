@@ -72,8 +72,9 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 		return ParseOpencodeDBWhere(db, "", 0)
 	}
 	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
-	ms := t.UnixMilli()
-	where := fmt.Sprintf(" and (m.time_created > %d or m.time_created > '%s' or json_extract(p.data,'$.time.start') > %d or json_extract(p.data,'$.time.start') > '%s')", ms, rfc, ms, rfc)
+	where := fmt.Sprintf(" and (%s or m.time_created > '%s' or %s or json_extract(p.data,'$.time.start') > '%s')",
+		newerThanEpoch("m.time_created", t), rfc,
+		newerThanEpoch("json_extract(p.data,'$.time.start')", t), rfc)
 	return ParseOpencodeDBWhere(db, where, 0)
 }
 

@@ -93,8 +93,25 @@ func parseTimeAny(v any) time.Time {
 	return time.Time{}
 }
 
+// newerThanEpoch is the SQL for "this numeric stamp is after t", for a column
+// deja reads through unixGuess and so accepts in either unit.
+//
+// A since clause that picks one unit is wrong in one direction or the other: a
+// seconds row is below every millisecond watermark, so the store is read once
+// and then never updated again with nothing printed (#2064); a millisecond row
+// is above every seconds watermark, so the store comes back whole on every
+// pass. Comparing against both unconditionally is the second of those. The
+// split is unixGuess's own, applied to the row rather than to the watermark.
+func newerThanEpoch(expr string, t time.Time) string {
+	return fmt.Sprintf("(%[1]s > %[2]d or (%[1]s <= %[4]d and %[1]s > %[3]d))",
+		expr, t.UnixMilli(), t.Unix(), epochMilliCutoff)
+}
+
+// Above this a stamp is milliseconds, below it seconds.
+const epochMilliCutoff = int64(1e12)
+
 func unixGuess(n int64) time.Time {
-	if n > 1e12 {
+	if n > epochMilliCutoff {
 		return time.UnixMilli(n)
 	}
 	if n > 0 {
