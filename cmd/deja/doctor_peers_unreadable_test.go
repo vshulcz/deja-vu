@@ -167,6 +167,14 @@ func TestAFileDejaCannotOpenIsReportedToo(t *testing.T) {
 			t.Skipf("cannot drop permissions here: %v", err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+		// Chmod reports success on Windows and leaves the file readable — it
+		// only toggles the read-only attribute — so the case this test is about
+		// never existed there and the assertion failed instead of skipping
+		// (#2081). Ask the filesystem rather than the call.
+		if f, err := os.Open(path); err == nil {
+			_ = f.Close()
+			t.Skip("this platform reads the file anyway, so there is no denial to report")
+		}
 		got := collectDoctorSync(t.TempDir())
 		if got.State != "unreadable" || !strings.Contains(got.Error, "permission denied") {
 			t.Errorf("a file deja may not read reports %#v", got)
