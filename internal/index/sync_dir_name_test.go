@@ -38,6 +38,12 @@ func TestEverySentenceAboutTheDirectoryIsSafeToPrint(t *testing.T) {
 			t.Skipf("cannot drop permissions: %v", err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+		// Chmod succeeding is not the same as access being denied: on Windows
+		// it toggles a read-only attribute and the directory still lists, so
+		// the skip above never fired. Ask the directory itself.
+		if _, err := os.ReadDir(dir); err == nil {
+			t.Skip("this platform still reads a directory with no permission bits")
+		}
 		_, err := Import(filepath.Join(base, "idx2"), dir)
 		if err == nil {
 			t.Skip("this platform read the directory anyway")
