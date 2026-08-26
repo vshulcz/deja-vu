@@ -59,7 +59,7 @@ func TestShareCountsWhatIsInTheShare(t *testing.T) {
 	if inShare != 1 {
 		t.Fatalf("the share holds %d masked spots, so this measures nothing: %q", inShare, out.String())
 	}
-	if !strings.Contains(stderr, "1 secrets masked") {
+	if !strings.Contains(stderr, "deja: 1 secret masked") {
 		t.Errorf("the floor line disagrees with the %d masked spots in the share: %q", inShare, strings.TrimSpace(stderr))
 	}
 }

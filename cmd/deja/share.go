@@ -65,7 +65,7 @@ func printSanitized(w io.Writer, text string) {
 	// One count, of the markers in what is being shared: adding the pass's own
 	// tally on top counted a secret this pass caught twice (#2061).
 	masked := strings.Count(redacted, redact.Marker)
-	fmt.Fprintf(os.Stderr, "deja: %d secrets masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked)
+	fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked, pluralS(masked))
 }
 
 // stripBidiAndInvisible removes the characters that make a share render as
