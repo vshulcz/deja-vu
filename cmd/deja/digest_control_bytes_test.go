@@ -133,6 +133,22 @@ func TestNothingServedCarriesAControlByte(t *testing.T) {
 		}
 	})
 
+	t.Run("a handoff", func(t *testing.T) {
+		// The path `internal/digest.MessageText` serves, and the one #1985 left
+		// out for being CLI-shaped: dropping that sanitiser left every other
+		// case here green while a raw escape reached the text a person pastes.
+		out, err := captureRun(t, "handoff", "s1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out, "pgbouncer") {
+			t.Fatalf("the handoff carried none of the session:\n%q", out)
+		}
+		if at := controlByteAt(out); at >= 0 {
+			t.Errorf("the handoff carried byte 0x%02x at %d", out[at], at)
+		}
+	})
+
 	// And the records those paths left behind, which is where the size bound
 	// reads them.
 	snaps := usage.Snapshots(idx, 0)
