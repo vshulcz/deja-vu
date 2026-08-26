@@ -67,7 +67,7 @@ func writeCompactFixture(t *testing.T) string {
 
 func TestCompactEvidenceNamesWhatTheSummaryDrops(t *testing.T) {
 	writeCompactFixture(t)
-	got := compactEvidence(index.DefaultDir(), "claude-compact")
+	got := compactEvidence(index.DefaultDir(), "claude-compact", "")
 	if got == "" {
 		t.Fatal("a session with files and commands should produce a block")
 	}
@@ -85,10 +85,10 @@ func TestCompactEvidenceNamesWhatTheSummaryDrops(t *testing.T) {
 func TestCompactEvidenceSaysNothingWhenItCannot(t *testing.T) {
 	writeCompactFixture(t)
 	dir := index.DefaultDir()
-	if got := compactEvidence(dir, ""); got != "" {
+	if got := compactEvidence(dir, "", ""); got != "" {
 		t.Errorf("no session id, no block: %q", got)
 	}
-	if got := compactEvidence(dir, "claude-not-indexed-yet"); got != "" {
+	if got := compactEvidence(dir, "claude-not-indexed-yet", ""); got != "" {
 		t.Errorf("an unknown session says nothing: %q", got)
 	}
 }

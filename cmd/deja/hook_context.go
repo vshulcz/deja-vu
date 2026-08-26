@@ -310,7 +310,7 @@ func runHookContext(dir string, plain bool) error {
 		// most needs is its own evidence: measured on this corpus, a summary
 		// keeps ~77% of the decisions and 0.2% of the commands that produced
 		// them (#543).
-		if ev := compactEvidence(dir, input.SessionID); ev != "" {
+		if ev := compactEvidence(dir, input.SessionID, input.CWD); ev != "" {
 			lead += "\n" + ev + "\n"
 		}
 	}

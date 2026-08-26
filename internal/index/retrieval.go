@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -1683,6 +1684,16 @@ func ChildrenOf(dir, id string) ([]model.Session, error) {
 // one without naming the harness, and the id is unique in practice: the
 // harnesses that generate them use uuids or their own prefixed ids.
 func FindByID(dir, id string) (model.Session, bool, error) {
+	return FindByIDInProject(dir, id, "")
+}
+
+// FindByIDInProject is FindByID for a caller that knows where it is standing.
+// The freshest match is the right guess only while the copies are the same
+// conversation; two projects can hold a session with one id, and then the
+// freshest is whichever was touched last, which has nothing to do with the one
+// asking (#1999). A project that names one of them settles it, and the rest of
+// the rule is unchanged.
+func FindByIDInProject(dir, id, project string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1701,19 +1712,40 @@ func FindByID(dir, id string) (model.Session, bool, error) {
 		return model.Session{}, false, err
 	}
 	var best SessionMeta
-	var found bool
+	var found, bestInProject bool
 	for _, meta := range m.Sessions {
 		if meta.ID != id {
 			continue
 		}
-		if !found || betterIDMatch(meta, best) {
-			best, found = meta, true
+		inProject := project != "" && sameProject(meta.Project, project)
+		switch {
+		case !found, inProject && !bestInProject:
+			best, found, bestInProject = meta, true, inProject
+		case inProject == bestInProject && betterIDMatch(meta, best):
+			best = meta
 		}
 	}
 	if !found {
 		return model.Session{}, false, nil
 	}
 	return loadSessionMeta(dir, m, best)
+}
+
+// sameProject reports whether a session's project is the one the caller is
+// standing in. A project is recorded as the directory's own name, sometimes
+// with its parent — "app" or "w/app" — so the caller's path is matched by its
+// last segments rather than whole.
+func sameProject(recorded, cwd string) bool {
+	if recorded == "" || cwd == "" {
+		return false
+	}
+	cwd = filepath.ToSlash(cwd)
+	base := path.Base(cwd)
+	if strings.EqualFold(recorded, base) {
+		return true
+	}
+	parent := path.Base(path.Dir(cwd))
+	return parent != "." && parent != "/" && strings.EqualFold(recorded, parent+"/"+base)
 }
 
 // betterIDMatch picks between two sessions carrying the same id (#1997). The
