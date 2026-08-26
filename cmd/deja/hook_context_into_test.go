@@ -50,6 +50,7 @@ func snapshotOnlyInto(t *testing.T, dir, kind string) string {
 // The déjà-vu path has had TestHookPromptRecordsTheSessionItAnswered since the
 // field was added; this is its other half.
 func TestHookContextRecordsTheSessionItStarted(t *testing.T) {
+	skipWindowsEmptySessionID(t)
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
@@ -86,6 +87,7 @@ func TestHookContextRecordsTheSessionItStarted(t *testing.T) {
 // id one hook derived some other way would look right in the log and pair
 // wrong.
 func TestBothHooksRecordTheSameSessionForOneSession(t *testing.T) {
+	skipWindowsEmptySessionID(t)
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
