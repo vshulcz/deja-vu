@@ -120,7 +120,19 @@ func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, 
 // session-start hook, the commonest injection there is, was recording nothing
 // while holding the id (#1949).
 func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
-	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
+	RecordDigestPolicySessions(indexDir, kind, digest, into, sessions, raw, policyName, nil)
+}
+
+// RecordDigestPolicySessions is RecordDigestPolicyInto plus the ids of the
+// sessions the digest carried.
+//
+// Without them the session-start hook was the one surface whose repetition
+// could not be measured: `deja log` showed 606 of its injections over six weeks
+// and not one of the sessions inside them, while the per-prompt path — which
+// does record ids — turned out to be re-serving 74 sessions at a 92% repeat
+// rate (#2038). A number nobody can compute is a number nobody fixes.
+func RecordDigestPolicySessions(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids []string) {
+	RecordServedSessions(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids)
 	snapshotWriteInto(indexDir, kind, digest, into, sessions, policyName, nil)
 }
 

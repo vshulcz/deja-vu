@@ -48,7 +48,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if len(input.WorkspacePaths) > 0 && input.WorkspacePaths[0] != "" && os.Getenv("CLAUDE_PROJECT_DIR") == "" {
 		_ = os.Setenv("CLAUDE_PROJECT_DIR", input.WorkspacePaths[0])
 	}
-	digest, sessions, raw, _, _ := cachedHookDigest(dir)
+	digest, sessions, raw, _, _, _ := cachedHookDigest(dir)
 	if digest == "" {
 		fmt.Fprintln(stdout, "{}")
 		return nil

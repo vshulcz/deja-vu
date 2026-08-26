@@ -37,6 +37,11 @@ type AutoRecallResult struct {
 	// own measurement. Candidates the digest skipped never reached an agent,
 	// so counting them inflates the ratio.
 	RawBytes int64
+	// IDs are the sessions that made it into Text, in the order they appear.
+	// The session-start hook is the surface that logs them, and without them
+	// its repetition could not be counted at all — 606 injections in six weeks
+	// with no record of what was in them (#2038).
+	IDs []string
 }
 
 func AutoRecallDigest(ss []model.Session, budget int) string {
@@ -122,6 +127,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	}
 	var b strings.Builder
 	var fingerprints []map[string]bool
+	var ids []string
 	var raw int64
 	for _, s := range candidates {
 		if mode == RecallSafe && !projectMatches(s.Project, o.ProjectNames) {
@@ -147,6 +153,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		}
 		b.WriteString(section)
 		fingerprints = append(fingerprints, fingerprint)
+		ids = append(ids, s.ID)
 		for _, m := range s.Messages {
 			raw += int64(len(m.Text))
 		}
@@ -154,7 +161,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 			break
 		}
 	}
-	return AutoRecallResult{Text: strings.TrimSpace(b.String()), Sessions: len(fingerprints), RawBytes: raw}
+	return AutoRecallResult{Text: strings.TrimSpace(b.String()), Sessions: len(fingerprints), RawBytes: raw, IDs: ids}
 }
 
 func projectMatches(project string, names []string) bool {
