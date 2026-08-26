@@ -48,6 +48,21 @@ const (
 // be held to it.
 const RecordRoom = snapshotRotateAt / snapshotsToKeep
 
+// RecordSize is what an answer of n bytes weighs once it is a line in this log:
+// the JSON envelope around it, plus what escaping costs.
+//
+// Escaping is a multiplier rather than a constant, which is what makes this a
+// function. Measured against a budget of 8192: plain text costs 168 bytes, a
+// real digest with its newlines 558, and text that is all newlines or all
+// quotes doubles — each of those is two bytes in JSON. A control byte costs six
+// (), but SafeText and SafeLine strip control bytes before any of this
+// text becomes a digest, so the doubling is the bound that applies.
+//
+// The envelope is the record's own fields — the stamp, the kind, the policy
+// name, the terms, the receiving session — and 512 covers them with room for
+// the longest of each.
+func RecordSize(n int) int { return 2*n + 512 }
+
 // SnapshotPath returns the injection-snapshot log for an index dir; a sibling
 // file like the usage log, so it survives full rebuilds.
 func SnapshotPath(indexDir string) string {
