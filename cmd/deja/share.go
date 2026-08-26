@@ -49,7 +49,7 @@ func runShare(dir string, args []string, w io.Writer) error {
 func printSanitized(w io.Writer, text string) {
 	// Redact the whole document at once: multiline secrets (PEM private key
 	// blocks) never match when scanned line-by-line.
-	redacted, counts := redact.Text(text)
+	redacted, _ := redact.Text(text)
 	redacted = stripBidiAndInvisible(redacted)
 	fmt.Fprint(w, redacted)
 	if !strings.HasSuffix(redacted, "\n") {
@@ -62,10 +62,9 @@ func printSanitized(w io.Writer, text string) {
 	// nothing new. Counting only what this pass replaced reported "0 secrets
 	// masked" on a document visibly full of them — the opposite of what the
 	// line is for.
+	// One count, of the markers in what is being shared: adding the pass's own
+	// tally on top counted a secret this pass caught twice (#2061).
 	masked := strings.Count(redacted, redact.Marker)
-	for _, n := range counts {
-		masked += n
-	}
 	fmt.Fprintf(os.Stderr, "deja: %d secrets masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked)
 }
 
