@@ -303,10 +303,32 @@ func gitWorktreeRoots(cwd string) []string {
 			roots = append(roots, strings.TrimSpace(p))
 		}
 	}
-	if len(roots) < 2 {
-		return nil // a single worktree adds nothing beyond cwd's own names
+	// A single worktree adds nothing beyond cwd's own names only when cwd is
+	// that worktree. From a package directory inside it, the root is the one
+	// name the caller does not already have — and it is the project recall is
+	// scoped by, so dropping it left an agent started anywhere but the top of
+	// its repository with no memory at all (#2037).
+	if len(roots) == 1 && sameDir(roots[0], cwd) {
+		return nil
 	}
 	return roots
+}
+
+// sameDir compares two paths as directories, so a symlinked or unclean spelling
+// of the same place does not read as a different one.
+func sameDir(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ra, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		ra = filepath.Clean(a)
+	}
+	rb, err := filepath.EvalSymlinks(b)
+	if err != nil {
+		rb = filepath.Clean(b)
+	}
+	return ra == rb
 }
 
 // agentArtifactMarkers flag transcript entries that are tool output or
