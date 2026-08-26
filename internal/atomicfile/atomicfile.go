@@ -12,6 +12,11 @@
 //
 // The index's own writers are excluded from this by `lockDir`, which is why
 // they can keep their fixed temp names.
+//
+// The same writers append rather than replace when the file is a log, and they
+// share the other half of the problem: a record left unterminated by a killed
+// process. EndsMidLine is here for them — it writes nothing, but the callers
+// are the same set and the reason is the same one.
 package atomicfile
 
 import (
