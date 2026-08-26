@@ -169,6 +169,11 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	// same day — including a turn goose stored without a timestamp of its own,
 	// which is reachable only through its session — and matched every session
 	// touched on a later date, handing back all of it (#2030).
+	//
+	// A matching session comes back whole, which is work repeated on every pass
+	// over an active store (#2030) — but it is also what keeps the session
+	// whole in the index: a partial return replaces what goose already had
+	// there, where the same partial return from opencode merges (#2033).
 	where := fmt.Sprintf(" and (m.created_timestamp > %d or datetime(s.updated_at) > datetime('%s'))", sec, rfc)
 	return parseGooseDBWhere(db, where, 0)
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // seedOpencodeSession adds one session with one text part to an opencode store,
@@ -150,5 +152,46 @@ func TestAGooseSessionThatContinuesIsNotCountedTwice(t *testing.T) {
 		if got := clipped(); got != 1 {
 			t.Fatalf("one long message in the store, pass %d says %d clipped", i+1, got)
 		}
+	}
+}
+
+// The other side of handing back only the new turns: what the index already
+// holds has to survive it. A partial return that replaced the session would
+// drop every turn it did not include (#2032).
+func TestAGooseSessionKeepsItsEarlierTurns(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 CLI not available")
+	}
+	tmp := t.TempDir()
+	setHome(t, tmp)
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+	db := filepath.Join(tmp, "goose.db")
+	t.Setenv("DEJA_GOOSE_DB", db)
+
+	seedGooseTurn(t, db, "g1", "user", "why does pgbouncer time out", 1785166187)
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if hits, err := Search(dir, search.Options{Query: "pgbouncer", All: true}); err != nil || len(hits) == 0 {
+		t.Fatalf("the first turn is not in the index (%d hits, %v), so this measures nothing", len(hits), err)
+	}
+
+	seedGooseTurn(t, db, "g1", "assistant", "the pool was too small", 1785166787)
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	s, ok, err := FindByIdentity(dir, "goose", "g1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || len(s.Messages) != 2 {
+		t.Fatalf("the session came back with %d messages (found=%v): the new turn replaced what was there", len(s.Messages), ok)
+	}
+	if hits, err := Search(dir, search.Options{Query: "pgbouncer", All: true}); err != nil || len(hits) == 0 {
+		t.Errorf("the first turn is gone from the index after the session continued (%d hits, %v)", len(hits), err)
 	}
 }
