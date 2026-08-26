@@ -17,6 +17,10 @@ a `schema_version` field so consumers can detect breaking changes.
   element shapes are stable; only additive fields inside them are permitted.
 - **`deja stats --impact --json`** returns one flat object of counters and
   carries no `schema_version` either, on the same terms.
+- **`deja log --last --json`** returns one record of the same shape `deja log
+  --json` returns in its array, so it carries no `schema_version` either: a
+  version on the single form and none on the array would be two answers about
+  one record.
 
 ### What changed in version 2
 
