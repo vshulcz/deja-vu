@@ -310,7 +310,7 @@ func runHookContext(dir string, plain bool) error {
 		// most needs is its own evidence: measured on this corpus, a summary
 		// keeps ~77% of the decisions and 0.2% of the commands that produced
 		// them (#543).
-		if ev := compactEvidence(dir, input.SessionID, input.CWD); ev != "" {
+		if ev := compactEvidence(dir, input.SessionID, hookCWD(input.CWD)); ev != "" {
 			lead += "\n" + ev + "\n"
 		}
 	}
@@ -556,11 +556,23 @@ func adoptHookCWD(cwd string) {
 	_ = os.Setenv("CLAUDE_PROJECT_DIR", cwd)
 }
 
-func cachedHookDigest(dir string) (string, int, int64, []string, int) {
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
-	if cwd == "" {
-		cwd, _ = os.Getwd()
+// hookCWD is where the hook is standing: what the payload says, else the
+// project directory the harness exported, else the process's own — the same
+// chain cachedHookDigest walks, so a host that exports the directory without
+// naming it in the payload is not treated as standing nowhere.
+func hookCWD(fromPayload string) string {
+	if fromPayload != "" {
+		return fromPayload
 	}
+	if cwd := os.Getenv("CLAUDE_PROJECT_DIR"); cwd != "" {
+		return cwd
+	}
+	cwd, _ := os.Getwd()
+	return cwd
+}
+
+func cachedHookDigest(dir string) (string, int, int64, []string, int) {
+	cwd := hookCWD("")
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
 		return "", 0, 0, nil, 0
 	}

@@ -1684,16 +1684,18 @@ func ChildrenOf(dir, id string) ([]model.Session, error) {
 // one without naming the harness, and the id is unique in practice: the
 // harnesses that generate them use uuids or their own prefixed ids.
 func FindByID(dir, id string) (model.Session, bool, error) {
-	return FindByIDInProject(dir, id, "")
+	return FindByIDPreferProject(dir, id, "")
 }
 
-// FindByIDInProject is FindByID for a caller that knows where it is standing.
+// FindByIDPreferProject is FindByID for a caller that knows where it is
+// standing. A preference, not a filter: a session outside the project still
+// answers when nothing inside it does.
 // The freshest match is the right guess only while the copies are the same
 // conversation; two projects can hold a session with one id, and then the
 // freshest is whichever was touched last, which has nothing to do with the one
 // asking (#1999). A project that names one of them settles it, and the rest of
 // the rule is unchanged.
-func FindByIDInProject(dir, id, project string) (model.Session, bool, error) {
+func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1735,17 +1737,30 @@ func FindByIDInProject(dir, id, project string) (model.Session, bool, error) {
 // standing in. A project is recorded as the directory's own name, sometimes
 // with its parent — "app" or "w/app" — so the caller's path is matched by its
 // last segments rather than whole.
+//
+// And by its ancestors' too: a session started in a subdirectory is re-projected
+// onto the repository root once it has touched enough files under it
+// (projectFromPaths), so the recorded name can be two segments the cwd only
+// reaches by walking up. Bare names match at the leaf alone, where the caller
+// actually is — an ancestor matching by base would make every worktree named
+// "wt" the same project.
 func sameProject(recorded, cwd string) bool {
 	if recorded == "" || cwd == "" {
 		return false
 	}
-	cwd = filepath.ToSlash(cwd)
-	base := path.Base(cwd)
-	if strings.EqualFold(recorded, base) {
+	cwd = path.Clean(filepath.ToSlash(cwd))
+	if strings.EqualFold(recorded, path.Base(cwd)) {
 		return true
 	}
-	parent := path.Base(path.Dir(cwd))
-	return parent != "." && parent != "/" && strings.EqualFold(recorded, parent+"/"+base)
+	for dir := cwd; ; dir = path.Dir(dir) {
+		parent, base := path.Base(path.Dir(dir)), path.Base(dir)
+		if parent == "." || parent == "/" || base == "." || base == "/" {
+			return false
+		}
+		if strings.EqualFold(recorded, parent+"/"+base) {
+			return true
+		}
+	}
 }
 
 // betterIDMatch picks between two sessions carrying the same id (#1997). The

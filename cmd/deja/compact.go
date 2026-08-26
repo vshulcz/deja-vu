@@ -45,7 +45,7 @@ func compactEvidence(dir, sessionID, cwd string) string {
 	// The payload names no harness, so the id is all there is to go on — and two
 	// projects can hold one id. The cwd it does carry is what keeps this block
 	// about the session that is compacting (#1999).
-	s, ok, err := index.FindByIDInProject(dir, sessionID, cwd)
+	s, ok, err := index.FindByIDPreferProject(dir, sessionID, cwd)
 	if err != nil || !ok {
 		return ""
 	}
