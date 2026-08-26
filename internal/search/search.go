@@ -2207,6 +2207,27 @@ func SafeNote(s string) string {
 	return clip(SafeLine(s))
 }
 
+// noteStateCap bounds the bracketed tail SafeNoteTitle will carry past the
+// clip. The longest state deja writes is " [superseded]" at 13 bytes; the room
+// above that is for one deja does not know yet, from a store written by hand.
+const noteStateCap = 24
+
+// SafeNoteTitle is SafeNote for a promoted note's title, which ends in the state
+// the note is in — "… [rejected]" — and that suffix is the part every one-line
+// surface reads it for. Clipping from the left would drop exactly it (#R11), so
+// the middle gives way instead.
+func SafeNoteTitle(s string) string {
+	line := SafeLine(s)
+	state := ""
+	// Only a short tail: the suffix is a state word, and exempting whatever
+	// follows the last " [" would let a long bracketed tail carry the whole
+	// title past the bound the clip is here to apply (#1645).
+	if i := strings.LastIndex(line, " ["); i > 0 && strings.HasSuffix(line, "]") && len(line)-i <= noteStateCap {
+		state, line = line[i:], line[:i]
+	}
+	return clip(line) + state
+}
+
 // SafeLine is SafeText confined to a single line, for the places that print
 // an untrusted string as one row of something structured — a listing entry, a
 // digest row, a "saved <path>" confirmation. A newline there ends deja's own

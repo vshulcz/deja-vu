@@ -873,7 +873,10 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		}
 		// The title is transcript text going straight to a terminal: an escape
 		// in it repaints the screen and a carriage return rewinds the line.
-		if title = redact.SafeForDisplay(title); title != "" {
+		// SafeForDisplay keeps a newline on purpose — the reading surfaces are
+		// the session's own layout — but this is one row of a listing, and a
+		// note title carries whatever a person wrote by hand (#2058).
+		if title = search.SafeNoteTitle(redact.SafeForDisplay(title)); title != "" {
 			// A session with no user turn borrows the assistant's opening line
 			// (#692), and unmarked it read like the reader's own question
 			// (#1100).

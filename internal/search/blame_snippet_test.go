@@ -84,3 +84,31 @@ func TestSafeCommandIsClippedFromTheRight(t *testing.T) {
 		t.Errorf("a path lost its own name: %q", p)
 	}
 }
+
+// A note title ends in the state the note is in, and that suffix is what every
+// one-line surface reads it for — so the clip keeps it. Only a short one: a long
+// bracketed tail would otherwise carry the whole title past the bound (#2058).
+func TestSafeNoteTitleKeepsTheStateAndStaysBounded(t *testing.T) {
+	long := strings.Repeat("very long title ", 40)
+	for _, c := range []struct {
+		name, in string
+		suffix   string
+		bounded  bool
+	}{
+		{"a state survives the clip", long + " [rejected]", " [rejected]", true},
+		{"a short title is untouched", "pool sizing [accepted]", " [accepted]", false},
+		{"a long bracketed tail is not a state", "note [" + strings.Repeat("x", 400) + "]", "", true},
+		{"no state at all", long, "", true},
+	} {
+		got := SafeNoteTitle(c.in)
+		if c.suffix != "" && !strings.HasSuffix(got, c.suffix) {
+			t.Errorf("%s: %q does not end in %q", c.name, got, c.suffix)
+		}
+		if c.bounded && len(got) > answerCap+noteStateCap {
+			t.Errorf("%s: %d bytes, over the %d bound", c.name, len(got), answerCap+noteStateCap)
+		}
+		if strings.Contains(got, "\n") {
+			t.Errorf("%s: the row is not one line: %q", c.name, got)
+		}
+	}
+}
