@@ -3063,8 +3063,14 @@ func deniedStoreCount() int {
 // opposed to an index that merely has not been built yet.
 func noAgentHistoryFound() bool {
 	for _, check := range doctorStoreChecks() {
-		store, _ := inspectDoctorStore(check)
-		if store.Files == 0 {
+		// The count, not the inspection. `store.Files` is `len(check.files)`
+		// and nothing else ever sets it (doctor_report.go:471), so asking
+		// `inspectDoctorStore` for it paid a stat per path, a listing per
+		// directory, and the newest file of the store opened and run through
+		// that store's parser — SQLite for opencode and cursor — to learn a
+		// number already in hand. Measured on a real home, 514 ms against
+		// 6.6 ms for the same answer (#1991).
+		if len(check.files) == 0 {
 			continue
 		}
 		// By content, not by existence: an empty notes file — one `deja
