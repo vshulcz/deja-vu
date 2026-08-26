@@ -6,10 +6,9 @@ import (
 )
 
 // `MessageText` is the third place served text is stripped, after
-// `search.SafeText` and `redact.SafeForDisplay` — and it is the one no path
-// test reaches: the handoff digest is built through it and is CLI-shaped, so
-// dropping the sanitiser here leaves every other guard green while a raw escape
-// reaches the file a person opens (#1985).
+// `search.SafeText` and `redact.SafeForDisplay` — the one the handoff digest
+// is built through. This holds it directly; `TestNothingServedCarriesAControlByte`
+// holds the path (#1985, #1989).
 func TestMessageTextStripsWhatATerminalActsOn(t *testing.T) {
 	in := "the build failed: \x1b[31mERROR\x1b[0m\x07 pgbouncer pool timed out\r and retried"
 

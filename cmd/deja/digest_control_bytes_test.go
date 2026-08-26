@@ -30,7 +30,10 @@ func TestNothingServedCarriesAControlByte(t *testing.T) {
 	}
 	// Colour, a bell, and a rewind — captured terminal output, as a transcript
 	// picks it up.
-	dirty := "the build failed: \x1b[31mERROR\x1b[0m\x07 pgbouncer pool timed out\r and retried"
+	// Names a file, so `blame` has something to answer about: a case that comes
+	// back empty measures nothing, which is how the first version of this test
+	// let blame through (#1985).
+	dirty := "the build failed in parser.go: \x1b[31mERROR\x1b[0m\x07 pgbouncer pool timed out\r and retried"
 	line := func(role string) string {
 		b, err := json.Marshal(map[string]any{
 			"type": role, "sessionId": "s1", "cwd": "/tmp/app",
@@ -61,6 +64,7 @@ func TestNothingServedCarriesAControlByte(t *testing.T) {
 	}{
 		{"recall", `{"query":"pgbouncer"}`, "recall"},
 		{"recall_context", `{"query":"pgbouncer"}`, "recall_context"},
+		{"blame", `{"path":"parser.go"}`, "blame"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			out, err := callMCPTool(idx, c.tool, json.RawMessage(c.args))
