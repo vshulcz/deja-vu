@@ -1714,16 +1714,20 @@ func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error)
 		return model.Session{}, false, err
 	}
 	var best SessionMeta
-	var found, bestInProject bool
+	var found bool
+	bestNear := -1
 	for _, meta := range m.Sessions {
 		if meta.ID != id {
 			continue
 		}
-		inProject := project != "" && sameProject(meta.Project, project)
+		near := -1
+		if project != "" {
+			near = projectDistance(meta.Project, project)
+		}
 		switch {
-		case !found, inProject && !bestInProject:
-			best, found, bestInProject = meta, true, inProject
-		case inProject == bestInProject && betterIDMatch(meta, best):
+		case !found, nearerProject(near, bestNear):
+			best, found, bestNear = meta, true, near
+		case near == bestNear && betterIDMatch(meta, best):
 			best = meta
 		}
 	}
@@ -1733,8 +1737,8 @@ func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error)
 	return loadSessionMeta(dir, m, best)
 }
 
-// sameProject reports whether a session's project is the one the caller is
-// standing in. A project is recorded as the directory's own name, sometimes
+// projectDistance measures a session's project against the directory the caller
+// is standing in. A project is recorded as the directory's own name, sometimes
 // with its parent — "app" or "w/app" — so the caller's path is matched by its
 // last segments rather than whole.
 //
@@ -1744,23 +1748,41 @@ func FindByIDPreferProject(dir, id, project string) (model.Session, bool, error)
 // reaches by walking up. Bare names match at the leaf alone, where the caller
 // actually is — an ancestor matching by base would make every worktree named
 // "wt" the same project.
-func sameProject(recorded, cwd string) bool {
+//
+// It answers with how far up the match was found — 0 where the caller stands —
+// so a session recorded against this very directory outranks one recorded
+// against a directory three levels above it. Without that, an agent someone ran
+// from their home directory could outrank the project's own session by being
+// the fresher of the two.
+func projectDistance(recorded, cwd string) int {
 	if recorded == "" || cwd == "" {
-		return false
+		return -1
 	}
 	cwd = path.Clean(filepath.ToSlash(cwd))
 	if strings.EqualFold(recorded, path.Base(cwd)) {
-		return true
+		return 0
 	}
-	for dir := cwd; ; dir = path.Dir(dir) {
+	for dir, up := cwd, 0; ; dir, up = path.Dir(dir), up+1 {
 		parent, base := path.Base(path.Dir(dir)), path.Base(dir)
 		if parent == "." || parent == "/" || base == "." || base == "/" {
-			return false
+			return -1
 		}
 		if strings.EqualFold(recorded, parent+"/"+base) {
-			return true
+			return up
 		}
 	}
+}
+
+func sameProject(recorded, cwd string) bool { return projectDistance(recorded, cwd) >= 0 }
+
+// nearerProject reports whether a match this far from the caller beats the one
+// already held. A match at any distance beats none; among matches the nearer
+// wins, and equals fall through to betterIDMatch.
+func nearerProject(near, held int) bool {
+	if near < 0 {
+		return false
+	}
+	return held < 0 || near < held
 }
 
 // betterIDMatch picks between two sessions carrying the same id (#1997). The

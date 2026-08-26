@@ -31,3 +31,32 @@ func TestSameProjectWalksUpToTheRepositoryRoot(t *testing.T) {
 		}
 	}
 }
+
+// How far up the match was found decides between two sessions that both match:
+// the project's own session beats one recorded against a directory above it,
+// however fresh that one is. People do run an agent from a home directory, which
+// is the case projectFromPaths was written for.
+func TestProjectDistanceRanksTheNearerMatch(t *testing.T) {
+	cwd := "/Users/me/work/app"
+	for _, c := range []struct {
+		recorded string
+		want     int
+	}{
+		{"app", 0},
+		{"work/app", 0},
+		{"me/work", 1},
+		{"Users/me", 2},
+		{"work", -1}, // a bare name matches only where the caller stands
+		{"other/app", -1},
+	} {
+		if got := projectDistance(c.recorded, cwd); got != c.want {
+			t.Errorf("projectDistance(%q, %q) = %d, want %d", c.recorded, cwd, got, c.want)
+		}
+	}
+	if !nearerProject(0, 2) || !nearerProject(3, -1) {
+		t.Error("a nearer match, and any match at all, has to win")
+	}
+	if nearerProject(2, 0) || nearerProject(-1, 3) || nearerProject(-1, -1) || nearerProject(1, 1) {
+		t.Error("a farther match, or none, must not displace what is held")
+	}
+}
