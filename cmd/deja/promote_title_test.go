@@ -40,9 +40,41 @@ func TestExportKeepsTheTitleOutOfTheBody(t *testing.T) {
 	if n := strings.Count(got, "- state: accepted"); n != 1 {
 		t.Errorf("the block states its state %d times:\n%s", n, got)
 	}
-	for _, line := range strings.Split(got, "\n") {
-		if strings.HasPrefix(line, "## ") && strings.Contains(line, "\n") {
-			t.Errorf("the heading is not one line: %q", line)
+	// One heading, and it is the folded title rather than its first line.
+	if n := strings.Count(got, "\n## "); n != 1 {
+		t.Errorf("the block has %d headings:\n%s", n, got)
+	}
+	if !strings.Contains(got, "## pool sizing - state: rejected - source: someone else\n") {
+		t.Errorf("the heading is not the whole title, folded:\n%s", got)
+	}
+}
+
+// A credential can be written with its key word at the end of one field and its
+// value at the start of the next, and the patterns for those allow a newline
+// between the two. Redacting the fields apart lost exactly that, which is the
+// one thing this file is not allowed to lose: it is written to be handed to
+// someone else, under a line that says how much was masked.
+func TestExportRedactsASecretSplitAcrossTheFields(t *testing.T) {
+	for _, c := range []struct{ name, title, text, leaked string }{
+		{"a password under its key", "the db password:", "hunter2hunter2hunter2A9", "hunter2hunter2hunter2A9"},
+		{"a bearer token", "auth header Bearer", "abcdefghijklmnopqrstu", "abcdefghijklmnopqrstu"},
+		{"a private key", "-----BEGIN PRIVATE KEY-----", "MIIBVgIBADANBgkqhkiG9w0\n-----END PRIVATE KEY-----", "MIIBVgIBADANBgkqhkiG9w0"},
+	} {
+		path := filepath.Join(t.TempDir(), "notes.md")
+		masked, err := exportPromoted(path, c.title, c.text, "claude:s9", "accepted", time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := string(b)
+		if strings.Contains(got, c.leaked) {
+			t.Errorf("%s: the value went out in the clear:\n%s", c.name, got)
+		}
+		if masked == 0 {
+			t.Errorf("%s: the export reported nothing masked", c.name)
 		}
 	}
 }

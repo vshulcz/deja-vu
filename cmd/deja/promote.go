@@ -293,8 +293,19 @@ func exportPromoted(path, title, text, src, state string, updated time.Time) (in
 	// the notes file is the one store a person writes by hand — and its tail
 	// then arrived at the head of the body, beside deja's own "- state:" and
 	// "- source:" lines (#2056).
+	//
+	// The body still sees the title's last line, because a credential can be
+	// written with its key word at the end of one field and its value at the
+	// start of the next, and the patterns for those allow a newline between the
+	// two. That line is one line by construction, so the split below is exact
+	// however many the title has.
 	title, titleCounts := redact.Text(title)
-	text, textCounts := redact.Text(text)
+	context := title
+	if i := strings.LastIndex(context, "\n"); i >= 0 {
+		context = context[i+1:]
+	}
+	withContext, textCounts := redact.Text(context + "\n" + text)
+	_, text, _ = strings.Cut(withContext, "\n")
 	masked := strings.Count(title, redact.Marker) + strings.Count(text, redact.Marker)
 	for _, n := range titleCounts {
 		masked += n
