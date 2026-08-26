@@ -146,7 +146,7 @@ when empty:
 
 | Field | Meaning |
 |---|---|
-| `path` | file the session was read from |
+| `path` | file the session was read from — the transcript, or the store for the database-backed harnesses; opencode is the exception and gives the project directory it ran in |
 | `title` | first user turn, elided to terminal width |
 | `agent_title` | `title` came from the assistant because the session has no user turn |
 | `touched` | the few files this session worked on most |
