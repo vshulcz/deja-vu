@@ -2207,6 +2207,19 @@ func SafeNote(s string) string {
 	return clip(SafeLine(s))
 }
 
+// SafeNoteTitle is SafeNote for a promoted note's title, which ends in the state
+// the note is in — "… [rejected]" — and that suffix is the part every one-line
+// surface reads it for. Clipping from the left would drop exactly it (#R11), so
+// the middle gives way instead.
+func SafeNoteTitle(s string) string {
+	line := SafeLine(s)
+	state := ""
+	if i := strings.LastIndex(line, " ["); i > 0 && strings.HasSuffix(line, "]") {
+		state, line = line[i:], line[:i]
+	}
+	return clip(line) + state
+}
+
 // SafeLine is SafeText confined to a single line, for the places that print
 // an untrusted string as one row of something structured — a listing entry, a
 // digest row, a "saved <path>" confirmation. A newline there ends deja's own
