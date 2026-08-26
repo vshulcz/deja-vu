@@ -210,6 +210,10 @@ func pluralSessions(n int) string {
 	return fmt.Sprintf("%d sessions", n)
 }
 
+// fold collapses runs of whitespace, for comparing a query against a command
+// without touching the command itself.
+func fold(s string) string { return strings.Join(strings.Fields(s), " ") }
+
 // commandMentions is the membership test for `how`: the term has to appear in
 // the command as a word, not inside a longer one. A raw substring test answered
 // `how go` with `golangci-lint run ./...`, and ranked it first (#1630) — and the
@@ -222,8 +226,6 @@ func pluralSessions(n int) string {
 // name the halves of a hyphenated tool.
 // A term that itself carries a separator (`go test`, `./x`) is matched as
 // written: it is already more specific than one word.
-func fold(s string) string { return strings.Join(strings.Fields(s), " ") }
-
 func commandMentions(low, term string) bool {
 	if term == "" {
 		return false
