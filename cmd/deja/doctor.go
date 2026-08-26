@@ -830,6 +830,9 @@ func doctorPolicy(w io.Writer, dir string) {
 			return
 		}
 		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", policy.Path())
+		// Except one thing, which is in force with or without a file and is
+		// the reason a directory can be missing from recall (#2050).
+		printIgnored(w, policy.Load())
 		return
 	}
 	if err != nil {
@@ -851,6 +854,7 @@ func doctorPolicy(w io.Writer, dir string) {
 		}
 		fmt.Fprintf(w, "  %-12s %s\n", activation, line)
 	}
+	printIgnored(w, pol)
 	for _, u := range unknown {
 		fmt.Fprintf(w, "  %-12s %q is not an activation or origin deja consults — this rule does nothing\n", "ignored", u)
 	}
@@ -1281,4 +1285,20 @@ func doctorExists(path string) bool {
 func doctorFilePresent(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.Size() > 0
+}
+
+// printIgnored says which directories deja does not recall from. A rule that
+// silently drops history is indistinguishable from history that was never
+// there, so it is printed whether it came from the policy file or from the
+// built-in default (#2050).
+func printIgnored(w io.Writer, pol policy.Policy) {
+	pats := pol.IgnorePatterns()
+	if len(pats) == 0 {
+		return
+	}
+	what := "default"
+	if len(pol.Ignore) > 0 {
+		what = "from the file"
+	}
+	fmt.Fprintf(w, "  %-12s %s (%s)\n", "not recalled", strings.Join(pats, ", "), what)
 }
