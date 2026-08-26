@@ -1954,6 +1954,11 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// reset down there would zero the number this build is about to report
 	// (#1861).
 	evicted.Store(0)
+	// The parsers' skip counters belong to the pass that parsed. They used to
+	// be cleared only by the manifest fold, so a pass that died before writing
+	// left its count for the next one to report: one bad line on disk, "2 lines
+	// skipped" on screen, with the manifest agreeing (#2010).
+	sources.DiagSnapshot()
 	old, err := readManifest(dir)
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
