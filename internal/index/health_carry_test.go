@@ -336,12 +336,22 @@ func TestAClipSurvivesAPassOverAnotherFile(t *testing.T) {
 		t.Errorf("the long message is still in the other file and the count is %d", got)
 	}
 
-	// And the file that holds it, re-read: counted once, not once more.
-	if err := os.WriteFile(a, []byte(turn("a", "2026-01-02T03:04:05Z", "user", long)), 0o644); err != nil {
+	// And the file that holds it, re-read by the merge path: counted once, not
+	// once more. Shorter than it was so the pass cannot append, still long
+	// enough to be clipped.
+	shorter := long[:len(long)-1000]
+	if len(shorter) < maxIndexedText {
+		t.Fatalf("the re-read fixture is %d bytes, under the %d that gets it clipped", len(shorter), maxIndexedText)
+	}
+	if err := os.WriteFile(a, []byte(turn("a", "2026-01-02T03:04:05Z", "user", shorter)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Ensure(dir, "", true, nil); err != nil {
+	out.Reset()
+	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
+	}
+	if said := out.String(); !strings.Contains(said, "incremental index") {
+		t.Fatalf("the re-read did not take the merge path: %q", said)
 	}
 	if got := clippedFor(t, dir, "claude"); got != 1 {
 		t.Errorf("one long message, count says %d", got)
