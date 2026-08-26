@@ -2,10 +2,12 @@ package index
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -145,5 +147,85 @@ update session set time_updated=1785166787000 where id='s1';`
 	}
 	if hits, err := Search(dir, search.Options{Query: "pgbouncer", All: true}); err != nil || len(hits) == 0 {
 		t.Errorf("the first turn is no longer searchable (%d hits, %v)", len(hits), err)
+	}
+}
+
+// cursor keeps a database per workspace beside the global one, so "this pass
+// read the store whole" is a fact about a store, not about the harness. A
+// workspace seen for the first time has no watermark; a harness-wide flag let
+// that pass replace sessions in the global store, which it had only read the
+// tail of (#2033).
+func TestANewCursorWorkspaceDoesNotTruncateTheGlobalStore(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 CLI not available")
+	}
+	tmp := t.TempDir()
+	setHome(t, tmp)
+	root := filepath.Join(tmp, "cursor")
+	t.Setenv("DEJA_CURSOR_ROOT", root)
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
+	t.Setenv("DEJA_GOOSE_DB", filepath.Join(tmp, "none-goose.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+
+	global := filepath.Join(root, "globalStorage", "state.vscdb")
+	if err := os.MkdirAll(filepath.Dir(global), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run := func(db, sql string) {
+		t.Helper()
+		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+			t.Fatalf("sqlite3: %v %s", err, out)
+		}
+	}
+	run(global, `create table if not exists cursorDiskKV (key text primary key, value text);
+insert or replace into cursorDiskKV values
+ ('composerData:cu1', json('{"composerId":"cu1","name":"Chat","createdAt":1752600000000,"lastUpdatedAt":1752600100000,"fullConversationHeadersOnly":[{"bubbleId":"b1","type":1}]}')),
+ ('bubbleId:cu1:b1', json('{"type":1,"text":"the first turn is about pgbouncer","timestamp":1752600001000,"workspaceProjectDir":"/w/app"}'));`)
+
+	dir := filepath.Join(tmp, "index.db")
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if hits, err := Search(dir, search.Options{Query: "pgbouncer", All: true}); err != nil || len(hits) == 0 {
+		t.Fatalf("the first turn is not in the index (%d hits, %v), so this measures nothing", len(hits), err)
+	}
+
+	// One pass, two things: a workspace store deja has never seen, and a second
+	// turn in the global conversation.
+	ws := filepath.Join(root, "workspaceStorage", "w1", "state.vscdb")
+	if err := os.MkdirAll(filepath.Dir(ws), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(ws, `create table if not exists cursorDiskKV (key text primary key, value text);
+insert or replace into cursorDiskKV values
+ ('composerData:cu2', json('{"composerId":"cu2","name":"Workspace chat","createdAt":1752700000000,"lastUpdatedAt":1752700100000,"fullConversationHeadersOnly":[{"bubbleId":"c1","type":1}]}')),
+ ('bubbleId:cu2:c1', json('{"type":1,"text":"a workspace turn about caching","timestamp":1752700001000,"workspaceProjectDir":"/w/other"}'));`)
+	run(global, `insert or replace into cursorDiskKV values
+ ('composerData:cu1', json('{"composerId":"cu1","name":"Chat","createdAt":1752600000000,"lastUpdatedAt":1752600200000,"fullConversationHeadersOnly":[{"bubbleId":"b1","type":1},{"bubbleId":"b2","type":2}]}')),
+ ('bubbleId:cu1:b2', json('{"type":2,"text":"the second turn is the answer","timestamp":1752600150000,"workspaceProjectDir":"/w/app"}'));`)
+	future := time.Now().Add(time.Hour)
+	_ = os.Chtimes(global, future, future)
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	s, ok, err := FindByIdentity(dir, "cursor", "cu1")
+	if err != nil || !ok {
+		t.Fatalf("the global session did not come back: %v %v", ok, err)
+	}
+	if len(s.Messages) != 2 {
+		texts := []string{}
+		for _, msg := range s.Messages {
+			texts = append(texts, msg.Text)
+		}
+		t.Errorf("the global conversation came back with %d turns after a new workspace appeared: %v", len(s.Messages), texts)
+	}
+	if hits, err := Search(dir, search.Options{Query: "pgbouncer", All: true}); err != nil || len(hits) == 0 {
+		t.Errorf("the first turn is no longer searchable (%d hits, %v)", len(hits), err)
+	}
+	if hits, err := Search(dir, search.Options{Query: "caching", All: true}); err != nil || len(hits) == 0 {
+		t.Errorf("the new workspace store was not indexed (%d hits, %v)", len(hits), err)
 	}
 }

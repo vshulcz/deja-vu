@@ -2024,9 +2024,18 @@ func fromDatabase(r Record) bool {
 // full. Only then may an old record be dropped because its key came back: a
 // store read from a watermark hands back the new turns alone, and dropping the
 // rest by key would take the earlier turns of a continued session with them.
+//
+// By store rather than by harness where the record names one: cursor keeps a
+// database per workspace as well as the global one, and a first sight of a new
+// workspace — opening a project — has no watermark, so a harness-wide flag let
+// that pass replace sessions in the store it had only read the tail of.
 func readWholeThisPass(r Record) bool {
 	if len(passWholeStores) == 0 {
 		return false
+	}
+	switch harnessForPath(r.SourcePath) {
+	case "cursor-db", "goose-db":
+		return passWholeStores[r.SourcePath]
 	}
 	harness, _, ok := strings.Cut(r.Key, ":")
 	return ok && passWholeStores[harness]
@@ -2037,9 +2046,13 @@ func readWholeThisPass(r Record) bool {
 // directory lock.
 var passWholeStores map[string]bool
 
-// wholeStoresThisPass records them. A kind is the fine-grained name for a path
-// and a record carries the harness its session belongs to, so the two are
-// matched up here rather than at every record.
+// wholeStoresThisPass records them, under both the store path and the harness:
+// a record names the first where it can and the second otherwise.
+//
+// Only these three stores are stamped with a watermark (setStoreLastUpdated).
+// Everything else is read whole on every pass and judged by its path, which is
+// why it needs none of this — a watermark added to another database later would
+// have to join fromDatabase and this function in the same change.
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
 	for p := range changed {
@@ -2056,6 +2069,7 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 		}
 		if old[p].LastUpdated == 0 || rereadsWholeSessions(p) {
 			passWholeStores[harness] = true
+			passWholeStores[p] = true
 		}
 	}
 }
