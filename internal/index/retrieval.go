@@ -1716,12 +1716,10 @@ func FindByID(dir, id string) (model.Session, bool, error) {
 	return loadSessionMeta(dir, m, best)
 }
 
-// betterIDMatch picks between two sessions carrying the same id. Returning the
-// first one the map handed over meant the compact hook could give a session
-// another's evidence, and a different one on the next compaction: 340 answers
-// against 60 over 400 identical calls (#1997). The freshest session is the best
-// guess for one that just compacted, and the harness name breaks a tie so the
-// answer never depends on the map again.
+// betterIDMatch picks between two sessions carrying the same id (#1997). The
+// freshest is the best guess for the one that just compacted; the harness name
+// breaks a tie, and since the manifest is keyed harness:id it always breaks —
+// so the answer never depends on map order.
 func betterIDMatch(candidate, held SessionMeta) bool {
 	if !candidate.Updated.Equal(held.Updated) {
 		return candidate.Updated.After(held.Updated)
