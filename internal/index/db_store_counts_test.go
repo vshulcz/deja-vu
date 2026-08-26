@@ -94,8 +94,8 @@ func seedGooseTurn(t *testing.T, db, session, role, text string, created int64) 
 	stmts := fmt.Sprintf(`
 create table if not exists sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text);
 create table if not exists messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
-insert or ignore into sessions values ('%[1]s','g','a goose session','/tmp/app', strftime('%%Y-%%m-%%dT%%H:%%M:%%SZ',%[4]d,'unixepoch'), strftime('%%Y-%%m-%%dT%%H:%%M:%%SZ',%[4]d,'unixepoch'));
-update sessions set updated_at = strftime('%%Y-%%m-%%dT%%H:%%M:%%SZ',%[4]d,'unixepoch') where id='%[1]s';
+insert or ignore into sessions values ('%[1]s','g','a goose session','/tmp/app', datetime(%[4]d,'unixepoch'), datetime(%[4]d,'unixepoch'));
+update sessions set updated_at = datetime(%[4]d,'unixepoch') where id='%[1]s';
 insert into messages (session_id,role,content_json,created_timestamp) values ('%[1]s','%[2]s',json_array(json_object('type','text','text','%[3]s')),%[4]d);
 `, session, role, text, created)
 	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
@@ -108,10 +108,9 @@ insert into messages (session_id,role,content_json,created_timestamp) values ('%
 // nothing resetting a database's counts (#2025) those turns were counted again
 // on every pass — a store in daily use would report clips in the thousands.
 //
-// The timestamps here are RFC3339, which is what goose writes: the since clause
-// compares s.updated_at against an RFC3339 string, and sqlite's own
-// datetime() format ("2026-01-02 03:00:00") never compares greater, so a
-// fixture written that way never re-reads the session and measures nothing.
+// The timestamps are sqlite's own format, which is what a real store holds; the
+// since clause puts both sides through datetime(), so the format no longer
+// decides the comparison (#2030).
 func TestAGooseSessionThatContinuesIsNotCountedTwice(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 CLI not available")
@@ -181,8 +180,12 @@ func TestAGooseSessionKeepsItsEarlierTurns(t *testing.T) {
 	}
 
 	seedGooseTurn(t, db, "g1", "assistant", "the pool was too small", 1785166787)
-	if err := Ensure(dir, "", false, nil); err != nil {
+	var out strings.Builder
+	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
+	}
+	if said := out.String(); !strings.Contains(said, "incremental index") {
+		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said)
 	}
 	s, ok, err := FindByIdentity(dir, "goose", "g1")
 	if err != nil {
