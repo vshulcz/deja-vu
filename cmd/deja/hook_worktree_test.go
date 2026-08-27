@@ -47,8 +47,10 @@ func TestASessionStartedInAWorktreeGetsTheProjectsMemory(t *testing.T) {
 	// The sessions were worked in the main checkout.
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "checkout", "one.jsonl"), "wtterm", []string{
-		`{"type":"user","sessionId":"wtterm","cwd":"` + filepath.ToSlash(repo) + `","timestamp":"` + old +
-			`","message":{"role":"user","content":"pgbouncer runs in transaction mode and prepared statements are off"}}`,
+		strings.TrimSpace(claudeRecord(t, map[string]any{
+			"type": "user", "sessionId": "wtterm", "cwd": repo, "timestamp": old,
+			"message": map[string]any{"role": "user", "content": "pgbouncer runs in transaction mode and prepared statements are off"},
+		})),
 	})
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
@@ -64,7 +66,7 @@ func TestASessionStartedInAWorktreeGetsTheProjectsMemory(t *testing.T) {
 			// A Windows path in a JSON string is a run of invalid escapes, and
 			// the payload would not parse at all — the same reason
 			// hook_cwd_test.go does this.
-			withHookStdin(t, `{"source":"startup","session_id":"ses_wt","cwd":"`+filepath.ToSlash(where.dir)+`"}`)
+			withHookStdin(t, hookPayload(t, map[string]string{"source": "startup", "session_id": "ses_wt", "cwd": where.dir}))
 			out := captureStdout(t, func() {
 				if err := runHookContext(index.DefaultDir(), true); err != nil {
 					t.Error(err)

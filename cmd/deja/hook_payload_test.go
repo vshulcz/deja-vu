@@ -43,3 +43,40 @@ func TestAHookPayloadSurvivesAWindowsPath(t *testing.T) {
 		t.Errorf("the backslashes are not escaped: %s", payload)
 	}
 }
+
+// claudeRecord builds one line of a claude transcript. A record is JSON too, so
+// a path pasted into one has the same hole a payload does — `filepath.ToSlash`
+// covers the backslash a Windows path carries and nothing else (#2096).
+func claudeRecord(t *testing.T, fields map[string]any) string {
+	t.Helper()
+	b, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b) + "\n"
+}
+
+// A path can hold a quote on every Unix filesystem, and that is the character
+// ToSlash does nothing about.
+func TestAFixtureSurvivesAPathHoldingAQuote(t *testing.T) {
+	odd := `/tmp/say "hello"/app`
+	payload := hookPayload(t, map[string]string{"source": "startup", "session_id": "ses1", "cwd": odd})
+	var got map[string]string
+	if err := json.Unmarshal([]byte(payload), &got); err != nil {
+		t.Fatalf("the payload is not JSON: %v: %s", err, payload)
+	}
+	if got["cwd"] != odd {
+		t.Errorf("the path did not survive: %q", got["cwd"])
+	}
+	rec := claudeRecord(t, map[string]any{
+		"type": "user", "sessionId": "s1", "cwd": odd,
+		"message": map[string]any{"role": "user", "content": "the pool was exhausted"},
+	})
+	var line map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(rec)), &line); err != nil {
+		t.Fatalf("the record is not JSON: %v: %s", err, rec)
+	}
+	if line["cwd"] != odd {
+		t.Errorf("the record's path did not survive: %v", line["cwd"])
+	}
+}
