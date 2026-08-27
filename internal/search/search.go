@@ -231,6 +231,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			// folding — measuring the unfolded pair there finds nothing and reports a
 			// genuine match as words that never meet.
 			windowText, windowToks := low, qtoks
+			// The pair the scorer counts on, folded below when that is where
+			// the match came from.
+			scoreLow, scoreToks := low, qtoks
 			if re != nil {
 				c = countRegex(re, m.Text)
 			} else {
@@ -246,6 +249,17 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 						phrasesFolded, o.FuzzyVariants)
 					if c > 0 {
 						windowText, windowToks = foldedLow, qtoksFolded
+						// And the pair the scorer counts on. Leaving it
+						// unfolded gave BM25 a term frequency of zero for a
+						// match the postings had already found, so a
+						// cross-script hit counted twice and scored nothing —
+						// ranked below a record that matched once (#1605).
+						// Only when the two token lists line up: termCount is
+						// indexed by position, and a fold that merged or split
+						// a token would count against the wrong term.
+						if len(qtoksFolded) == len(qtoks) {
+							scoreLow, scoreToks = foldedLow, qtoksFolded
+						}
 					}
 				}
 			}
@@ -264,15 +278,15 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 					doc.minWindow = w
 				}
 			}
-			doc.length += countDocumentWords(low, qtoks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
+			doc.length += countDocumentWords(scoreLow, scoreToks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
 			// The token, not the raw query — the same rule as countIn. This
 			// path is what scores `retry` inside `retry-backoff`, which
 			// countDocumentWords cannot match because it counts whole words
 			// and treats the hyphen as one. Comparing the raw query here left
 			// a punctuated query with a session that matched three times and
 			// scored zero, ranked below one that matched once (#1603).
-			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qtoks[0]) {
-				n := strings.Count(low, qtoks[0])
+			if len(scoreToks) == 1 && doc.termCount[0] == 0 && strings.Contains(scoreLow, scoreToks[0]) {
+				n := strings.Count(scoreLow, scoreToks[0])
 				doc.termCount[0] += n
 				if m.Role == "user" {
 					doc.userCount[0] += n
