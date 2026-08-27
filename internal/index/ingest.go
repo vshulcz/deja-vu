@@ -2052,7 +2052,10 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 	if m.RedactionRules == nil {
 		m.RedactionRules = map[string]int{}
 	}
-	h := harnessForPath(sourcePath)
+	// The store, not the file kind: `deja stats` prints these as headings, and
+	// "cline-sdk" is a word no other screen uses (#2238, the shape #2234 fixed
+	// for the ingest counters).
+	h := sources.HarnessForKind(harnessForPath(sourcePath))
 	if h == "" {
 		if _, ok := m.Files[sources.OpencodeDB()]; ok {
 			h = "opencode"
@@ -3280,7 +3283,8 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 						if m.RedactionRules == nil {
 							m.RedactionRules = map[string]int{}
 						}
-						h := harnessForPath(s.Path)
+						// The store, as above (#2238).
+						h := sources.HarnessForKind(harnessForPath(s.Path))
 						if h == "" {
 							if _, ok := m.Files[sources.OpencodeDB()]; ok {
 								h = "opencode"
