@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 func TestInstallAntigravityPluginShape(t *testing.T) {
@@ -89,18 +92,49 @@ func TestHookAntigravityInjectsOnlyOnFirstInvocation(t *testing.T) {
 	}
 }
 
-// Antigravity runs the hook from the plugin directory, so recall scoped by
-// cwd would come back empty for every project. The payload names the real
-// workspace and the hook must use it.
+// Antigravity runs the hook in the folder holding hooks.json rather than the
+// user's project, so the workspace in the payload is the only thing that says
+// which project this is. The scoping used to be checked through the export deja
+// wrote; that export is gone (#2185), so this asks the question directly: the
+// memory that comes back is the named workspace's.
 func TestHookAntigravityScopesToWorkspacePath(t *testing.T) {
+	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	at := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "alpha", "one.jsonl"), "alpha1", []string{
+		`{"type":"user","sessionId":"alpha1","timestamp":"` + at +
+			`","message":{"role":"user","content":"the alpha work: pgbouncer runs in transaction mode"}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "one.jsonl"), "beta1", []string{
+		`{"type":"user","sessionId":"beta1","timestamp":"` + at +
+			`","message":{"role":"user","content":"the beta work: the kafka consumer keeps rebalancing"}}`,
+	})
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	base := t.TempDir()
+	beta := filepath.Join(base, "tmp", "beta")
+	if err := os.MkdirAll(beta, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Neither the environment nor the working directory names a project.
+	t.Chdir(base)
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
+
 	var out bytes.Buffer
-	in := `{"invocationNum":1,"workspacePaths":["/some/workspace"]}`
-	if err := runHookAntigravity(t.TempDir(), strings.NewReader(in), &out); err != nil {
+	in := `{"invocationNum":1,"workspacePaths":["` + beta + `"]}`
+	if err := runHookAntigravity(dir, strings.NewReader(in), &out); err != nil {
 		t.Fatalf("hook: %v", err)
 	}
-	if got := os.Getenv("CLAUDE_PROJECT_DIR"); got != "/some/workspace" {
-		t.Fatalf("workspace not adopted for scoping: %q", got)
+	if !strings.Contains(out.String(), "rebalancing") {
+		t.Errorf("the workspace named in the payload did not scope the recall:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "transaction mode") {
+		t.Errorf("another project's memory came back:\n%s", out.String())
+	}
+	if got := os.Getenv("CLAUDE_PROJECT_DIR"); got != "" {
+		t.Errorf("the door left %q in the environment for the next call in this process", got)
 	}
 }
 

@@ -10,14 +10,14 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// The payload says which project a hook call is about. `adoptHookCWD` exports
-// it and refuses to overwrite an export that is already there, so a second
-// payload in the same process was answered with the first one's project —
-// framed and injected exactly as a right answer would be (#2182).
+// The payload says which project a hook call is about. deja used to write that
+// answer into its own environment and read it back, and the write refused to
+// overwrite what was there, so a second payload in the same process was
+// answered with the first one's project — framed and injected exactly as a
+// right answer would be (#2182; the write itself went in #2185).
 //
 // One process per invocation is the shape today, which is what made this a
-// landmine rather than a fault; five doors call `adoptHookCWD`, and the second
-// of them in any process inherited the first one's project.
+// landmine rather than a fault.
 func TestEachHookPayloadIsAnsweredForItsOwnProject(t *testing.T) {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -86,12 +86,10 @@ func TestNoHookDoorReadsTheProjectOutOfTheEnvironment(t *testing.T) {
 		t.Fatalf("found %d hook files, so this measures nothing", len(files))
 	}
 	allowed := map[string]bool{
-		// hookCWD is the chain itself: payload, then export, then where the
-		// process stands. adoptHookCWD writes it. The antigravity door asks
-		// whether the export is already set before writing the workspace it
-		// was handed.
-		"hook_context.go":     true,
-		"hook_antigravity.go": true,
+		// hookCWD is the chain itself: payload, then whatever the host
+		// exported, then where the process stands. It is the only place that
+		// may read it.
+		"hook_context.go": true,
 	}
 	for _, f := range files {
 		if strings.HasSuffix(f, "_test.go") || allowed[filepath.Base(f)] {
