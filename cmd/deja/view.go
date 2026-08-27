@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,6 +32,10 @@ const (
 	viewTranscripts  = 200
 	viewPreviewBytes = 6 << 10
 	viewRecalls      = 100
+	// The same bound for notes, for the same reason: a store with a thousand
+	// promoted notes made the page 7.6 MB, which is not the single fast file
+	// the transcript cap exists to keep (#2111).
+	viewNotes = 200
 )
 
 type viewSession struct {
@@ -71,6 +76,10 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// NoteCount is how many notes the page carries and TotalNotes how many
+	// there are, so the page can say when those differ (#2111).
+	NoteCount  int
+	TotalNotes int
 }
 
 func runView(dir string, args []string) error {
@@ -194,8 +203,18 @@ func writeViewHTML(dir, out string) (string, int, error) {
 			Terms: sn.Terms, Digest: sn.Digest,
 		})
 	}
-	notes := make([]viewNote, 0, 16)
-	for _, n := range sources.LoadPromotedNotes() {
+	loaded := sources.LoadPromotedNotes()
+	// By date, newest first: LoadPromotedNotes returns them in the order they
+	// were first written to the file, so cutting that keeps an arbitrary set
+	// rather than the newest — and the page's own order was the file's.
+	sort.SliceStable(loaded, func(i, j int) bool { return loaded[i].At.After(loaded[j].At) })
+	page.TotalNotes = len(loaded)
+	if len(loaded) > viewNotes {
+		loaded = loaded[:viewNotes]
+	}
+	page.NoteCount = len(loaded)
+	notes := make([]viewNote, 0, len(loaded))
+	for _, n := range loaded {
 		notes = append(notes, viewNote{
 			Project: n.Project, State: n.State, Title: n.Title, Text: n.Text,
 			Tags: n.Tags, At: n.At.Format("2006-01-02"),
