@@ -9,8 +9,14 @@ so a real store on the machine is neither read nor touched.
 python gen_corpus.py --out /tmp/bench --sessions 5000 --projects 50
 go build -o deja-a ./cmd/deja        # baseline commit
 go build -o deja-b ./cmd/deja        # comparison commit (or a stubbed build)
-python run_bench.py --out-root /tmp/bench --head-bin ./deja-a --stub-bin ./deja-b --rounds 7
+python run_bench.py --out-root /tmp/bench --bin base=./deja-a --bin opt=./deja-b --rounds 7
 ```
+
+`--bin LABEL=PATH` is repeatable, so more than two builds can share one
+interleaved window. That is the only way to compare more than two: separate
+runs are not comparable, for the reason in the first lesson below. The first
+`--bin` is the baseline the summary subtracts from, and `--head-bin` /
+`--stub-bin` still work as shorthand for `head=` / `stub=`.
 
 `results.csv` holds one row per (round, arm, binary); `results-summary.txt`
 reports min/median per cell. Interleaving keeps a machine-wide slowdown from

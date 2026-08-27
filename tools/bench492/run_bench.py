@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Runner for the #492 CJK bigram build-cost re-measurement.
 
-Matrix: arm {ja, en} x binary {head, stub}, interleaved one round at a time
-(h-ja, s-ja, h-en, s-en, repeat) so a machine-wide slowdown mid-run does not
-land entirely on one cell. Each cell measurement:
+Matrix: arm {ja, en} x every binary passed with --bin, interleaved one round
+at a time (bin1-ja, bin2-ja, ..., bin1-en, ..., repeat) so a machine-wide
+slowdown mid-run does not land entirely on one cell. Each cell measurement:
 
   1. delete the index dir for that (arm, bin) cell
   2. run `<bin> index --rebuild` with the cell's env (isolated store,
@@ -13,7 +13,8 @@ land entirely on one cell. Each cell measurement:
      size in bytes
 
 Output: results.csv (round,arm,bin,seconds,index_bytes) and
-results-summary.txt (min/median per arm x bin cell).
+results-summary.txt (min/median per arm x bin cell, then the cost the first
+binary carries and each later one does not).
 
 This script only measures; it does not build binaries or generate the corpus (gen_corpus.py does that).
 """
@@ -58,6 +59,39 @@ def cell_env(fakehome: str, index_dir: str, claude_root: str) -> dict:
     return env
 
 
+def parse_bins(specs, head_bin: str, stub_bin: str):
+    """Resolve --bin LABEL=PATH (repeatable) into an ordered [(label, path)].
+
+    --head-bin/--stub-bin are kept as shorthand for the two-binary case this
+    script started with, so callers written against it keep working. Order is
+    the order given: the first binary is the one the summary subtracts from.
+    """
+    pairs = list(specs)
+    if head_bin:
+        pairs.insert(0, f"head={head_bin}")
+    if stub_bin:
+        pairs.append(f"stub={stub_bin}")
+    if not pairs:
+        raise SystemExit("run_bench: pass at least one --bin LABEL=PATH (or --head-bin/--stub-bin)")
+
+    out = []
+    seen = set()
+    for spec in pairs:
+        label, sep, path = spec.partition("=")
+        if not sep or not label or not path:
+            raise SystemExit(f"run_bench: --bin wants LABEL=PATH, got {spec!r}")
+        if any(c in label for c in "/\\ ." + os.sep):
+            raise SystemExit(f"run_bench: label {label!r} must be a bare word — it names index dirs and log files")
+        if label in seen:
+            raise SystemExit(f"run_bench: duplicate --bin label {label!r}")
+        seen.add(label)
+        path = os.path.abspath(path)
+        if not os.path.isfile(path):
+            raise SystemExit(f"run_bench: binary not found: {path}")
+        out.append((label, path))
+    return out
+
+
 def run_cell(binary: str, arm: str, bin_label: str, out_root: str, fakehome: str, log_dir: str, round_no: int):
     index_dir = os.path.join(out_root, f"idx-{arm}-{bin_label}")
     claude_root = os.path.join(out_root, f"store-{arm}", "claude-root")
@@ -96,26 +130,26 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--rounds", type=int, default=7)
     ap.add_argument("--out-root", default=HERE)
-    ap.add_argument("--head-bin", required=True, help="baseline deja binary")
-    ap.add_argument("--stub-bin", required=True, help="comparison deja binary (stubbed or optimized)")
+    ap.add_argument(
+        "--bin",
+        action="append",
+        default=[],
+        metavar="LABEL=PATH",
+        help="a deja binary to measure, repeatable; the first one is the baseline",
+    )
+    ap.add_argument("--head-bin", help="shorthand for --bin head=PATH")
+    ap.add_argument("--stub-bin", help="shorthand for --bin stub=PATH")
     ap.add_argument("--arms", default="ja,en")
     args = ap.parse_args()
 
     out_root = os.path.abspath(args.out_root)
-    head_bin = os.path.abspath(args.head_bin)
-    stub_bin = os.path.abspath(args.stub_bin)
     arms = args.arms.split(",")
-
-    for b in (head_bin, stub_bin):
-        if not os.path.isfile(b):
-            raise SystemExit(f"run_bench: binary not found: {b}")
+    binaries = parse_bins(args.bin, args.head_bin, args.stub_bin)
 
     fakehome = os.path.join(out_root, "fakehome")
     os.makedirs(fakehome, exist_ok=True)
     log_dir = os.path.join(out_root, "logs")
     os.makedirs(log_dir, exist_ok=True)
-
-    binaries = [("head", head_bin), ("stub", stub_bin)]
 
     rows = []  # (round, arm, bin, seconds, index_bytes)
     csv_path = os.path.join(out_root, "results.csv")
@@ -150,20 +184,22 @@ def main():
                     f"time min={min(secs):.3f}s median={statistics.median(secs):.3f}s max={max(secs):.3f}s  "
                     f"size min={min(sizes)} median={statistics.median(sizes):.0f} max={max(sizes)}\n"
                 )
-        sf.write("\nbigram cost (head - stub), by median:\n")
-        for arm in arms:
-            h = groups.get((arm, "head"))
-            s = groups.get((arm, "stub"))
-            if not h or not s:
-                continue
-            h_t = statistics.median(v[0] for v in h)
-            s_t = statistics.median(v[0] for v in s)
-            h_sz = statistics.median(v[1] for v in h)
-            s_sz = statistics.median(v[1] for v in s)
-            sf.write(
-                f"  {arm:2s}: time {h_t:.3f}s - {s_t:.3f}s = {h_t - s_t:+.3f}s   "
-                f"size {h_sz:.0f} - {s_sz:.0f} = {h_sz - s_sz:+.0f} bytes\n"
-            )
+        base_label = binaries[0][0]
+        for other_label, _ in binaries[1:]:
+            sf.write(f"\ncost carried by {base_label} and not by {other_label}, by median:\n")
+            for arm in arms:
+                b = groups.get((arm, base_label))
+                o = groups.get((arm, other_label))
+                if not b or not o:
+                    continue
+                b_t = statistics.median(v[0] for v in b)
+                o_t = statistics.median(v[0] for v in o)
+                b_sz = statistics.median(v[1] for v in b)
+                o_sz = statistics.median(v[1] for v in o)
+                sf.write(
+                    f"  {arm:2s}: time {b_t:.3f}s - {o_t:.3f}s = {b_t - o_t:+.3f}s   "
+                    f"size {b_sz:.0f} - {o_sz:.0f} = {b_sz - o_sz:+.0f} bytes\n"
+                )
 
     print(f"wrote {csv_path}")
     print(f"wrote {summary_path}")
