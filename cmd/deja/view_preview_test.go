@@ -15,7 +15,9 @@ func TestSessionPreviewCutsOnARuneBoundary(t *testing.T) {
 	for i := 0; i < 90; i++ {
 		msgs = append(msgs, model.Message{Role: "user", Text: "x" + strings.Repeat("é", 40)})
 	}
-	out := sessionPreview(msgs)
+	// The trailing cut moved to clipForPage, which runs after the redaction —
+	// cutting before it would slice a secret in half and print the half (#2100).
+	out := clipForPage(sessionPreview(msgs))
 	if len(out) <= viewPreviewBytes {
 		t.Fatalf("fixture did not reach the cap: %d bytes", len(out))
 	}

@@ -98,7 +98,7 @@ func TestViewGeneratesSelfContainedHTML(t *testing.T) {
 
 func TestViewPreviewCap(t *testing.T) {
 	long := strings.Repeat("word ", viewPreviewBytes)
-	got := sessionPreview([]model.Message{{Role: "user", Text: long}})
+	got := clipForPage(sessionPreview([]model.Message{{Role: "user", Text: long}}))
 	if len(got) > viewPreviewBytes+8 {
 		t.Fatalf("preview exceeds cap: %d", len(got))
 	}
