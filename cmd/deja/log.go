@@ -67,6 +67,13 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		}
 		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), pol)
 		fmt.Fprintln(w, s.Digest)
+		// This is the newest digest by its stamp (#2140), so a stamp from
+		// ahead of the clock holds the spot until the clock catches up — and
+		// the digest an agent actually received last is then not the one on
+		// screen. The list above names the same fault in its own words.
+		if index.StampedAhead(s.Time, time.Now()) {
+			fmt.Fprintf(os.Stderr, "deja: this digest is stamped later than this machine's clock, so it leads by its stamp — a digest served since may be older by that stamp and sit below it\n")
+		}
 		return nil
 	}
 	events := usage.Events(dir, n)
