@@ -103,21 +103,45 @@ func parseTimeAny(v any) time.Time {
 // pass. Comparing against both unconditionally is the second of those. The
 // split is unixGuess's own, applied to the row rather than to the watermark.
 func newerThanEpoch(expr string, t time.Time) string {
-	return fmt.Sprintf("(%[1]s > %[2]d or (%[1]s <= %[4]d and %[1]s > %[3]d))",
+	// Milliseconds and seconds are the two units a store writes and then
+	// filters on; a microsecond or nanosecond row is a larger number than any
+	// millisecond watermark, so it passes the first test and comes back. Over-
+	// inclusion is the safe direction here — the reader decides the date.
+	return fmt.Sprintf("(%[1]s > %[2]d or (%[1]s < %[4]d and %[1]s > %[3]d))",
 		expr, t.UnixMilli(), t.Unix(), epochMilliCutoff)
 }
 
-// Above this a stamp is milliseconds, below it seconds.
-const epochMilliCutoff = int64(1e12)
+// The magnitudes that tell one unit from another. A moment in the 2020s is
+// about 1.7e9 seconds, 1.7e12 milliseconds, 1.7e15 microseconds and 1.7e18
+// nanoseconds, so each band holds every real stamp of its unit with three
+// decades of room either side.
+//
+// Reading anything above milliseconds AS milliseconds is what this replaces: a
+// microsecond store came back dated to the year 58136 and a nanosecond one to
+// the year 56 million, and a session dated in the future takes the top of every
+// recency surface and keeps it (#2063, #2102).
+const (
+	epochMilliCutoff = int64(1e11)
+	epochMicroCutoff = int64(1e14)
+	epochNanoCutoff  = int64(1e17)
+)
 
+// unixGuess reads a numeric stamp in whichever unit it was written in. It is
+// the front door for every store that writes a number rather than a date, so a
+// unit it cannot place is a whole harness misdated.
 func unixGuess(n int64) time.Time {
-	if n > epochMilliCutoff {
-		return time.UnixMilli(n)
-	}
-	if n > 0 {
+	switch {
+	case n <= 0:
+		return time.Time{}
+	case n < epochMilliCutoff:
 		return time.Unix(n, 0)
+	case n < epochMicroCutoff:
+		return time.UnixMilli(n)
+	case n < epochNanoCutoff:
+		return time.UnixMicro(n)
+	default:
+		return time.Unix(0, n)
 	}
-	return time.Time{}
 }
 
 // textFromContentKind is textFromContent plus the attribution question: did
