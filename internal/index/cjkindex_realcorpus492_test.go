@@ -10,9 +10,9 @@
 // The pipeline reproduced here is the one a real build walks before
 // indexKeys() sees a byte (ingest.go:404,448-468):
 //
-//	ParseClaudeFile -> preRedactSessions (NFC + redact + 64 KiB cap)
-//	  -> skip messages that trim to empty -> tokenizedPart(role, text)
-//	  -> indexKeys(text)
+//	ParseClaudeFile -> preRedactSessions (stripSelfRecall -> NFC -> redact
+//	  -> 64 KiB cap) -> skip messages that trim to empty
+//	  -> tokenizedPart(role, text) -> indexKeys(text)
 //
 // Skipping any of those measures a different string than the index does. The
 // cross-file duplicate filter (seenMsgs.dup) is the one step left out; it
@@ -164,9 +164,17 @@ func TestRealCorpusStats492(t *testing.T) {
 		newKeys      int64
 		legacyRaw    int64 // len(cjkfold.Bigrams) — unique unfolded bigrams
 		legacyFolded int64 // distinct folded keys the legacy path yields
-		allTokens    int64 // every indexKeys token, ASCII included: bucket() calls
-		cjkChars     int64
-		totalChars   int64
+		// allTokens sums distinct(indexKeys(text)) per message, which is a lower
+		// bound on the bucket() calls a build makes and not the count itself:
+		// eachIndexKey also hands bucket() the three dateTokens of every
+		// timestamped message (ingest.go:944,1076), and those never reach this
+		// counter. On a 365k-message store that is at most ~1.1M calls, ~2.6%,
+		// and less wherever a year or an ISO date in the text already produced
+		// the same key. Any decomposition checked against this number carries
+		// that much slack by construction.
+		allTokens  int64
+		cjkChars   int64
+		totalChars int64
 	)
 	var sampleAll, sampleCJK []sampleMsg
 	seenMsg, seenCJK := 0, 0
