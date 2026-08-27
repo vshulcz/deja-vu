@@ -72,6 +72,12 @@ func TestALoneRareAnchorIsServedOnlyAmongWordsTheCorpusKnows(t *testing.T) {
 	if out, _ := captureRun(t, "search", "retry_budget kkjh"); strings.Contains(out, "target") {
 		t.Errorf("a two-word query was answered on one of them:\n%s", out)
 	}
+	// Both words known, still two of them: the length floor is what withholds
+	// this one, and nothing else does. Without this case the floor can be
+	// lowered to two and every assertion above still passes.
+	if out, _ := captureRun(t, "search", "retry_budget production"); strings.Contains(out, "target") {
+		t.Errorf("a two-word query was answered although the floor is three:\n%s", out)
+	}
 	// And the word on its own still answers exactly, which is the tier below.
 	if out, _ = captureRun(t, "search", "retry_budget"); !strings.Contains(out, "target") {
 		t.Fatalf("the rare word alone finds nothing, so this measures nothing:\n%s", out)
