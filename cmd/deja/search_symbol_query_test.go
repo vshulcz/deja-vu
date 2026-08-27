@@ -15,7 +15,7 @@ import (
 func TestASymbolOnlyQuerySaysWhyItFoundNothing(t *testing.T) {
 	symbolQueryStore(t)
 
-	for _, q := range []string{"🔥", "🔥🔥", "✅", "!!!", "→", "❤️", "👨‍👩‍👧"} {
+	for _, q := range []string{"🔥", "🔥🔥", "✅", "!!!", "→", "\u2764\ufe0f", "\U0001F468\u200d\U0001F469\u200d\U0001F467"} {
 		out, err := captureRunStderr(t, "search", q)
 		if err != nil {
 			t.Fatal(err)
@@ -49,16 +49,16 @@ func TestASymbolOnlyQuerySaysWhyItFoundNothing(t *testing.T) {
 }
 
 // An emoji written with a joiner or a variation selector used to leave that
-// invisible character standing as the whole query, so "❤️" asked for the
+// invisible character standing as the whole query, so a heart asked for its
 // selector and answered with every session that spelled some other emoji the
 // same way (#2133).
 func TestAnEmojiQueryDoesNotMatchADifferentEmoji(t *testing.T) {
 	symbolQueryStore(t)
 
-	out, _ := captureRun(t, "search", "❤️")
+	out, _ := captureRun(t, "search", "\u2764\ufe0f")
 	for _, sid := range []string{"s1", "s2"} {
 		if strings.Contains(out, sid) {
-			t.Errorf("\"❤️\" matched %s, which says a different emoji:\n%s", sid, out)
+			t.Errorf("the heart query matched %s, which says a different emoji:\n%s", sid, out)
 		}
 	}
 	// The words beside the emoji still find both sessions, which is the only
@@ -81,7 +81,7 @@ func symbolQueryStore(t *testing.T) {
 	}
 	for sid, text := range map[string]string{
 		"s1": "the pump bearing failed ⚠️ again",
-		"s2": "the disk is nearly full \U0001F468‍\U0001F469‍\U0001F467 said the family",
+		"s2": "the disk is nearly full \U0001F468\u200d\U0001F469\u200d\U0001F467 said the family",
 	} {
 		rec := claudeRecord(t, map[string]any{
 			"type": "user", "sessionId": sid, "cwd": "/tmp/app",

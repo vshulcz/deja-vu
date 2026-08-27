@@ -233,10 +233,10 @@ func Tokens(s string) []string {
 			return unicode.IsSpace(r)
 		}
 		// Joiners and variation selectors go with them. They are invisible, and
-		// leaving one standing made "❤️" a query for its selector: it matched
-		// every session holding any other emoji spelled with one — "⚠️" among
-		// them — and never the heart (#2133). Other combining marks stay:
-		// they are what tells one Arabic or Hebrew word from another.
+		// leaving one standing made a heart a query for its selector: it matched
+		// every session holding any other emoji spelled with one — a warning
+		// sign among them — and never the heart (#2133). Other combining marks
+		// stay: they are what tells one Arabic or Hebrew word from another.
 		return unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsSymbol(r) ||
 			unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Variation_Selector, r)
 	})
