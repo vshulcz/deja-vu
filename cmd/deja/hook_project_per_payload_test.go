@@ -83,7 +83,7 @@ func TestNoHookDoorReadsTheProjectOutOfTheEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(files) < 5 {
-		t.Fatalf("found %d hook files, so this measures nothing", len(files))
+		t.Fatalf("found %d files, so this measures nothing", len(files))
 	}
 	allowed := map[string]bool{
 		// hookCWD is the chain itself: payload, then whatever the host
