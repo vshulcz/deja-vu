@@ -704,25 +704,11 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 func dejaVuLineDue(dir, sid string) bool {
 	p := dir + ".dejavu"
 	now := time.Now()
-	if sid == "" {
-		if b, err := os.ReadFile(p); err == nil {
-			for _, line := range strings.Split(string(b), "\n") {
-				fields := strings.Fields(line)
-				if len(fields) != 2 || fields[0] != "-" {
-					continue
-				}
-				if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
-					now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
-					return false
-				}
-			}
-		}
-		return recordDejaVuLine(p, "-", now)
-	}
+	key := dejaVuKey(sid)
 	if b, err := os.ReadFile(p); err == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			fields := strings.Fields(line)
-			if len(fields) != 2 || fields[0] != sid {
+			if len(fields) != 2 || fields[0] != key {
 				continue
 			}
 			if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
@@ -731,7 +717,24 @@ func dejaVuLineDue(dir, sid string) bool {
 			}
 		}
 	}
-	return recordDejaVuLine(p, sid, now)
+	return recordDejaVuLine(p, key, now)
+}
+
+// dejaVuKey is how a session is named in `.dejavu`, which is two fields to a
+// line and holds the machine-wide fallback under "-".
+//
+// Mapped, for the reason hookseenKey is: the id comes from the hook payload, a
+// space made the line three fields so nothing ever matched it — the notice then
+// fired on every prompt, which the limit exists to prevent — and a newline
+// wrote a line under whatever followed it, spending another session's window.
+// Prefixed, so an agent calling itself "-" cannot share the fallback's window
+// with a host that sent no id at all. Entries age out inside twenty minutes, so
+// the shape can change without converting anything (#2170).
+func dejaVuKey(sid string) string {
+	if sid == "" {
+		return "-"
+	}
+	return "s" + hookseenKey(sid)
 }
 
 const (
