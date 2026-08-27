@@ -149,6 +149,32 @@ func ParseCursorDB(db string) ([]model.Session, error) {
 	return parseCursorDB(db, time.Time{})
 }
 
+// cursorComposerListMax is how many composers a pass will name one by one. The
+// query goes to sqlite3 as a single argument, so a list long enough stops being
+// a query at all; past this the caller asks for every composer instead, which
+// costs a scan of a metadata table rather than a failed pass.
+const cursorComposerListMax = 400
+
+// cursorComposerKeyList names, as a SQL value list, the composer rows the given
+// bubbles belong to. A bubble key is "bubbleId:<composerId>:<bubbleId>", which
+// is the only place that link is written down, and a composer row is keyed
+// "composerData:<composerId>" — the shape the reader already falls back to when
+// a row carries no composerId of its own. The list is bounded by what this pass
+// read, so it names the changed composers rather than the store's.
+func cursorComposerKeyList(bubbles []map[string]any) string {
+	seen := map[string]bool{}
+	var out []string
+	for _, b := range bubbles {
+		parts := strings.SplitN(str(b["key"]), ":", 3)
+		if len(parts) != 3 || parts[1] == "" || seen[parts[1]] {
+			continue
+		}
+		seen[parts[1]] = true
+		out = append(out, "'"+sqlEscape("composerData:"+parts[1])+"'")
+	}
+	return strings.Join(out, ",")
+}
+
 func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
@@ -161,6 +187,38 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 		composerWhere = " and " + newerThanEpoch("json_extract(value,'$.lastUpdatedAt')", since)
 		bubbleWhere = " and " + newerThanEpoch("json_extract(value,'$.timestamp')", since)
 	}
+	// The bubbles first, because they decide which composers are worth
+	// reading. Cursor writes a composer's lastUpdatedAt when it feels like it
+	// and the turns arrive regardless, so filtering the composers on their own
+	// stamp skipped every turn written after it — and the next pass, carrying a
+	// later watermark, excluded the bubble on its own stamp too, which loses
+	// the turn for good (#2159).
+	bubbles, err := cursorQuery(db, `select key,`+
+		`json_extract(value,'$.type') as type,`+
+		`coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')) as text,`+
+		`json_extract(value,'$.timestamp') as ts,`+
+		`json_extract(value,'$.workspaceProjectDir') as wsdir `+
+		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`+bubbleWhere)
+	if err != nil {
+		return nil, err
+	}
+	if composerWhere != "" {
+		switch keys := cursorComposerKeyList(bubbles); {
+		case keys == "":
+			// No bubble moved, so no composer can be pulled in by one.
+		case strings.Count(keys, ",") >= cursorComposerListMax:
+			// Past this many the list is the wrong shape for the job: the
+			// query is one argv element to sqlite3, and a long enough one is
+			// refused outright — which would turn a large pass into an error
+			// where it used to be a read. Every composer row comes back
+			// instead; they are metadata, the bubbles stay filtered, and a
+			// composer with no new turns is dropped below anyway.
+			composerWhere = ""
+		default:
+			composerWhere = " and (" + strings.TrimPrefix(composerWhere, " and ") +
+				" or key in (" + keys + "))"
+		}
+	}
 	composers, err := cursorQuery(db, `select key,`+
 		`json_extract(value,'$.composerId') as cid,`+
 		`json_extract(value,'$.name') as name,`+
@@ -172,15 +230,6 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	}
 	if len(composers) == 0 {
 		return nil, nil
-	}
-	bubbles, err := cursorQuery(db, `select key,`+
-		`json_extract(value,'$.type') as type,`+
-		`coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')) as text,`+
-		`json_extract(value,'$.timestamp') as ts,`+
-		`json_extract(value,'$.workspaceProjectDir') as wsdir `+
-		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`+bubbleWhere)
-	if err != nil {
-		return nil, err
 	}
 	byComposer := map[string][]map[string]any{}
 	for _, b := range bubbles {
