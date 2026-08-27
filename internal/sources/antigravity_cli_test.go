@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -139,8 +140,18 @@ func TestParseAntigravityCLISessionGetsAProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, transcript := antigravityTree(t)
+	// Marshalled rather than pasted: the path goes inside a JSON string, and a
+	// path can hold a quote as well as a backslash (#2096).
+	viewed, err := json.Marshal(map[string]any{
+		"source": "MODEL", "type": "VIEW_FILE",
+		"content":    "Created At: 2026-08-14T09:00:01Z\nFile Path: file://" + filepath.Join(deep, "pool.go") + "\n\nthe pool is capped at 4",
+		"created_at": "2026-08-14T09:00:01Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	body := `{"source":"USER_EXPLICIT","content":"why is the pool exhausted?","created_at":"2026-08-14T09:00:00Z","type":""}
-{"source":"MODEL","type":"VIEW_FILE","content":"Created At: 2026-08-14T09:00:01Z\nFile Path: file://` + filepath.ToSlash(filepath.Join(deep, "pool.go")) + `\n\nthe pool is capped at 4","created_at":"2026-08-14T09:00:01Z"}
+` + string(viewed) + `
 {"source":"MODEL","type":"PLANNER_RESPONSE","content":"the pool is capped at 4","created_at":"2026-08-14T09:00:02Z"}
 `
 	if err := os.WriteFile(transcript, []byte(body), 0o644); err != nil {

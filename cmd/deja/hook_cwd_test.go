@@ -49,8 +49,13 @@ func TestHooksRecallFromPayloadCWD(t *testing.T) {
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	at := time.Now().AddDate(0, 0, -2).UTC().Format(time.RFC3339)
-	body := `{"type":"user","sessionId":"a1","cwd":"` + filepath.ToSlash(root) + `","timestamp":"` + at + `","message":{"role":"user","content":"the retry budget keeps blowing up under load"}}` + "\n" +
-		`{"type":"assistant","sessionId":"a1","cwd":"` + filepath.ToSlash(root) + `","timestamp":"` + at + `","message":{"role":"assistant","content":[{"type":"text","text":"decision: cap retries at three"}]}}` + "\n"
+	body := claudeRecord(t, map[string]any{
+		"type": "user", "sessionId": "a1", "cwd": root, "timestamp": at,
+		"message": map[string]any{"role": "user", "content": "the retry budget keeps blowing up under load"},
+	}) + claudeRecord(t, map[string]any{
+		"type": "assistant", "sessionId": "a1", "cwd": root, "timestamp": at,
+		"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "decision: cap retries at three"}}},
+	})
 	if err := os.WriteFile(filepath.Join(root, "a1.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +65,7 @@ func TestHooksRecallFromPayloadCWD(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	payload := `{"prompt":"the retry budget keeps blowing up","cwd":"` + filepath.ToSlash(root) + `"}`
+	payload := hookPayload(t, map[string]string{"prompt": "the retry budget keeps blowing up", "cwd": root})
 	if err := runHookPromptMode(dir, strings.NewReader(payload), &out, false); err != nil {
 		t.Fatal(err)
 	}
