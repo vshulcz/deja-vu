@@ -12,13 +12,12 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // relevanceTerms is the ranking's own tokenisation, used for the scripts that
 // carry no ASCII identifier to find.
-func relevanceTerms(q string) []string { return index.RelevanceTerms(q) }
+func relevanceTerms(q string) []string { return query.RelevanceTerms(q) }
 
 // promptSearchTerms extracts the informative tokens from a natural-language
 // prompt: stop words and short fragments dropped, capped so the query stays

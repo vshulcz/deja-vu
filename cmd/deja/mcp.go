@@ -964,7 +964,13 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	} else if result.Tier == search.TierError {
 		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
 	} else if result.Tier == search.TierRelevance {
-		fmt.Fprintln(&b, "No exact match; sessions ranked by relevance to the whole query.")
+		// Not "ranked by relevance", which reads as "here is what I found
+		// about it". Nothing matched: these are the nearest sessions by
+		// wording, and an agent handed them under the old line answered
+		// questions about subjects this machine has never held — eight of
+		// eight came back with sessions rather than nothing, and the tool
+		// description promises an empty result means no record (#2074).
+		fmt.Fprintln(&b, "No session is about this. Nothing matched the query, so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 	}
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")

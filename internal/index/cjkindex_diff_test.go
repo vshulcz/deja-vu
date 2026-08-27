@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 )
@@ -125,6 +126,7 @@ func TestCJKIndexKeysDifferential492(t *testing.T) {
 		{name: "two-rune run", text: "装订"},
 		{name: "supplementary-plane Han", text: "𠀾界𠀀"},
 		{name: "kana only", text: "ひらがなカタカナ"},
+		{name: "mark run adjacent to CJK", text: "テストーー"},
 		{name: "Hangul only", text: "한글만사용"},
 		{name: "mixed CJK and Latin boundaries", text: "abc装订def 관계 xyz"},
 		{name: "long CJK run across tokenizer byte boundary", text: longRun},
@@ -135,6 +137,137 @@ func TestCJKIndexKeysDifferential492(t *testing.T) {
 			want := legacyCJKKeys(tc.text)
 			assertSameKeySet492(t, tc.text, got, want)
 		})
+	}
+}
+
+// TestCJKMarkOnlyRuns492 pins the intentional asymmetry between query and
+// index emission. The Bigrams mark guard (#1392) has no index-side mirror. On
+// one- and two-mark runs the token path emits the identical key, so the
+// asymmetry never reaches the index. On runs of three or more marks cjkIndexKeys
+// contributes interior bigrams the token path does not, so mirroring the guard
+// would change the index. This table is the tripwire for both directions
+// (#492).
+func TestCJKMarkOnlyRuns492(t *testing.T) {
+	cases := []struct {
+		input     string
+		wantKeys  []string
+		covered   bool
+		extraKeys []string
+	}{
+		{input: "ー", wantKeys: []string{"tー"}, covered: true},
+		{input: "ーー", wantKeys: []string{"tーー"}, covered: true},
+		{
+			input:     "ーーーー",
+			wantKeys:  []string{"tーーーー", "tーー"},
+			extraKeys: []string{"tーー"},
+		},
+		{input: "ｰ", wantKeys: []string{"tｰ"}, covered: true},
+		{input: "ﾞ", wantKeys: []string{"tﾞ"}, covered: true},
+		{input: "ﾟ", wantKeys: []string{"tﾟ"}, covered: true},
+		{input: "〆", wantKeys: []string{"t〆"}, covered: true},
+		{
+			input:     "ｰﾞﾟ",
+			wantKeys:  []string{"tｰﾞﾟ", "tｰﾞ", "tﾞﾟ"},
+			extraKeys: []string{"tｰﾞ", "tﾞﾟ"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			if got := cjkfold.Bigrams(tc.input); len(got) != 0 {
+				t.Fatalf("cjkfold.Bigrams(%q) = %q, want no keys", tc.input, got)
+			}
+
+			gotKeys := indexKeys(tc.input)
+			assertSameKeySet492(t, tc.input, gotKeys, tc.wantKeys)
+
+			tokenPath := make(map[string]struct{})
+			for _, tok := range tokens(tc.input) {
+				tokenPath["t"+tok] = struct{}{}
+			}
+			for _, part := range identifierParts(tc.input) {
+				tokenPath["t"+part] = struct{}{}
+			}
+
+			cjkKeys := collectCJKIndexKeys492(tc.input)
+			cjkSet := make(map[string]struct{}, len(cjkKeys))
+			for _, key := range cjkKeys {
+				cjkSet[key] = struct{}{}
+			}
+
+			if tc.covered {
+				for _, key := range cjkKeys {
+					if _, ok := tokenPath[key]; !ok {
+						t.Fatalf("input %q: cjkIndexKeys key %q is not covered by token path", tc.input, key)
+					}
+				}
+				return
+			}
+
+			if len(tc.extraKeys) == 0 {
+				t.Fatalf("input %q: non-covered fixture names no extra cjkIndexKeys keys", tc.input)
+			}
+			for _, key := range tc.extraKeys {
+				if _, ok := cjkSet[key]; !ok {
+					t.Fatalf("input %q: cjkIndexKeys did not emit golden extra key %q; got %q",
+						tc.input, key, cjkKeys)
+				}
+				if _, ok := tokenPath[key]; ok {
+					t.Fatalf("input %q: golden extra key %q is unexpectedly covered by token path",
+						tc.input, key)
+				}
+			}
+		})
+	}
+}
+
+func TestCJKMarkGuardSweep492(t *testing.T) {
+	matched := 0
+	for r := rune(0); r <= utf8.MaxRune; r++ {
+		if !utf8.ValidRune(r) {
+			continue
+		}
+		if !cjkfold.IsCJK(r) {
+			continue
+		}
+
+		input := string(r)
+		if len(cjkfold.Bigrams(input)) != 0 {
+			continue
+		}
+		matched++
+
+		gotKeys := indexKeys(input)
+		indexSet := make(map[string]struct{}, len(gotKeys))
+		for _, key := range gotKeys {
+			indexSet[key] = struct{}{}
+		}
+
+		wantKey := "t" + input
+		if _, ok := indexSet[wantKey]; !ok {
+			t.Fatalf("rune %U: indexKeys(%q) = %q, missing token-path key %q",
+				r, input, gotKeys, wantKey)
+		}
+
+		tokenPath := make(map[string]struct{})
+		for _, tok := range tokens(input) {
+			tokenPath["t"+tok] = struct{}{}
+		}
+		for _, part := range identifierParts(input) {
+			tokenPath["t"+part] = struct{}{}
+		}
+
+		cjkKeys := collectCJKIndexKeys492(input)
+		for _, key := range cjkKeys {
+			if _, ok := tokenPath[key]; !ok {
+				t.Fatalf("rune %U: cjkIndexKeys key %q is not covered by token path; cjk keys %q",
+					r, key, cjkKeys)
+			}
+		}
+	}
+
+	if matched < 5 {
+		t.Fatalf("mark-guard sweep matched %d CJK runes, want at least 5", matched)
 	}
 }
 

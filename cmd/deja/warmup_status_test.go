@@ -237,6 +237,30 @@ func TestOpencodePluginRecallsPerPrompt(t *testing.T) {
 	}
 }
 
+// opencode spawns agents through its `task` tool — 817 of them on the store
+// this was measured against — and none of the plugin's other hooks reach one:
+// the system prompt is built for the session that spawned it, and the
+// per-prompt pass fires on what a person typed. Its instructions are the only
+// thing that arrives, so recall has to be put there.
+func TestOpencodePluginCarriesRecallIntoASpawnedAgent(t *testing.T) {
+	src := opencodePluginJS("/bin/deja")
+	for _, want := range []string{
+		"tool.execute.before",
+		`input?.tool !== "task"`,
+		"hook-tool",
+		"updatedInput",
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("generated plugin missing %q:\n%s", want, src)
+		}
+	}
+	// The spawn is rewritten, not blocked, and a spawn deja has nothing to say
+	// about keeps the prompt its parent wrote.
+	if !strings.Contains(src, "if (next) args.prompt = next") {
+		t.Fatalf("plugin does not leave a silent recall alone:\n%s", src)
+	}
+}
+
 // Compaction throws away the working transcript. Claude Code gets it indexed
 // first through PreCompact; opencode fires experimental.session.compacting at
 // the same moment and was going unused.

@@ -18,7 +18,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/query"
-	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 func Search(dir string, o query.Options) ([]model.Session, error) {
@@ -346,35 +345,10 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:
 // lowercased, stopwords dropped. Exported so callers and the benchmark can
-// mirror exactly what the relevance tier scores against.
-func RelevanceTerms(q string) []string {
-	// Letters and digits are wordy in every script; everything else splits.
-	// The old "anything above U+0400 is wordy" rule swallowed CJK and
-	// fullwidth punctuation ("？", "，"), so a real Chinese question became
-	// one giant term that matched nothing and never reached bigram
-	// expansion.
-	fields := strings.FieldsFunc(strings.ToLower(q), func(r rune) bool {
-		if r < 128 {
-			return (r < 'a' || r > 'z') && (r < '0' || r > '9') &&
-				r != '-' && r != '_' && r != '.' && r != '/'
-		}
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-	fields = expandCJKTokens(fields)
-	seen := map[string]bool{}
-	var out []string
-	for _, f := range fields {
-		if len([]rune(f)) < 2 || (len(f) < 3 && !cjkfold.IsCJK([]rune(f)[0])) || search.IsStopWord(f) || seen[f] {
-			continue
-		}
-		if cjkFunctionBigram(f) {
-			continue
-		}
-		seen[f] = true
-		out = append(out, f)
-	}
-	return out
-}
+// mirror exactly what the relevance tier scores against. The implementation
+// lives in query so that packages below index can reduce a question to its
+// words without importing index.
+func RelevanceTerms(q string) []string { return query.RelevanceTerms(q) }
 
 // RelevanceMatchTerms returns the query's relevance terms plus the surface
 // forms the relevance tier actually matches on. Callers count and snippet
@@ -3011,7 +2985,7 @@ func retrievalKeys(keys []string) []string {
 }
 
 func queryKeys(s string) []string {
-	toks := expandCJKTokens(tokens(s))
+	toks := query.ExpandCJKTokens(tokens(s))
 	if len(toks) == 0 {
 		return nil
 	}

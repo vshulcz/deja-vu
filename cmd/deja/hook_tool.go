@@ -72,9 +72,18 @@ type toolHookInput struct {
 }
 
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
+	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
-	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
 	adoptHookCWD(input.CWD)
+	// Spawning an agent is the one action whose reply has to reach someone
+	// other than the caller, so it answers in its own shape. See hook_spawn.go.
+	if isSpawnTool(input.ToolName) {
+		if !planIndexReady(dir) {
+			return nil
+		}
+		return runHookSpawn(dir, input, raw, stdout)
+	}
 	// Never build or repair from here. This runs inside an action the user is
 	// waiting on, and a miss costs nothing while a rebuild costs seconds.
 	if !planIndexReady(dir) {

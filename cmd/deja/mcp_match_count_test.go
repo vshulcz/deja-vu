@@ -96,7 +96,9 @@ func TestRelevanceHitsAreNotCalledMatches(t *testing.T) {
 	// A fixture that stops reaching the tier makes this test guard nothing,
 	// and skipping there hides that: the query above stopped reaching it once
 	// already, and the test went quiet instead of saying so.
-	if !strings.Contains(text, "ranked by relevance") {
+	// The sentinel is the tier's own words, and they changed when the line
+	// stopped reading as "here is what I found about it" (#2074).
+	if !strings.Contains(text, "nearest by wording") {
 		t.Fatalf("the fixture no longer reaches the relevance tier, so this test guards nothing:\n%s", firstLines(text, 3))
 	}
 	if strings.Contains(text, "matched)") {
