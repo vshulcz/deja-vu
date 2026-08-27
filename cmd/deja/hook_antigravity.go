@@ -45,10 +45,17 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// Antigravity runs the hook with the working directory set to the folder
 	// holding hooks.json, not the user's project, so scoping recall by cwd
 	// would silently recall nothing. The payload names the real workspace.
-	if len(input.WorkspacePaths) > 0 && input.WorkspacePaths[0] != "" && os.Getenv("CLAUDE_PROJECT_DIR") == "" {
-		_ = os.Setenv("CLAUDE_PROJECT_DIR", input.WorkspacePaths[0])
+	workspace := ""
+	if len(input.WorkspacePaths) > 0 {
+		workspace = input.WorkspacePaths[0]
 	}
-	digest, sessions, raw, _, _ := cachedHookDigest(dir)
+	if workspace != "" && os.Getenv("CLAUDE_PROJECT_DIR") == "" {
+		_ = os.Setenv("CLAUDE_PROJECT_DIR", workspace)
+	}
+	// The payload, not the export it may or may not have set: the export is
+	// written once per process and refuses to change, so a second payload was
+	// answered for the first one's workspace (#2182).
+	digest, sessions, raw, _, _ := cachedHookDigestFor(dir, workspace)
 	if digest == "" {
 		fmt.Fprintln(stdout, "{}")
 		return nil

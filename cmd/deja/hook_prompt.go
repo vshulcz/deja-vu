@@ -152,10 +152,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		requestWarmup(dir)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
-	if cwd == "" {
-		cwd, _ = os.Getwd()
-	}
+	// The payload first, then the export, then where the process stands: the
+	// export is set once per process and will not change, so reading it alone
+	// answered a second payload with the first one's project (#2182).
+	cwd := hookCWD(input.CWD)
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND.

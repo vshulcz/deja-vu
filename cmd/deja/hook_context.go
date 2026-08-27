@@ -240,7 +240,7 @@ func runHookContext(dir string, plain bool) error {
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
 	adoptHookCWD(input.CWD)
-	digest, sessions, raw, taskMatched, withheld := cachedHookDigest(dir)
+	digest, sessions, raw, taskMatched, withheld := cachedHookDigestFor(dir, input.CWD)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -572,7 +572,16 @@ func hookCWD(fromPayload string) string {
 }
 
 func cachedHookDigest(dir string) (string, int, int64, []string, int) {
-	cwd := hookCWD("")
+	return cachedHookDigestFor(dir, "")
+}
+
+// cachedHookDigestFor is cachedHookDigest for a caller that was told which
+// project the call is about. The payload is that authority: `adoptHookCWD`
+// exports it and will not overwrite an export already there, so reading it back
+// out of the environment answered a second payload in the same process with the
+// first one's project (#2182).
+func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int) {
+	cwd := hookCWD(fromPayload)
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
 		return "", 0, 0, nil, 0
 	}
@@ -601,7 +610,7 @@ func cachedHookDigest(dir string) (string, int, int64, []string, int) {
 			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld
 		}
 	}
-	digest, sessions, raw, taskMatched, withheld := hookDigestResult(dir)
+	digest, sessions, raw, taskMatched, withheld := hookDigestResultFor(dir, cwd)
 	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld)
 	return digest, sessions, raw, taskMatched, withheld
 }
@@ -676,6 +685,14 @@ func hookDigest(dir string) string {
 }
 
 func hookDigestResult(dir string) (string, int, int64, []string, int) {
+	return hookDigestResultFor(dir, "")
+}
+
+// hookDigestResultFor is hookDigestResult for a caller that was told which
+// project the call is about, rather than one reading it back out of the
+// environment: the export is set once per process and refuses to change, so a
+// second payload was answered with the first one's project (#2182).
+func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -700,7 +717,10 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 		requestWarmup(dir)
 		return "", 0, 0, nil, 0
 	}
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	cwd := fromPayload
+	if cwd == "" {
+		cwd = os.Getenv("CLAUDE_PROJECT_DIR")
+	}
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
