@@ -108,7 +108,7 @@ func runStats(dir string, args []string) error {
 	if (jsonOut && card) || (jsonOut && html) || (card && html) {
 		return fmt.Errorf("stats: choose one output")
 	}
-	if err := checkHarness(options.Harness); err != nil {
+	if err := checkHarness(&options.Harness); err != nil {
 		return fmt.Errorf("stats: %w", err)
 	}
 	if err := checkRole(options.Role); err != nil {

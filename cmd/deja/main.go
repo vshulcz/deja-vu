@@ -800,7 +800,8 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkHarness(o.Harness); err != nil {
+	harnessRaw := o.Harness
+	if err := checkHarness(&o.Harness); err != nil {
 		return err
 	}
 	if err := checkRole(o.Role); err != nil {
@@ -836,7 +837,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// is advice for a state the tool is not in: indexing changes nothing
 		// and doctor reports the stores as found. Name what emptied the result
 		// instead (#637).
-		if where := activeFilters(o, sinceRaw); where != "" {
+		if where := activeFilters(o, sinceRaw, harnessRaw); where != "" {
 			fmt.Fprintf(os.Stderr, "deja: no sessions match %s\n", where)
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 			return nil
@@ -978,7 +979,8 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkHarness(o.Harness); err != nil {
+	harnessRaw := o.Harness
+	if err := checkHarness(&o.Harness); err != nil {
 		return err
 	}
 	if err := checkRole(o.Role); err != nil {
@@ -1100,8 +1102,8 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		switch note := policyHiddenNote(policy.ActivationSearch, policyHidden); {
 		case note != "":
 			fmt.Fprint(os.Stderr, note)
-		case activeFilters(o, sinceRaw) != "":
-			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw))
+		case activeFilters(o, sinceRaw, harnessRaw) != "":
+			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw, harnessRaw))
 			fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 		default:
@@ -1545,11 +1547,19 @@ func olderThanWindow(dir string, since time.Duration) string {
 // nothing under harness X" — so `--harness cluade` read as "you have no claude
 // history" instead of "that is not a harness". A known-but-empty harness is
 // still valid; only an unknown name is refused (#1113).
-func checkHarness(name string) error {
-	if name == "" || sources.IsKnownHarness(name) {
+// It also normalises, which is why it takes a pointer: the notes store is
+// stored as "deja" and narrated by the index run as "notes", and retrieval has
+// accepted both since #1888 — but this check ran first and refused the printed
+// name as a typo, so nothing below it ever saw the alias, and `deja stats`
+// compares the stored name exactly (#2191).
+func checkHarness(name *string) error {
+	if *name == "notes" {
+		*name = "deja"
+	}
+	if *name == "" || sources.IsKnownHarness(*name) {
 		return nil
 	}
-	return fmt.Errorf("%q is not a harness deja knows — one of: %s", name, strings.Join(sources.HarnessNames(), ", "))
+	return fmt.Errorf("%q is not a harness deja knows — one of: %s", *name, strings.Join(sources.HarnessNames(), ", "))
 }
 
 // knownRoles is the set `--role` accepts. It lists the documented spellings the
@@ -1601,10 +1611,17 @@ func emptyRoleNote(dir, role string) string {
 // activeFilters names the filters a caller set, so an empty result can say
 // which of them emptied it rather than blaming the index. sinceRaw carries
 // what the reader actually typed: "168h0m0s" is not the flag they passed.
-func activeFilters(o search.Options, sinceRaw string) string {
+func activeFilters(o search.Options, sinceRaw, harnessRaw string) string {
 	var parts []string
 	if o.Harness != "" {
-		parts = append(parts, fmt.Sprintf("harness %q", o.Harness))
+		// Same reason as sinceRaw: `--harness notes` is stored as "deja", and
+		// telling someone their "deja" filter matched nothing names a flag
+		// they did not pass (#2191).
+		name := o.Harness
+		if harnessRaw != "" {
+			name = harnessRaw
+		}
+		parts = append(parts, fmt.Sprintf("harness %q", name))
 	}
 	if o.Project != "" {
 		parts = append(parts, fmt.Sprintf("project %q", o.Project))
@@ -2072,7 +2089,7 @@ func runBlame(dir string, args []string) error {
 	// A typo'd harness must name the mistake, not read as "nobody touched this
 	// file under harness X" — the same reason search and the MCP blame validate
 	// it (#1113). blame has no --role to check.
-	if err := checkHarness(o.Harness); err != nil {
+	if err := checkHarness(&o.Harness); err != nil {
 		return err
 	}
 	target, err := search.ResolveBlamePath(path)
