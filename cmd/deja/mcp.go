@@ -684,12 +684,14 @@ func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []by
 	}
 	for _, h := range hits {
 		out = append(out, blameHitJSON{
+			// A note's title carries no bound into the index (#2092), and this
+			// payload is read by an agent whose context it spends.
 			Session: blameSessionJSON{
 				ID: h.Session.ID, Harness: h.Session.Harness, Project: h.Session.Project,
-				Path: h.Session.Path, Title: h.Session.Title,
+				Path: h.Session.Path, Title: search.SafeNoteTitle(h.Session.Title),
 				Started: h.Session.Started, Updated: h.Session.Updated, Touched: h.Session.Touched,
 			},
-			Title: h.Session.Title, Count: h.Count, Score: h.Score,
+			Title: search.SafeNoteTitle(h.Session.Title), Count: h.Count, Score: h.Score,
 			Tier: h.Tier, Snippets: h.Snippets,
 		})
 	}
