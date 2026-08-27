@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -96,5 +98,36 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		fmt.Fprintf(w, "%s  %-14s %s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, mark)
 	}
 	fmt.Fprintln(w, "\nuse `deja log --last` to see the exact text of the most recent injected digest")
+	// The log's stamps are deja's own, written at recall time, so one in the
+	// future means the clock moved backwards since — and those events sit above
+	// everything from then on, while the status bar leaves them out of its
+	// counters. Two surfaces reading one file and disagreeing with nothing to
+	// say why is the shape #696 rejected; `deja last` and `doctor` name it
+	// already (#2105, #2107, #2122).
+	if n := eventsStampedAhead(events, time.Now()); n > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d event%s stamped later than this machine's clock — %s at the top of this list, and the counters leave %s out\n",
+			n, pluralS(n), pluralThatThose(n), pluralThoseOnes(n))
+	}
 	return nil
+}
+
+// pluralThoseOnes is the pronoun for the tail of that sentence, so it never
+// says "leaves it out" about several events or "them" about one.
+func pluralThoseOnes(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
+}
+
+// eventsStampedAhead counts the listed events whose stamp is after now, by the
+// same rule the other surfaces count sessions with.
+func eventsStampedAhead(events []usage.Event, now time.Time) int {
+	n := 0
+	for _, e := range events {
+		if index.StampedAhead(e.Time, now) {
+			n++
+		}
+	}
+	return n
 }
