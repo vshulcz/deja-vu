@@ -37,7 +37,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// doctorReport
 		"schema_version": true, "stores": true, "index": true, "mcp": true,
 		"sqlite3": true, "version": true, "embed": true, "policy": true,
-		"ingest_health": true, "deep": true,
+		"ingest_health": true, "ingest_files": true, "deep": true,
 		// doctorStore
 		"name": true, "state": true, "paths": true, "files": true,
 		"indexed_sessions": true, "indexed_from_elsewhere": true,
@@ -57,6 +57,8 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"stamped_ahead": true,
 		// index.HarnessIngest
 		"malformed_lines": true, "clipped_messages": true,
+		// index.FileIngest
+		"malformed": true, "clipped": true,
 		"failed_files": true, "last_error": true,
 		// index.DeepReport / index.DeepFinding
 		"files_checked": true, "sessions_indexed": true, "sampled_files": true,
