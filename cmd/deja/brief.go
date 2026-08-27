@@ -202,6 +202,28 @@ func runBrief(dir string, w io.Writer) error {
 	}
 	if err == nil && len(recent) > 0 {
 		label := "recent    "
+		// The project is budgeted once for the whole block, against the widest
+		// line in it — usually the widest date, and a longer harness name where
+		// the block mixes harnesses. The line with no project in it is what
+		// gets measured, so the two separators and the date are all counted
+		// exactly once, and both separators are counted because the project is
+		// measured as if it were there — that is the line it has to fit. The
+		// continuation label below is the same width as this one, so measuring
+		// with the first line's label measures them all.
+		// Budgeting per line spelled one project three ways: a date carrying
+		// its year is five columns wider, so the tail was cut further on those
+		// lines and vanished from the widest one, and the block #1073 put
+		// together read as three different projects (#2128). A block of
+		// different projects pays for it — a short one on a narrow-date line is
+		// cut to a budget some other line set — which is the price of the block
+		// reading as a block.
+		blockRest := 0
+		for _, s := range recent {
+			bare := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, "", search.RelativeDate(s.Updated))
+			if r := barColumns(bare); r > blockRest {
+				blockRest = r
+			}
+		}
 		for _, s := range recent {
 			title := s.Title
 			if title == "" {
@@ -219,13 +241,9 @@ func runBrief(dir string, w io.Writer) error {
 			// the prefix alone reached 58, the budget fell to its floor and the
 			// line ran to 71 — a wrapped row rather than a ragged end (#1592).
 			// Shorten the path first, then budget the title against what is
-			// left.
-			// Measure the line with no project in it, so the two separators and
-			// the date are all counted exactly once.
-			// Both separators are counted: the project is measured as if it
-			// were there, because that is the line it has to fit.
-			bare := fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, "", search.RelativeDate(s.Updated))
-			project := fitBriefProject(s.Project, barColumns(bare))
+			// left. The title is still budgeted per line: that is what keeps
+			// the lines the same length when the dates are not.
+			project := fitBriefProject(s.Project, blockRest)
 			head := fmt.Sprintf("%s [%s] %s · ", label, s.Harness, search.RelativeDate(s.Updated))
 			if project != "" {
 				head = fmt.Sprintf("%s [%s] %s · %s · ", label, s.Harness, project, search.RelativeDate(s.Updated))
