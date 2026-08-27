@@ -47,7 +47,7 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	root = updateClaudeHook(root, "PreCompact", exe+" hook-precompact", "manual|auto", false)
 	root = updateClaudeHook(root, "UserPromptSubmit", exe+" hook-prompt", "", false)
 	// Scoped to the tools that change something, so it never fires on a read.
-	root = updateClaudeHook(root, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit", false)
+	root = updateClaudeHook(root, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
 		return installResult{}, err
