@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
@@ -144,6 +146,49 @@ func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName 
 	snapshotWriteInto(indexDir, kind, digest, "", sessions, policyName, terms)
 }
 
+// snapshotLineMax is the longest line the reader takes, and therefore the
+// longest one worth writing. A record past it was written and then unreadable:
+// `deja log` showed nothing for an injection that happened, and the next
+// rotation rewrote the file without it (#2222).
+const snapshotLineMax = 4 << 20
+
+// snapshotDigestMax is how much of a digest goes into the log. The budget is
+// the line's, and one byte of text can cost six of JSON — a control byte is
+// written \u00XX — so this is the ceiling that holds however the text escapes,
+// without a trial encode to find out.
+//
+// Generous next to what anything actually injects: a session-start digest is
+// 8 KB and the MCP budget is 4 KB. It is `deja://session/…`, which records the
+// whole session it served, that reaches for megabytes.
+const snapshotDigestMax = (snapshotLineMax - snapshotEnvelope) / 6
+
+// snapshotEnvelope is room for the rest of the record around the digest — the
+// stamp, kind, terms, policy and the session it went into.
+const snapshotEnvelope = 64 << 10
+
+// clipDigest cuts a digest down to what this file can read back, saying where
+// it cut. The head is kept, because that is what an agent was shown first, and
+// `Bytes` still carries the size that was served: the clipping is this file's
+// business, not a claim about the injection.
+func clipDigest(digest string) string {
+	if len(digest) <= snapshotDigestMax {
+		return digest
+	}
+	head := digest[:runeBoundaryAt(digest, snapshotDigestMax)]
+	return head + fmt.Sprintf("\n… (clipped: the whole digest was %d bytes)", len(digest))
+}
+
+// runeBoundaryAt is n backed up to where a rune starts, so a cut lands between
+// characters rather than inside one. A half rune is not an error — the encoder
+// writes U+FFFD for it — but it is a mojibake tail on the last line of a digest
+// someone reads.
+func runeBoundaryAt(s string, n int) int {
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return n
+}
+
 func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
 	if digest == "" {
 		return
@@ -153,7 +198,7 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 		return
 	}
 	b, err := marshalSnapshot(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
-		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
+		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: clipDigest(digest)})
 	if err != nil {
 		return
 	}
