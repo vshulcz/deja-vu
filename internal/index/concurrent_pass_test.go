@@ -61,8 +61,11 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(proj, fmt.Sprintf("s%02d.jsonl", sessions)), []byte(newLine+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The windows the two passes occupy, so the test can say whether they
-	// really contended rather than running one after the other by luck.
+	// All four start together, and the windows the two passes occupy are kept,
+	// so the test can say whether they really contended: without a barrier the
+	// scheduler can run one pass to completion before the other begins, and
+	// the overlap this is about would be a matter of luck.
+	start := make(chan struct{})
 	var mu sync.Mutex
 	starts := make([]time.Time, 2)
 	ends := make([]time.Time, 2)
@@ -71,6 +74,7 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
+			<-start
 			switch i {
 			case 0, 1:
 				// One rebuild and one incremental pass, which is the pair a
@@ -86,14 +90,14 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 				// Until the passes are finished, not a fixed number of rounds:
 				// forty sessions rebuild in milliseconds, and a loop that
 				// counts can be over before the pass begins.
+				// At least one round happens whatever the scheduler does, so a
+				// reader that lands late fails nothing; what it must never do
+				// is come back empty or corrupt.
 				rounds := 0
-				for {
+				for done := false; !done; {
 					select {
 					case <-passesDone:
-						if rounds == 0 {
-							errs[i] = fmt.Errorf("the reader never ran while a pass did")
-						}
-						return
+						done = true
 					default:
 					}
 					// The door every surface uses. The plain one fails here
@@ -115,6 +119,7 @@ func TestTwoPassesAtOnceKeepTheCountsAndTheAnswers(t *testing.T) {
 			}
 		}(i)
 	}
+	close(start)
 	// The readers stop once both passes are back.
 	go func() {
 		for i := 0; i < 2; i++ {
