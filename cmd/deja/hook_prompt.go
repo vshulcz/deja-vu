@@ -597,17 +597,28 @@ func rotateHookseen(p, sid string) {
 	if len(lines) > tailLines {
 		start = len(lines) - tailLines
 	}
-	var keep []string
+	// The caller's own lines are kept beyond the tail so its dedup survives the
+	// rotation — but only as many as the tail itself. Keeping all of them left
+	// a long session able to fill the file with its own entries, after which
+	// every write rotated a megabyte again: the tool hooks write a token per
+	// call, so that is reachable rather than theoretical (#2164).
+	var keep, mine []string
 	prefix := sid + " "
 	for i, ln := range lines {
 		if ln == "" {
 			continue
 		}
-		if i >= start || strings.HasPrefix(ln, prefix) {
+		switch {
+		case i >= start:
 			keep = append(keep, ln)
+		case strings.HasPrefix(ln, prefix):
+			mine = append(mine, ln)
 		}
 	}
-	_ = atomicfile.Write(p, []byte(strings.Join(keep, "\n")+"\n"), 0o600)
+	if len(mine) > tailLines {
+		mine = mine[len(mine)-tailLines:]
+	}
+	_ = atomicfile.Write(p, []byte(strings.Join(append(mine, keep...), "\n")+"\n"), 0o600)
 }
 
 // rememberInjectedIDs records arbitrary dedupe tokens against a session, so a
@@ -617,14 +628,21 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 	if sid == "" {
 		return
 	}
-	f, err := os.OpenFile(dir+".hookseen", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+	p := dir + ".hookseen"
+	// Rotate rather than stop, for the reason rememberInjected does: a full
+	// file used to end the dedup for good, and the hooks that write tokens are
+	// the ones whose whole job is not repeating themselves to the same agent.
+	// Stopping here left that to whenever a session injection happened to
+	// rotate the file, and on a machine whose hooks inject tokens rather than
+	// sessions, nothing ever did (#2164).
+	if fi, err := os.Stat(p); err == nil && fi.Size() > 1<<20 {
+		rotateHookseen(p, sid)
+	}
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	if fi, err := f.Stat(); err == nil && fi.Size() > 1<<20 {
-		return
-	}
 	if atomicfile.EndsMidLine(f) {
 		_, _ = f.WriteString("\n")
 	}
