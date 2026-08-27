@@ -43,7 +43,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"indexed_sessions": true, "indexed_from_elsewhere": true,
 		"denied": true, "skipped": true, "partial": true, "unchecked": true,
 		// doctorComponent
-		"path": true, "stale_stores": true,
+		"path": true, "stale_stores": true, "sessions_stamped_ahead": true,
 		// doctorVersionReport
 		"current": true, "latest": true,
 		// doctorEmbedReport
