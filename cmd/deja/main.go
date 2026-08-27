@@ -1368,7 +1368,33 @@ func commandHint(q string) string {
 	if first == "" || strings.HasPrefix(first, "-") {
 		return ""
 	}
+	// A hint is about a guess at a command, and a guess is short: a command
+	// with an argument or two. "hook up the pool" is a sentence, and a hint
+	// there is noise on top of a search that already failed — the same lesson
+	// #715 learned about short words (#2115).
+	if !looksLikeAnInvocation(q) {
+		return ""
+	}
 	low := strings.ToLower(first)
+	// A guess with an exact answer behind it. `deja hook context` is the
+	// hyphen-free spelling of a command that exists, and the candidate list
+	// below drops every `hook-` name on the grounds that plumbing is not
+	// something anyone means to type — which is right about proposing it and
+	// wrong about hiding it from the reader who typed its own stem (#2115).
+	if hint := hyphenatedCommandHint(q, low); hint != "" {
+		return hint
+	}
+	// The word deja's own MCP tool is called, and the one the documentation
+	// uses throughout, so `deja recall <words>` is a fair guess at the shell
+	// form. Nothing is near it by name, so the hint said nothing at all —
+	// the same shape as the curated answers below (#2115).
+	if low == "recall" {
+		rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(q), first))
+		if rest != "" {
+			return fmt.Sprintf("deja: %q is what the MCP tool is called — from a shell it is `deja %q`, and `deja hook-prompt` is the per-prompt recall\n", first, rest)
+		}
+		return fmt.Sprintf("deja: %q is what the MCP tool is called — from a shell it is `deja <query>`, and `deja hook-prompt` is the per-prompt recall\n", first)
+	}
 	// A one- or two-letter word is a word, not a mistyped command name. Any
 	// prefix counts as "near" — so "a" reached `deja aider` and every sentence
 	// starting with a short word got a hint (#715, my own regression from
@@ -1413,6 +1439,47 @@ func commandHint(q string) string {
 		return "deja: \"unforget\" is not a command — `deja forget --unforget <id>` is, and `deja forget --list` names the ids\n"
 	}
 	return fmt.Sprintf("deja: %q is not a command — did you mean `deja %s`?\n", first, near)
+}
+
+// hyphenatedCommandHint answers the guess that spelled a hyphenated command
+// with a space: the two words joined name a real one, or the first word is the
+// stem of some and there is no second word to join (#2115).
+func hyphenatedCommandHint(q, low string) string {
+	rest := strings.Fields(strings.TrimSpace(q))
+	if len(rest) > 1 {
+		joined := low + "-" + strings.ToLower(rest[1])
+		if _, ok := commands[joined]; ok {
+			return fmt.Sprintf("deja: %q is not a command — did you mean `deja %s`?\n", low+" "+rest[1], joined)
+		}
+	}
+	// Only the stem on its own. With words after it that do not join into a
+	// command, the reader is searching — "hook up the pool" is a sentence, and
+	// a hint about `hook-context` there is noise on top of a failed search.
+	if len(rest) != 1 {
+		return ""
+	}
+	var stems []string
+	for name := range commands {
+		if strings.HasPrefix(name, low+"-") {
+			stems = append(stems, name)
+		}
+	}
+	if len(stems) == 0 {
+		return ""
+	}
+	sort.Strings(stems)
+	if len(stems) > 3 {
+		stems = stems[:3]
+	}
+	return fmt.Sprintf("deja: %q is not a command on its own — `deja %s` and the rest of that family are; `deja help` names them\n",
+		low, strings.Join(stems, "`, `deja "))
+}
+
+// looksLikeAnInvocation separates a guess at a command from prose. A command
+// and an argument or two is short; "recall the decision we made about the pool"
+// is a sentence, and the hint is about the first kind (#2115).
+func looksLikeAnInvocation(q string) bool {
+	return len(strings.Fields(q)) <= 3
 }
 
 // sinceRawArg recovers the text the reader typed after --since. parseSearch
