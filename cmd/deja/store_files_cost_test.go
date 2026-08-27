@@ -33,16 +33,26 @@ func TestTheEmptyScreenDoesNotParseEveryStore(t *testing.T) {
 		seedClaude(t, claude, "app", string(rune('a'+i)), "the pgbouncer pool kept timing out "+string(long), "we retried")
 	}
 
-	start := time.Now()
-	checks := doctorStoreChecks()
-	enumerate := time.Since(start)
-
-	start = time.Now()
-	answer := noAgentHistoryFound()
-	asked := time.Since(start)
-
-	if answer {
-		t.Fatal("the fixture has history, so this measures nothing")
+	// Best of three on each side. Both are well under a millisecond, and a
+	// runner busy with the rest of the suite stretches such a sample by more
+	// than the bar below allows — the same flake #2193 caught in the usage
+	// package. The minimum is the run that was not interrupted.
+	enumerate, asked := time.Duration(1<<62-1), time.Duration(1<<62-1)
+	var checks []doctorStoreCheck
+	for round := 0; round < 3; round++ {
+		start := time.Now()
+		checks = doctorStoreChecks()
+		if took := time.Since(start); took < enumerate {
+			enumerate = took
+		}
+		start = time.Now()
+		answer := noAgentHistoryFound()
+		if took := time.Since(start); took < asked {
+			asked = took
+		}
+		if answer {
+			t.Fatal("the fixture has history, so this measures nothing")
+		}
 	}
 	// Four times the enumeration, plus a millisecond or two of slack for a
 	// loaded runner: far above the spread between runs, far below the cost of
