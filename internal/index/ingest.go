@@ -60,6 +60,21 @@ func IngestHealth(dir string) map[string]HarnessIngest {
 	return m.IngestHealth
 }
 
+// IngestFilesReport returns the same story per file: which path each refused
+// line, clipped message or unreadable store came from. The rollup says a line
+// was skipped and doctor points at `--json` for more, which used to hold the
+// rollup again (#2189). Sparse — only files with something to report.
+func IngestFilesReport(dir string) map[string]FileIngest {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	return m.IngestFiles
+}
+
 // mergeIngestDiag folds the sources side-channel counters into the manifest.
 // The counts live per file, because that is what they are about: a pass that
 // re-reads one transcript must not erase what a different one reported, and a

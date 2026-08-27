@@ -351,6 +351,9 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   "ingest_health": {
     "claude": {"malformed_lines": 0, "failed_files": 0}
   },
+  "ingest_files": {
+    "/Users/you/.claude/projects/app/one.jsonl": {"malformed": 2}
+  },
   "sync": {
     "state": "ok",
     "peers": [
@@ -391,6 +394,13 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `auto`, each with the rule in force and how many sessions it withheld;
 `ignored` and `inert` list policy lines that matched no harness or no import.
 Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
+
+`ingest_files` is where those counts came from, keyed by file path: `malformed`
+lines, `clipped` messages, and `error` when the file itself would not open. It
+is sparse — a file with nothing to report is not in it — and absent when no file
+has anything to report. The per-harness numbers above are the sum of the files
+deja can attribute to a harness, so a path it cannot place is here and in no
+harness's total. Line numbers are not recorded: the parsers count refused lines, not where they were.
 
 `sync.state` is `ok` or `unreadable`; `unreadable` adds an `error` saying why the peers file could not be parsed, and its `peers` list is empty because deja could read nothing from it — a sync is never stopped by a malformed config, so the report is the only place that failure shows. `sync.peers` is every machine this one knows, and it is always present — an
 empty list means no machines are configured, which a script can tell apart from
