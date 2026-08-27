@@ -275,6 +275,62 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 	return recalls, bytes, injected
 }
 
+// StatusNumbers is everything the status line can print, from one read.
+type StatusNumbers struct {
+	// Today, demand side: what an agent asked for and got, and what deja
+	// injected unprompted, on the same terms TodayDemand uses.
+	Recalls  int
+	Bytes    int
+	Injected int
+	// This week, for the line the quiet days print.
+	WeekRecalls int
+	WeekBytes   int
+	// Today's source transcripts behind what was served, for the "less than
+	// replaying" clause.
+	RawToday int64
+}
+
+// StatusCounters is TodayDemand, Week and TodayRaw in one pass.
+//
+// The line renders on every prompt and took two of these reads — 8 ms each on a
+// busy fortnight's log — for numbers one read produces. TodayDemand's own doc
+// gives the other half of the reason: two passes can straddle a write and
+// report numbers that were never true together, and the line prints today's
+// beside the week's (#2224).
+func StatusCounters(indexDir string) StatusNumbers {
+	var out StatusNumbers
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	cut := WeekCut(now)
+	for _, e := range read(Path(indexDir)) {
+		if ahead(e.Time, now) {
+			continue
+		}
+		// TodayRaw counts what was served today whether or not it found
+		// anything, which is the one place the empty rule differs.
+		if !e.Time.Before(midnight) && (servedKind(e.Kind) || injectedKind(e.Kind)) {
+			out.RawToday += e.RawBytes
+		}
+		if e.FoundNothing() {
+			continue
+		}
+		if !e.Time.Before(midnight) {
+			switch {
+			case servedKind(e.Kind):
+				out.Recalls++
+				out.Bytes += e.Bytes
+			case injectedKind(e.Kind):
+				out.Injected += e.Bytes
+			}
+		}
+		if !e.Time.Before(cut) && servedKind(e.Kind) {
+			out.WeekRecalls++
+			out.WeekBytes += e.Bytes
+		}
+	}
+	return out
+}
+
 // TodayDemand returns today's non-empty, agent-requested memory events, the
 // bytes they served, and separately the bytes deja injected unprompted.
 // Automatic injections and empty results stay out of the recall count so
