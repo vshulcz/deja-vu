@@ -396,7 +396,9 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
 
 `ingest_files` is where those counts came from, keyed by file path: `malformed`
-lines, `clipped` messages, and `error` when the file itself would not open. It
+lines, `clipped` messages, and `error` when nothing from that path is in the
+index at all — it would not open, or it is one document that would not parse,
+as a cline or roo task is. It
 is sparse — a file with nothing to report is not in it — and absent when no file
 has anything to report. The per-harness numbers above are the sum of the files
 deja can attribute to a harness, so a path it cannot place is here and in no
