@@ -41,6 +41,52 @@ func TestFixPairsDropACommandTheErrorSurvived(t *testing.T) {
 	}
 }
 
+// The same error a dozen records later says the same thing as the same error
+// immediately after: the command did not settle it. Six records was the whole
+// of the check, so a session that ran a command, worked on something else and
+// hit the error again stored the command as the fix. Measured over this
+// machine's transcripts, 104 of the 831 pairs the miner kept were contradicted
+// that way.
+func TestFixPairsDropACommandTheErrorOutlivedLater(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "brew install coreutils for timeout", Time: now.Add(time.Minute)},
+	}
+	// Far enough that the old six-record window never reached it.
+	for i := 0; i < 12; i++ {
+		ms = append(ms, model.Message{Role: "tool-output", Text: "ok", Time: now.Add(time.Duration(i) * time.Minute)})
+	}
+	ms = append(ms, model.Message{
+		Role: "tool-output", Text: "zsh:1: command not found: timeout",
+		Time: now.Add(time.Hour),
+	})
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 0 {
+		t.Errorf("a command the error outlived was stored as a fix: %+v", pairs)
+	}
+}
+
+// And the check stays a check on the same error: another error later in the
+// session says nothing about this one, and withholding on it would empty the
+// table for any session that hit more than one thing.
+func TestFixPairsKeepACommandADifferentErrorFollowed(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "curl --max-time 5 example.internal", Time: now.Add(time.Minute)},
+	}
+	for i := 0; i < 12; i++ {
+		ms = append(ms, model.Message{Role: "tool-output", Text: "ok", Time: now.Add(time.Duration(i) * time.Minute)})
+	}
+	ms = append(ms, model.Message{
+		Role: "tool-output", Text: "zsh:1: command not found: gsed",
+		Time: now.Add(time.Hour),
+	})
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 1 {
+		t.Errorf("a different error later withheld the pair: %+v", pairs)
+	}
+}
+
 // Sequence alone is 13% precise on a real store — the next command is usually
 // the session moving on. A pair survives the build only with a second reason:
 // the command names what the error named, or the same remedy recurs.
