@@ -139,25 +139,27 @@ func ParseCursorDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseCursorDB(db)
 	}
-	return parseCursorDB(db, t.UnixMilli())
+	return parseCursorDB(db, t)
 }
 
 // ParseCursorDB reads composer sessions with a narrow projection — dumping
 // whole JSON values through the sqlite3 pipe on a multi-hundred-MB store
 // takes minutes, extracting scalars takes seconds (same lesson as opencode).
 func ParseCursorDB(db string) ([]model.Session, error) {
-	return parseCursorDB(db, 0)
+	return parseCursorDB(db, time.Time{})
 }
 
-func parseCursorDB(db string, sinceMS int64) ([]model.Session, error) {
+func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
 	composerWhere := ""
 	bubbleWhere := ""
-	if sinceMS > 0 {
-		composerWhere = fmt.Sprintf(" and json_extract(value,'$.lastUpdatedAt') > %d", sinceMS)
-		bubbleWhere = fmt.Sprintf(" and json_extract(value,'$.timestamp') > %d", sinceMS)
+	// The clause reads the units the reader does, or the two disagree about
+	// what a store holds (#2086).
+	if !since.IsZero() {
+		composerWhere = " and " + newerThanEpoch("json_extract(value,'$.lastUpdatedAt')", since)
+		bubbleWhere = " and " + newerThanEpoch("json_extract(value,'$.timestamp')", since)
 	}
 	composers, err := cursorQuery(db, `select key,`+
 		`json_extract(value,'$.composerId') as cid,`+
@@ -258,9 +260,13 @@ func numberVal(v any) (int64, bool) {
 	return 0, false
 }
 
+// epochMS reads Cursor's stamps, which it writes in milliseconds — through the
+// same guess every other source uses, because a reader that assumes the unit
+// dates a seconds-stamped store to three weeks after the epoch and says nothing
+// about it (#2094).
 func epochMS(v any) time.Time {
-	if n, ok := numberVal(v); ok && n > 0 {
-		return time.UnixMilli(n)
+	if n, ok := numberVal(v); ok {
+		return unixGuess(n)
 	}
 	return time.Time{}
 }
