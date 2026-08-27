@@ -194,10 +194,18 @@ func Redactions(dir string) (RedactionStats, error) {
 		if len(parts) != 2 {
 			continue
 		}
-		if out.Rules[parts[0]] == nil {
-			out.Rules[parts[0]] = map[string]int{}
+		// An index written before #2238 holds keys by file kind, and a pass
+		// since then writes them by store, so one manifest can carry both. The
+		// reader folds, or the screen shows "cline" and "cline-sdk" as two
+		// stores with the counts split between them until a full rebuild.
+		name := parts[0]
+		if store := sources.HarnessForKind(name); store != "" {
+			name = store
 		}
-		out.Rules[parts[0]][parts[1]] = count
+		if out.Rules[name] == nil {
+			out.Rules[name] = map[string]int{}
+		}
+		out.Rules[name][parts[1]] += count
 	}
 	return out, nil
 }

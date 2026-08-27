@@ -67,3 +67,44 @@ func TestRedactionCountsAreFiledUnderTheStore(t *testing.T) {
 		t.Errorf("nothing is filed under the name the rest of deja prints: %v", stats.Rules)
 	}
 }
+
+// An index written before the fix holds keys by file kind, and a pass since
+// then writes them by store — one manifest, both shapes. The reader folds, or
+// the screen shows two stores where there is one (#2238).
+func TestOldKindKeysFoldIntoTheStoreOnRead(t *testing.T) {
+	dir := t.TempDir()
+	m := Manifest{
+		Version: version,
+		RedactionRules: map[string]int{
+			"cline-sdk:github-token":    2,
+			"cline:github-token":        1,
+			"cline-vscode:aws-key":      3,
+			"claude:github-token":       4,
+			"nothing-like-a-store:rule": 5,
+		},
+	}
+	if err := writeManifest(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	stats, err := Redactions(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stats.Rules["cline"]["github-token"]; got != 3 {
+		t.Errorf("the two spellings of one store report %d github tokens, want 2+1", got)
+	}
+	if got := stats.Rules["cline"]["aws-key"]; got != 3 {
+		t.Errorf("the other kind of the same store reports %d aws keys, want 3", got)
+	}
+	if _, ok := stats.Rules["cline-sdk"]; ok {
+		t.Errorf("a file kind is still a heading: %v", stats.Rules)
+	}
+	if got := stats.Rules["claude"]["github-token"]; got != 4 {
+		t.Errorf("a store whose kind carries its own name reports %d, want 4", got)
+	}
+	// A name deja does not know is left as it is rather than dropped: it came
+	// from somewhere, and losing the count would be worse than an odd heading.
+	if got := stats.Rules["nothing-like-a-store"]["rule"]; got != 5 {
+		t.Errorf("an unknown name reports %d, want 5", got)
+	}
+}
