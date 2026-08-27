@@ -15,7 +15,7 @@ import (
 // hostile is what a transcript or a hand-written note can put in a name:
 // markup, an escape byte and a bidi override, which reverses the rendering of
 // everything after it.
-const hostile = "</script><img src=x onerror=alert(1)> [31m & <b>bold‮"
+const hostile = "</script><img src=x onerror=alert(1)> \x1b[31m & <b>bold\u202e"
 
 // Every terminal row deja prints scrubs these; the pages did not, and a page is
 // where a bidi override actually reverses a line for a reader (#2090).
@@ -85,8 +85,8 @@ func TestTheViewPageDoesNotCarryControlOrBidiCharacters(t *testing.T) {
 func assertNoControlOrBidi(t *testing.T, what, s string) {
 	t.Helper()
 	for _, bad := range []struct{ name, text string }{
-		{"an escape byte", ""},
-		{"a bidi override", "‮"},
+		{"an escape byte", "\x1b"},
+		{"a bidi override", "\u202e"},
 		{"a carriage return", "\r"},
 	} {
 		if strings.Contains(s, bad.text) {
