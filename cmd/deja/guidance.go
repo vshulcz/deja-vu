@@ -390,18 +390,36 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	} else {
 		// grok writes a twin below; check its markers before touching this
 		// file, or a refusal there leaves this one already rewritten (#1705).
-		if harness == "grok" {
+		//
+		// Only on the way in. Removing is the other direction: the two blocks
+		// are bounded independently, and refusing to take out the one that can
+		// be taken out left a complete deja block in a file nobody had been
+		// told about (#2210).
+		if harness == "grok" && !uninstall {
 			b, rerr := os.ReadFile(filepath.Join(sources.GrokHome(), "AGENTS.md"))
 			if rerr != nil && !os.IsNotExist(rerr) {
 				return installResult{}, rerr
 			}
 			if cerr := checkGuidanceMarkers(string(b)); cerr != nil {
-				return installResult{}, cerr
+				return installResult{}, markerErrorFor(filepath.Join(sources.GrokHome(), "AGENTS.md"), cerr)
 			}
 		}
 		updated, uerr := updateGuidanceBlock(string(old), uninstall)
 		if uerr != nil {
-			return installResult{}, uerr
+			// The twin still has to be dealt with: this file is the one that
+			// cannot be bounded, and the other one's block is nobody's hostage.
+			if harness == "grok" && uninstall {
+				twin, terr := removeGrokTwinBlock()
+				if terr != nil {
+					return installResult{}, terr
+				}
+				// Both unbounded is the case where saying only one path sends
+				// the reader to fix half of it and run into the other half.
+				if twin != "" {
+					return installResult{}, fmt.Errorf("%s: %w (and the same in %s)", path, uerr, twin)
+				}
+			}
+			return installResult{}, markerErrorFor(path, uerr)
 		}
 		next = []byte(updated)
 	}
@@ -423,13 +441,44 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		}
 		updatedAlt, uerr := updateGuidanceBlock(string(oldAlt), uninstall)
 		if uerr != nil {
-			return installResult{}, uerr
+			return installResult{}, markerErrorFor(alt, uerr)
 		}
 		if _, werr := writeIfChanged(alt, oldAlt, []byte(updatedAlt)); werr != nil {
 			return installResult{}, werr
 		}
 	}
 	return installResult{Path: path, Action: a}, nil
+}
+
+// markerErrorFor names the file a marker refusal is about. The refusal is the
+// instruction to finish the job by hand, and it used to leave the reader
+// looking for which of deja's files it meant (#2210).
+func markerErrorFor(path string, err error) error {
+	return fmt.Errorf("%s: %w", path, err)
+}
+
+// removeGrokTwinBlock takes deja's block out of grok's other file when this one
+// cannot be bounded. Written for the uninstall direction only: the two blocks
+// stand on their own, so one broken file is no reason to keep the other.
+//
+// The first return value is the twin's path when it is unbounded too, so the
+// caller can name both files at once — `grok-auto` runs `grok` first and would
+// otherwise fail on the same file twice and never mention this one.
+func removeGrokTwinBlock() (unbounded string, err error) {
+	alt := filepath.Join(sources.GrokHome(), "AGENTS.md")
+	oldAlt, rerr := os.ReadFile(alt)
+	if rerr != nil {
+		if os.IsNotExist(rerr) {
+			return "", nil
+		}
+		return "", rerr
+	}
+	updated, uerr := updateGuidanceBlock(string(oldAlt), true)
+	if uerr != nil {
+		return alt, nil
+	}
+	_, werr := writeIfChanged(alt, oldAlt, []byte(updated))
+	return "", werr
 }
 
 func updateGuidanceBlock(old string, uninstall bool) (string, error) {
