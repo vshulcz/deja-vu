@@ -52,7 +52,7 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		// null, and those rows are kept rather than dropped — an unreadable
 		// stamp is a reason to look at a message, not to hide it.
 		const norm = `strftime('%Y-%m-%dT%H:%M:%f',m.created_at)`
-		w := sqlEscape(t.UTC().Format("2006-01-02T15:04:05.000"))
+		w := sqlEscape(millisecondBackoff(t))
 		where = " and (" + norm + " is null or " + norm + " > '" + w + "')"
 	}
 	q := `select s.id as id,s.cwd_last as cwd,s.title as title,` +
