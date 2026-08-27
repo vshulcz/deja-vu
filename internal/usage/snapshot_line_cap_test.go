@@ -12,7 +12,7 @@ import (
 // rotation rewrote the file without it. A record deja cannot read is worse than
 // a record it clipped (#2222).
 func TestADigestTooLargeToReadBackIsClippedRatherThanLost(t *testing.T) {
-	for _, size := range []int{8 << 10, 1 << 20, 3 << 20, 5 << 20, 16 << 20} {
+	for _, size := range []int{8 << 10, 100 << 10, snapshotDigestMax, snapshotDigestMax + 1, 5 << 20, 16 << 20} {
 		dir := t.TempDir()
 		digest := strings.Repeat("z", size)
 		RecordDigestTerms(dir, KindResource, digest, 1, 0, nil, "s1")
@@ -28,15 +28,22 @@ func TestADigestTooLargeToReadBackIsClippedRatherThanLost(t *testing.T) {
 		if !strings.HasPrefix(got[0].Digest, strings.Repeat("z", 4096)) {
 			t.Errorf("a %d B digest came back as something else: %.80q", size, got[0].Digest)
 		}
-		if size <= 3<<20 {
-			// Everything that round-tripped before still does, whole.
+		if size <= snapshotDigestMax {
+			// Anything inside the budget is kept whole, and everything deja
+			// actually injects is far inside it.
 			if got[0].Digest != digest {
-				t.Errorf("a %d B digest was clipped to %d, though it fitted before", size, len(got[0].Digest))
+				t.Errorf("a %d B digest was clipped to %d, though it is within the budget", size, len(got[0].Digest))
 			}
 			continue
 		}
-		if len(got[0].Digest) >= size {
-			t.Errorf("a %d B digest was not clipped: %d bytes came back", size, len(got[0].Digest))
+		// The kept head is inside the budget. The record itself is a little
+		// longer than the head, because it says it was clipped.
+		head := got[0].Digest[:strings.LastIndex(got[0].Digest, "\n… (clipped")]
+		if len(head) > snapshotDigestMax {
+			t.Errorf("a %d B digest kept %d bytes, over the %d budget", size, len(head), snapshotDigestMax)
+		}
+		if len(head) >= size {
+			t.Errorf("a %d B digest was not clipped: %d bytes kept", size, len(head))
 		}
 		// And the clipping says so, rather than ending mid-sentence.
 		if !strings.Contains(got[0].Digest, "clipped") {
@@ -63,6 +70,9 @@ func TestClippingSurvivesTheShapesThatCostMost(t *testing.T) {
 		{"invalid bytes, which triple", strings.Repeat(string([]byte{0xff}), 6<<20)},
 		{"multi-byte runes", strings.Repeat("é", 3<<20)},
 		{"one long rune run", strings.Repeat("🙂", 2<<20)},
+		// One byte in front, so the budget falls inside a rune rather than
+		// between two: this is what backs the cut up.
+		{"a rune the cut lands inside", "a" + strings.Repeat("日", 1<<20)},
 	} {
 		dir := t.TempDir()
 		RecordDigestTerms(dir, KindResource, c.digest, 1, 0, nil, "s1")

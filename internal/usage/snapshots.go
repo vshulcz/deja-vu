@@ -152,29 +152,30 @@ func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName 
 // rotation rewrote the file without it (#2222).
 const snapshotLineMax = 4 << 20
 
-// clipDigest cuts a digest down to what this file can read back, saying so
-// where it cut. The head is kept, because that is what an agent was shown
-// first, and `Bytes` still carries the size that was served: the clipping is
-// this file's business, not a claim about the injection.
+// snapshotDigestMax is how much of a digest goes into the log. The budget is
+// the line's, and one byte of text can cost six of JSON — a control byte is
+// written \u00XX — so this is the ceiling that holds however the text escapes,
+// without a trial encode to find out.
 //
-// The budget is on the marshalled line, not on the digest, since escaping is
-// what decides the difference — a digest of newlines doubles.
+// Generous next to what anything actually injects: a session-start digest is
+// 8 KB and the MCP budget is 4 KB. It is `deja://session/…`, which records the
+// whole session it served, that reaches for megabytes.
+const snapshotDigestMax = (snapshotLineMax - snapshotEnvelope) / 6
+
+// snapshotEnvelope is room for the rest of the record around the digest — the
+// stamp, kind, terms, policy and the session it went into.
+const snapshotEnvelope = 64 << 10
+
+// clipDigest cuts a digest down to what this file can read back, saying where
+// it cut. The head is kept, because that is what an agent was shown first, and
+// `Bytes` still carries the size that was served: the clipping is this file's
+// business, not a claim about the injection.
 func clipDigest(digest string) string {
-	const marker = "\n… (clipped: the whole digest was %d bytes)"
-	if len(digest)+len(marker) < snapshotLineMax {
+	if len(digest) <= snapshotDigestMax {
 		return digest
 	}
-	// Halve until the line fits, then keep what fits. Two passes in practice,
-	// and bounded by the loop rather than by an assumption about escaping.
-	keep := snapshotLineMax / 2
-	for keep > 0 {
-		clipped := digest[:runeBoundaryAt(digest, keep)] + fmt.Sprintf(marker, len(digest))
-		if b, err := json.Marshal(clipped); err == nil && len(b)+snapshotEnvelope < snapshotLineMax {
-			return clipped
-		}
-		keep /= 2
-	}
-	return fmt.Sprintf("(clipped: the whole digest was %d bytes)", len(digest))
+	head := digest[:runeBoundaryAt(digest, snapshotDigestMax)]
+	return head + fmt.Sprintf("\n… (clipped: the whole digest was %d bytes)", len(digest))
 }
 
 // runeBoundaryAt is n backed up to where a rune starts, so a cut lands between
@@ -182,19 +183,11 @@ func clipDigest(digest string) string {
 // writes U+FFFD for it — but it is a mojibake tail on the last line of a digest
 // someone reads.
 func runeBoundaryAt(s string, n int) int {
-	if n >= len(s) {
-		return len(s)
-	}
 	for n > 0 && !utf8.RuneStart(s[n]) {
 		n--
 	}
 	return n
 }
-
-// snapshotEnvelope is room for the rest of the record around the digest — the
-// stamp, kind, terms, policy and the session it went into. Generous on purpose:
-// being under the reader's ceiling is what matters, not being near it.
-const snapshotEnvelope = 64 << 10
 
 func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
 	if digest == "" {
