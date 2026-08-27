@@ -205,12 +205,39 @@ func MatchesParts(text string, terms, phrases []string, variants map[string][]st
 	return len(terms) > 0 || len(phrases) > 0
 }
 
-// Tokens lowercases and dedupes whitespace-separated query tokens.
+// Tokens lowercases and dedupes the words of a query.
+//
+// A word is broken by whitespace or by punctuation and symbols outside ASCII,
+// and then trimmed of the ASCII punctuation this has always trimmed. The middle
+// step is the fix: a query pasted from a chat client or a word processor
+// carries typographic punctuation, and it used to stay glued to the word —
+// `“retry”`, `—retry—` and `budget…` could not match the plain word the index
+// holds, so two of them were rescued by the close-spellings fallback, which
+// tells the reader they misspelled something, and `—retry—` missed outright
+// (#2117).
+//
+// ASCII keeps trimming rather than splitting, and this is deliberately not the
+// index's own rule (letters, digits, `_`, `-`). Two things depend on it: a
+// regex query is words to this function and a pattern to the matcher, so
+// splitting `dad|gift` changes which passage an excerpt centres on
+// (TestRegexSnippetsStillRankByMatchCount), and an apostrophe inside a word is
+// left where the reader typed it.
+//
+// The length cut stays on bytes: "л" and "舵" are one rune and two or three
+// bytes, and a rule that calls them too short to look up is wrong for half the
+// world's alphabets (#828).
 func Tokens(s string) []string {
+	const asciiTrim = "\t\n\r .,;:!?()[]{}<>\"'`"
+	broken := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		if r < 0x80 {
+			return unicode.IsSpace(r)
+		}
+		return unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsSymbol(r)
+	})
 	seen := map[string]bool{}
 	var out []string
-	for _, tok := range strings.Fields(strings.ToLower(s)) {
-		tok = strings.Trim(tok, "\t\n\r .,;:!?()[]{}<>\"'`")
+	for _, tok := range broken {
+		tok = strings.Trim(tok, asciiTrim)
 		if len(tok) < 2 || seen[tok] {
 			continue
 		}
