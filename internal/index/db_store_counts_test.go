@@ -136,7 +136,9 @@ func TestAGooseSessionThatContinuesIsNotCountedTwice(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return m.IngestHealth["goose-db"].ClippedMessages
+		// By the store, which is the key doctor files these under since #2234
+		// — "goose-db" is the file kind.
+		return m.IngestHealth["goose"].ClippedMessages
 	}
 	if got := clipped(); got != 1 {
 		t.Fatalf("the build clipped %d messages, so this measures nothing", got)
