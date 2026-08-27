@@ -27,7 +27,7 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	// SessionStart carries the project digest; PreToolUse (hook-tool) carries
 	// the prior decision for the file or command about to change. Codex uses the
@@ -302,7 +302,7 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	hooks, _ := root["hooks"].(map[string]any)
 	if hooks == nil {
