@@ -349,6 +349,14 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if commandFailed(ms[j].Text) || outputFailed(ms, j) {
 				continue
 			}
+			// Reading something is not fixing it. The rule that keeps a pair —
+			// the command names what the error named — is satisfied by
+			// construction when the command greps for the symbol the compiler
+			// complained about, so the table filled with the step an agent
+			// takes between hitting an error and solving it.
+			if investigationCommand(cmd) {
+				continue
+			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
 			break
 		}
