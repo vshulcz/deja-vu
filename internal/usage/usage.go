@@ -586,7 +586,7 @@ func Impact(indexDir string) ImpactReport {
 			for _, id := range e.SessionIDs {
 				worn[id]++
 			}
-		case e.Kind == KindHook:
+		case injectedKind(e.Kind):
 			// A session start with no project session to show still injects
 			// the environment block, and that event is logged empty. Counting
 			// it made "N session starts began with project memory" claim
@@ -600,13 +600,26 @@ func Impact(indexDir string) ImpactReport {
 			// measured on three recalls and ten blocks, a tenfold saving reads
 			// as fourfold, understating what deja did. Both stay out.
 			if e.Empty {
+				if e.Kind == KindDejaVu {
+					r.DejaVuMoments++
+				}
 				continue
 			}
-			r.Injections++
+			// Every door that carried a digest, not the session-start one
+			// alone: the per-prompt recall and the tool-time line are distilled
+			// from real transcripts too, and dropping them computed the ratio
+			// this report exists for from half the events — the drift #1907
+			// fixed for blame, running the other way (#2204).
+			if e.Kind == KindDejaVu {
+				r.DejaVuMoments++
+			}
+			// `injections` keeps the meaning the report documents: session
+			// starts that began with project memory.
+			if e.Kind == KindHook {
+				r.Injections++
+			}
 			r.ServedBytes += e.Bytes
 			r.RawBytes += e.RawBytes
-		case e.Kind == KindDejaVu:
-			r.DejaVuMoments++
 		}
 	}
 	for _, n := range worn {

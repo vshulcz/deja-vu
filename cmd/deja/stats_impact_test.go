@@ -16,6 +16,8 @@ func TestStatsImpactCountsAndArithmetic(t *testing.T) {
 	usage.RecordServedSessions(dir, usage.KindRecall, 500, 1, false, 25000, []string{"s1"})
 	usage.RecordResultRaw(dir, usage.KindRecall, 0, 0, true, 0) // empty result must not count
 	usage.RecordResultRaw(dir, usage.KindHook, 2000, 3, false, 100000)
+	// A per-prompt injection carries a digest like the rest, so its bytes are
+	// in the ratio (#2204).
 	usage.RecordResult(dir, usage.KindDejaVu, 100, 1, false)
 
 	var out bytes.Buffer
@@ -29,7 +31,7 @@ func TestStatsImpactCountsAndArithmetic(t *testing.T) {
 		"1 session start began with project memory",
 		"1 session recalled 2+ times",
 		"1 prompt matched work",
-		"50× less",
+		"49× less",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("impact output missing %q:\n%s", want, got)
@@ -44,7 +46,7 @@ func TestStatsImpactCountsAndArithmetic(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &r); err != nil {
 		t.Fatal(err)
 	}
-	if r.Recalls != 2 || r.Injections != 1 || r.ReusedTwice != 1 || r.DejaVuMoments != 1 || r.ServedBytes != 3500 || r.RawBytes != 175000 {
+	if r.Recalls != 2 || r.Injections != 1 || r.ReusedTwice != 1 || r.DejaVuMoments != 1 || r.ServedBytes != 3600 || r.RawBytes != 175000 {
 		t.Fatalf("json report wrong: %+v", r)
 	}
 }
