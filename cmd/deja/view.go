@@ -18,6 +18,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -122,6 +123,20 @@ func redactMask(s string) string {
 	return out
 }
 
+// safeLineForPage is redactMask plus the scrub every printed row gets: a page
+// is read by a person too, and a bidi override reverses a line in a browser as
+// surely as in a terminal (#2090). For the one-line fields — a project, a
+// title — where a line break would be a second row rather than a paragraph.
+func safeLineForPage(s string) string { return search.SafeLine(redactMask(s)) }
+
+// safeNameForPage is for the fields a person copies rather than reads — a
+// project is what `--project` is given back — so the spaces inside it are part
+// of it, the way they are in a path (#2044).
+func safeNameForPage(s string) string { return search.SafePath(redactMask(s)) }
+
+// safeTextForPage is the same for a body, where the newlines are meant.
+func safeTextForPage(s string) string { return search.SafeText(redactMask(s)) }
+
 func writeViewHTML(dir, out string) (string, int, error) {
 	abs, err := filepath.Abs(out)
 	if err != nil {
@@ -185,24 +200,27 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	// someone opens and passes on, and the index it is built from may have been
 	// written by an older deja or before a pattern was fixed.
 	for i := range sessions {
-		sessions[i].Title = redactMask(sessions[i].Title)
-		sessions[i].Preview = redactMask(sessions[i].Preview)
-		sessions[i].Project = redactMask(sessions[i].Project)
+		// The id too: it is a filename stem for most harnesses, and a
+		// filename takes a control byte on every Unix filesystem.
+		sessions[i].ID = safeNameForPage(sessions[i].ID)
+		sessions[i].Title = safeLineForPage(sessions[i].Title)
+		sessions[i].Preview = safeTextForPage(sessions[i].Preview)
+		sessions[i].Project = safeNameForPage(sessions[i].Project)
 	}
 	for i := range recalls {
-		recalls[i].Digest = redactMask(recalls[i].Digest)
+		recalls[i].Digest = safeTextForPage(recalls[i].Digest)
 		for j := range recalls[i].Terms {
-			recalls[i].Terms[j] = redactMask(recalls[i].Terms[j])
+			recalls[i].Terms[j] = safeLineForPage(recalls[i].Terms[j])
 		}
 	}
 	for i := range notes {
-		notes[i].Title = redactMask(notes[i].Title)
-		notes[i].Text = redactMask(notes[i].Text)
+		notes[i].Title = safeLineForPage(notes[i].Title)
+		notes[i].Text = safeTextForPage(notes[i].Text)
 		// A note's project and tags are what the user typed, so they are text
 		// like the rest rather than structure deja minted.
-		notes[i].Project = redactMask(notes[i].Project)
+		notes[i].Project = safeNameForPage(notes[i].Project)
 		for j := range notes[i].Tags {
-			notes[i].Tags[j] = redactMask(notes[i].Tags[j])
+			notes[i].Tags[j] = safeNameForPage(notes[i].Tags[j])
 		}
 	}
 	sj, err := json.Marshal(sessions)
