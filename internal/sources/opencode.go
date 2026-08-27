@@ -104,7 +104,11 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`then json_extract(p.data,'$.state.output') end as out,` +
 		`json_extract(p.data,'$.state.metadata.exit') as exit,` +
 		`json_extract(p.data,'$.time.start') as pt,` +
-		`json_extract(m.data,'$.time.created') as mt ` +
+		`json_extract(m.data,'$.time.created') as mt,` +
+		// The row's own column, which is what the since clause filters on. A
+		// store that fills it and leaves the blob's time out handed back
+		// messages dated to the year zero (#2086).
+		`m.time_created as mc ` +
 		`from session s join message m on m.session_id=s.id join part p on p.message_id=m.id ` +
 		// The type test is written twice on purpose. json_extract on its own
 		// parses every blob in the table — parts average ~12 KB and are mostly
@@ -225,9 +229,20 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 			continue
 		}
 		txt = capParsedMessage(txt)
+		// Whatever carries the stamp: the part's, then the message blob's, then
+		// the message row's column — and failing all three the conversation's
+		// own start, which is the fallback cursor takes for a bubble without a
+		// stamp. The year zero is not a time anyone asked deja to record, and
+		// it reaches `show --json` as it is.
 		t := parseTimeAny(r["pt"])
 		if t.IsZero() {
 			t = parseTimeAny(r["mt"])
+		}
+		if t.IsZero() {
+			t = parseTimeAny(r["mc"])
+		}
+		if t.IsZero() {
+			t = s.Started
 		}
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
