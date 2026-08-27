@@ -34,6 +34,10 @@ const (
 	// settle it: measured over this machine's transcripts, 104 of the 831 pairs
 	// the miner kept were contradicted that way, and each one is a wrong answer
 	// handed to an agent at the moment it is stuck.
+	// fixOutputWindow is how far past a command its own output can sit. One
+	// record in the ordinary case; two leaves room for a harness that writes
+	// something between them.
+	fixOutputWindow = 2
 	// fixCommandMax bounds what is stored per pair; a command longer than this
 	// is a heredoc or a pasted script, not something to hand back.
 	fixCommandMax = 200
@@ -251,6 +255,64 @@ func lastFrictionIndex(ms []model.Message) map[uint64]int {
 	return last
 }
 
+// genericFailure are the shapes isFriction turns away. It turns them away for
+// identity — `Error: ` names nothing a second session can be matched on — and
+// that is a different question from whether the command failed, which is all
+// this asks.
+var genericFailure = []string{
+	"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL", "panic: ",
+}
+
+// outputReadsAsFailure reports whether what a command printed is a failure:
+// either a friction line, which is specific enough to be one, or one of the
+// shapes friction declines to name.
+func outputReadsAsFailure(text string) bool {
+	if _, _, ok := firstFrictionLine(text); ok {
+		return true
+	}
+	for _, raw := range strings.Split(text, "\n") {
+		l := strings.TrimSpace(raw)
+		for _, g := range genericFailure {
+			if strings.HasPrefix(l, g) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// commandFailed reads the exit status the record carries, for the harnesses
+// that store one (codex and opencode append it; Claude does not).
+func commandFailed(text string) bool {
+	i := strings.LastIndex(text, "→ exit ")
+	if i < 0 {
+		return false
+	}
+	code := strings.TrimSpace(text[i+len("→ exit "):])
+	if j := strings.IndexAny(code, " \n"); j >= 0 {
+		code = code[:j]
+	}
+	n, err := strconv.Atoi(code)
+	return err == nil && n != 0
+}
+
+// outputFailed reports whether what came back from the command is itself an
+// error. The same friction rules the error side uses, so a command that
+// printed a fresh failure is read as one wherever the exit status is not
+// recorded.
+func outputFailed(ms []model.Message, cmd int) bool {
+	for k := cmd + 1; k < len(ms) && k <= cmd+fixOutputWindow; k++ {
+		if ms[k].Role == roleCommand {
+			return false
+		}
+		if ms[k].Role != roleToolOutput {
+			continue
+		}
+		return outputReadsAsFailure(ms[k].Text)
+	}
+	return false
+}
+
 // fixPairsIn mines one session.
 func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 	var out []FixPair
@@ -276,6 +338,16 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			}
 			if lastSeen[sig] > j {
 				break
+			}
+			// A command that failed is not a remedy for anything, and handing
+			// one to an agent at the moment it is stuck is the worst place to
+			// be wrong. Two ways to know: the record says so, where the
+			// harness stored the exit status, and the output right after it
+			// carries an error of its own. Keep scanning the window — a
+			// session that tried something and failed usually tries again,
+			// and the retry is the pair worth having.
+			if commandFailed(ms[j].Text) || outputFailed(ms, j) {
+				continue
 			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
 			break
