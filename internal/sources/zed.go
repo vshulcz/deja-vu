@@ -189,7 +189,7 @@ func zedSinceWhere(t time.Time) string {
 		return ""
 	}
 	const norm = `strftime('%Y-%m-%dT%H:%M:%f',updated_at)`
-	w := sqlEscape(t.UTC().Format("2006-01-02T15:04:05.000"))
+	w := sqlEscape(millisecondBackoff(t))
 	return " where " + norm + " is null or " + norm + " > '" + w + "'"
 }
 

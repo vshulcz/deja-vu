@@ -80,10 +80,13 @@ func TestGrokSinceHandlesEveryStampShapeItReads(t *testing.T) {
 			if n := count("2026-07-27T16:00:00Z"); n != 0 {
 				t.Errorf("a watermark after both returned %d messages, want none", n)
 			}
-			// The boundary: a message stamped at the watermark is already in
-			// the index, and one a fraction of a second later is not.
-			if n := count("2026-07-27T15:29:47Z"); n != 0 {
-				t.Errorf("a watermark exactly at the later message returned %d, want none", n)
+			// The boundary: a message stamped at the watermark comes back
+			// once more rather than being skipped. The clause compares
+			// through strftime's %f, which is milliseconds, so the watermark
+			// is backed off by one — offering a message twice is the side of
+			// that error worth being on (#2155).
+			if n := count("2026-07-27T15:29:47Z"); n < 1 {
+				t.Errorf("a watermark exactly at the later message returned %d, want it offered once more", n)
 			}
 		})
 	}
