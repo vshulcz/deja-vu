@@ -258,7 +258,9 @@ func ParseRooTask(path string) ([]model.Session, error) {
 		Content json.RawMessage `json:"content"`
 	}
 	if err := json.Unmarshal(b, &turns); err != nil {
-		diagMalformedLine(path)
+		// One document per task, as in cline: a file that will not parse is a
+		// path deja could not read, not a line (#2232).
+		diagFileError(path, err)
 		return nil, nil
 	}
 	taskDir := filepath.Dir(path)

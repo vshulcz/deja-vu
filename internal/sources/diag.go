@@ -39,6 +39,20 @@ func DiagMalformedCounts() map[string]int {
 	return out
 }
 
+// DiagFailedPaths returns the paths that could not be read so far, without
+// clearing them — the sibling of DiagMalformedCounts, and for the same reason:
+// the index narrates each store as it lands, before the manifest fold drains
+// these counters (#1993).
+func DiagFailedPaths() map[string]string {
+	diagMu.Lock()
+	defer diagMu.Unlock()
+	out := make(map[string]string, len(diagFailed))
+	for p, msg := range diagFailed {
+		out[p] = msg
+	}
+	return out
+}
+
 // DiagSnapshot returns and clears the counters accumulated since the last
 // snapshot: malformed JSONL lines per file, and files whose parse failed
 // outright with the error text.

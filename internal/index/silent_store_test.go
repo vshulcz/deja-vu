@@ -58,11 +58,13 @@ func TestAStoreThatYieldedNothingButRefusedLinesIsNarrated(t *testing.T) {
 	}
 	said := out.String()
 
-	// The premise: deja did notice, and filed it where doctor reads.
+	// The premise: deja did notice, and filed it where doctor reads. Either
+	// bucket counts — a task that will not parse is a path deja could not read
+	// (#2232), a line inside a JSONL transcript is a line.
 	health := IngestHealth(dir)
 	var counted int
 	for _, e := range health {
-		counted += e.MalformedLines
+		counted += e.MalformedLines + e.FailedFiles
 	}
 	if counted == 0 {
 		t.Fatalf("nothing was recorded as unreadable, so this measures nothing:\n%s\n%v", said, health)
