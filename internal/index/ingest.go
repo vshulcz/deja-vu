@@ -2114,7 +2114,18 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 	for key, count := range old.RedactionRules {
 		parts := strings.SplitN(key, ":", 2)
-		if len(parts) == 2 && !skipHarness[parts[0]] {
+		if len(parts) != 2 {
+			continue
+		}
+		// Folded before the lookup: an index written before #2238 files these
+		// by file kind, and a pass since then drops by store — so a stale
+		// "cline-sdk" count survived its file being re-read and was added to
+		// the fresh "cline" one when the report folded them (#2240).
+		name := parts[0]
+		if store := sources.HarnessForKind(name); store != "" {
+			name = store
+		}
+		if !skipHarness[name] {
 			m.RedactionRules[key] = count
 		}
 	}

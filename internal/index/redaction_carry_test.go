@@ -80,3 +80,57 @@ func TestAReReadFileDoesNotCountItsRedactionsTwice(t *testing.T) {
 		t.Errorf("a pass with nothing new to read moved the count to %d", got)
 	}
 }
+
+// And the same file, in an index whose rules were written before the fold: the
+// stale kind key has to go when its file is re-read, or the report folds it
+// into the fresh count and reports both (#2240).
+func TestAStaleKindKeyIsDroppedWhenItsFileIsReRead(t *testing.T) {
+	tmp := t.TempDir()
+	setHome(t, tmp)
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+	cline := filepath.Join(tmp, "cline")
+	if err := os.MkdirAll(cline, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLINE_ROOT", cline)
+
+	secret := "ghp_" + strings.Repeat("a", 36)
+	stamp := time.Now().Add(-time.Hour).UnixMilli()
+	path := filepath.Join(cline, "one.messages.json")
+	turn := func(i int) string {
+		return fmt.Sprintf(`{"ts":%d,"role":"user","content":"the token is %s"}`, stamp+int64(i), secret)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := os.WriteFile(path, []byte(`{"agent":"lead","messages":[`+turn(0)+`]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// The manifest as a deja from before the fold left it.
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.RedactionRules = map[string]int{"cline-sdk:github-token": 1}
+	if err := writeManifest(dir, m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(path, []byte(`{"agent":"lead","messages":[`+turn(0)+`,`+turn(1)+`]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	stats, err := Redactions(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stats.Rules["cline"]["github-token"]; got != 2 {
+		t.Errorf("two secrets in the file, the report says %d", got)
+	}
+}
