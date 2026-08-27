@@ -455,10 +455,12 @@ one.
 `recalls` counts agent-initiated recalls that returned matches, `injections`
 session starts that began with project memory. `served_bytes` is what the
 digests actually returned and `raw_bytes` the source transcripts they were
-distilled from, so the ratio is how much reading deja saved. The two go
-together: a session start that carried only the environment block is in neither,
-because that block is a summary of what the machine keeps hitting rather than a
-digest of transcripts. `deja stats` counts its bytes, which is the number for
+distilled from, so the ratio is how much reading deja saved. Both cover every
+door that carried a digest — the session start, the per-prompt recall, the
+tool-time line — while `injections` stays the count of session starts. What is
+in neither is a session start that carried only the environment block, because
+that block is a summary of what the machine keeps hitting rather than a digest
+of transcripts. `deja stats` counts its bytes, which is the number for
 everything deja handed over. `reused_twice` is
 sessions agents recalled two or more times, `dejavu_moments` prompts matched to
 prior work, and `credited_aloud` the recalls an agent said out loud.

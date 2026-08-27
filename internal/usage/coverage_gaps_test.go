@@ -39,10 +39,13 @@ func TestImpactCountsEachKindOnce(t *testing.T) {
 	if got.DejaVuMoments != 1 {
 		t.Fatalf("déjà vu moments = %d", got.DejaVuMoments)
 	}
-	if got.ServedBytes != 200 {
-		t.Fatalf("served bytes = %d, want 100+50+30+20", got.ServedBytes)
+	// Every door that carried a digest, the per-prompt one included: it is
+	// distilled from transcripts like the rest, and leaving it out computed the
+	// ratio from a subset of what deja served (#2204).
+	if got.ServedBytes != 210 {
+		t.Fatalf("served bytes = %d, want 100+50+30+20+10", got.ServedBytes)
 	}
-	if got.RawBytes != 20_000 {
+	if got.RawBytes != 21_000 {
 		t.Fatalf("raw bytes = %d", got.RawBytes)
 	}
 }
