@@ -2102,7 +2102,11 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 		if !skipped {
 			continue
 		}
-		h := harnessForPath(path)
+		// The store, matching the key the rules are filed under since #2238:
+		// asking for the file kind here left "cline-sdk" against a "cline" key,
+		// so nothing matched and every incremental pass carried the old counts
+		// on top of the fresh ones (#2240).
+		h := sources.HarnessForKind(harnessForPath(path))
 		if h == "" && path == sources.OpencodeDB() {
 			h = "opencode"
 		}
