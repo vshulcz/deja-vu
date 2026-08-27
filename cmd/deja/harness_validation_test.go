@@ -11,16 +11,24 @@ import (
 // sessions — both said "matched nothing under harness X" — so `--harness
 // cluade` read as "you have no claude history" (#1113).
 func TestCheckHarnessRejectsOnlyUnknownNames(t *testing.T) {
-	if err := checkHarness(""); err != nil {
+	empty := ""
+	if err := checkHarness(&empty); err != nil {
 		t.Errorf("an empty harness is the no-filter case, not an error: %v", err)
 	}
 	// Every registry name must pass, installed or not.
 	for _, name := range sources.HarnessNames() {
-		if err := checkHarness(name); err != nil {
+		if err := checkHarness(&name); err != nil {
 			t.Errorf("known harness %q rejected: %v", name, err)
 		}
 	}
-	err := checkHarness("cluade")
+	// The name the index run prints for the notes store, which the check now
+	// rewrites to the one it is stored under (#2191).
+	printed := "notes"
+	if err := checkHarness(&printed); err != nil || printed != "deja" {
+		t.Errorf("notes was not accepted as the printed name for deja: %v, left as %q", err, printed)
+	}
+	typo := "cluade"
+	err := checkHarness(&typo)
 	if err == nil {
 		t.Fatal("a misspelled harness was accepted")
 	}
