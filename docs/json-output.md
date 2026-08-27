@@ -164,6 +164,11 @@ when empty:
 `messages` is likewise absent rather than empty on `last`, which never returns
 turns.
 
+Inside a message, `time` is the turn's own stamp and is absent when the
+transcript did not carry one — the zero time reads as a date in the year one
+rather than as the absence of a date, and every surface deja prints shows `-`
+for it instead.
+
 ## `deja last --json`
 
 Recent session metadata uses a versioned envelope and never includes messages:
