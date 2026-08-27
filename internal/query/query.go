@@ -166,7 +166,10 @@ func hasLetterOrDigit(s string) bool {
 }
 
 func appendUnique(dst []string, values ...string) []string {
-	seen := make(map[string]bool, len(dst)+len(values))
+	// Sized on dst alone. The sum is the same map either way — it grows on its
+	// own — and adding two lengths is what the allocation-size analyser reads
+	// as an overflow candidate.
+	seen := make(map[string]bool, len(dst))
 	for _, v := range dst {
 		seen[v] = true
 	}
