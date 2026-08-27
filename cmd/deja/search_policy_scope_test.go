@@ -37,7 +37,7 @@ func TestNoMatchesCountsWhatSearchMayRead(t *testing.T) {
 
 	// Without a rule the miss is a wording problem and reads like one.
 	var out bytes.Buffer
-	printNoMatches(&out, dir, "ticker window")
+	printNoMatches(&out, dir, "ticker window", false)
 	if !strings.Contains(out.String(), "no matches in 1 indexed session") {
 		t.Errorf("an ordinary miss lost its count:\n%s", out.String())
 	}
@@ -49,7 +49,7 @@ func TestNoMatchesCountsWhatSearchMayRead(t *testing.T) {
 	t.Setenv("DEJA_POLICY_FILE", policyFile)
 
 	out.Reset()
-	printNoMatches(&out, dir, "ticker window")
+	printNoMatches(&out, dir, "ticker window", false)
 	got := out.String()
 	if strings.Contains(got, "try fewer words") {
 		t.Errorf("the reader was sent after their wording:\n%s", got)

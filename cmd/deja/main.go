@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -1104,7 +1105,7 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 			fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 		default:
-			printNoMatches(os.Stderr, dir, o.Query)
+			printNoMatches(os.Stderr, dir, o.Query, o.Regex)
 		}
 	}
 	if o.Capped && len(hits) > 0 {
@@ -1281,7 +1282,7 @@ func termCountLine(dir, q string) string {
 // index holds zero sessions concludes the tool is broken rather than that
 // their query missed. It fired on every ordinary miss, so the signature could
 // not be used to recognise the failure it was written for (#637).
-func printNoMatches(w io.Writer, dir, q string) {
+func printNoMatches(w io.Writer, dir, q string, regex bool) {
 	// An empty store is not a query problem: "fewer words" cannot help when
 	// nothing is indexed, and `last`, `blame` and the brief all say what to do
 	// instead. Search is the command a new machine reaches for first (#832).
@@ -1304,7 +1305,17 @@ func printNoMatches(w io.Writer, dir, q string) {
 	// state the rule — the cut is on bytes, so "л" and "舵" are long enough
 	// while "p" is not, and a rule that reads false to half the world's
 	// alphabets is worse than none.
-	if len(query.Tokens(q)) == 0 {
+	// Both sentences below are about the word index, and --re does not use it:
+	// a regex is matched against the text itself, so an emoji it did not find
+	// is a miss like any other rather than something deja cannot look up.
+	if !regex && len(query.Tokens(q)) == 0 {
+		// Length is the wrong reason for a query that holds no word at all: an
+		// emoji is four bytes, and it was dropped for being a symbol. Sending
+		// that reader after a longer word sends them after nothing (#2133).
+		if !hasIndexableRune(q) {
+			fmt.Fprintf(w, "deja: nothing to search for in %q — deja indexes words, and emoji, symbols and punctuation are not words\n", q)
+			return
+		}
 		fmt.Fprintf(w, "deja: nothing to search for in %q — every word in it is too short to look up\n", q)
 		return
 	}
@@ -1480,6 +1491,18 @@ func hyphenatedCommandHint(q, low string) string {
 // is a sentence, and the hint is about the first kind (#2115).
 func looksLikeAnInvocation(q string) bool {
 	return len(strings.Fields(q)) <= 3
+}
+
+// hasIndexableRune says whether a query holds anything the index could have
+// kept. Letters and digits are what the tokenizer keeps; everything else is a
+// separator, which is why an emoji-only query reaches the index as nothing.
+func hasIndexableRune(q string) bool {
+	for _, r := range q {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // sinceRawArg recovers the text the reader typed after --since. parseSearch

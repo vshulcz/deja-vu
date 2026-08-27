@@ -24,7 +24,7 @@ func TestQueryWithNothingToLookUpSaysSo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, q := range []string{"p", "a b c", "..."} {
+	for _, q := range []string{"p", "a b c"} {
 		out, err := captureRunStderr(t, q)
 		if err != nil {
 			t.Fatal(err)
@@ -37,9 +37,20 @@ func TestQueryWithNothingToLookUpSaysSo(t *testing.T) {
 		}
 	}
 
+	// Punctuation has no word in it at all, so length is not what stopped it:
+	// that query gets the sentence about words rather than the one about
+	// length (#2133).
+	out, err := captureRunStderr(t, "...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "nothing to search for") || strings.Contains(out, "too short to look up") {
+		t.Errorf("\"...\" is not too short, it holds no word:\n%s", out)
+	}
+
 	// A word the store simply does not have keeps the ordinary answer: there
 	// is something to look up, it just is not there.
-	out, err := captureRunStderr(t, "zzzqqq")
+	out, err = captureRunStderr(t, "zzzqqq")
 	if err != nil {
 		t.Fatal(err)
 	}
