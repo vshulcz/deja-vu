@@ -116,6 +116,11 @@ func trimTimestamp(l string) string {
 	return l
 }
 
+// dejaFixReport matches the header line `deja fix` prints: the error, then the
+// date of the session it came from. Nothing else writes that separator with a
+// bare date behind it.
+var dejaFixReport = regexp.MustCompile(` · \d{4}-\d{2}-\d{2}$`)
+
 var leadingTimestamp = regexp.MustCompile(`^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\]?\s+`)
 
 // isFriction keeps the error shapes that name something specific. The generic
@@ -164,6 +169,15 @@ func isFriction(l string) bool {
 		if _, err := strconv.Atoi(strings.TrimSpace(l[:i])); err == nil {
 			return false
 		}
+	}
+	// `deja fix` prints the error it answers with the date beside it, and the
+	// command underneath. Both come back as tool output in the next session:
+	// the first is read as a fresh sighting of the error it is quoting, so
+	// asking deja about an error taught deja that the error happened again,
+	// and the command it printed became a candidate remedy for it. Found on a
+	// real store as the pair `command not found: python · 2026-05-18`.
+	if dejaFixReport.MatchString(l) || strings.HasPrefix(l, "ran next: ") {
+		return false
 	}
 	// The list was nine phrases about things not being found or permitted, and
 	// it matched 3 of 12 ordinary errors on measurement — missing runtime
