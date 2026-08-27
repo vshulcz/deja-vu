@@ -1,6 +1,7 @@
 package index
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -2316,8 +2317,18 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 		// that truncates and regrows past the old length looks exactly like
 		// an append, and appending onto it leaves the rewritten prefix in the
 		// index with its old text. Compare the prefix before trusting it.
-		if of.PrefixHash != 0 && filePrefixHash(p, of.SafeSize) != of.PrefixHash {
-			return false
+		switch {
+		case of.PrefixSample != 0:
+			if filePrefixSample(p, of.SafeSize) != of.PrefixSample {
+				return false
+			}
+		case of.PrefixHash != 0:
+			// A manifest from before the sample existed. Verified the old way
+			// this once; the walk above has already recorded a sample, so the
+			// next call is bounded.
+			if filePrefixHash(p, of.SafeSize) != of.PrefixHash {
+				return false
+			}
 		}
 		switch harnessForPath(p) {
 		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot", "grok":
@@ -2743,9 +2754,10 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 				// this is the difference between a stat and 650 ms of reading.
 				if of, ok := old[p]; ok && of.Size == fs.Size && of.MTime == fs.MTime {
 					fs.SafeSize, fs.PrefixHash = of.SafeSize, of.PrefixHash
+					fs.PrefixSample = of.PrefixSample
 				} else {
 					fs.SafeSize = lastCompleteLineOffset(p, fi.Size())
-					fs.PrefixHash = filePrefixHash(p, fs.SafeSize)
+					fs.PrefixSample = filePrefixSample(p, fs.SafeSize)
 				}
 			}
 			if harnessForPath(p) == "grok" {
@@ -2899,9 +2911,51 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 	wg.Wait()
 }
 
+// prefixSampleWindow is how much is read at each end. Large enough that a
+// rewrite cannot plausibly reproduce it byte for byte, small enough that the
+// cost does not depend on how long the session has been running.
+const prefixSampleWindow = 512 << 10
+
+// filePrefixSample fingerprints the first n bytes by reading at most two
+// windows of them: the head and the bytes ending at n. n is mixed in, so a
+// file that grew and one that was rewritten to the same content at a
+// different length do not collide.
+func filePrefixSample(path string, n int64) uint64 {
+	if n <= 0 {
+		return 0
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = f.Close() }()
+	h := fnv.New64a()
+	var b [8]byte
+	binary.LittleEndian.PutUint64(b[:], uint64(n))
+	_, _ = h.Write(b[:])
+	head := min(n, prefixSampleWindow)
+	if _, err := io.Copy(h, io.LimitReader(f, head)); err != nil {
+		return 0
+	}
+	if n > head {
+		start := max(head, n-prefixSampleWindow)
+		if _, err := f.Seek(start, io.SeekStart); err != nil {
+			return 0
+		}
+		if _, err := io.Copy(h, io.LimitReader(f, n-start)); err != nil {
+			return 0
+		}
+	}
+	return h.Sum64()
+}
+
 // filePrefixHash fingerprints the first n bytes of a file. Only used to decide
 // whether an append is safe, so a fast non-cryptographic hash is the right
 // tool: a collision costs one unnecessary full reparse, never a wrong index.
+//
+// Kept for manifests written before filePrefixSample: those store a hash of
+// every byte, and it takes one more read to verify them before the walk
+// records a sample instead.
 func filePrefixHash(path string, n int64) uint64 {
 	if n <= 0 {
 		return 0
