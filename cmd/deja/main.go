@@ -892,7 +892,36 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		}
 		fmt.Println()
 	}
+	// The listing is ordered by a date, so one that has not happened leads it
+	// and nothing else on the screen says why. The first screen carries the
+	// same sentence beside the same list, because leaving it unexplained makes
+	// the counters and the list disagree for no visible reason (#696, #2104).
+	if n := stampedAheadCount(ss, time.Now()); n > 0 {
+		fmt.Fprintf(os.Stderr, "deja: %d session%s stamped later than this machine's clock — %s at the top of this list\n",
+			n, pluralS(n), pluralThatThose(n))
+	}
 	return nil
+}
+
+// stampedAheadCount counts the listed sessions whose stamp is after now, by the
+// same rule the first screen counts them with.
+func stampedAheadCount(ss []model.Session, now time.Time) int {
+	n := 0
+	for _, s := range ss {
+		if index.StampedAhead(s.Updated, now) {
+			n++
+		}
+	}
+	return n
+}
+
+// pluralThatThose keeps the sentence above readable for one session and for
+// several, the way pluralThem does for the ingest lines.
+func pluralThatThose(n int) string {
+	if n == 1 {
+		return "that one is"
+	}
+	return "those are"
 }
 
 // cmdSearch is the explicit form. Bare `deja <words>` also searches, but a
