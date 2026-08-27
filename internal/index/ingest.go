@@ -681,8 +681,19 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 			// index run that narrates every store it read and stays silent
 			// about the one it skipped makes an empty deja look like an empty
 			// history (#794).
-			if reason := sources.SkipReason(r.name); reason != "" && progress != nil && !SuppressHarnessNarration {
-				fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
+			//
+			// Two ways to yield nothing, and the second had no line at all: a
+			// store deja could not open has a skip reason, and one whose files
+			// it read and refused has a count instead — computed just above and
+			// then dropped, in the case where nothing else on screen mentions
+			// the store (#2229).
+			if progress != nil && !SuppressHarnessNarration {
+				switch reason := sources.SkipReason(r.name); {
+				case reason != "":
+					fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
+				case unreadable[r.name] > 0:
+					fmt.Fprintln(progress, nothingReadableNarration(r.name, unreadable[r.name]))
+				}
 			}
 			continue
 		}
@@ -719,6 +730,18 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 	return line
 }
 
+// nothingReadableNarration is the line for a store that yielded no session
+// because deja could not read what it found. "0 sessions, 0 messages" is the
+// ordinary line's shape and says the wrong thing here — there were sessions,
+// and none of them survived the read (#2229).
+func nothingReadableNarration(name string, unreadable int) string {
+	label := name
+	if label == "deja" {
+		label = "notes"
+	}
+	return fmt.Sprintf("deja: %s: nothing indexed — %d line%s could not be read", label, unreadable, pluralS(unreadable))
+}
+
 // totalMalformed is malformedByHarness summed: the incremental line names the
 // pass, not a store.
 func totalMalformed() int {
@@ -735,7 +758,10 @@ func totalMalformed() int {
 func malformedByHarness() map[string]int {
 	out := map[string]int{}
 	for p, n := range sources.DiagMalformedCounts() {
-		if h := harnessForPath(p); h != "" {
+		// By the store's own name, not the file kind's: harnessForPath answers
+		// "cline-sdk" where the run narrates "cline", so the count never
+		// reached the line that would have said it (#2229).
+		if h := sources.HarnessForKind(harnessForPath(p)); h != "" {
 			out[h] += n
 		}
 	}
