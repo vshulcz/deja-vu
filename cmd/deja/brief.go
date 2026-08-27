@@ -48,7 +48,10 @@ func briefWithholdingRule(withheld map[string]int, total int) string {
 
 // runBrief is what a bare `deja` on a terminal shows: the memory, alive.
 // Manifest metadata and the usage sidecar only — it must feel instant.
-// Pipes and scripts still get the usage text; `deja help` always works.
+//
+// A bare `deja` into a pipe or a script still gets the usage text, which is the
+// right answer when nobody asked for a screen. `deja brief` asks for it, and
+// then it goes wherever the writer goes (#2108); `deja help` always works.
 func runBrief(dir string, w io.Writer) error {
 	justGreeted := false
 	ov, err := index.Overview(dir)
@@ -73,7 +76,10 @@ func runBrief(dir string, w io.Writer) error {
 			return nil
 		}
 	}
-	color := statColorOK(os.Stdout)
+	// The writer, not os.Stdout: this screen has a name now, so it can be
+	// written somewhere that is not the terminal, and the escapes belong to
+	// wherever it is going (#2108).
+	color := statColorOK(w)
 	bold, dim, reset := "", "", ""
 	if color {
 		bold, dim, reset = logoBold, logoDim, logoReset

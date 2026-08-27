@@ -160,6 +160,10 @@ var commands = map[string]command{
 	"check": func(dir string, rest []string) error {
 		return runCheck(dir, rest, os.Stdin, os.Stdout)
 	},
+	// The screen `deja` prints on a terminal, under a name, so it can be paged,
+	// captured into a bug report or read over a pipe — and so the obvious guess
+	// stops being a search for the word (#2108).
+	"brief":           func(dir string, _ []string) error { return runBrief(dir, os.Stdout) },
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
@@ -2874,6 +2878,7 @@ Usage:
   deja index [--rebuild]
   deja embed
   deja bench recall|context|prompt [--json] [--seed n]
+  deja brief         (the screen a bare deja prints on a terminal)
   deja log [n] [--last] [--json]
   deja statusline
   deja stats [--json] [--impact] [--redaction] [--card [path]] [--html [path]]
