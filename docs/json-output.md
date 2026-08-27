@@ -311,7 +311,8 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   "index": {
     "state": "ok",
     "path": "/home/user/.cache/deja/index.db",
-    "stale_stores": 0
+    "stale_stores": 0,
+    "sessions_stamped_ahead": 0
   },
   "mcp": [
     {

@@ -1171,6 +1171,14 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	default:
 		fmt.Fprintln(w, "  freshness up to date")
 	}
+	// A stamp the clock cannot account for puts a session at the top of every
+	// surface ordered by date, and leaves it there. The first screen has said
+	// so since #696 and the listing since #2105; this is where a reader looks
+	// when a store reads wrong (#2106).
+	if idx.SessionsAhead > 0 {
+		fmt.Fprintf(w, "  clock    %s stamped later than this machine's clock — `deja last` leads with %s\n",
+			doctorCount(idx.SessionsAhead, "session"), pluralThatThose(idx.SessionsAhead))
+	}
 	// What the last sync did with this machine's own rules: records that were
 	// dropped because they belong to sessions forgotten here are invisible
 	// afterwards, and a peer who keeps sending them drops them every time

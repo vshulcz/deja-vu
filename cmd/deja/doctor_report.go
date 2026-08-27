@@ -62,6 +62,12 @@ type doctorIndexReport struct {
 	State       string `json:"state"`
 	Path        string `json:"path,omitempty"`
 	StaleStores int    `json:"stale_stores"`
+	// SessionsAhead counts sessions stamped later than this machine's clock.
+	// One of those leads `deja last` and the digest's recent block until the
+	// data is edited, and it arrives from an ordinary place: a hand-written
+	// note's ts (#2063), or a store whose stamps were read in the wrong unit
+	// (#2102). doctor has named the same fact for a peer since #1855.
+	SessionsAhead int `json:"sessions_stamped_ahead"`
 }
 
 type doctorVersionReport struct {
@@ -606,6 +612,9 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 		return result
 	}
 	result.State = "ok"
+	if ov, err := index.Overview(dir); err == nil {
+		result.SessionsAhead = ov.Future
+	}
 	builtAt := index.ManifestBuiltAt(dir)
 	for _, mod := range storeMods {
 		if !mod.IsZero() && mod.After(builtAt) {
