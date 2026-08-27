@@ -345,10 +345,9 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:
 // lowercased, stopwords dropped. Exported so callers and the benchmark can
-// mirror exactly what the relevance tier scores against.
-// RelevanceTerms is the ranking's own tokenisation. It lives in query so that
-// packages below index can reduce a question to its words without importing
-// index; this wrapper keeps the call site every script already uses.
+// mirror exactly what the relevance tier scores against. The implementation
+// lives in query so that packages below index can reduce a question to its
+// words without importing index.
 func RelevanceTerms(q string) []string { return query.RelevanceTerms(q) }
 
 // RelevanceMatchTerms returns the query's relevance terms plus the surface
@@ -1131,6 +1130,24 @@ func SearchWithRecovery(dir string, o query.Options, progress io.Writer) ([]mode
 
 func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer) (SearchResult, error) {
 	r, err := SearchDetailed(dir, o)
+	if err == nil && r.Tier == query.TierRelevance {
+		// A question asked as a sentence ANDs into nothing and lands on the
+		// tier that means nothing matched, so the agent gets neighbours where
+		// the words inside its own question would have found the answer. Ask
+		// again with those words.
+		//
+		// A retry, not a replacement: the literal query keeps its result
+		// whenever it found one, and the reduced query is taken only when it
+		// gets off the relevance tier.
+		if reduced := reduceToTerms(o.Query); reduced != "" && reduced != o.Query {
+			alt := o
+			alt.Query = reduced
+			if r2, err2 := SearchDetailed(dir, alt); err2 == nil &&
+				r2.Tier != query.TierRelevance && len(r2.Sessions) > 0 {
+				return r2, nil
+			}
+		}
+	}
 	if err == nil || !IsCorrupt(err) {
 		return r, err
 	}
