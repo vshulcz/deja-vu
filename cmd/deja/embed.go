@@ -94,6 +94,23 @@ func unreadableSidecarNote(dir string, err error) string {
 	return fmt.Sprintf("deja: the vector sidecar will not parse (%v) — semantic search is off until `deja embed` writes it again\n", err)
 }
 
+// saidSidecarStale keeps the note below to once per retired file, on the same
+// terms as saidSidecarUnreadable, and is cleared when a usable sidecar turns up.
+var saidSidecarStale bool
+
+// staleSidecarNote names a sidecar built for an earlier index. Vectors address
+// records by offset, so a rebuild of records.bin retires them and search refuses
+// the file (#1355) — which one more indexed session is enough to cause, so this
+// is the state a machine that embeds passes through routinely, and it used to
+// pass through it in silence (#2208).
+func staleSidecarNote() string {
+	if saidSidecarStale {
+		return ""
+	}
+	saidSidecarStale = true
+	return "deja: the vector sidecar was built for an earlier index — semantic search is off until `deja embed` runs again\n"
+}
+
 func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.File) []search.Hit {
 	sidecar, err := embed.Read(dir)
 	if err != nil {
@@ -102,8 +119,10 @@ func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.Fil
 	}
 	saidSidecarUnreadable = false
 	if embed.Stale(dir, sidecar) {
+		fmt.Fprint(notice, staleSidecarNote())
 		return hits
 	}
+	saidSidecarStale = false
 	client, err := embed.New()
 	if err != nil {
 		fmt.Fprintln(notice, "deja: semantic rerank unavailable; using lexical order")
@@ -128,8 +147,10 @@ func maybeSemantic(dir string, hits []search.Hit, o search.Options, notice *os.F
 	}
 	saidSidecarUnreadable = false
 	if embed.Stale(dir, sidecar) {
+		fmt.Fprint(notice, staleSidecarNote())
 		return hits, false
 	}
+	saidSidecarStale = false
 	client, err := embed.New()
 	if err != nil {
 		return hits, false
