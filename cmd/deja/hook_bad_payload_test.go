@@ -11,13 +11,20 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
-// A hook fed something that is not a payload carries on with the zero value.
-// Two halves of that are worth holding apart, and neither was held: the memory
-// still reaches the agent — an agent that asked for context gets it, whatever
-// its host wrote to stdin — and the receiver the payload was carrying is lost,
-// which leaves the injection log unable to answer the question #1949 gave it
-// the `into` field for (#2161).
-func TestAHookPayloadItCannotReadStillInjects(t *testing.T) {
+// A hook fed something that is not a payload carries on with the zero value,
+// and what that costs depends on what else names the project. On a host that
+// exports nothing and runs the hook outside the project — the shape #759 is
+// about — the call stands nowhere: no project, no memory, no row. On a host
+// that does export it, the memory still goes out and the log records an
+// injection whose receiver is unknown, which is the half #2161 asks about.
+// Both are here, because a fix for either has to keep the other in view.
+//
+// The first version of this test ran the broken payloads after a good one in
+// the same process, where `adoptHookCWD`'s export was still standing from the
+// good call — so it measured a leak rather than the product and concluded that
+// the memory still goes out. Each case starts here where a fresh process
+// starts: nothing adopted.
+func TestAPayloadDejaCannotReadLosesTheProjectItNamed(t *testing.T) {
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
@@ -60,22 +67,44 @@ func TestAHookPayloadItCannotReadStillInjects(t *testing.T) {
 		{"binary", "\x00\x01binary"},
 		{"empty", ""},
 	} {
+		// Where a fresh process starts: the export the good call above left is
+		// not something another invocation would have.
+		t.Setenv("CLAUDE_PROJECT_DIR", "")
 		before := len(usage.Snapshots(dir, 0))
 		withHookStdin(t, tc.payload)
 		out := captureStdout(t, func() { runHookContextPlain(t) })
-		if !strings.Contains(out, "transaction mode") {
-			t.Errorf("%s: the agent asked for context and got none:\n%q", tc.name, out)
+		if strings.Contains(out, "transaction mode") {
+			t.Errorf("%s: a payload deja could not read was answered with a project's memory anyway:\n%q", tc.name, out)
 		}
-		// The row this call wrote, not whatever the last one left behind.
-		if after := len(usage.Snapshots(dir, 0)); after != before+1 {
-			t.Fatalf("%s: the injection log grew by %d rows, so the receiver below is another call's", tc.name, after-before)
+		if strings.TrimSpace(out) != "" {
+			t.Errorf("%s: the hook said something on a payload it could not read:\n%q", tc.name, out)
 		}
-		// The receiver is what a broken payload costs today. #2161 asks whether
-		// it should stay that way; when that is decided, this line is the one
-		// to change.
-		if into := latestSnapshotInto(t, dir); into != "" {
-			t.Errorf("%s: the log names %q as the receiver of an injection whose payload deja could not read", tc.name, into)
+		// And nothing is recorded, so the log does not carry an injection that
+		// never happened — which is the other half of what #2161 asks: an
+		// unreadable payload leaves no trace at all, of the call or of the
+		// silence.
+		if after := len(usage.Snapshots(dir, 0)); after != before {
+			t.Errorf("%s: the injection log grew by %d rows for a call that injected nothing", tc.name, after-before)
 		}
+	}
+
+	// The other host: it exports the project, so a payload deja cannot read
+	// still knows where it is standing. The memory goes out and the log keeps
+	// a row — with no receiver, because that is what the payload was carrying.
+	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
+	before := len(usage.Snapshots(dir, 0))
+	withHookStdin(t, "this is not json at all")
+	out = captureStdout(t, func() { runHookContextPlain(t) })
+	if !strings.Contains(out, "transaction mode") {
+		t.Errorf("a host that names the project got no memory from a broken payload:\n%q", out)
+	}
+	if after := len(usage.Snapshots(dir, 0)); after != before+1 {
+		t.Fatalf("the injection log grew by %d rows, so the receiver below is another call's", after-before)
+	}
+	// #2161 asks whether this should stay empty; when that is decided, this is
+	// the line to change.
+	if into := latestSnapshotInto(t, dir); into != "" {
+		t.Errorf("the log names %q as the receiver of an injection whose payload deja could not read", into)
 	}
 }
 
