@@ -139,16 +139,26 @@ func refreshWiringAfterUpgrade() []string {
 		return nil
 	}
 	var changed []string
+	failed := false
 	for _, target := range st.Targets {
 		res, err := installTarget(target, exe, false)
 		if err != nil {
 			// A harness the user has since removed is not an error worth
 			// surfacing: the next install run will drop it from the record.
+			failed = true
 			continue
 		}
 		if res.Action != "" && res.Action != "unchanged" {
 			changed = append(changed, target)
 		}
+	}
+	// Only when every target took the new path. Stamping the record after a
+	// refusal claimed a rewire that did not happen: the version then matched,
+	// so no later start tried again, and doctor's stale-wiring check reads the
+	// recorded path — which named the binary that exists while the config on
+	// disk still named the old one, so it said nothing either (#2212).
+	if failed {
+		return changed
 	}
 	recordWiring(st.Targets, false)
 	return changed
