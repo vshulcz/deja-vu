@@ -1,6 +1,10 @@
 package index
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
 
 // Progress reports what a build is doing while it does it. The first build on
 // a real corpus takes about ten seconds, and until now those seconds were
@@ -64,10 +68,19 @@ func reportHarness(name string, sessions, messages int) {
 
 // filesPerHarness weights the reading stage: a store with 900 session files
 // should move the bar far more than one with three.
+//
+// By store, because the parse loop advances by the store's name: counting a
+// file under its kind filed cline's files as "cline-sdk" against a bar that
+// only ever asked for "cline", so those files sized the stage and never moved
+// it (#2242).
 func filesPerHarness(files map[string]FileState) map[string]int {
 	out := map[string]int{}
 	for p := range files {
-		out[harnessForPath(p)]++
+		h := harnessForPath(p)
+		if store := sources.HarnessForKind(h); store != "" {
+			h = store
+		}
+		out[h]++
 	}
 	return out
 }
