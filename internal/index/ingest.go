@@ -145,7 +145,11 @@ func mergeIngestDiag(m *Manifest) {
 func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 	out := map[string]HarnessIngest{}
 	for p, e := range files {
-		h := harnessForPath(p)
+		// The store, not the file kind: the run narrates "cline" and doctor
+		// filed the same fact under "cline-sdk", while the documentation calls
+		// this key a harness. Five stores have kinds by another name, so for
+		// those a script keyed on the documented name found nothing (#2234).
+		h := sources.HarnessForKind(harnessForPath(p))
 		if h == "" {
 			continue
 		}
