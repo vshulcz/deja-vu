@@ -70,7 +70,7 @@ func TestHookContextRecordsTheSessionItStarted(t *testing.T) {
 	// longer exists — and the second run below would keep this one's.
 	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 
-	withHookStdin(t, `{"source":"startup","session_id":"ses_from_harness","cwd":"`+cwd+`"}`)
+	withHookStdin(t, hookPayload(t, map[string]string{"source": "startup", "session_id": "ses_from_harness", "cwd": cwd}))
 	if out := captureStdout(t, func() { runHookContextPlain(t) }); !strings.Contains(out, "transaction mode") {
 		t.Fatalf("the hook injected nothing, so there is no record to check:\n%q", out)
 	}
@@ -103,7 +103,7 @@ func TestBothHooksRecordTheSameSessionForOneSession(t *testing.T) {
 	t.Chdir(cwd)
 	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 
-	withHookStdin(t, `{"source":"startup","session_id":"ses_both","cwd":"`+cwd+`"}`)
+	withHookStdin(t, hookPayload(t, map[string]string{"source": "startup", "session_id": "ses_both", "cwd": cwd}))
 	if out := captureStdout(t, func() { runHookContextPlain(t) }); !strings.Contains(out, "transaction mode") {
 		t.Fatalf("the session-start hook injected nothing:\n%q", out)
 	}

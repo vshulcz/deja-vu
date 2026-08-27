@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -17,14 +18,12 @@ func writeKimiPlugin(t *testing.T, home string, enabled bool) {
 	if err := os.WriteFile(filepath.Join(root, "kimi.plugin.json"), []byte(`{"name":"deja"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	record := `{"version":1,"plugins":[{"id":"deja","root":` + strconvQuote(root) +
+	record := `{"version":1,"plugins":[{"id":"deja","root":` + strconv.Quote(root) +
 		`,"source":"local-path","enabled":` + boolText(enabled) + `,"installedAt":"2026-08-23T00:00:00Z"}]}`
 	if err := os.WriteFile(filepath.Join(home, "plugins", "installed.json"), []byte(record), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
-
-func strconvQuote(s string) string { return `"` + strings.ReplaceAll(s, `\`, `\\`) + `"` }
 
 func boolText(b bool) string {
 	if b {
