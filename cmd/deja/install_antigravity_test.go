@@ -123,7 +123,14 @@ func TestHookAntigravityScopesToWorkspacePath(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 
 	var out bytes.Buffer
-	in := `{"invocationNum":1,"workspacePaths":["` + beta + `"]}`
+	// Marshalled rather than pasted: a Windows path is full of backslashes,
+	// and hand-built JSON turns them into escape sequences the decoder refuses
+	// — the payload then names no workspace and the recall comes back empty.
+	payload, err := json.Marshal(map[string]any{"invocationNum": 1, "workspacePaths": []string{beta}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := string(payload)
 	if err := runHookAntigravity(dir, strings.NewReader(in), &out); err != nil {
 		t.Fatalf("hook: %v", err)
 	}

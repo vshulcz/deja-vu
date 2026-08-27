@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,7 +67,7 @@ func TestAHookCallLeavesTheEnvironmentAsItFoundIt(t *testing.T) {
 			_, _ = captureRun(t, "hook-tool")
 		}},
 		{"antigravity", func() {
-			withHookStdin(t, `{"workspacePaths":["`+project+`"],"invocationNum":1}`)
+			withHookStdin(t, antigravityPayload(t, project))
 			_, _ = captureRun(t, "hook-antigravity")
 		}},
 	} {
@@ -104,4 +105,16 @@ func TestTheProjectChainPrefersThePayloadThenTheHost(t *testing.T) {
 	if strings.TrimSpace(wd) == "" {
 		t.Fatal("the working directory is empty, so the last case measures nothing")
 	}
+}
+
+// antigravityPayload marshals the workspace rather than pasting it into a JSON
+// string: a Windows path is full of backslashes, and the decoder reads those as
+// escapes.
+func antigravityPayload(t *testing.T, workspace string) string {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{"workspacePaths": []string{workspace}, "invocationNum": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

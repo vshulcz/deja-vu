@@ -161,7 +161,16 @@ func TestAFutureUsageEventIsShownButNotCounted(t *testing.T) {
 	}
 	// The premise: the same event, stamped an hour ago, is counted — otherwise
 	// the absence above says nothing about the future stamp.
-	past := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	// An hour ago, unless an hour ago was yesterday: the bar counts from local
+	// midnight, so between midnight and one in the morning this fixture landed
+	// outside the window it is meant to be inside.
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	at := now.Add(-time.Hour)
+	if at.Before(midnight) {
+		at = midnight.Add(time.Second)
+	}
+	past := at.UTC().Format(time.RFC3339Nano)
 	if err := os.WriteFile(usage.Path(dir), []byte(fmt.Sprintf(`{"t":"%s","kind":"hook","bytes":5151,"sessions":1}`, past)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

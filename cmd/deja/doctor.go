@@ -946,19 +946,32 @@ func dejaCommandIn(path string) string {
 		return ""
 	}
 	for _, m := range commandValue.FindAllStringSubmatch(string(b), -1) {
-		if value := strings.TrimSpace(m[1]); commandIsDeja(value) {
+		value := strings.TrimSpace(m[2])
+		// A quoted value carries escapes; an unquoted one is what it says. TOML
+		// and JSONC both double the backslashes in a Windows path, and reading
+		// the raw text of one produced a path that exists nowhere — doctor then
+		// reported a working install as broken (#2216).
+		if m[1] == `"` {
+			value = quotedPathUnescape.Replace(value)
+		}
+		if commandIsDeja(value) {
 			return value
 		}
 	}
 	return ""
 }
 
+// quotedPathUnescape undoes what a quoted string does to a Windows path. Only
+// the two escapes a path can carry: anything else in a command line is not
+// something this check should be interpreting.
+var quotedPathUnescape = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
+
 // commandValue matches a `command` or `cmd` key and the value after it, in the
 // three shapes these configs come in: JSON and JSONC quote the key, TOML uses
 // `=`, YAML uses `:` and quotes nothing. A JSONC file that will not parse as
 // JSON — zed's settings, which carry comments — reaches this too, so the whole
 // text is scanned rather than a line at a time.
-var commandValue = regexp.MustCompile(`"?(?:command|cmd)"?\s*[:=]\s*"?([^",\n}]+)`)
+var commandValue = regexp.MustCompile(`"?(?:command|cmd)"?\s*[:=]\s*("?)([^",\n}]+)`)
 
 // mcpEntryDejaCommand is mcpEntryRunsDeja's answer to "which one": the same
 // walk, returning the command or argument that named deja.
