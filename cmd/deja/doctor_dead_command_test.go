@@ -90,6 +90,12 @@ func TestTheMissingBinaryCheckReadsEveryConfigShapeAndNothingElse(t *testing.T) 
 		// belong to the format, and reading them raw named a path that exists
 		// nowhere — doctor then called a working install broken.
 		{"a quoted path in toml", "[mcp_servers.deja]\ncommand = \"" + realJSON + "\"\n", ""},
+		// TOML's literal string, where a backslash is a backslash and nothing
+		// is escaped — which is how a Windows path is written there.
+		{"a literal path in toml", "[mcp_servers.deja]\ncommand = '" + real + "'\n", ""},
+		{"a literal path that is gone", "[mcp_servers.deja]\ncommand = '" + gone + "'\n", gone},
+		// YAML's double-quoted scalar escapes like JSON does.
+		{"a quoted path in yaml", "extensions:\n  deja:\n    cmd: \"" + goneJSON + "\"\n", gone},
 		{"no deja entry", `{"mcpServers":{"other":{"command":"/usr/bin/other"}}}`, ""},
 		{"a directory named deja", `{"mcpServers":{"deja":{"command":"deja","cwd":"` + goneJSON + `"}}}`, ""},
 		{"an unrelated path in toml", "[tool]\ndata_dir = \"" + goneJSON + "\"\n", ""},
