@@ -229,7 +229,7 @@ func run(args []string) error {
 	if cmd, ok := commands[args[0]]; ok {
 		return cmd(dir, args[1:])
 	}
-	return runSearch(dir, args, sourceInstance)
+	return runBareSearch(dir, args, sourceInstance)
 }
 
 func cmdVersion(_ string, _ []string) error {
@@ -965,7 +965,18 @@ func ensureForCLISearch(dir string, o search.Options, force bool, progress io.Wr
 	return nil
 }
 
+// runBareSearch is `deja <words>` — the form where the first word stood where a
+// command name goes. That is the only form the mistyped-command hint is about:
+// `deja search doctro` is someone searching for the word (#2197).
+func runBareSearch(dir string, args []string, sourceInstance string) error {
+	return searchWithOptions(dir, args, sourceInstance, true)
+}
+
 func runSearch(dir string, args []string, sourceInstance string) error {
+	return searchWithOptions(dir, args, sourceInstance, false)
+}
+
+func searchWithOptions(dir string, args []string, sourceInstance string, bare bool) error {
 	force := false
 	var filtered []string
 	for _, a := range args {
@@ -1132,6 +1143,19 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	// (#604).
 	o.Width = printableWidth(os.Stdout)
 	search.Print(os.Stdout, hits, o)
+	// A wrong guess at a command name falls through to search, and the hint
+	// that names it ran only on an empty result — so a typo whose word happens
+	// to be in the history got a conversation back and nothing about the
+	// command it meant (#2197). After the results, on stderr, and only for the
+	// bare form: `deja search doctro` is someone searching for the word.
+	//
+	// One word only, which is narrower than the empty-result hint on purpose.
+	// There, a hint costs nothing over a failed search; here it lands on an
+	// answer the reader may well have wanted, and "doctors pool" is a search
+	// however close its first word sits to a command name.
+	if bare && len(hits) > 0 && len(strings.Fields(o.Query)) == 1 {
+		fmt.Fprint(os.Stderr, commandHint(o.Query))
+	}
 	return nil
 }
 
