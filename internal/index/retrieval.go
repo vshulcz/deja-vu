@@ -92,9 +92,23 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 				// token to all indexed tokens containing it (bucket directories only,
 				// no record scan), then intersect.
 				var variants map[string][]string
-				posts, variants, err = intersectSubstringPostingsDetailed(dir, tokens(o.Query))
+				bare, spelledApart := compoundQueryTokens(tokens(o.Query))
+
+				posts, variants, err = intersectSubstringPostingsDetailed(dir, bare)
 				if err != nil {
 					return SearchResult{}, fmt.Errorf("substr postings: %w", err)
+				}
+				// The postings above found the parts; the record check below
+				// counts what the reader typed, and the text does not hold the
+				// compound. Hand it the words spelled apart as this term's
+				// other spelling, which is what the store actually says (#2125).
+				if len(spelledApart) > 0 {
+					if variants == nil {
+						variants = map[string][]string{}
+					}
+					for tok, apart := range spelledApart {
+						variants[tok] = append(variants[tok], apart)
+					}
 				}
 				if len(posts) > 0 {
 					fallbackVariants = variants
@@ -105,7 +119,12 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 					// enough informative words to rank by relevance, prefer
 					// that ranking and keep the substring hits as the tail.
 					if rel, rerr := relevanceSearch(dir, m, o); rerr == nil && len(rel.Sessions) > 0 {
-						closeSS, serr := scanRecords(dir, m, o, postingOffsets(cutPostingsBySession(posts, m, o)))
+						// With the variants too, for the reason the scan below
+						// takes them: a compound spelled apart is not a
+						// substring of what the store wrote, so this
+						// comparison would call the close tier empty and hand
+						// the answer to relevance (#2125).
+						closeSS, serr := scanRecordsWithVariants(dir, m, o, postingOffsets(cutPostingsBySession(posts, m, o)), variants)
 						agree := false
 						if serr == nil {
 							top := rel.Sessions[0].Harness + ":" + rel.Sessions[0].ID
@@ -184,7 +203,12 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if len(posts) == 0 {
 		return SearchResult{}, nil
 	}
-	ss, err := scanRecords(dir, m, o, postingOffsets(posts))
+	// With the variants the rung above collected, not without them. A
+	// substring variant needs none — the text holding "opencode" holds "code"
+	// too — but a compound spelled apart is not a substring of anything the
+	// store wrote, so the postings found the session and this check dropped it
+	// again (#2125).
+	ss, err := scanRecordsWithVariants(dir, m, o, postingOffsets(posts), fallbackVariants)
 	if err == nil && len(ss) == 0 {
 		if result, ferr := stemSearch(dir, m, o); ferr != nil {
 			return SearchResult{}, fmt.Errorf("stem postings: %w", ferr)
@@ -2228,6 +2252,44 @@ func intersectPostings(dir string, keys []string) ([]posting, error) {
 func intersectSubstringPostings(dir string, bare []string) ([]posting, error) {
 	posts, _, err := intersectSubstringPostingsDetailed(dir, bare)
 	return posts, err
+}
+
+// compoundQueryTokens spells a compound query token as its parts, and says how
+// the words read spelled apart.
+//
+// The index already splits what it stores — indexKeys adds identifierParts,
+// which is why `retry backoff` reaches a session that wrote `retry-backoff`.
+// The other direction had nothing: a store that says "blowing up" was
+// unreachable from `blowing-up`, because this rung expands a query token to
+// indexed tokens *containing* it ("code" finds "opencode") and no indexed token
+// contains a compound the store never wrote (#2125).
+//
+// The parts replace the compound rather than joining it: the list is
+// intersected, so a token that expands to nothing empties the result. A query
+// naming a compound the store really holds never arrives here — the exact tier
+// answered it — so the replacement costs nothing that works.
+func compoundQueryTokens(toks []string) ([]string, map[string]string) {
+	out := make([]string, 0, len(toks))
+	apart := map[string]string{}
+	for _, tok := range toks {
+		if !strings.ContainsAny(tok, "-_") {
+			out = append(out, tok)
+			continue
+		}
+		var parts []string
+		for _, part := range strings.FieldsFunc(tok, func(r rune) bool { return r == '-' || r == '_' }) {
+			if len(part) >= 2 {
+				parts = append(parts, part)
+			}
+		}
+		if len(parts) < 2 {
+			out = append(out, tok)
+			continue
+		}
+		out = append(out, parts...)
+		apart[tok] = strings.Join(parts, " ")
+	}
+	return out, apart
 }
 
 func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, map[string][]string, error) {
