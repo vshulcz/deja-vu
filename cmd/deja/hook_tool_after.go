@@ -59,7 +59,6 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input toolAfterInput
 	raw := readHookPayload(stdin, hookStdinWait)
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
-	adoptHookCWD(input.CWD)
 	if !planIndexReady(dir) {
 		return nil
 	}

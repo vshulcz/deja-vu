@@ -73,7 +73,6 @@ type toolHookInput struct {
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
-	adoptHookCWD(input.CWD)
 	// Never build or repair from here. This runs inside an action the user is
 	// waiting on, and a miss costs nothing while a rebuild costs seconds.
 	if !planIndexReady(dir) {

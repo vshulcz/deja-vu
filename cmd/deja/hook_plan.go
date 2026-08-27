@@ -63,7 +63,6 @@ func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
 	if input.ToolName != "ExitPlanMode" {
 		return nil
 	}
-	adoptHookCWD(input.CWD)
 
 	lines := planFindings(dir, input.ToolInput.Plan, input.SessionID)
 	if len(lines) == 0 {

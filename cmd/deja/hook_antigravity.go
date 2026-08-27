@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -49,12 +48,9 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if len(input.WorkspacePaths) > 0 {
 		workspace = input.WorkspacePaths[0]
 	}
-	if workspace != "" && os.Getenv("CLAUDE_PROJECT_DIR") == "" {
-		_ = os.Setenv("CLAUDE_PROJECT_DIR", workspace)
-	}
-	// The payload, not the export it may or may not have set: the export is
-	// written once per process and refuses to change, so a second payload was
-	// answered for the first one's workspace (#2182).
+	// The payload, and nothing written back into the environment: deja used to
+	// export the workspace here, which carried this call's project into the
+	// next one in the same process and decided nothing else (#2185).
 	digest, sessions, raw, _, _ := cachedHookDigestFor(dir, workspace)
 	if digest == "" {
 		fmt.Fprintln(stdout, "{}")

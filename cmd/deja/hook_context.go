@@ -239,7 +239,6 @@ func runHookContext(dir string, plain bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	adoptHookCWD(input.CWD)
 	digest, sessions, raw, taskMatched, withheld := cachedHookDigestFor(dir, input.CWD)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
@@ -546,20 +545,20 @@ func hookGate() string {
 	return mode + "|" + policy.Load().Describe(policy.ActivationAuto)
 }
 
-// adoptHookCWD takes the working directory out of a hook payload when the
-// environment does not already name one. The harness knows the project; the
-// environment variable is a Claude Code convenience the others do not share.
-func adoptHookCWD(cwd string) {
-	if cwd == "" || os.Getenv("CLAUDE_PROJECT_DIR") != "" {
-		return
-	}
-	_ = os.Setenv("CLAUDE_PROJECT_DIR", cwd)
-}
-
 // hookCWD is where the hook is standing: what the payload says, else the
-// project directory the harness exported, else the process's own — the same
-// chain cachedHookDigest walks, so a host that exports the directory without
-// naming it in the payload is not treated as standing nowhere.
+// project directory the harness exported, else the process's own — so a host
+// that exports the directory without naming it in the payload is not treated
+// as standing nowhere (#759), and one that names it in the payload without
+// exporting anything is not either.
+//
+// deja used to write the payload's answer back into its own environment. After
+// #2183 nothing read it to decide anything: the doors take the project from the
+// payload, and the two children that need one are handed it — the refresh child
+// on its own environment, and the warmup child not at all, since `deja index`
+// reads every project. What the write still did was carry one call's project
+// into the next in the same process, which is the fault #2182 was, and which
+// made an earlier measurement of #2161 report the opposite of the truth
+// (#2185).
 func hookCWD(fromPayload string) string {
 	if fromPayload != "" {
 		return fromPayload
@@ -576,10 +575,9 @@ func cachedHookDigest(dir string) (string, int, int64, []string, int) {
 }
 
 // cachedHookDigestFor is cachedHookDigest for a caller that was told which
-// project the call is about. The payload is that authority: `adoptHookCWD`
-// exports it and will not overwrite an export already there, so reading it back
-// out of the environment answered a second payload in the same process with the
-// first one's project (#2182).
+// project the call is about. The payload is that authority: deja used to write
+// it into its own environment and read it back, which answered a second payload
+// in the same process with the first one's project (#2182, #2185).
 func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int) {
 	cwd := hookCWD(fromPayload)
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
@@ -690,8 +688,8 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 
 // hookDigestResultFor is hookDigestResult for a caller that was told which
 // project the call is about, rather than one reading it back out of the
-// environment: the export is set once per process and refuses to change, so a
-// second payload was answered with the first one's project (#2182).
+// environment, where a project deja itself had written stayed for every later
+// call in the process (#2182, #2185).
 func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int) {
 	withheld := 0
 	defer func() { _ = recover() }()
