@@ -391,6 +391,24 @@ func IsKnownHarness(name string) bool {
 	return false
 }
 
+// HarnessForKind names the store a fine-grained kind belongs to: "cline-sdk"
+// and "cline-vscode" are both cline. A caller holding a kind and speaking to a
+// person wants this one — the index run narrates per store, and looking a kind
+// up under the harness's own name found nothing (#2229).
+func HarnessForKind(kind string) string {
+	for _, h := range Registry() {
+		if h.Name == kind {
+			return h.Name
+		}
+		for _, k := range h.Kinds {
+			if k.Name == kind {
+				return h.Name
+			}
+		}
+	}
+	return ""
+}
+
 // KindForPath returns the fine-grained kind whose Match accepts p, or "".
 func KindForPath(p string) string {
 	for _, h := range Registry() {
