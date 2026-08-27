@@ -553,7 +553,10 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 		}
 		score *= proximityBoost(doc.minWindow, queryTokenCount)
 		score *= titleBoost(doc.titleHits, queryTokenCount)
-		if n := worn[doc.hit.Session.ID]; n > 0 {
+		// By the id as a log holds it: the counts come from .usage.jsonl, and
+		// a byte that is not valid UTF-8 is U+FFFD there and itself here, so
+		// the two never met (#2199).
+		if n := worn[model.LoggedID(doc.hit.Session.ID)]; n > 0 {
 			doc.hit.Reused = n
 			score *= wornBoost(n)
 		}
