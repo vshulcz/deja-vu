@@ -39,6 +39,10 @@ func inspectionOne(cmd string) bool {
 	if len(f) == 0 {
 		return true
 	}
+	f = dropShellKeywords(f)
+	if len(f) == 0 {
+		return true
+	}
 	// `cd` decides nothing on its own; what follows it does, and that is a
 	// separate part.
 	if f[0] == "cd" {
@@ -52,12 +56,22 @@ func inspectionOne(cmd string) bool {
 	switch f[0] {
 	case "ls", "cat", "pwd", "echo", "which", "whoami", "date", "env", "printenv",
 		"head", "tail", "less", "more", "stat", "file", "find", "tree", "df", "du",
-		"ps", "top", "htop", "id", "uname", "hostname", "clear", "history":
+		"ps", "top", "htop", "id", "uname", "hostname", "clear", "history",
+		// Waiting is not doing: a poll loop around a read is still a read,
+		// and `sleep` left one part of it unclassified, which made the whole
+		// line count as a change.
+		"sleep", "wait", "true", "false", "printf":
 		return true
 	case "git":
 		if len(f) > 1 {
 			switch f[1] {
-			case "status", "diff", "log", "show", "branch", "remote", "stash",
+			case "stash", "worktree", "tag", "remote":
+				// Read or write depending on the argument: `git stash list`
+				// looks, `git stash push` changes; `git worktree list` looks,
+				// `git worktree add` changes. Listed unconditionally before,
+				// which read every one of them as a look.
+				return len(f) > 2 && gitReadArg(f[2])
+			case "status", "diff", "log", "show", "branch",
 				"blame", "reflog", "describe", "rev-parse", "ls-files",
 				// The rest of git's read side. `ls-files` was here and
 				// `ls-tree` was not, so half of the same class fell through.
@@ -103,7 +117,7 @@ func investigationOne(cmd string) bool {
 	if inspectionOne(cmd) {
 		return true
 	}
-	f := strings.Fields(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(cmd), "$ ")))
+	f := dropShellKeywords(strings.Fields(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(cmd), "$ "))))
 	if len(f) == 0 {
 		return true
 	}
@@ -114,6 +128,16 @@ func investigationOne(cmd string) bool {
 	case "grep", "rg", "ag", "ack", "awk", "wc", "diff", "jq", "yq", "column",
 		"sort", "uniq", "basename", "dirname", "realpath", "readlink", "gofmt":
 		return true
+	case "gh":
+		// Going to look at CI after a failure is the same move as grepping
+		// for the symbol: it is where an agent goes next, not what it did
+		// about it.
+		if len(f) > 2 {
+			switch f[2] {
+			case "checks", "view", "list", "status", "diff":
+				return true
+			}
+		}
 	case "sed":
 		// `sed -n '10,20p' f` prints; `sed -i …` edits.
 		return !hasFlag(f, "-i") && !hasFlag(f, "--in-place")
@@ -146,4 +170,30 @@ func dropGitGlobals(rest []string) []string {
 		}
 	}
 	return nil
+}
+
+// dropShellKeywords removes the words a shell puts in front of the command
+// itself. `until gh pr checks …; do sleep 20; done` was classified as the
+// command `until`.
+func dropShellKeywords(f []string) []string {
+	for len(f) > 0 {
+		switch f[0] {
+		case "until", "while", "if", "then", "else", "elif", "do", "done", "fi", "time", "!":
+			f = f[1:]
+		default:
+			return f
+		}
+	}
+	return nil
+}
+
+// gitReadArg is the argument that makes an argument-dependent git subcommand a
+// read: `list` and `show` for stash and worktree, the list flags for tag and
+// remote.
+func gitReadArg(a string) bool {
+	switch a {
+	case "list", "show", "-l", "--list", "-v", "--verbose":
+		return true
+	}
+	return false
 }
