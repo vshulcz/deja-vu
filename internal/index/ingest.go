@@ -1909,8 +1909,14 @@ func titleWorthy(t string) bool {
 // — and the state is what every one-line surface reads it for, so cutting the
 // tail would drop exactly the part that matters and, worse, make a state
 // change invisible to the comparison that decides whether to rewrite the row
-// (#R11). Note titles are deja's own text, so the injection this bound exists
-// to stop cannot arrive through them.
+// (#R11).
+//
+// What makes the exemption safe is not that the text is deja's own — the notes
+// file is edited by hand, so a note title is whatever someone typed (#2063) —
+// but that every reader clips it for its own layout: `last`, `stats`, the view
+// page and the MCP payloads through SafeNoteTitle, hook-context through
+// trimBriefTitle. TestEverySurfaceThatPrintsANoteTitleBoundsIt holds that, and
+// a new surface has to join it (#2092).
 func boundSourceTitle(harness, title string) string {
 	if harness == "deja" {
 		return title

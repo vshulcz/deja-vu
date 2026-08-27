@@ -129,6 +129,11 @@ func redactMask(s string) string {
 // title — where a line break would be a second row rather than a paragraph.
 func safeLineForPage(s string) string { return search.SafeLine(redactMask(s)) }
 
+// safeTitleForPage bounds as well as scrubs. A note's title carries no bound
+// into the index on purpose — the state suffix is what a one-line surface reads
+// it for — so the readers clip it, and this page is one of them (#2092).
+func safeTitleForPage(s string) string { return search.SafeNoteTitle(redactMask(s)) }
+
 // safeNameForPage is for the fields a person copies rather than reads — a
 // project is what `--project` is given back — so the spaces inside it are part
 // of it, the way they are in a path (#2044).
@@ -203,7 +208,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		// The id too: it is a filename stem for most harnesses, and a
 		// filename takes a control byte on every Unix filesystem.
 		sessions[i].ID = safeNameForPage(sessions[i].ID)
-		sessions[i].Title = safeLineForPage(sessions[i].Title)
+		sessions[i].Title = safeTitleForPage(sessions[i].Title)
 		sessions[i].Preview = safeTextForPage(sessions[i].Preview)
 		sessions[i].Project = safeNameForPage(sessions[i].Project)
 	}
@@ -214,7 +219,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		}
 	}
 	for i := range notes {
-		notes[i].Title = safeLineForPage(notes[i].Title)
+		notes[i].Title = safeTitleForPage(notes[i].Title)
 		notes[i].Text = safeTextForPage(notes[i].Text)
 		// A note's project and tags are what the user typed, so they are text
 		// like the rest rather than structure deja minted.
