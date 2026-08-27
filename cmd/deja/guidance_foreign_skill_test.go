@@ -31,7 +31,7 @@ func TestRetiringGuidanceLeavesAForeignSkillAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := dropRetiredGuidance("gemini"); err != nil {
+	if err := dropRetiredGuidanceForTest("gemini"); err != nil {
 		t.Fatalf("dropRetiredGuidance: %v", err)
 	}
 
@@ -57,7 +57,7 @@ func TestRetiringGuidanceRemovesOurOwnSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := dropRetiredGuidance("gemini"); err != nil {
+	if err := dropRetiredGuidanceForTest("gemini"); err != nil {
 		t.Fatalf("dropRetiredGuidance: %v", err)
 	}
 
@@ -87,7 +87,7 @@ func TestRetiringGuidanceKeepsADirectoryThatIsNotEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := dropRetiredGuidance("gemini"); err != nil {
+	if err := dropRetiredGuidanceForTest("gemini"); err != nil {
 		t.Fatalf("dropRetiredGuidance: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestRetiringGuidanceSparesTheSharedSkill(t *testing.T) {
 		t.Fatalf("wrong fixture: no retired path equals %s\n  %v", shared, retiredGuidancePaths("cursor"))
 	}
 
-	if err := dropRetiredGuidance("cursor"); err != nil {
+	if err := dropRetiredGuidanceForTest("cursor"); err != nil {
 		t.Fatalf("dropRetiredGuidance: %v", err)
 	}
 
@@ -135,4 +135,11 @@ func TestRetiringGuidanceSparesTheSharedSkill(t *testing.T) {
 	if string(got) != body {
 		t.Errorf("the shared skill was rewritten:\n%q", string(got))
 	}
+}
+
+// dropRetiredGuidanceForTest keeps these tests reading as they did before the
+// note was added: they are about what the files look like afterwards.
+func dropRetiredGuidanceForTest(harness string) error {
+	_, err := dropRetiredGuidance(harness, true)
+	return err
 }
