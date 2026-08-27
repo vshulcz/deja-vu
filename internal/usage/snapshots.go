@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -184,7 +185,7 @@ func rotateSnapshots(p string, incoming int) {
 	// deja could not have written — a side effect worth naming rather than
 	// discovering: the file shrinks by more than the rotation alone would
 	// explain (#1946).
-	snaps := snapshotsFrom(p, snapshotsToKeep) // newest first
+	snaps := snapshotsFrom(p, snapshotsToKeep) // last appended first
 	// Keeping a fixed count says nothing about the size that triggered this. A
 	// read of `deja://session/…` records a whole session here, unbudgeted, and
 	// twenty of those sit above the threshold for good: the file then rotates on
@@ -239,6 +240,12 @@ func snapshotsFrom(p string, n int) []Snapshot {
 			out = append(out, s)
 		}
 	}
+	// Last appended first, and no further: this is what the rotation rewrites
+	// from, and there the order decides which records survive. The sibling
+	// rotation in usage.go keeps an event stamped ahead of the window rather
+	// than dropping it, on the grounds that deleting a recorded event on a
+	// guess about someone's clock cannot be undone — retention reads the file
+	// as written, and only the reader below sorts (#2140).
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
 	}
@@ -249,8 +256,20 @@ func snapshotsFrom(p string, n int) []Snapshot {
 }
 
 // Snapshots returns up to n recorded digests for an index dir, newest first.
+//
+// By stamp, arrival order breaking ties. Reversing the file and stopping there
+// is only newest-first while the file is append-ordered by time, and it is not
+// always: several agents append to one file, and a clock that moved backwards
+// writes an older stamp after a newer one — the case #2105 and #2122 handle
+// elsewhere. `deja log --last` reads the first of these as the most recent
+// digest, and it was the last one appended (#2140).
 func Snapshots(indexDir string, n int) []Snapshot {
-	return snapshotsFrom(SnapshotPath(indexDir), n)
+	out := snapshotsFrom(SnapshotPath(indexDir), 0)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Time.After(out[j].Time) })
+	if n > 0 && len(out) > n {
+		out = out[:n]
+	}
+	return out
 }
 
 // Events returns up to n usage events, newest first. n <= 0 means all.
@@ -271,9 +290,13 @@ func Events(indexDir string, n int) []Event {
 			out = append(out, e)
 		}
 	}
+	// By stamp, arrival order breaking ties, for the reason Snapshots above
+	// takes it. This list is read, never rewritten: the usage log's own
+	// rotation reads the file separately (#2140).
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
 	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Time.After(out[j].Time) })
 	if n > 0 && len(out) > n {
 		out = out[:n]
 	}
