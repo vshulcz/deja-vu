@@ -593,7 +593,7 @@ func TestStemmedOutputIsDeterministic(t *testing.T) {
 func TestPrintNoMatchesReportsTheStoreSize(t *testing.T) {
 	dir := seedBriefIndex(t)
 	var b bytes.Buffer
-	printNoMatches(&b, dir, "jwt refresh token")
+	printNoMatches(&b, dir, "jwt refresh token", false)
 	out := b.String()
 	if strings.Contains(out, "in 0 indexed session") {
 		t.Fatalf("printed the corruption signature for a healthy index: %q", out)
@@ -603,7 +603,7 @@ func TestPrintNoMatchesReportsTheStoreSize(t *testing.T) {
 	}
 	// No index at all: say nothing rather than a wrong number.
 	var b2 bytes.Buffer
-	printNoMatches(&b2, filepath.Join(t.TempDir(), "gone"), "q")
+	printNoMatches(&b2, filepath.Join(t.TempDir(), "gone"), "q", false)
 	if strings.Contains(b2.String(), "indexed session") {
 		t.Fatalf("invented a count with no index: %q", b2.String())
 	}
@@ -1264,7 +1264,7 @@ func TestSessionCountCountsSessionsNotFiles(t *testing.T) {
 		t.Fatalf("SessionCount = %d, want the 2 sessions across 4 scanned files", n)
 	}
 	var b bytes.Buffer
-	printNoMatches(&b, dir, "nothing")
+	printNoMatches(&b, dir, "nothing", false)
 	if !strings.Contains(b.String(), "in 2 indexed sessions") {
 		t.Fatalf("message = %q", b.String())
 	}
