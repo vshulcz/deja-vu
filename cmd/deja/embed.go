@@ -71,11 +71,36 @@ func embedPolicyKeep(dir string) (func(index.Record) bool, func() int, error) {
 		}, nil
 }
 
+// saidSidecarUnreadable keeps the note below to once per broken file: an empty
+// search runs the rerank and then the semantic tier, and one broken file is one
+// fact. Cleared when a read succeeds, so the MCP server — which lives for the
+// whole session — reports a file that breaks, is rebuilt and breaks again.
+var saidSidecarUnreadable bool
+
+// unreadableSidecarNote names a sidecar that is on disk and will not parse.
+// Falling back to the lexical order is right — a recall must not fail over its
+// own bookkeeping — but this was the one cause of "semantic results stopped"
+// that said nothing, while an unreachable endpoint on the same path has always
+// printed a line (#2201). A sidecar that is simply not there is the ordinary
+// case and stays quiet.
+func unreadableSidecarNote(dir string, err error) string {
+	if saidSidecarUnreadable {
+		return ""
+	}
+	if _, statErr := os.Stat(embed.Path(dir)); statErr != nil {
+		return ""
+	}
+	saidSidecarUnreadable = true
+	return fmt.Sprintf("deja: the vector sidecar will not parse (%v) — semantic search is off until `deja embed` writes it again\n", err)
+}
+
 func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.File) []search.Hit {
 	sidecar, err := embed.Read(dir)
 	if err != nil {
+		fmt.Fprint(notice, unreadableSidecarNote(dir, err))
 		return hits
 	}
+	saidSidecarUnreadable = false
 	if embed.Stale(dir, sidecar) {
 		return hits
 	}
@@ -98,8 +123,10 @@ func maybeSemantic(dir string, hits []search.Hit, o search.Options, notice *os.F
 	}
 	sidecar, err := embed.Read(dir)
 	if err != nil {
+		fmt.Fprint(notice, unreadableSidecarNote(dir, err))
 		return hits, false
 	}
+	saidSidecarUnreadable = false
 	if embed.Stale(dir, sidecar) {
 		return hits, false
 	}
