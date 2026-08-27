@@ -2469,9 +2469,16 @@ func stemPostings(dir string, terms, phrases []string) ([]posting, map[string][]
 		return nil, nil, err
 	}
 	matchesPer := make([][]string, len(terms))
-	anchored := 0
 	for i, term := range terms {
 		matchesPer[i] = stemMatches(term, catalog)
+	}
+	// Whatever the catalog has no whole word for gets one pass looking for the
+	// word inside a token that glued it to something else. One pass for all of
+	// them: the catalog is ~200k tokens on a real store, which is the walk the
+	// fuzzy tier goes out of its way not to do per term.
+	fillGluedMatches(terms, matchesPer, catalog)
+	anchored := 0
+	for i := range terms {
 		if len(matchesPer[i]) > 0 {
 			anchored++
 		}
@@ -2564,6 +2571,77 @@ func hasStemToken(terms []string) bool {
 		}
 	}
 	return false
+}
+
+// fillGluedMatches finds a term's other forms inside tokens that glued the
+// word to something else: "k8sнастройки" holds "настройки" and is one token,
+// so nothing splits it and stemMatches, which asks the catalog for whole
+// words, comes back empty. The reader then has to type the case the transcript
+// used, in the one place deja normally spares them that (#2145).
+//
+// Only when the whole-word lookup found nothing, only at the ends of the
+// token, only for forms of four runes or more, and only for Cyrillic terms.
+// That last one is the point rather than caution: Russian is where a word has
+// a dozen endings and the reader cannot be expected to guess which one the
+// transcript used, while in Latin the same rule reaches "latest" from "tests"
+// and "preserve" from "press". English compounds have their own road — the
+// indexer splits them into parts — and this one would only add coincidences.
+func fillGluedMatches(terms []string, matchesPer [][]string, catalog map[string]bool) {
+	formsPer := make([][]string, len(terms))
+	want := false
+	for i, term := range terms {
+		if len(matchesPer[i]) > 0 || len([]rune(term)) < 5 || !isCyrToken(term) {
+			continue
+		}
+		for _, f := range append(stemMatchForms(term), term) {
+			// Four runes is the floor: a shorter fragment at the end of a long
+			// token is a coincidence more often than a word.
+			if len([]rune(f)) >= 4 {
+				formsPer[i] = append(formsPer[i], f)
+				want = true
+			}
+		}
+	}
+	if !want {
+		return
+	}
+	found := make([]map[string]bool, len(terms))
+	for tok := range catalog {
+		for i, forms := range formsPer {
+			for _, f := range forms {
+				// The token has to be the word plus something, and the
+				// something is what makes this rung necessary — so the length
+				// is measured against the form, not against the term, which is
+				// the longer of the two when the query is in a case with a long
+				// ending. Runes on both sides: a byte comparison would admit a
+				// token one byte longer, which in Cyrillic is no character at
+				// all.
+				if len([]rune(tok)) <= len([]rune(f)) ||
+					(!strings.HasPrefix(tok, f) && !strings.HasSuffix(tok, f)) {
+					continue
+				}
+				if found[i] == nil {
+					found[i] = map[string]bool{}
+				}
+				found[i][tok] = true
+				break
+			}
+		}
+	}
+	for i, set := range found {
+		if len(set) == 0 {
+			continue
+		}
+		out := make([]string, 0, len(set))
+		for tok := range set {
+			out = append(out, tok)
+		}
+		sort.Strings(out)
+		if len(out) > 8 {
+			out = out[:8]
+		}
+		matchesPer[i] = out
+	}
 }
 
 func stemMatches(term string, catalog map[string]bool) []string {
