@@ -33,4 +33,16 @@ Two lessons from using it, so the next measurement does not relearn them:
 - To measure against a real store instead of the generated one, point
   `--out-root` at a directory whose `store-<arm>/claude-root` is a copy of
   (or junction to) the real transcripts. Keep `DEJA_INDEX_DIR` isolation —
-  the runner never writes into a live index either way.
+  the runner never writes into a live index either way. Take that copy
+  before the first build: a live store grows while the run is going, and
+  then the cells are timing different bytes.
+
+The read-only counterpart is `internal/index/cjkindex_realcorpus492_test.go`,
+behind the `realcorpus492` build tag so a normal `go test ./...` never sees
+it. It replays what a real build walks before `indexKeys` sees a byte
+(`ParseClaudeFile` -> `preRedactSessions` -> skip-if-empty -> `tokenizedPart`)
+and reports the one thing no generator can be reasoned into: the bigram
+repetition rate, which is what both dedupe halves are paid for. Measured so
+far — `benchJAText`, the fixture the microbenchmarks use, 4.000; this
+generator, 1.640; a real 365k-message Chinese store, 1.376 (#492). The
+per-message speedups move with it, so quote them against a rate.
