@@ -751,6 +751,14 @@ var removingTargets map[string]bool
 // has been edited since it wrote it.
 var forceGuidance bool
 
+// configParseError names the file a parse refusal is about. The refusal is what
+// a reader is sent to act on — doctor points at `deja install <targets>` when a
+// rewire failed, and the parser's own words alone left them guessing which of
+// the harness configs it had opened (#2214).
+func configParseError(path string, err error) error {
+	return fmt.Errorf("%s: %w", path, err)
+}
+
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
 // The markers are what every generator writes: the subcommands the hooks call,
 // and the name of the MCP server and extension entries.
@@ -920,7 +928,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
@@ -953,7 +961,7 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
 	nextRoot = updateClaudeHook(nextRoot, "PreCompact", exe+" hook-precompact", "manual|auto", uninstall)
@@ -1108,7 +1116,7 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	cmd := exe + " statusline"
 	existing, _ := root["statusLine"].(map[string]any)
@@ -1258,7 +1266,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
@@ -1294,7 +1302,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	mcp, _ := root["mcp"].(map[string]any)
 	if mcp == nil {
@@ -1327,7 +1335,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {

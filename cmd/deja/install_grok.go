@@ -30,7 +30,7 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 	root := map[string]any{}
 	if len(old) > 0 {
 		if err := json.Unmarshal(old, &root); err != nil {
-			return installResult{}, err
+			return installResult{}, configParseError(path, err)
 		}
 	}
 	mcp, _ := root["mcp"].(map[string]any)

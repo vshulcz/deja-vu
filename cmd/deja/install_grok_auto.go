@@ -41,7 +41,7 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	root = updateClaudeHook(root, "SessionStart", exe+" hook-context", "startup|resume", false)
 	root = updateClaudeHook(root, "PreCompact", exe+" hook-precompact", "manual|auto", false)
