@@ -674,6 +674,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	}
 	wg.Wait()
 	unreadable := malformedByHarness()
+	refused := failedByHarness()
 	var ss []model.Session
 	for _, r := range results {
 		if len(r.ss) == 0 {
@@ -691,8 +692,8 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 				switch reason := sources.SkipReason(r.name); {
 				case reason != "":
 					fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
-				case unreadable[r.name] > 0:
-					fmt.Fprintln(progress, nothingReadableNarration(r.name, unreadable[r.name]))
+				case unreadable[r.name] > 0 || refused[r.name] > 0:
+					fmt.Fprintln(progress, nothingReadableNarration(r.name, unreadable[r.name], refused[r.name]))
 				}
 			}
 			continue
@@ -734,12 +735,34 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 // because deja could not read what it found. "0 sessions, 0 messages" is the
 // ordinary line's shape and says the wrong thing here — there were sessions,
 // and none of them survived the read (#2229).
-func nothingReadableNarration(name string, unreadable int) string {
+func nothingReadableNarration(name string, unreadable, refused int) string {
 	label := name
 	if label == "deja" {
 		label = "notes"
 	}
-	return fmt.Sprintf("deja: %s: nothing indexed — %d line%s could not be read", label, unreadable, pluralS(unreadable))
+	// Lines and whole files are different losses and the sentence says which:
+	// a task deja could not parse is a path, and calling it a line said "1
+	// line" about three thousand turns (#2232).
+	var what []string
+	if unreadable > 0 {
+		what = append(what, fmt.Sprintf("%d line%s", unreadable, pluralS(unreadable)))
+	}
+	if refused > 0 {
+		what = append(what, fmt.Sprintf("%d path%s", refused, pluralS(refused)))
+	}
+	return fmt.Sprintf("deja: %s: nothing indexed — %s could not be read", label, strings.Join(what, " and "))
+}
+
+// failedByHarness is malformedByHarness for the paths that would not open or
+// would not parse at all.
+func failedByHarness() map[string]int {
+	out := map[string]int{}
+	for p := range sources.DiagFailedPaths() {
+		if h := sources.HarnessForKind(harnessForPath(p)); h != "" {
+			out[h]++
+		}
+	}
+	return out
 }
 
 // totalMalformed is malformedByHarness summed: the incremental line names the
