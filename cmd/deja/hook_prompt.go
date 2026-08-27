@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -459,6 +460,31 @@ func citationLine(s model.Session, terms []string) string {
 		title, s.Harness, date, shortID(s.ID))
 }
 
+// hookseenKey makes an agent session id safe to be one field of a `.hookseen`
+// line. The file is whitespace-separated and the id arrives in the hook
+// payload, which is whatever the host sends. A space cost that session its
+// dedup and handed its entries to whatever id its first word named, and a
+// newline wrote a line of its own — so a payload could mark memory as already
+// shown to any session it liked (#2167).
+//
+// Writing and reading go through this, so a mapped id matches itself, and every
+// id a harness actually sends maps to itself, which is why no existing file
+// needs converting.
+func hookseenKey(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return '_'
+		}
+		return r
+	}, s)
+}
+
+// hookseenField reports whether a value can be one field of a line as it
+// stands. The session id above is mapped because it is only ever compared with
+// itself; a value is not, because it is compared with the index's own ids —
+// so one that cannot be a field is left out of the file instead.
+func hookseenField(s string) bool { return s != "" && hookseenKey(s) == s }
+
 // alreadyInjected returns the session ids this hook already injected into the
 // given agent session, so follow-up prompts do not repeat the same memory.
 func alreadyInjected(dir, sid string) map[string]bool {
@@ -470,11 +496,12 @@ func alreadyInjected(dir, sid string) map[string]bool {
 	if err != nil {
 		return out
 	}
+	key := hookseenKey(sid)
 	for _, line := range strings.Split(string(b), "\n") {
 		// Two fields when the entry is a block fingerprint, three when it is a
 		// session with the time it was shown.
 		parts := strings.Fields(line)
-		if len(parts) >= 2 && parts[0] == sid {
+		if len(parts) >= 2 && parts[0] == key {
 			out[parts[1]] = true
 		}
 	}
@@ -508,11 +535,12 @@ func recentlyInjected(dir, sid string, window int) map[string]bool {
 		return out
 	}
 	lines := strings.Split(string(b), "\n")
+	key := hookseenKey(sid)
 	// Newest first: the window counts injections, and the file is append-only.
 	kept := 0
 	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
 		parts := strings.Fields(lines[i])
-		if len(parts) < 2 || parts[0] != sid {
+		if len(parts) < 2 || parts[0] != key {
 			continue
 		}
 		kept++
@@ -535,12 +563,13 @@ func forgetInjected(dir, sid string) {
 	if err != nil {
 		return
 	}
+	key := hookseenKey(sid)
 	var kept []string
 	for _, line := range strings.Split(string(b), "\n") {
 		if line == "" {
 			continue
 		}
-		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == sid {
+		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == key {
 			continue
 		}
 		kept = append(kept, line)
@@ -579,7 +608,14 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 	}
 	stamp := time.Now().UTC().Format(time.RFC3339)
 	for _, s := range ss {
-		fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
+		// The value stays byte-exact: it is looked up against the index's own
+		// ids, and a mapped one would match nothing there. One that cannot be
+		// a field is dropped instead — a missing dedup entry costs a second
+		// showing, where a broken line costs the entry written after it.
+		if !hookseenField(s.ID) {
+			continue
+		}
+		fmt.Fprintf(f, "%s %s %s\n", hookseenKey(sid), s.ID, stamp)
 	}
 }
 
@@ -603,7 +639,7 @@ func rotateHookseen(p, sid string) {
 	// every write rotated a megabyte again: the tool hooks write a token per
 	// call, so that is reachable rather than theoretical (#2164).
 	var keep, mine []string
-	prefix := sid + " "
+	prefix := hookseenKey(sid) + " "
 	for i, ln := range lines {
 		if ln == "" {
 			continue
@@ -647,7 +683,10 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 		_, _ = f.WriteString("\n")
 	}
 	for _, id := range ids {
-		fmt.Fprintf(f, "%s %s\n", sid, id)
+		if !hookseenField(id) {
+			continue
+		}
+		fmt.Fprintf(f, "%s %s\n", hookseenKey(sid), id)
 	}
 }
 
