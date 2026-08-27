@@ -43,6 +43,13 @@ func TestMain(m *testing.M) {
 		"DEJA_GROK_ROOT":        filepath.Join(root, "grok"),
 		"DEJA_QWEN_ROOT":        filepath.Join(root, "qwen"),
 	}
+	// The version lookup is the one thing in this package that talks to the
+	// internet, and only one test ever replaced it — so a full run asked
+	// api.github.com eleven times, left HTTP/2 connections whose cleanup
+	// goroutines outlived their tests, and raced the zone tests' writes to
+	// time.Local under -race (#2206). A test that wants the real path can put
+	// it back for itself.
+	doctorLookup = offlineLookup
 	for key, value := range stores {
 		if err := os.Setenv(key, value); err != nil {
 			panic(err)
