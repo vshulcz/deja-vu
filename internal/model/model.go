@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type Message struct {
@@ -117,4 +118,33 @@ func (s *Session) Touch(t time.Time) {
 	if s.Updated.IsZero() || t.After(s.Updated) {
 		s.Updated = t
 	}
+}
+
+// LoggedID is a session id as a JSON log holds it. encoding/json replaces every
+// byte that is not valid UTF-8 with U+FFFD, so an id carrying one — a project
+// directory named with a stray byte, which ext4 allows — comes back from the
+// usage log as a different string and matched no session in the index (#2199).
+// Anything comparing an id against one that has been through JSON has to
+// compare the same form.
+//
+// Byte for byte what the encoder does, rather than strings.ToValidUTF8, which
+// collapses a run of bad bytes into one replacement where the encoder writes
+// one per byte.
+func LoggedID(id string) string {
+	if utf8.ValidString(id) {
+		return id
+	}
+	var b strings.Builder
+	b.Grow(len(id))
+	for i := 0; i < len(id); {
+		r, size := utf8.DecodeRuneInString(id[i:])
+		if r == utf8.RuneError && size == 1 {
+			b.WriteRune(utf8.RuneError)
+			i++
+			continue
+		}
+		b.WriteString(id[i : i+size])
+		i += size
+	}
+	return b.String()
 }
