@@ -269,15 +269,22 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 					doc.minWindow = w
 				}
 			}
-			doc.length += countDocumentWords(low, qtoks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
+			// Count the document over the same pair the match was found on.
+			// A cross-script hit is counted above through the fold and then
+			// scored here against the surface text, where the query's words
+			// appear nowhere: term frequency stays zero, BM25 scores zero, and
+			// a record that matched twice ranks below one that matched once
+			// (#1605). windowText and windowToks already carry whichever pair
+			// answered, so scoring follows the same rule proximity does.
+			doc.length += countDocumentWords(windowText, windowToks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
 			// The token, not the raw query — the same rule as countIn. This
 			// path is what scores `retry` inside `retry-backoff`, which
 			// countDocumentWords cannot match because it counts whole words
 			// and treats the hyphen as one. Comparing the raw query here left
 			// a punctuated query with a session that matched three times and
 			// scored zero, ranked below one that matched once (#1603).
-			if len(qtoks) == 1 && doc.termCount[0] == 0 && strings.Contains(low, qtoks[0]) {
-				n := strings.Count(low, qtoks[0])
+			if len(windowToks) == 1 && doc.termCount[0] == 0 && strings.Contains(windowText, windowToks[0]) {
+				n := strings.Count(windowText, windowToks[0])
 				doc.termCount[0] += n
 				if m.Role == "user" {
 					doc.userCount[0] += n
