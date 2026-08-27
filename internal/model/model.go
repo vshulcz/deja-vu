@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 )
@@ -9,6 +10,28 @@ type Message struct {
 	Role string    `json:"role"`
 	Text string    `json:"text"`
 	Time time.Time `json:"time"`
+}
+
+// MarshalJSON leaves the time out of a message the transcript never stamped.
+//
+// The zero time marshals as "0001-01-01T00:00:00Z", which reads as a date
+// rather than as the absence of one: a consumer sorting by it puts the message
+// before everything that ever happened, and one bucketing by month gets a
+// bucket in the year one. Every surface deja prints already refuses it — the
+// listing shows "-" because "0001-01-01 reads as corrupted data rather than as
+// a missing field" (#765) — and this is the surface a machine reads (#2113).
+func (m Message) MarshalJSON() ([]byte, error) {
+	// The alias sheds the method, so this does not call itself; the outer Time
+	// shadows the embedded one, which is how a field is dropped without
+	// restating the rest of the shape.
+	type message Message
+	if m.Time.IsZero() {
+		return json.Marshal(struct {
+			message
+			Time *time.Time `json:"time,omitempty"`
+		}{message(m), nil})
+	}
+	return json.Marshal(message(m))
 }
 
 type Session struct {
