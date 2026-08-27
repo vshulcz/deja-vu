@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
-// visibleWidth is what a terminal actually spends on a line: ANSI stripped,
-// runes not bytes.
-func visibleWidth(line string) int { return visibleLen(line) }
+// visibleWidth is what a terminal actually spends on a line: ANSI stripped and
+// measured the way the renderer measures, in columns. Counting runes agreed
+// with that for every ASCII fixture here and let a CJK line twice the
+// terminal's width past the guards below (#2130).
+func visibleWidth(line string) int { return termwidth.Columns(visibleText(line)) }
 
 // briefStore writes three sessions whose ages decide how wide the date on the
 // `recent` line is — "today" is five columns, "Jun 27 2025" is eleven.
@@ -125,7 +128,7 @@ func TestBriefRecentLinesHonourColumns(t *testing.T) {
 			t.Errorf("COLUMNS=60: line is %d columns: %q", w, l)
 		}
 		// The floor keeps a readable fragment rather than an empty column.
-		if i := strings.LastIndex(l, " · "); i < 0 || visibleLen(l[i+3:]) < 12 {
+		if i := strings.LastIndex(l, " · "); i < 0 || visibleWidth(l[i+3:]) < 12 {
 			t.Errorf("COLUMNS=60 cut the title down to nothing: %q", l)
 		}
 	}
@@ -140,7 +143,7 @@ func TestBriefRecentLinesHonourColumns(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, l := range recentLines(buf.String()) {
-		if i := strings.LastIndex(l, " · "); i < 0 || visibleLen(l[i+3:]) < 12 {
+		if i := strings.LastIndex(l, " · "); i < 0 || visibleWidth(l[i+3:]) < 12 {
 			t.Errorf("COLUMNS=40 cut the title down to nothing: %q", l)
 		}
 	}
