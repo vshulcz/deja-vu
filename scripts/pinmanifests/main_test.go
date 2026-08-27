@@ -142,3 +142,37 @@ func TestRenderScoopIsStableAndComplete(t *testing.T) {
 		t.Fatal("arm64 hash is not the arm64 one")
 	}
 }
+
+// A tag reference at the end of a line is still a tag reference. `$` without
+// the multiline flag matches only the end of the whole file, so the
+// ReleaseNotesUrl in the winget locale — the last thing on its line — kept
+// pointing at v0.16.1 through three releases while every other reference moved
+// (#2088).
+func TestEditMovesATagReferenceAtTheEndOfALine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "locale.yaml")
+	original := `PackageIdentifier: vshulcz.deja-vu
+PackageVersion: 0.0.1
+LicenseUrl: https://github.com/vshulcz/deja-vu/blob/v0.0.1/LICENSE
+ReleaseNotesUrl: https://github.com/vshulcz/deja-vu/releases/tag/v0.0.1
+ShortDescription: memory for coding agents
+`
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := parse("1.2.3", sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := edit(path, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(out)
+	if !strings.Contains(got, "/releases/tag/v1.2.3") {
+		t.Errorf("the release notes still point at the old tag:\n%s", got)
+	}
+	if strings.Contains(got, "v0.0.1") {
+		t.Errorf("a stale tag reference is left behind:\n%s", got)
+	}
+}

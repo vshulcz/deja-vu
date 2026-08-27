@@ -193,7 +193,10 @@ func renderCodexPlugin(p pins) ([]byte, error) {
 
 var (
 	versionLine = regexp.MustCompile(`(?m)^PackageVersion: .*$`)
-	tagRefs     = regexp.MustCompile(`/v\d+\.\d+\.\d+(/|$)`)
+	// (?m) because a tag reference is often the last thing on its line: the
+	// ReleaseNotesUrl in the winget locale sat at v0.16.1 through three
+	// releases while every reference followed by a slash moved (#2088).
+	tagRefs     = regexp.MustCompile(`(?m)/v\d+\.\d+\.\d+(/|$)`)
 	fileRefs    = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_windows`)
 	jsonVersion = regexp.MustCompile(`(?m)^(\s*"version":\s*)"[^"]*"`)
 	amdSha      = regexp.MustCompile(`(?m)^(\s*InstallerSha256: )[0-9A-Fa-f]{64}(\s*)$`)
