@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
@@ -144,6 +146,56 @@ func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName 
 	snapshotWriteInto(indexDir, kind, digest, "", sessions, policyName, terms)
 }
 
+// snapshotLineMax is the longest line the reader takes, and therefore the
+// longest one worth writing. A record past it was written and then unreadable:
+// `deja log` showed nothing for an injection that happened, and the next
+// rotation rewrote the file without it (#2222).
+const snapshotLineMax = 4 << 20
+
+// clipDigest cuts a digest down to what this file can read back, saying so
+// where it cut. The head is kept, because that is what an agent was shown
+// first, and `Bytes` still carries the size that was served: the clipping is
+// this file's business, not a claim about the injection.
+//
+// The budget is on the marshalled line, not on the digest, since escaping is
+// what decides the difference — a digest of newlines doubles.
+func clipDigest(digest string) string {
+	const marker = "\n… (clipped: the whole digest was %d bytes)"
+	if len(digest)+len(marker) < snapshotLineMax {
+		return digest
+	}
+	// Halve until the line fits, then keep what fits. Two passes in practice,
+	// and bounded by the loop rather than by an assumption about escaping.
+	keep := snapshotLineMax / 2
+	for keep > 0 {
+		clipped := digest[:runeBoundaryAt(digest, keep)] + fmt.Sprintf(marker, len(digest))
+		if b, err := json.Marshal(clipped); err == nil && len(b)+snapshotEnvelope < snapshotLineMax {
+			return clipped
+		}
+		keep /= 2
+	}
+	return fmt.Sprintf("(clipped: the whole digest was %d bytes)", len(digest))
+}
+
+// runeBoundaryAt is n backed up to where a rune starts, so a cut lands between
+// characters rather than inside one. A half rune is not an error — the encoder
+// writes U+FFFD for it — but it is a mojibake tail on the last line of a digest
+// someone reads.
+func runeBoundaryAt(s string, n int) int {
+	if n >= len(s) {
+		return len(s)
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return n
+}
+
+// snapshotEnvelope is room for the rest of the record around the digest — the
+// stamp, kind, terms, policy and the session it went into. Generous on purpose:
+// being under the reader's ceiling is what matters, not being near it.
+const snapshotEnvelope = 64 << 10
+
 func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
 	if digest == "" {
 		return
@@ -153,7 +205,7 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 		return
 	}
 	b, err := marshalSnapshot(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
-		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
+		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: clipDigest(digest)})
 	if err != nil {
 		return
 	}
