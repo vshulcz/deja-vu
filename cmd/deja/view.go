@@ -209,7 +209,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		// filename takes a control byte on every Unix filesystem.
 		sessions[i].ID = safeNameForPage(sessions[i].ID)
 		sessions[i].Title = safeTitleForPage(sessions[i].Title)
-		sessions[i].Preview = safeTextForPage(sessions[i].Preview)
+		sessions[i].Preview = clipForPage(safeTextForPage(sessions[i].Preview))
 		sessions[i].Project = safeNameForPage(sessions[i].Project)
 	}
 	for i := range recalls {
@@ -220,7 +220,10 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	}
 	for i := range notes {
 		notes[i].Title = safeTitleForPage(notes[i].Title)
-		notes[i].Text = safeTextForPage(notes[i].Text)
+		// Capped like a session's preview, and for the same reason: a promoted
+		// note carries whatever was promoted, and one of a megabyte outweighed
+		// a hundred sessions on the page (#2100).
+		notes[i].Text = clipForPage(safeTextForPage(notes[i].Text))
 		// A note's project and tags are what the user typed, so they are text
 		// like the rest rather than structure deja minted.
 		notes[i].Project = safeNameForPage(notes[i].Project)
@@ -284,15 +287,23 @@ func sessionPreview(msgs []model.Message) string {
 			break
 		}
 	}
-	out := b.String()
-	if len(out) > viewPreviewBytes {
-		cut := viewPreviewBytes
-		for cut > 0 && !utf8.RuneStart(out[cut]) {
-			cut--
-		}
-		out = out[:cut] + "…"
+	// Whole messages, and the trailing cut is left to clipForPage: cutting here
+	// happens before the redaction below, so a secret sliced in half stops
+	// matching the pattern that would have masked it and the half is printed.
+	return b.String()
+}
+
+// clipForPage bounds a cell at the size a preview gets, cutting on a rune
+// boundary and saying that it cut.
+func clipForPage(s string) string {
+	if len(s) <= viewPreviewBytes {
+		return s
 	}
-	return out
+	cut := viewPreviewBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
 }
 
 func openInBrowser(path string) {
