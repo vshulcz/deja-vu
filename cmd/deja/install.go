@@ -19,7 +19,13 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-type installResult struct{ Path, Action string }
+type installResult struct {
+	Path, Action string
+	// Note is what the caller should say besides the action: a file deja knows
+	// about, could not act on, and left as it found it. Empty in every ordinary
+	// case, so a printer can append it blind (#2218).
+	Note string
+}
 
 func runInstall(dir string, args []string, uninstall bool) error {
 	// Every path deja writes hangs off the home directory, and homeDir()
@@ -123,6 +129,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		defer func() { removingTargets = nil }()
 	}
 	defer recordWiring(targets, uninstall)
+	saidNotes := map[string]bool{}
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
 	var done []lineItem
@@ -151,6 +158,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			if err != nil {
 				note(t, err)
 				continue
+			}
+			// Two targets can share one guidance harness — `gemini` and
+			// `gemini-auto` do — and a note about a file is about the file,
+			// not about the target that noticed it.
+			if gr.Note != "" && saidNotes[gr.Note] {
+				gr.Note = ""
+			} else if gr.Note != "" {
+				saidNotes[gr.Note] = true
 			}
 			if gr.Path != "" && !banner {
 				fmt.Println(guidanceOutput(t, gr))

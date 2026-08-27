@@ -193,8 +193,12 @@ func retiredGuidancePaths(harness string) []string {
 }
 
 // dropRetiredGuidance removes deja's marked block from a file it no longer
-// writes, leaving every other line in it alone.
-func dropRetiredGuidance(harness string) error {
+// writes, leaving every other line in it alone. It returns what the caller
+// should say about the files it had to leave: a block whose markers do not pair
+// cannot be bounded, and guessing its end is what deleted a file in #1705 — but
+// leaving deja's instructions in front of an agent after an uninstall, without
+// a word, is the other way to get it wrong (#2218).
+func dropRetiredGuidance(harness string, uninstall bool) (note string, err error) {
 	keep := guidancePath(harness)
 	for _, path := range retiredGuidancePaths(harness) {
 		// A relocation variable can point a harness's own directory at the
@@ -208,7 +212,7 @@ func dropRetiredGuidance(harness string) error {
 			if os.IsNotExist(err) {
 				continue
 			}
-			return err
+			return note, err
 		}
 		if start, end := guidanceMarkerLines(string(old)); start < 0 || end < 0 {
 			// A skill file has frontmatter rather than markers. Ours is
@@ -219,30 +223,40 @@ func dropRetiredGuidance(harness string) error {
 				filepath.Base(filepath.Dir(path)) == "deja-history" &&
 				strings.Contains(string(old), "name: deja-history") {
 				if err := os.Remove(path); err != nil {
-					return err
+					return note, err
 				}
 				// Take the directory too, but only if we emptied it.
 				_ = os.Remove(filepath.Dir(path))
+				continue
+			}
+			// A start with no end: deja's text is still in a file the agent
+			// reads, and only the reader can decide where it ends. Said on the
+			// way out, where "leave nothing behind" is the promise; on the way
+			// in the block is deja's own guidance twice over, and "delete this
+			// by hand" is not advice for someone installing.
+			if start >= 0 && uninstall {
+				note = path + ": deja's guidance block has no end marker, so it was left as it is — delete from " +
+					guidanceStart + " to the end of that block by hand"
 			}
 			continue
 		}
 		next, uerr := updateGuidanceBlock(string(old), true)
 		if uerr != nil {
-			return uerr
+			return note, markerErrorFor(path, uerr)
 		}
 		// A file that held nothing but our block was ours to begin with, so
 		// leaving it behind empty would be litter rather than someone's content.
 		if strings.TrimSpace(next) == "" {
 			if err := os.Remove(path); err != nil {
-				return err
+				return note, err
 			}
 			continue
 		}
 		if _, err := writeIfChanged(path, old, []byte(next)); err != nil {
-			return err
+			return note, err
 		}
 	}
-	return nil
+	return note, nil
 }
 
 // sharedSkillStillWanted reports whether a harness other than the one being
@@ -342,7 +356,8 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	if path == "" {
 		return installResult{}, nil
 	}
-	if err := dropRetiredGuidance(harness); err != nil {
+	retiredNote, err := dropRetiredGuidance(harness, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
 	// Grok Build reads the cross-agent skills directory, so it gets the shared
@@ -362,17 +377,17 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 	if guidanceOwnsWholeFile(harness) {
 		if uninstall {
 			if len(old) == 0 {
-				return installResult{Path: path, Action: "unchanged"}, nil
+				return installResult{Path: path, Action: "unchanged", Note: retiredNote}, nil
 			}
 			// One file serves several harnesses, so removing it because one of
 			// them was uninstalled would take the memory away from the rest.
 			if sharedSkillHarnesses[harness] && sharedSkillStillWanted(harness) {
-				return installResult{Path: path, Action: "kept"}, nil
+				return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
 			}
 			if err := os.Remove(path); err != nil {
 				return installResult{}, err
 			}
-			return installResult{Path: path, Action: "removed"}, nil
+			return installResult{Path: path, Action: "removed", Note: retiredNote}, nil
 		} else {
 			next = []byte(guidanceText(harness))
 			// A skill inside an antigravity plugin directory is ingested only
@@ -428,7 +443,7 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	if a == "kept" {
-		return installResult{Path: path, Action: a}, nil
+		return installResult{Path: path, Action: a, Note: retiredNote}, nil
 	}
 	// grok is three CLIs sharing one directory: the one that still reads
 	// GROK.md is not the one being maintained, and grok-dev reads AGENTS.md
@@ -447,7 +462,7 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			return installResult{}, werr
 		}
 	}
-	return installResult{Path: path, Action: a}, nil
+	return installResult{Path: path, Action: a, Note: retiredNote}, nil
 }
 
 // markerErrorFor names the file a marker refusal is about. The refusal is the
@@ -625,5 +640,11 @@ func guidanceOutput(harness string, result installResult) string {
 	if result.Path == "" {
 		return fmt.Sprintf("%s: guidance unsupported", harness)
 	}
-	return fmt.Sprintf("%s: guidance %s %s", harness, result.Action, result.Path)
+	line := fmt.Sprintf("%s: guidance %s %s", harness, result.Action, result.Path)
+	// A file deja knows about and could not act on. Printed under the action
+	// rather than in place of it: the action is still what happened (#2218).
+	if result.Note != "" {
+		line += "\n" + strings.Repeat(" ", len(harness)+2) + result.Note
+	}
+	return line
 }
