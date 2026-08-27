@@ -86,6 +86,10 @@ func TestTheMissingBinaryCheckReadsEveryConfigShapeAndNothingElse(t *testing.T) 
 	}{
 		{"a bare name is the PATH's", `{"mcpServers":{"deja":{"command":"deja","args":["mcp"]}}}`, ""},
 		{"a binary that is there", `{"mcpServers":{"deja":{"command":"` + realJSON + `","args":["mcp"]}}}`, ""},
+		// A quoted path in a file that does not parse as JSON: the escapes
+		// belong to the format, and reading them raw named a path that exists
+		// nowhere — doctor then called a working install broken.
+		{"a quoted path in toml", "[mcp_servers.deja]\ncommand = \"" + realJSON + "\"\n", ""},
 		{"no deja entry", `{"mcpServers":{"other":{"command":"/usr/bin/other"}}}`, ""},
 		{"a directory named deja", `{"mcpServers":{"deja":{"command":"deja","cwd":"` + goneJSON + `"}}}`, ""},
 		{"an unrelated path in toml", "[tool]\ndata_dir = \"" + goneJSON + "\"\n", ""},
