@@ -2803,6 +2803,10 @@ func oneSuffixStep(word string) []string {
 		// full of "retries" (#1079).
 		add(strings.TrimSuffix(word, "ies") + "y")
 		add(strings.TrimSuffix(word, "es"))
+		// And the plain "s", for the reason the "es" case below takes it:
+		// "movies" is neither "movy" nor "movi", and nothing further down
+		// strips it again (#2137).
+		add(strings.TrimSuffix(word, "s"))
 	case strings.HasSuffix(word, "ied"):
 		add(strings.TrimSuffix(word, "ied") + "y")
 	case strings.HasSuffix(word, "ed"):
@@ -2814,7 +2818,15 @@ func oneSuffixStep(word string) []string {
 		add(base)
 		add(base + "e")
 	case strings.HasSuffix(word, "es"):
+		// Both strips, because the switch stops here and the plain "s" case
+		// below never runs for these words: "boxes" needs the "es" gone and
+		// "pipelines" needs only the "s", and a plural of every noun ending in
+		// "e" reached the stub "pipelin" and no further. Whichever form the
+		// store does not hold falls out at the catalog, which every lookup
+		// goes through; the relevance keys take the forms unfiltered, and there
+		// the extra one is the real singular (#2137).
 		add(strings.TrimSuffix(word, "es"))
+		add(strings.TrimSuffix(word, "s"))
 	case strings.HasSuffix(word, "s"):
 		add(strings.TrimSuffix(word, "s"))
 	}
