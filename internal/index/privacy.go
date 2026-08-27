@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -215,9 +216,20 @@ func appendTombstones(keys []string) error {
 		buf.WriteString(key)
 		buf.WriteByte('\n')
 	}
-	f, err := os.OpenFile(tombstonePath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	// O_RDWR because the append has to read the last byte: a process killed
+	// between a key and its newline leaves the file ending mid-line, and the
+	// next key appended onto that line loses both. Losing the interrupted key
+	// is the accepted cost of writing without a lock; losing the forget after
+	// it is not (#2195).
+	f, err := os.OpenFile(tombstonePath(), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
+	}
+	if atomicfile.EndsMidLine(f) {
+		if _, err := f.Write([]byte{'\n'}); err != nil {
+			_ = f.Close()
+			return err
+		}
 	}
 	if _, err := f.Write(buf.Bytes()); err != nil {
 		_ = f.Close()
