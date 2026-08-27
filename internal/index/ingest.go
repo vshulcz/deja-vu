@@ -704,7 +704,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		}
 		ss = append(ss, r.ss...)
 		if progress != nil && !SuppressHarnessNarration {
-			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name]))
+			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name], refused[r.name]))
 		}
 	}
 	return ss
@@ -715,7 +715,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 // in SQLite — and the count alone then reads as the whole story while half of
 // it is missing from recall. The skip reason was printed only for a store that
 // yielded nothing at all (#1758, the shape of #794).
-func harnessNarration(name string, ss []model.Session, skipped string, unreadable int) string {
+func harnessNarration(name string, ss []model.Session, skipped string, unreadable, refused int) string {
 	msgs := 0
 	for _, s := range ss {
 		msgs += len(s.Messages)
@@ -728,6 +728,13 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 	line := fmt.Sprintf("deja: %s: %d session%s, %d message%s", label, len(ss), pluralS(len(ss)), msgs, pluralS(msgs))
 	if unreadable > 0 {
 		line += fmt.Sprintf(" — %d line%s skipped, deja could not read %s", unreadable, pluralS(unreadable), pluralThem(unreadable))
+	}
+	// A file deja could not read at all is the third fact of this kind, beside
+	// the refused lines and the missing tool. Without it a store that gave up
+	// ten sessions and lost three tasks read like a store with nothing wrong
+	// (#2236).
+	if refused > 0 {
+		line += fmt.Sprintf(" — %d path%s could not be read at all", refused, pluralS(refused))
 	}
 	if skipped != "" {
 		line += " — part of this store could not be read: " + skipped
