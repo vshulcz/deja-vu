@@ -626,6 +626,14 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 			result.StaleStores++
 		}
 	}
+	// Damage outranks staleness: a store that cannot answer is not merely
+	// behind. The human report has named this since #735 while the JSON called
+	// the same store "ok", so a script watching it for index health was told
+	// everything was fine (#2292).
+	if index.Damaged(dir) {
+		result.State = "damaged"
+		return result
+	}
 	if result.StaleStores > 0 {
 		result.State = "stale"
 		// "run `deja index`" is the advice attached to `stale`, and it cannot

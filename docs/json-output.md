@@ -381,7 +381,10 @@ when it is `unreadable` — the sidecar is on disk and deja cannot parse it —
 with an `error` saying why. A sidecar fault is reported whether or not an
 endpoint is configured, so `embed` is present in that case even with no
 endpoint. `index.path` points at the index
-directory; `index.db` is that directory's name, not a file. Store `state`
+directory; `index.db` is that directory's name, not a file. `index.state` is
+`missing`, `ok`, `stale`, `stale-readonly` (stale where the index cannot be
+written, so `deja index` cannot fix it) or `damaged` (records or postings are
+gone; the next search rebuilds it). Store `state`
 values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
 `denied` field naming the unreadable path), `needs-sqlite3` and `needs-zstd`
 (both of which add a `skipped` field saying which CLI is missing); an existing

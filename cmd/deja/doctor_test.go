@@ -218,10 +218,12 @@ func TestDoctorIndexStates(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"manifest.gob", "sessions.gob"} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte("fixture"), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	// A real index, not two files named like one: a manifest that will not
+	// decode is damage by deja's own definition (#735), and since #2292 the
+	// report says so — which is the right answer for a fixture like that and
+	// the wrong one for the staleness arithmetic this test is about.
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
 	}
 	manifestTime := time.Now().Add(-time.Minute)
 	if err := os.Chtimes(filepath.Join(dir, "manifest.gob"), manifestTime, manifestTime); err != nil {
