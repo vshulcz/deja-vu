@@ -1,6 +1,6 @@
 {
   "name": "deja-vu",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "Memory for AI coding agents: your own past sessions, recalled before you ask.",
   "author": {
     "name": "vshulcz",

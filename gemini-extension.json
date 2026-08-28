@@ -1,6 +1,6 @@
 {
   "name": "deja",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "Search the coding sessions already on your disk — Gemini CLI, Claude Code, Codex, Cursor and seventeen more — including work from before deja was installed.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {
