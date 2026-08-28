@@ -320,10 +320,6 @@ func doctorEmbed(w io.Writer, r doctorEmbedReport) {
 	fmt.Fprintf(w, "  sidecar    coverage=%.1f%%\n", r.Coverage)
 }
 
-// unplacedFiles counts transcripts under root that the harness's own filter
-// did not pick up. A harness that changes its layout in a new version presents
-// exactly this way: quietly fewer sessions, no error, and a directory size that
-// still looks right (#701).
 // inDotDir reports whether the path sits inside a dot-directory below the
 // root — a cache, a temp dir, anything a tool keeps for itself.
 func inDotDir(root, p string) bool {
@@ -339,6 +335,11 @@ func inDotDir(root, p string) bool {
 	return false
 }
 
+// unplacedFiles counts transcripts under root that the harness's own filter did
+// not pick up. A harness that changes its layout in a new version presents
+// exactly this way: quietly fewer sessions, no error, and a directory size that
+// still looks right (#701).
+//
 // unplacedFiles counts the transcripts under a root that deja did not read,
 // split by whether it declined them on purpose. Everything was one number
 // before, and on a machine that spawns subagents most of it is the deliberate
