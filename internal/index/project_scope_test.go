@@ -29,3 +29,29 @@ func TestProjectScopeDoesNotMatchOnABareBasename(t *testing.T) {
 		}
 	}
 }
+
+// The strict rule drops the allowance synced work gets: right for recall, wrong
+// for a command that packages one session for another agent (#2347).
+func TestStrictProjectScopeDropsTheSyncedAllowance(t *testing.T) {
+	cases := []struct {
+		project, want string
+		in            bool
+	}{
+		{"work/api", "work/api", true},
+		{"imported:work/api", "work/api", true},
+		{"imported:clients/acme/api", "api", false},
+		{"imported:goprojects/svc", "svc", false},
+		{"imported:svc", "svc", true},
+		{"src/clients/acme/api", "acme/api", true},
+		{"acme/api", "", false},
+	}
+	for _, c := range cases {
+		if got := ProjectInScopeStrict(c.project, c.want); got != c.in {
+			t.Errorf("ProjectInScopeStrict(%q, %q) = %v, want %v", c.project, c.want, got, c.in)
+		}
+	}
+	// And the loose rule still answers the synced case recall depends on.
+	if !ProjectInScope("imported:goprojects/svc", "svc") {
+		t.Error("the loose rule no longer reaches a peer's project by its local name")
+	}
+}

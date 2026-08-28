@@ -745,6 +745,27 @@ func projectInScope(project, want string) bool {
 	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
 }
 
+// ProjectInScopeStrict is ProjectInScope without the allowance synced work
+// gets. The loose rule is right for recall — a peer's parent path is not this
+// machine's, so `imported:goprojects/svc` has to answer to a local `svc` — and
+// wrong for a command that packages one session's content for another agent:
+// `deja handoff`, run from a directory named api, picked a teammate's
+// `clients/acme/api` because it was the newest thing ending in /api (#2347).
+func ProjectInScopeStrict(project, want string) bool {
+	if want == "" {
+		return false
+	}
+	p := strings.TrimPrefix(strings.ToLower(project), "imported:")
+	w := strings.ToLower(want)
+	if p == w {
+		return true
+	}
+	if !strings.ContainsAny(w, `/\`) {
+		return false
+	}
+	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
+}
+
 // ProjectInScope reports whether a session's project is the one a caller is
 // standing in. Exported so the automatic surfaces share one rule: the same
 // question answered three different ways is how a client's project reached a
