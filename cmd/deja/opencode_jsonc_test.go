@@ -113,7 +113,7 @@ func TestOpencodeJSONCKeepsTrailingCommasValid(t *testing.T) {
 	}
 	for name, in := range cases {
 		t.Run(name, func(t *testing.T) {
-			out, err := updateOpencodeJSONC([]byte(in+"\n"), "/usr/local/bin/deja", false)
+			out, _, err := updateOpencodeJSONC([]byte(in+"\n"), "/usr/local/bin/deja", false)
 			if err != nil {
 				t.Fatal(err)
 			}
