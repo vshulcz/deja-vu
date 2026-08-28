@@ -24,12 +24,6 @@ func runShare(dir string, args []string, w io.Writer) error {
 			return fmt.Errorf("share: unknown flag %q — share writes to stdout (redirect it), and `deja promote <id> --to <path>` is the one that writes a file", a)
 		}
 	}
-	// An empty prefix matches the first session there is, so `deja share
-	// "$ID"` with the variable unset printed a shareable digest of a session
-	// nobody chose (#2259). Every other selector command refuses one.
-	if strings.TrimSpace(args[0]) == "" {
-		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix (see `deja last`)")
-	}
 	s, ok, err := findByPrefix(dir, args[0])
 	noteAmbiguousPrefix(dir, args[0], "sharing")
 	if err != nil {

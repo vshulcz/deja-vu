@@ -1434,6 +1434,13 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if ok {
 		defer unlock()
 	}
+	// Every id has the empty string as a prefix, so a blank selector matched
+	// whichever session came first and the caller handed back a transcript
+	// nobody asked for. The MCP resource reader guards its own (#1728) and the
+	// CLI now guards share and ctx (#2259); doing it here ends the class.
+	if strings.TrimSpace(p) == "" {
+		return model.Session{}, false, nil
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return model.Session{}, false, err

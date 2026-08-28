@@ -74,3 +74,42 @@ func TestAnEmptySelectorIsNotASession(t *testing.T) {
 		t.Errorf("share of a blank selector printed: %q", out.String())
 	}
 }
+
+// And the lookup itself: every id has the empty string as a prefix, so the
+// guard belongs where the class lives rather than only at the callers (#2259).
+func TestFindByPrefixMatchesNothingForABlankPrefix(t *testing.T) {
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	claude := filepath.Join(tmp, "claude", "-work-app")
+	if err := os.MkdirAll(claude, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	line := fmt.Sprintf(`{"type":"user","sessionId":"sess1","timestamp":%q,"cwd":"/work/app",`+
+		`"message":{"role":"user","content":"gateway_timeout on the reconnect_loop"}}`, at)
+	if err := os.WriteFile(filepath.Join(claude, "s1.jsonl"), []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// The premise: a real prefix resolves.
+	if _, ok, err := index.FindByPrefix(dir, "sess1"); err != nil || !ok {
+		t.Fatalf("a real id did not resolve: %v %v", ok, err)
+	}
+	for _, p := range []string{"", " ", "\t"} {
+		if s, ok, err := index.FindByPrefix(dir, p); ok || err != nil {
+			t.Errorf("prefix %q resolved to %q (%v)", p, s.ID, err)
+		}
+	}
+}
