@@ -84,6 +84,15 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
 		return err
 	}
+	// The exclude list is a privacy control that only runs at ingest, so an
+	// index built before the pattern still holds the session — share refuses
+	// it for that reason (#1307). promote copied the session's opening line
+	// into deja's own store and reported that the note now outranks the
+	// transcript in recall, while every reading surface filters that note out
+	// again for the same project (#2278).
+	if sources.ExcludedProject(s.Project) {
+		return fmt.Errorf("%s is in a project your exclude list covers — a note promoted from it is filtered out of recall too; `deja index --rebuild` drops the session, or remove the pattern to promote it", prefix)
+	}
 	src := s.Harness + ":" + s.ID
 	if s.Harness == "deja" {
 		// A correction on a promoted note is what `promote` tells you to write,
