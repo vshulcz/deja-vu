@@ -46,11 +46,11 @@ func policyLeakIndex(t *testing.T) string {
 // keep injecting after it is set.
 func TestHookCacheHonorsRecallOff(t *testing.T) {
 	dir := policyLeakIndex(t)
-	if d, _, _, _, _, _ := cachedHookDigest(dir); d == "" {
+	if d, _, _, _, _, _, _ := cachedHookDigest(dir); d == "" {
 		t.Fatal("expected a digest before the kill switch")
 	}
 	t.Setenv("DEJA_RECALL", "off")
-	if d, _, _, _, _, _ := cachedHookDigest(dir); d != "" {
+	if d, _, _, _, _, _, _ := cachedHookDigest(dir); d != "" {
 		t.Fatalf("cache served a digest with DEJA_RECALL=off:\n%s", d)
 	}
 }
@@ -61,18 +61,18 @@ func TestHookCacheRefusesEntryFromAnotherPolicy(t *testing.T) {
 	dir := policyLeakIndex(t)
 	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
 	// Warm the cache under the permissive policy.
-	warm, _, _, _, _, _ := cachedHookDigest(dir)
+	warm, _, _, _, _, _, _ := cachedHookDigest(dir)
 	if warm == "" {
 		t.Fatal("expected a digest to cache")
 	}
 	// Plant a recognizable entry as if it had been built then.
 	planted := "PLANTED-UNDER-OLD-POLICY"
-	writeHookCache(dir, cwd, planted, 1, 10, nil, 0, nil)
-	if got, _, _, _, _, _ := cachedHookDigest(dir); got != planted {
+	writeHookCache(dir, cwd, planted, 1, 10, nil, 0, nil, nil)
+	if got, _, _, _, _, _, _ := cachedHookDigest(dir); got != planted {
 		t.Fatalf("cache did not serve its own entry back: %q", got)
 	}
 	t.Setenv("DEJA_AUTORECALL_LOCAL_ONLY", "1")
-	if got, _, _, _, _, _ := cachedHookDigest(dir); got == planted {
+	if got, _, _, _, _, _, _ := cachedHookDigest(dir); got == planted {
 		t.Fatal("cache served an entry built under a policy that no longer applies")
 	}
 }

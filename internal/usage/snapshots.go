@@ -178,12 +178,21 @@ func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, id
 // does record ids — turned out to be re-serving 74 sessions at a 92% repeat
 // rate (#2038). A number nobody can compute is a number nobody fixes.
 func RecordDigestPolicySessions(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids []string) {
+	RecordDigestPolicySessionsFrom(indexDir, kind, digest, into, sessions, raw, policyName, ids, nil)
+}
+
+// RecordDigestPolicySessionsFrom also records which projects the digest was
+// built from. A session-start block can carry content that names no project at
+// all — the environment block is aggregated from every project's walls — and
+// without the field a forget of one of them could not reach the stored text
+// (#2349).
+func RecordDigestPolicySessionsFrom(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids, projects []string) {
 	// One instant for one act: the two writers used to take their own, which
 	// left `deja log` and `deja log --last` disagreeing about when an
 	// injection happened (#2294).
 	at := time.Now().UTC()
 	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
-	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, nil, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
