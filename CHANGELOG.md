@@ -8,6 +8,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.19.1] - 2026-08-28
+
+A patch release about reach and honesty. Memory now arrives where an agent
+actually works — inside the subagents that do the reviewing and the hunting —
+and several surfaces stopped claiming more than they knew.
+
+### Added
+- A spawned agent gets the memory its parent has. Subagents receive no session
+  start and send no user prompt, so nothing deja injected ever reached them:
+  289 of 328 sessions on the store this was measured against were subagents,
+  and 1% of them saw a recall. `PreToolUse` rewrites the instructions the
+  parent wrote, which is the one place a subagent can still be reached. The
+  same for opencode, through its plugin's `tool.execute.before`. (#2143, #2147)
+- The block says so when the question itself was asked before, rather than
+  saying a session matched the subject. Matched on the question's terms rather
+  than its wording: the exact-wording counter saw a fifth of the repeats this
+  store holds, and 6.5% of substantial questions are asked again in a later
+  session. (#2276)
+- A session start leads with what the project has not been told yet. (#2047)
+- A failing test is read as friction by its name. `--- FAIL: TestName` is the
+  most common failure in a Go repository — 2,318 of 6,744 error lines here —
+  and it was rejected with the summary lines that identify nothing. (#2180)
+- The policy file names the directories deja skips, so a scratch tree can be
+  kept out of recall by rule rather than by hand. (#2060)
+
+### Changed
+- `recall`'s description says what works. It asked for a single specific token
+  and warned that several words are ANDed; measured over 760 real calls,
+  nothing matched zero times at any query length and the longer questions came
+  back with more. (#2342)
+- `doctor` stops reporting deliberate skips as files it could not read. The row
+  said "1192 not recognised here" where 596 were subagent transcripts deja is
+  written to leave alone and 452 sat in a `.tmp` directory. (#2345)
+- The relevance tokenisation moved to the package both `index` and `prompt`
+  build on, which also took a cross-package dependency out. (#2136)
+
+### Fixed
+- A directory the trust policy says is not to be recalled is now out of reach
+  everywhere. The rule was applied at one call site — the CLI's own search —
+  so `doctor` printed "not recalled" while the per-prompt hook injected those
+  sessions into every message. (#2323)
+- One rare word no longer decides which session answers. The gate that checks a
+  session says the subject was given a single term, the rarest by corpus IDF,
+  and a small corpus crowns ordinary nouns: the session that settled a question
+  was dropped for saying "orders worker" where the question said "service". The
+  block's two slots also stopped holding two copies of one answer. (#2328)
+- A cross-script CJK hit is scored on the text that matched it. It was counted
+  through the fold and then scored against the surface text, where the query's
+  words appear nowhere, so a record that matched twice ranked below one that
+  matched once. (#2157)
+- Japanese grammar bigrams stop triggering auto-recall. The fallback dropped
+  "pure grammar" through a Chinese closed class, while Japanese grammar lives in
+  hiragana — and the bigram slide crosses word boundaries, so ての in すべて|の
+  is not even a word. Contributed by
+  [@Sora-bluesky](https://github.com/Sora-bluesky). (#2262)
+- The fix pair is held to what a remedy is: the error must stay gone for the
+  rest of the session, the command must not have failed itself, and reading
+  something is not fixing it — a `grep` for the symbol the compiler named
+  satisfies "the command names what the error named" by construction. And
+  `deja fix`'s own output no longer counts as a fresh error, which had made
+  asking about an error record that it happened again. (#2166, #2169, #2172,
+  #2174)
+- An agent's own scratch sessions and the transcript's record of a deja call
+  stay out of recall, so the tool stops answering with itself. (#2054, #2068)
+- The injection cooldown carries across agent sessions in a project, so a
+  fleet of agents opened together does not re-serve one session to each.
+  (#2041)
+- A whole transcript is no longer re-read to verify an append. The rewind guard
+  hashed every byte before the append point on each search that saw the file
+  change, which for the session being written is every search: 1.70s per call
+  against a 250 MB transcript, now 0.36s. (#2154)
+- `deja last`, `show`, `forget` and `remember` complete their own flags.
+  Contributed by [@vaibhav8a](https://github.com/vaibhav8a). (#2148, #2021,
+  #2027, #2028)
+- Six days of the bug hunt, 148 changes, went in behind these: the session
+  start and the file line stay inside the checkout's own project rather than
+  one whose name ends the same way, `forget` takes what it forgot out of the
+  injection log, the usage log records which projects a digest was built from,
+  and `doctor`, `view` and `friction` name the rule when a trust policy empties
+  what they show. (#2351)
+
+
 ## [0.19.0] - 2026-08-26
 
 Two things, mostly. deja now installs the way each harness installs everything
@@ -779,7 +861,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vshulcz/deja-vu/compare/v0.17.3...v0.18.0
 [0.17.1]: https://github.com/vshulcz/deja-vu/compare/v0.17.0...v0.17.1
