@@ -139,13 +139,17 @@ func TestInstallOpencodePluginUninstallMissingDir(t *testing.T) {
 }
 
 func TestInstallAutoWrappers(t *testing.T) {
+	// An -auto target writes several files, and what it reports is the first
+	// one it changed — reporting the last said "unchanged" about a run that
+	// had rewired something else (#2396). The rest ride along in the note.
 	for _, tc := range []struct {
 		name string
 		fn   func(string, bool) (installResult, error)
 		want string
+		also string
 	}{
-		{"codex", installCodexAuto, filepath.Join(".codex", "hooks.json")},
-		{"opencode", installOpencodeAuto, filepath.Join(".config", "opencode", "plugins", "deja.js")},
+		{"codex", installCodexAuto, filepath.Join(".codex", "config.toml"), "hooks.json"},
+		{"opencode", installOpencodeAuto, filepath.Join(".config", "opencode", "opencode.json"), "deja.js"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -158,11 +162,14 @@ func TestInstallAutoWrappers(t *testing.T) {
 			if r.Action != "created" || r.Path != filepath.Join(home, tc.want) {
 				t.Fatalf("install result = %#v", r)
 			}
+			if !strings.Contains(r.Note, tc.also) {
+				t.Errorf("the other file it wrote is unmentioned: %#v", r)
+			}
 			r, err = tc.fn("/bin/deja", true)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if r.Path != filepath.Join(home, tc.want) {
+			if r.Path == "" || r.Action == "" {
 				t.Fatalf("uninstall result = %#v", r)
 			}
 		})

@@ -639,60 +639,126 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	}
 }
 
+// wroteAll folds what an -auto target did into the one result its caller
+// prints. Reporting only the last write said "unchanged" about a run that had
+// just rewired the MCP entry, and named the hook file while doing it (#2396).
+// The first write that changed something is the answer; anything else it
+// changed rides along in the note, and when nothing changed the last write
+// stands, since that is the file the target is named for.
+func wroteAll(rs ...installResult) installResult {
+	out := rs[len(rs)-1]
+	for _, r := range rs {
+		if r.Path != "" && r.Action != "unchanged" {
+			out = r
+			break
+		}
+	}
+	var also []string
+	for _, r := range rs {
+		if r.Path == "" || r.Action == "unchanged" || r.Path == out.Path {
+			continue
+		}
+		also = append(also, fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path)))
+	}
+	for _, line := range also {
+		if out.Note != "" {
+			out.Note += "; "
+		}
+		out.Note += line
+	}
+	return out
+}
+
 func installClaudeAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installClaude(exe, uninstall); err != nil {
+	mcp, err := installClaude(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := installClaudeCommands(exe, uninstall); err != nil {
+	cmds, err := installClaudeCommands(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installClaudeHook(exe, uninstall)
+	hook, err := installClaudeHook(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, cmds, hook), nil
 }
 
 func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall); err != nil {
+	mcp, err := installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installAntigravityPlugin(exe, uninstall)
+	plugin, err := installAntigravityPlugin(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin), nil
 }
 
 func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installOpenClawMCP(exe, uninstall); err != nil {
+	mcp, err := installOpenClawMCP(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
 	// The plugin covers the prompt; the bootstrap hook covers the session.
-	if _, err := installOpenClawPlugin(exe, uninstall); err != nil {
+	plugin, err := installOpenClawPlugin(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installOpenClawHooks(exe, uninstall)
+	hooks, err := installOpenClawHooks(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin, hooks), nil
 }
 
 func installHermesAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installHermesMCP(exe, uninstall); err != nil {
+	mcp, err := installHermesMCP(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installHermesPlugin(exe, uninstall)
+	plugin, err := installHermesPlugin(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin), nil
 }
 
 func installPiAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+	mcp, err := installMCPJSON(filepath.Join(sources.PiConfigDir(), "mcp.json"), exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installPiExtension(exe, uninstall)
+	ext, err := installPiExtension(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, ext), nil
 }
 
 func installCursorAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installCursor(exe, uninstall); err != nil {
+	mcp, err := installCursor(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installCursorHooks(exe, uninstall)
+	hooks, err := installCursorHooks(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, hooks), nil
 }
 
 func installCodexAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installCodex(exe, uninstall); err != nil {
+	mcp, err := installCodex(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
 	res, err := installCodexHooks(exe, uninstall)
+	if err == nil {
+		res = wroteAll(mcp, res)
+	}
 	// Writing the file is not the same as codex agreeing to run it. Said here
 	// because this is the moment someone is watching, and because the state it
 	// warns about is invisible: everything on disk looks right and no memory
@@ -704,10 +770,15 @@ func installCodexAuto(exe string, uninstall bool) (installResult, error) {
 }
 
 func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installOpencode(exe, uninstall); err != nil {
+	mcp, err := installOpencode(exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
-	return installOpencodePlugin(exe, uninstall)
+	plugin, err := installOpencodePlugin(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin), nil
 }
 
 // pruneGuidanceDirs drops the directories install had to create for a guidance
