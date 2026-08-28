@@ -2042,7 +2042,6 @@ func parseSearch(args []string) (search.Options, error) {
 	return o, nil
 }
 
-// searchFlags is every flag the bare search form accepts, for the typo check.
 // flagsOfOtherCommands names the command each flag belongs to, for the tokens
 // that are real deja flags somewhere but not here. Only exact matches: a query
 // may legitimately start with a dash, and `--` still ends option parsing.
@@ -2072,6 +2071,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--seed":        "bench",
 }
 
+// searchFlags is every flag the bare search form accepts, for the typo check.
 var searchFlags = []string{
 	"--json", "--re", "--all", "--no-embed", "--rebuild",
 	"--harness", "--project", "--since", "--role", "--limit", "--session",
