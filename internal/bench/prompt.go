@@ -30,8 +30,15 @@ type PromptChain struct {
 	Fact string
 	// Paraphrase is Question asked in someone else's words.
 	Paraphrase string
-	Sessions   []model.Session
-	Negative   bool
+	// Tied says this chain's store also holds the sentence that ties the
+	// paraphrase's ordinary words to the term of art — the one every real
+	// store has and this corpus did not. Measured: for all five paraphrases
+	// the arm fails on, no message anywhere in the corpus says both, so no
+	// lexical method can reach them and the arm's 15 of 20 is a ceiling
+	// rather than a defect. A chain marked Tied is the reachable case (#2331).
+	Tied     bool
+	Sessions []model.Session
+	Negative bool
 	// Kind names what this chain is here to measure: "" for the plain case,
 	// "marathon" for a chain whose sessions are long enough to be skipped
 	// wholesale, "fresh" for one worked on minutes ago, "bucket" for filler
@@ -202,6 +209,73 @@ func promptCorpusHash(chains []PromptChain) string {
 	return hex.EncodeToString(h[:])
 }
 
+// PromptTiedCount is how many tied chains the corpus carries.
+const PromptTiedCount = 6
+
+// tiedTopics are the tied arm's own subjects. Separate from the plain topics
+// on purpose: sharing them would let a plain chain's sessions answer the tied
+// paraphrase, and the arm would measure the corpus rather than the bridge.
+func tiedTopics() []promptTopic {
+	return []promptTopic{
+		{"quorum", "quorum reads were turned off for the status endpoint", "what did we do about quorum reads?", "why does the status endpoint no longer ask every replica"},
+		{"debounce", "the debounce on the search box was set to 250ms", "what debounce did we settle on?", "how long do we wait before sending what someone typed"},
+		{"replay", "a replay guard was added to the payment retry path", "what did we add to the payment retry path?", "what stops a retried charge from taking the money twice"},
+		{"vacuum", "autovacuum was tuned per table for the events table", "what did we change about vacuum?", "how did we stop dead rows piling up in the biggest table"},
+		{"sharding", "sharding was keyed on tenant rather than on user", "what is the shard key now?", "by what are the rows split across the machines"},
+		{"watermark", "a watermark was added so the queue drops nothing", "what did we add so the queue stops dropping?", "how did we stop the queue from throwing work away"},
+	}
+}
+
+// tiedChains repeat the plain shape with one addition: a short session where
+// somebody writes the sentence that names the thing and describes it in the
+// same breath. That is what a real store holds — nobody writes only the term
+// of art or only the ordinary words — and it is the material the
+// co-occurrence map is built from. Without it the map has nothing to learn
+// and a question in other words cannot be bridged by anything lexical.
+func tiedChains(rng *rand.Rand, base time.Time) []PromptChain {
+	topics := tiedTopics()
+	out := make([]PromptChain, 0, PromptTiedCount)
+	for i := 0; i < PromptTiedCount && i < len(topics); i++ {
+		topic := topics[i]
+		chain := PromptChain{
+			ID:         fmt.Sprintf("prompt-tied-%02d", i),
+			Project:    fmt.Sprintf("promptbenchtied%02d", i),
+			Topic:      topic.word,
+			Question:   topic.question,
+			Paraphrase: topic.paraphrase,
+			Tied:       true,
+		}
+		t := base.Add(time.Duration(500+i*10) * time.Minute)
+		// The session that settled it, in the term's own words.
+		chain.Sessions = append(chain.Sessions, model.Session{
+			ID: chain.ID + "-answer", Harness: "claude", Project: chain.Project,
+			Updated: t.Add(20 * time.Minute),
+			Messages: []model.Message{
+				{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: t},
+				{Role: "assistant", Text: fillerText(rng, "wrote it down and moved on"), Time: t.Add(time.Minute)},
+			},
+		})
+		// The sentence that ties the two vocabularies, in a session of its own
+		// — it explains, it does not decide, so an arm that asks for the
+		// decision must not be satisfied by it.
+		tie := fmt.Sprintf("what we call %s is %s", topic.word, topic.paraphrase)
+		chain.Sessions = append(chain.Sessions, model.Session{
+			// Deliberately outside the chain's id prefix: the probe counts a
+			// hit only for the chain's own sessions, and a tie that explains
+			// the words while settling nothing must not be able to pass the
+			// arm on its own. It is there to be learned from, not returned.
+			ID: fmt.Sprintf("prompt-tievocab-%02d", i), Harness: "claude", Project: chain.Project,
+			Updated: t.Add(10 * time.Minute),
+			Messages: []model.Message{
+				{Role: "user", Text: tie, Time: t.Add(5 * time.Minute)},
+				{Role: "assistant", Text: fillerText(rng, "noted, that is the same thing"), Time: t.Add(6 * time.Minute)},
+			},
+		})
+		out = append(out, chain)
+	}
+	return out
+}
+
 // promptShapeChain builds one chain with a given session length and start
 // time, so a gate can be measured instead of argued about.
 func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, start time.Time, turns int) PromptChain {
@@ -241,7 +315,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// session was touched, and a corpus dated in the future reads as newer
 	// than now and is withheld wholesale.
 	base := time.Date(2024, time.May, 1, 0, 0, 0, 0, time.UTC)
-	chains := make([]PromptChain, 0, len(topics)+PromptNegativeCount)
+	chains := make([]PromptChain, 0, len(topics)+PromptNegativeCount+PromptTiedCount)
 	for i, topic := range topics {
 		chain := PromptChain{
 			ID:         fmt.Sprintf("prompt-chain-%02d", i),
@@ -764,5 +838,6 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	chains = append(chains, tiedChains(rng, base)...)
 	return PromptCorpus{Chains: chains, Hash: promptCorpusHash(chains)}
 }

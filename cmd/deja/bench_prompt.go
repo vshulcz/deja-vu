@@ -153,6 +153,13 @@ type promptReport struct {
 	// it was measured by hand on a live store that had absorbed the questions
 	// being asked of it (#2120).
 	Paraphrase promptArmReport `json:"paraphrase"`
+	// Tied is the same question in someone else's words, on a store that also
+	// holds the sentence tying those words to the term of art. Separate from
+	// Paraphrase because that arm has a ceiling: measured over the corpus, no
+	// message anywhere says both vocabularies for any of the five it fails,
+	// so nothing lexical can reach them. This arm is the reachable half, and
+	// what a working bridge (#2331) would move.
+	Tied promptArmReport `json:"paraphrase_tied"`
 	// What the block actually shows. Every other arm scores which session was
 	// chosen; none of them looks at the lines inside it, which is how a recall
 	// that had found the right session came to open with "продолжай дальше"
@@ -233,6 +240,10 @@ func runBenchPrompt(args []string) error {
 		report.Fresh.Fired, report.Fresh.Cases, report.Fresh.Correct, report.Fresh.Precision)
 	fmt.Printf("negative controls  %2d/%-2d  —        false fires: %d\n",
 		report.Negative.Fired, report.Negative.Cases, report.Negative.FalseFires)
+	fmt.Printf("reworded           %2d/%-2d  %2d       %.2f\n",
+		report.Paraphrase.Fired, report.Paraphrase.Cases, report.Paraphrase.Correct, report.Paraphrase.Precision)
+	fmt.Printf("reworded, tied     %2d/%-2d  %2d       %.2f\n",
+		report.Tied.Fired, report.Tied.Cases, report.Tied.Correct, report.Tied.Precision)
 	return nil
 }
 
@@ -275,6 +286,25 @@ func measurePrompt(seed int64) (promptReport, error) {
 		scope := chain.Project
 		if chain.Kind == "bucket-answer" {
 			scope = bench.PromptBucketProject
+		}
+		// A tied chain exists for the reworded arm alone: its store carries a
+		// sentence that explains the words without settling anything, which is
+		// the point of it. Counting it as a plain question would report the
+		// bridge's absence as a failure of the ordinary case.
+		if chain.Tied {
+			if chain.Paraphrase != "" {
+				pterms := prompt.Terms(chain.Paraphrase)
+				report.Tied.Cases++
+				if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
+					report.Tied.Fired++
+					if pcorrect {
+						report.Tied.Correct++
+					} else {
+						report.Tied.FalseFires++
+					}
+				}
+			}
+			continue
 		}
 		fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms)
 		arm := &report.Real
@@ -421,13 +451,14 @@ func measurePrompt(seed int64) (promptReport, error) {
 		}
 		if chain.Paraphrase != "" {
 			pterms := prompt.Terms(chain.Paraphrase)
-			report.Paraphrase.Cases++
+			arm := &report.Paraphrase
+			arm.Cases++
 			if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
-				report.Paraphrase.Fired++
+				arm.Fired++
 				if pcorrect {
-					report.Paraphrase.Correct++
+					arm.Correct++
 				} else {
-					report.Paraphrase.FalseFires++
+					arm.FalseFires++
 				}
 			}
 		}
@@ -482,6 +513,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.OffTopic, nil)
 	finishPromptArm(&report.Russian, nil)
 	finishPromptArm(&report.Paraphrase, nil)
+	finishPromptArm(&report.Tied, nil)
 	for _, q := range absentSubjectQuestions() {
 		report.AbsentSubject.Cases++
 		if fired, _ := promptBenchProbe(indexDir, bench.PromptHaystackProject, "no-such-chain", prompt.Terms(q)); fired {
