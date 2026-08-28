@@ -58,7 +58,7 @@ func TestHookRawCountsOnlyTheSessionsItServed(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chdir(back) })
 
-	digest, served, raw, _, _, _ := hookDigestResult(dir)
+	digest, served, raw, _, _, _, _ := hookDigestResult(dir)
 	if digest == "" || served == 0 {
 		t.Skip("no memory to recall in this environment")
 	}
