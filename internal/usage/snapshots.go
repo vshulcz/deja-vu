@@ -111,7 +111,7 @@ func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int
 	// injection, and separate time.Now() calls left them microseconds apart
 	// with nothing else to join them on (#2294).
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, at)
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, at)
 }
 
@@ -128,7 +128,7 @@ func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, 
 // while holding the id (#1949).
 func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, at)
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, at)
 }
 
@@ -138,7 +138,7 @@ func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, r
 // log` and `deja log --last` disagreeing about when it happened (#2294).
 func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, at)
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, "", at)
 	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, at)
 }
 

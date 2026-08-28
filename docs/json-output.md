@@ -522,7 +522,9 @@ no sessions is still a recall, and the count of those is what
 `empty_result_rate` is made of. It does not mean nothing was served: a session
 start on a checkout with no sessions of its own injects the environment block,
 which is about the machine rather than the project, so that event is `empty`
-and carries its `bytes`.
+and carries its `bytes`. `into` names the agent session an injection went to,
+as the harness names it, and is absent when the writer did not know one — an
+MCP recall answers a tool call, not a session start.
 
 A line needs both `t` and `kind` to appear here at all: a half-written line, or
 one from something that is not deja, is skipped rather than shown with a missing

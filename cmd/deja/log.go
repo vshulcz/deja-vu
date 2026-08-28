@@ -99,7 +99,11 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		if e.Sessions > 0 {
 			sess = fmt.Sprintf(" · %d session%s", e.Sessions, pluralS(e.Sessions))
 		}
-		fmt.Fprintf(w, "%s  %-14s %s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, mark)
+		into := ""
+		if e.Into != "" {
+			into = " · into: " + e.Into
+		}
+		fmt.Fprintf(w, "%s  %-14s %s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, into, mark)
 	}
 	if total > len(events) {
 		// Nobody typed the 20 — it is the default above — and this is the

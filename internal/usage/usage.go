@@ -101,6 +101,12 @@ type Event struct {
 	// SessionIDs lists the sessions served by an agent-initiated recall, so
 	// search can weigh what agents actually re-used.
 	SessionIDs []string `json:"ids,omitempty"`
+	// Into is the agent session that received this injection, as the harness
+	// names it. The digest log has carried it since #1494, and the event did
+	// not, so the audit list showed several injections as identical rows and
+	// only the newest could be named, through --last (#2307). It is the other
+	// direction from SessionIDs: what was served, and to whom.
+	Into string `json:"into,omitempty"`
 }
 
 type Summary struct {
@@ -212,14 +218,14 @@ func RecordServedSessions(indexDir, kind string, bytes, sessions int, empty bool
 }
 
 func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {
-	recordFullAt(indexDir, kind, bytes, sessions, empty, raw, ids, time.Now().UTC())
+	recordFullAt(indexDir, kind, bytes, sessions, empty, raw, ids, "", time.Now().UTC())
 }
 
 // recordFullAt is recordFull with the instant supplied, so an injection that
 // writes an event AND a digest snapshot stamps both with one time. Two
 // time.Now() calls left the two logs disagreeing by microseconds about the same
 // injection, and nothing else joins them (#2294).
-func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, at time.Time) {
+func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, into string, at time.Time) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
@@ -240,7 +246,7 @@ func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw in
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids})
+	b, err := json.Marshal(Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids, Into: into})
 	if err != nil {
 		return
 	}
