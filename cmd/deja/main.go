@@ -2498,10 +2498,17 @@ func printSources(dir string) {
 		raw := sources.LoadOpencode()
 		kept := sources.FilterSessions(raw)
 		opencodeExcluded = len(raw) - len(kept)
-		s, m = sources.CountSessions(kept), 0
-		for _, x := range kept {
-			m += len(x.Messages)
+		// Subtracted from the SQL numbers rather than recounted from what
+		// loaded: the loader drops a session holding no text at all, which the
+		// row has always counted, so recounting would move the numbers for a
+		// reason that has nothing to do with the exclude list.
+		dropped := 0
+		for _, x := range raw {
+			if sources.ExcludedProject(x.Project) {
+				dropped += len(x.Messages)
+			}
 		}
+		s, m = max(0, s-opencodeExcluded), max(0, m-dropped)
 	}
 	note = ""
 	if size > 0 && !sources.SQLite3Available() {

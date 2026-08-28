@@ -82,3 +82,60 @@ insert into part values('p2','m2','{"type":"text","text":"hello from secret"}');
 		t.Errorf("the opencode row does not say what it dropped: %s", got)
 	}
 }
+
+// And a pattern that excludes nothing must leave the numbers alone: the row is
+// counted in SQL, while the loader that measures the exclusion drops a session
+// holding no text at all, which SQL counts (#2247).
+func TestAPatternThatMatchesNothingLeavesTheOpencodeRowAlone(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	tmp := t.TempDir()
+	db := filepath.Join(tmp, "opencode.db")
+	script := `create table session(id text, directory text, time_created any, time_updated any);
+create table message(id text, session_id text, time_created any, data text);
+create table part(id text, message_id text, data text);
+insert into session values('s1','/work/keep','2026-01-02T03:00:00Z','2026-01-02T03:00:00Z');
+insert into session values('s2','/work/empty','2026-01-02T03:00:00Z','2026-01-02T03:00:00Z');
+insert into message values('m1','s1',1,'{"role":"user"}');
+insert into part values('p1','m1','{"type":"text","text":"hello from keep"}');`
+	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		t.Fatalf("seed: %v %s", err, out)
+	}
+	home := filepath.Join(tmp, "home")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_OPENCODE_DB", db)
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+
+	row := func() string {
+		out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
+		for _, l := range strings.Split(out, "\n") {
+			if strings.HasPrefix(l, "opencode\t") {
+				return l
+			}
+		}
+		t.Fatalf("no opencode row in:\n%s", out)
+		return ""
+	}
+	t.Setenv("DEJA_EXCLUDE_PROJECTS", "")
+	before := row()
+	t.Setenv("DEJA_EXCLUDE_PROJECTS", "nothing-matches-this")
+	after := row()
+	for _, want := range []string{"sessions=2", "messages=1"} {
+		if !strings.Contains(before, want) {
+			t.Fatalf("the premise is wrong — without a pattern the row reads %s", before)
+		}
+		if !strings.Contains(after, want) {
+			t.Errorf("a pattern matching nothing changed the row to %s", after)
+		}
+	}
+	if strings.Contains(after, "excluded-sessions=") {
+		t.Errorf("nothing was excluded and the row says it dropped something: %s", after)
+	}
+}
