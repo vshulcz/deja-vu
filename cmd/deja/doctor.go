@@ -324,12 +324,33 @@ func doctorEmbed(w io.Writer, r doctorEmbedReport) {
 // did not pick up. A harness that changes its layout in a new version presents
 // exactly this way: quietly fewer sessions, no error, and a directory size that
 // still looks right (#701).
-func unplacedFiles(root string, seen []string) int {
+// inDotDir reports whether the path sits inside a dot-directory below the
+// root — a cache, a temp dir, anything a tool keeps for itself.
+func inDotDir(root, p string) bool {
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		return false
+	}
+	for _, part := range strings.Split(filepath.Dir(rel), string(filepath.Separator)) {
+		if strings.HasPrefix(part, ".") && part != "." && part != ".." {
+			return true
+		}
+	}
+	return false
+}
+
+// unplacedFiles counts the transcripts under a root that deja did not read,
+// split by whether it declined them on purpose. Everything was one number
+// before, and on a machine that spawns subagents most of it is the deliberate
+// skip: this store reported "1192 not recognised here" of which 596 were
+// subagent transcripts deja is written to leave alone (#1384). A number that
+// large reads as the tool failing to understand the user's own history, which
+// is the one thing doctor exists to rule out.
+func unplacedFiles(root string, seen []string, skipped func(string) bool) (unread, byRule int) {
 	have := make(map[string]bool, len(seen))
 	for _, p := range seen {
 		have[filepath.Clean(p)] = true
 	}
-	extra := 0
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
@@ -339,12 +360,23 @@ func unplacedFiles(root string, seen []string) int {
 		default:
 			return nil
 		}
-		if !have[filepath.Clean(p)] {
-			extra++
+		if have[filepath.Clean(p)] {
+			return nil
 		}
+		// A store's own scratch is not a transcript deja failed to read: 452
+		// of the 482 this machine reported for codex sat in `.tmp`, and a
+		// count that size reads as a parser that cannot cope with the store.
+		if inDotDir(root, p) {
+			return nil
+		}
+		if skipped != nil && skipped(p) {
+			byRule++
+			return nil
+		}
+		unread++
 		return nil
 	})
-	return extra
+	return unread, byRule
 }
 
 // printDoctorStoreWarnings says what deja could not read and why.
@@ -581,16 +613,26 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// The count comes from the same filter the parser uses, so a store whose
 	// layout differs slightly loses those files from every number deja prints
 	// — the one thing `doctor` exists to rule out (#701).
-	printFiles := func(name, path string, present bool, seen []string) {
+	// printFilesSkipping is printFiles for a harness that declines some of its
+	// own files by a rule, so the two can be told apart in the row.
+	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool) {
 		detail := doctorCount(len(seen), "file")
-		if extra := unplacedFiles(path, seen); extra > 0 {
-			detail += fmt.Sprintf(", %d not recognised here", extra)
+		unread, byRule := unplacedFiles(path, seen, skipped)
+		if byRule > 0 {
+			detail += fmt.Sprintf(", %d subagent transcripts skipped (DEJA_INCLUDE_SUBAGENTS=1)", byRule)
+		}
+		if unread > 0 {
+			detail += fmt.Sprintf(", %d not recognised here", unread)
 		}
 		printRow(name, path, present, detail)
 	}
+	printFiles := func(name, path string, present bool, seen []string) {
+		printFilesSkipping(name, path, present, seen, nil)
+	}
 
 	claudeRoot := sources.ClaudeRoot()
-	printFiles("claude", claudeRoot, doctorExists(claudeRoot), sources.ClaudeFiles())
+	printFilesSkipping("claude", claudeRoot, doctorExists(claudeRoot), sources.ClaudeFiles(),
+		func(p string) bool { return !sources.ClaudeFileWanted(p) })
 
 	codexRoot := sources.CodexRoot()
 	printFiles("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles())
