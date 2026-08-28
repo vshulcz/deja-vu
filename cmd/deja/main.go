@@ -3878,8 +3878,15 @@ func joinCapped(items []string, n int) string {
 // older one is recognised by the ids and project name inside its text, the same
 // weaker test the view page falls back to.
 func forgetDigestMatcher(o index.ForgetOptions, keys []string) func(usage.Snapshot) bool {
-	ids := make([]string, 0, len(keys))
+	// Both spellings: a listing renders `claude:abc` and a hook block quotes
+	// the bare id, so a sweep that knew only one of them missed half the
+	// records it was meant to take.
+	ids := make([]string, 0, 2*len(keys))
 	for _, k := range keys {
+		if k == "" {
+			continue
+		}
+		ids = append(ids, k)
 		if _, id, ok := strings.Cut(k, ":"); ok && id != "" {
 			ids = append(ids, id)
 		}
@@ -3891,15 +3898,77 @@ func forgetDigestMatcher(o index.ForgetOptions, keys []string) func(usage.Snapsh
 					return true
 				}
 			}
-			if len(s.Projects) == 0 && strings.Contains(s.Digest, o.Project) {
+			if len(s.Projects) == 0 && digestNames(s.Digest, o.Project) {
 				return true
 			}
 		}
 		for _, id := range ids {
-			if strings.Contains(s.Digest, id) {
+			if digestNames(s.Digest, id) {
 				return true
 			}
 		}
 		return false
+	}
+}
+
+// digestNames reports whether a digest names a project or a session where it
+// renders one, rather than anywhere in its text. Searching the whole text made
+// `forget --project api` delete a digest about work/web whose prose read "a
+// late api call": the reader forgot one project and lost another's record
+// (#2330). The two shapes deja writes are the recall listing,
+//
+//  1. [claude] work/app · claude:abc · 2 matches
+//
+// and the hook block,
+//
+//   - **work/app** `abc` · 2026-08-28
+//
+// A digest in neither shape names nothing, so a sweep keeps it: with `projects`
+// recorded since #2324 the guess is only needed for older records, and deleting
+// one on a guess cannot be undone.
+func digestNames(digest, want string) bool {
+	if want == "" {
+		return false
+	}
+	for _, line := range strings.Split(digest, "\n") {
+		for _, field := range digestNamedFields(line) {
+			if field == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// digestNamedFields pulls the project and id positions out of one rendered
+// line: the fields that follow the harness in brackets, and anything a hook
+// block emphasises or quotes.
+func digestNamedFields(line string) []string {
+	var out []string
+	if _, after, ok := strings.Cut(line, "] "); ok {
+		for _, field := range strings.Split(after, " · ") {
+			out = append(out, strings.TrimSpace(field))
+		}
+	}
+	out = append(out, betweenAll(line, "**")...)
+	out = append(out, betweenAll(line, "`")...)
+	return out
+}
+
+// betweenAll returns every substring wrapped by the given marker.
+func betweenAll(s, marker string) []string {
+	var out []string
+	for {
+		i := strings.Index(s, marker)
+		if i < 0 {
+			return out
+		}
+		rest := s[i+len(marker):]
+		j := strings.Index(rest, marker)
+		if j < 0 {
+			return out
+		}
+		out = append(out, strings.TrimSpace(rest[:j]))
+		s = rest[j+len(marker):]
 	}
 }

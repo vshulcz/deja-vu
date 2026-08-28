@@ -413,6 +413,12 @@ func snapshotWithheld(pol policy.Policy, sn usage.Snapshot, hidden map[string]bo
 	return false
 }
 
+// The page and `deja forget` read an old record differently on purpose. Here a
+// name anywhere in the text is enough, because the cost of a wrong match is a
+// digest of your own work missing from a page you can regenerate. forget looks
+// only where a digest renders a project, because there the cost is deleting a
+// record that cannot come back (#2330).
+
 // notesAllowedOnPage drops the promoted notes whose project a rule withholds,
 // and says how many went. Browsing, so the search activation governs it — the
 // same activation the session list on this page is filtered by.
