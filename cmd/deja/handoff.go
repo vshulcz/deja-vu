@@ -202,6 +202,17 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		// listing does and what a listing filters (#937). Without this the
 		// pick landed on a session the rule keeps out of recall and packaged
 		// its content for another agent (#953).
+		// Synced work is offered by recall under the looser rule, but handing
+		// it to another agent on a directory-name match is a different act:
+		// from a directory named api, the newest match was a teammate's
+		// clients/acme/api (#2347).
+		var own []model.Session
+		for _, s := range ss {
+			if index.ProjectInScopeStrict(s.Project, name) {
+				own = append(own, s)
+			}
+		}
+		ss = own
 		kept, _ := policyFilterSessionsCounted(policy.ActivationSearch, ss)
 		keptIDs := map[string]bool{}
 		for _, k := range kept {
