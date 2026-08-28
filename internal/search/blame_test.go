@@ -45,9 +45,17 @@ func TestBlameFiltersProjectBoostLimitAndJSON(t *testing.T) {
 		ss = append(ss, model.Session{ID: string(rune('a' + i)), Harness: "claude", Project: "/repo", Updated: now, Messages: []model.Message{{Role: "user", Text: "parser.go"}}})
 	}
 	target := BlameTarget{FullPath: "/repo/parser.go", Base: "parser.go", Stem: "parser"}
-	hits := Blame(ss, target, BlameOptions{Harness: "claude", Project: "repo"})
+	o := BlameOptions{Harness: "claude", Project: "repo"}
+	ranked := Blame(ss, target, o)
+	if len(ranked) != 12 {
+		t.Fatalf("ranked=%d, want every session that touched the file", len(ranked))
+	}
+	hits := CapBlame(ranked, o)
 	if len(hits) != 10 {
 		t.Fatalf("default limit=%d", len(hits))
+	}
+	if all := CapBlame(ranked, BlameOptions{All: true}); len(all) != 12 {
+		t.Fatalf("--all limit=%d", len(all))
 	}
 	if got := Blame(ss, target, BlameOptions{Harness: "codex", All: true}); len(got) != 0 {
 		t.Fatalf("harness filter=%#v", got)
