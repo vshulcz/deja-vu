@@ -51,8 +51,14 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		sessions map[string]bool
 		harness  map[string]bool
 		last     time.Time
+		// text is the occurrence to show. One failure prints differently on
+		// every run — a port, a pid, an ip — and the signature is what folds
+		// them together, so the row needs one of the texts to name: the newest,
+		// because the port it printed last is the port the reader will see next
+		// (#2375).
+		text string
 	}
-	found := map[string]*seen{}
+	found := map[uint64]*seen{}
 	sessions := map[string]bool{}
 	// friction reads across the whole store, so a peer's recurring errors — its
 	// hosts, its infra IPs — surfaced here even when the trust policy withheld
@@ -74,19 +80,20 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		key := meta.Harness + ":" + meta.ID
 		sessions[key] = true
 		for _, line := range strings.Split(r.Text, "\n") {
-			line, ok := index.FrictionLine(line)
+			line, sig, ok := index.FrictionSignature(line)
 			if !ok {
 				continue
 			}
-			s := found[line]
+			s := found[sig]
 			if s == nil {
-				s = &seen{sessions: map[string]bool{}, harness: map[string]bool{}}
-				found[line] = s
+				s = &seen{sessions: map[string]bool{}, harness: map[string]bool{}, text: line}
+				found[sig] = s
 			}
 			s.sessions[key] = true
 			s.harness[meta.Harness] = true
-			if r.Time.After(s.last) {
+			if r.Time.After(s.last) || s.text == "" {
 				s.last = r.Time
+				s.text = line
 			}
 		}
 	}); err != nil {
@@ -103,7 +110,8 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		harnesses []string
 	}
 	var rows []row
-	for line, s := range found {
+	for _, s := range found {
+		line := s.text
 		if len(s.sessions) < index.FrictionMinSessions {
 			continue
 		}

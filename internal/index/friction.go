@@ -42,6 +42,19 @@ const (
 	FrictionMinSessions = 3
 )
 
+// FrictionSignature is FrictionLine plus the signature the line hashes to, for
+// a caller that groups runs of one failure rather than lines of text. The
+// numbers a machine hands out — a port, a pid, an ip — are masked in the
+// signature and kept in the line, so a listing can count the runs together and
+// still show one that was really printed (#2375).
+func FrictionSignature(l string) (string, uint64, bool) {
+	line, ok := FrictionLine(l)
+	if !ok {
+		return line, 0, false
+	}
+	return line, frictionHash(line), true
+}
+
 // FrictionLine reports whether a line of tool output names something specific
 // that went wrong, and returns it in the form two sessions can be compared on.
 func FrictionLine(l string) (string, bool) {
