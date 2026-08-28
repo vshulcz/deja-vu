@@ -72,7 +72,7 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		}
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return "", err
+		return "", configParseError(path, err)
 	}
 	hooks, _ := root["hooks"].(map[string]any)
 	internal, _ := mapAt(hooks, "internal")

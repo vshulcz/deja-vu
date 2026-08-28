@@ -86,8 +86,12 @@ type doctorReport struct {
 	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
 	Policy        doctorPolicyReport             `json:"policy"`
 	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
-	Sync          doctorSyncReport               `json:"sync"`
-	Deep          *index.DeepReport              `json:"deep,omitempty"`
+	// IngestFiles is where those counts came from. Without it the pointer at
+	// the end of doctor's ingest line led back to the numbers it had just
+	// printed, and the file to fix was never named (#2189).
+	IngestFiles map[string]index.FileIngest `json:"ingest_files,omitempty"`
+	Sync        doctorSyncReport            `json:"sync"`
+	Deep        *index.DeepReport           `json:"deep,omitempty"`
 }
 
 // doctorSyncReport is the Sync section in the machine form. The text report has
@@ -249,6 +253,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	}
 	report.Index = inspectDoctorIndex(dir, storeMods)
 	report.Ingest = index.IngestHealth(dir)
+	report.IngestFiles = index.IngestFilesReport(dir)
 	report.MCP = collectDoctorMCP()
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
@@ -620,6 +625,14 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 		if !mod.IsZero() && mod.After(builtAt) {
 			result.StaleStores++
 		}
+	}
+	// Damage outranks staleness: a store that cannot answer is not merely
+	// behind. The human report has named this since #735 while the JSON called
+	// the same store "ok", so a script watching it for index health was told
+	// everything was fine (#2292).
+	if index.Damaged(dir) {
+		result.State = "damaged"
+		return result
 	}
 	if result.StaleStores > 0 {
 		result.State = "stale"

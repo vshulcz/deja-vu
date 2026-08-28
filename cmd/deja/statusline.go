@@ -73,7 +73,11 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		fmt.Fprint(stdout, withFileMemory(dir, in, line))
 		return nil
 	}
-	recalls, bytes, injected := usage.TodayDemand(dir)
+	// One read for the whole line: it renders on every prompt, and two passes
+	// over the log can also straddle a write and print numbers that were never
+	// true together (#2224).
+	n := usage.StatusCounters(dir)
+	recalls, bytes, injected := n.Recalls, n.Bytes, n.Injected
 	if recalls == 0 {
 		// Injections are not recalls, but they are the whole day for someone
 		// who lives on auto-recall: saying "0 B injected" while memory has
@@ -83,7 +87,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · no agent recalls today · %s injected", humanBytes(int64(injected)))))
 			return nil
 		}
-		if wr, wb, _, _ := usage.Week(dir); wr > 0 {
+		if wr, wb := n.WeekRecalls, n.WeekBytes; wr > 0 {
 			// The line below this one already branches at one; this one said
 			// "1 agent recalls" all day, on the surface the reader looks at
 			// most (#1600).
@@ -99,7 +103,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		noun = "recall"
 	}
 	line := fmt.Sprintf("deja · %d %s · %s ctx today · %s injected", recalls, noun, humanBytes(int64(bytes)), humanBytes(int64(injected)))
-	if raw := usage.TodayRaw(dir); bytes > 0 && raw/int64(bytes) >= 2 {
+	if raw := n.RawToday; bytes > 0 && raw/int64(bytes) >= 2 {
 		line += fmt.Sprintf(" · ~%d× less than replaying", raw/int64(bytes))
 	}
 	fmt.Fprint(stdout, withFileMemory(dir, in, line))

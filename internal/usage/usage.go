@@ -101,6 +101,12 @@ type Event struct {
 	// SessionIDs lists the sessions served by an agent-initiated recall, so
 	// search can weigh what agents actually re-used.
 	SessionIDs []string `json:"ids,omitempty"`
+	// Into is the agent session that received this injection, as the harness
+	// names it. The digest log has carried it since #1494, and the event did
+	// not, so the audit list showed several injections as identical rows and
+	// only the newest could be named, through --last (#2307). It is the other
+	// direction from SessionIDs: what was served, and to whom.
+	Into string `json:"into,omitempty"`
 }
 
 type Summary struct {
@@ -212,6 +218,14 @@ func RecordServedSessions(indexDir, kind string, bytes, sessions int, empty bool
 }
 
 func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {
+	recordFullAt(indexDir, kind, bytes, sessions, empty, raw, ids, "", time.Now().UTC())
+}
+
+// recordFullAt is recordFull with the instant supplied, so an injection that
+// writes an event AND a digest snapshot stamps both with one time. Two
+// time.Now() calls left the two logs disagreeing by microseconds about the same
+// injection, and nothing else joins them (#2294).
+func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, into string, at time.Time) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
@@ -232,7 +246,7 @@ func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int6
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids})
+	b, err := json.Marshal(Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids, Into: into})
 	if err != nil {
 		return
 	}
@@ -273,6 +287,62 @@ func TodayWithInjections(indexDir string) (recalls, bytes, injected int) {
 		}
 	}
 	return recalls, bytes, injected
+}
+
+// StatusNumbers is everything the status line can print, from one read.
+type StatusNumbers struct {
+	// Today, demand side: what an agent asked for and got, and what deja
+	// injected unprompted, on the same terms TodayDemand uses.
+	Recalls  int
+	Bytes    int
+	Injected int
+	// This week, for the line the quiet days print.
+	WeekRecalls int
+	WeekBytes   int
+	// Today's source transcripts behind what was served, for the "less than
+	// replaying" clause.
+	RawToday int64
+}
+
+// StatusCounters is TodayDemand, Week and TodayRaw in one pass.
+//
+// The line renders on every prompt and took two of these reads — 8 ms each on a
+// busy fortnight's log — for numbers one read produces. TodayDemand's own doc
+// gives the other half of the reason: two passes can straddle a write and
+// report numbers that were never true together, and the line prints today's
+// beside the week's (#2224).
+func StatusCounters(indexDir string) StatusNumbers {
+	var out StatusNumbers
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	cut := WeekCut(now)
+	for _, e := range read(Path(indexDir)) {
+		if ahead(e.Time, now) {
+			continue
+		}
+		// TodayRaw counts what was served today whether or not it found
+		// anything, which is the one place the empty rule differs.
+		if !e.Time.Before(midnight) && (servedKind(e.Kind) || injectedKind(e.Kind)) {
+			out.RawToday += e.RawBytes
+		}
+		if e.FoundNothing() {
+			continue
+		}
+		if !e.Time.Before(midnight) {
+			switch {
+			case servedKind(e.Kind):
+				out.Recalls++
+				out.Bytes += e.Bytes
+			case injectedKind(e.Kind):
+				out.Injected += e.Bytes
+			}
+		}
+		if !e.Time.Before(cut) && servedKind(e.Kind) {
+			out.WeekRecalls++
+			out.WeekBytes += e.Bytes
+		}
+	}
+	return out
 }
 
 // TodayDemand returns today's non-empty, agent-requested memory events, the
@@ -472,6 +542,15 @@ func rotate(p string) {
 		return
 	}
 	cutoff := time.Now().UTC().Add(-keepWindow)
+	// One bit decides whether this write pays for a rotation: is any event old
+	// enough to drop. Parsing the whole log to learn it cost every short-lived
+	// hook 13 ms on a log of twelve thousand events, and the memo below only
+	// spares the second write in the same process (#2220).
+	oldest, ok := oldestStampIn(p)
+	if ok && !oldest.Before(cutoff) {
+		rememberOldest(p, oldest, fi.Size())
+		return
+	}
 	all := read(p)
 	var keep []Event
 	for _, e := range all {
@@ -510,6 +589,85 @@ func rotate(p string) {
 	_ = atomicfile.Write(p, buf.Bytes(), 0o600)
 }
 
+// oldestStampIn reads the log's stamps without decoding its records. Every line
+// this package writes starts with {"t":"<RFC3339>", so the oldest event can be
+// found by comparing text.
+//
+// To the second, deliberately. RFC3339Nano drops trailing zeros from the
+// fraction, so "…:00.5Z" and "…:00Z" differ first at '.' against 'Z' and sort
+// the wrong way round — the fraction is exactly where text order stops being
+// time order. Seconds are all this decides with: the question is whether
+// anything is older than a fortnight.
+//
+// ok is false when a line does not carry a stamp where the writer puts it: a
+// log from another version, a half-written line, anything this cannot speak
+// for. The caller then does what it always did and parses.
+func oldestStampIn(p string) (oldest time.Time, ok bool) {
+	f, err := os.Open(p)
+	if err != nil {
+		return time.Time{}, false
+	}
+	defer func() { _ = f.Close() }()
+	best := ""
+	sc := bufio.NewScanner(f)
+	// The same line ceiling read() uses: a line longer than that is one this
+	// scan cannot speak for either.
+	sc.Buffer(make([]byte, 4096), 1<<20)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		stamp, found := stampPrefix(line)
+		if !found {
+			return time.Time{}, false
+		}
+		if best == "" || stamp[:len(secondsPrecision)] < best[:len(secondsPrecision)] {
+			best = stamp
+		}
+	}
+	if sc.Err() != nil || best == "" {
+		return time.Time{}, false
+	}
+	t, err := time.Parse(time.RFC3339Nano, best)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t.UTC(), true
+}
+
+// stampPrefix returns the value of the leading "t" field, which is where this
+// package's writer puts it. Anything else is left to the parser.
+func stampPrefix(line string) (string, bool) {
+	const prefix = `{"t":"`
+	if !strings.HasPrefix(line, prefix) {
+		return "", false
+	}
+	rest := line[len(prefix):]
+	end := strings.IndexByte(rest, '"')
+	if end < 0 {
+		return "", false
+	}
+	stamp := rest[:end]
+	// Only the shape the writer emits: UTC, with the trailing Z, and long
+	// enough to carry whole seconds. An offset like +02:00 sorts by its digits
+	// rather than by when it happened.
+	if len(stamp) < len(secondsPrecision) || !strings.HasSuffix(stamp, "Z") {
+		return "", false
+	}
+	return stamp, true
+}
+
+// secondsPrecision is the prefix of an RFC 3339 stamp up to whole seconds —
+// "2026-08-27T10:00:00" — and its length is how much of one this compares.
+const secondsPrecision = "2006-01-02T15:04:05"
+
+// rememberOldest records what the scan above found, in the same shape the full
+// read records, so the memo means one thing however it was filled.
+func rememberOldest(p string, oldest time.Time, size int64) {
+	nothingToDrop.Store(p, rotationMemo{oldest: oldest, size: size, at: time.Now().UTC()})
+}
+
 // WornSessions counts, per session id, how often agent-initiated recalls
 // served it inside the retention window. Search uses it as a small bounded
 // boost: what agents keep pulling is what the user keeps needing.
@@ -545,6 +703,11 @@ type ImpactReport struct {
 	RawBytes      int64 `json:"raw_bytes"`      // source transcripts those digests distilled
 	ReusedTwice   int   `json:"reused_twice"`   // sessions agents recalled 2+ times
 	DejaVuMoments int   `json:"dejavu_moments"` // prompts matched to prior work
+	// ToolLines counts the PreToolUse injections — one line about the command
+	// or file an agent is about to touch. Their bytes were counted from the
+	// start and no counter named the door, so a machine served only through
+	// that hook read as two zeros (#2309).
+	ToolLines int `json:"tool_lines"`
 	// Since is the oldest event still in the log. The log is rewritten past
 	// 1MB keeping the last 14 days, so every count above is a window and not a
 	// lifetime — one rotation over a 30-day log halved them (#1889). The same
@@ -586,7 +749,7 @@ func Impact(indexDir string) ImpactReport {
 			for _, id := range e.SessionIDs {
 				worn[id]++
 			}
-		case e.Kind == KindHook:
+		case injectedKind(e.Kind):
 			// A session start with no project session to show still injects
 			// the environment block, and that event is logged empty. Counting
 			// it made "N session starts began with project memory" claim
@@ -600,13 +763,29 @@ func Impact(indexDir string) ImpactReport {
 			// measured on three recalls and ten blocks, a tenfold saving reads
 			// as fourfold, understating what deja did. Both stay out.
 			if e.Empty {
+				if e.Kind == KindDejaVu {
+					r.DejaVuMoments++
+				}
 				continue
 			}
-			r.Injections++
+			// Every door that carried a digest, not the session-start one
+			// alone: the per-prompt recall and the tool-time line are distilled
+			// from real transcripts too, and dropping them computed the ratio
+			// this report exists for from half the events — the drift #1907
+			// fixed for blame, running the other way (#2204).
+			if e.Kind == KindDejaVu {
+				r.DejaVuMoments++
+			}
+			// `injections` keeps the meaning the report documents: session
+			// starts that began with project memory.
+			if e.Kind == KindHook {
+				r.Injections++
+			}
+			if e.Kind == KindTool {
+				r.ToolLines++
+			}
 			r.ServedBytes += e.Bytes
 			r.RawBytes += e.RawBytes
-		case e.Kind == KindDejaVu:
-			r.DejaVuMoments++
 		}
 	}
 	for _, n := range worn {

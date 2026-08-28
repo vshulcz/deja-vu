@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -74,13 +73,12 @@ type toolHookInput struct {
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
-	adoptHookCWD(input.CWD)
 	// Never build or repair from here. This runs inside an action the user is
 	// waiting on, and a miss costs nothing while a rebuild costs seconds.
 	if !planIndexReady(dir) {
 		return nil
 	}
-	line := toolHookLine(dir, input)
+	line := toolHookLine(dir, hookCWD(input.CWD), input)
 	if line == "" {
 		return nil
 	}
@@ -114,15 +112,15 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 // the tool that runs a command, and a file's history only before the file is
 // changed — Read, Glob and NotebookRead carry a file_path too, and a hook wired
 // with a wide matcher would otherwise fire on every one of them.
-func toolHookLine(dir string, input toolHookInput) string {
+func toolHookLine(dir, cwd string, input toolHookInput) string {
 	switch input.ToolName {
 	case "Bash":
 		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
-			return commandHookLine(dir, cmd)
+			return commandHookLine(dir, cwd, cmd)
 		}
 	case "Edit", "Write", "MultiEdit", "NotebookEdit":
 		if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
-			return fileHookLine(dir, path)
+			return fileHookLine(dir, cwd, path)
 		}
 	case "apply_patch":
 		// Codex and other OpenAI-style agents make every file edit through a
@@ -131,7 +129,7 @@ func toolHookLine(dir string, input toolHookInput) string {
 		// file-history line fires here too — without this the hook is blind to
 		// every edit those agents make.
 		for _, path := range applyPatchFiles(input.ToolInput.Command) {
-			if line := fileHookLine(dir, path); line != "" {
+			if line := fileHookLine(dir, cwd, path); line != "" {
 				return line
 			}
 		}
@@ -158,7 +156,7 @@ func applyPatchFiles(patch string) []string {
 	return out
 }
 
-func commandHookLine(dir, cmd string) string {
+func commandHookLine(dir, cwd, cmd string) string {
 	// "You have run this before" is worthless for an inspection command the
 	// agent runs constantly — git status, git diff, ls, cat. On a real store
 	// these are the top of the table (git status --short in 116 sessions), and
@@ -206,7 +204,7 @@ func commandHookLine(dir, cmd string) string {
 	// exists changes nothing. A command deserves the same: before `npm run
 	// build`, what matters is that it failed here last time and why, not that
 	// it has been run twice.
-	if d := commandDecisionLine(dir, cmd); d != "" {
+	if d := commandDecisionLine(dir, cwd, cmd); d != "" {
 		return head + " — last time: " + d
 	}
 	return head + "."
@@ -219,14 +217,10 @@ func commandHookLine(dir, cmd string) string {
 // the files a session touched but not the commands it ran, so there is no
 // cheaper lookup, and this hook fires on a build or a deploy rather than on
 // every message — the prompt hook already pays a search per keystroke.
-func commandDecisionLine(dir, cmd string) string {
+func commandDecisionLine(dir, cwd, cmd string) string {
 	terms := prompt.Terms(normalizedCommandText(cmd))
 	if len(terms) == 0 {
 		return ""
-	}
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
-	if cwd == "" {
-		cwd, _ = os.Getwd()
 	}
 	ranked, matched, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
 	if err != nil {
@@ -267,16 +261,12 @@ func normalizedCommandText(cmd string) string {
 	return strings.Join(out, " ")
 }
 
-func fileHookLine(dir, path string) string {
+func fileHookLine(dir, cwd, path string) string {
 	// FileSessions matches on the file's basename, so without scoping "main.go"
 	// or "README.md" collects every project's file of that name — the line then
 	// claims a history this file does not have and points `deja blame` at a
 	// pile of other repos. Count only sessions in the project being worked in,
 	// unless the stored path is the exact one (which cannot collide).
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
-	if cwd == "" {
-		cwd, _ = os.Getwd()
-	}
 	projects := digest.ProjectNameCandidates(cwd)
 	// A hook that fires unasked is the auto activation, so a session the trust
 	// policy withholds must not even be counted here.
@@ -399,7 +389,17 @@ func fileMetaInScope(meta index.SessionMeta, path string, projects []string) boo
 		if cand == "" {
 			continue
 		}
-		if proj == cand || strings.HasSuffix(proj, "/"+cand) || strings.HasSuffix(cand, "/"+proj) {
+		// The shared rule, so this scope cannot drift from the one the session
+		// start and the handoff use: a bare candidate is a suffix match only
+		// for a peer's project, whose path is not this machine's. Taking it
+		// for a local one answered an edit to /work/api/ledger.go with seven
+		// sessions from a client's acme/api, and their decision (#2339).
+		if index.ProjectInScope(meta.Project, cand) {
+			return true
+		}
+		// The other direction: a store that records the bare project name
+		// ("api") against a candidate that carries the parent ("work/api").
+		if strings.HasSuffix(cand, "/"+proj) {
 			return true
 		}
 	}

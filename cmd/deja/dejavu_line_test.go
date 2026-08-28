@@ -48,11 +48,24 @@ func TestDejaVuLineReturnsAfterTheWindow(t *testing.T) {
 	}
 	stale := time.Now().Add(-dejaVuLineWindow - time.Minute).Unix()
 	path := dir + ".dejavu"
-	if err := os.WriteFile(path, []byte("agent-0 "+strconv.FormatInt(stale, 10)+"\n"), 0o600); err != nil {
+	// Written under the key the file actually uses: a hand-spelled id is not
+	// one, and the read would then miss it for the wrong reason and let this
+	// pass without the window ever expiring (#2170).
+	line := dejaVuKey("agent-0") + " " + strconv.FormatInt(stale, 10) + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if !dejaVuLineDue(dir, "agent-0") {
 		t.Error("the line never came back after the window passed")
+	}
+	// The premise the assertion above rests on: the same entry inside the
+	// window does withhold it.
+	fresh := dejaVuKey("agent-0") + " " + strconv.FormatInt(time.Now().Unix(), 10) + "\n"
+	if err := os.WriteFile(path, []byte(fresh), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if dejaVuLineDue(dir, "agent-0") {
+		t.Error("an entry inside the window did not withhold the line, so the test above measures nothing")
 	}
 }
 

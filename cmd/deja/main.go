@@ -56,6 +56,15 @@ func rebuildWindowError(err error) error {
 		return err
 	}
 	if !rebuildInProgress(index.DefaultDir()) {
+		// Not a rebuild, so the manifest is missing for some other reason —
+		// and on a machine where the cache cannot be created that reached the
+		// reader as `open …/manifest.gob: no such file or directory`, which is
+		// the shape #798 replaced everywhere else (#2267).
+		if d := index.DefaultDir(); !dirExists(d) {
+			if a := nearestExistingDir(filepath.Dir(d)); a != "" && !dirWritable(a) {
+				return fmt.Errorf("cannot create the index directory (%s) — %s is not writable; check its permissions, or point DEJA_INDEX_DIR somewhere writable", filepath.Dir(d), a)
+			}
+		}
 		return err
 	}
 	return fmt.Errorf("the index is being rebuilt right now — run this again in a moment")
@@ -164,7 +173,16 @@ var commands = map[string]command{
 	// The screen `deja` prints on a terminal, under a name, so it can be paged,
 	// captured into a bug report or read over a pipe — and so the obvious guess
 	// stops being a search for the word (#2108).
-	"brief":           func(dir string, _ []string) error { return runBrief(dir, os.Stdout) },
+	// The arguments were thrown away here, so `deja brief --json` printed the
+	// human screen and exited 0 — the shape #2253 fixed for friction and
+	// restore (#2265). statusline stays as it is on purpose: a harness runs it
+	// on every redraw, and a refusal would land in someone's prompt.
+	"brief": func(dir string, rest []string) error {
+		for _, a := range rest {
+			return fmt.Errorf("brief takes no arguments — got %q", a)
+		}
+		return runBrief(dir, os.Stdout)
+	},
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
@@ -229,7 +247,7 @@ func run(args []string) error {
 	if cmd, ok := commands[args[0]]; ok {
 		return cmd(dir, args[1:])
 	}
-	return runSearch(dir, args, sourceInstance)
+	return runBareSearch(dir, args, sourceInstance)
 }
 
 func cmdVersion(_ string, _ []string) error {
@@ -437,6 +455,12 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.id == "" {
 		return idPrefixNeeded(dir, "show needs an id-prefix", showNeedsID)
 	}
+	// A harness that does not exist matches nothing, and the refusal then
+	// blamed the id the reader typed correctly (#2251). search, last, blame
+	// and the MCP tools have always named the value they did not recognise.
+	if err := checkHarness(&o.harness); err != nil {
+		return err
+	}
 	var s model.Session
 	var ok bool
 	if o.harness != "" {
@@ -470,7 +494,15 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.sliced {
 		// Both flags are documented for `show` and only the JSON path honoured
 		// them; the text output printed the whole session (#709).
+		total := len(s.Messages)
 		s.Messages = sliceMessages(s.Messages, o.offset, o.limit)
+		// The JSON has reported the window all along; the terminal printed the
+		// slice and said nothing, so five turns of two hundred read the same as
+		// a session that is five turns long (#2296). search says it in this
+		// shape two commands away.
+		if line := showWindowNote(o.offset, len(s.Messages), total); line != "" {
+			fmt.Fprintln(os.Stderr, line)
+		}
 	} else if n := len(s.Messages); n > showLargeSession {
 		fmt.Fprintf(os.Stderr, "deja: %d messages — `--offset n --limit n` reads a slice\n", n)
 	}
@@ -486,6 +518,29 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	printSpawnEdges(os.Stderr, dir, s)
 	search.PrintSession(os.Stdout, s)
 	return nil
+}
+
+// showWindowNote is what the terminal says about a slice: which messages it
+// printed and how many there are. Empty when the slice is the whole session,
+// because a reader who asked for everything needs no arithmetic.
+func showWindowNote(offset, returned, total int) string {
+	if total == 0 {
+		// Not the offset's fault, and asked before the full-window case below:
+		// a session deja holds with nothing readable in it answers every
+		// window the same way, and printing a bare header for it is the silent
+		// empty this note exists to end.
+		return "deja: this session has no messages to show"
+	}
+	if offset <= 0 && returned == total {
+		return ""
+	}
+	if returned == 0 {
+		return fmt.Sprintf("deja: --offset %d is past the end — the session has %d message%s", offset, total, pluralS(total))
+	}
+	first := offset + 1
+	last := offset + returned
+	return fmt.Sprintf("deja: showing message%s %d-%d of %d — `--offset %d` reads the next slice",
+		pluralS(returned), first, last, total, last)
 }
 
 // printSpawnEdges names the sessions around this one when an agent spawned it
@@ -666,6 +721,13 @@ func cmdCtx(dir string, rest []string) error {
 		}
 	}
 	q := strings.Join(rest, " ")
+	// Blank is not a query: it matched nothing and the search handed back the
+	// first session in the store, so `deja ctx "$TOPIC"` with the variable
+	// unset printed a transcript nobody asked for (#2259).
+	if strings.TrimSpace(q) == "" {
+		return idPrefixNeeded(dir, "ctx needs a query or an id-prefix",
+			"ctx needs query or id-prefix (see `deja last`)")
+	}
 	if !strings.Contains(q, " ") && len(q) >= 6 {
 		done, err := ctxFromIDPrefix(dir, q)
 		if err != nil || done {
@@ -800,7 +862,8 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkHarness(o.Harness); err != nil {
+	harnessRaw := o.Harness
+	if err := checkHarness(&o.Harness); err != nil {
 		return err
 	}
 	if err := checkRole(o.Role); err != nil {
@@ -836,7 +899,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 		// is advice for a state the tool is not in: indexing changes nothing
 		// and doctor reports the stores as found. Name what emptied the result
 		// instead (#637).
-		if where := activeFilters(o, sinceRaw); where != "" {
+		if where := activeFilters(o, sinceRaw, harnessRaw); where != "" {
 			fmt.Fprintf(os.Stderr, "deja: no sessions match %s\n", where)
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 			return nil
@@ -964,7 +1027,18 @@ func ensureForCLISearch(dir string, o search.Options, force bool, progress io.Wr
 	return nil
 }
 
+// runBareSearch is `deja <words>` — the form where the first word stood where a
+// command name goes. That is the only form the mistyped-command hint is about:
+// `deja search doctro` is someone searching for the word (#2197).
+func runBareSearch(dir string, args []string, sourceInstance string) error {
+	return searchWithOptions(dir, args, sourceInstance, true)
+}
+
 func runSearch(dir string, args []string, sourceInstance string) error {
+	return searchWithOptions(dir, args, sourceInstance, false)
+}
+
+func searchWithOptions(dir string, args []string, sourceInstance string, bare bool) error {
 	force := false
 	var filtered []string
 	for _, a := range args {
@@ -978,7 +1052,8 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkHarness(o.Harness); err != nil {
+	harnessRaw := o.Harness
+	if err := checkHarness(&o.Harness); err != nil {
 		return err
 	}
 	if err := checkRole(o.Role); err != nil {
@@ -1057,7 +1132,14 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		// list the cap has already trimmed.
 		detailed, rerr := search.RunDetailed(ss, o)
 		if rerr != nil {
-			return fmt.Errorf("run: %w", rerr)
+			// "run:" is the name of a function, and the reader of this line is
+			// someone who mistyped a pattern (#2286). The only error that
+			// reaches here in practice is the regexp compile, so it says which
+			// input to look at.
+			if o.Regex {
+				return fmt.Errorf("--re pattern: %w", rerr)
+			}
+			return rerr
 		}
 		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
 	}
@@ -1100,8 +1182,8 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 		switch note := policyHiddenNote(policy.ActivationSearch, policyHidden); {
 		case note != "":
 			fmt.Fprint(os.Stderr, note)
-		case activeFilters(o, sinceRaw) != "":
-			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw))
+		case activeFilters(o, sinceRaw, harnessRaw) != "":
+			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw, harnessRaw))
 			fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
 		default:
@@ -1130,6 +1212,19 @@ func runSearch(dir string, args []string, sourceInstance string) error {
 	// (#604).
 	o.Width = printableWidth(os.Stdout)
 	search.Print(os.Stdout, hits, o)
+	// A wrong guess at a command name falls through to search, and the hint
+	// that names it ran only on an empty result — so a typo whose word happens
+	// to be in the history got a conversation back and nothing about the
+	// command it meant (#2197). After the results, on stderr, and only for the
+	// bare form: `deja search doctro` is someone searching for the word.
+	//
+	// One word only, which is narrower than the empty-result hint on purpose.
+	// There, a hint costs nothing over a failed search; here it lands on an
+	// answer the reader may well have wanted, and "doctors pool" is a search
+	// however close its first word sits to a command name.
+	if bare && len(hits) > 0 && len(strings.Fields(o.Query)) == 1 {
+		fmt.Fprint(os.Stderr, commandHint(o.Query))
+	}
 	return nil
 }
 
@@ -1545,11 +1640,19 @@ func olderThanWindow(dir string, since time.Duration) string {
 // nothing under harness X" — so `--harness cluade` read as "you have no claude
 // history" instead of "that is not a harness". A known-but-empty harness is
 // still valid; only an unknown name is refused (#1113).
-func checkHarness(name string) error {
-	if name == "" || sources.IsKnownHarness(name) {
+// It also normalises, which is why it takes a pointer: the notes store is
+// stored as "deja" and narrated by the index run as "notes", and retrieval has
+// accepted both since #1888 — but this check ran first and refused the printed
+// name as a typo, so nothing below it ever saw the alias, and `deja stats`
+// compares the stored name exactly (#2191).
+func checkHarness(name *string) error {
+	if *name == "notes" {
+		*name = "deja"
+	}
+	if *name == "" || sources.IsKnownHarness(*name) {
 		return nil
 	}
-	return fmt.Errorf("%q is not a harness deja knows — one of: %s", name, strings.Join(sources.HarnessNames(), ", "))
+	return fmt.Errorf("%q is not a harness deja knows — one of: %s", *name, strings.Join(sources.HarnessNames(), ", "))
 }
 
 // knownRoles is the set `--role` accepts. It lists the documented spellings the
@@ -1601,10 +1704,17 @@ func emptyRoleNote(dir, role string) string {
 // activeFilters names the filters a caller set, so an empty result can say
 // which of them emptied it rather than blaming the index. sinceRaw carries
 // what the reader actually typed: "168h0m0s" is not the flag they passed.
-func activeFilters(o search.Options, sinceRaw string) string {
+func activeFilters(o search.Options, sinceRaw, harnessRaw string) string {
 	var parts []string
 	if o.Harness != "" {
-		parts = append(parts, fmt.Sprintf("harness %q", o.Harness))
+		// Same reason as sinceRaw: `--harness notes` is stored as "deja", and
+		// telling someone their "deja" filter matched nothing names a flag
+		// they did not pass (#2191).
+		name := o.Harness
+		if harnessRaw != "" {
+			name = harnessRaw
+		}
+		parts = append(parts, fmt.Sprintf("harness %q", name))
 	}
 	if o.Project != "" {
 		parts = append(parts, fmt.Sprintf("project %q", o.Project))
@@ -1980,6 +2090,12 @@ func parseSearch(args []string) (search.Options, error) {
 			if near := nearestSearchFlag(a); near != "" {
 				return o, fmt.Errorf("unknown flag %q — did you mean %s?", a, near)
 			}
+			// A flag deja takes elsewhere is not a typo and is nowhere near a
+			// search flag by edit distance, so it went into the query and the
+			// search that would have found everything reported nothing (#2249).
+			if cmd := flagsOfOtherCommands[a]; cmd != "" {
+				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", a, cmd)
+			}
 			q = append(q, a)
 		}
 	}
@@ -1993,6 +2109,35 @@ func parseSearch(args []string) (search.Options, error) {
 		return o, fmt.Errorf("query required")
 	}
 	return o, nil
+}
+
+// flagsOfOtherCommands names the command each flag belongs to, for the tokens
+// that are real deja flags somewhere but not here. Only exact matches: a query
+// may legitimately start with a dash, and `--` still ends option parsing.
+var flagsOfOtherCommands = map[string]string{
+	"--offset":      "show",
+	"--span":        "restore",
+	"--out":         "restore",
+	"--force":       "restore",
+	"--tag":         "remember",
+	"--deep":        "doctor",
+	"--offline":     "doctor",
+	"--dry-run":     "forget",
+	"--all-matches": "forget",
+	"--list":        "forget",
+	"--unforget":    "forget",
+	"--before":      "forget",
+	"--to":          "handoff",
+	"--exec":        "resume",
+	"--plain":       "hook-prompt",
+	"--no-open":     "view",
+	"--full":        "sync export",
+	"--peer":        "sync export",
+	"--pull":        "sync ssh",
+	"--both":        "sync ssh",
+	"--from":        "last",
+	"--last":        "log",
+	"--seed":        "bench",
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
@@ -2072,14 +2217,14 @@ func runBlame(dir string, args []string) error {
 	// A typo'd harness must name the mistake, not read as "nobody touched this
 	// file under harness X" — the same reason search and the MCP blame validate
 	// it (#1113). blame has no --role to check.
-	if err := checkHarness(o.Harness); err != nil {
+	if err := checkHarness(&o.Harness); err != nil {
 		return err
 	}
 	target, err := search.ResolveBlamePath(path)
 	if err != nil {
 		return err
 	}
-	hits, hidden, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
+	hits, hidden, total, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
 	}
@@ -2107,12 +2252,19 @@ func runBlame(dir string, args []string) error {
 		return nil
 	}
 	search.PrintBlame(os.Stdout, hits, false)
+	// blame answers "who touched this file". Ten blocks and nothing else reads
+	// as all of them, the misread search already avoids with the same sentence
+	// (#2299). --json keeps its bare array: a machine consumer reading a total
+	// would need a different shape, and that is a break, not a note.
+	if total > len(hits) {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), total)
+	}
 	return nil
 }
 
-func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, error) {
-	hits, hidden, _, err := blameHits(dir, target, o, activation, progress, false)
-	return hits, hidden, err
+func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, error) {
+	hits, hidden, total, _, err := blameHits(dir, target, o, activation, progress, false)
+	return hits, hidden, total, err
 }
 
 // findBlameHitsStale is findBlameHits for a caller that must not wait: it
@@ -2121,31 +2273,35 @@ func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions,
 // before editing a file, so declining for the length of a refresh means the
 // edit happens without the history (#1784). The CLI keeps the blocking path —
 // someone typed it and is watching the progress (#1306).
-func findBlameHitsStale(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, bool, error) {
+func findBlameHitsStale(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, bool, error) {
 	return blameHits(dir, target, o, activation, progress, true)
 }
 
-func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer, stale bool) ([]search.BlameHit, int, bool, error) {
+func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer, stale bool) ([]search.BlameHit, int, int, bool, error) {
 	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
 	refreshing := false
 	if stale {
 		var err error
 		if refreshing, err = index.EnsureForSearchStale(dir, query, progress); err != nil {
-			return nil, 0, false, err
+			return nil, 0, 0, false, err
 		} else if refreshing {
 			requestWarmup(dir)
 		}
 	} else if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
-		return nil, 0, false, err
+		return nil, 0, 0, false, err
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, query, progress)
 	if err != nil {
-		return nil, 0, false, err
+		return nil, 0, 0, false, err
 	}
 	all := search.Blame(withFileTouchers(dir, result.Sessions, target), target, o)
-	hits := policyFilterBlame(activation, all)
+	visible := policyFilterBlame(activation, all)
+	// Cap after the trust filter, not before: cutting first meant a withheld
+	// session ate one of the ten slots, so a reader could get eight hits with
+	// forty sessions still waiting behind --all.
+	hits := search.CapBlame(visible, o)
 	attachBlameLifecycles(hits)
-	return hits, len(all) - len(hits), refreshing, nil
+	return hits, len(all) - len(visible), len(visible), refreshing, nil
 }
 
 // blameToucherCap bounds how many extra sessions a blame reads from the
@@ -2447,12 +2603,37 @@ func printSources(dir string) {
 		size = fi.Size()
 	}
 	s, m, _ := sources.OpencodeCounts()
+	// The counts come out of sqlite, which knows nothing about the exclude
+	// list, so with a pattern in force this row kept reporting sessions that
+	// are not indexed, not searchable and not exported while every other row
+	// subtracted them (#2247). Only then is the store loaded: counting by SQL
+	// is why this row is cheap on a large database.
+	opencodeExcluded := 0
+	if len(sources.ExclusionPatterns()) > 0 {
+		raw := sources.LoadOpencode()
+		kept := sources.FilterSessions(raw)
+		opencodeExcluded = len(raw) - len(kept)
+		// Subtracted from the SQL numbers rather than recounted from what
+		// loaded: the loader drops a session holding no text at all, which the
+		// row has always counted, so recounting would move the numbers for a
+		// reason that has nothing to do with the exclude list.
+		dropped := 0
+		for _, x := range raw {
+			if sources.ExcludedProject(x.Project) {
+				dropped += len(x.Messages)
+			}
+		}
+		s, m = max(0, s-opencodeExcluded), max(0, m-dropped)
+	}
 	note = ""
 	if size > 0 && !sources.SQLite3Available() {
 		note = "\t(sqlite3 CLI not found — opencode sessions unavailable)"
 	}
 	if n := len(sources.ExclusionPatterns()); n > 0 {
 		note += fmt.Sprintf("\texcluded-patterns=%d", n)
+	}
+	if opencodeExcluded > 0 {
+		note += fmt.Sprintf("\texcluded-sessions=%d", opencodeExcluded)
 	}
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
@@ -2480,6 +2661,7 @@ func runForget(dir string, args []string) error {
 	list := false
 	allMatches := false
 	unforget, unforgetGiven := "", false
+	given := map[string]bool{}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--list":
@@ -2489,6 +2671,14 @@ func runForget(dir string, args []string) error {
 		case "--all-matches":
 			allMatches = true
 		case "--session", "--project", "--before", "--unforget":
+			// Given twice, the last one used to win in silence: `deja forget
+			// --session a --session b` deleted b, reported one session and
+			// left a behind, which the reader believes is gone (#2271).
+			// stats already refuses this shape for its own flags.
+			if given[args[i]] {
+				return fmt.Errorf("forget: %s specified twice", args[i])
+			}
+			given[args[i]] = true
 			if i+1 >= len(args) {
 				return fmt.Errorf("forget: %s needs a value", args[i])
 			}
@@ -2586,8 +2776,7 @@ func runForget(dir string, args []string) error {
 			// this path went straight to Unforget, which lifts the tombstone
 			// and rebuilds. Name what it would restore and stop (#1066).
 			if len(lifting) == 0 {
-				fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
-				return nil
+				return fmt.Errorf("no tombstone matches %q — `deja forget --list` shows what is forgotten", unforget)
 			}
 			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould restore %d tombstone%s and rebuild the index — %s\n",
 				len(lifting), pluralS(len(lifting)), joinCapped(lifting, 5))
@@ -2601,8 +2790,11 @@ func runForget(dir string, args []string) error {
 			return err
 		}
 		if lifted == 0 {
-			fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
-			return nil
+			// A restore that restored nothing used to exit 0, so a script
+			// could not tell it from a restore that worked: the typo, the id
+			// that was never forgotten and the session still gone all read as
+			// success (#2263). Every neighbour refuses what it cannot find.
+			return fmt.Errorf("no tombstone matches %q — `deja forget --list` shows what is forgotten", unforget)
 		}
 		// Lifting a tombstone brings a session back only if the transcript is
 		// still on this machine. An imported one lives only in the index, so
@@ -2683,6 +2875,9 @@ func runForget(dir string, args []string) error {
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
 		}
+		if n := usage.CountSnapshots(dir, forgetDigestMatcher(o, result.Keys)); n > 0 {
+			fmt.Fprintf(os.Stdout, "would remove: %d stored digest(s) from the injection log\n", n)
+		}
 		// Two transcripts can write the same harness:id, and then one manifest
 		// row holds both conversations. The build says so once (#698); forget
 		// said "1 session" and took two, from two projects (#970).
@@ -2722,6 +2917,15 @@ func runForget(dir string, args []string) error {
 			} else if gone > 0 {
 				fmt.Fprintf(os.Stdout, "removed %d promoted note%s from %s\n", gone, pluralS(gone), sources.NotesFile())
 			}
+		}
+		// The digests those sessions were served in are content too, and the
+		// page publishes them: forget already reaches the note log for the
+		// same reason (#690, #841). The usage log stays — an event is what
+		// happened, not what was said (#2325).
+		if gone, err := usage.ForgetSnapshots(dir, forgetDigestMatcher(o, result.Keys)); err != nil {
+			fmt.Fprintf(os.Stdout, "could not remove stored digests from the injection log: %v\n", err)
+		} else if gone > 0 {
+			fmt.Fprintf(os.Stdout, "removed %d stored digest%s from the injection log\n", gone, pluralS(gone))
 		}
 		n, err := sources.ForgetPromotedTitles(func(src string) bool {
 			return dropped[src]
@@ -3295,6 +3499,39 @@ func existingNonDirAncestor(p string) string {
 	}
 }
 
+// nearestExistingDir walks up until it finds a directory that is there, so a
+// refusal can name the thing that actually refused rather than the path that
+// could not be created under it.
+func nearestExistingDir(p string) string {
+	for cur := filepath.Clean(p); ; {
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			if dirExists(cur) {
+				return cur
+			}
+			return ""
+		}
+		if dirExists(parent) {
+			return parent
+		}
+		cur = parent
+	}
+}
+
+// dirWritable reports whether this process can create something in dir.
+// Permission bits alone answer for the wrong user on the wrong platform, so it
+// asks the filesystem.
+func dirWritable(dir string) bool {
+	f, err := os.CreateTemp(dir, ".deja-probe-*")
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	_ = f.Close()
+	_ = os.Remove(name)
+	return true
+}
+
 // ensureError turns a failed build into something the reader can act on.
 // A denied write surfaced as `ensure: open /…/index.db.lock: permission
 // denied` — the path of an internal lock file and a syscall error, which says
@@ -3310,6 +3547,13 @@ func ensureError(dir string, err error) error {
 		// paths hit (#893, #906), and the reader is sent to check the
 		// permissions of a directory that no longer exists (#931).
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
+			// Unless something above it is there and simply refuses: a
+			// locked-down ~/.cache cannot be written into either, and reading
+			// that as an ejected volume sent the reader to reconnect a disk
+			// that never left (#2267).
+			if a := nearestExistingDir(parent); a != "" && !dirWritable(a) {
+				return fmt.Errorf("cannot create the index directory (%s) — %s is not writable; check its permissions, or point DEJA_INDEX_DIR somewhere writable", parent, a)
+			}
 			return fmt.Errorf("the index directory is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
 		}
 		// The denial is not always about the index: forget writes the
@@ -3627,4 +3871,104 @@ func joinCapped(items []string, n int) string {
 		return strings.Join(items, ", ")
 	}
 	return strings.Join(items[:n], ", ") + fmt.Sprintf(", +%d more", len(items)-n)
+}
+
+// forgetDigestMatcher decides which stored digests belong to what a forget just
+// took. A record written since #2324 names its own projects, which is exact; an
+// older one is recognised by the ids and project name inside its text, the same
+// weaker test the view page falls back to.
+func forgetDigestMatcher(o index.ForgetOptions, keys []string) func(usage.Snapshot) bool {
+	// Both spellings: a listing renders `claude:abc` and a hook block quotes
+	// the bare id, so a sweep that knew only one of them missed half the
+	// records it was meant to take.
+	ids := make([]string, 0, 2*len(keys))
+	for _, k := range keys {
+		if k == "" {
+			continue
+		}
+		ids = append(ids, k)
+		if _, id, ok := strings.Cut(k, ":"); ok && id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return func(s usage.Snapshot) bool {
+		if o.Project != "" {
+			for _, p := range s.Projects {
+				if p == o.Project {
+					return true
+				}
+			}
+			if len(s.Projects) == 0 && digestNames(s.Digest, o.Project) {
+				return true
+			}
+		}
+		for _, id := range ids {
+			if digestNames(s.Digest, id) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// digestNames reports whether a digest names a project or a session where it
+// renders one, rather than anywhere in its text. Searching the whole text made
+// `forget --project api` delete a digest about work/web whose prose read "a
+// late api call": the reader forgot one project and lost another's record
+// (#2330). The two shapes deja writes are the recall listing,
+//
+//  1. [claude] work/app · claude:abc · 2 matches
+//
+// and the hook block,
+//
+//   - **work/app** `abc` · 2026-08-28
+//
+// A digest in neither shape names nothing, so a sweep keeps it: with `projects`
+// recorded since #2324 the guess is only needed for older records, and deleting
+// one on a guess cannot be undone.
+func digestNames(digest, want string) bool {
+	if want == "" {
+		return false
+	}
+	for _, line := range strings.Split(digest, "\n") {
+		for _, field := range digestNamedFields(line) {
+			if field == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// digestNamedFields pulls the project and id positions out of one rendered
+// line: the fields that follow the harness in brackets, and anything a hook
+// block emphasises or quotes.
+func digestNamedFields(line string) []string {
+	var out []string
+	if _, after, ok := strings.Cut(line, "] "); ok {
+		for _, field := range strings.Split(after, " · ") {
+			out = append(out, strings.TrimSpace(field))
+		}
+	}
+	out = append(out, betweenAll(line, "**")...)
+	out = append(out, betweenAll(line, "`")...)
+	return out
+}
+
+// betweenAll returns every substring wrapped by the given marker.
+func betweenAll(s, marker string) []string {
+	var out []string
+	for {
+		i := strings.Index(s, marker)
+		if i < 0 {
+			return out
+		}
+		rest := s[i+len(marker):]
+		j := strings.Index(rest, marker)
+		if j < 0 {
+			return out
+		}
+		out = append(out, strings.TrimSpace(rest[:j]))
+		s = rest[j+len(marker):]
+	}
 }

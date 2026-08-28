@@ -76,6 +76,16 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// SessionsWithheld is how many sessions a trust rule kept off the page.
+	SessionsWithheld int
+	// NotesWithheld is how many promoted notes a trust rule kept off the page.
+	NotesWithheld int
+	// RecallsWithheld is how many stored digests a trust rule kept off the page.
+	RecallsWithheld int
+	// RecallCount is how many injections the page carries and TotalRecalls how
+	// many the log holds, for the same reason the two note counts exist.
+	RecallCount  int
+	TotalRecalls int
 	// NoteCount is how many notes the page carries and TotalNotes how many
 	// there are, so the page can say when those differ (#2111).
 	NoteCount  int
@@ -166,6 +176,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	// consulted the policy and this one did not: it embedded imported sessions
 	// a local-only rule had already withheld from search, the listing, stats
 	// and the agent. Browsing, so the search activation governs it (#937).
+	hiddenProjects := policyHiddenProjects(policy.ActivationSearch, metas)
 	metas, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, metas)
 	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
 		fmt.Fprint(os.Stderr, note)
@@ -175,6 +186,10 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		GeneratedAt:   time.Now().Format("2006-01-02 15:04"),
 		TotalSessions: report.TotalSessions,
 		Harnesses:     len(report.Harnesses),
+		// On the page too, not only on stderr: the file is what someone looks
+		// at and passes on, and a page a rule emptied read as a machine with
+		// no history at all — the misread #2319 closed on friction (#2321).
+		SessionsWithheld: policyHidden,
 	}
 	if len(metas) > 0 {
 		page.DateEnd = metas[0].Updated.Local().Format("2006-01-02")
@@ -195,8 +210,25 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		}
 		sessions = append(sessions, v)
 	}
-	recalls := make([]viewRecall, 0, viewRecalls)
-	for _, sn := range usage.Snapshots(dir, viewRecalls) {
+	// Every injection there is, so the page can say what it left behind: the
+	// tab used to claim it held all of them while carrying the newest hundred
+	// (#2313). Reading them all costs nothing extra — Snapshots parses the
+	// whole file and cuts at the end either way.
+	allRecalls := usage.Snapshots(dir, 0)
+	// A digest is titles, project names and message text already assembled —
+	// the three things the filter above keeps off this page — and it outlives
+	// the rule it was served under: content recalled while imported sessions
+	// were allowed stayed on the page after a local-only rule withheld them
+	// everywhere else (#2315). The record has no project field, so what is
+	// recognisable is the name of a project being withheld now.
+	allRecalls, page.RecallsWithheld = withoutHiddenProjects(allRecalls, hiddenProjects)
+	page.TotalRecalls = len(allRecalls)
+	if len(allRecalls) > viewRecalls {
+		allRecalls = allRecalls[:viewRecalls]
+	}
+	page.RecallCount = len(allRecalls)
+	recalls := make([]viewRecall, 0, len(allRecalls))
+	for _, sn := range allRecalls {
 		recalls = append(recalls, viewRecall{
 			Time: sn.Time.Local().Format("2006-01-02 15:04"), Kind: sn.Kind,
 			Sessions: sn.Sessions, Bytes: sn.Bytes, Policy: sn.Policy,
@@ -204,6 +236,12 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		})
 	}
 	loaded := sources.LoadPromotedNotes()
+	// A promoted note is a session's decision in the reader's own words, and it
+	// keeps the project it came from — so a note promoted from an imported
+	// session stayed on this page after a local-only rule withheld that project
+	// from search, the listing and the agent. Same gap as the digests above,
+	// with the project known exactly rather than recognised in prose (#2317).
+	loaded, page.NotesWithheld = notesAllowedOnPage(loaded)
 	// By date, newest first: LoadPromotedNotes returns them in the order they
 	// were first written to the file, so cutting that keeps an arbitrary set
 	// rather than the newest — and the page's own order was the file's.
@@ -336,4 +374,62 @@ func openInBrowser(path string) {
 		cmd = exec.Command("xdg-open", path)
 	}
 	_ = cmd.Start()
+}
+
+// withoutHiddenProjects drops the digests that name a withheld project, and
+// says how many went. Substring rather than equality: the digest renders the
+// project inside a line of prose, and the name is what a reader would see.
+func withoutHiddenProjects(snaps []usage.Snapshot, hidden map[string]bool) ([]usage.Snapshot, int) {
+	pol := policy.Load()
+	kept := make([]usage.Snapshot, 0, len(snaps))
+	for _, sn := range snaps {
+		if snapshotWithheld(pol, sn, hidden) {
+			continue
+		}
+		kept = append(kept, sn)
+	}
+	return kept, len(snaps) - len(kept)
+}
+
+// snapshotWithheld decides whether a stored digest may go on the page. A record
+// that names its own projects is answered by the policy alone, which is what
+// makes it right when the sessions behind it have left the index (#2324). One
+// written before that field existed can only be recognised by the names of the
+// projects a rule is hiding now, and that is the older, weaker test.
+func snapshotWithheld(pol policy.Policy, sn usage.Snapshot, hidden map[string]bool) bool {
+	if len(sn.Projects) > 0 {
+		for _, project := range sn.Projects {
+			if !pol.Allows(policy.ActivationSearch, project) {
+				return true
+			}
+		}
+		return false
+	}
+	for project := range hidden {
+		if strings.Contains(sn.Digest, project) {
+			return true
+		}
+	}
+	return false
+}
+
+// The page and `deja forget` read an old record differently on purpose. Here a
+// name anywhere in the text is enough, because the cost of a wrong match is a
+// digest of your own work missing from a page you can regenerate. forget looks
+// only where a digest renders a project, because there the cost is deleting a
+// record that cannot come back (#2330).
+
+// notesAllowedOnPage drops the promoted notes whose project a rule withholds,
+// and says how many went. Browsing, so the search activation governs it — the
+// same activation the session list on this page is filtered by.
+func notesAllowedOnPage(notes []sources.PromotedNote) ([]sources.PromotedNote, int) {
+	p := policy.Load()
+	kept := make([]sources.PromotedNote, 0, len(notes))
+	for _, n := range notes {
+		if n.Project != "" && !p.Allows(policy.ActivationSearch, n.Project) {
+			continue
+		}
+		kept = append(kept, n)
+	}
+	return kept, len(notes) - len(kept)
 }

@@ -694,3 +694,14 @@ func truncateRunes(s string, n int) string {
 	}
 	return s[:n]
 }
+
+// millisecondBackoff formats a watermark for a clause that compares through
+// strftime's %f. That is milliseconds, and the readers parse nanoseconds, so a
+// message inside the watermark's own millisecond compares as not after it — and
+// the two sides disagree about which millisecond a stamp is in at all, because
+// Go truncates here where strftime rounds. Backing the watermark off by a
+// millisecond puts the error on the side that costs a message being offered
+// twice rather than the side that skips it for good (#2155).
+func millisecondBackoff(t time.Time) string {
+	return t.UTC().Add(-time.Millisecond).Format("2006-01-02T15:04:05.000")
+}

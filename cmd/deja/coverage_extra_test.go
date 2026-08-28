@@ -33,9 +33,9 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 	t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
 	t.Setenv("XDG_CONFIG_HOME", "")
-	// The hook adopts the payload's cwd by exporting CLAUDE_PROJECT_DIR into
-	// the process, so a test that runs it hands every later test a project
-	// directory that no longer exists. Pinned here so it is restored per test.
+	// A host may export CLAUDE_PROJECT_DIR, and the developer's own must not
+	// decide what a test recalls. Pinned here so every test starts with the
+	// project named by its own payload and nothing else (#2185).
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// Goose resolves through %APPDATA% on Windows; pin it so the doctor
@@ -486,7 +486,8 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 	if _, err := parseSearch([]string{"--all", "needle"}); err != nil {
 		t.Fatalf("parse --all: %v", err)
 	}
-	if out, err := captureRun(t, "--re", "("); err == nil || !strings.Contains(err.Error(), "run:") || out != "" {
+	// The refusal names the input rather than the function it came from (#2286).
+	if out, err := captureRun(t, "--re", "("); err == nil || !strings.Contains(err.Error(), "--re pattern") || out != "" {
 		t.Fatalf("bad regex out=%q err=%v", out, err)
 	}
 	badRoot := t.TempDir()

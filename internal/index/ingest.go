@@ -60,6 +60,21 @@ func IngestHealth(dir string) map[string]HarnessIngest {
 	return m.IngestHealth
 }
 
+// IngestFilesReport returns the same story per file: which path each refused
+// line, clipped message or unreadable store came from. The rollup says a line
+// was skipped and doctor points at `--json` for more, which used to hold the
+// rollup again (#2189). Sparse — only files with something to report.
+func IngestFilesReport(dir string) map[string]FileIngest {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	return m.IngestFiles
+}
+
 // mergeIngestDiag folds the sources side-channel counters into the manifest.
 // The counts live per file, because that is what they are about: a pass that
 // re-reads one transcript must not erase what a different one reported, and a
@@ -127,10 +142,25 @@ func mergeIngestDiag(m *Manifest) {
 }
 
 // healthFromFiles sums the per-file counts per harness.
+//
+// Paths in order, because LastError is one of them: taking whichever the map
+// handed over last gave the same index a different error on every run, so a
+// script diffing `doctor --json` saw a change where nothing changed (#2245).
+// The first failing path is the one quoted; ingest_files holds them all.
 func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 	out := map[string]HarnessIngest{}
-	for p, e := range files {
-		h := harnessForPath(p)
+	paths := make([]string, 0, len(files))
+	for p := range files {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	for _, p := range paths {
+		e := files[p]
+		// The store, not the file kind: the run narrates "cline" and doctor
+		// filed the same fact under "cline-sdk", while the documentation calls
+		// this key a harness. Five stores have kinds by another name, so for
+		// those a script keyed on the documented name found nothing (#2234).
+		h := sources.HarnessForKind(harnessForPath(p))
 		if h == "" {
 			continue
 		}
@@ -139,7 +169,9 @@ func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 		cur.ClippedMessages += e.Clipped
 		if e.Error != "" {
 			cur.FailedFiles++
-			cur.LastError = e.Error
+			if cur.LastError == "" {
+				cur.LastError = e.Error
+			}
 		}
 		out[h] = cur
 	}
@@ -659,6 +691,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	}
 	wg.Wait()
 	unreadable := malformedByHarness()
+	refused := failedByHarness()
 	var ss []model.Session
 	for _, r := range results {
 		if len(r.ss) == 0 {
@@ -666,14 +699,25 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 			// index run that narrates every store it read and stays silent
 			// about the one it skipped makes an empty deja look like an empty
 			// history (#794).
-			if reason := sources.SkipReason(r.name); reason != "" && progress != nil && !SuppressHarnessNarration {
-				fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
+			//
+			// Two ways to yield nothing, and the second had no line at all: a
+			// store deja could not open has a skip reason, and one whose files
+			// it read and refused has a count instead — computed just above and
+			// then dropped, in the case where nothing else on screen mentions
+			// the store (#2229).
+			if progress != nil && !SuppressHarnessNarration {
+				switch reason := sources.SkipReason(r.name); {
+				case reason != "":
+					fmt.Fprintf(progress, "deja: %s: skipped — %s\n", r.name, reason)
+				case unreadable[r.name] > 0 || refused[r.name] > 0:
+					fmt.Fprintln(progress, nothingReadableNarration(r.name, unreadable[r.name], refused[r.name]))
+				}
 			}
 			continue
 		}
 		ss = append(ss, r.ss...)
 		if progress != nil && !SuppressHarnessNarration {
-			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name]))
+			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name], refused[r.name]))
 		}
 	}
 	return ss
@@ -684,7 +728,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 // in SQLite — and the count alone then reads as the whole story while half of
 // it is missing from recall. The skip reason was printed only for a store that
 // yielded nothing at all (#1758, the shape of #794).
-func harnessNarration(name string, ss []model.Session, skipped string, unreadable int) string {
+func harnessNarration(name string, ss []model.Session, skipped string, unreadable, refused int) string {
 	msgs := 0
 	for _, s := range ss {
 		msgs += len(s.Messages)
@@ -698,10 +742,51 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 	if unreadable > 0 {
 		line += fmt.Sprintf(" — %d line%s skipped, deja could not read %s", unreadable, pluralS(unreadable), pluralThem(unreadable))
 	}
+	// A file deja could not read at all is the third fact of this kind, beside
+	// the refused lines and the missing tool. Without it a store that gave up
+	// ten sessions and lost three tasks read like a store with nothing wrong
+	// (#2236).
+	if refused > 0 {
+		line += fmt.Sprintf(" — %d path%s could not be read at all", refused, pluralS(refused))
+	}
 	if skipped != "" {
 		line += " — part of this store could not be read: " + skipped
 	}
 	return line
+}
+
+// nothingReadableNarration is the line for a store that yielded no session
+// because deja could not read what it found. "0 sessions, 0 messages" is the
+// ordinary line's shape and says the wrong thing here — there were sessions,
+// and none of them survived the read (#2229).
+func nothingReadableNarration(name string, unreadable, refused int) string {
+	label := name
+	if label == "deja" {
+		label = "notes"
+	}
+	// Lines and whole files are different losses and the sentence says which:
+	// a task deja could not parse is a path, and calling it a line said "1
+	// line" about three thousand turns (#2232).
+	var what []string
+	if unreadable > 0 {
+		what = append(what, fmt.Sprintf("%d line%s", unreadable, pluralS(unreadable)))
+	}
+	if refused > 0 {
+		what = append(what, fmt.Sprintf("%d path%s", refused, pluralS(refused)))
+	}
+	return fmt.Sprintf("deja: %s: nothing indexed — %s could not be read", label, strings.Join(what, " and "))
+}
+
+// failedByHarness is malformedByHarness for the paths that would not open or
+// would not parse at all.
+func failedByHarness() map[string]int {
+	out := map[string]int{}
+	for p := range sources.DiagFailedPaths() {
+		if h := sources.HarnessForKind(harnessForPath(p)); h != "" {
+			out[h]++
+		}
+	}
+	return out
 }
 
 // totalMalformed is malformedByHarness summed: the incremental line names the
@@ -720,7 +805,10 @@ func totalMalformed() int {
 func malformedByHarness() map[string]int {
 	out := map[string]int{}
 	for p, n := range sources.DiagMalformedCounts() {
-		if h := harnessForPath(p); h != "" {
+		// By the store's own name, not the file kind's: harnessForPath answers
+		// "cline-sdk" where the run narrates "cline", so the count never
+		// reached the line that would have said it (#2229).
+		if h := sources.HarnessForKind(harnessForPath(p)); h != "" {
 			out[h] += n
 		}
 	}
@@ -1977,7 +2065,10 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 	if m.RedactionRules == nil {
 		m.RedactionRules = map[string]int{}
 	}
-	h := harnessForPath(sourcePath)
+	// The store, not the file kind: `deja stats` prints these as headings, and
+	// "cline-sdk" is a word no other screen uses (#2238, the shape #2234 fixed
+	// for the ingest counters).
+	h := sources.HarnessForKind(harnessForPath(sourcePath))
 	if h == "" {
 		if _, ok := m.Files[sources.OpencodeDB()]; ok {
 			h = "opencode"
@@ -2024,7 +2115,11 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 		if !skipped {
 			continue
 		}
-		h := harnessForPath(path)
+		// The store, matching the key the rules are filed under since #2238:
+		// asking for the file kind here left "cline-sdk" against a "cline" key,
+		// so nothing matched and every incremental pass carried the old counts
+		// on top of the fresh ones (#2240).
+		h := sources.HarnessForKind(harnessForPath(path))
 		if h == "" && path == sources.OpencodeDB() {
 			h = "opencode"
 		}
@@ -2032,7 +2127,18 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 	}
 	for key, count := range old.RedactionRules {
 		parts := strings.SplitN(key, ":", 2)
-		if len(parts) == 2 && !skipHarness[parts[0]] {
+		if len(parts) != 2 {
+			continue
+		}
+		// Folded before the lookup: an index written before #2238 files these
+		// by file kind, and a pass since then drops by store — so a stale
+		// "cline-sdk" count survived its file being re-read and was added to
+		// the fresh "cline" one when the report folded them (#2240).
+		name := parts[0]
+		if store := sources.HarnessForKind(name); store != "" {
+			name = store
+		}
+		if !skipHarness[name] {
 			m.RedactionRules[key] = count
 		}
 	}
@@ -3205,7 +3311,8 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 						if m.RedactionRules == nil {
 							m.RedactionRules = map[string]int{}
 						}
-						h := harnessForPath(s.Path)
+						// The store, as above (#2238).
+						h := sources.HarnessForKind(harnessForPath(s.Path))
 						if h == "" {
 							if _, ok := m.Files[sources.OpencodeDB()]; ok {
 								h = "opencode"

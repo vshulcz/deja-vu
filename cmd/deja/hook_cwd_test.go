@@ -11,33 +11,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// The harness names the project in its payload; deja read only the
-// environment, so a host that sends `cwd` without exporting
-// CLAUDE_PROJECT_DIR recalled nothing — indistinguishable from having no
-// memory (#759).
-func TestAdoptHookCWD(t *testing.T) {
-	t.Run("takes the payload when the environment is silent", func(t *testing.T) {
-		t.Setenv("CLAUDE_PROJECT_DIR", "")
-		adoptHookCWD("/w/from-payload")
-		if got := os.Getenv("CLAUDE_PROJECT_DIR"); got != "/w/from-payload" {
-			t.Errorf("CLAUDE_PROJECT_DIR = %q", got)
-		}
-	})
-	t.Run("never overrides an explicit environment", func(t *testing.T) {
-		t.Setenv("CLAUDE_PROJECT_DIR", "/w/from-env")
-		adoptHookCWD("/w/from-payload")
-		if got := os.Getenv("CLAUDE_PROJECT_DIR"); got != "/w/from-env" {
-			t.Errorf("payload overrode the environment: %q", got)
-		}
-	})
-	t.Run("an empty payload changes nothing", func(t *testing.T) {
-		t.Setenv("CLAUDE_PROJECT_DIR", "")
-		adoptHookCWD("")
-		if got := os.Getenv("CLAUDE_PROJECT_DIR"); got != "" {
-			t.Errorf("CLAUDE_PROJECT_DIR = %q", got)
-		}
-	})
-}
+// The chain the payload rides is pinned in hook_env_untouched_test.go, which
+// also holds what replaced the export deja used to write (#2185).
 
 // End to end: the payload alone must be enough for both hooks.
 func TestHooksRecallFromPayloadCWD(t *testing.T) {

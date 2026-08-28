@@ -38,7 +38,22 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	where := ""
 	if !t.IsZero() {
-		where = " and m.created_at > '" + sqlEscape(t.UTC().Format(time.RFC3339Nano)) + "'"
+		// Both sides normalised, the way the zed reader does it, because the
+		// two are written in different shapes: grokDBTime reads sqlite's own
+		// "2026-07-27 15:29:47" as happily as an RFC3339 string, and compared
+		// as text a space sorts below the T — so on such a store every message
+		// stamped later the same day read as older than the watermark and
+		// nothing reached the index until the date rolled over (#2150, the
+		// shape #2030 fixed for goose).
+		//
+		// strftime rather than datetime: datetime() drops the fraction, and a
+		// message half a second after the watermark would compare equal to it
+		// and be left out. A stamp sqlite cannot read at all normalises to
+		// null, and those rows are kept rather than dropped — an unreadable
+		// stamp is a reason to look at a message, not to hide it.
+		const norm = `strftime('%Y-%m-%dT%H:%M:%f',m.created_at)`
+		w := sqlEscape(millisecondBackoff(t))
+		where = " and (" + norm + " is null or " + norm + " > '" + w + "')"
 	}
 	q := `select s.id as id,s.cwd_last as cwd,s.title as title,` +
 		`m.role as role,m.message_json as body,m.created_at as at ` +

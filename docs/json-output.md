@@ -351,6 +351,9 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   "ingest_health": {
     "claude": {"malformed_lines": 0, "failed_files": 0}
   },
+  "ingest_files": {
+    "/Users/you/.claude/projects/app/one.jsonl": {"malformed": 2}
+  },
   "sync": {
     "state": "ok",
     "peers": [
@@ -378,7 +381,10 @@ when it is `unreadable` — the sidecar is on disk and deja cannot parse it —
 with an `error` saying why. A sidecar fault is reported whether or not an
 endpoint is configured, so `embed` is present in that case even with no
 endpoint. `index.path` points at the index
-directory; `index.db` is that directory's name, not a file. Store `state`
+directory; `index.db` is that directory's name, not a file. `index.state` is
+`missing`, `ok`, `stale`, `stale-readonly` (stale where the index cannot be
+written, so `deja index` cannot fix it) or `damaged` (records or postings are
+gone; the next search rebuilds it). Store `state`
 values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
 `denied` field naming the unreadable path), `needs-sqlite3` and `needs-zstd`
 (both of which add a `skipped` field saying which CLI is missing); an existing
@@ -390,7 +396,19 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and
 `auto`, each with the rule in force and how many sessions it withheld;
 `ignored` and `inert` list policy lines that matched no harness or no import.
-Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
+Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`,
+which quotes one of that store's failures — the first failing path in order,
+so the same index reports the same error every run. `ingest_files` below has
+every one of them.
+
+`ingest_files` is where those counts came from, keyed by file path: `malformed`
+lines, `clipped` messages, and `error` when nothing from that path is in the
+index at all — it would not open, or it is one document that would not parse,
+as a cline or roo task is. It
+is sparse — a file with nothing to report is not in it — and absent when no file
+has anything to report. The per-harness numbers above are the sum of the files
+deja can attribute to a harness, so a path it cannot place is here and in no
+harness's total. Line numbers are not recorded: the parsers count refused lines, not where they were.
 
 `sync.state` is `ok` or `unreadable`; `unreadable` adds an `error` saying why the peers file could not be parsed, and its `peers` list is empty because deja could read nothing from it — a sync is never stopped by a malformed config, so the report is the only place that failure shows. `sync.peers` is every machine this one knows, and it is always present — an
 empty list means no machines are configured, which a script can tell apart from
@@ -432,6 +450,7 @@ What deja has actually served on this machine, measured from the usage log:
   "raw_bytes": 150000,
   "reused_twice": 2,
   "dejavu_moments": 1,
+  "tool_lines": 12,
   "since": "2026-07-27T14:33:13Z",
   "credited_aloud": 3
 }
@@ -445,13 +464,17 @@ one.
 `recalls` counts agent-initiated recalls that returned matches, `injections`
 session starts that began with project memory. `served_bytes` is what the
 digests actually returned and `raw_bytes` the source transcripts they were
-distilled from, so the ratio is how much reading deja saved. The two go
-together: a session start that carried only the environment block is in neither,
-because that block is a summary of what the machine keeps hitting rather than a
-digest of transcripts. `deja stats` counts its bytes, which is the number for
+distilled from, so the ratio is how much reading deja saved. Both cover every
+door that carried a digest — the session start, the per-prompt recall, the
+tool-time line — while `injections` stays the count of session starts. What is
+in neither is a session start that carried only the environment block, because
+that block is a summary of what the machine keeps hitting rather than a digest
+of transcripts. `deja stats` counts its bytes, which is the number for
 everything deja handed over. `reused_twice` is
 sessions agents recalled two or more times, `dejavu_moments` prompts matched to
-prior work, and `credited_aloud` the recalls an agent said out loud.
+prior work, `tool_lines` the PreToolUse injections — one line about the command
+or file an agent was about to touch — and `credited_aloud` the recalls an agent
+said out loud.
 
 `since` is the oldest event still in the usage log, so no count above covers
 more than the period from then to now. On a quiet machine that is every event
@@ -502,7 +525,9 @@ no sessions is still a recall, and the count of those is what
 `empty_result_rate` is made of. It does not mean nothing was served: a session
 start on a checkout with no sessions of its own injects the environment block,
 which is about the machine rather than the project, so that event is `empty`
-and carries its `bytes`.
+and carries its `bytes`. `into` names the agent session an injection went to,
+as the harness names it, and is absent when the writer did not know one — an
+MCP recall answers a tool call, not a session start.
 
 A line needs both `t` and `kind` to appear here at all: a half-written line, or
 one from something that is not deja, is skipped rather than shown with a missing
@@ -512,8 +537,10 @@ never disagree about whether something happened.
 `deja log --last --json` is a different shape: one object, the most recent
 injected digest itself. It carries `t` and `kind` as above, the `digest` text,
 `bytes`, and — each omitted when empty — `sessions`, the `policy` that allowed
-the injection, the `terms` behind a déjà vu firing, and `into`, the agent session
-it went to. It is `null` when no digest has been recorded: one object is the
+the injection, the `terms` behind a déjà vu firing, `into`, the agent session
+it went to, and `projects`, the projects the digest was built from. `projects`
+is absent on records written before it existed and on injections whose writer
+does not know them. It is `null` when no digest has been recorded: one object is the
 shape, and that is how a missing one is spelled.
 
 ## `deja blame <path> --json`

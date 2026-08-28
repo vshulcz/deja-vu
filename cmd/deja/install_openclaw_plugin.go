@@ -73,7 +73,7 @@ func setOpenClawPluginEnabled(on bool) (string, error) {
 		}
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return "", err
+		return "", configParseError(path, err)
 	}
 	plugins, _ := root["plugins"].(map[string]any)
 	entries, _ := mapAt(plugins, "entries")

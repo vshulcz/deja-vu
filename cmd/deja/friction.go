@@ -28,14 +28,21 @@ import (
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--limit" && i+1 < len(args) {
-			i++
-			n, err := strconv.Atoi(args[i])
-			if err != nil || n <= 0 {
-				return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i])
-			}
-			limit = n
+		// Anything else used to be dropped on the floor, so `deja friction
+		// --json` and `--limt 3` answered in prose and exited 0 as though they
+		// had been understood (#2253).
+		if args[i] != "--limit" {
+			return fmt.Errorf("friction: unknown flag %q — it takes --limit n", args[i])
 		}
+		if i+1 >= len(args) {
+			return fmt.Errorf("friction: --limit needs value")
+		}
+		i++
+		n, err := strconv.Atoi(args[i])
+		if err != nil || n <= 0 {
+			return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i])
+		}
+		limit = n
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
@@ -127,6 +134,14 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			// someone lands when recall feels thin, so it is the worst place
 			// to say the history is not there (#1044).
 			fmt.Fprintln(stdout, strings.TrimPrefix(emptyIndexHint("nothing recurring"), "deja: "))
+		case len(sessions) == 0 && len(withheldSessions) > 0:
+			// The sessions that recorded tool output are exactly the ones a
+			// rule took away, and saying the machine never had them is a claim
+			// about the store rather than about the rule — the misread #637
+			// and #1044 closed elsewhere. The stderr note above says the same
+			// thing, and stdout is what a redirect keeps (#2319).
+			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
+				len(withheldSessions), pluralS(len(withheldSessions)))
 		case len(sessions) == 0:
 			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
 				total, pluralS(total))
@@ -136,6 +151,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		}
 		return nil
 	}
+	total := len(rows)
 	if len(rows) > limit {
 		rows = rows[:limit]
 	}
@@ -148,6 +164,12 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, " · last %s", r.when.Local().Format("Jan 2"))
 		}
 		fmt.Fprintln(stdout)
+	}
+	// The header claims to say what this machine keeps tripping over, so a cut
+	// list with nothing after it reads as all of it — the sentence `how` and
+	// `files` print for the same flag (#2311).
+	if total > len(rows) {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), total)
 	}
 	return nil
 }

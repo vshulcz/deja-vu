@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -887,10 +888,122 @@ func doctorMCP(w io.Writer) {
 			status = "plugin"
 		}
 		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)
+		// "Wired" says the server is declared, not that it can start. A config
+		// naming a binary that is gone — a restored backup, a hand edit, a
+		// machine where deja moved and one file was fixed by hand — read as
+		// healthy while no memory arrived (#2216).
+		if status == "wired" {
+			if missing := dejaCommandMissing(c.path); missing != "" {
+				fmt.Fprintf(w, "  %-12s %s\n", "",
+					"points at "+missing+", which is not there — `deja install "+c.name+"` rewrites it for this binary")
+			}
+		}
 		if note := doctorWiringNote(c.name); note != "" && status == "wired" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", note)
 		}
 	}
+}
+
+// dejaCommandMissing returns the deja binary a config names when that file is
+// not there, and "" when the config names one that is, names none, or names it
+// by bare name for the PATH to resolve. deja writes these commands itself, so
+// reading them back is the difference between "declared" and "can start".
+func dejaCommandMissing(path string) string {
+	cmd := dejaCommandIn(path)
+	// A bare name is the PATH's business, and this check would answer for a
+	// lookup it does not do. A relative path or a `~` is worse than that: it
+	// resolves against wherever the reader is standing, or against nothing,
+	// so a stat here would report a working setup broken.
+	if cmd == "" || !filepath.IsAbs(cmd) {
+		return ""
+	}
+	if _, err := os.Stat(cmd); err == nil {
+		return ""
+	}
+	return cmd
+}
+
+// dejaCommandIn finds the command a config runs deja with. JSON configs are
+// parsed the way the wiring check parses them; the rest are read a line at a
+// time, because a `command` key with a path whose name is deja means the same
+// thing in TOML, YAML and JSONC, and adding a parser per format to answer one
+// question is not worth the surface.
+func dejaCommandIn(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var root map[string]any
+	if json.Unmarshal(b, &root) == nil {
+		for _, key := range []string{"mcpServers", "mcp", "servers"} {
+			m, _ := root[key].(map[string]any)
+			for _, v := range m {
+				if cmd := mcpEntryDejaCommand(v); cmd != "" {
+					return cmd
+				}
+			}
+		}
+		return ""
+	}
+	for _, m := range commandValue.FindAllStringSubmatch(string(b), -1) {
+		// One group per quoting, so a quote inside a value cannot end it: a
+		// path under C:\Users\O'Brien is a path, not a delimiter.
+		//
+		// Only the double-quoted form carries escapes. TOML's literal string
+		// and YAML's single-quoted scalar keep their backslashes, which is how
+		// a Windows path is normally written there, and reading an escaped one
+		// raw named a path that exists nowhere — doctor then called a working
+		// install broken (#2216).
+		var value string
+		switch {
+		case m[1] != "":
+			value = quotedPathUnescape.Replace(m[1])
+		case m[2] != "":
+			value = m[2]
+		default:
+			value = m[3]
+		}
+		if value = strings.TrimSpace(value); commandIsDeja(value) {
+			return value
+		}
+	}
+	return ""
+}
+
+// quotedPathUnescape undoes what a quoted string does to a Windows path. Only
+// the two escapes a path can carry: anything else in a command line is not
+// something this check should be interpreting.
+var quotedPathUnescape = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
+
+// commandValue matches a `command` or `cmd` key and the value after it, in the
+// three shapes these configs come in: JSON and JSONC quote the key, TOML uses
+// `=`, YAML uses `:` and quotes nothing. A JSONC file that will not parse as
+// JSON — zed's settings, which carry comments — reaches this too, so the whole
+// text is scanned rather than a line at a time.
+var commandValue = regexp.MustCompile(`"?(?:command|cmd)"?\s*[:=]\s*(?:"([^"\n]*)"|'([^'\n]*)'|([^",\n}]+))`)
+
+// mcpEntryDejaCommand is mcpEntryRunsDeja's answer to "which one": the same
+// walk, returning the command or argument that named deja.
+func mcpEntryDejaCommand(v any) string {
+	m, _ := v.(map[string]any)
+	if m == nil {
+		return ""
+	}
+	if t, ok := m["transport"].(map[string]any); ok {
+		if cmd := mcpEntryDejaCommand(t); cmd != "" {
+			return cmd
+		}
+	}
+	if cmd, _ := m["command"].(string); commandIsDeja(cmd) {
+		return strings.TrimSpace(cmd)
+	}
+	args, _ := m["args"].([]any)
+	for _, a := range args {
+		if s, ok := a.(string); ok && commandIsDeja(s) {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
 }
 
 // doctorWiringNote adds what "wired" cannot promise for a given harness. Three

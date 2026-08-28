@@ -48,21 +48,29 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		case "--force":
 			force = true
 		case "--span":
-			if i+1 < len(args) {
-				i++
-				n, err := strconv.Atoi(args[i])
-				if err != nil || n <= 0 {
-					return fmt.Errorf("restore: --span wants a positive number, got %q", args[i])
-				}
-				want = n
+			// A missing value used to be ignored, which for -o meant the file
+			// went to stdout while the reader believed it had been written
+			// (#2253).
+			if i+1 >= len(args) {
+				return fmt.Errorf("restore: --span needs value")
 			}
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				return fmt.Errorf("restore: --span wants a positive number, got %q", args[i])
+			}
+			want = n
 		case "-o", "--out":
-			if i+1 < len(args) {
-				i++
-				out = args[i]
+			if i+1 >= len(args) {
+				return fmt.Errorf("restore: -o needs value")
 			}
+			i++
+			out = args[i]
 		default:
-			if !strings.HasPrefix(args[i], "-") && path == "" {
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("restore: unknown flag %q", args[i])
+			}
+			if path == "" {
 				path = args[i]
 			}
 		}

@@ -194,10 +194,18 @@ func Redactions(dir string) (RedactionStats, error) {
 		if len(parts) != 2 {
 			continue
 		}
-		if out.Rules[parts[0]] == nil {
-			out.Rules[parts[0]] = map[string]int{}
+		// An index written before #2238 holds keys by file kind, and a pass
+		// since then writes them by store, so one manifest can carry both. The
+		// reader folds, or the screen shows "cline" and "cline-sdk" as two
+		// stores with the counts split between them until a full rebuild.
+		name := parts[0]
+		if store := sources.HarnessForKind(name); store != "" {
+			name = store
 		}
-		out.Rules[parts[0]][parts[1]] = count
+		if out.Rules[name] == nil {
+			out.Rules[name] = map[string]int{}
+		}
+		out.Rules[name][parts[1]] += count
 	}
 	return out, nil
 }
@@ -505,6 +513,14 @@ func RebuildInProgress(dir string) bool {
 	}
 	if ok {
 		unlock()
+		return false
+	}
+	// A lock that could not be created is not a lock somebody holds: tryLockDir
+	// answers "not acquired, no error" for a directory it may not write into,
+	// so a read-only index still serves readers — and that read as a rebuild in
+	// flight, telling people to wait for something that never finishes (#2267).
+	// A real holder left the file behind.
+	if _, err := os.Stat(dir + ".lock"); err != nil {
 		return false
 	}
 	return true

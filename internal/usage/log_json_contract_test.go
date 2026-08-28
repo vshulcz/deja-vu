@@ -36,16 +36,22 @@ func assertShape(t *testing.T, name string, got, want map[string]bool) {
 // Snapshot. docs/json-output.md promises both shapes stay stable and only grow
 // additively; these snapshots enforce that.
 func TestLogJSONShapesAreStable(t *testing.T) {
+	// "into" on the event is additive and optional, for the same reason it is
+	// on the snapshot: the list showed several injections as identical rows,
+	// and the recipient was one file over (#2307).
 	assertShape(t, "Event", topLevelJSONKeys(Event{}), map[string]bool{
 		"t": true, "kind": true, "bytes": true, "sessions": true,
-		"empty": true, "raw": true, "ids": true,
+		"empty": true, "raw": true, "ids": true, "into": true,
 	})
 	// "into" is additive and optional: it names the agent session an injection
 	// went to, which the log never recorded. Without it the only measure of
 	// whether a recall was used is the sentence the block asks the agent to
 	// say — 22 of 1218 injections on a real store, which counts reporting.
+	// "projects" is additive and optional: the trust policy answers for a
+	// project name with no index at all, so a record that names its own
+	// projects can be held to a rule tightened after it was written (#2324).
 	assertShape(t, "Snapshot", topLevelJSONKeys(Snapshot{}), map[string]bool{
 		"t": true, "kind": true, "sessions": true, "bytes": true,
-		"policy": true, "terms": true, "into": true, "digest": true,
+		"policy": true, "terms": true, "into": true, "projects": true, "digest": true,
 	})
 }

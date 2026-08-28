@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -135,7 +137,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// second line, a trailing NUL) keeps its recall instead of losing the
 	// whole payload to a syntax error.
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
-	adoptHookCWD(input.CWD)
 	// The failure the user just reported is worth capturing whether or not
 	// this prompt also earns a recall, so it is decided before the gates that
 	// silence the recall path.
@@ -151,10 +152,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		requestWarmup(dir)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
-	if cwd == "" {
-		cwd, _ = os.Getwd()
-	}
+	// The payload first, then the export, then where the process stands: the
+	// export is set once per process and will not change, so reading it alone
+	// answered a second payload with the first one's project (#2182).
+	cwd := hookCWD(input.CWD)
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND.
@@ -343,8 +344,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
 	rememberInjected(dir, input.SessionID, ss)
-	usage.RecordDigestInto(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
-		terms, sessionIDs(ss)...)
+	usage.RecordDigestFrom(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+		terms, sessionProjects(ss), sessionIDs(ss))
 	if plain {
 		fmt.Fprintln(stdout, out)
 		return nil
@@ -395,8 +396,47 @@ func byIdentifying(terms []string, idf map[string]float64) []string {
 		return terms
 	}
 	out := append([]string(nil), terms...)
-	sort.SliceStable(out, func(i, j int) bool { return idf[out[i]] > idf[out[j]] })
+	sort.SliceStable(out, func(i, j int) bool {
+		if idf[out[i]] != idf[out[j]] {
+			return idf[out[i]] > idf[out[j]]
+		}
+		// A store of one or two sessions collapses every ratio to zero, so the
+		// terms all tied and the word the session had to have spoken was
+		// whichever the reader typed first — "seeing", in a question about
+		// gateway_timeout. The only session such a store holds was then
+		// dropped for not saying it (#2257). The rest of the ranking already
+		// treats a tiny corpus as a special case; this is that case for the
+		// lead term: prefer the word that reads like a term of art.
+		// Shape before length, or "dashboards" would out-rank "s3": a word
+		// carrying an underscore, a dot, a slash or a digit names something
+		// whatever its length, and length is only the tiebreak among words
+		// that look alike.
+		if a, b := symbolShaped(out[i]), symbolShaped(out[j]); a != b {
+			return a
+		}
+		if a, b := identifying(out[i]), identifying(out[j]); a != b {
+			return a
+		}
+		return utf8.RuneCountInString(out[i]) > utf8.RuneCountInString(out[j])
+	})
 	return out
+}
+
+// identifying reports whether one term reads like a term of art — the same
+// test the recall bar applies to a whole question, asked of a single word. It
+// admits any ordinary word of three letters, so the length below settles the
+// ties it leaves: "gateway_timeout" over "seeing".
+func identifying(term string) bool { return search.HasIdentifierTerm([]string{term}) }
+
+// symbolShaped reports whether a term is punctuated or numbered the way a
+// symbol, a path or a version is — "gateway_timeout", "pkg/index", "v11", "s3".
+func symbolShaped(term string) bool {
+	for _, r := range term {
+		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
+			return true
+		}
+	}
+	return false
 }
 
 // citationLine pre-writes the narration so the agent copies structure instead
@@ -459,6 +499,31 @@ func citationLine(s model.Session, terms []string) string {
 		title, s.Harness, date, shortID(s.ID))
 }
 
+// hookseenKey makes an agent session id safe to be one field of a `.hookseen`
+// line. The file is whitespace-separated and the id arrives in the hook
+// payload, which is whatever the host sends. A space cost that session its
+// dedup and handed its entries to whatever id its first word named, and a
+// newline wrote a line of its own — so a payload could mark memory as already
+// shown to any session it liked (#2167).
+//
+// Writing and reading go through this, so a mapped id matches itself, and every
+// id a harness actually sends maps to itself, which is why no existing file
+// needs converting.
+func hookseenKey(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return '_'
+		}
+		return r
+	}, s)
+}
+
+// hookseenField reports whether a value can be one field of a line as it
+// stands. The session id above is mapped because it is only ever compared with
+// itself; a value is not, because it is compared with the index's own ids —
+// so one that cannot be a field is left out of the file instead.
+func hookseenField(s string) bool { return s != "" && hookseenKey(s) == s }
+
 // alreadyInjected returns the session ids this hook already injected into the
 // given agent session, so follow-up prompts do not repeat the same memory.
 func alreadyInjected(dir, sid string) map[string]bool {
@@ -470,11 +535,12 @@ func alreadyInjected(dir, sid string) map[string]bool {
 	if err != nil {
 		return out
 	}
+	key := hookseenKey(sid)
 	for _, line := range strings.Split(string(b), "\n") {
 		// Two fields when the entry is a block fingerprint, three when it is a
 		// session with the time it was shown.
 		parts := strings.Fields(line)
-		if len(parts) >= 2 && parts[0] == sid {
+		if len(parts) >= 2 && parts[0] == key {
 			out[parts[1]] = true
 		}
 	}
@@ -508,11 +574,12 @@ func recentlyInjected(dir, sid string, window int) map[string]bool {
 		return out
 	}
 	lines := strings.Split(string(b), "\n")
+	key := hookseenKey(sid)
 	// Newest first: the window counts injections, and the file is append-only.
 	kept := 0
 	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
 		parts := strings.Fields(lines[i])
-		if len(parts) < 2 || parts[0] != sid {
+		if len(parts) < 2 || parts[0] != key {
 			continue
 		}
 		kept++
@@ -535,12 +602,13 @@ func forgetInjected(dir, sid string) {
 	if err != nil {
 		return
 	}
+	key := hookseenKey(sid)
 	var kept []string
 	for _, line := range strings.Split(string(b), "\n") {
 		if line == "" {
 			continue
 		}
-		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == sid {
+		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == key {
 			continue
 		}
 		kept = append(kept, line)
@@ -579,7 +647,14 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 	}
 	stamp := time.Now().UTC().Format(time.RFC3339)
 	for _, s := range ss {
-		fmt.Fprintf(f, "%s %s %s\n", sid, s.ID, stamp)
+		// The value stays byte-exact: it is looked up against the index's own
+		// ids, and a mapped one would match nothing there. One that cannot be
+		// a field is dropped instead — a missing dedup entry costs a second
+		// showing, where a broken line costs the entry written after it.
+		if !hookseenField(s.ID) {
+			continue
+		}
+		fmt.Fprintf(f, "%s %s %s\n", hookseenKey(sid), s.ID, stamp)
 	}
 }
 
@@ -597,17 +672,28 @@ func rotateHookseen(p, sid string) {
 	if len(lines) > tailLines {
 		start = len(lines) - tailLines
 	}
-	var keep []string
-	prefix := sid + " "
+	// The caller's own lines are kept beyond the tail so its dedup survives the
+	// rotation — but only as many as the tail itself. Keeping all of them left
+	// a long session able to fill the file with its own entries, after which
+	// every write rotated a megabyte again: the tool hooks write a token per
+	// call, so that is reachable rather than theoretical (#2164).
+	var keep, mine []string
+	prefix := hookseenKey(sid) + " "
 	for i, ln := range lines {
 		if ln == "" {
 			continue
 		}
-		if i >= start || strings.HasPrefix(ln, prefix) {
+		switch {
+		case i >= start:
 			keep = append(keep, ln)
+		case strings.HasPrefix(ln, prefix):
+			mine = append(mine, ln)
 		}
 	}
-	_ = atomicfile.Write(p, []byte(strings.Join(keep, "\n")+"\n"), 0o600)
+	if len(mine) > tailLines {
+		mine = mine[len(mine)-tailLines:]
+	}
+	_ = atomicfile.Write(p, []byte(strings.Join(append(mine, keep...), "\n")+"\n"), 0o600)
 }
 
 // rememberInjectedIDs records arbitrary dedupe tokens against a session, so a
@@ -617,19 +703,29 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 	if sid == "" {
 		return
 	}
-	f, err := os.OpenFile(dir+".hookseen", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+	p := dir + ".hookseen"
+	// Rotate rather than stop, for the reason rememberInjected does: a full
+	// file used to end the dedup for good, and the hooks that write tokens are
+	// the ones whose whole job is not repeating themselves to the same agent.
+	// Stopping here left that to whenever a session injection happened to
+	// rotate the file, and on a machine whose hooks inject tokens rather than
+	// sessions, nothing ever did (#2164).
+	if fi, err := os.Stat(p); err == nil && fi.Size() > 1<<20 {
+		rotateHookseen(p, sid)
+	}
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	if fi, err := f.Stat(); err == nil && fi.Size() > 1<<20 {
-		return
-	}
 	if atomicfile.EndsMidLine(f) {
 		_, _ = f.WriteString("\n")
 	}
 	for _, id := range ids {
-		fmt.Fprintf(f, "%s %s\n", sid, id)
+		if !hookseenField(id) {
+			continue
+		}
+		fmt.Fprintf(f, "%s %s\n", hookseenKey(sid), id)
 	}
 }
 
@@ -647,25 +743,11 @@ func rememberInjectedIDs(dir, sid string, ids ...string) {
 func dejaVuLineDue(dir, sid string) bool {
 	p := dir + ".dejavu"
 	now := time.Now()
-	if sid == "" {
-		if b, err := os.ReadFile(p); err == nil {
-			for _, line := range strings.Split(string(b), "\n") {
-				fields := strings.Fields(line)
-				if len(fields) != 2 || fields[0] != "-" {
-					continue
-				}
-				if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
-					now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
-					return false
-				}
-			}
-		}
-		return recordDejaVuLine(p, "-", now)
-	}
+	key := dejaVuKey(sid)
 	if b, err := os.ReadFile(p); err == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			fields := strings.Fields(line)
-			if len(fields) != 2 || fields[0] != sid {
+			if len(fields) != 2 || fields[0] != key {
 				continue
 			}
 			if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
@@ -674,7 +756,24 @@ func dejaVuLineDue(dir, sid string) bool {
 			}
 		}
 	}
-	return recordDejaVuLine(p, sid, now)
+	return recordDejaVuLine(p, key, now)
+}
+
+// dejaVuKey is how a session is named in `.dejavu`, which is two fields to a
+// line and holds the machine-wide fallback under "-".
+//
+// Mapped, for the reason hookseenKey is: the id comes from the hook payload, a
+// space made the line three fields so nothing ever matched it — the notice then
+// fired on every prompt, which the limit exists to prevent — and a newline
+// wrote a line under whatever followed it, spending another session's window.
+// Prefixed, so an agent calling itself "-" cannot share the fallback's window
+// with a host that sent no id at all. Entries age out inside twenty minutes, so
+// the shape can change without converting anything (#2170).
+func dejaVuKey(sid string) string {
+	if sid == "" {
+		return "-"
+	}
+	return "s" + hookseenKey(sid)
 }
 
 const (
@@ -919,6 +1018,22 @@ func densestMessages(msgs []model.Message, low, terms []string, cap int) []model
 		if keep[i] {
 			out = append(out, m)
 		}
+	}
+	return out
+}
+
+// sessionProjects names the projects behind a served digest, deduped in order.
+// The digest log records them so a rule tightened later can be applied to the
+// stored text without the sessions still being in the index (#2324).
+func sessionProjects(ss []model.Session) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if s.Project == "" || seen[s.Project] {
+			continue
+		}
+		seen[s.Project] = true
+		out = append(out, s.Project)
 	}
 	return out
 }

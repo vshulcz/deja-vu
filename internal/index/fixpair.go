@@ -462,3 +462,29 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	}
 	return out
 }
+
+// FixCandidateSeen reports whether deja is holding an unconfirmed sighting for
+// this error: something WAS run after it once, which is not yet evidence that
+// it worked. The command that says "nothing ran after that error" asks first,
+// so it does not deny holding what it is holding (#2282).
+func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
+	sigs := map[uint64]bool{}
+	for _, raw := range strings.Split(text, "\n") {
+		if line, ok := FrictionLine(raw); ok {
+			sigs[frictionHash(line)] = true
+		}
+	}
+	if len(sigs) == 0 {
+		return false
+	}
+	for _, p := range ReadFixes(dir) {
+		if !sigs[p.Sig] || !p.Candidate {
+			continue
+		}
+		if allow != nil && !allow(p.Project) {
+			continue
+		}
+		return true
+	}
+	return false
+}

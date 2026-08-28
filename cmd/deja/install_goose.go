@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -266,8 +266,16 @@ func writeGooseHook() error {
 // searched against what the user just typed rather than chosen when the
 // session opened.
 func cmdGooseHook(_ string, _ []string) error {
-	_ = readHookStdin()
-	return refreshGooseHints()
+	// The payload names the project, when the host puts it there. This door
+	// discarded it and recalled from wherever the process stood, so a host that
+	// runs its hooks from a plugin directory rather than the project got the
+	// recall of nowhere (#2187). Decoded rather than unmarshalled, like the
+	// other doors, so trailing bytes cost nothing.
+	var input struct {
+		CWD string `json:"cwd"`
+	}
+	_ = json.NewDecoder(bytes.NewReader(readHookStdin())).Decode(&input)
+	return refreshGooseHintsFor(input.CWD)
 }
 
 // refreshGooseForPrompt writes prompt-scoped recall where goose will read it.
@@ -284,15 +292,26 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 		// Goose calls it message; matcher_context carries the same text.
 		Message string `json:"message"`
 		Prompt  string `json:"prompt"`
+		CWD     string `json:"cwd"`
 	}
-	_ = json.Unmarshal(payload, &input)
+	_ = json.NewDecoder(bytes.NewReader(payload)).Decode(&input)
 	prompt := input.Message
 	if prompt == "" {
 		prompt = input.Prompt
 	}
+	// The project travels with the prompt: this re-encodes a payload of its
+	// own, and dropping the cwd left the recall scoped to wherever the process
+	// stood (#2187). Marshalled rather than quoted by hand, since strconv.Quote
+	// writes \x escapes that are not JSON.
+	inner, err := json.Marshal(struct {
+		Prompt string `json:"prompt"`
+		CWD    string `json:"cwd"`
+	}{prompt, input.CWD})
+	if err != nil {
+		return err
+	}
 	var out strings.Builder
-	if err := runHookPromptMode(dir, strings.NewReader(
-		`{"prompt":`+strconv.Quote(prompt)+`}`), &out, true); err != nil {
+	if err := runHookPromptMode(dir, bytes.NewReader(inner), &out, true); err != nil {
 		return err
 	}
 	// Silence means the history has nothing for this question. Leave the
@@ -305,7 +324,7 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 		return err
 	}
 	old, _ := os.ReadFile(path)
-	_, err := writeIfChanged(path, old, []byte(out.String()))
+	_, err = writeIfChanged(path, old, []byte(out.String()))
 	return err
 }
 
@@ -319,10 +338,17 @@ func gooseRecallPath() string {
 }
 
 func refreshGooseHints() error {
-	digest, sessions, _, _, _ := cachedHookDigest(index.DefaultDir())
+	return refreshGooseHintsFor("")
+}
+
+// refreshGooseHintsFor is refreshGooseHints for a caller that was told which
+// project the call is about; "" leaves the chain to answer, which is what the
+// wrapper and the installer want (#2187).
+func refreshGooseHintsFor(cwd string) error {
+	digest, sessions, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
 	body := digest
 	if sessions > 0 {
-		body = frameRecall(gooseLead + digest)
+		body = frameRecall(startLead(gooseLead) + digest)
 	}
 	if strings.TrimSpace(body) == "" {
 		body = "No matching history yet.\n"

@@ -239,8 +239,7 @@ func runHookContext(dir string, plain bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	adoptHookCWD(input.CWD)
-	digest, sessions, raw, taskMatched, withheld := cachedHookDigest(dir)
+	digest, sessions, raw, taskMatched, withheld := cachedHookDigestFor(dir, input.CWD)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -303,7 +302,7 @@ func runHookContext(dir string, plain bool) error {
 	}
 	// One actionable line so injected memory leads somewhere: models that see
 	// bare data tend to ignore it.
-	lead := sessionStartLead
+	lead := startLead(sessionStartLead)
 	if input.Source == "compact" {
 		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
 		// The generic digest is about the project. What a compacted session
@@ -546,20 +545,20 @@ func hookGate() string {
 	return mode + "|" + policy.Load().Describe(policy.ActivationAuto)
 }
 
-// adoptHookCWD takes the working directory out of a hook payload when the
-// environment does not already name one. The harness knows the project; the
-// environment variable is a Claude Code convenience the others do not share.
-func adoptHookCWD(cwd string) {
-	if cwd == "" || os.Getenv("CLAUDE_PROJECT_DIR") != "" {
-		return
-	}
-	_ = os.Setenv("CLAUDE_PROJECT_DIR", cwd)
-}
-
 // hookCWD is where the hook is standing: what the payload says, else the
-// project directory the harness exported, else the process's own — the same
-// chain cachedHookDigest walks, so a host that exports the directory without
-// naming it in the payload is not treated as standing nowhere.
+// project directory the harness exported, else the process's own — so a host
+// that exports the directory without naming it in the payload is not treated
+// as standing nowhere (#759), and one that names it in the payload without
+// exporting anything is not either.
+//
+// deja used to write the payload's answer back into its own environment. After
+// #2183 nothing read it to decide anything: the doors take the project from the
+// payload, and the two children that need one are handed it — the refresh child
+// on its own environment, and the warmup child not at all, since `deja index`
+// reads every project. What the write still did was carry one call's project
+// into the next in the same process, which is the fault #2182 was, and which
+// made an earlier measurement of #2161 report the opposite of the truth
+// (#2185).
 func hookCWD(fromPayload string) string {
 	if fromPayload != "" {
 		return fromPayload
@@ -572,7 +571,15 @@ func hookCWD(fromPayload string) string {
 }
 
 func cachedHookDigest(dir string) (string, int, int64, []string, int) {
-	cwd := hookCWD("")
+	return cachedHookDigestFor(dir, "")
+}
+
+// cachedHookDigestFor is cachedHookDigest for a caller that was told which
+// project the call is about. The payload is that authority: deja used to write
+// it into its own environment and read it back, which answered a second payload
+// in the same process with the first one's project (#2182, #2185).
+func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int) {
+	cwd := hookCWD(fromPayload)
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
 		return "", 0, 0, nil, 0
 	}
@@ -601,7 +608,7 @@ func cachedHookDigest(dir string) (string, int, int64, []string, int) {
 			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld
 		}
 	}
-	digest, sessions, raw, taskMatched, withheld := hookDigestResult(dir)
+	digest, sessions, raw, taskMatched, withheld := hookDigestResultFor(dir, cwd)
 	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld)
 	return digest, sessions, raw, taskMatched, withheld
 }
@@ -676,6 +683,14 @@ func hookDigest(dir string) string {
 }
 
 func hookDigestResult(dir string) (string, int, int64, []string, int) {
+	return hookDigestResultFor(dir, "")
+}
+
+// hookDigestResultFor is hookDigestResult for a caller that was told which
+// project the call is about, rather than one reading it back out of the
+// environment, where a project deja itself had written stayed for every later
+// call in the process (#2182, #2185).
+func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -700,7 +715,10 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 		requestWarmup(dir)
 		return "", 0, 0, nil, 0
 	}
-	cwd := os.Getenv("CLAUDE_PROJECT_DIR")
+	cwd := fromPayload
+	if cwd == "" {
+		cwd = os.Getenv("CLAUDE_PROJECT_DIR")
+	}
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
@@ -1022,5 +1040,21 @@ func indexCanCatchUp(dir string) bool {
 	fresh, _ := index.UpToDate(dir, "")
 	return fresh
 }
+
+// startLead swaps a "from this project" lead for the wide one when recall is
+// set to reach past the checkout. The mode replaces the lookup names with the
+// projects of the machine's recent sessions (see hookDigestResultFor), and
+// every harness lead said "this project" either way — so a client's sessions
+// arrived described as this project's history (#2343).
+func startLead(narrow string) string {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_RECALL")), search.RecallAggressive) {
+		return wideRecallLead
+	}
+	return narrow
+}
+
+// wideRecallLead is sessionStartLead for DEJA_RECALL=aggressive, where the
+// sessions come from this machine rather than from this checkout.
+const wideRecallLead = "The sessions below are recent work on this machine, not only in this project — deja is set to recall widely. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, tell the user in one short line what deja-vu recalled and how you reused it; otherwise do not mention it.\n"
 
 const sessionStartLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, tell the user in one short line what deja-vu recalled and how you reused it; otherwise do not mention it.\n"

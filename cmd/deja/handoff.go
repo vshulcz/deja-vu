@@ -13,6 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -52,6 +53,11 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return fmt.Errorf("handoff: unknown flag %q", args[i])
 			}
+			// The last one used to win, so a stray word replaced the id and
+			// the refusal named it as the session that was missing (#2251).
+			if prefix != "" {
+				return fmt.Errorf("handoff takes one id-prefix — got %q and %q", prefix, args[i])
+			}
 			prefix = args[i]
 		}
 	}
@@ -77,6 +83,13 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
 		return err
 	}
+	// The exclude list is a privacy control that only runs at ingest, so an
+	// index built before the pattern still holds the session. share refuses it
+	// for that reason (#1307) and promote followed (#2278); handing the same
+	// session to another agent is the same move with a longer extract (#2280).
+	if sources.ExcludedProject(s.Project) {
+		return fmt.Errorf("%s is in a project your exclude list covers — `deja index --rebuild` drops it from the index, or remove the pattern to hand it off", prefix)
+	}
 	// Source receipt: the user must always see WHAT is being handed off —
 	// wrong-project or stale handoffs should be obvious before they land.
 	age := "unknown age"
@@ -90,7 +103,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: note — this session is %s; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
 	}
 	digest := digest.Handoff(s, handoffBudget)
-	usage.RecordDigest(dir, usage.KindHandoff, digest, 1, rawSize([]model.Session{s}))
+	usage.RecordDigestPolicyFrom(dir, usage.KindHandoff, digest, "", 1, rawSize([]model.Session{s}), projectsOf(s), "")
 	if !doExec {
 		printSanitized(stdout, digest)
 		if pasteOnly {
@@ -181,7 +194,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	// work in this project rather than handing over older work in silence.
 	var hiddenNewest time.Time
 	for _, name := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.RecentProject(dir, name, 3)
+		ss, err := index.RecentInProject(dir, name, 3)
 		if err != nil || len(ss) == 0 {
 			continue
 		}

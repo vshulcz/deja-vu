@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -61,11 +62,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			enc.SetIndent("", "  ")
 			return enc.Encode(s)
 		}
-		pol := ""
-		if s.Policy != "" {
-			pol = " · policy: " + s.Policy
-		}
-		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), pol)
+		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), snapshotTail(s))
 		fmt.Fprintln(w, s.Digest)
 		// This is the newest digest by its stamp (#2140), so a stamp from
 		// ahead of the clock holds the spot until the clock catches up — and
@@ -76,7 +73,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		}
 		return nil
 	}
-	events := usage.Events(dir, n)
+	events, total := usage.EventsCounted(dir, n)
 	if jsonOut {
 		// A nil slice encodes as null, and null is not an empty list: len()
 		// raises, iteration raises, `jq '.[]'` errors. Every other
@@ -102,7 +99,18 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		if e.Sessions > 0 {
 			sess = fmt.Sprintf(" · %d session%s", e.Sessions, pluralS(e.Sessions))
 		}
-		fmt.Fprintf(w, "%s  %-14s %s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, mark)
+		into := ""
+		if e.Into != "" {
+			into = " · into: " + e.Into
+		}
+		fmt.Fprintf(w, "%s  %-14s %s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, into, mark)
+	}
+	if total > len(events) {
+		// Nobody typed the 20 — it is the default above — and this is the
+		// audit trail, where a list that stops without saying so reads as
+		// everything deja served. The same sentence blame and show print
+		// (#2299, #2296, #2305).
+		fmt.Fprintf(w, "\nshowing %d of %d — `deja log %d` shows the rest\n", len(events), total, total)
 	}
 	fmt.Fprintln(w, "\nuse `deja log --last` to see the exact text of the most recent injected digest")
 	// The log's stamps are deja's own, written at recall time, so one in the
@@ -137,4 +145,24 @@ func eventsStampedAhead(events []usage.Event, now time.Time) int {
 		}
 	}
 	return n
+}
+
+// snapshotTail is the part of the header that depends on what the record
+// happens to carry. The record knows which agent session received the digest
+// and which terms fired it — both were added to explain an injection after the
+// fact (#1494) — and only --json ever said them, so the surface a person types
+// answered "what was injected" and never to whom or why (#2301). Fields the
+// record does not carry print nothing, the way policy already did.
+func snapshotTail(s usage.Snapshot) string {
+	var b strings.Builder
+	if s.Policy != "" {
+		b.WriteString(" · policy: " + s.Policy)
+	}
+	if s.Into != "" {
+		b.WriteString(" · into: " + s.Into)
+	}
+	if len(s.Terms) > 0 {
+		b.WriteString(" · terms: " + strings.Join(s.Terms, ", "))
+	}
+	return b.String()
 }

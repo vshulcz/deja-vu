@@ -104,6 +104,8 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	return BlameTarget{FullPath: full, Base: base, Stem: stem}, nil
 }
 
+// Blame ranks every session that carries evidence for the file, in full. The
+// listing cut lives in CapBlame.
 func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	// One clock reading for the whole ranking. Called per session, the decay
 	// differed by nanoseconds between candidates, so sessions with identical
@@ -183,8 +185,22 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		}
 		return hits[i].Session.ID < hits[j].Session.ID
 	})
-	if !o.All && len(hits) > 10 {
-		hits = hits[:10]
+	return hits
+}
+
+// BlameCap is how many hits the default listing shows. The rest are behind
+// --all, so a caller that cuts the list here owes the reader the count it cut
+// from — blame is an answer to "who touched this file", and ten of forty reads
+// as the whole answer unless something says otherwise (#2299).
+const BlameCap = 10
+
+// CapBlame trims a ranked list to BlameCap unless the reader asked for all of
+// it. Kept apart from Blame so the caller still holds the full length: the cut
+// used to happen inside the ranking, where nothing downstream could tell ten
+// hits from ten of forty.
+func CapBlame(hits []BlameHit, o BlameOptions) []BlameHit {
+	if !o.All && len(hits) > BlameCap {
+		return hits[:BlameCap]
 	}
 	return hits
 }
@@ -356,7 +372,15 @@ func blameSnippet(text, role string, target BlameTarget) string {
 		// stopped existing and is prose as far as a snippet goes.
 		path, span, _ := strings.Cut(text, "\n")
 		if pathLineFor(path, target) != "" {
-			return strings.TrimSpace(SafePath(path) + " " + snippet(span, target.Base, nil))
+			// A space put nothing between the two, and this command is written
+			// for paths that contain spaces (the comment above), so the reader
+			// could not tell where the path ended — on the line they paste into
+			// `deja restore` (#2284). An em dash cannot occur in either half by
+			// accident.
+			if cut := snippet(span, target.Base, nil); strings.TrimSpace(cut) != "" {
+				return strings.TrimSpace(SafePath(path)) + " — " + strings.TrimSpace(cut)
+			}
+			return strings.TrimSpace(SafePath(path))
 		}
 	}
 	return snippet(text, target.Base, nil)

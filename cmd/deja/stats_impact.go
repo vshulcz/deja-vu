@@ -24,7 +24,7 @@ func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
 	// from four ignored ones is the agent naming deja out loud in a later
 	// transcript, and that lives in the index, not in the usage log (#1062).
 	// Only pay for the session scan when there is activity to explain.
-	if r.Recalls > 0 || r.Injections > 0 {
+	if impactHasActivity(r) {
 		if ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard); err == nil {
 			// Filtered like `deja stats` filters its own report: this count is
 			// derived from session text, and every other surface that reads
@@ -55,7 +55,7 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 		_, err = fmt.Fprintf(w, "%s,\n  \"credited_aloud\": %d\n}\n", body, credits)
 		return err
 	}
-	if r.Recalls == 0 && r.Injections == 0 {
+	if !impactHasActivity(r) {
 		fmt.Fprintln(w, "deja: no recall activity recorded yet — impact numbers appear once agents start recalling")
 		return nil
 	}
@@ -72,6 +72,12 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	// (#1652). The verbs are already invariant.
 	fmt.Fprintf(w, "  recalls served     %d agent-initiated recall%s returned matches\n", r.Recalls, pluralS(r.Recalls))
 	fmt.Fprintf(w, "  memory at start    %d session start%s began with project memory\n", r.Injections, pluralS(r.Injections))
+	if r.ServedBytes > 0 && r.RawBytes == 0 {
+		// The tool-time line is recorded with no raw size behind it — it is a
+		// fact about the store rather than a digest of transcripts — so the
+		// ratio block below skipped it and the bytes went unsaid (#2309).
+		fmt.Fprintf(w, "  context served     %s, with no raw transcript size recorded behind it\n", humanBytes(int64(r.ServedBytes)))
+	}
 	if r.RawBytes > 0 && r.ServedBytes > 0 {
 		// The frame, the header and the session lines cost more than the text
 		// they wrap when sessions are short — which is exactly the state a new
@@ -94,10 +100,13 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	if r.ReusedTwice > 0 {
 		fmt.Fprintf(w, "  knowledge re-used  %d session%s recalled 2+ times — fixes that keep paying\n", r.ReusedTwice, pluralS(r.ReusedTwice))
 	}
+	if r.ToolLines > 0 {
+		fmt.Fprintf(w, "  tool-time lines    %d command%s or file%s deja had seen before\n", r.ToolLines, pluralS(r.ToolLines), pluralS(r.ToolLines))
+	}
 	if r.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  déjà vu moments    %d prompt%s matched work you had already done\n", r.DejaVuMoments, pluralS(r.DejaVuMoments))
 	}
-	served := r.Recalls + r.Injections
+	served := r.Recalls + r.Injections + r.DejaVuMoments + r.ToolLines
 	switch {
 	case credits > 0:
 		fmt.Fprintf(w, "  credited aloud     %d of %d said \"deja-vu recalled\" — memory that was used, not just served\n", credits, served)
@@ -108,4 +117,15 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	fmt.Fprintln(w, "the source transcripts those digests distilled. `deja log` shows every entry.")
 	fmt.Fprintln(w, "for retrieval timing on your own corpus, run `deja bench recall`.")
 	return nil
+}
+
+// impactHasActivity says whether this machine has served anything at all.
+// The two counters this used to read — recalls and session-start injections —
+// are exactly the two a machine running only the prompt hook never increments:
+// a per-prompt déjà vu lands in DejaVuMoments and hook-tool under no counter at
+// all, both carrying their bytes. So the default install read as "nothing
+// recorded" while `deja log`, the stats card and this report's own --json
+// listed the injections (#2303).
+func impactHasActivity(r usage.ImpactReport) bool {
+	return r.Recalls > 0 || r.Injections > 0 || r.DejaVuMoments > 0 || r.ToolLines > 0 || r.ServedBytes > 0
 }

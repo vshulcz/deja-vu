@@ -57,6 +57,21 @@ func policyFilterSessionsCounted(activation string, ss []model.Session) ([]model
 	return kept, before - len(kept)
 }
 
+// policyHiddenProjects names the projects a rule is withholding right now. The
+// view page needs them by name rather than by session: a stored digest carries
+// no project field, so the only way to keep withheld content off a shareable
+// page is to recognise the names inside it (#2315).
+func policyHiddenProjects(activation string, ss []model.Session) map[string]bool {
+	p := policy.Load()
+	hidden := map[string]bool{}
+	for _, s := range ss {
+		if s.Project != "" && !p.Allows(activation, s.Project) {
+			hidden[s.Project] = true
+		}
+	}
+	return hidden
+}
+
 // denyPolicyHidden stops a direct-access command (show, share, handoff) from
 // revealing a session a trust rule withholds. Naming an exact id is still
 // browsing under the search activation — ctx already refuses here (#1026), and

@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
@@ -32,8 +34,13 @@ type Snapshot struct {
 	// tell whether a recall was used is the sentence the block asks the agent
 	// to say — measured on a real store, that sentence appears after 22 of 1218
 	// injections, which measures reporting rather than use.
-	Into   string `json:"into,omitempty"`
-	Digest string `json:"digest"`
+	Into string `json:"into,omitempty"`
+	// Projects names the projects the digest was built from. The trust policy
+	// answers for a project name with no index at all, so a record that names
+	// its own projects can be checked against a rule tightened after it was
+	// written — even when the sessions behind it are gone (#2324).
+	Projects []string `json:"projects,omitempty"`
+	Digest   string   `json:"digest"`
 }
 
 const (
@@ -102,11 +109,31 @@ func RecordDigestTerms(indexDir, kind, digest string, sessions int, raw int64, t
 	RecordDigestInto(indexDir, kind, digest, "", sessions, raw, terms, ids...)
 }
 
+// RecordDigestFrom is RecordDigestInto plus the projects the digest was built
+// from, for the reason RecordServedFrom exists.
+func RecordDigestFrom(indexDir, kind, digest, into string, sessions int, raw int64, terms, projects, ids []string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, projects, at)
+}
+
+// RecordDigestPolicyFrom is RecordDigestPolicyInto for a caller that knows the
+// projects behind the digest, for the reason RecordServedFrom exists.
+func RecordDigestPolicyFrom(indexDir, kind, digest, into string, sessions int, raw int64, projects []string, policyName string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
+}
+
 // RecordDigestInto is RecordDigestTerms knowing which agent session received
 // the injection, so a later reading of the store can ask whether it was used.
 func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int64, terms []string, ids ...string) {
-	RecordServedSessions(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids)
-	snapshotWriteInto(indexDir, kind, digest, into, sessions, "", terms)
+	// One instant for both logs: the event and the digest describe the same
+	// injection, and separate time.Now() calls left them microseconds apart
+	// with nothing else to join them on (#2294).
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, nil, at)
 }
 
 // RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
@@ -121,8 +148,27 @@ func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, 
 // session-start hook, the commonest injection there is, was recording nothing
 // while holding the id (#1949).
 func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
-	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
-	snapshotWriteInto(indexDir, kind, digest, into, sessions, policyName, nil)
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, nil, at)
+}
+
+// RecordServedSnapshot writes the counting event and the digest snapshot for
+// one served answer, stamped alike. The MCP surfaces used to call the two
+// writers back to back, which took two instants for one act and left `deja
+// log` and `deja log --last` disagreeing about when it happened (#2294).
+func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
+	RecordServedFrom(indexDir, kind, digest, sessions, raw, ids, nil, policyName)
+}
+
+// RecordServedFrom is RecordServedSnapshot for a caller that knows which
+// projects the digest was built from. Without them a stored digest can only be
+// checked against a later rule by recognising project names inside its own
+// prose, which fails as soon as the sessions behind it leave the index (#2324).
+func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, ids, projects []string, policyName string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, "", at)
+	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, projects, at)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
@@ -144,7 +190,56 @@ func snapshotWriteTerms(indexDir, kind, digest string, sessions int, policyName 
 	snapshotWriteInto(indexDir, kind, digest, "", sessions, policyName, terms)
 }
 
+// snapshotLineMax is the longest line the reader takes, and therefore the
+// longest one worth writing. A record past it was written and then unreadable:
+// `deja log` showed nothing for an injection that happened, and the next
+// rotation rewrote the file without it (#2222).
+const snapshotLineMax = 4 << 20
+
+// snapshotDigestMax is how much of a digest goes into the log. The budget is
+// the line's, and one byte of text can cost six of JSON — a control byte is
+// written \u00XX — so this is the ceiling that holds however the text escapes,
+// without a trial encode to find out.
+//
+// Generous next to what anything actually injects: a session-start digest is
+// 8 KB and the MCP budget is 4 KB. It is `deja://session/…`, which records the
+// whole session it served, that reaches for megabytes.
+const snapshotDigestMax = (snapshotLineMax - snapshotEnvelope) / 6
+
+// snapshotEnvelope is room for the rest of the record around the digest — the
+// stamp, kind, terms, policy and the session it went into.
+const snapshotEnvelope = 64 << 10
+
+// clipDigest cuts a digest down to what this file can read back, saying where
+// it cut. The head is kept, because that is what an agent was shown first, and
+// `Bytes` still carries the size that was served: the clipping is this file's
+// business, not a claim about the injection.
+func clipDigest(digest string) string {
+	if len(digest) <= snapshotDigestMax {
+		return digest
+	}
+	head := digest[:runeBoundaryAt(digest, snapshotDigestMax)]
+	return head + fmt.Sprintf("\n… (clipped: the whole digest was %d bytes)", len(digest))
+}
+
+// runeBoundaryAt is n backed up to where a rune starts, so a cut lands between
+// characters rather than inside one. A half rune is not an error — the encoder
+// writes U+FFFD for it — but it is a mojibake tail on the last line of a digest
+// someone reads.
+func runeBoundaryAt(s string, n int) int {
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return n
+}
+
 func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, terms, nil, time.Now().UTC())
+}
+
+// snapshotWriteIntoAt is snapshotWriteInto with the instant supplied, so a
+// caller writing both logs for one injection can stamp them alike (#2294).
+func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, policyName string, terms, projects []string, at time.Time) {
 	if digest == "" {
 		return
 	}
@@ -152,8 +247,9 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
 	}
-	b, err := marshalSnapshot(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
-		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: digest})
+	b, err := marshalSnapshot(Snapshot{Time: at, Kind: kind, Sessions: sessions,
+		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into,
+		Projects: projects, Digest: clipDigest(digest)})
 	if err != nil {
 		return
 	}
@@ -274,9 +370,17 @@ func Snapshots(indexDir string, n int) []Snapshot {
 
 // Events returns up to n usage events, newest first. n <= 0 means all.
 func Events(indexDir string, n int) []Event {
+	events, _ := EventsCounted(indexDir, n)
+	return events
+}
+
+// EventsCounted is Events plus how many events the log holds, so a caller that
+// shows a window can say what it left out. The whole file is read either way —
+// the cut happens at the end — so the count costs nothing (#2305).
+func EventsCounted(indexDir string, n int) ([]Event, int) {
 	f, err := os.Open(Path(indexDir))
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	defer func() { _ = f.Close() }()
 	var out []Event
@@ -297,10 +401,11 @@ func Events(indexDir string, n int) []Event {
 		out[i], out[j] = out[j], out[i]
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Time.After(out[j].Time) })
+	total := len(out)
 	if n > 0 && len(out) > n {
 		out = out[:n]
 	}
-	return out
+	return out, total
 }
 
 // marshalSnapshot writes one record without encoding/json's HTML escaping. That
@@ -357,4 +462,60 @@ func boundTerms(terms []string) []string {
 		out[i] = t
 	}
 	return out
+}
+
+// ForgetSnapshots drops the stored digests a predicate names and returns how
+// many went. `deja forget` takes the messages out of the index and the notes'
+// borrowed titles out of the note log (#690, #841); the digests served from
+// those sessions stayed here, and `deja view` published the text again with no
+// trust rule in play (#2325).
+//
+// The usage log is left alone on purpose: it records that something was served,
+// at a size, at a time — an event rather than the content, which is what keeps
+// the counters honest after a forget.
+//
+// Like the rotation, this rewrites the file from what the reader accepts, so a
+// line deja could not have written goes with it — the side effect #1946 named
+// rather than left to be discovered.
+func ForgetSnapshots(indexDir string, drop func(Snapshot) bool) (int, error) {
+	p := SnapshotPath(indexDir)
+	snaps := snapshotsFrom(p, 0) // last appended first
+	if len(snaps) == 0 {
+		return 0, nil
+	}
+	var buf bytes.Buffer
+	gone := 0
+	// Back to the order the file was written in, so the surviving records keep
+	// their positions: the rotation and `--last` both read this file as
+	// appended (#2140).
+	for i := len(snaps) - 1; i >= 0; i-- {
+		if drop(snaps[i]) {
+			gone++
+			continue
+		}
+		b, err := marshalSnapshot(snaps[i])
+		if err != nil {
+			continue
+		}
+		buf.Write(append(b, '\n'))
+	}
+	if gone == 0 {
+		return 0, nil
+	}
+	if err := atomicfile.Write(p, buf.Bytes(), 0o600); err != nil {
+		return 0, err
+	}
+	return gone, nil
+}
+
+// CountSnapshots says how many stored digests a predicate names, without
+// touching the file — what `forget --dry-run` reports.
+func CountSnapshots(indexDir string, match func(Snapshot) bool) int {
+	n := 0
+	for _, s := range snapshotsFrom(SnapshotPath(indexDir), 0) {
+		if match(s) {
+			n++
+		}
+	}
+	return n
 }

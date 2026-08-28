@@ -739,13 +739,28 @@ func projectInScope(project, want string) bool {
 		return false
 	}
 	p, w := strings.ToLower(project), strings.ToLower(want)
+	imported := false
 	if rest, ok := strings.CutPrefix(p, "imported:"); ok {
 		// A synced session carries the peer's prefix and is otherwise the same
 		// project under the same name.
-		p = rest
+		p, imported = rest, true
 	}
 	if p == w {
 		return true
+	}
+	// A candidate with no separator is a bare directory name, and as a suffix
+	// against a LOCAL project it cannot tell two directories apart: working in
+	// /work/api, the candidate "api" matched a client's acme/api and the
+	// session-start hook injected it "from this project" (#2333). Nothing is
+	// lost by insisting on more here — a claude project is recorded as
+	// parent/base and the candidates carry that form, and the stores that
+	// record a bare project name match it exactly on the line above.
+	//
+	// A peer's project keeps the peer's path, which is not this machine's, so
+	// the loose rule stays for imported work: matching it by the name this
+	// machine knows it by is the point of scoping a synced index.
+	if !imported && !strings.ContainsAny(w, `/\`) {
+		return false
 	}
 	// Both separators, because a project name is built from a path and windows
 	// builds it with backslashes. Matching only "/" made every scoped ranking on
@@ -754,6 +769,12 @@ func projectInScope(project, want string) bool {
 	// platform's separator with it.
 	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
 }
+
+// ProjectInScope reports whether a session's project is the one a caller is
+// standing in. Exported so the automatic surfaces share one rule: the same
+// question answered three different ways is how a client's project reached a
+// session start (#2333), a handoff (#2336) and a tool-time line (#2339).
+func ProjectInScope(project, want string) bool { return projectInScope(project, want) }
 
 // relevantMetasCounts additionally reports how many terms of ANY frequency
 // each session matched — the noise gate for full-index relevance search,
@@ -1262,6 +1283,46 @@ func displayPath(p string) string {
 	return p
 }
 
+// RecentInProject is RecentProject under the scope rule the automatic paths
+// use: a session belongs to this project or it does not. `deja handoff`, which
+// picks a session for another agent when nobody named one, walked the loose
+// helper and packaged a client's acme/api from a directory named api (#2336) —
+// the shape #2333 closed on the session-start hook.
+func RecentInProject(dir, project string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	// Scoped before the cut, not after: filtering a window of the loose
+	// helper's answer would drop this project's sessions whenever another
+	// project's newer ones filled it.
+	var metas []SessionMeta
+	for _, meta := range m.Sessions {
+		if projectInScope(meta.Project, project) {
+			metas = append(metas, meta)
+		}
+	}
+	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
+	if n > 0 && len(metas) > n {
+		metas = metas[:n]
+	}
+	return sessionsForMetas(dir, metas)
+}
+
+// RecentProject finds sessions whose project name contains the given string —
+// a browsing helper, loose on purpose, the way `--project` is on the surfaces a
+// person types. A caller deciding on its own which sessions belong to the
+// directory it is standing in wants RecentInProject instead (#2336).
 func RecentProject(dir, project string, n int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
@@ -1400,8 +1461,10 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 		project = strings.ToLower(project)
 		var mine []SessionMeta
 		for _, meta := range m.Sessions {
-			p := strings.ToLower(meta.Project)
-			if p == project || (project != "" && strings.Contains(p, project)) {
+			// The same scope rule the ranked path uses. A substring test here
+			// put a client's acme/api into a session start in /work/api,
+			// injected under "sessions from this project" (#2333).
+			if projectInScope(meta.Project, project) {
 				mine = append(mine, meta)
 			}
 		}
@@ -1433,6 +1496,13 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	}
 	if ok {
 		defer unlock()
+	}
+	// Every id has the empty string as a prefix, so a blank selector matched
+	// whichever session came first and the caller handed back a transcript
+	// nobody asked for. The MCP resource reader guards its own (#1728) and the
+	// CLI now guards share and ctx (#2259); doing it here ends the class.
+	if strings.TrimSpace(p) == "" {
+		return model.Session{}, false, nil
 	}
 	m, err := readManifestCached(dir)
 	if err != nil {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -45,15 +44,19 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// Antigravity runs the hook with the working directory set to the folder
 	// holding hooks.json, not the user's project, so scoping recall by cwd
 	// would silently recall nothing. The payload names the real workspace.
-	if len(input.WorkspacePaths) > 0 && input.WorkspacePaths[0] != "" && os.Getenv("CLAUDE_PROJECT_DIR") == "" {
-		_ = os.Setenv("CLAUDE_PROJECT_DIR", input.WorkspacePaths[0])
+	workspace := ""
+	if len(input.WorkspacePaths) > 0 {
+		workspace = input.WorkspacePaths[0]
 	}
-	digest, sessions, raw, _, _ := cachedHookDigest(dir)
+	// The payload, and nothing written back into the environment: deja used to
+	// export the workspace here, which carried this call's project into the
+	// next one in the same process and decided nothing else (#2185).
+	digest, sessions, raw, _, _ := cachedHookDigestFor(dir, workspace)
 	if digest == "" {
 		fmt.Fprintln(stdout, "{}")
 		return nil
 	}
-	digest = frameRecall(antigravityLead + digest)
+	digest = frameRecall(startLead(antigravityLead) + digest)
 	usage.RecordDigestPolicy(dir, usage.KindHook, digest, sessions, raw,
 		policy.Load().Describe(policy.ActivationAuto))
 	b, err := json.Marshal(antigravityHookResponse{

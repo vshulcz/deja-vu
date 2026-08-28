@@ -166,7 +166,10 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 	}
 	var msgs clineMessages
 	if err := json.Unmarshal(b, &msgs); err != nil {
-		diagMalformedLine(path)
+		// The whole task is one document: nothing from this path is indexed,
+		// which is a path deja could not read rather than a line it skipped.
+		// "1 line could not be read" was said of three thousand turns (#2232).
+		diagFileError(path, err)
 		return nil, nil
 	}
 	// Only the lead agent's transcript is a user-facing session; subagent
@@ -250,7 +253,7 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 		Content json.RawMessage `json:"content"`
 	}
 	if err := json.Unmarshal(b, &turns); err != nil {
-		diagMalformedLine(path)
+		diagFileError(path, err)
 		return nil, nil
 	}
 	taskDir := filepath.Dir(path)

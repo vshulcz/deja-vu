@@ -190,7 +190,7 @@ func syncSSHPush(dir, host string, full bool) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
+	fmt.Fprint(os.Stdout, sshExportedLine(n))
 	if n == 0 {
 		fmt.Fprintln(os.Stdout, "deja: nothing new to push")
 		return errNothingToSend
@@ -290,7 +290,7 @@ func syncSSHPull(dir, host string, full bool) error {
 		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, host)
 	}
 	learnPeerMachine(dir, host, before)
-	fmt.Fprintf(os.Stdout, "deja: imported %d records\n", n)
+	fmt.Fprint(os.Stdout, sshCountLine("imported", n))
 	return nil
 }
 
@@ -321,3 +321,13 @@ func sshCapture(host, cmd string) (string, error) {
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }
+
+// sshCountLine is a push or pull count, in the same words the local paths
+// use: this file had its own format strings and said "exported 1 records" on
+// the first sync anyone runs against a new machine, and the same for the
+// pull (#2290).
+func sshCountLine(verb string, n int) string {
+	return fmt.Sprintf("deja: %s %d record%s\n", verb, n, pluralS(n))
+}
+
+func sshExportedLine(n int) string { return sshCountLine("exported", n) }

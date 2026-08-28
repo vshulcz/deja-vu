@@ -19,7 +19,13 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-type installResult struct{ Path, Action string }
+type installResult struct {
+	Path, Action string
+	// Note is what the caller should say besides the action: a file deja knows
+	// about, could not act on, and left as it found it. Empty in every ordinary
+	// case, so a printer can append it blind (#2218).
+	Note string
+}
 
 func runInstall(dir string, args []string, uninstall bool) error {
 	// Every path deja writes hangs off the home directory, and homeDir()
@@ -107,6 +113,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// means every agent keeps shelling out to a binary the user just removed.
 	if uninstall {
 		targets = withAutoTargets(targets)
+		// A name it does not know drops out of that expansion and leaves
+		// nothing to do, so `deja uninstall claude-cod` printed not one word
+		// and exited 0 — while `deja install claude-cod` names the near miss
+		// (#2273). Someone removing deja by a half-remembered name was told it
+		// worked, with the wiring still in place.
+		if len(targets) == 0 {
+			return unknownTargetError(targetArgs[0])
+		}
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -123,6 +137,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		defer func() { removingTargets = nil }()
 	}
 	defer recordWiring(targets, uninstall)
+	saidNotes := map[string]bool{}
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
 	var done []lineItem
@@ -151,6 +166,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			if err != nil {
 				note(t, err)
 				continue
+			}
+			// Two targets can share one guidance harness — `gemini` and
+			// `gemini-auto` do — and a note about a file is about the file,
+			// not about the target that noticed it.
+			if gr.Note != "" && saidNotes[gr.Note] {
+				gr.Note = ""
+			} else if gr.Note != "" {
+				saidNotes[gr.Note] = true
 			}
 			if gr.Path != "" && !banner {
 				fmt.Println(guidanceOutput(t, gr))
@@ -751,6 +774,14 @@ var removingTargets map[string]bool
 // has been edited since it wrote it.
 var forceGuidance bool
 
+// configParseError names the file a parse refusal is about. The refusal is what
+// a reader is sent to act on — doctor points at `deja install <targets>` when a
+// rewire failed, and the parser's own words alone left them guessing which of
+// the harness configs it had opened (#2214).
+func configParseError(path string, err error) error {
+	return fmt.Errorf("%s: %w", path, err)
+}
+
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
 // The markers are what every generator writes: the subcommands the hooks call,
 // and the name of the MCP server and extension entries.
@@ -920,7 +951,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
@@ -953,7 +984,7 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
 	nextRoot = updateClaudeHook(nextRoot, "PreCompact", exe+" hook-precompact", "manual|auto", uninstall)
@@ -1108,7 +1139,7 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	cmd := exe + " statusline"
 	existing, _ := root["statusLine"].(map[string]any)
@@ -1258,7 +1289,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
@@ -1294,7 +1325,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	mcp, _ := root["mcp"].(map[string]any)
 	if mcp == nil {
@@ -1327,7 +1358,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return installResult{}, err
+		return installResult{}, configParseError(path, err)
 	}
 	m, _ := root["mcpServers"].(map[string]any)
 	if m == nil {
