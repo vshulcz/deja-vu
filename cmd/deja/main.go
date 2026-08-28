@@ -164,7 +164,16 @@ var commands = map[string]command{
 	// The screen `deja` prints on a terminal, under a name, so it can be paged,
 	// captured into a bug report or read over a pipe — and so the obvious guess
 	// stops being a search for the word (#2108).
-	"brief":           func(dir string, _ []string) error { return runBrief(dir, os.Stdout) },
+	// The arguments were thrown away here, so `deja brief --json` printed the
+	// human screen and exited 0 — the shape #2253 fixed for friction and
+	// restore (#2265). statusline stays as it is on purpose: a harness runs it
+	// on every redraw, and a refusal would land in someone's prompt.
+	"brief": func(dir string, rest []string) error {
+		for _, a := range rest {
+			return fmt.Errorf("brief takes no arguments — got %q", a)
+		}
+		return runBrief(dir, os.Stdout)
+	},
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
