@@ -218,6 +218,11 @@ func heroStat(r stats.Report) (string, string) {
 		return formatStatNumber(handed), "recalls handed to your agents"
 	case r.TotalSessions > 0:
 		return formatStatNumber(r.TotalSessions), "sessions of agent history, all searchable"
+	case r.PolicyWithheld > 0:
+		// Indexed and withheld is not empty: `deja index` changes nothing in
+		// that state, and the terminal line and the JSON both already tell the
+		// two apart (#2288).
+		return formatStatNumber(r.PolicyWithheld), "sessions your trust policy keeps to itself"
 	default:
 		return "", "nothing indexed yet — run deja index"
 	}
