@@ -142,9 +142,20 @@ func mergeIngestDiag(m *Manifest) {
 }
 
 // healthFromFiles sums the per-file counts per harness.
+//
+// Paths in order, because LastError is one of them: taking whichever the map
+// handed over last gave the same index a different error on every run, so a
+// script diffing `doctor --json` saw a change where nothing changed (#2245).
+// The first failing path is the one quoted; ingest_files holds them all.
 func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 	out := map[string]HarnessIngest{}
-	for p, e := range files {
+	paths := make([]string, 0, len(files))
+	for p := range files {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	for _, p := range paths {
+		e := files[p]
 		// The store, not the file kind: the run narrates "cline" and doctor
 		// filed the same fact under "cline-sdk", while the documentation calls
 		// this key a harness. Five stores have kinds by another name, so for
@@ -158,7 +169,9 @@ func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 		cur.ClippedMessages += e.Clipped
 		if e.Error != "" {
 			cur.FailedFiles++
-			cur.LastError = e.Error
+			if cur.LastError == "" {
+				cur.LastError = e.Error
+			}
 		}
 		out[h] = cur
 	}

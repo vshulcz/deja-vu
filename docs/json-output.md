@@ -393,7 +393,10 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and
 `auto`, each with the rule in force and how many sessions it withheld;
 `ignored` and `inert` list policy lines that matched no harness or no import.
-Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`.
+Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`,
+which quotes one of that store's failures — the first failing path in order,
+so the same index reports the same error every run. `ingest_files` below has
+every one of them.
 
 `ingest_files` is where those counts came from, keyed by file path: `malformed`
 lines, `clipped` messages, and `error` when nothing from that path is in the
