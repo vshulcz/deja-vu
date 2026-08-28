@@ -770,6 +770,12 @@ func projectInScope(project, want string) bool {
 	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
 }
 
+// ProjectInScope reports whether a session's project is the one a caller is
+// standing in. Exported so the automatic surfaces share one rule: the same
+// question answered three different ways is how a client's project reached a
+// session start (#2333), a handoff (#2336) and a tool-time line (#2339).
+func ProjectInScope(project, want string) bool { return projectInScope(project, want) }
+
 // relevantMetasCounts additionally reports how many terms of ANY frequency
 // each session matched — the noise gate for full-index relevance search,
 // where demanding two rare terms also rejects real answers that pair one
