@@ -59,7 +59,9 @@ func TestDoctorNamesAConfigPointingAtAMissingBinary(t *testing.T) {
 	if !strings.Contains(out, gone) {
 		t.Errorf("doctor does not name the binary the config points at:\n%s", out)
 	}
-	if !strings.Contains(out, p) {
+	// The report contracts a home path to ~ (#2360), so the row names the file
+	// in that form. What matters here is that it names it at all.
+	if !strings.Contains(out, reportPath(p)) {
 		t.Errorf("doctor does not name the config that points there:\n%s", out)
 	}
 }

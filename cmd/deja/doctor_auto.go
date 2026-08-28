@@ -104,16 +104,16 @@ func doctorAutoRecall(w io.Writer) {
 			if note == "" || note == "v"+kimiPluginVersion {
 				note = "the Kimi Code plugin recalls on every prompt"
 			}
-			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "plugin", path, note)
+			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "plugin", reportPath(path), note)
 			continue
 		}
 		switch {
 		case err != nil:
-			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "missing", path, note)
+			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "missing", reportPath(path), note)
 		case a.marker != "" && !strings.Contains(string(b), a.marker):
-			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — reinstall)\n", a.name, "stale", path, a.marker)
+			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — reinstall)\n", a.name, "stale", reportPath(path), a.marker)
 		default:
-			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", path, note)
+			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
 		}
 	}
 }
