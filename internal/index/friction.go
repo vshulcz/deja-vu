@@ -36,7 +36,16 @@ const (
 	// field costs 2.7 KB across that corpus — the exactness is nearly free.
 	frictionSessionCap = 256
 	frictionLineMin    = 20
-	frictionLineMax    = 120
+	// The cap is about recognising a line, not about how much of it fits on a
+	// screen — every surface that prints one clips it to the width it has. Set
+	// at 120 it dropped the errors that carry a path: a build naming a module
+	// and a file, a registry naming an image, a database naming a host. Over
+	// the store on this machine that was 2,319 lines naming a wall the list
+	// knows, against 7,053 it recognised — a third again, thrown away for
+	// length alone, and 1,406 of them fit inside 160 (#2438). A bound there
+	// still is: a page of output pasted as one line is nobody's recognisable
+	// wall, and hashing it makes a new wall every run.
+	frictionLineMax = 200
 	// FrictionMinSessions is how many separate sessions must hit an error
 	// before it is worth saying. Twice is a coincidence.
 	FrictionMinSessions = 3
