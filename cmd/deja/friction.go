@@ -28,14 +28,21 @@ import (
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--limit" && i+1 < len(args) {
-			i++
-			n, err := strconv.Atoi(args[i])
-			if err != nil || n <= 0 {
-				return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i])
-			}
-			limit = n
+		// Anything else used to be dropped on the floor, so `deja friction
+		// --json` and `--limt 3` answered in prose and exited 0 as though they
+		// had been understood (#2253).
+		if args[i] != "--limit" {
+			return fmt.Errorf("friction: unknown flag %q — it takes --limit n", args[i])
 		}
+		if i+1 >= len(args) {
+			return fmt.Errorf("friction: --limit needs value")
+		}
+		i++
+		n, err := strconv.Atoi(args[i])
+		if err != nil || n <= 0 {
+			return fmt.Errorf("friction: --limit wants a positive number, got %q", args[i])
+		}
+		limit = n
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
