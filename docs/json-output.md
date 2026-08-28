@@ -369,6 +369,9 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
         "sessions_from_there": 0,
         "last_error": "ssh build-box: exit status 255"
       }
+    ],
+    "imported": [
+      {"machine": "desktop", "sessions": 5}
     ]
   }
 }
@@ -428,6 +431,14 @@ reported. `host` is not: it is a name to act on — `deja sync ssh <host>` — a
 bounded name names no machine, so it is reported exactly as the config file
 spells it, however long. Neither can carry a raw control byte into a terminal:
 the JSON encoder escapes those in any string.
+`sync.imported` names the machines whose work is in this index without a peer
+row of their own — the state a first exchange leaves, when a batch was carried
+by hand or by a shared folder and no `deja sync ssh` target has been named yet.
+A machine counted in a `peers` row is not repeated here. The key is absent when
+nothing has arrived that way, so a reader can tell that from a deja too old to
+report it, and `machine` is the name the records carry, reported as they spell
+it for the reason `host` is.
+
 `stamped_ahead` appears when the newer of the two timestamps is more than a
 minute later than this machine's clock: the age would be negative and the row
 would otherwise read as a sync that just happened, so a consumer should treat
