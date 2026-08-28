@@ -24,7 +24,7 @@ func runStatsImpact(w io.Writer, dir string, jsonOut bool) error {
 	// from four ignored ones is the agent naming deja out loud in a later
 	// transcript, and that lives in the index, not in the usage log (#1062).
 	// Only pay for the session scan when there is activity to explain.
-	if r.Recalls > 0 || r.Injections > 0 {
+	if impactHasActivity(r) {
 		if ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, io.Discard); err == nil {
 			// Filtered like `deja stats` filters its own report: this count is
 			// derived from session text, and every other surface that reads
@@ -55,7 +55,7 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 		_, err = fmt.Fprintf(w, "%s,\n  \"credited_aloud\": %d\n}\n", body, credits)
 		return err
 	}
-	if r.Recalls == 0 && r.Injections == 0 {
+	if !impactHasActivity(r) {
 		fmt.Fprintln(w, "deja: no recall activity recorded yet — impact numbers appear once agents start recalling")
 		return nil
 	}
@@ -97,7 +97,7 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	if r.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  déjà vu moments    %d prompt%s matched work you had already done\n", r.DejaVuMoments, pluralS(r.DejaVuMoments))
 	}
-	served := r.Recalls + r.Injections
+	served := r.Recalls + r.Injections + r.DejaVuMoments
 	switch {
 	case credits > 0:
 		fmt.Fprintf(w, "  credited aloud     %d of %d said \"deja-vu recalled\" — memory that was used, not just served\n", credits, served)
@@ -108,4 +108,15 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	fmt.Fprintln(w, "the source transcripts those digests distilled. `deja log` shows every entry.")
 	fmt.Fprintln(w, "for retrieval timing on your own corpus, run `deja bench recall`.")
 	return nil
+}
+
+// impactHasActivity says whether this machine has served anything at all.
+// The two counters this used to read — recalls and session-start injections —
+// are exactly the two a machine running only the prompt hook never increments:
+// a per-prompt déjà vu lands in DejaVuMoments and hook-tool under no counter at
+// all, both carrying their bytes. So the default install read as "nothing
+// recorded" while `deja log`, the stats card and this report's own --json
+// listed the injections (#2303).
+func impactHasActivity(r usage.ImpactReport) bool {
+	return r.Recalls > 0 || r.Injections > 0 || r.DejaVuMoments > 0 || r.ServedBytes > 0
 }
