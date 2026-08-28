@@ -739,13 +739,28 @@ func projectInScope(project, want string) bool {
 		return false
 	}
 	p, w := strings.ToLower(project), strings.ToLower(want)
+	imported := false
 	if rest, ok := strings.CutPrefix(p, "imported:"); ok {
 		// A synced session carries the peer's prefix and is otherwise the same
 		// project under the same name.
-		p = rest
+		p, imported = rest, true
 	}
 	if p == w {
 		return true
+	}
+	// A candidate with no separator is a bare directory name, and as a suffix
+	// against a LOCAL project it cannot tell two directories apart: working in
+	// /work/api, the candidate "api" matched a client's acme/api and the
+	// session-start hook injected it "from this project" (#2333). Nothing is
+	// lost by insisting on more here — a claude project is recorded as
+	// parent/base and the candidates carry that form, and the stores that
+	// record a bare project name match it exactly on the line above.
+	//
+	// A peer's project keeps the peer's path, which is not this machine's, so
+	// the loose rule stays for imported work: matching it by the name this
+	// machine knows it by is the point of scoping a synced index.
+	if !imported && !strings.ContainsAny(w, `/\`) {
+		return false
 	}
 	// Both separators, because a project name is built from a path and windows
 	// builds it with backslashes. Matching only "/" made every scoped ranking on
@@ -1400,8 +1415,10 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 		project = strings.ToLower(project)
 		var mine []SessionMeta
 		for _, meta := range m.Sessions {
-			p := strings.ToLower(meta.Project)
-			if p == project || (project != "" && strings.Contains(p, project)) {
+			// The same scope rule the ranked path uses. A substring test here
+			// put a client's acme/api into a session start in /work/api,
+			// injected under "sessions from this project" (#2333).
+			if projectInScope(meta.Project, project) {
 				mine = append(mine, meta)
 			}
 		}
