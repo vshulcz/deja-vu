@@ -113,6 +113,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	// means every agent keeps shelling out to a binary the user just removed.
 	if uninstall {
 		targets = withAutoTargets(targets)
+		// A name it does not know drops out of that expansion and leaves
+		// nothing to do, so `deja uninstall claude-cod` printed not one word
+		// and exited 0 — while `deja install claude-cod` names the near miss
+		// (#2273). Someone removing deja by a half-remembered name was told it
+		// worked, with the wiring still in place.
+		if len(targets) == 0 {
+			return unknownTargetError(targetArgs[0])
+		}
 	}
 	exe, err := os.Executable()
 	if err != nil {
