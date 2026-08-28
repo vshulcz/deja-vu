@@ -288,6 +288,9 @@
   "sqlite3": {
     "state": "missing"
   },
+  "git": {
+    "state": "missing"
+  },
   "version": {
     "state": "update-available",
     "current": "1.0.0",

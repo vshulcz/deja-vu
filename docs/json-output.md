@@ -327,6 +327,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     }
   ],
   "sqlite3": {"state": "ok"},
+  "git": {"state": "ok"},
   "version": {
     "state": "ok",
     "current": "0.14.1",
@@ -394,6 +395,11 @@ values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
 but empty store directory reports `missing`. A store also carries `indexed_sessions`
 and, when it holds peer-synced work, `indexed_from_elsewhere`; a store whose
 permission walk was cut short or blocked carries `partial` or `unchecked`.
+`sqlite3` and `git` are the two tools deja shells out to, each `ok` or
+`missing`: sqlite3 reads the opencode, Cursor, grok, hermes, goose and zed
+stores, and git supplies changed-file notes, worktree names and the task
+signal. Both degrade quietly, which is why the report names them.
+
 Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `--offline`), or `unknown`. `policy.state` is `default`, `active` or
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and
