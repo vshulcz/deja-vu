@@ -55,8 +55,11 @@ func TestThePageNamesTheRuleThatHidThings(t *testing.T) {
 	if !strings.Contains(page, "Held back by the trust policy") {
 		t.Fatalf("nothing was held back, so this measures nothing:\n%s", pageStatsBlock(page))
 	}
-	if !strings.Contains(page, "local-only") {
-		t.Errorf("the page does not name the rule that hid them:\n%s", pageStatsBlock(page))
+	// The activation as well as the rule, the way the CLI note reads: on a
+	// machine whose activations differ, "local-only" alone reads as deja's one
+	// rule (#2367).
+	if !strings.Contains(page, "search: local-only") {
+		t.Errorf("the page does not name the rule and the door it governs:\n%s", pageStatsBlock(page))
 	}
 	// The rule, not the file it lives in: the page is passed around and the
 	// path sits under the reader's home directory.

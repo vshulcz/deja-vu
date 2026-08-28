@@ -195,7 +195,10 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		// at and passes on, and a page a rule emptied read as a machine with
 		// no history at all — the misread #2319 closed on friction (#2321).
 		SessionsWithheld: policyHidden,
-		PolicyRule:       policy.Load().Describe(policy.ActivationSearch),
+		// The activation as well as the rule, the way the CLI note reads it:
+		// on a machine whose activations differ, "local-only" alone reads as
+		// deja's one rule rather than the browsing one (#2367).
+		PolicyRule: policy.ActivationSearch + ": " + policy.Load().Describe(policy.ActivationSearch),
 	}
 	if len(metas) > 0 {
 		page.DateEnd = metas[0].Updated.Local().Format("2006-01-02")
