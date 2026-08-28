@@ -407,6 +407,13 @@ func byIdentifying(terms []string, idf map[string]float64) []string {
 		// dropped for not saying it (#2257). The rest of the ranking already
 		// treats a tiny corpus as a special case; this is that case for the
 		// lead term: prefer the word that reads like a term of art.
+		// Shape before length, or "dashboards" would out-rank "s3": a word
+		// carrying an underscore, a dot, a slash or a digit names something
+		// whatever its length, and length is only the tiebreak among words
+		// that look alike.
+		if a, b := symbolShaped(out[i]), symbolShaped(out[j]); a != b {
+			return a
+		}
 		if a, b := identifying(out[i]), identifying(out[j]); a != b {
 			return a
 		}
@@ -420,6 +427,17 @@ func byIdentifying(terms []string, idf map[string]float64) []string {
 // admits any ordinary word of three letters, so the length below settles the
 // ties it leaves: "gateway_timeout" over "seeing".
 func identifying(term string) bool { return search.HasIdentifierTerm([]string{term}) }
+
+// symbolShaped reports whether a term is punctuated or numbered the way a
+// symbol, a path or a version is — "gateway_timeout", "pkg/index", "v11", "s3".
+func symbolShaped(term string) bool {
+	for _, r := range term {
+		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
+			return true
+		}
+	}
+	return false
+}
 
 // citationLine pre-writes the narration so the agent copies structure instead
 // of having to follow an instruction — models do the former far more reliably.
