@@ -410,6 +410,13 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if !index.LooksLikeError(a.Error) {
 				return "That text does not read like an error line - pass the failing output itself.", nil
 			}
+			// Held-but-unconfirmed is not never-seen, and the agent asking is
+			// the one that would otherwise re-derive the remedy (#2282).
+			if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
+				return pol.Allows(policy.ActivationMCP, project)
+			}) {
+				return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", nil
+			}
 			return "No session on this machine ran a command after that error.", nil
 		}
 		var fb strings.Builder
