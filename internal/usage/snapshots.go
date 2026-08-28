@@ -132,6 +132,16 @@ func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, r
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, at)
 }
 
+// RecordServedSnapshot writes the counting event and the digest snapshot for
+// one served answer, stamped alike. The MCP surfaces used to call the two
+// writers back to back, which took two instants for one act and left `deja
+// log` and `deja log --last` disagreeing about when it happened (#2294).
+func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, at)
+}
+
 // SnapshotOnly stores the digest text without writing a counting event, for
 // callers that already recorded one with extra fields.
 func SnapshotOnly(indexDir, kind, digest string, sessions int) {
