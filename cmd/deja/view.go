@@ -76,6 +76,11 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// PolicyRule names the rule that held things back, as the CLI note names
+	// it — the activation and what it allows. Not the file it lives in: that
+	// path sits under the reader's home directory and this page is meant to be
+	// passed around (#2354).
+	PolicyRule string
 	// SessionsWithheld is how many sessions a trust rule kept off the page.
 	SessionsWithheld int
 	// NotesWithheld is how many promoted notes a trust rule kept off the page.
@@ -190,6 +195,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		// at and passes on, and a page a rule emptied read as a machine with
 		// no history at all — the misread #2319 closed on friction (#2321).
 		SessionsWithheld: policyHidden,
+		PolicyRule:       policy.Load().Describe(policy.ActivationSearch),
 	}
 	if len(metas) > 0 {
 		page.DateEnd = metas[0].Updated.Local().Format("2006-01-02")
