@@ -2612,6 +2612,7 @@ func runForget(dir string, args []string) error {
 	list := false
 	allMatches := false
 	unforget, unforgetGiven := "", false
+	given := map[string]bool{}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--list":
@@ -2621,6 +2622,14 @@ func runForget(dir string, args []string) error {
 		case "--all-matches":
 			allMatches = true
 		case "--session", "--project", "--before", "--unforget":
+			// Given twice, the last one used to win in silence: `deja forget
+			// --session a --session b` deleted b, reported one session and
+			// left a behind, which the reader believes is gone (#2271).
+			// stats already refuses this shape for its own flags.
+			if given[args[i]] {
+				return fmt.Errorf("forget: %s specified twice", args[i])
+			}
+			given[args[i]] = true
 			if i+1 >= len(args) {
 				return fmt.Errorf("forget: %s needs a value", args[i])
 			}
