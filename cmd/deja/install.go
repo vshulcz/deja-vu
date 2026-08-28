@@ -1512,6 +1512,29 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 	return append(next, '\n'), note, nil
 }
 
+// dropJSONCEntry takes the deja entry out of an "mcp" block written as lines,
+// and hands back what is left beside what it removed. An entry spelled across
+// lines carries `"deja"` on its first one only; dropping just that line left
+// the rest of it in the block and the config stopped parsing (#2394), so the
+// entry is bounded by counting braces the way the block itself is.
+func dropJSONCEntry(lines []string) (body, dropped []string) {
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
+		if !strings.Contains(l, `"deja"`) {
+			body = append(body, l)
+			continue
+		}
+		dropped = append(dropped, l)
+		depth := strings.Count(l, "{") - strings.Count(l, "}")
+		for depth > 0 && i+1 < len(lines) {
+			i++
+			dropped = append(dropped, lines[i])
+			depth += strings.Count(lines[i], "{") - strings.Count(lines[i], "}")
+		}
+	}
+	return body, dropped
+}
+
 // jsoncLastCodeLine finds the last line of a .jsonc block that a parser would
 // read as code, and where that code ends on it. It returns -1 when the block
 // holds nothing but comments and blank lines.
@@ -1599,14 +1622,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// it ran is the same sentence the .json writer prints (#2390); without
 		// it, what install told you depended on which of the two names the
 		// config had (#2392).
-		var body, dropped []string
-		for _, l := range lines[start+1 : end] {
-			if strings.Contains(l, `"deja"`) {
-				dropped = append(dropped, l)
-				continue
-			}
-			body = append(body, l)
-		}
+		body, dropped := dropJSONCEntry(lines[start+1 : end])
 		note := ""
 		if !uninstall {
 			note = replacedJSONCLineNote(dropped, line)
