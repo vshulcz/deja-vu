@@ -2875,6 +2875,9 @@ func runForget(dir string, args []string) error {
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
 		}
+		if n := usage.CountSnapshots(dir, forgetDigestMatcher(o, result.Keys)); n > 0 {
+			fmt.Fprintf(os.Stdout, "would remove: %d stored digest(s) from the injection log\n", n)
+		}
 		// Two transcripts can write the same harness:id, and then one manifest
 		// row holds both conversations. The build says so once (#698); forget
 		// said "1 session" and took two, from two projects (#970).
@@ -2914,6 +2917,15 @@ func runForget(dir string, args []string) error {
 			} else if gone > 0 {
 				fmt.Fprintf(os.Stdout, "removed %d promoted note%s from %s\n", gone, pluralS(gone), sources.NotesFile())
 			}
+		}
+		// The digests those sessions were served in are content too, and the
+		// page publishes them: forget already reaches the note log for the
+		// same reason (#690, #841). The usage log stays — an event is what
+		// happened, not what was said (#2325).
+		if gone, err := usage.ForgetSnapshots(dir, forgetDigestMatcher(o, result.Keys)); err != nil {
+			fmt.Fprintf(os.Stdout, "could not remove stored digests from the injection log: %v\n", err)
+		} else if gone > 0 {
+			fmt.Fprintf(os.Stdout, "removed %d stored digest%s from the injection log\n", gone, pluralS(gone))
 		}
 		n, err := sources.ForgetPromotedTitles(func(src string) bool {
 			return dropped[src]
@@ -3859,4 +3871,35 @@ func joinCapped(items []string, n int) string {
 		return strings.Join(items, ", ")
 	}
 	return strings.Join(items[:n], ", ") + fmt.Sprintf(", +%d more", len(items)-n)
+}
+
+// forgetDigestMatcher decides which stored digests belong to what a forget just
+// took. A record written since #2324 names its own projects, which is exact; an
+// older one is recognised by the ids and project name inside its text, the same
+// weaker test the view page falls back to.
+func forgetDigestMatcher(o index.ForgetOptions, keys []string) func(usage.Snapshot) bool {
+	ids := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if _, id, ok := strings.Cut(k, ":"); ok && id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return func(s usage.Snapshot) bool {
+		if o.Project != "" {
+			for _, p := range s.Projects {
+				if p == o.Project {
+					return true
+				}
+			}
+			if len(s.Projects) == 0 && strings.Contains(s.Digest, o.Project) {
+				return true
+			}
+		}
+		for _, id := range ids {
+			if strings.Contains(s.Digest, id) {
+				return true
+			}
+		}
+		return false
+	}
 }

@@ -94,3 +94,53 @@ func lastSnapshot(t *testing.T, dir string) Snapshot {
 	}
 	return got
 }
+
+// forget takes the messages and the notes' borrowed titles; the digests served
+// from those sessions stayed, so a page republished forgotten text (#2325).
+func TestForgetSnapshotsDropsWhatItIsToldAndNothingElse(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	RecordServedFrom(dir, KindRecall, "a peer digest", 1, 100, nil, []string{"imported:client/api"}, "")
+	RecordServedFrom(dir, KindRecall, "my own digest", 1, 100, nil, []string{"work/app"}, "")
+
+	match := func(s Snapshot) bool {
+		for _, p := range s.Projects {
+			if p == "imported:client/api" {
+				return true
+			}
+		}
+		return false
+	}
+	if n := CountSnapshots(dir, match); n != 1 {
+		t.Fatalf("CountSnapshots = %d, want the one record that matches", n)
+	}
+	gone, err := ForgetSnapshots(dir, match)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gone != 1 {
+		t.Errorf("dropped %d records, want 1", gone)
+	}
+	left := Snapshots(dir, 0)
+	if len(left) != 1 || left[0].Digest != "my own digest" {
+		t.Errorf("what is left = %+v, want the other project's digest", left)
+	}
+	// The events stay: they say something was served, not what it said.
+	if events := Events(dir, 0); len(events) != 2 {
+		t.Errorf("events = %d, want both", len(events))
+	}
+	// A sweep that matches nothing rewrites nothing.
+	if n, err := ForgetSnapshots(dir, match); err != nil || n != 0 {
+		t.Errorf("second sweep dropped %d (err %v), want 0", n, err)
+	}
+}
+
+// An empty log is not an error, and there is nothing to count in it.
+func TestForgetSnapshotsOnAnEmptyLog(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	if n, err := ForgetSnapshots(dir, func(Snapshot) bool { return true }); err != nil || n != 0 {
+		t.Errorf("ForgetSnapshots on an empty log = %d, %v", n, err)
+	}
+	if n := CountSnapshots(dir, func(Snapshot) bool { return true }); n != 0 {
+		t.Errorf("CountSnapshots on an empty log = %d", n)
+	}
+}

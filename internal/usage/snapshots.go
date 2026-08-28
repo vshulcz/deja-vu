@@ -463,3 +463,59 @@ func boundTerms(terms []string) []string {
 	}
 	return out
 }
+
+// ForgetSnapshots drops the stored digests a predicate names and returns how
+// many went. `deja forget` takes the messages out of the index and the notes'
+// borrowed titles out of the note log (#690, #841); the digests served from
+// those sessions stayed here, and `deja view` published the text again with no
+// trust rule in play (#2325).
+//
+// The usage log is left alone on purpose: it records that something was served,
+// at a size, at a time — an event rather than the content, which is what keeps
+// the counters honest after a forget.
+//
+// Like the rotation, this rewrites the file from what the reader accepts, so a
+// line deja could not have written goes with it — the side effect #1946 named
+// rather than left to be discovered.
+func ForgetSnapshots(indexDir string, drop func(Snapshot) bool) (int, error) {
+	p := SnapshotPath(indexDir)
+	snaps := snapshotsFrom(p, 0) // last appended first
+	if len(snaps) == 0 {
+		return 0, nil
+	}
+	var buf bytes.Buffer
+	gone := 0
+	// Back to the order the file was written in, so the surviving records keep
+	// their positions: the rotation and `--last` both read this file as
+	// appended (#2140).
+	for i := len(snaps) - 1; i >= 0; i-- {
+		if drop(snaps[i]) {
+			gone++
+			continue
+		}
+		b, err := marshalSnapshot(snaps[i])
+		if err != nil {
+			continue
+		}
+		buf.Write(append(b, '\n'))
+	}
+	if gone == 0 {
+		return 0, nil
+	}
+	if err := atomicfile.Write(p, buf.Bytes(), 0o600); err != nil {
+		return 0, err
+	}
+	return gone, nil
+}
+
+// CountSnapshots says how many stored digests a predicate names, without
+// touching the file — what `forget --dry-run` reports.
+func CountSnapshots(indexDir string, match func(Snapshot) bool) int {
+	n := 0
+	for _, s := range snapshotsFrom(SnapshotPath(indexDir), 0) {
+		if match(s) {
+			n++
+		}
+	}
+	return n
+}
