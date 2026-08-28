@@ -1277,6 +1277,46 @@ func displayPath(p string) string {
 	return p
 }
 
+// RecentInProject is RecentProject under the scope rule the automatic paths
+// use: a session belongs to this project or it does not. `deja handoff`, which
+// picks a session for another agent when nobody named one, walked the loose
+// helper and packaged a client's acme/api from a directory named api (#2336) —
+// the shape #2333 closed on the session-start hook.
+func RecentInProject(dir, project string, n int) ([]model.Session, error) {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	unlock, ok, err := tryLockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		defer unlock()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil, err
+	}
+	// Scoped before the cut, not after: filtering a window of the loose
+	// helper's answer would drop this project's sessions whenever another
+	// project's newer ones filled it.
+	var metas []SessionMeta
+	for _, meta := range m.Sessions {
+		if projectInScope(meta.Project, project) {
+			metas = append(metas, meta)
+		}
+	}
+	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
+	if n > 0 && len(metas) > n {
+		metas = metas[:n]
+	}
+	return sessionsForMetas(dir, metas)
+}
+
+// RecentProject finds sessions whose project name contains the given string —
+// a browsing helper, loose on purpose, the way `--project` is on the surfaces a
+// person types. A caller deciding on its own which sessions belong to the
+// directory it is standing in wants RecentInProject instead (#2336).
 func RecentProject(dir, project string, n int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
