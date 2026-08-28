@@ -672,6 +672,13 @@ func cmdCtx(dir string, rest []string) error {
 		}
 	}
 	q := strings.Join(rest, " ")
+	// Blank is not a query: it matched nothing and the search handed back the
+	// first session in the store, so `deja ctx "$TOPIC"` with the variable
+	// unset printed a transcript nobody asked for (#2259).
+	if strings.TrimSpace(q) == "" {
+		return idPrefixNeeded(dir, "ctx needs a query or an id-prefix",
+			"ctx needs query or id-prefix (see `deja last`)")
+	}
 	if !strings.Contains(q, " ") && len(q) >= 6 {
 		done, err := ctxFromIDPrefix(dir, q)
 		if err != nil || done {
