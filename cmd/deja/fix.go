@@ -76,6 +76,15 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		// "never seen it", but the test it used rejects `Error: …`, `npm ERR!`
 		// and any line with a quote — the exact output people paste — so it
 		// accused users of not pasting an error when they had.
+		// Held-but-unconfirmed is not the same as never seen, and saying the
+		// second about the first tells someone who fixed this an hour ago that
+		// deja lost it (#2282).
+		if index.FixCandidateSeen(dir, text, func(project string) bool {
+			return pol.Allows(policy.ActivationSearch, project)
+		}) {
+			fmt.Fprintln(stdout, "deja: one session ran something after that error, and nothing has confirmed it worked — deja waits for a second sighting before naming a remedy")
+			return nil
+		}
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
 		return nil
 	}
