@@ -2021,6 +2021,12 @@ func parseSearch(args []string) (search.Options, error) {
 			if near := nearestSearchFlag(a); near != "" {
 				return o, fmt.Errorf("unknown flag %q — did you mean %s?", a, near)
 			}
+			// A flag deja takes elsewhere is not a typo and is nowhere near a
+			// search flag by edit distance, so it went into the query and the
+			// search that would have found everything reported nothing (#2249).
+			if cmd := flagsOfOtherCommands[a]; cmd != "" {
+				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", a, cmd)
+			}
 			q = append(q, a)
 		}
 	}
@@ -2037,6 +2043,35 @@ func parseSearch(args []string) (search.Options, error) {
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
+// flagsOfOtherCommands names the command each flag belongs to, for the tokens
+// that are real deja flags somewhere but not here. Only exact matches: a query
+// may legitimately start with a dash, and `--` still ends option parsing.
+var flagsOfOtherCommands = map[string]string{
+	"--offset":      "show",
+	"--span":        "restore",
+	"--out":         "restore",
+	"--force":       "restore",
+	"--tag":         "remember",
+	"--deep":        "doctor",
+	"--offline":     "doctor",
+	"--dry-run":     "forget",
+	"--all-matches": "forget",
+	"--list":        "forget",
+	"--unforget":    "forget",
+	"--before":      "forget",
+	"--to":          "handoff",
+	"--exec":        "resume",
+	"--plain":       "hook-prompt",
+	"--no-open":     "view",
+	"--full":        "sync export",
+	"--peer":        "sync export",
+	"--pull":        "sync ssh",
+	"--both":        "sync ssh",
+	"--from":        "last",
+	"--last":        "log",
+	"--seed":        "bench",
+}
+
 var searchFlags = []string{
 	"--json", "--re", "--all", "--no-embed", "--rebuild",
 	"--harness", "--project", "--since", "--role", "--limit", "--session",
