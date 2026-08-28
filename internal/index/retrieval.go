@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
@@ -1294,6 +1295,30 @@ func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model
 	return out, nil
 }
 
+// ignoredByPolicy is the trust rule that says a directory's sessions are not
+// to be recalled. It was applied at one call site — the CLI's own search — so
+// `deja doctor` printed "not recalled */.claude/jobs/*" while the per-prompt
+// hook injected those sessions into every message, which is the most automatic
+// surface deja has and the one where the rule matters most. The same shape as
+// #2070: a rule in one path of several is a rule half the callers do not have.
+//
+// Applied here because this is where every tier and every surface turns a
+// manifest entry into a session it can serve.
+func ignoredByPolicy(ss []model.Session) []model.Session {
+	pol := policy.Load()
+	if len(pol.IgnorePatterns()) == 0 {
+		return ss
+	}
+	out := ss[:0:0]
+	for _, s := range ss {
+		if pol.Ignored(s.Path, s.Project) {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 // sessionsForMetas loads full sessions for the given metas in ONE pass over
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
@@ -1323,7 +1348,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	for i := range out {
 		orderPromotedNote(&out[i])
 	}
-	return out, nil
+	return ignoredByPolicy(out), nil
 }
 
 // RecentProjects is RecentProject for several project names at once: one
@@ -1868,7 +1893,9 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		orderPromotedNote(s)
 		out = append(out, *s)
 	}
-	return out, nil
+	// The scoring and relevance tiers build their sessions here rather than
+	// through sessionsForMetas, so the ignore rule has to hold at both.
+	return ignoredByPolicy(out), nil
 }
 
 func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []posting {
