@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding memory to Claude Code — deja-vu</title>
+<meta name="description" content="How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Claude Code">
+<meta property="og:description" content="How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Claude Code">
+<meta name="twitter:description" content="How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to Claude Code","description":"How to give Claude Code recall over every coding agent's sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Claude Code","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to Claude Code?","acceptedAnswer":{"@type":"Answer","text":"Run deja install claude-auto to write the MCP server, the /deja command and the SessionStart hook, or add this repository as a plugin marketplace with claude plugin marketplace add vshulcz/deja-vu."}},{"@type":"Question","name":"Where does Claude Code keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ${CLAUDE_CONFIG_DIR:-~/.claude}/projects/ as JSONL, one file per session, which is what deja indexes."}},{"@type":"Question","name":"Will installing both the MCP server and the plugin duplicate the tools?","acceptedAnswer":{"@type":"Answer","text":"No. Claude keys MCP servers by name and every manifest deja ships names this one deja, so the two collapse into a single server."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html" aria-current="page">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Claude Code</h1>
+<p class="pagelede">the MCP server, the hook, and the plugin marketplace<span class="mins" data-mins></span></p>
+
+<p>Claude Code writes every session to disk and starts the next one empty. The work is still there — and so is whatever you did that week in Cursor, Codex or any other agent you had open.</p>
+
+<h2>What Claude Code already has</h2>
+<p>Transcripts live under <code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/</code> as JSONL, one file per session, complete down to the tool calls. Nothing reads them back, including Claude Code's own next session. <a href="../registry/claude-code.html">How Claude's store is read</a> has the format, the quirks and the date it was last checked against a real store.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install claude-auto</pre>
+<p>That writes three things: the deja MCP server into <code>~/.claude.json</code>, a <code>/deja</code> command at <code>~/.claude/commands/deja.md</code>, and a SessionStart hook in <code>~/.claude/settings.json</code> so a new session opens already carrying what the last ones settled. The MCP server on its own is <code>deja install claude-code</code>.</p>
+<p>This repository is also a Claude plugin marketplace, if you would rather install it the way Claude Code installs everything else:</p>
+<pre>claude plugin marketplace add vshulcz/deja-vu
+claude plugin install deja-vu@deja-vu</pre>
+<p>Running both is safe rather than doubled. Claude keys MCP servers by name, and every manifest we ship names this one <code>deja</code>, so the two collapse into a single server instead of listing every tool twice.</p>
+<p>Either path needs the binary — a plugin ships files, not runtimes:</p>
+<pre>brew install deja-vu
+# or
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+
+<h2>What the hook actually changes</h2>
+<p>Without it, recall depends on the agent deciding to search. The hook moves the decision earlier: the session opens with what this project already settled, so the first exchange is not spent re-deriving it. <a href="after-compaction.html">After compaction</a> covers the other half — the moment a long session is summarised and the details go.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="../registry/claude-code.html">How Claude's store is read</a> · <a href="rules-files.html">When CLAUDE.md grows</a></p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

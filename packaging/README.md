@@ -35,10 +35,15 @@ After GoReleaser publishes a tag:
 
 ## Publish
 
-For the first Scoop publication, copy `scoop/deja-vu.json` to
-`bucket/deja-vu.json` in a fork of `ScoopInstaller/Main`, run the checks above,
-and open a pull request there. After acceptance, Scoop's checkver automation
-can propose routine version updates; keep this source copy in sync.
+deja-vu is in `ScoopInstaller/Main` as of 0.18.0, so `scoop install deja-vu`
+works without adding a bucket. Scoop's own automation proposes version bumps
+from `checkver` and takes hashes from the release's `checksums.txt`; this source
+copy exists so the manifest can be checked before it is submitted, and should be
+kept in sync when the shape changes rather than when the version does.
+
+Note that Main is for command-line tools and Extras for the rest — the star and
+fork numbers in the criteria are read as "either", not "both". A submission to
+Extras was closed and moved here on exactly that basis.
 
 For WinGet, copy the three files into
 `manifests/v/vshulcz/deja-vu/<version>/` in a fork of

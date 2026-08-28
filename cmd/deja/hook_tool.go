@@ -71,8 +71,17 @@ type toolHookInput struct {
 }
 
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
+	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
-	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
+	// Spawning an agent is the one action whose reply has to reach someone
+	// other than the caller, so it answers in its own shape. See hook_spawn.go.
+	if isSpawnTool(input.ToolName) {
+		if !planIndexReady(dir) {
+			return nil
+		}
+		return runHookSpawn(dir, input, raw, stdout)
+	}
 	// Never build or repair from here. This runs inside an action the user is
 	// waiting on, and a miss costs nothing while a rebuild costs seconds.
 	if !planIndexReady(dir) {
@@ -162,7 +171,7 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// these are the top of the table (git status --short in 116 sessions), and
 	// a line about them on every action is pure noise. The value is in a build,
 	// a test, a deploy — a command that does something.
-	if inspectionCommand(cmd) {
+	if index.InspectionCommand(cmd) {
 		return ""
 	}
 	use, ok := index.CommandHistory(dir, cmd)
@@ -407,30 +416,6 @@ func fileMetaInScope(meta index.SessionMeta, path string, projects []string) boo
 }
 
 func baseName(p string) string { return index.CrossBase(p) }
-
-// inspectionCommand reports whether the command only looks at state rather than
-// changing it — the class whose reuse-count says nothing worth an injection.
-func inspectionCommand(cmd string) bool {
-	f := strings.Fields(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(cmd), "$ ")))
-	if len(f) == 0 {
-		return true
-	}
-	switch f[0] {
-	case "ls", "cat", "pwd", "echo", "which", "whoami", "date", "env", "printenv",
-		"head", "tail", "less", "more", "stat", "file", "find", "tree", "df", "du",
-		"ps", "top", "htop", "id", "uname", "hostname", "clear", "history":
-		return true
-	case "git":
-		if len(f) > 1 {
-			switch f[1] {
-			case "status", "diff", "log", "show", "branch", "remote", "stash",
-				"blame", "reflog", "describe", "rev-parse", "ls-files":
-				return true
-			}
-		}
-	}
-	return false
-}
 
 // truncateToolLine caps the line at max bytes on a rune boundary, so a
 // non-ASCII filename near the limit is not split mid-rune into a U+FFFD.

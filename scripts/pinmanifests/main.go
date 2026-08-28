@@ -1,4 +1,4 @@
-// Command pinmanifests rewrites the scoop, winget and Codex plugin manifests for a
+// Command pinmanifests rewrites the scoop, winget and plugin manifests for a
 // release.
 //
 // These files carry a version and the SHA-256 of the two Windows zips, and they
@@ -39,6 +39,17 @@ const (
 	// sat at 0.1.0 from July through 0.17.1 because nothing compared it to
 	// anything.
 	codexPlugin = "codex-plugin/.codex-plugin/plugin.json"
+	// Same reasoning for the Claude bundle, which the directory mirrors from
+	// the default branch. It had no version field at all until the directory's
+	// own scanner asked for one.
+	claudePlugin = "claude-plugin/.claude-plugin/plugin.json"
+	// The Gemini gallery crawls the manifest at the repository root and shows
+	// its version, and `gemini extensions install` reads the same file.
+	geminiExtension = "gemini-extension.json"
+	// The Agent Plugins manifest at the root: cursor.directory reads it
+	// straight from the default branch, so its version is the one a
+	// listing shows.
+	agentPlugin = "plugin.json"
 	releaseAPI  = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
 	assetBase   = "https://github.com/vshulcz/deja-vu/releases/download"
 )
@@ -61,7 +72,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "pinmanifests:", err)
 			os.Exit(1)
 		}
-		fmt.Println("scoop, winget and the codex plugin match the newest release")
+		fmt.Println("scoop, winget and the plugin manifests match the newest release")
 		return
 	}
 
@@ -80,7 +91,7 @@ func main() {
 	if err := write(*root, p); err != nil {
 		fail(err)
 	}
-	fmt.Printf("pinned scoop, winget and the codex plugin to %s\n", p.version)
+	fmt.Printf("pinned scoop, winget and the plugin manifests to %s\n", p.version)
 }
 
 // parse pulls the two Windows hashes out of a checksums file. Both must be
@@ -113,11 +124,14 @@ func parse(version, checksums string) (pins, error) {
 
 func write(root string, p pins) error {
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:   renderScoop,
-		versionPath: renderVersion,
-		localePath:  renderLocale,
-		installer:   renderInstaller,
-		codexPlugin: renderCodexPlugin,
+		scoopPath:       renderScoop,
+		versionPath:     renderVersion,
+		localePath:      renderLocale,
+		installer:       renderInstaller,
+		codexPlugin:     renderPluginVersion(codexPlugin),
+		claudePlugin:    renderPluginVersion(claudePlugin),
+		geminiExtension: renderPluginVersion(geminiExtension),
+		agentPlugin:     renderPluginVersion(agentPlugin),
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -130,29 +144,59 @@ func write(root string, p pins) error {
 	return nil
 }
 
+// scoopManifest is a struct rather than a map because Scoop's own bucket
+// tooling formats manifests in this key order, and a map marshals alphabetical.
+// A submission that arrives sorted differently comes back from their formatter
+// as a diff on every line.
+type scoopManifest struct {
+	Version      string               `json:"version"`
+	Description  string               `json:"description"`
+	Homepage     string               `json:"homepage"`
+	License      string               `json:"license"`
+	Architecture map[string]scoopArch `json:"architecture"`
+	Bin          string               `json:"bin"`
+	Checkver     string               `json:"checkver"`
+	Autoupdate   scoopAutoupdate      `json:"autoupdate"`
+}
+
+type scoopArch struct {
+	URL  string `json:"url"`
+	Hash string `json:"hash,omitempty"`
+}
+
+type scoopAutoupdate struct {
+	Architecture map[string]scoopArch `json:"architecture"`
+	// Without this the updater can raise the version but has nothing to put in
+	// the hash fields. goreleaser publishes checksums.txt beside the archives,
+	// which is $baseurl here, and that is the shape the bucket's own manifests
+	// use.
+	Hash map[string]string `json:"hash"`
+}
+
 func renderScoop(p pins) ([]byte, error) {
-	m := map[string]any{
-		"version":     p.version,
-		"description": "Persistent memory for coding agents",
-		"homepage":    "https://github.com/vshulcz/deja-vu",
-		"license":     "MIT",
-		"architecture": map[string]any{
-			"64bit": map[string]any{
-				"url":  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_amd64.zip", assetBase, p.version, p.version),
-				"hash": p.amd64,
+	m := scoopManifest{
+		Version:     p.version,
+		Description: "Persistent memory for coding agents",
+		Homepage:    "https://github.com/vshulcz/deja-vu",
+		License:     "MIT",
+		Architecture: map[string]scoopArch{
+			"64bit": {
+				URL:  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_amd64.zip", assetBase, p.version, p.version),
+				Hash: p.amd64,
 			},
-			"arm64": map[string]any{
-				"url":  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_arm64.zip", assetBase, p.version, p.version),
-				"hash": p.arm64,
+			"arm64": {
+				URL:  fmt.Sprintf("%s/v%s/deja-vu_%s_windows_arm64.zip", assetBase, p.version, p.version),
+				Hash: p.arm64,
 			},
 		},
-		"bin":      "deja.exe",
-		"checkver": "github",
-		"autoupdate": map[string]any{
-			"architecture": map[string]any{
-				"64bit": map[string]any{"url": assetBase + "/v$version/deja-vu_$version_windows_amd64.zip"},
-				"arm64": map[string]any{"url": assetBase + "/v$version/deja-vu_$version_windows_arm64.zip"},
+		Bin:      "deja.exe",
+		Checkver: "github",
+		Autoupdate: scoopAutoupdate{
+			Architecture: map[string]scoopArch{
+				"64bit": {URL: assetBase + "/v$version/deja-vu_$version_windows_amd64.zip"},
+				"arm64": {URL: assetBase + "/v$version/deja-vu_$version_windows_arm64.zip"},
 			},
+			Hash: map[string]string{"url": "$baseurl/checksums.txt"},
 		},
 	}
 	b, err := json.MarshalIndent(m, "", "    ")
@@ -175,20 +219,21 @@ func renderLocale(p pins) ([]byte, error) { return edit(localePath, p) }
 
 func renderInstaller(p pins) ([]byte, error) { return edit(installer, p) }
 
-// renderCodexPlugin rewrites only the version field. The manifest carries
-// descriptions, prompts and pointers that no release derives, so regenerating it
-// from a template here would drop whatever someone adds later — the same reason
-// the winget files are edited rather than rendered.
-func renderCodexPlugin(p pins) ([]byte, error) {
-	b, err := os.ReadFile(codexPlugin)
-	if err != nil {
-		return nil, err
+// renderPluginVersion rewrites only the version field. These manifests carry
+// descriptions, prompts and pointers that no release derives, so regenerating
+// them from a template here would drop whatever someone adds later — the same
+// reason the winget files are edited rather than rendered.
+func renderPluginVersion(path string) func(pins) ([]byte, error) {
+	return func(p pins) ([]byte, error) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if !jsonVersion.MatchString(string(b)) {
+			return nil, fmt.Errorf("%s has no version field to pin", path)
+		}
+		return []byte(jsonVersion.ReplaceAllString(string(b), `${1}"`+p.version+`"`)), nil
 	}
-	s := jsonVersion.ReplaceAllString(string(b), `${1}"`+p.version+`"`)
-	if !jsonVersion.MatchString(string(b)) {
-		return nil, fmt.Errorf("%s has no version field to pin", codexPlugin)
-	}
-	return []byte(s), nil
 }
 
 var (
@@ -251,11 +296,14 @@ func runCheck(root string) error {
 		return err
 	}
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:   renderScoop,
-		versionPath: renderVersion,
-		localePath:  renderLocale,
-		installer:   renderInstaller,
-		codexPlugin: renderCodexPlugin,
+		scoopPath:       renderScoop,
+		versionPath:     renderVersion,
+		localePath:      renderLocale,
+		installer:       renderInstaller,
+		codexPlugin:     renderPluginVersion(codexPlugin),
+		claudePlugin:    renderPluginVersion(claudePlugin),
+		geminiExtension: renderPluginVersion(geminiExtension),
+		agentPlugin:     renderPluginVersion(agentPlugin),
 	} {
 		want, err := render(p)
 		if err != nil {

@@ -237,6 +237,30 @@ func TestOpencodePluginRecallsPerPrompt(t *testing.T) {
 	}
 }
 
+// opencode spawns agents through its `task` tool — 817 of them on the store
+// this was measured against — and none of the plugin's other hooks reach one:
+// the system prompt is built for the session that spawned it, and the
+// per-prompt pass fires on what a person typed. Its instructions are the only
+// thing that arrives, so recall has to be put there.
+func TestOpencodePluginCarriesRecallIntoASpawnedAgent(t *testing.T) {
+	src := opencodePluginJS("/bin/deja")
+	for _, want := range []string{
+		"tool.execute.before",
+		`input?.tool !== "task"`,
+		"hook-tool",
+		"updatedInput",
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("generated plugin missing %q:\n%s", want, src)
+		}
+	}
+	// The spawn is rewritten, not blocked, and a spawn deja has nothing to say
+	// about keeps the prompt its parent wrote.
+	if !strings.Contains(src, "if (next) args.prompt = next") {
+		t.Fatalf("plugin does not leave a silent recall alone:\n%s", src)
+	}
+}
+
 // Compaction throws away the working transcript. Claude Code gets it indexed
 // first through PreCompact; opencode fires experimental.session.compacting at
 // the same moment and was going unused.
@@ -247,5 +271,42 @@ func TestOpencodePluginIndexesBeforeCompaction(t *testing.T) {
 	}
 	if !strings.Contains(src, "hook-precompact") {
 		t.Fatalf("compaction hook does not index:\n%s", src)
+	}
+}
+
+// TestWarmupProgressNamesAnUnwrittenPhase covers #1731: a status file that
+// exists but has not had its phase written yet left progress() returning "",
+// and every caller wraps that fragment in a parenthetical — so the sentence
+// handed to an agent was "deja is indexing this machine's history ()."
+func TestWarmupProgressNamesAnUnwrittenPhase(t *testing.T) {
+	tests := []struct {
+		name string
+		st   warmupStatus
+		want string
+	}{
+		{name: "phase not yet written, no total", st: warmupStatus{}, want: "starting"},
+		{name: "phase not yet written, with total", st: warmupStatus{Done: 1, Total: 4}, want: "starting 25%"},
+		{name: "phase written, no total", st: warmupStatus{Phase: "finding transcripts…"}, want: "finding transcripts…"},
+		{name: "phase written, with total", st: warmupStatus{Phase: "indexing messages", Done: 1, Total: 4}, want: "indexing messages 25%"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.st.progress(); got != tt.want {
+				t.Errorf("progress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestWarmupSentencesNeverShowAnEmptyParenthetical is the property the fix
+// exists to protect, asserted on the rendered sentences rather than on the
+// fragment: no surface may hand a user or an agent "()".
+func TestWarmupSentencesNeverShowAnEmptyParenthetical(t *testing.T) {
+	st := &warmupStatus{}
+	for _, got := range []string{st.progress(), st.line()} {
+		if got == "" || strings.Contains(got, "()") {
+			t.Errorf("rendered %q with an unwritten phase, want a named phase", got)
+		}
 	}
 }

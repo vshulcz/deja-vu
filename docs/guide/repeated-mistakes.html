@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The agent keeps making a mistake you already fixed — deja-vu</title>
+<meta name="description" content="Why a coding agent hits the same wall it solved last month, how to see which walls a machine keeps hitting, and how to hand it the fix at the moment it fails.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="When the agent repeats a mistake you already fixed">
+<meta property="og:description" content="Why a coding agent hits the same wall it solved last month, how to see which walls a machine keeps hitting, and how to hand it the fix at the moment it fails.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="When the agent repeats a mistake you already fixed">
+<meta name="twitter:description" content="Why a coding agent hits the same wall it solved last month, how to see which walls a machine keeps hitting, and how to hand it the fix at the moment it fails.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"When the agent repeats a mistake you already fixed","description":"Why a coding agent hits the same wall it solved last month, how to see which walls a machine keeps hitting, and how to hand it the fix at the moment it fails.","url":"https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Repeated mistakes","item":"https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does my coding agent keep making the same mistake?","acceptedAnswer":{"@type":"Answer","text":"Because the session that solved it ended and nothing reads its transcript back. The agent is not repeating a mistake it remembers making — from its side the problem is new every time."}},{"@type":"Question","name":"Should I write the fix into CLAUDE.md or AGENTS.md?","acceptedAnswer":{"@type":"Answer","text":"For a rule you already know you need, yes. It does not help for a wall you have not hit twice yet, and every line costs context on every session, so the file cannot hold everything."}},{"@type":"Question","name":"Can the agent be told the fix at the moment it fails?","acceptedAnswer":{"@type":"Answer","text":"Yes. A post-failure hook can search the machine's own history for what was run after the same error in the sessions where it did not come back, and hand that to the agent unprompted."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html" aria-current="page">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>When the agent repeats a mistake you already fixed</h1>
+<p class="pagelede">it is not repeating a mistake — from its side the problem is new<span class="mins" data-mins></span></p>
+
+<p>The agent proposes the approach you tried in March and backed out of. Or it hits the same error again — <code>ModuleNotFoundError: No module named 'yaml'</code> — and starts guessing, in a repository where that exact error was solved four times already.</p>
+<p>It is not being stubborn. From its side the problem is new: the session that solved it ended, and nothing read the transcript back. The word "repeats" describes your experience, not the agent's.</p>
+
+<h2>Which walls a machine actually hits again</h2>
+<p><code>deja friction</code> counts errors that appear in three or more separate sessions and names the agents that hit them:</p>
+<pre>$ deja friction
+what this machine keeps tripping over — 500 sessions read
+  16 sessions  command not found: timeout
+               claude, opencode · last Aug 23
+  11 sessions  command not found: python
+               antigravity, claude, codex, opencode · last Jul 22
+  10 sessions  ModuleNotFoundError: No module named 'yaml'
+               claude, opencode · last Aug 20</pre>
+<p>Two things worth noticing in that output. The counts are sessions, not occurrences — sixteen separate times somebody started fresh and met the same wall. And the harness column is usually more than one, which is why a memory scoped to a single agent does not close it.</p>
+
+<h2>The fix that stayed fixed</h2>
+<p>Knowing you hit something sixteen times is only half of it. The other half is what ended it:</p>
+<pre>$ deja fix "ModuleNotFoundError: No module named 'yaml'"</pre>
+<p>The answer is a command that was actually run on this machine after that error, in sessions where the error did not come back afterwards. That last clause is the whole design: a command that was run and then followed by the same failure again is not a fix, and pairing an error with whatever came next without checking would produce exactly that kind of confident wrong answer. When nothing qualifies, the command says so rather than guessing:</p>
+<pre>$ deja fix "command not found: timeout"
+deja: no session on this machine ran a command after that error</pre>
+
+<h2>Doing it without being asked</h2>
+<p>Neither command helps if you have to remember to run it, and the moment you would remember is after you have already lost the twenty minutes. So the same lookup runs from hooks, where the harness supports them:</p>
+<ul>
+<li><b>Before a command runs</b> — the invocation this project actually uses, with the flags it was run with, instead of a plausible guess.</li>
+<li><b>After one fails</b> — what followed that same error here before. This is the pair an agent never thinks to ask for, because from inside the session there is nothing to ask about.</li>
+<li><b>Before a file is edited</b> — what earlier sessions decided about that file, including a decision that was tried and reverted.</li>
+</ul>
+<p><code>deja install --auto</code> wires whichever of those the harness exposes; the <a href="agents.html">agents guide</a> lists which supports what.</p>
+
+<h2>What about a rules file</h2>
+<p><code>CLAUDE.md</code>, <code>AGENTS.md</code> and their equivalents are the right place for a rule you already know you need — the build command, the conventions, the directory nobody may touch. They do not solve this one for two reasons. Nobody writes down the wall they have not hit twice yet, and the file is read in full on every session, so it cannot hold the long tail of things that each mattered once. History is the long tail.</p>
+
+<h2>Marking what did not work</h2>
+<p>Sometimes the repeated mistake is one you already investigated and rejected. <code>deja promote &lt;id&gt; --state rejected --note "why"</code> marks that session, and every later hit for it shows that it was tried and rejected, with the reason. Nothing is deleted — <code>--state accepted</code> takes the mark back — and the note travels to the other machines you sync with.</p>
+
+<p><a href="forgetting.html">Why agents forget in the first place</a> · <a href="after-compaction.html">What compaction drops</a> · <a href="getting-started.html">Getting started</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

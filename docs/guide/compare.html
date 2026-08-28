@@ -31,6 +31,7 @@
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"How deja compares","description":"An honest feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory.","url":"https://vshulcz.github.io/deja-vu/guide/compare.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/compare.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Compare","item":"https://vshulcz.github.io/deja-vu/guide/compare.html"}]}</script>
 <style>
@@ -69,6 +70,32 @@
 <div class="wrap"><div class="doc">
 <aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
 <a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
 <a href="agents.html">Agents & MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html">CLI reference</a>
@@ -130,6 +157,25 @@
 
 <div class="note">On that benchmark row, plainly: <b>MemPalace publishes a higher LongMemEval number than we do</b> — 96.6% R@5 against our 95.5% hit@5 on the same 500-question set. The metrics are defined slightly differently and neither of us has rerun the other's harness, so treat the gap as unresolved rather than as either of us winning. What we can say about our own is that the harness is in this repo and you can run it.</div>
 
+<h2>The other tools that read the same files</h2>
+<p>A second group is closer to deja than any memory system: tools that also read the session files coding agents leave on disk. They are built for a person doing the looking — a window or a terminal you open when you want to find something. Cells are from each project's own README, read on 26 August 2026.</p>
+
+<div class="cmpwrap">
+<table>
+<tr><th></th><th class="us">deja-vu</th><th>cass</th><th>Agent Sessions</th><th>agent-historian</th><th>casr</th><th>Agent Session Viewer</th></tr>
+<tr><td>What it is</td><td class="us">index the agent queries</td><td>TUI and CLI over one timeline</td><td>macOS app</td><td>CLI for agents</td><td>session converter</td><td>web viewer</td></tr>
+<tr><td>Agents read</td><td class="us">20</td><td>25 providers</td><td>14 CLIs</td><td>5 CLIs</td><td>Claude, Codex, Gemini and more</td><td>Claude Code, Codex</td></tr>
+<tr><td>Recall without being asked</td><td class="us y">✓ hooks at session start, before an edit, after a failure</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Serves an agent</td><td class="us y">✓ MCP + skill</td><td class="y">✓ MCP</td><td class="n">—</td><td class="y">✓ MCP</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Secrets stripped at index time</td><td class="us y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Also does</td><td class="us"><code>blame</code>, <code>fix</code>, <code>how</code>, digests</td><td>timeline browsing</td><td>live quota burn per session, priced per model</td><td>project or global scope</td><td>resume a Codex session inside Claude Code</td><td>full-text search per project</td></tr>
+<tr><td>Written in</td><td class="us">Go, one binary</td><td>Rust</td><td>Swift, macOS only</td><td>TypeScript</td><td>Rust</td><td>Python</td></tr>
+</table>
+</div>
+
+<div class="note">The row that matters is the third one. Every tool here can find the session you are thinking of; deja is the one where nobody has to be thinking of it — the hook fires at session start and before an edit, so the earlier decision arrives whether or not anyone remembered to look. That is a different job from browsing, and on browsing several of these are better than we are.</div>
+
 <h2>When to pick something else</h2>
 <p>Honest routing, because the categories genuinely differ:</p>
 <p><b>Mem0 / Memori</b> — you are building an application and want to give <em>your users</em> memory through an API. deja has no SDK; it is not for app-embedded memory.</p>
@@ -139,6 +185,9 @@
 <p><b>MemPalace</b> — the closest overlap by far, and the honest comparison is narrow: it also reads Claude Code sessions off disk and also keeps them verbatim. It brings a local embedding model and a vector store; deja is one binary with neither, parses 20 harnesses rather than three, and adds the things built around a code history specifically — <code>deja blame</code>, SSH sync, sanitized digests. If you want semantic paraphrase matching and don't mind a Python install with a 300&nbsp;MB model, theirs is the better fit.</p>
 <p><b>cognee / Graphiti</b> — you want a knowledge graph with entities, relationships and time-valid facts to reason over, and you accept a database and an LLM key as the price. deja does not build a graph; it searches what was said.</p>
 <p><b>Hindsight</b> — you want an agent to accumulate curated beliefs about the world over time, through an API you call. deja never writes memories of its own: it indexes the record your agents already produced.</p>
+<p><b>cass</b> — you want to sit and read across your own history, and you want the widest net: it lists 25 providers against our 20 harnesses, in a TUI built for browsing a single timeline. It also serves an agent over MCP and strips secrets. deja's difference is the hook, not the search.</p>
+<p><b>Agent Sessions</b> — you are on a Mac and the question is where your quota went. It attributes 5-hour and weekly burn to the individual session, priced per model, which deja does not do at all. deja has no window to open.</p>
+<p><b>casr</b> — you want to carry one session into a different agent and keep going. deja resumes a session in the tool that wrote it and otherwise answers questions about it; it does not convert between formats.</p>
 <p><b>A vector database + your own pipeline</b> — you need semantic paraphrase matching above all. deja's lexical ladder loses to embeddings on pure paraphrase (we say so in the <a href="benchmarks.html">benchmarks</a>); it wins on identifiers, error strings, and everything code-shaped, with no key and no daemon.</p>
 
 <h2>What only deja does</h2>

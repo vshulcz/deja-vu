@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding memory to Grok Build — deja-vu</title>
+<meta name="description" content="How to give Grok Build recall over every coding agent's sessions on the machine — the hooks it reads, the marketplace plugin in review, and the name that is not it.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Grok Build">
+<meta property="og:description" content="How to give Grok Build recall over every coding agent's sessions on the machine — the hooks it reads, the marketplace plugin in review, and the name that is not it.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Grok Build">
+<meta name="twitter:description" content="How to give Grok Build recall over every coding agent's sessions on the machine — the hooks it reads, the marketplace plugin in review, and the name that is not it.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to Grok Build","description":"How to give Grok Build recall over every coding agent's sessions on the machine — the hooks it reads, the marketplace plugin in review, and the name that is not it.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Grok Build","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to Grok Build?","acceptedAnswer":{"@type":"Answer","text":"Run deja install grok-auto, which writes the MCP server into ~/.grok/config.toml and the recall hooks into ~/.grok/hooks/. A plugin for the marketplace is in review."}},{"@type":"Question","name":"Where does Grok Build keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.grok/sessions as ACP JSONL update streams with JSON metadata, plus a grok.db store — GROK_HOME moves the tree."}},{"@type":"Question","name":"Does Grok Build support recall without being asked?","acceptedAnswer":{"@type":"Answer","text":"Yes. It reads hooks in the same shape Claude Code uses, so recall can arrive at session start, on a prompt, before a tool runs and before compaction."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html" aria-current="page">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Grok Build</h1>
+<p class="pagelede">it reads Claude-shaped hooks, so all four moments work<span class="mins" data-mins></span></p>
+
+<p>Grok Build writes every session to disk and starts the next one without them. The work that would answer today's question is in those files, and in whatever other agent you used before it.</p>
+
+<h2>What Grok already has</h2>
+<p>Sessions live under <code>~/.grok/sessions</code> as ACP update streams — JSONL with JSON metadata beside them — plus a <code>grok.db</code> store (<code>GROK_HOME</code> moves the tree). Complete, and unread by anything.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install grok-auto</pre>
+<p>Writes <code>[mcp_servers.deja]</code> into <code>~/.grok/config.toml</code> and a hook file of deja's own into <code>~/.grok/hooks/</code>. Grok reads hooks in the same shape Claude Code uses, which is why all four moments work here: session start, per prompt, before a tool runs, and before compaction.</p>
+<p>A plugin for the official marketplace is <a href="https://github.com/xai-org/plugin-marketplace/pull/332">in review</a>. When it lands, <code>grok plugin install deja</code> is the other path, and the two coexist: each half of the plugin stands down when it finds what the CLI already wired, so nothing is listed or injected twice.</p>
+<p>Either way it needs the binary, since a plugin delivers files rather than runtimes:</p>
+<pre>brew install deja-vu
+# or
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+
+<h2>One thing to know about the name</h2>
+<p>There is a community CLI that shares the name <code>grok</code> and the <code>~/.grok</code> directory, and it is a different product. deja reads xAI's Grok Build store, and <code>deja resume</code> prints a <code>grok --resume</code> for its sessions and refuses for the community CLI's, which has no terminal resume. Where something still could not be checked against a running Grok Build, the <a href="../registry/grok.html">registry page</a> says so and names what was tried instead of guessing.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="../registry/grok.html">How Grok's store is read</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/grok">The plugin source</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

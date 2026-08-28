@@ -27,7 +27,16 @@ type PromptChain struct {
 	// Fact is what the session concluded, so an arm can ask whether the block
 	// carries the conclusion rather than merely the subject: a passing mention
 	// says the subject too.
-	Fact     string
+	Fact string
+	// Paraphrase is Question asked in someone else's words.
+	Paraphrase string
+	// Tied says this chain's store also holds the sentence that ties the
+	// paraphrase's ordinary words to the term of art — the one every real
+	// store has and this corpus did not. Measured: for all five paraphrases
+	// the arm fails on, no message anywhere in the corpus says both, so no
+	// lexical method can reach them and the arm's 15 of 20 is a ceiling
+	// rather than a defect. A chain marked Tied is the reachable case (#2331).
+	Tied     bool
 	Sessions []model.Session
 	Negative bool
 	// Kind names what this chain is here to measure: "" for the plain case,
@@ -107,6 +116,11 @@ type promptTopic struct {
 	word     string
 	fact     string
 	question string
+	// paraphrase asks the same thing in words the fixture does not use. Every
+	// other arm asks with the fixture's own wording, so none of them can see
+	// the failure this exists for: a person coming back a month later and
+	// asking about the same decision differently.
+	paraphrase string
 }
 
 // Each topic is one short word plus the sentence a session would record and
@@ -118,47 +132,52 @@ type promptTopic struct {
 func promptRussianTopics() []promptTopic {
 	return []promptTopic{
 		{"вебхук", "повторную доставку вебхука ограничили тремя попытками",
-			"напомни, сколько попыток у повторной доставки вебхука, и что делать дальше"},
+			"напомни, сколько попыток у повторной доставки вебхука, и что делать дальше",
+			"сколько раз мы пробуем достучаться, если получатель не ответил"},
 		{"шардирование", "шардирование по клиенту заменили на шардирование по региону",
-			"погоди, а по чему у нас в итоге шардирование, покажи ещё раз"},
+			"погоди, а по чему у нас в итоге шардирование, покажи ещё раз",
+			"по какому признаку данные разложены между узлами"},
 		{"индексация", "индексацию перенесли в фоновый воркер после записи",
-			"подожди, где именно теперь происходит индексация, объясни снова"},
+			"подожди, где именно теперь происходит индексация, объясни снова",
+			"в какой момент строится поисковый указатель после сохранения"},
 		// A compound written with a hyphen, which is how people name things in
 		// Russian as readily as in English. Measured on a real store, one direct
 		// question in seven that got no answer at all was this: the subject word
 		// never became a search term, so nothing could match it.
 		{"коорд-сообщение", "коорд-сообщение теперь шлём одним пакетом на всю группу",
-			"напомни, что мы решали про коорд-сообщение"},
+			"напомни, что мы решали про коорд-сообщение",
+			"как теперь рассылаем оповещение всей группе"},
 		// Four letters, which is where Russian keeps its short subjects — сеть,
 		// порт, диск, кеш. The floor for Cyrillic stands at five, so none of
 		// them can become a search term at all, the same way ttl and dns could
 		// not before the English floor was named rather than measured.
 		{"кеш", "кеш инвалидируем по версии схемы, а не по времени",
-			"напомни, что там было с кеш"},
+			"напомни, что там было с кеш",
+			"по какому признаку мы сбрасываем сохранённые данные"},
 	}
 }
 
 func promptTopics() []promptTopic {
 	return []promptTopic{
-		{"etag", "the stale etag reuse was replaced with generation checks", "why did we replace the stale etag reuse?"},
-		{"ttl", "the ttl for cached tokens was settled at 14 minutes", "what ttl did we settle on?"},
-		{"jitter", "retry backoff got jitter so retries stop arriving together", "did we add jitter to the backoff?"},
-		{"mutex", "the mutex around the writer was replaced with a channel", "what did we do about the writer mutex?"},
-		{"quota", "the upload quota check moved before the multipart parse", "where does the quota check happen now?"},
-		{"gzip", "gzip was disabled for streaming responses because it buffered", "why is gzip off for streaming?"},
-		{"utf8", "invalid utf8 in filenames is now replaced rather than rejected", "how do we handle invalid utf8 in names?"},
-		{"cron", "the nightly cron moved to 03:17 to miss the backup window", "when does the nightly cron run?"},
-		{"oauth", "oauth refresh tokens are rotated on every use", "are oauth refresh tokens rotated?"},
-		{"dns", "dns lookups are cached for 30 seconds inside the pool", "how long do we cache dns lookups?"},
-		{"panic", "a panic in the parser is recovered and logged as a corrupt file", "what happens when the parser panics?"},
-		{"wal", "wal mode is enabled so readers stop blocking the writer", "why did we turn on wal mode?"},
+		{"etag", "the stale etag reuse was replaced with generation checks", "why did we replace the stale etag reuse?", "why did we stop reusing the cached validator header"},
+		{"ttl", "the ttl for cached tokens was settled at 14 minutes", "what ttl did we settle on?", "how long do cached tokens stay valid now"},
+		{"jitter", "retry backoff got jitter so retries stop arriving together", "did we add jitter to the backoff?", "how did we stop retries from arriving all at once"},
+		{"mutex", "the mutex around the writer was replaced with a channel", "what did we do about the writer mutex?", "what replaced the lock around the writer"},
+		{"quota", "the upload quota check moved before the multipart parse", "where does the quota check happen now?", "at what point is the upload size limit checked"},
+		{"gzip", "gzip was disabled for streaming responses because it buffered", "why is gzip off for streaming?", "why is compression off for streamed responses"},
+		{"utf8", "invalid utf8 in filenames is now replaced rather than rejected", "how do we handle invalid utf8 in names?", "what happens to filenames with broken encoding"},
+		{"cron", "the nightly cron moved to 03:17 to miss the backup window", "when does the nightly cron run?", "what time does the nightly job start"},
+		{"oauth", "oauth refresh tokens are rotated on every use", "are oauth refresh tokens rotated?", "do we issue a new refresh token each time"},
+		{"dns", "dns lookups are cached for 30 seconds inside the pool", "how long do we cache dns lookups?", "for how long is a name lookup kept in the pool"},
+		{"panic", "a panic in the parser is recovered and logged as a corrupt file", "what happens when the parser panics?", "what does the parser do when it crashes on a file"},
+		{"wal", "wal mode is enabled so readers stop blocking the writer", "why did we turn on wal mode?", "why did readers stop blocking the writer"},
 		// Asked with nothing but the subject and filler around it. The other
 		// three-letter topics here are asked in sentences carrying words the
 		// answering session also uses — "settle", "mode" — so they pass on
 		// those and the floor never shows. Measured: "what ttl did we settle
 		// on" reduces to [settle], and the ttl case is answered by a word that
 		// has nothing to do with ttl.
-		{"tls", "tls verification stays on for the internal mesh", "напомни, что там было с tls"},
+		{"tls", "tls verification stays on for the internal mesh", "напомни, что там было с tls", "верификация сертификатов во внутренней сети включена"},
 	}
 }
 
@@ -190,15 +209,117 @@ func promptCorpusHash(chains []PromptChain) string {
 	return hex.EncodeToString(h[:])
 }
 
+// cooccurTieCopies is how many sessions repeat the tying sentence. The map
+// links two words only once they have shared three sessions.
+const cooccurTieCopies = 3
+
+// PromptTiedCount is how many tied chains the corpus carries.
+const PromptTiedCount = 6
+
+// tiedTopics are the tied arm's own subjects. Separate from the plain topics
+// on purpose: sharing them would let a plain chain's sessions answer the tied
+// paraphrase, and the arm would measure the corpus rather than the bridge.
+func tiedTopics() []tiedTopic {
+	return []tiedTopic{
+		{promptTopic{"quorum", "quorum reads were turned off for the status endpoint", "what did we do about quorum reads?", "why does the status endpoint no longer ask every replica"},
+			"the quorum read is the one that asks every replica"},
+		{promptTopic{"debounce", "the debounce on the search box was set to 250ms", "what debounce did we settle on?", "how long do we wait before sending what someone typed"},
+			"the debounce is how long we wait before sending"},
+		{promptTopic{"replay", "a replay guard was added to the payment retry path", "what did we add to the payment retry path?", "what stops a retried charge from taking the money twice"},
+			"the replay guard is what stops a retried charge"},
+		{promptTopic{"vacuum", "autovacuum was tuned per table for the events table", "what did we change about vacuum?", "how did we stop dead rows piling up in the biggest table"},
+			"vacuum is what clears the dead rows piling up in a table"},
+		{promptTopic{"sharding", "sharding was keyed on tenant rather than on user", "what is the shard key now?", "by what are the rows split across the machines"},
+			"sharding is how the rows are split across machines"},
+		{promptTopic{"watermark", "a watermark was added so the queue drops nothing", "what did we add so the queue stops dropping?", "how did we stop the queue from throwing work away"},
+			"the watermark is what keeps the queue from throwing work away"},
+	}
+}
+
+// tiedTopic is a subject plus the sentence a team writes when it explains its
+// own word in passing. Not a restatement of the question: a session repeating
+// the question verbatim is the best lexical match there can be, and an arm it
+// always wins measures the fixture rather than the search.
+type tiedTopic struct {
+	promptTopic
+	tie string
+}
+
+// tiedChains repeat the plain shape with one addition: a short session where
+// somebody writes the sentence that names the thing and describes it in the
+// same breath. That is what a real store holds — nobody writes only the term
+// of art or only the ordinary words — and it is the material the
+// co-occurrence map is built from. Without it the map has nothing to learn
+// and a question in other words cannot be bridged by anything lexical.
+func tiedChains(rng *rand.Rand, base time.Time) []PromptChain {
+	topics := tiedTopics()
+	out := make([]PromptChain, 0, PromptTiedCount)
+	for i := 0; i < PromptTiedCount && i < len(topics); i++ {
+		topic := topics[i]
+		chain := PromptChain{
+			ID:         fmt.Sprintf("prompt-tied-%02d", i),
+			Project:    fmt.Sprintf("promptbenchtied%02d", i),
+			Topic:      topic.word,
+			Question:   topic.question,
+			Paraphrase: topic.paraphrase,
+			Tied:       true,
+		}
+		t := base.Add(time.Duration(500+i*10) * time.Minute)
+		// The session that settled it, in the term's own words.
+		chain.Sessions = append(chain.Sessions, model.Session{
+			ID: chain.ID + "-answer", Harness: "claude", Project: chain.Project,
+			Updated: t.Add(20 * time.Minute),
+			Messages: []model.Message{
+				{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: t},
+				{Role: "assistant", Text: fillerText(rng, "wrote it down and moved on"), Time: t.Add(time.Minute)},
+			},
+		})
+		// The sentence that ties the two vocabularies, in a session of its own
+		// — it explains, it does not decide, so an arm that asks for the
+		// decision must not be satisfied by it.
+		// Said in three sessions, which is the evidence the co-occurrence map
+		// asks for by construction (cooccurMinPair, "a pattern, not a
+		// one-off"). One sentence teaches it nothing, and a store where a
+		// team's own vocabulary appears exactly once does not exist.
+		tie := topic.tie
+		for copyN := 1; copyN < cooccurTieCopies; copyN++ {
+			chain.Sessions = append(chain.Sessions, model.Session{
+				ID:      fmt.Sprintf("prompt-tievocab-%02d-%d", i, copyN),
+				Harness: "claude", Project: chain.Project,
+				Updated: t.Add(time.Duration(10+copyN) * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: tie, Time: t.Add(time.Duration(5+copyN) * time.Minute)},
+					{Role: "assistant", Text: fillerText(rng, "same thing, different words"), Time: t.Add(time.Duration(6+copyN) * time.Minute)},
+				},
+			})
+		}
+		chain.Sessions = append(chain.Sessions, model.Session{
+			// Deliberately outside the chain's id prefix: the probe counts a
+			// hit only for the chain's own sessions, and a tie that explains
+			// the words while settling nothing must not be able to pass the
+			// arm on its own. It is there to be learned from, not returned.
+			ID: fmt.Sprintf("prompt-tievocab-%02d", i), Harness: "claude", Project: chain.Project,
+			Updated: t.Add(10 * time.Minute),
+			Messages: []model.Message{
+				{Role: "user", Text: tie, Time: t.Add(5 * time.Minute)},
+				{Role: "assistant", Text: fillerText(rng, "noted, that is the same thing"), Time: t.Add(6 * time.Minute)},
+			},
+		})
+		out = append(out, chain)
+	}
+	return out
+}
+
 // promptShapeChain builds one chain with a given session length and start
 // time, so a gate can be measured instead of argued about.
 func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, start time.Time, turns int) PromptChain {
 	chain := PromptChain{
-		ID:       fmt.Sprintf("prompt-chain-%02d", i),
-		Project:  fmt.Sprintf("promptbench%02d", i),
-		Topic:    topic.word,
-		Question: topic.question,
-		Kind:     kind,
+		ID:         fmt.Sprintf("prompt-chain-%02d", i),
+		Project:    fmt.Sprintf("promptbench%02d", i),
+		Topic:      topic.word,
+		Question:   topic.question,
+		Paraphrase: topic.paraphrase,
+		Kind:       kind,
 	}
 	msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: start}}
 	for k := 0; k < turns; k++ {
@@ -228,13 +349,14 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// session was touched, and a corpus dated in the future reads as newer
 	// than now and is withheld wholesale.
 	base := time.Date(2024, time.May, 1, 0, 0, 0, 0, time.UTC)
-	chains := make([]PromptChain, 0, len(topics)+PromptNegativeCount)
+	chains := make([]PromptChain, 0, len(topics)+PromptNegativeCount+PromptTiedCount)
 	for i, topic := range topics {
 		chain := PromptChain{
-			ID:       fmt.Sprintf("prompt-chain-%02d", i),
-			Project:  fmt.Sprintf("promptbench%02d", i),
-			Topic:    topic.word,
-			Question: topic.question,
+			ID:         fmt.Sprintf("prompt-chain-%02d", i),
+			Project:    fmt.Sprintf("promptbench%02d", i),
+			Topic:      topic.word,
+			Question:   topic.question,
+			Paraphrase: topic.paraphrase,
 		}
 		for j := 0; j < ContextPriorCount; j++ {
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
@@ -257,9 +379,11 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// one worked on minutes ago.
 	chains = append(chains, promptShapeChain(rng, len(topics), "marathon", promptTopic{
 		"backpressure", "the queue got backpressure so producers block instead of dropping", "what did we do about queue backpressure?",
+		"how did we stop the queue from throwing messages away",
 	}, base, 400))
 	chains = append(chains, promptShapeChain(rng, len(topics)+1, "fresh", promptTopic{
 		"idempotency", "the import path became idempotent by keying on the source hash", "how did we make the import idempotent?",
+		"what stops a repeated import from writing the same rows twice",
 	}, time.Now().Add(-2*time.Minute).UTC(), 3))
 	// The bucket case. An agent started from a parent directory — a home
 	// directory, a workspace root — gets a project scope that holds everything
@@ -275,9 +399,9 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// about nothing, but a neighbour carrying two of the same common words,
 	// which is enough to clear a bar meant for rare ones.
 	for i, junk := range []promptTopic{
-		{"tarpit", "the crawler tarpit was left in place deliberately", ""},
-		{"statement", "the statement cache is disabled on the read mirror after those failures", ""},
-		{"quotas", "the per-tenant quota was moved into the gateway", ""},
+		{"tarpit", "the crawler tarpit was left in place deliberately", "", ""},
+		{"statement", "the statement cache is disabled on the read mirror after those failures", "", ""},
+		{"quotas", "the per-tenant quota was moved into the gateway", "", ""},
 	} {
 		id := fmt.Sprintf("prompt-bucket-%02d", i)
 		t := base.Add(time.Duration(900+i*10) * time.Minute)
@@ -347,7 +471,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		})
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "russian",
-			Topic: ru.word, Question: ru.question, Fact: ru.fact,
+			Topic: ru.word, Question: ru.question, Fact: ru.fact, Paraphrase: ru.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(200 * time.Minute), Messages: msgs,
@@ -359,8 +483,8 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// they are, and is blind to which of the two settled anything — so the one
 	// that merely talked about it can win on saying it more often.
 	for i, c := range []promptTopic{
-		{"nightjar", "nightjar batches are flushed every 30 seconds", "what did we decide about nightjar"},
-		{"lodestone", "lodestone runs on the read replica now", "what did we decide about lodestone"},
+		{"nightjar", "nightjar batches are flushed every 30 seconds", "what did we decide about nightjar", ""},
+		{"lodestone", "lodestone runs on the read replica now", "what did we decide about lodestone", ""},
 	} {
 		id := fmt.Sprintf("prompt-concluded-%02d", i)
 		project := fmt.Sprintf("promptbenchconcluded%02d", i)
@@ -383,7 +507,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		answer := t.Add(-200 * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "concluded",
-			Topic: c.word, Question: c.question, Fact: c.fact,
+			Topic: c.word, Question: c.question, Fact: c.fact, Paraphrase: c.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: answer, Updated: answer,
@@ -398,8 +522,8 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// so the English markers — the older half of the list — had nothing
 	// guarding them.
 	for i, d := range []promptTopic{
-		{"kingfisher", "kingfisher retries are capped at four", "what did we decide about kingfisher"},
-		{"saltmarsh", "saltmarsh writes go to the replica", "what did we decide about saltmarsh"},
+		{"kingfisher", "kingfisher retries are capped at four", "what did we decide about kingfisher", ""},
+		{"saltmarsh", "saltmarsh writes go to the replica", "what did we decide about saltmarsh", ""},
 	} {
 		id := fmt.Sprintf("prompt-decen-%02d", i)
 		project := fmt.Sprintf("promptbenchdecen%02d", i)
@@ -417,7 +541,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 		})
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "decision-en",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute), Messages: msgs,
@@ -432,15 +556,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// one working word. Correct here means the session that concluded about the
 	// short subject is found.
 	for i, d := range []promptTopic{
-		{"v3", "v3 of the exporter halved the scrape time", "ну что там v3 показал"},
-		{"pr", "the pr went in after the flake was fixed", "как там pr, смержился?"},
+		{"v3", "v3 of the exporter halved the scrape time", "ну что там v3 показал", ""},
+		{"pr", "the pr went in after the flake was fixed", "как там pr, смержился?", ""},
 	} {
 		id := fmt.Sprintf("prompt-short-%02d", i)
 		project := fmt.Sprintf("promptbenchshort%02d", i)
 		t := base.Add(time.Duration(3100+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "short-subject",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -457,15 +581,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// injected blocks opened on a near-copy of the message the agent was
 	// reading at that moment.
 	for i, d := range []promptTopic{
-		{"cormorant", "the fix: cormorant retries are capped at four", "start the cormorant retry now"},
-		{"kittiwake", "the fix: kittiwake writes go to the replica", "start the kittiwake write now"},
+		{"cormorant", "the fix: cormorant retries are capped at four", "start the cormorant retry now", ""},
+		{"kittiwake", "the fix: kittiwake writes go to the replica", "start the kittiwake write now", ""},
 	} {
 		id := fmt.Sprintf("prompt-echo-%02d", i)
 		project := fmt.Sprintf("promptbenchecho%02d", i)
 		t := base.Add(time.Duration(3300+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "echo-line",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -482,15 +606,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// question was left holding a verb. Measured on a real store, compound
 	// subjects come back on topic 68% of the time against 100% for plain ones.
 	for i, d := range []promptTopic{
-		{"стоп-лист", "в итоге решили: стоп-лист держим в редисе", "что мы решали про стоп-лист"},
-		{"прод-бд", "в итоге решили: прод-бд читаем только с реплики", "что мы решали про прод-бд"},
+		{"стоп-лист", "в итоге решили: стоп-лист держим в редисе", "что мы решали про стоп-лист", ""},
+		{"прод-бд", "в итоге решили: прод-бд читаем только с реплики", "что мы решали про прод-бд", ""},
 	} {
 		id := fmt.Sprintf("prompt-compound-%02d", i)
 		project := fmt.Sprintf("promptbenchcompound%02d", i)
 		t := base.Add(time.Duration(3500+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "compound-subject",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -503,15 +627,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	}
 	// Two chains for the end-to-end arm, which runs the hook itself.
 	for i, d := range []promptTopic{
-		{"ptarmigan", "the fix: ptarmigan retries are capped at four", "what did we decide about ptarmigan"},
-		{"godwit", "в итоге решили: godwit пишет только в реплику", "что мы решали про godwit"},
+		{"ptarmigan", "the fix: ptarmigan retries are capped at four", "what did we decide about ptarmigan", ""},
+		{"godwit", "в итоге решили: godwit пишет только в реплику", "что мы решали про godwit", ""},
 	} {
 		id := fmt.Sprintf("prompt-e2e-%02d", i)
 		project := fmt.Sprintf("promptbenche2e%02d", i)
 		t := base.Add(time.Duration(3700+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "hook-e2e",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -526,14 +650,14 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// recall a session to itself, and with two cases the end-to-end arm could
 	// not see that rule at all.
 	for i, d := range []promptTopic{
-		{"whimbrel", "the fix: whimbrel retries are capped at four", "what did we decide about whimbrel"},
+		{"whimbrel", "the fix: whimbrel retries are capped at four", "what did we decide about whimbrel", ""},
 	} {
 		id := fmt.Sprintf("prompt-e2eself-%02d", i)
 		project := fmt.Sprintf("promptbenche2eself%02d", i)
 		t := base.Add(time.Duration(3900+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "hook-e2e-self",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -553,14 +677,14 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	for i, d := range []promptTopic{
 		{"v41", "[2026-08-16T20:43:05+0300] [MainThread] [W] [toil.leader] Job 'WDLStartJob' " +
 			"kind-WDLStartJob/instance-z1bqhro3 v41 is completely failed",
-			"ну что там v41 показал"},
+			"ну что там v41 показал", ""},
 	} {
 		id := fmt.Sprintf("prompt-toolonly-%02d", i)
 		project := fmt.Sprintf("promptbenchtoolonly%02d", i)
 		t := base.Add(time.Duration(4300+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "tool-only",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -583,14 +707,15 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// the same session held.
 	for i, d := range []promptTopic{
 		{"dunlin", "the fix: dunlin retries are capped at four",
-			"what did we decide about dunlin"},
+			"what did we decide about dunlin",
+			"how many times do we retry that job before giving up"},
 	} {
 		id := fmt.Sprintf("prompt-decinline-%02d", i)
 		project := fmt.Sprintf("promptbenchdecinline%02d", i)
 		t := base.Add(time.Duration(4700+i*10) * time.Minute)
 		chains = append(chains, PromptChain{
 			ID: id, Project: project, Kind: "decision-inline",
-			Topic: d.word, Question: d.question, Fact: d.fact,
+			Topic: d.word, Question: d.question, Fact: d.fact, Paraphrase: d.paraphrase,
 			Sessions: []model.Session{{
 				ID: id + "-session", Harness: "claude", Project: project,
 				Started: t, Updated: t.Add(10 * time.Minute),
@@ -612,8 +737,8 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// digest weighs every query word alike while the ranking knows which one
 	// identified the match.
 	for i, d := range []promptTopic{
-		{"quicksilver", "quicksilver retries are capped at four", "what did we decide about quicksilver"},
-		{"harbourmaster", "harbourmaster writes its log to stderr", "what did we decide about harbourmaster"},
+		{"quicksilver", "quicksilver retries are capped at four", "what did we decide about quicksilver", ""},
+		{"harbourmaster", "harbourmaster writes its log to stderr", "what did we decide about harbourmaster", ""},
 	} {
 		id := fmt.Sprintf("prompt-decoy-%02d", i)
 		project := fmt.Sprintf("promptbenchdecoy%02d", i)
@@ -644,9 +769,9 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// compete, so an earlier fixture proved nothing. This one repeats each
 	// topic the way a long night of work really does.
 	hay := []promptTopic{
-		{"kestrel", "the kestrel timeout was raised to ninety seconds", "why is the kestrel timeout ninety seconds?"},
-		{"escrow", "escrow release waits on the second signature", "what does escrow release wait for?"},
-		{"parquet", "parquet writes are batched per hour, not per row", "how often do we write parquet?"},
+		{"kestrel", "the kestrel timeout was raised to ninety seconds", "why is the kestrel timeout ninety seconds?", ""},
+		{"escrow", "escrow release waits on the second signature", "what does escrow release wait for?", ""},
+		{"parquet", "parquet writes are batched per hour, not per row", "how often do we write parquet?", ""},
 	}
 	var noise []model.Message
 	for k := 0; k < 200; k++ {
@@ -747,5 +872,6 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	chains = append(chains, tiedChains(rng, base)...)
 	return PromptCorpus{Chains: chains, Hash: promptCorpusHash(chains)}
 }

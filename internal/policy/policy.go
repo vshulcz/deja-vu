@@ -32,6 +32,12 @@ const (
 // displayed and never matched (#955). Most specific wins.
 type Policy struct {
 	Activations map[string]map[string]bool `json:"activations,omitempty"`
+	// Ignore lists the directories deja does not recall from: an agent
+	// runtime's scratch tree, a CI checkout, an evaluation harness. Without it
+	// the only way to keep such sessions out was `deja forget`, which removes
+	// what exists and says nothing about what the same directory writes
+	// tomorrow (#2050). Empty means the default in ignore.go.
+	Ignore []string `json:"ignore,omitempty"`
 }
 
 func Path() string {

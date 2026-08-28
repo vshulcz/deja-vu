@@ -1,0 +1,21 @@
+# Read by the HOL plugin scanner, which catalogues clone the whole repository to
+# run — so it reads a Go project, not the plugin bundle it came for.
+#
+# Every path below is a redaction test or its corpus. They hold fake API keys and
+# tokens on purpose: that is the input the redactor is tested against, and a
+# secret scanner cannot tell the difference. Nothing here is ignored for the
+# plugin bundles themselves (claude-plugin/, codex-plugin/, extensions/), which
+# stay in scope.
+
+[scanner]
+ignore_paths = [
+  "internal/redact/*_test.go",
+  "internal/index/*_test.go",
+  "cmd/deja/*_test.go",
+  # Drives a real agent against a throwaway config and prints the placeholder
+  # key it wired, so the run is reproducible.
+  "scripts/agent-smoke.sh",
+  # Asserts the npm release script refuses a bad version; the "dynamic
+  # execution" it trips on is node's own test runner spawning the script.
+  "scripts/release_npm_test.mjs",
+]

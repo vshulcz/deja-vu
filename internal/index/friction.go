@@ -56,6 +56,7 @@ func FrictionLine(l string) (string, bool) {
 func normalizeFriction(l string) string {
 	l = strings.TrimSpace(l)
 	l = strings.TrimSpace(trimLogPrefix(l))
+	l = trimTestDuration(l)
 	// The prefix is `<where>:<line>: `, where <where> is a shell name or an
 	// `(eval)`/`(anon)` marker. Only strip it when the middle field is a
 	// number — `Error: cannot find x: y` must keep its shape.
@@ -116,6 +117,11 @@ func trimTimestamp(l string) string {
 	return l
 }
 
+// dejaFixReport matches the header line `deja fix` prints: the error, then the
+// date of the session it came from. Nothing else writes that separator with a
+// bare date behind it.
+var dejaFixReport = regexp.MustCompile(` · \d{4}-\d{2}-\d{2}$`)
+
 var leadingTimestamp = regexp.MustCompile(`^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\]?\s+`)
 
 // isFriction keeps the error shapes that name something specific. The generic
@@ -131,6 +137,15 @@ func isFriction(l string) bool {
 	// environment block or `deja fix` (#1319).
 	if n := utf8.RuneCountInString(l); n < frictionLineMin || n > frictionLineMax {
 		return false
+	}
+	// A named test failure is the most specific thing a build prints: the test
+	// name is stable across runs and across machines, which is more than most
+	// error strings manage. It was rejected with the bare summary lines, and on
+	// this machine's store that is 2,318 of the 6,744 error lines an agent
+	// actually hit — the single most common failure it sees, and the one it
+	// most often solved before.
+	if namedTestFailure(l) {
+		return true
 	}
 	for _, generic := range []string{
 		"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL",
@@ -164,6 +179,15 @@ func isFriction(l string) bool {
 		if _, err := strconv.Atoi(strings.TrimSpace(l[:i])); err == nil {
 			return false
 		}
+	}
+	// `deja fix` prints the error it answers with the date beside it, and the
+	// command underneath. Both come back as tool output in the next session:
+	// the first is read as a fresh sighting of the error it is quoting, so
+	// asking deja about an error taught deja that the error happened again,
+	// and the command it printed became a candidate remedy for it. Found on a
+	// real store as the pair `command not found: python · 2026-05-18`.
+	if dejaFixReport.MatchString(l) || strings.HasPrefix(l, "ran next: ") {
+		return false
 	}
 	// The list was nine phrases about things not being found or permitted, and
 	// it matched 3 of 12 ordinary errors on measurement — missing runtime
@@ -385,4 +409,37 @@ func frictionTexts(dir string, m Manifest, metas []SessionMeta, want map[uint64]
 			return
 		}
 	}
+}
+
+// goTestFailure matches the line `go test` prints for a failing test, with the
+// subtest path Go writes for table cases. The name is the identity; anything
+// after it is this run's.
+var goTestFailure = regexp.MustCompile(`^--- (?:FAIL|SKIP): (\S+)`)
+
+// testDuration is the per-run time Go appends to that line. Two runs of the
+// same failing test differ only there, and left in, each run is its own piece
+// of friction and none of them ever reaches a second session.
+var testDuration = regexp.MustCompile(`\s+\(\d+(?:\.\d+)?s\)$`)
+
+func trimTestDuration(l string) string {
+	if !strings.HasPrefix(l, "--- ") {
+		return l
+	}
+	return strings.TrimSpace(testDuration.ReplaceAllString(l, ""))
+}
+
+// namedTestFailure reports whether the line is a test failure carrying a test
+// name, as opposed to the bare `FAIL` and `--- FAIL` summaries that name
+// nothing and are rejected with the other generic shapes.
+func namedTestFailure(l string) bool {
+	m := goTestFailure.FindStringSubmatch(l)
+	if m == nil {
+		return false
+	}
+	// Source that quotes the shape is not a failure — the same reason the
+	// quote and comment guards below exist.
+	if strings.ContainsAny(l, "\"$") {
+		return false
+	}
+	return len(m[1]) > 3
 }

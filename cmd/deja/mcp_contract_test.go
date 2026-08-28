@@ -314,3 +314,114 @@ func TestRecallReturnsTheDecisionNotOnlyTheQuestion(t *testing.T) {
 		t.Fatalf("recall dropped the question:\n%s", got)
 	}
 }
+
+// TestMCPPingAndResourceTemplates covers #1720: neither `ping` nor
+// `resources/templates/list` had a case in handleMCP, so both fell through
+// to -32601. A host that pings for keepalive reads that error as a stale
+// connection and drops the server, and we declare a resources capability,
+// so clients ask for its templates as a matter of course.
+func TestMCPPingAndResourceTemplates(t *testing.T) {
+	hermeticEnv(t)
+
+	resp := driveMCP(t,
+		`{"jsonrpc":"2.0","id":1,"method":"ping"}`,
+		`{"jsonrpc":"2.0","id":2,"method":"resources/templates/list","params":{}}`,
+	)
+	if len(resp) != 2 {
+		t.Fatalf("got %d responses, want 2: %#v", len(resp), resp)
+	}
+
+	for _, r := range resp {
+		if e, ok := r["error"]; ok {
+			t.Fatalf("response %v carried an error: %#v", r["id"], e)
+		}
+	}
+
+	ping, ok := resp[0]["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("ping result is not an object: %#v", resp[0])
+	}
+	if len(ping) != 0 {
+		t.Errorf("ping result = %#v, want an empty object", ping)
+	}
+
+	templates, ok := resp[1]["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("resources/templates/list result is not an object: %#v", resp[1])
+	}
+	list, ok := templates["resourceTemplates"].([]any)
+	if !ok {
+		t.Fatalf("result has no resourceTemplates array: %#v", templates)
+	}
+	if len(list) != 0 {
+		t.Errorf("resourceTemplates = %#v, want an empty array", list)
+	}
+}
+
+// TestMCPUndeclaredMethodStillErrors is the control for the case above: the
+// fix must add exactly the two spec methods, not turn the default branch
+// into a catch-all that answers anything.
+func TestMCPUndeclaredMethodStillErrors(t *testing.T) {
+	hermeticEnv(t)
+
+	resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}`)
+	if len(resp) != 1 {
+		t.Fatalf("got %d responses, want 1", len(resp))
+	}
+	e, ok := resp[0]["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("prompts/list did not error: %#v", resp[0])
+	}
+	if code, _ := e["code"].(float64); code != -32601 {
+		t.Errorf("prompts/list error code = %v, want -32601", e["code"])
+	}
+}
+
+// TestMCPResourceReadRefusesAnEmptySessionRef covers #1728: FindByPrefix
+// matches on strings.HasPrefix, and every id has "" as a prefix, so a URI
+// carrying no id at all returned a full session digest — a whole transcript
+// the agent never asked for, echoed back under the URI it did send.
+func TestMCPResourceReadRefusesAnEmptySessionRef(t *testing.T) {
+	tmp := hermeticEnv(t)
+	claude := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claude)
+	seedClaude(t, claude, "app", "sess-alpha", "the frobnicator crash in parser.go", "fixed the frobnicator")
+	seedClaude(t, claude, "app", "sess-beta", "another frobnicator regression today", "frobnicator again")
+
+	refused := []struct {
+		name string
+		uri  string
+	}{
+		{name: "no id at all", uri: "deja://session/"},
+		{name: "harness prefix only", uri: "deja://session/claude:"},
+	}
+	for _, tt := range refused {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"`+tt.uri+`"}}`)
+			e, ok := resp[0]["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("%s was served instead of refused: %#v", tt.uri, resp[0])
+			}
+			if code, _ := e["code"].(float64); code != -32602 {
+				t.Errorf("error code = %v, want -32602", e["code"])
+			}
+		})
+	}
+
+	// Control: a real URI from resources/list must still be served, so the
+	// guard cannot be satisfied by refusing everything.
+	t.Run("a full uri is still served", func(t *testing.T) {
+		list := driveMCP(t, `{"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}`)
+		resources := list[0]["result"].(map[string]any)["resources"].([]any)
+		uri := resources[0].(map[string]any)["uri"].(string)
+
+		read := driveMCP(t, `{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"`+uri+`"}}`)
+		if e, ok := read[0]["error"]; ok {
+			t.Fatalf("real uri %q was refused: %#v", uri, e)
+		}
+		contents := read[0]["result"].(map[string]any)["contents"].([]any)
+		if text := contents[0].(map[string]any)["text"].(string); !strings.Contains(text, "frobnicator") {
+			t.Fatalf("resource text wrong:\n%s", text)
+		}
+	})
+}

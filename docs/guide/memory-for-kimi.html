@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding memory to Kimi Code — deja-vu</title>
+<meta name="description" content="How to give Kimi Code recall over every coding agent's sessions on the machine — the plugin, the hook that fires on each prompt, and the CLI path.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Kimi Code">
+<meta property="og:description" content="How to give Kimi Code recall over every coding agent's sessions on the machine — the plugin, the hook that fires on each prompt, and the CLI path.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Kimi Code">
+<meta name="twitter:description" content="How to give Kimi Code recall over every coding agent's sessions on the machine — the plugin, the hook that fires on each prompt, and the CLI path.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to Kimi Code","description":"How to give Kimi Code recall over every coding agent's sessions on the machine — the plugin, the hook that fires on each prompt, and the CLI path.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Kimi Code","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I give Kimi Code memory of past sessions?","acceptedAnswer":{"@type":"Answer","text":"Install the plugin with /plugins install https://github.com/vshulcz/deja-vu, or run deja install kimi-auto. Both add MCP tools over a local index of every agent's transcripts and recall on every prompt."}},{"@type":"Question","name":"Where does Kimi Code keep its session history?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.kimi-code/sessions, as JSONL wire logs per agent — KIMI_CODE_HOME moves the whole tree."}},{"@type":"Question","name":"Does the Kimi plugin conflict with the deja CLI install?","acceptedAnswer":{"@type":"Answer","text":"No. Each half of the plugin stands down when it finds what deja install kimi already wired, so tools are not listed twice and recall is not injected twice."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html" aria-current="page">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Kimi Code</h1>
+<p class="pagelede">one /plugins install, and the sessions stop starting empty<span class="mins" data-mins></span></p>
+
+<p>Kimi Code starts each session empty, and the sessions it has kept are its own. The history that would answer today's question is usually spread across whatever else you were using in the months before.</p>
+
+<h2>What Kimi already has</h2>
+<p>Sessions are written under <code>~/.kimi-code/sessions</code> as JSONL wire logs, one per agent within a session (<code>KIMI_CODE_HOME</code> moves the tree). They are readable and complete; nothing reads them back for you.</p>
+
+<h2>Adding recall</h2>
+<pre>/plugins install https://github.com/vshulcz/deja-vu</pre>
+<p>Kimi installs the plugin from the repository — the manifest sits at the root, which is the only reason that file is there. It needs the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary, which is what indexes and searches:</p>
+<pre>brew install deja-vu
+# or
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+<p>With the CLI instead, <code>deja install kimi-auto</code> writes the MCP server into <code>mcp.json</code> and a <code>[[hooks]]</code> block into <code>config.toml</code>. Having both is fine: the plugin reads those two files and skips whatever the installer already covers.</p>
+
+<h2>What arrives</h2>
+<ul>
+<li>The MCP server, with the six tools deja serves everywhere.</li>
+<li>The <code>deja-history</code> skill, so the agent knows the CLI contract when the tools are not reachable.</li>
+<li><code>/deja:recall &lt;query&gt;</code> for asking directly.</li>
+<li>Recall on every prompt, through a <code>UserPromptSubmit</code> hook — Kimi appends a hook's stdout to the turn's context, which is the whole mechanism. It stays silent when the history has no answer.</li>
+</ul>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="repeated-mistakes.html">When the same wall comes back</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/kimi">The plugin source</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -124,6 +124,7 @@ func TestCompletionScripts(t *testing.T) {
 		{"bash", []string{"complete -F _deja_completion deja", "install_targets=", "compgen -f"}},
 		{"zsh", []string{"#compdef deja", "compdef _deja deja", "install_targets="}},
 		{"fish", []string{"complete -c deja", "__fish_seen_subcommand_from blame", "-F"}},
+		{"powershell", []string{"Register-ArgumentCompleter -Native -CommandName deja", "$installTargets =", "CompletionResult"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.shell, func(t *testing.T) {
@@ -136,17 +137,28 @@ func TestCompletionScripts(t *testing.T) {
 					t.Errorf("completion output missing %q", want)
 				}
 			}
-			for _, want := range []string{"blame", "stats", "sync", "harness", "claude-code", "fish"} {
+			for _, want := range []string{"blame", "stats", "sync", "harness", "claude-code", "fish", "powershell"} {
 				if !strings.Contains(out, want) {
 					t.Errorf("completion output missing %q", want)
 				}
 			}
 		})
 	}
-	for _, args := range [][]string{{"completion"}, {"completion", "powershell"}} {
+	for _, args := range [][]string{{"completion"}, {"completion", "nu"}} {
 		if _, err := captureRun(t, args...); err == nil {
 			t.Fatalf("run(%q) succeeded, want error", args)
 		}
+	}
+	powershell, err := captureRun(t, "completion", "powershell")
+	if err != nil {
+		t.Fatalf("run completion powershell: %v", err)
+	}
+	pwsh, err := captureRun(t, "completion", "pwsh")
+	if err != nil {
+		t.Fatalf("run completion pwsh: %v", err)
+	}
+	if powershell != pwsh {
+		t.Error("pwsh alias returned a different completion script")
 	}
 }
 
@@ -174,6 +186,30 @@ func TestCompletionScriptsParseWhenShellIsAvailable(t *testing.T) {
 				t.Fatalf("%s rejected completion script: %v\n%s", tc.shell, err, out)
 			}
 		})
+	}
+}
+
+func TestPowerShellCompletionScriptParsesWhenAvailable(t *testing.T) {
+	tested := false
+	for _, candidate := range []string{"pwsh", "powershell"} {
+		shell, err := exec.LookPath(candidate)
+		if err != nil {
+			continue
+		}
+		tested = true
+		t.Run(candidate, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "deja-completion.ps1")
+			if err := os.WriteFile(path, []byte(powershellCompletion), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command(shell, "-NoProfile", "-NonInteractive", "-File", path)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("PowerShell rejected completion script: %v\n%s", err, out)
+			}
+		})
+	}
+	if !tested {
+		t.Skip("PowerShell is not installed")
 	}
 }
 

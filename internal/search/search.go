@@ -224,7 +224,12 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			if o.Role != "" && !roleMatches(m.Role, o.Role) {
 				continue
 			}
-			low := strings.ToLower(m.Text)
+			// The transcript's own record of a call to deja is not something
+			// anyone said, and a question matches the log of that question
+			// being asked (#2067). Removed from matching only; the line stays
+			// in the transcript for `deja how` and `deja fix`.
+			text := withoutOwnCallLog(m.Text)
+			low := strings.ToLower(text)
 			c := 0
 			// windowText and windowToks are the pair proximity is measured on: the
 			// surface text and the query's own words, except where the match came from
@@ -235,9 +240,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			// the match came from.
 			scoreLow, scoreToks := low, qtoks
 			if re != nil {
-				c = countRegex(re, m.Text)
+				c = countRegex(re, text)
 			} else {
-				c = countIn(m.Text, low, qtoks, phrases, o.FuzzyVariants)
+				c = countIn(text, low, qtoks, phrases, o.FuzzyVariants)
 				// Postings are keyed on Traditional-folded CJK, so a query in
 				// one script legitimately reaches a record in the other. This
 				// counting pass works on surface text and would score that
@@ -245,7 +250,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				// already found — retry with both sides folded.
 				if c == 0 && queryCJK {
 					foldedLow := cjkfold.String(low)
-					c = countIn(cjkfold.String(m.Text), foldedLow, qtoksFolded,
+					c = countIn(cjkfold.String(text), foldedLow, qtoksFolded,
 						phrasesFolded, o.FuzzyVariants)
 					if c > 0 {
 						windowText, windowToks = foldedLow, qtoksFolded
@@ -273,11 +278,15 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				// first three showed wherever a word happened to appear early
 				// rather than the passage that carries the answer.
 				w := tokenWindow(windowText, windowToks)
-				snipCands = append(snipCands, snipCand{text: m.Text, weight: c, window: w})
+				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w})
 				if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
 					doc.minWindow = w
 				}
 			}
+			// Counted over the pair the match was found on: a cross-script hit
+			// is counted above through the fold and, scored against the surface
+			// text where the query's words appear nowhere, would take a term
+			// frequency of zero and rank below a record that matched once.
 			doc.length += countDocumentWords(scoreLow, scoreToks, o.FuzzyVariants, doc.termCount, doc.userCount, m.Role == "user")
 			// The token, not the raw query — the same rule as countIn. This
 			// path is what scores `retry` inside `retry-backoff`, which
@@ -1267,7 +1276,14 @@ func variantDetail(text string, terms []string, variants map[string][]string) st
 	return ""
 }
 
+// FindByPrefix is the fallback the CLI takes when there is no index to read, so
+// it has to answer an empty prefix the same way index.FindByPrefix does: with
+// no match. Otherwise the guard depends on whether a rebuild happens to be
+// running, which is the worst kind of intermittent.
 func FindByPrefix(ss []model.Session, p string) (model.Session, bool) {
+	if p == "" {
+		return model.Session{}, false
+	}
 	for _, s := range mergeSessions(ss) {
 		if strings.HasPrefix(s.ID, p) {
 			return s, true
@@ -2147,7 +2163,11 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 		}
 		best := make([]msgScore, 0, 8)
 		for mi, m := range s.Messages {
-			low := strings.ToLower(m.Text)
+			// The same rule the scoring loop applies: a transcript's record of
+			// a call to deja is not something anyone said, and this tier is
+			// where the live miss came through — the scoring loop was fixed
+			// first and the hit arrived here instead (#2067).
+			low := strings.ToLower(withoutOwnCallLog(m.Text))
 			var foldedLow string
 			distinct := 0
 			weighted := 0.0

@@ -103,8 +103,12 @@ func guidancePath(harness string) string {
 		// system prompt, so the agent would never find it on its own.
 		return filepath.Join(sources.HermesHome(), "skills", "deja-history", "SKILL.md")
 	case "grok":
-		// grok reads <cwd>/.grok/GROK.md first and only falls back to the
-		// home copy, so this never shadows a project's own instructions.
+		// This file is for @vibe-kit/grok-cli, which reads <cwd>/.grok/GROK.md
+		// first and only falls back to the home copy, so it never shadows a
+		// project's own instructions. Grok Build ignores it — its home rules are
+		// Agents.md, AGENTS.md, Claude.md and CLAUDE.md, and `grok inspect` on
+		// 1.0.5 lists those and not this. What reaches Grok Build is the shared
+		// skill written alongside it, which the same command lists.
 		return filepath.Join(sources.GrokHome(), "GROK.md")
 	case "opencode":
 		// opencode reads skills from its config directory, which is the cheaper

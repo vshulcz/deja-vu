@@ -45,6 +45,12 @@ archives:
       # writes the skill too; shipping it here means it can be read, or copied
       # by hand on a machine where deja cannot write ~/.agents (#1320).
       - skills/deja-search/SKILL.md
+      # `gemini extensions install <repo-url>` resolves to the release asset for
+      # the platform, unpacks it and reads the manifest from the top of the
+      # archive — so leaving these two behind fails the install outright:
+      # "Configuration file not found at .../gemini-extension.json".
+      - gemini-extension.json
+      - GEMINI.md
 
 checksum:
   name_template: checksums.txt
@@ -116,7 +122,7 @@ release:
     ```sh
     curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
     go install github.com/vshulcz/deja-vu/cmd/deja@{{ .Tag }}
-    brew install vshulcz/tap/deja-vu
+    brew install deja-vu
     ```
 
 # The tap repository (github.com/vshulcz/homebrew-tap) must exist before tagged releases run.

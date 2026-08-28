@@ -148,9 +148,7 @@ func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, 
 // session-start hook, the commonest injection there is, was recording nothing
 // while holding the id (#1949).
 func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
-	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
-	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, nil, at)
+	RecordDigestPolicySessions(indexDir, kind, digest, into, sessions, raw, policyName, nil)
 }
 
 // RecordServedSnapshot writes the counting event and the digest snapshot for
@@ -169,6 +167,23 @@ func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, id
 	at := time.Now().UTC()
 	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, "", at)
 	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, projects, at)
+}
+
+// RecordDigestPolicySessions is RecordDigestPolicyInto plus the ids of the
+// sessions the digest carried.
+//
+// Without them the session-start hook was the one surface whose repetition
+// could not be measured: `deja log` showed 606 of its injections over six weeks
+// and not one of the sessions inside them, while the per-prompt path — which
+// does record ids — turned out to be re-serving 74 sessions at a 92% repeat
+// rate (#2038). A number nobody can compute is a number nobody fixes.
+func RecordDigestPolicySessions(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids []string) {
+	// One instant for one act: the two writers used to take their own, which
+	// left `deja log` and `deja log --last` disagreeing about when an
+	// injection happened (#2294).
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, nil, at)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for

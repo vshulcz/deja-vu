@@ -89,7 +89,8 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// Every id has the empty string as a prefix, so a URI carrying no id at all
 	// matched the first session and handed back a transcript nobody asked for —
 	// with the requested URI echoed back, so nothing said which one it was
-	// (#1728). resources/list only ever emits a full URI.
+	// (#1728). `deja://session/` and `deja://session/claude:` both land here,
+	// and resources/list only ever emits a full URI.
 	if strings.TrimSpace(id) == "" {
 		return nil, -32602, "resource uri carries no session id"
 	}

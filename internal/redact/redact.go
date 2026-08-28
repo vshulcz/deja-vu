@@ -37,6 +37,16 @@ var (
 	// secret sat in the clear because every pattern here was English-only. The
 	// value class and length floor are the same, so the looseness is unchanged.
 	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	// An environment variable holding a credential does not have to say "api" or
+	// "token" in its name: DEJA_EMBED_KEY, GROQ_KEY, VOYAGE_KEY all end in plain
+	// _KEY, which genericKVRE never matched, so an opaque value — one with no
+	// provider prefix and not enough entropy for the last-resort pass — was
+	// indexed in the clear. Measured on `export DEJA_EMBED_KEY=9f2b…f83`.
+	//
+	// Case-sensitive on purpose: this is the shell shape, and matching `_key`
+	// as well would take `cache_key: <16 chars>` out of every YAML file people
+	// paste, which costs recall for no secret.
+	envKeyRE = regexp.MustCompile(`\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_KEY)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
 	// The same shape in the languages people actually type in. \b is ASCII-only
 	// in RE2, so a Cyrillic or CJK key word can never sit behind it — these get
 	// their own pattern. A Russian speaker writing "пароль: …" had the secret
@@ -201,6 +211,9 @@ func Text(s string) (string, Counts) {
 	}
 	if kvAssignmentNearby(lower) {
 		s = replaceSubmatch(s, genericKVRE, "credential", counts, func(m []string) string {
+			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+		})
+		s = replaceSubmatch(s, envKeyRE, "credential", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
 		s = replaceSubmatch(s, genericKVIntlRE, "credential", counts, func(m []string) string {

@@ -1,0 +1,13 @@
+{
+  "name": "deja",
+  "version": "0.2.0",
+  "description": "Recall the sessions your other coding agents already wrote — Claude Code, Codex, Cursor, opencode and sixteen more, including work from before deja was installed.",
+  "keywords": ["memory", "recall", "sessions", "search", "history"],
+  "author": {
+    "name": "vshulcz",
+    "url": "https://github.com/vshulcz"
+  },
+  "homepage": "https://github.com/vshulcz/deja-vu",
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT"
+}

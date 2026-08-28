@@ -8,9 +8,10 @@ same local index.
 | Directory | Published as | Installed with |
 |---|---|---|
 | [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin opencode-deja` |
-| [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin add dsh-deja` |
+| [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
 
 Two more integrations live outside this directory because their registries read
 a fixed path in this repository: `claude-plugin/` (Claude Code marketplace) and
@@ -37,6 +38,12 @@ cd extensions/opencode && npm publish --access public
 cd extensions/dsh      && npm publish --access public
 ```
 
+The Grok plugin is published by a catalog entry, not by us: the entry in
+`xai-org/plugin-marketplace` pins a full commit SHA of this repository and a
+`path` of `extensions/grok`, and Grok re-verifies the SHA after cloning. A new
+version of the plugin means a pull request there that moves the pin — nothing
+ships until it does.
+
 The Zed extension is not published by us: `zed-industries/extensions` pins this
 repository as a submodule and builds `extensions/zed`. A new version means
 bumping `version` in `extensions/zed/extension.toml` and opening a PR there that
@@ -52,6 +59,38 @@ marketplace entry. `TestKimiManifestsAgree` keeps the two manifests one plugin.
 Kimi notifies about updates only for plugins installed from its own
 marketplace, so `deja doctor` reports the installed plugin version against the
 one this deja ships.
+
+Gemini installs this repository itself: `gemini extensions install
+https://github.com/vshulcz/deja-vu` reads `gemini-extension.json` at the
+repository root — the only reason that file is not under `extensions/` — and the
+gallery at geminicli.com crawls repositories tagged `gemini-cli-extension` for
+the same file. It carries the MCP server and `GEMINI.md`; the hooks stay with
+`deja install gemini`, because they only run when `hooksConfig.enabled` is set
+in the user's `settings.json` and an extension cannot write that.
+
+Its `name` is `deja`, the same name the installer's extension uses, and
+`TestGeminiExtensionSharesTheInstallerName` keeps it that way: Gemini keys an
+extension by that name and refuses a second install under a name it already
+has, which is what makes two deja extensions on one machine impossible.
+
+`plugin.json` and `mcp.json` at the repository root are the [Agent
+Plugins](https://open-plugins.com) manifests — a vendor-neutral format for the
+parts that are the same everywhere, a manifest plus `skills/` plus MCP servers.
+They cost nothing to carry because `skills/deja-search/` was already where the
+standard puts skills, and they are what cursor.directory auto-detects from a
+repository URL. Both documents are closed schemas: an unknown top-level field is
+a violation, so `TestAgentPluginManifestIsPortable` and its two neighbours pin
+the fields, the name grammar and the one-token stdio command.
+
+Qwen Code takes the same file. `qwen extensions install <repo>` reads
+`gemini-extension.json` and installs the MCP server, `GEMINI.md` and the
+`deja-search` skill under `~/.qwen/extensions/deja` — checked on Qwen Code
+0.20.0 — and `qwen mcp list` then shows one `deja` server rather than two,
+because MCP servers are keyed by name and `deja install qwen` writes the same
+one into `settings.json`. Qwen also reads Claude-format marketplaces, so
+`qwen extensions sources add <repo>` finds `.claude-plugin/marketplace.json`
+here and lists the plugin. Nothing extra ships for any of that; it is the same
+two files the Gemini install uses.
 
 ## Rules that cost us time once
 

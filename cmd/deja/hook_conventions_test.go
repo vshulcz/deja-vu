@@ -90,7 +90,7 @@ func TestSessionStartSurfacesADecisionTheDigestDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	text, _, _, _, _ := hookDigestResult(dir)
+	text, _, _, _, _, _ := hookDigestResult(dir)
 	if !strings.Contains(text, "standing decisions in this project") {
 		t.Fatalf("no standing-decisions block was injected:\n%s", text)
 	}
@@ -126,7 +126,7 @@ func TestStandingDecisionsRespectTheTrustPolicy(t *testing.T) {
 	// Deny local memory for auto-activation.
 	writePolicyFile(t, `{"activations":{"auto":{"local":false}}}`)
 
-	text, _, _, _, _ := hookDigestResult(dir)
+	text, _, _, _, _, _ := hookDigestResult(dir)
 	if strings.Contains(text, "pgxpolicymarker") {
 		t.Fatalf("a policy-denied project's decision was injected into the hook:\n%s", text)
 	}

@@ -345,7 +345,7 @@ func refreshGooseHints() error {
 // project the call is about; "" leaves the chain to answer, which is what the
 // wrapper and the installer want (#2187).
 func refreshGooseHintsFor(cwd string) error {
-	digest, sessions, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
+	digest, sessions, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
 	body := digest
 	if sessions > 0 {
 		body = frameRecall(startLead(gooseLead) + digest)

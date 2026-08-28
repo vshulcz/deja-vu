@@ -163,13 +163,13 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 		return map[string]any{"tools": []map[string]any{
 			{
 				"name":        "recall",
-				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with the most specific token available: an exact error string, function name, file path, or flag (multiple words are ANDed). Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. A bracketed marker on a result is the user's own later judgement on that session; act on what it says. Follow up with recall_context when one session looks right and you need its full story. When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
+				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with an exact error string, function name, file path or flag when you have one — that is the strongest key there is. Otherwise ask in your own words, as a phrase or a question: the search falls back to ranking when nothing matches exactly, and a sentence is not rejected. Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. A bracketed marker on a result is the user's own later judgement on that session; act on what it says. Follow up with recall_context when one session looks right and you need its full story. When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
 				"annotations": map[string]any{"title": "Search past sessions", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms; specific tokens (error strings, function names, flags) match best. Multiple words are ANDed."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}, "offset": map[string]any{"type": "number", "description": "Skip this many ranked matches — page through results without re-ranking."}}, "required": []string{"query"}},
+				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "An exact token — error string, function name, flag — matches strongest. Failing that, the question in your own words; several words are tried together first and then ranked, so a phrase still finds things."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}, "offset": map[string]any{"type": "number", "description": "Skip this many ranked matches — page through results without re-ranking."}}, "required": []string{"query"}},
 			},
 			{
 				"name":        "recall_context",
-				"description": "Return a full markdown digest (~8KB) of the single best-matching prior session — problem, decisions, outcome — when a bare recall hit is not enough and you need the reasoning behind it. Use after recall, or directly when the user asks 'remind me how we handled X' or 'what was the whole story with Y'. Query terms are matched against transcript text, so use tokens likely to appear verbatim: an error string, function name, or flag. Not for browsing many sessions — use recall for that; this returns one deep digest. When it genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
+				"description": "Return a full markdown digest (~8KB) of the single best-matching prior session — problem, decisions, outcome — when a bare recall hit is not enough and you need the reasoning behind it. Use after recall, or directly when the user asks 'remind me how we handled X' or 'what was the whole story with Y'. Query terms are matched against transcript text, so a token likely to appear verbatim — an error string, function name, or flag — finds it fastest; the question in your own words works too. Not for browsing many sessions — use recall for that; this returns one deep digest. When it genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
 				"annotations": map[string]any{"title": "Digest one past session", "readOnlyHint": true, "openWorldHint": false},
 				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
 			},
@@ -199,14 +199,16 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 			},
 		}}, 0, ""
 	case "ping":
-		// Part of the protocol at the version above, and a keepalive: a host
-		// that gets an error here is entitled to decide the server is gone.
-		// The result is empty by definition.
+		// Part of the spec at the version we claim, and both sides must
+		// answer it with an empty result. A host that pings for keepalive
+		// is entitled to read an error as a stale connection and drop the
+		// server, so this cannot fall through to -32601.
 		return map[string]any{}, 0, ""
 	case "resources/templates/list":
-		// We declare a resources capability, so clients ask what templates it
-		// has. deja publishes fixed session URIs rather than templates, so the
-		// honest answer is an empty list in the protocol's own shape.
+		// We declare a resources capability, so clients ask for its
+		// templates. deja exposes concrete session resources and no URI
+		// templates, and the empty list is the shape that says so —
+		// an error here reads as a broken capability.
 		return map[string]any{"resourceTemplates": []map[string]any{}}, 0, ""
 	case "resources/list":
 		return mcpResourcesList(dir)
@@ -981,7 +983,13 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	} else if result.Tier == search.TierError {
 		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
 	} else if result.Tier == search.TierRelevance {
-		fmt.Fprintln(&b, "No exact match; sessions ranked by relevance to the whole query.")
+		// Not "ranked by relevance", which reads as "here is what I found
+		// about it". Nothing matched: these are the nearest sessions by
+		// wording, and an agent handed them under the old line answered
+		// questions about subjects this machine has never held — eight of
+		// eight came back with sessions rather than nothing, and the tool
+		// description promises an empty result means no record (#2074).
+		fmt.Fprintln(&b, "No session is about this. Nothing matched the query, so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 	}
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")

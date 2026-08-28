@@ -47,5 +47,16 @@ session asked for it is not written down, and deja does not guess.
 - `generated_title` takes precedence over `session_summary`.
 - Missing summary files fall back to directory IDs and the `.cwd` or URL-decoded path.
 - Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.
+- `deja resume` prints `grok --resume <id>` and runs it in the recovered
+  working directory, since Grok Build scopes its session list by directory.
+  Rows that came out of `grok.db` belong to the other product and get an error
+  instead.
 
-**Last verified:** 2026-07-27
+- Grok Build reads deja's wiring three ways at once: `[mcp_servers.deja]` in
+  `config.toml`, `~/.grok/hooks/deja.json` in Claude Code's hook shape, and the
+  shared skill in `~/.agents/skills`. It also scans `~/.claude.json` and
+  `~/.cursor/mcp.json`, so a machine wired for those has deja in Grok already.
+  `~/.grok/GROK.md` is the exception: that file is for the other product, and
+  Grok Build's home rules are `Agents.md`, `AGENTS.md`, `Claude.md`, `CLAUDE.md`.
+
+**Last verified:** 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)

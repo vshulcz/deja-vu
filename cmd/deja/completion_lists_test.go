@@ -7,6 +7,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+var completionTestShells = []string{"bash", "zsh", "fish", "powershell"}
+
 func emittedCompletion(t *testing.T, shell string) string {
 	t.Helper()
 	out, err := captureRun(t, "completion", shell)
@@ -29,7 +31,7 @@ func TestCompletionOffersEveryHarness(t *testing.T) {
 	// every harness name also appears among the install targets, so looking for
 	// them one at a time passes on a completion that offers none of them.
 	want := strings.Join(names, " ")
-	for _, shell := range []string{"bash", "zsh", "fish"} {
+	for _, shell := range completionTestShells {
 		if script := emittedCompletion(t, shell); !strings.Contains(script, want) {
 			t.Errorf("%s completion does not offer the registry's harnesses", shell)
 		}
@@ -44,7 +46,7 @@ func TestCompletionOffersEveryHandoffTarget(t *testing.T) {
 		t.Fatalf("handoffTargets returned %d, so this test proves nothing", len(targets))
 	}
 	want := strings.Join(targets, " ")
-	for _, shell := range []string{"bash", "zsh", "fish"} {
+	for _, shell := range completionTestShells {
 		if script := emittedCompletion(t, shell); !strings.Contains(script, want) {
 			t.Errorf("%s completion does not offer every handoff target", shell)
 		}
@@ -54,10 +56,9 @@ func TestCompletionOffersEveryHandoffTarget(t *testing.T) {
 // And nothing is left holding a placeholder: a substitution that stops matching
 // would otherwise ship the marker to the reader's shell.
 func TestCompletionSubstitutesEveryPlaceholder(t *testing.T) {
-	for _, shell := range []string{"bash", "zsh", "fish"} {
-		if script := emittedCompletion(t, shell); strings.Contains(script, "%") &&
-			strings.Contains(script, "%HARNESSES%") || strings.Contains(script, "%HANDOFF_TARGETS%") ||
-			strings.Contains(script, "%INSTALL_TARGETS%") {
+	for _, shell := range completionTestShells {
+		if script := emittedCompletion(t, shell); strings.Contains(script, "%HARNESSES%") ||
+			strings.Contains(script, "%HANDOFF_TARGETS%") || strings.Contains(script, "%INSTALL_TARGETS%") {
 			t.Errorf("%s completion still carries a placeholder", shell)
 		}
 	}

@@ -630,10 +630,16 @@ func runAnswerCarry(questions []lmeQuestion, limit int) {
 // about the subject. Without these the benchmark measured a path no user gets:
 // it assumed every question produces a block, while the hook stays silent on
 // 86 of these 500.
-func passHookGates(ranked []model.Session, matched, _ []int, terms []string) []model.Session {
+func passHookGates(ranked []model.Session, matched, strong []int, terms []string) []model.Session {
 	kept := ranked[:0]
 	for i, s := range ranked {
-		if i < len(matched) && !search.RecallWorthShowing(terms, matched[i]) {
+		// strong was taken and discarded here too — the third instrument
+		// scoring half the bar (#2070).
+		st := -1
+		if i < len(strong) {
+			st = strong[i]
+		}
+		if i < len(matched) && !search.RecallWorthShowing(terms, matched[i], st) {
 			continue
 		}
 		if !search.SpeechCarriesAnyTerm(s, terms) {
@@ -802,7 +808,9 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 		// The bar admits a single match when the question names something
 		// identifiable, which is what the hook asks here too.
 		about := 0
-		if len(ranked) > 0 && search.RecallWorthShowing(terms, 1) {
+		// One match, and no claim about how rare it was: -1 keeps the
+		// question-side reading this arm has always used.
+		if len(ranked) > 0 && search.RecallWorthShowing(terms, 1, -1) {
 			about = 1
 		}
 		switch {

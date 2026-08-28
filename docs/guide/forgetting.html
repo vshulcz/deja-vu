@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your coding agent forgets everything between sessions — deja-vu</title>
+<meta name="description" content="Why coding agents start from scratch every session, what compaction actually keeps, and how to read the history Claude Code, Codex and Cursor already wrote to disk.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/forgetting.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Your coding agent forgets everything between sessions">
+<meta property="og:description" content="Why coding agents start from scratch every session, what compaction actually keeps, and how to read the history they already wrote to disk.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/forgetting.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Your coding agent forgets everything between sessions">
+<meta name="twitter:description" content="Why coding agents start from scratch every session, what compaction actually keeps, and how to read the history they already wrote to disk.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Your coding agent forgets everything between sessions","description":"Why coding agents start from scratch every session, what compaction actually keeps, and how to read the history Claude Code, Codex and Cursor already wrote to disk.","url":"https://vshulcz.github.io/deja-vu/guide/forgetting.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/forgetting.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Forgetting","item":"https://vshulcz.github.io/deja-vu/guide/forgetting.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does my coding agent forget everything between sessions?","acceptedAnswer":{"@type":"Answer","text":"A session's context window is discarded when the session ends. The transcript is still written to disk — Claude Code, Codex, Cursor, opencode and others each keep their own log — but nothing reads it back, so the next session starts empty."}},{"@type":"Question","name":"Does compaction preserve what happened earlier in a session?","acceptedAnswer":{"@type":"Answer","text":"Partly. Measured over 43 real compactions, the summary kept 77% of the decisions and 0.2% of the commands that had been run. Prose survives; the work does not."}},{"@type":"Question","name":"Can an agent read the sessions I had before I installed anything?","acceptedAnswer":{"@type":"Answer","text":"Yes, if the tool indexes the transcripts that are already on disk rather than recording forward from installation. Those files hold months of history before any memory tool existed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html" aria-current="page">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Why your coding agent forgets, and what is still on disk</h1>
+<p class="pagelede">the context window is gone; the transcript is not<span class="mins" data-mins></span></p>
+
+<p>You solved something in March. In August the same agent, in the same repository, proposes the approach you already tried and backed out of. Nothing is broken — the session that held the answer ended, and its context window went with it.</p>
+
+<h2>What actually happens at the end of a session</h2>
+<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and a dozen others each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
+<p>So the work is not lost. It is unread. Nothing in the default setup opens yesterday's transcript when you ask today's question.</p>
+
+<h2>Compaction is not memory</h2>
+<p>Long sessions compact: the harness replaces earlier turns with a summary so the window keeps fitting. That summary is prose, and prose is not what you need back.</p>
+<p>Measured over 43 real compactions from one machine's history — the method and the corpus are in the <a href="benchmarks.html">benchmarks</a>:</p>
+<ul>
+<li><b>77%</b> of the decisions survived the summary.</li>
+<li><b>0.2%</b> of the commands that had actually been run survived it.</li>
+</ul>
+<p>That gap is the whole problem in one number. The reasoning is summarised; the invocation with the four flags that made it work, the error text you pasted, the span an edit replaced — those are the first things a summary drops, and the first things you need when the same wall appears again.</p>
+
+<h2>Three answers people try</h2>
+<h3>A rules file</h3>
+<p><code>CLAUDE.md</code>, <code>AGENTS.md</code> and their equivalents are read every session, which makes them the right place for standing instructions — conventions, the build command, what not to touch. They are the wrong place for history: someone has to write each fact by hand, and nobody writes down the thing they have not hit twice yet.</p>
+<h3>A memory service</h3>
+<p>Memory platforms record facts forward from the moment you install them, usually through an extraction step that an LLM performs on the way in. They work, and they start empty: the months before installation are not in them, and neither is anything the extraction step decided was not a fact. They also add a network dependency to a loop that did not have one.</p>
+<h3>Reading the transcripts you already have</h3>
+<p>The third answer treats the logs as the memory. Nothing needs to be recorded ahead of time, because the recording already happened — including everything from before the tool was installed. That is what <a href="https://github.com/vshulcz/deja-vu">deja</a> does: it indexes those files locally, and serves them back to whichever agent asks.</p>
+
+<h2>What that looks like</h2>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p>The second command wires recall into every agent it finds and builds the first index. Ten seconds to install, about ten to index a few gigabytes of history.</p>
+<pre>$ deja "connection pool exhausted"
+[claude] api   · Jul 8 · 8f31c0a9 — 2 matches
+  login started failing after refresh token rotation; jwt kid mismatch in tests
+  fixed by reloading jwks cache after rotateKey and adding a clock-skew test
+[codex]  web   · Jul 1 · b77d91e2 — 1 match
+  refresh token cookie needed SameSite=Lax in local callback flow</pre>
+<p>Two answers, from two different tools, neither of which is the one you are using now. With auto-recall on, the agent does that lookup itself: at session start, on a prompt that matches earlier work, before it edits a file or runs a command, and after a command fails. The <a href="agents.html">agents guide</a> lists which harness supports which of those moments.</p>
+
+<h2>Why not just grep the logs</h2>
+<p>Because of what it costs. On a seeded benchmark of thirty task chains, reaching the same working context by grepping the raw transcripts took a median of <b>57,489</b> tokens; replaying the full history took <b>16,919</b>; recall took <b>286</b> for the same fact coverage, and nothing at all on the chains where the history had no answer. Those numbers, the corpus generator and the relevance labelling are all in the repository — read how "relevant" is defined before believing any of them, including ours.</p>
+
+<h2>What it does not do</h2>
+<p>It does not write memories, so it cannot invent one. It does not send anything anywhere: indexing and search are local, and credentials are stripped as the index is built — see <a href="privacy.html">privacy</a>. It does not make an agent smarter; it stops it from starting empty.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="compare.html">How this compares to the memory platforms</a> · <a href="https://github.com/vshulcz/deja-vu">Source</a></p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

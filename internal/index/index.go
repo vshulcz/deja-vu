@@ -126,6 +126,20 @@ type FileState struct {
 	// looks exactly like an append. Without this the rewritten prefix keeps
 	// its old text in the index and the new text is never read.
 	PrefixHash uint64 `json:"prefix_hash,omitempty"`
+	// PrefixSample fingerprints the same span without reading all of it: the
+	// head, the bytes just before SafeSize, and SafeSize itself. The full hash
+	// costs a read of the whole transcript on every search that finds the file
+	// changed, which on a session being written right now is every search —
+	// measured at 1.70s per call against a 250 MB transcript, growing with it.
+	//
+	// It catches what PrefixHash exists to catch. A rewind truncates and
+	// rewrites from the truncation point, so either that point is past
+	// SafeSize and the indexed bytes are genuinely untouched, or it is before
+	// it and the window ending at SafeSize falls inside the rewritten region.
+	//
+	// PrefixHash stays for manifests written before this existed; they verify
+	// the old way once, and the next walk records a sample.
+	PrefixSample uint64 `json:"prefix_sample,omitempty"`
 }
 
 type SessionMeta struct {

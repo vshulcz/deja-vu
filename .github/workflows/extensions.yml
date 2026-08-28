@@ -158,6 +158,60 @@ jobs:
             process.exit(bad ? 1 : 0);
           '
 
+  grok:
+    name: grok-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/grok
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The plugin has to parse
+        run: node --check lib.mjs && node --check hooks/recall.mjs && node --check bin/deja-mcp.mjs
+
+      - run: node --test test/*.test.mjs
+
+      - name: The bundle has to stay loadable by Grok
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            let bad = 0;
+            // Grok discovers components from fixed paths, so a rename here is a
+            // capability that silently never arrives.
+            for (const path of [".grok-plugin/plugin.json", ".mcp.json", "hooks/hooks.json", "commands/recall.md", "skills/deja-history/SKILL.md"]) {
+              if (!fs.existsSync(path)) { console.error("missing: " + path); bad++; }
+            }
+            const manifest = JSON.parse(fs.readFileSync(".grok-plugin/plugin.json", "utf8"));
+            for (const key of ["name", "version", "description", "license"]) {
+              if (!manifest[key]) { console.error("manifest has no " + key); bad++; }
+            }
+            // Every command Grok runs from this bundle is resolved against
+            // GROK_PLUGIN_ROOT: a bare relative path would be resolved against
+            // the session directory instead, which is wherever the user is.
+            const mcp = JSON.parse(fs.readFileSync(".mcp.json", "utf8"));
+            const hooks = JSON.parse(fs.readFileSync("hooks/hooks.json", "utf8"));
+            const commands = [
+              ...Object.values(mcp.mcpServers ?? {}).flatMap((s) => s.args ?? []),
+              ...Object.values(hooks.hooks ?? {}).flat().flatMap((g) => (g.hooks ?? []).map((h) => h.command)),
+            ];
+            // Spelled without its opening brace on purpose: shellcheck reads a
+            // dollar-brace sequence inside this single-quoted script as a shell
+            // expansion someone forgot to quote, and fails the lint.
+            const rootVar = "GROK_PLUGIN_ROOT}/";
+            for (const command of commands) {
+              const at = String(command).indexOf(rootVar);
+              if (at < 0) { console.error("path is not rooted at the plugin: " + command); bad++; continue; }
+              const rel = String(command).slice(at + rootVar.length).replace(/"$/, "");
+              if (!fs.existsSync(rel)) { console.error("points at a file that is not in the bundle: " + rel); bad++; }
+            }
+            process.exit(bad ? 1 : 0);
+          '
+
   metadata:
     name: packages point at this repository
     runs-on: ubuntu-latest

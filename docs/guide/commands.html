@@ -31,6 +31,7 @@
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"CLI reference","description":"Every deja subcommand: search, recall, ctx, blame, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.","url":"https://vshulcz.github.io/deja-vu/guide/commands.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/commands.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"CLI reference","item":"https://vshulcz.github.io/deja-vu/guide/commands.html"}]}</script>
 </head>
@@ -40,6 +41,32 @@
 <div class="wrap"><div class="doc">
 <aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
 <a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
 <a href="agents.html">Agents & MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html" aria-current="page">CLI reference</a>
@@ -74,12 +101,12 @@
 <tr><td><code>deja resume &lt;id&gt;</code></td><td>Reopen a session in the agent that wrote it. Prints the command; <code>--exec</code> runs it. Where the harness scopes its session list to one project, the command carries the <code>cd</code> that makes the id resolve; where a harness has no way to reopen a conversation from a terminal, it says so rather than printing something that would start a new one. The <a href="harnesses.html">matrix</a> has the column.</td></tr>
 <tr><td><code>deja warmup</code></td><td>Build or refresh the index without searching — for a shell profile or a provisioning script.</td></tr>
 <tr><td><code>deja statusline</code></td><td>One line for an agent's status bar: today's sessions and what deja has served, and — when the host pipes its session payload — the file this session is working on most with what earlier sessions decided about it. Silent when no earlier session touched it.</td></tr>
-<tr><td><code>deja completion &lt;bash|zsh|fish&gt;</code></td><td>Print a completion script for your shell.</td></tr>
+<tr><td><code>deja completion &lt;bash|zsh|fish|powershell&gt;</code></td><td>Print a completion script for your shell. <code>pwsh</code> is accepted as an alias for PowerShell.</td></tr>
 <tr><td><code>deja uninstall &lt;target|--all&gt;</code></td><td>Remove deja's wiring from an agent. Other servers in shared config files are left alone.</td></tr>
 <tr><td><code>deja version</code></td><td>Print the version.</td></tr>
 <tr><td><code>deja sources</code></td><td>Discovered stores per harness, with redaction counts.</td></tr>
 <tr><td><code>deja install &lt;target|--all|--auto&gt;</code></td><td>Wire MCP recall (and hooks) into your agents.</td></tr>
-<tr><td><code>deja embed</code></td><td>Build the semantic vector sidecar from a local endpoint.</td></tr>
+<tr><td><code>deja embed</code></td><td>Build the semantic vector sidecar from an embedding endpoint.</td></tr>
 <tr><td><code>deja sync export/import/ssh</code></td><td>Move redacted memory between machines.</td></tr>
 <tr><td><code>deja sync forget &lt;host&gt;</code></td><td>Drop a machine deja knows, so a bare <code>deja sync</code> stops trying it.</td></tr>
 <tr><td><code>deja promote &lt;id&gt;</code></td><td>Distill a session into a curated note: quoted evidence with provenance and a lifecycle state (<code>--state accepted|rejected|superseded|stale</code>). Corrections append; the note outranks the raw transcript in recall. <code>--to path</code> also appends a Markdown block for repo-visible notes. <code>--tag</code> adds keywords; promoting into ground another accepted note already covers prints a conflict warning naming the older note.</td></tr>

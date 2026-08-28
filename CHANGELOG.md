@@ -7,9 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.19.0] - 2026-08-26
+
+Two things, mostly. deja now installs the way each harness installs everything
+else — as a package in its own format, from its own catalogue — and a long bug
+hunt went through the parts that report: the usage log, sync between machines,
+and what `doctor` says when a file will not open.
+
 ### Added
-- The Codex plugin carries its own hooks: a marketplace install now brings session-start recall, per-prompt recall and pre-compaction capture with it, instead of only tools and the skill. It stands down where `deja install codex-auto` already wrote the same hook into Codex's own hooks.json.
-- A Kimi Code plugin, in `extensions/kimi`. One `/plugins install` gives Kimi the MCP tools, the shared skill, a `/deja:recall` command and recall on every prompt through its `UserPromptSubmit` hook. It stands down where `deja install kimi` already wired the same thing, so having both is not two of anything.
+- Gemini CLI installs this repository as an extension: `gemini extensions install https://github.com/vshulcz/deja-vu` brings the MCP server, the context file and the `deja-search` skill. The manifest sits at the root, which is also what the extensions gallery crawls. (#1725)
+- The Agent Plugins manifests are at the root too, so any host that reads the portable v1 format — Qwen Code among them — installs deja without a format of its own. (#1769)
+- A Kimi Code plugin, in `extensions/kimi`. One `/plugins install` gives Kimi the MCP tools, the shared skill, a `/deja:recall` command and recall on every prompt through its `UserPromptSubmit` hook. It stands down where `deja install kimi` already wired the same thing, so having both is not two of anything. (#1573)
+- A Grok Build plugin, with a licence in every bundle. (#1591)
+- A dsh plugin, and auto-recall that reaches the model rather than the transcript. (#1552)
+- The Codex plugin carries its own hooks: a marketplace install now brings session-start recall, per-prompt recall and pre-compaction capture with it, instead of only tools and the skill. It stands down where `deja install codex-auto` already wrote the same hook into Codex's own hooks.json. (#1583, #1584)
+- The opencode, dsh and Zed packages live in this repository, so a change to deja and the change to its packages land together. (#1562)
+- `deja embed` reaches an authenticated endpoint: `DEJA_EMBED_KEY` for any OpenAI-compatible URL, and `OPENAI_API_KEY` only for an HTTPS `api.openai.com` one — never forwarded implicitly to localhost or a third party. Contributed by [@chrisgeo](https://github.com/chrisgeo). (#1919)
+- PowerShell completion. (#1803)
+- The fix pair arrives when a command fails, rather than waiting to be asked. (#1550)
+- Recall says when a hit is the other machine's copy of a session this one already holds, and when a session's date is later than this machine's clock. (#1754, #1776)
+- An index run says how many lines it could not read, and `doctor --json` carries the sync state that used to exist only on the screen. (#1839, #1994)
+
+### Changed
+- The release archive carries `gemini-extension.json` and `GEMINI.md`. `gemini extensions install` reads the manifest out of the release asset rather than from git, so the documented command failed on every published version until now. (#1935)
+- `deja install` refuses rather than guesses in the places it used to guess: a guidance block it cannot bound, a `cordis.patch.yml` missing one of deja's markers, a goose `extensions:` list where a mapping was expected, an opencode.jsonc that uses trailing commas, a relative `XDG_CONFIG_HOME`, and a machine with no home directory. It also writes a config back with the line endings it already had. (#1666, #1669, #1691, #1694, #1696, #1698, #1700, #1702, #1706)
+- The usage log holds one definition of an event, one week for every counter that shows one, and a record size it can actually hold. Rotation keeps the newest events instead of emptying the file. (#1918, #1921, #1923, #1974, #1981, #1986)
+- `doctor` explains rather than accuses: a corrupt sidecar is not a missing one, an unreadable peers file is not "no machines", a transcript it may not open is named instead of the harness format being blamed, and a peer stamp ahead of this machine's clock is said out loud. (#1711, #1713, #1749, #1841, #1856, #1860, #1961)
+
+### Fixed
+- Two syncs at once no longer lose machines, and one machine named in two letter cases is one machine — in the watermark, in `doctor`'s count, and in how a host name is matched, which is the way ssh matches it. (#1854, #1868, #1877, #1879, #1884)
+- ssh gets a connect timeout, so a sleeping machine costs seconds rather than minutes. (#1773)
+- A credential in an uppercase `_KEY` environment assignment is stripped at index time, and so is a secret whose JSON arrived with its quotes escaped. (#1766, #1958)
+- The PATH offer in `install.sh` sat behind a condition `curl | sh` can never meet, so nobody installing the documented way was ever asked. (#1852)
+- A truncated line — in the log, in the snapshots file, in the hook's dedup file — is closed before the next event is appended, rather than merged into it. (#1910, #1947, #1966)
+- Unicode folding covers Arabic hamza and madda, the three Greek marks written on a spacing diaeresis, and letters carrying two marks. (#1836, #1873, #1895, #1914)
+- The statusline gives the filename up before the memory half when the bar is too narrow, and uses the count form when even the title will not fit. (#1881, #1904)
+- The index resolves a shared session id the same way every time, counts the empty transcripts of the last build rather than of the process, follows a store directory that is a symlink, and says a store went away instead of greeting the reader as new. (#1745, #1764, #1851, #1998)
 
 
 ## [0.18.0] - 2026-08-22
@@ -745,7 +779,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vshulcz/deja-vu/compare/v0.17.3...v0.18.0
 [0.17.1]: https://github.com/vshulcz/deja-vu/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/vshulcz/deja-vu/compare/v0.16.9...v0.17.0

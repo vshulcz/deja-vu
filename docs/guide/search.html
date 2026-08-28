@@ -31,6 +31,7 @@
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Search","description":"deja search syntax: exact and phrase queries, natural language with stop-word handling, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.","url":"https://vshulcz.github.io/deja-vu/guide/search.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/search.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Search","item":"https://vshulcz.github.io/deja-vu/guide/search.html"}]}</script>
 </head>
@@ -40,6 +41,32 @@
 <div class="wrap"><div class="doc">
 <aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
 <a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
 <a href="agents.html">Agents & MCP</a>
 <a href="search.html" aria-current="page">Search</a>
 <a href="commands.html">CLI reference</a>
@@ -76,9 +103,9 @@
 </ul>
 <p>Each result carries a tier — <code>exact</code>, <code>close</code> (with the variant), or <code>semantic</code> (with the cosine) — in the CLI, JSON and MCP output.</p>
 <h2>Semantic recall</h2>
-<pre>deja embed          # build a vector sidecar from a local embedding endpoint
+<pre>deja embed          # build a vector sidecar from an embedding endpoint
 deja "ran out of db connections"   # matches "connection pool exhausted"</pre>
-<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. No endpoint, no semantic layer — search is unchanged.</p>
+<p>Resolution: <code>DEJA_EMBED_URL</code>, else a probed Ollama or LM Studio. Authenticated endpoints use <code>DEJA_EMBED_KEY</code>; an HTTPS <code>api.openai.com</code> URL also accepts <code>OPENAI_API_KEY</code>. No endpoint, no semantic layer — search is unchanged.</p>
 
 <h2>Natural-language queries</h2>
 <p>Stop words are dropped, word forms bridge morphology in both directions (<code>failing</code> finds <code>fails</code>), and when no session holds every remaining token deja drops up to two — telling you exactly which (<code>ignoring "why" — no session matches it together with the rest</code>). Zero results now mean the content genuinely is not there.</p>

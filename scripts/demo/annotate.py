@@ -115,7 +115,7 @@ def main():
     ed.text(((W - ed.textlength(facts, font=small)) / 2, cy - 20), facts, font=small, fill=MUTED)
     # The real one. An invented short URL on a card people screenshot is a lie
     # with a long half-life.
-    cmd = "brew install vshulcz/tap/deja-vu"
+    cmd = "brew install deja-vu"
     cw = ed.textlength(cmd, font=mid)
     box = [(W - cw) / 2 - 26, cy + 40, (W + cw) / 2 + 26, cy + 96]
     ed.rounded_rectangle(box, radius=10, fill=CARD, outline=CARD_EDGE, width=1)

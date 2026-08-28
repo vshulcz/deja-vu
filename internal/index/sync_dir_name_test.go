@@ -42,12 +42,20 @@ func TestEverySentenceAboutTheDirectoryIsSafeToPrint(t *testing.T) {
 		// every filesystem takes one — Windows refuses the whole class. Its
 		// siblings above already skip on that; this one failed instead (#2081).
 		if err := os.MkdirAll(dir, 0o755); err != nil {
+			// The sibling case above already skips on a refused name; this one
+			// called it fatal, and Windows refuses an escape byte in a path.
 			t.Skipf("the filesystem refused the name: %v", err)
 		}
 		if err := os.Chmod(dir, 0o000); err != nil {
 			t.Skipf("cannot drop permissions: %v", err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+		// Chmod succeeding is not the same as access being denied: on Windows
+		// it toggles a read-only attribute and the directory still lists, so
+		// the skip above never fired. Ask the directory itself.
+		if _, err := os.ReadDir(dir); err == nil {
+			t.Skip("this platform still reads a directory with no permission bits")
+		}
 		_, err := Import(filepath.Join(base, "idx2"), dir)
 		if err == nil {
 			t.Skip("this platform read the directory anyway")

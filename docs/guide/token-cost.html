@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What memory costs in tokens — deja-vu</title>
+<meta name="description" content="What memory costs in tokens, measured — and why recall is the answer to too many tokens rather than another source of them.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/token-cost.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="What memory costs in tokens">
+<meta property="og:description" content="What memory costs in tokens, measured — and why recall is the answer to too many tokens rather than another source of them.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/token-cost.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="What memory costs in tokens">
+<meta name="twitter:description" content="What memory costs in tokens, measured — and why recall is the answer to too many tokens rather than another source of them.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"What memory costs in tokens","description":"What memory costs in tokens, measured — and why recall is the answer to too many tokens rather than another source of them.","url":"https://vshulcz.github.io/deja-vu/guide/token-cost.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/token-cost.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"What memory costs","item":"https://vshulcz.github.io/deja-vu/guide/token-cost.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does adding memory to a coding agent cost a lot of tokens?","acceptedAnswer":{"@type":"Answer","text":"It depends on whether memory retrieves or replays. On a seeded benchmark of thirty task chains, reaching the same working context cost a median of 286 tokens by recall, 16,919 by replaying matched sessions and 57,489 by grepping the raw logs, at the same fact coverage."}},{"@type":"Question","name":"How do I stop a memory layer from filling the context window?","acceptedAnswer":{"@type":"Answer","text":"Cap what it may inject and let it say nothing when the history has no answer. deja caps a per-prompt injection at 1,536 bytes and an MCP recall at about 4 KB, and injects nothing on chains where no earlier fact is relevant."}},{"@type":"Question","name":"Does recall slow the agent down?","acceptedAnswer":{"@type":"Answer","text":"The lookup is a lexical query against a local index: a median of about 0.4 ms in process. A hook adds process start and a freshness check over the stores, tens of milliseconds on a multi-gigabyte corpus. Nothing waits on a model."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html" aria-current="page">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>What memory costs in tokens</h1>
+<p class="pagelede">a few hundred tokens, or fifty thousand — the difference is retrieval<span class="mins" data-mins></span></p>
+
+<p>Every context-window trick is a trade: more of what you need in the window, less room for everything else. So the question about giving an agent its history is not whether it helps — it is what it costs each turn, and whether the cost is bounded.</p>
+
+<h2>Retrieval against replay, measured</h2>
+<p>Thirty seeded task chains, each with a fact established earlier and needed later, plus five negative controls where nothing earlier is relevant. Four ways to reach the same working context:</p>
+<table>
+<thead><tr><th>Approach</th><th>Median tokens</th><th>Median coverage</th><th>Tokens on the negative controls</th></tr></thead>
+<tbody>
+<tr><td>recall</td><td><b>286</b></td><td>1.00</td><td>0</td></tr>
+<tr><td>replay the matched sessions</td><td>16,919</td><td>1.00</td><td>14,920</td></tr>
+<tr><td>grep the raw logs</td><td>57,489</td><td>1.00</td><td>0</td></tr>
+<tr><td>no memory at all</td><td>0</td><td>0.00</td><td>0</td></tr>
+</tbody>
+</table>
+<p>Same fact coverage for about 200× fewer tokens than grepping and about 60× fewer than replaying. The last column is the one people skip: on chains where no earlier fact is relevant, replay still spends about fifteen thousand tokens saying nothing useful, and recall spends zero.</p>
+<p>Run it yourself — the corpus generator and the relevance labels are ordinary Go in the repository, and the arms are seeded:</p>
+<pre>deja bench context    # 30 seeded chains plus five negative controls
+deja bench recall     # ranking regression floor, CI fails if recall drops</pre>
+<p>Audit what "relevant" means before trusting any number here, ours included. A benchmark that defines its own success is a benchmark that always passes.</p>
+
+<h2>The caps that keep it bounded</h2>
+<p>An average is not a guarantee, so the ceilings matter more than the median:</p>
+<ul>
+<li><b>Per-prompt recall:</b> 1,536 bytes. That is the block a hook adds when what you just typed matches earlier work.</li>
+<li><b>An MCP recall:</b> about 4 KB per call, dense text rather than whole sessions.</li>
+<li><b>Nothing at all,</b> which is the common case at any injection point. The block appears when the history answers and is absent otherwise.</li>
+</ul>
+<p>That last one is a design decision rather than an optimisation. A memory that always says something teaches you to skip whatever it says, and then you are paying for a block nobody reads.</p>
+
+<h2>The other cost, which is not tokens</h2>
+<p>Latency. A lookup is a lexical query against a local index — a median of about 0.4 ms in process, around 25 ms on the LongMemEval-S haystacks. A hook pays process start and a freshness check across the stores on top, tens of milliseconds on a multi-gigabyte corpus. Nothing in that path waits on a model, which is the reason the numbers are in milliseconds rather than seconds.</p>
+
+<h2>Why "just summarise it" is a different trade</h2>
+<p>Compaction is the built-in answer to a full window, and it keeps the wrong half: over 43 real compactions it retained 77% of the decisions and 0.2% of the commands that had been run. It is cheap and lossy in exactly the places that cost you time later — see <a href="after-compaction.html">what compaction drops</a>. Retrieval is the opposite trade: nothing is thrown away, and you pay a few hundred tokens for the part you need at the moment you need it.</p>
+
+<h2>What this does not claim</h2>
+<p>Recall does not reduce your token bill on its own — it replaces a large, vague context with a small, specific one, and whether that lowers spend depends on what you were doing instead. If the honest alternative was pasting nothing and re-solving the problem, the comparison is with your afternoon rather than with your invoice.</p>
+
+<p><a href="benchmarks.html">Benchmarks in full</a> · <a href="after-compaction.html">What compaction drops</a> · <a href="search.html">How ranking works</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

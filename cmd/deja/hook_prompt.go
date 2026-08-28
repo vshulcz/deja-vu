@@ -177,8 +177,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// questions in a day, and what stops it repeating itself is the block
 	// fingerprint below, not a ban on where it came from.
 	recent := recentlyInjected(dir, input.SessionID, injectionCooldown)
-	skip := make(map[string]bool, len(recent)+1)
+	// The same cooldown across agent sessions in this project. Without it the
+	// window reset every time a new agent session opened, which is how one
+	// marathon reached 110 servings (#2038).
+	projectKey := ""
+	if cands := digest.ProjectNameCandidates(cwd); len(cands) > 0 {
+		projectKey = cands[0]
+	}
+	inProject := recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+	skip := make(map[string]bool, len(recent)+len(inProject)+1)
 	for id := range recent {
+		skip[id] = true
+	}
+	for id := range inProject {
 		skip[id] = true
 	}
 	if input.SessionID != "" {
@@ -204,9 +215,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// The one word of the question that identifies something, kept apart for
 	// the test below: asking whether any term was spoken lets "показал" answer
 	// for "v11", and nearly every session says a word like that.
+	// The words of the question that identify something, kept apart for the
+	// test below: asking whether ANY term was spoken lets "показал" answer for
+	// "v11", and nearly every session says a word like that.
+	//
+	// One word was too few. Rareness is measured against this corpus, and in a
+	// small or homogeneous one it crowns whichever ordinary noun happens to be
+	// uncommon: on a seeded store the question "the orders service runs out of
+	// db connections" led on "service", so the session that settled it — which
+	// says "orders worker" and never "service" — was dropped at this gate
+	// while a neighbour about the reporting service was served in its place.
+	// The ranking had already put the right one first with two strong terms.
 	leadTerms := terms
 	if ordered := byIdentifying(terms, idfOf); len(ordered) > 0 {
-		leadTerms = ordered[:1]
+		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
 	for i, s := range ranked {
@@ -224,7 +246,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// hook pays its cost on every message the user sends. Measured on
 		// cross-paired prompts whose answer is absent, the old bar injected on
 		// 94% of them; half of those rested on one ordinary word.
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		// A word rare enough to identify something is a real match on its own —
@@ -279,6 +301,16 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 				continue
 			}
 		}
+		// Two slots, two answers. The same content reaches the block from
+		// several sessions all the time — a marathon that was split, a
+		// resumed session, a workflow run again — and spending both slots on
+		// it costs the reader the second answer entirely. Measured on a
+		// seeded store where the question drifted from the wording of the
+		// session that settled it, both slots went to two copies of one
+		// neighbour on every framing but the near-verbatim one.
+		if sameAnswerAs(ss, s, terms) {
+			continue
+		}
 		ss = append(ss, s)
 		if len(ss) == 2 {
 			break
@@ -328,7 +360,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if nudge != "" {
 			tail += "\n" + nudge
 		}
-		body = promptHookLead + rejectedWarning + digest + tail
+		lead := promptHookLead
+		// A repeat of the question itself is a different claim than a session
+		// about the subject, and a stronger one: the agent does not have to
+		// decide whether the history is relevant, only whether the answer
+		// still holds. Measured over this machine's own sessions, 6.5% of
+		// substantial questions are asked again in a later session, and the
+		// exact-match counter in `deja stats` sees a fifth of them.
+		if again := search.AskedBefore(ss[0], terms); again != "" {
+			lead = "This was asked here before" + askedBeforeWhen(ss[0]) +
+				" — \"" + again + "\". What that session settled is below; " +
+				"say so if it still holds, and say so if it does not.\n"
+		}
+		body = lead + rejectedWarning + digest + tail
 	} else {
 		body = weakRecallPointer(ss, terms) + rejectedWarning
 		if nudge != "" {
@@ -343,7 +387,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
-	rememberInjected(dir, input.SessionID, ss)
+	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
 	usage.RecordDigestFrom(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
 		terms, sessionProjects(ss), sessionIDs(ss))
 	if plain {
@@ -373,6 +417,56 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	fmt.Fprintln(stdout, string(b))
 	return nil
 }
+
+// askedBeforeWhen dates the earlier question, so the reader can weigh a decision
+// from yesterday against one from March. Empty when the session carries no
+// date rather than printing a zero one.
+func askedBeforeWhen(s model.Session) string {
+	if s.Updated.IsZero() {
+		return ""
+	}
+	return " (" + s.Updated.Local().Format("2006-01-02") + ")"
+}
+
+// sameAnswerAs reports whether this session would say what one already chosen
+// says. Judged on the lines the question actually matched rather than on the
+// whole transcript: two sessions of the same workflow differ everywhere else
+// and agree exactly where it matters.
+func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool {
+	next := matchedFingerprint(s, terms)
+	if next == "" {
+		return false
+	}
+	for _, c := range chosen {
+		if matchedFingerprint(c, terms) == next {
+			return true
+		}
+	}
+	return false
+}
+
+// matchedFingerprint is the session's matching lines, normalised, hashed. Empty
+// when nothing matched, which is not a duplicate of anything.
+func matchedFingerprint(s model.Session, terms []string) string {
+	var b strings.Builder
+	for _, m := range s.Messages {
+		if !search.SpeechCarriesAnyTerm(model.Session{Messages: []model.Message{m}}, terms) {
+			continue
+		}
+		b.WriteString(strings.Join(strings.Fields(strings.ToLower(m.Text)), " "))
+		b.WriteByte('\n')
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return blockFingerprint(b.String())
+}
+
+// leadTermsKept is how many of the question's identifying words a session may
+// be judged on. Three rather than one: the gate exists to reject a session
+// that matched only where a tool printed the subject, and three of the rarest
+// words still keep the ordinary ones out.
+const leadTermsKept = 3
 
 // promptTermsWorthAsking is the gate before the index is touched. Two terms
 // were required, which silenced the sharpest prompt there is: "do we need
@@ -562,6 +656,45 @@ func blockFingerprint(body string) string {
 // again. Ten is the length of a short stretch of work.
 const injectionCooldown = 10
 
+// recentlyInjectedInProject is the same cooldown counted across agent sessions
+// rather than inside one, because the cooldown above only ever saw the session
+// it was called from and every new agent session started blank.
+//
+// Measured over six weeks of a real log: per-prompt recall made 937 injections
+// drawn from 74 distinct sessions, 92% of them repeats, with ten sessions
+// carrying 80% of the total — the two commonest being marathons of 2.6M and
+// 1.4M words, which match nearly any prompt. The agent is told to say nothing
+// about a recall that did not help, so the hundredth serving of the same
+// session is correctly met with silence, and `stats --impact` counts that
+// silence against us (#2038).
+//
+// Scoped to the project on purpose: the same session answering the same
+// question in a different repository is not the repetition being fixed here.
+func recentlyInjectedInProject(dir, project string, window int) map[string]bool {
+	out := map[string]bool{}
+	if project == "" || window <= 0 {
+		return out
+	}
+	b, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		return out
+	}
+	lines := strings.Split(string(b), "\n")
+	kept := 0
+	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
+		// Four fields since this cooldown was added; lines written before it
+		// carry no project and match nothing, which is the right answer for
+		// them rather than a guess.
+		parts := strings.Fields(lines[i])
+		if len(parts) < 4 || parts[3] != project {
+			continue
+		}
+		kept++
+		out[parts[1]] = true
+	}
+	return out
+}
+
 // recentlyInjected is alreadyInjected narrowed to the last few things this
 // agent session was shown.
 func recentlyInjected(dir, sid string, window int) map[string]bool {
@@ -621,6 +754,25 @@ func forgetInjected(dir, sid string) {
 }
 
 func rememberInjected(dir, sid string, ss []model.Session) {
+	rememberInjectedFor(dir, sid, "", ss)
+}
+
+// rememberInjectedFor is rememberInjected with the project the injection went
+// to, so recentlyInjectedInProject can count across agent sessions. Callers
+// that have no project pass the empty string and write the old three-field
+// line.
+func rememberInjectedFor(dir, sid, project string, ss []model.Session) {
+	ids := make([]string, 0, len(ss))
+	for _, s := range ss {
+		ids = append(ids, s.ID)
+	}
+	rememberInjectedIDsFor(dir, sid, project, ids)
+}
+
+// rememberInjectedIDsFor is rememberInjectedFor for a caller that has the ids
+// rather than the sessions — the session-start hook, which serves out of a
+// cached digest and knows only what went into it.
+func rememberInjectedIDsFor(dir, sid, project string, ids []string) {
 	if sid == "" {
 		return
 	}
@@ -646,15 +798,21 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 		_, _ = f.WriteString("\n")
 	}
 	stamp := time.Now().UTC().Format(time.RFC3339)
-	for _, s := range ss {
+	for _, id := range ids {
 		// The value stays byte-exact: it is looked up against the index's own
 		// ids, and a mapped one would match nothing there. One that cannot be
 		// a field is dropped instead — a missing dedup entry costs a second
 		// showing, where a broken line costs the entry written after it.
-		if !hookseenField(s.ID) {
+		if !hookseenField(id) {
 			continue
 		}
-		fmt.Fprintf(f, "%s %s %s\n", hookseenKey(sid), s.ID, stamp)
+		if project == "" {
+			fmt.Fprintf(f, "%s %s %s\n", hookseenKey(sid), id, stamp)
+			continue
+		}
+		// The project has no spaces by the time it gets here — it is one
+		// candidate name, not a path — so the line stays field-separated.
+		fmt.Fprintf(f, "%s %s %s %s\n", hookseenKey(sid), id, stamp, project)
 	}
 }
 

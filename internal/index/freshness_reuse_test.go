@@ -17,14 +17,14 @@ func TestUnchangedFilesKeepTheirDerivedState(t *testing.T) {
 
 	first := currentFilesWith("", nil)
 	fs, ok := first[path]
-	if !ok || fs.SafeSize == 0 || fs.PrefixHash == 0 {
+	if !ok || fs.SafeSize == 0 || fs.PrefixSample == 0 {
 		t.Fatalf("derived state missing on a first walk: %+v", fs)
 	}
 
 	// Unchanged file: the values must come back identical without being
 	// recomputed, which is what makes the walk a stat pass.
 	second := currentFilesWith("", first)
-	if second[path].SafeSize != fs.SafeSize || second[path].PrefixHash != fs.PrefixHash {
+	if second[path].SafeSize != fs.SafeSize || second[path].PrefixSample != fs.PrefixSample {
 		t.Fatalf("carried state differs: %+v vs %+v", second[path], fs)
 	}
 

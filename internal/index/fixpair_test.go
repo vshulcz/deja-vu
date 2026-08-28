@@ -41,6 +41,101 @@ func TestFixPairsDropACommandTheErrorSurvived(t *testing.T) {
 	}
 }
 
+// The same error a dozen records later says the same thing as the same error
+// immediately after: the command did not settle it. Six records was the whole
+// of the check, so a session that ran a command, worked on something else and
+// hit the error again stored the command as the fix. Measured over this
+// machine's transcripts, 104 of the 831 pairs the miner kept were contradicted
+// that way.
+func TestFixPairsDropACommandTheErrorOutlivedLater(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "brew install coreutils for timeout", Time: now.Add(time.Minute)},
+	}
+	// Far enough that the old six-record window never reached it.
+	for i := 0; i < 12; i++ {
+		ms = append(ms, model.Message{Role: "tool-output", Text: "ok", Time: now.Add(time.Duration(i) * time.Minute)})
+	}
+	ms = append(ms, model.Message{
+		Role: "tool-output", Text: "zsh:1: command not found: timeout",
+		Time: now.Add(time.Hour),
+	})
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 0 {
+		t.Errorf("a command the error outlived was stored as a fix: %+v", pairs)
+	}
+}
+
+// And the check stays a check on the same error: another error later in the
+// session says nothing about this one, and withholding on it would empty the
+// table for any session that hit more than one thing.
+func TestFixPairsKeepACommandADifferentErrorFollowed(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "curl --max-time 5 example.internal", Time: now.Add(time.Minute)},
+	}
+	for i := 0; i < 12; i++ {
+		ms = append(ms, model.Message{Role: "tool-output", Text: "ok", Time: now.Add(time.Duration(i) * time.Minute)})
+	}
+	ms = append(ms, model.Message{
+		Role: "tool-output", Text: "zsh:1: command not found: gsed",
+		Time: now.Add(time.Hour),
+	})
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 1 {
+		t.Errorf("a different error later withheld the pair: %+v", pairs)
+	}
+}
+
+// A command that failed is not a remedy. Reading 116 confirmed pairs off a real
+// store, ten stored a command whose own record said it exited non-zero — and
+// this line is handed to an agent at the moment it is stuck, where being wrong
+// costs most.
+func TestFixPairsDropACommandThatFailedItself(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "python3 -m pytest  → exit 1", Time: now.Add(time.Minute)},
+	}
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 0 {
+		t.Errorf("a command that exited non-zero was stored as a fix: %+v", pairs)
+	}
+}
+
+// Where the harness stores no exit status — Claude does not — the output right
+// after the command says the same thing.
+func TestFixPairsDropACommandWhoseOutputFailed(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "brew install coreutils", Time: now.Add(time.Minute)},
+		{Role: "tool-output", Text: "Error: Permission denied @ dir_s_mkdir - /opt/homebrew/lib", Time: now.Add(2 * time.Minute)},
+	}
+	if pairs := fixPairsIn(ms, "claude:s1", "p"); len(pairs) != 0 {
+		t.Errorf("a command whose output failed was stored as a fix: %+v", pairs)
+	}
+}
+
+// And the retry is what the session is for: a failed attempt must not take the
+// error's whole look-ahead window with it.
+func TestFixPairsKeepTheRetryAfterAFailedAttempt(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "zsh:1: command not found: timeout", Time: now},
+		{Role: "command", Text: "brew install coreutils", Time: now.Add(time.Minute)},
+		{Role: "tool-output", Text: "Error: Permission denied @ dir_s_mkdir - /opt/homebrew/lib", Time: now.Add(2 * time.Minute)},
+		{Role: "command", Text: "curl --max-time 5 example.internal", Time: now.Add(3 * time.Minute)},
+		{Role: "tool-output", Text: "200 OK", Time: now.Add(4 * time.Minute)},
+	}
+	pairs := fixPairsIn(ms, "claude:s1", "p")
+	if len(pairs) != 1 {
+		t.Fatalf("want the retry stored, got %d pairs: %+v", len(pairs), pairs)
+	}
+	if pairs[0].Command != "curl --max-time 5 example.internal" {
+		t.Errorf("wrong command stored: %q", pairs[0].Command)
+	}
+}
+
 // Sequence alone is 13% precise on a real store — the next command is usually
 // the session moving on. A pair survives the build only with a second reason:
 // the command names what the error named, or the same remedy recurs.

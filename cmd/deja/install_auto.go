@@ -238,9 +238,32 @@ export const DejaRecall = async ({ $, client }) => {
         // memory is optional: never break the session over it
       }
     },
+    // A spawned agent gets none of the above: the system prompt is built for
+    // the session that spawned it and the per-prompt pass fires on what the
+    // user typed, which a subagent never does. Its instructions are the one
+    // thing that reaches it, so recall goes in there.
+    "tool.execute.before": async (input, output) => {
+      try {
+        if (input?.tool !== "task") return
+        const args = output?.args
+        if (!args?.prompt) return
+        const payload = JSON.stringify({
+          hook_event_name: "PreToolUse",
+          tool_name: "Task",
+          tool_input: { prompt: args.prompt },
+          session_id: input.sessionID || "",
+        })
+        const raw = await $%secho ${JSON.stringify(payload)} | %s%q hook-tool%s.text()
+        if (!raw.trim()) return
+        const next = JSON.parse(raw)?.hookSpecificOutput?.updatedInput?.prompt
+        if (next) args.prompt = next
+      } catch {
+        // memory is optional: never break a spawn over it
+      }
+    },
   }
 }
-`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`")
+`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`")
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is

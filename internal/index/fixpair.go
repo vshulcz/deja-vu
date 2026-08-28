@@ -28,9 +28,16 @@ const (
 	// fixLookAhead is how far past the error a command still counts as an
 	// answer to it. Beyond that the session has moved on to something else.
 	fixLookAhead = 10
-	// fixQuietAfter is how many records must pass without the same error for
-	// the command to count as having settled it.
-	fixQuietAfter = 6
+	// The quiet check runs to the end of the session rather than over a window.
+	// Six records was long enough to miss the session hitting the same error
+	// again a little later, which is the transcript saying the command did not
+	// settle it: measured over this machine's transcripts, 104 of the 831 pairs
+	// the miner kept were contradicted that way, and each one is a wrong answer
+	// handed to an agent at the moment it is stuck.
+	// fixOutputWindow is how far past a command its own output can sit. One
+	// record in the ordinary case; two leaves room for a harness that writes
+	// something between them.
+	fixOutputWindow = 2
 	// fixCommandMax bounds what is stored per pair; a command longer than this
 	// is a heredoc or a pasted script, not something to hand back.
 	fixCommandMax = 200
@@ -228,9 +235,88 @@ func trimTermEdges(t string) string {
 	return strings.Trim(t, "/.")
 }
 
+// lastFrictionIndex records, for every error the session hit, the last record
+// it appears in. The quiet check asks whether an error came back after the
+// command that was supposed to settle it, and asking that by rescanning the
+// tail once per candidate is quadratic: on this machine's transcripts it took
+// a full rebuild from 15.8s to 57.8s. One pass answers it for every pair.
+func lastFrictionIndex(ms []model.Message) map[uint64]int {
+	last := make(map[uint64]int)
+	for i, m := range ms {
+		if m.Role != roleToolOutput && m.Role != "assistant" {
+			continue
+		}
+		for _, raw := range strings.Split(m.Text, "\n") {
+			if line, ok := FrictionLine(raw); ok {
+				last[frictionHash(line)] = i
+			}
+		}
+	}
+	return last
+}
+
+// genericFailure are the shapes isFriction turns away. It turns them away for
+// identity — `Error: ` names nothing a second session can be matched on — and
+// that is a different question from whether the command failed, which is all
+// this asks.
+var genericFailure = []string{
+	"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL", "panic: ",
+}
+
+// outputReadsAsFailure reports whether what a command printed is a failure:
+// either a friction line, which is specific enough to be one, or one of the
+// shapes friction declines to name.
+func outputReadsAsFailure(text string) bool {
+	if _, _, ok := firstFrictionLine(text); ok {
+		return true
+	}
+	for _, raw := range strings.Split(text, "\n") {
+		l := strings.TrimSpace(raw)
+		for _, g := range genericFailure {
+			if strings.HasPrefix(l, g) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// commandFailed reads the exit status the record carries, for the harnesses
+// that store one (codex and opencode append it; Claude does not).
+func commandFailed(text string) bool {
+	i := strings.LastIndex(text, "→ exit ")
+	if i < 0 {
+		return false
+	}
+	code := strings.TrimSpace(text[i+len("→ exit "):])
+	if j := strings.IndexAny(code, " \n"); j >= 0 {
+		code = code[:j]
+	}
+	n, err := strconv.Atoi(code)
+	return err == nil && n != 0
+}
+
+// outputFailed reports whether what came back from the command is itself an
+// error. The same friction rules the error side uses, so a command that
+// printed a fresh failure is read as one wherever the exit status is not
+// recorded.
+func outputFailed(ms []model.Message, cmd int) bool {
+	for k := cmd + 1; k < len(ms) && k <= cmd+fixOutputWindow; k++ {
+		if ms[k].Role == roleCommand {
+			return false
+		}
+		if ms[k].Role != roleToolOutput {
+			continue
+		}
+		return outputReadsAsFailure(ms[k].Text)
+	}
+	return false
+}
+
 // fixPairsIn mines one session.
 func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 	var out []FixPair
+	lastSeen := lastFrictionIndex(ms)
 	for i, m := range ms {
 		if m.Role != roleToolOutput && m.Role != "assistant" {
 			continue
@@ -250,8 +336,26 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				// records on, instead of abandoning the error entirely.
 				continue
 			}
-			if repeatsError(ms, j+1, j+fixQuietAfter, sig) {
+			if lastSeen[sig] > j {
 				break
+			}
+			// A command that failed is not a remedy for anything, and handing
+			// one to an agent at the moment it is stuck is the worst place to
+			// be wrong. Two ways to know: the record says so, where the
+			// harness stored the exit status, and the output right after it
+			// carries an error of its own. Keep scanning the window — a
+			// session that tried something and failed usually tries again,
+			// and the retry is the pair worth having.
+			if commandFailed(ms[j].Text) || outputFailed(ms, j) {
+				continue
+			}
+			// Reading something is not fixing it. The rule that keeps a pair —
+			// the command names what the error named — is satisfied by
+			// construction when the command greps for the symbol the compiler
+			// complained about, so the table filled with the step an agent
+			// takes between hitting an error and solving it.
+			if investigationCommand(cmd) {
+				continue
 			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
 			break
@@ -269,21 +373,6 @@ func firstFrictionLine(text string) (string, uint64, bool) {
 		}
 	}
 	return "", 0, false
-}
-
-// repeatsError reports whether the same error shows up again in ms[from:to].
-func repeatsError(ms []model.Message, from, to int, sig uint64) bool {
-	for k := from; k < len(ms) && k <= to; k++ {
-		if ms[k].Role != roleToolOutput && ms[k].Role != "assistant" {
-			continue
-		}
-		for _, raw := range strings.Split(ms[k].Text, "\n") {
-			if line, ok := FrictionLine(raw); ok && frictionHash(line) == sig {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func firstLineOf(s string) string {

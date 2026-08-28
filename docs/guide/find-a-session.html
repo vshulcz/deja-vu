@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find the coding session where you solved it — deja-vu</title>
+<meta name="description" content="How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/find-a-session.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Finding the session where you solved it">
+<meta property="og:description" content="How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/find-a-session.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Finding the session where you solved it">
+<meta name="twitter:description" content="How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Finding the session where you solved it","description":"How to search chat history across every coding agent on the machine, by the token you remember rather than the topic you half-remember.","url":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Finding a session","item":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I find the session where I fixed something?","acceptedAnswer":{"@type":"Answer","text":"Search the transcripts by the most specific thing you remember — an exact error string, a function name, a file path or a flag. Those match a session even when you have forgotten which tool, project or month it was."}},{"@type":"Question","name":"Can I reopen an old session in the agent that ran it?","acceptedAnswer":{"@type":"Answer","text":"For fifteen of the twenty harnesses deja reads, yes: deja resume <id> hands the id back to that harness and it continues the conversation. The rest have no resume path of their own."}},{"@type":"Question","name":"What if I only remember roughly when it was?","acceptedAnswer":{"@type":"Answer","text":"Time is a hint rather than a filter: a date in the query weighs recent sessions up without hiding older ones, and deja last lists the most recent sessions by project, role or harness."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html" aria-current="page">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Finding the session where you solved it</h1>
+<p class="pagelede">search by the token you remember, not the topic you half-remember<span class="mins" data-mins></span></p>
+
+<p>You fixed it. You remember the error, roughly. You do not remember whether it was Claude Code or Codex, which project it was under, or whether it was three weeks or three months ago — and the harness's own history list is a wall of titles, in one tool, in reverse order. Nothing on the machine lets you search chat history across all of them at once.</p>
+
+<h2>Search by the most specific thing you remember</h2>
+<p>Not the topic — the token. An exact error string, a function name, a file path, a flag. Those survive in a transcript verbatim, and they are what separates the session you want from forty that discuss the same subject:</p>
+<pre>$ deja "connection pool exhausted"
+[claude] api   · Jul 8 · 8f31c0a9 — 2 matches
+  login started failing after refresh token rotation; jwt kid mismatch in tests
+  fixed by reloading jwks cache after rotateKey and adding a clock-skew test
+[codex]  web   · Jul 1 · b77d91e2 — 1 match
+  refresh token cookie needed SameSite=Lax in local callback flow</pre>
+<p>Several words are ANDed, quotes require the exact phrase, and when nothing matches exactly the search falls back to word forms and close spellings rather than returning nothing. The harness column matters more than it looks: the session you want is often in the tool you were <em>not</em> thinking of.</p>
+
+<h2>Narrowing without guessing</h2>
+<ul>
+<li><code>--harness claude</code>, <code>--project api-gateway</code> — when you are sure, and only then.</li>
+<li><code>--since 30d</code> — a hard filter. A date inside the query is the softer version: it weighs recent sessions up without hiding older ones, because "I think it was in spring" is a hint and should not throw away the answer if it was April.</li>
+<li><code>--role user</code> — search only what you typed, which is a good filter when you remember your own words but not the answer.</li>
+<li><code>deja last 20 --project api</code> — no query at all, just the recent sessions in one project.</li>
+</ul>
+
+<h2>Reading it, then continuing it</h2>
+<p>A hit gives you a session id. Two things to do with it:</p>
+<pre>deja show 8f31c0a9      # read the session
+deja ctx  8f31c0a9      # a Markdown digest to paste into whatever you are doing now
+deja resume 8f31c0a9    # reopen it in the agent that ran it</pre>
+<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for fifteen of the twenty harnesses deja reads — Claude Code, Codex, Cursor, opencode, Gemini CLI, Cline, Copilot, Goose, Kimi, Qwen, pi, omp, OpenClaw, Antigravity and Hermes. The remaining five — aider, Grok Build, Roo Code, DeepSeek Harness and Zed — have no resume path of their own, and deja says so rather than pretending.</p>
+<p>Ids are matched by prefix, so the eight characters a result prints are enough to type.</p>
+
+<h2>When the answer is a command rather than a session</h2>
+<p>Often what you actually want is not the conversation but one line out of it:</p>
+<pre>deja how "docker compose up"    # the invocation this project really uses
+deja fix "pq: too many connections"   # what was run after that error, where it stayed fixed
+deja blame path/to/file.go      # which sessions decided what about this file</pre>
+<p>Those skip the reading step entirely.</p>
+
+<p><a href="where-sessions-are-stored.html">Where the transcripts live</a> · <a href="search.html">How search and ranking work</a> · <a href="switching-agents.html">When the session was in another agent</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

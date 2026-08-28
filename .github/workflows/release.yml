@@ -15,6 +15,12 @@ jobs:
       contents: write
       id-token: write
       attestations: write
+      # The release opens a discussion (#1559), and GitHub answers a token that
+      # may not create one with a 404 naming the category instead of the
+      # permission: "Discussion could not be created. Make sure you passed a
+      # valid category name." The category was always valid — v0.19.0 published
+      # its binaries and then failed the run on this line.
+      discussions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

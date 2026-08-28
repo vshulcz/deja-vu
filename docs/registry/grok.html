@@ -26,6 +26,7 @@
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Grok Build session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/grok.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/grok.html","name":"Grok Build session format","position":3}]}</script>
 </head>
@@ -71,8 +72,20 @@
 <li><code>generated_title</code> takes precedence over <code>session_summary</code>.</li>
 <li>Missing summary files fall back to directory IDs and the <code>.cwd</code> or URL-decoded path.</li>
 <li>Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.</li>
+<li><code>deja resume</code> prints <code>grok --resume &lt;id&gt;</code> and runs it in the recovered</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-27</p>
+<p>working directory, since Grok Build scopes its session list by directory.</p>
+<p>Rows that came out of <code>grok.db</code> belong to the other product and get an error</p>
+<p>instead.</p>
+<ul>
+<li>Grok Build reads deja&#39;s wiring three ways at once: <code>[mcp_servers.deja]</code> in</li>
+</ul>
+<p><code>config.toml</code>, <code>~/.grok/hooks/deja.json</code> in Claude Code&#39;s hook shape, and the</p>
+<p>shared skill in <code>~/.agents/skills</code>. It also scans <code>~/.claude.json</code> and</p>
+<p><code>~/.cursor/mcp.json</code>, so a machine wired for those has deja in Grok already.</p>
+<p><code>~/.grok/GROK.md</code> is the exception: that file is for the other product, and</p>
+<p>Grok Build&#39;s home rules are <code>Agents.md</code>, <code>AGENTS.md</code>, <code>Claude.md</code>, <code>CLAUDE.md</code>.</p>
+<p><strong>Last verified:</strong> 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)</p>
 
 <hr>
 <p>deja reads this format and nineteen others, and turns what it finds into memory your

@@ -238,6 +238,11 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 func plausibleSession(t *testing.T, harness string) model.Session {
 	t.Helper()
 	s := model.Session{ID: "abc123", Harness: harness, Project: "p", Path: "/tmp/x.jsonl"}
+	if harness == "grok" {
+		// Grok Build sessions are directories of updates.jsonl; the other rows
+		// under this harness come from the grok-dev database and cannot resume.
+		s.Path = filepath.Join(t.TempDir(), "sessions", "workspace%2Fp", "abc123", "updates.jsonl")
+	}
 	if harness == "openclaw" {
 		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")
 		if err := os.MkdirAll(dir, 0o755); err != nil {

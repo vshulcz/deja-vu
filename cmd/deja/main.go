@@ -1079,7 +1079,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// Before ranking, not after: the cap is applied while ranking, so a rule
 	// that runs later still lets denied sessions occupy the result slots and
 	// the allowed ones never reach the page (#1060).
-	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, result.Sessions)
+	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, search.WithoutIgnored(result.Sessions))
 	o.PolicyWithheld = policyHidden
 	o.Tier = result.Tier
 	if result.Neighbour {
@@ -3164,7 +3164,7 @@ Usage:
   deja sync forget <host>
   deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]
   deja sources
-  deja completion <bash|zsh|fish>
+  deja completion <bash|zsh|fish|powershell>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
   deja forget --list | --unforget <id>
   deja doctor [--json] [--deep] [--offline]

@@ -6,15 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 )
 
 type Client struct {
-	URL   string
-	Model string
-	HTTP  *http.Client
+	URL    string
+	Model  string
+	apiKey string
+	HTTP   *http.Client
 }
 
 var probeURLs = []string{"http://localhost:11434/api/embed", "http://localhost:1234/v1/embeddings"}
@@ -24,11 +26,11 @@ func New() (*Client, error) {
 	if model == "" {
 		model = "nomic-embed-text"
 	}
-	if url := os.Getenv("DEJA_EMBED_URL"); url != "" {
-		return &Client{URL: url, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
+	if endpoint := os.Getenv("DEJA_EMBED_URL"); endpoint != "" {
+		return &Client{URL: endpoint, Model: model, apiKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
 	}
-	for _, url := range probeURLs {
-		c := &Client{URL: url, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}
+	for _, endpoint := range probeURLs {
+		c := &Client{URL: endpoint, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}
 		if err := c.probe(); err == nil {
 			return c, nil
 		}
@@ -53,6 +55,9 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 		return nil, fmt.Errorf("create embedding request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("embedding request: %w", err)
@@ -83,6 +88,17 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	return result, nil
 }
 
+func embedAPIKey(endpoint string) string {
+	if key := os.Getenv("DEJA_EMBED_KEY"); key != "" {
+		return key
+	}
+	parsed, err := url.Parse(endpoint)
+	if err == nil && strings.EqualFold(parsed.Scheme, "https") && strings.EqualFold(parsed.Hostname(), "api.openai.com") {
+		return os.Getenv("OPENAI_API_KEY")
+	}
+	return ""
+}
+
 func (c *Client) probe() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -96,4 +112,6 @@ func (c *Client) probe() error {
 	return nil
 }
 
-func IsOllama(url string) bool { return strings.HasSuffix(strings.TrimRight(url, "/"), "/api/embed") }
+func IsOllama(endpoint string) bool {
+	return strings.HasSuffix(strings.TrimRight(endpoint, "/"), "/api/embed")
+}

@@ -4,7 +4,7 @@ deja is a single zero-dependency binary. Pick one install path:
 
 ```sh
 npm install -g @vshulcz/deja-vu     # or: npx -y @vshulcz/deja-vu
-# or: brew install vshulcz/tap/deja-vu
+# or: brew install deja-vu
 # or: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 ```
 

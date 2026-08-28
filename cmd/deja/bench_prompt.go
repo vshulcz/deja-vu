@@ -146,6 +146,20 @@ type promptReport struct {
 	// about which line the block opens with, and every arm here scores which
 	// session was chosen.
 	Russian promptArmReport `json:"russian_questions"`
+	// Paraphrase asks each chain's question in words the fixture never used —
+	// the shape of a person coming back a month later. Every other arm asks
+	// with the fixture's own wording, so the gap between this and
+	// real_questions is the vocabulary mismatch, which had no instrument until
+	// it was measured by hand on a live store that had absorbed the questions
+	// being asked of it (#2120).
+	Paraphrase promptArmReport `json:"paraphrase"`
+	// Tied is the same question in someone else's words, on a store that also
+	// holds the sentence tying those words to the term of art. Separate from
+	// Paraphrase because that arm has a ceiling: measured over the corpus, no
+	// message anywhere says both vocabularies for any of the five it fails,
+	// so nothing lexical can reach them. This arm is the reachable half, and
+	// what a working bridge (#2331) would move.
+	Tied promptArmReport `json:"paraphrase_tied"`
 	// What the block actually shows. Every other arm scores which session was
 	// chosen; none of them looks at the lines inside it, which is how a recall
 	// that had found the right session came to open with "продолжай дальше"
@@ -226,6 +240,10 @@ func runBenchPrompt(args []string) error {
 		report.Fresh.Fired, report.Fresh.Cases, report.Fresh.Correct, report.Fresh.Precision)
 	fmt.Printf("negative controls  %2d/%-2d  —        false fires: %d\n",
 		report.Negative.Fired, report.Negative.Cases, report.Negative.FalseFires)
+	fmt.Printf("reworded           %2d/%-2d  %2d       %.2f\n",
+		report.Paraphrase.Fired, report.Paraphrase.Cases, report.Paraphrase.Correct, report.Paraphrase.Precision)
+	fmt.Printf("reworded, tied     %2d/%-2d  %2d       %.2f\n",
+		report.Tied.Fired, report.Tied.Cases, report.Tied.Correct, report.Tied.Precision)
 	return nil
 }
 
@@ -268,6 +286,25 @@ func measurePrompt(seed int64) (promptReport, error) {
 		scope := chain.Project
 		if chain.Kind == "bucket-answer" {
 			scope = bench.PromptBucketProject
+		}
+		// A tied chain exists for the reworded arm alone: its store carries a
+		// sentence that explains the words without settling anything, which is
+		// the point of it. Counting it as a plain question would report the
+		// bridge's absence as a failure of the ordinary case.
+		if chain.Tied {
+			if chain.Paraphrase != "" {
+				pterms := prompt.Terms(chain.Paraphrase)
+				report.Tied.Cases++
+				if pfired, pcorrect := promptBenchProbeBlock(indexDir, scope, chain.ID, pterms); pfired {
+					report.Tied.Fired++
+					if pcorrect {
+						report.Tied.Correct++
+					} else {
+						report.Tied.FalseFires++
+					}
+				}
+			}
+			continue
 		}
 		fired, correct := promptBenchProbe(indexDir, scope, chain.ID, terms)
 		arm := &report.Real
@@ -412,6 +449,19 @@ func measurePrompt(seed int64) (promptReport, error) {
 				report.Shown.Correct++
 			}
 		}
+		if chain.Paraphrase != "" {
+			pterms := prompt.Terms(chain.Paraphrase)
+			arm := &report.Paraphrase
+			arm.Cases++
+			if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
+				arm.Fired++
+				if pcorrect {
+					arm.Correct++
+				} else {
+					arm.FalseFires++
+				}
+			}
+		}
 		arm.Cases++
 		if fired {
 			arm.Fired++
@@ -462,6 +512,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Haystack, nil)
 	finishPromptArm(&report.OffTopic, nil)
 	finishPromptArm(&report.Russian, nil)
+	finishPromptArm(&report.Paraphrase, nil)
+	finishPromptArm(&report.Tied, nil)
 	for _, q := range absentSubjectQuestions() {
 		report.AbsentSubject.Cases++
 		if fired, _ := promptBenchProbe(indexDir, bench.PromptHaystackProject, "no-such-chain", prompt.Terms(q)); fired {
@@ -488,13 +540,13 @@ func measurePrompt(seed int64) (promptReport, error) {
 // opening line came from the top of a long transcript does not, and that line
 // is the whole frame an agent reads before deciding to ignore the rest.
 func shownLineCarriesATerm(dir, project string, terms []string) bool {
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
 	var keep []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, s)
@@ -526,7 +578,7 @@ func shownLineCarriesATerm(dir, project string, terms []string) bool {
 // and reports whether its first quoted line carries the subject rather than an
 // ordinary word the question shares with the same session.
 func firstShownLineCarries(dir, project string, terms []string, topic string) bool {
-	ranked, matched, _, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return false
 	}
@@ -535,7 +587,7 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, ranked[i])
@@ -557,14 +609,14 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 // blockCarries builds the block the hook would inject and reports whether it
 // holds a distinctive word of what the session concluded.
 func blockCarries(dir, project string, terms []string, fact, topic string) bool {
-	ranked, matched, _, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil || len(ranked) == 0 {
 		return false
 	}
 	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, ranked[i])
@@ -599,11 +651,59 @@ func blockCarries(dir, project string, terms []string, fact, topic string) bool 
 // would discard downstream is discarded here too, so the number reported is
 // what a user would actually see.
 
+// promptBenchProbeBlock asks what the block would carry rather than what leads
+// it. The block has two slots, and for a question asked in other words the
+// first is often the session that explains the vocabulary — "the quorum read is
+// the one that asks every replica" — which is a better lexical match than any
+// answer can be, because it holds both vocabularies. Demanding it be beaten
+// measures the fixture; asking whether the answer travels with it measures the
+// search.
+func promptBenchProbeBlock(dir, project, chainID string, terms []string) (fired, correct bool) {
+	if !promptTermsWorthAsking(terms) {
+		return false, false
+	}
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	if err != nil {
+		return false, false
+	}
+	shown := 0
+	var chosen []model.Session
+	for i, s := range ranked {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+			continue
+		}
+		if len(s.Messages) > dejaVuMaxMessages {
+			if s = focusSession(s, terms); len(s.Messages) == 0 {
+				continue
+			}
+		}
+		// The same dedup the hook applies: two slots are two answers, and a
+		// store that said one thing in three sessions must not fill the block
+		// with it (#2328).
+		if sameAnswerAs(chosen, s, terms) {
+			continue
+		}
+		chosen = append(chosen, s)
+		fired = true
+		if strings.HasPrefix(s.ID, chainID) {
+			correct = true
+		}
+		shown++
+		if shown == promptBlockSlots {
+			break
+		}
+	}
+	return fired, correct
+}
+
+// promptBlockSlots is how many sessions the per-prompt block carries.
+const promptBlockSlots = 2
+
 func promptBenchProbe(dir, project, chainID string, terms []string) (fired, correct bool) {
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}
@@ -611,7 +711,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 		// The same bar the hook applies, from the same function — kept in one
 		// place because the two drifted: this one asked whether the query held
 		// an identifier, the hook asked whether the session did.
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		if len(s.Messages) > dejaVuMaxMessages {
@@ -643,13 +743,13 @@ func finishPromptArm(arm *promptArmReport, terms []int) {
 // blockOpensOnEcho reports whether the first line the agent would read is the
 // question it just asked, handed back.
 func blockOpensOnEcho(dir, project string, terms []string, question string) bool {
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
 	var keep []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
 			continue
 		}
 		keep = append(keep, s)

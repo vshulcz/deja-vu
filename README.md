@@ -17,6 +17,10 @@ disk, and hands the right one back when it is needed.</p>
 
 <p align="center"><b>Every memory tool starts empty and records forward. deja starts full.</b></p>
 
+<p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
+before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as
+the index is built, so what reaches the model is safe to send.</p>
+
 <p align="center">
 <b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.6%</b> on LoCoMo &middot; <b>sub-millisecond</b> lookups over 5&nbsp;GB of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
@@ -57,7 +61,7 @@ solved in that project when the session opens.
 <details>
 <summary>Other ways to install, and what to do if you want less than all of it</summary>
 
-`brew install vshulcz/tap/deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
+`brew install deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
 or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop apps that
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.
@@ -69,8 +73,14 @@ their own marketplaces instead:
 claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
 ```
 
-On Windows the install script exits with `unsupported OS` — it is a shell script. Take
-`deja-vu_<version>_windows_amd64.zip` from the
+On Windows the install script exits with `unsupported OS` — it is a shell script. Use
+Scoop instead, from the main bucket every Scoop install already has:
+
+```powershell
+scoop install deja-vu
+```
+
+Or take `deja-vu_<version>_windows_amd64.zip` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest) and put `deja.exe` on
 your `PATH`, e.g. in `%USERPROFILE%\.local\bin`.
 
@@ -93,7 +103,7 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, DeepSeek Harness and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok gets `~/.grok/GROK.md`, which it reads only when a project has no `.grok/GROK.md` of its own. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, DeepSeek Harness and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
 
 </details>
 
@@ -270,13 +280,14 @@ for people who install extensions there rather than from a CLI:
 | Harness | Package | Install |
 | --- | --- | --- |
 | opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
-| DeepSeek Harness | npm `dsh-deja` | `dsh plugin add dsh-deja` |
+| DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
+| Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
 
 Either path is enough on its own, and having both is not a problem: the
-opencode, dsh, Kimi and Codex packages read what `deja install` wrote and
+opencode, dsh, Kimi, Grok and Codex packages read what `deja install` wrote and
 contribute only what is missing, and in Zed both halves use one server id, so
 there is nothing to have twice whichever order you install in.
 
@@ -286,15 +297,34 @@ Each uses the deja you already have; the copy it bundles is only the fallback.
 
 Point `deja embed` at a local Ollama, LM Studio or OpenAI-compatible endpoint with
 `DEJA_EMBED_URL` and rephrased queries still hit. Without a reachable runtime, lexical
-search and MCP recall continue unchanged.
+search and MCP recall continue unchanged. OpenAI Platform works with its standard key:
+
+```sh
+export OPENAI_API_KEY='sk-...'
+export DEJA_EMBED_URL='https://api.openai.com/v1/embeddings'
+export DEJA_EMBED_MODEL='text-embedding-3-small'
+deja embed
+```
+
+For another authenticated OpenAI-compatible endpoint, set `DEJA_EMBED_KEY` explicitly:
+
+```sh
+export DEJA_EMBED_URL='https://example.com/v1/embeddings'
+export DEJA_EMBED_MODEL='embedding-model'
+export DEJA_EMBED_KEY='...'
+deja embed
+```
+
+`DEJA_EMBED_KEY` takes precedence. `OPENAI_API_KEY` is used automatically only for an
+HTTPS `api.openai.com` URL; it is never implicitly sent to local or third-party endpoints.
 
 <details>
 <summary>Where the vectors live and what they cost</summary>
 
 The sidecar sits beside the index as `.vectors.bin`, not inside `index.db`. Float32 vectors
-cost roughly 4 MB per 1k messages for a 1,024 dimension model. Embedding is local, and it
-never sends raw source files, only the redacted indexed text truncated to about 2k
-characters.
+cost roughly 4 MB per 1k messages for a 1,024 dimension model. A remote endpoint receives
+the redacted indexed text, truncated to about 2k characters, but never raw source files.
+With Ollama or LM Studio, embedding stays local and needs no key.
 
 </details>
 
@@ -379,6 +409,20 @@ battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/de
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+## Guides
+
+Written for the situation rather than the feature:
+
+- [The agent lost the context you had](https://vshulcz.github.io/deja-vu/guide/lost-context.html) — after a crash, a clear, or a session that came back empty
+- [The context window is full](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) — what compaction keeps, measured, and what to do instead
+- [Resuming yesterday's session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) — find it across every agent, reopen it in the one that owns it
+- [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
+- [Finding the session where you solved it](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
+- [Why agents forget between sessions](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [Where each agent keeps its history](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
+- [What compaction drops](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+
+Per harness: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
 
 ## Try it on your own history
 

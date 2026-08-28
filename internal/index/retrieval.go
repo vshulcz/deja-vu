@@ -18,8 +18,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
-	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 func Search(dir string, o query.Options) ([]model.Session, error) {
@@ -371,35 +371,10 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:
 // lowercased, stopwords dropped. Exported so callers and the benchmark can
-// mirror exactly what the relevance tier scores against.
-func RelevanceTerms(q string) []string {
-	// Letters and digits are wordy in every script; everything else splits.
-	// The old "anything above U+0400 is wordy" rule swallowed CJK and
-	// fullwidth punctuation ("？", "，"), so a real Chinese question became
-	// one giant term that matched nothing and never reached bigram
-	// expansion.
-	fields := strings.FieldsFunc(strings.ToLower(q), func(r rune) bool {
-		if r < 128 {
-			return (r < 'a' || r > 'z') && (r < '0' || r > '9') &&
-				r != '-' && r != '_' && r != '.' && r != '/'
-		}
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-	fields = expandCJKTokens(fields)
-	seen := map[string]bool{}
-	var out []string
-	for _, f := range fields {
-		if len([]rune(f)) < 2 || (len(f) < 3 && !cjkfold.IsCJK([]rune(f)[0])) || search.IsStopWord(f) || seen[f] {
-			continue
-		}
-		if cjkFunctionBigram(f) {
-			continue
-		}
-		seen[f] = true
-		out = append(out, f)
-	}
-	return out
-}
+// mirror exactly what the relevance tier scores against. The implementation
+// lives in query so that packages below index can reduce a question to its
+// words without importing index.
+func RelevanceTerms(q string) []string { return query.RelevanceTerms(q) }
 
 // RelevanceMatchTerms returns the query's relevance terms plus the surface
 // forms the relevance tier actually matches on. Callers count and snippet
@@ -1406,6 +1381,30 @@ func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model
 	return out, nil
 }
 
+// ignoredByPolicy is the trust rule that says a directory's sessions are not
+// to be recalled. It was applied at one call site — the CLI's own search — so
+// `deja doctor` printed "not recalled */.claude/jobs/*" while the per-prompt
+// hook injected those sessions into every message, which is the most automatic
+// surface deja has and the one where the rule matters most. The same shape as
+// #2070: a rule in one path of several is a rule half the callers do not have.
+//
+// Applied here because this is where every tier and every surface turns a
+// manifest entry into a session it can serve.
+func ignoredByPolicy(ss []model.Session) []model.Session {
+	pol := policy.Load()
+	if len(pol.IgnorePatterns()) == 0 {
+		return ss
+	}
+	out := ss[:0:0]
+	for _, s := range ss {
+		if pol.Ignored(s.Path, s.Project) {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 // sessionsForMetas loads full sessions for the given metas in ONE pass over
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
@@ -1435,7 +1434,7 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 	for i := range out {
 		orderPromotedNote(&out[i])
 	}
-	return out, nil
+	return ignoredByPolicy(out), nil
 }
 
 // RecentProjects is RecentProject for several project names at once: one
@@ -1486,6 +1485,15 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
+	}
+	// Every id has "" as a prefix, so an empty one used to resolve to whichever
+	// session sorted first — and PrefixMatches has always answered 0 for it.
+	// That is the disagreement #853 is about, with the sign flipped: the count
+	// says nothing matches and the resolver opens something anyway. It reached a
+	// user through the MCP resource URI (#1728), which is a boundary that can be
+	// guarded, but the shared lookup is where the two answers have to agree.
+	if p == "" {
+		return model.Session{}, false, nil
 	}
 	// Non-blocking: the session-start hook reaches this through the handoff
 	// tip, and a blocking lock made the agent wait out the entire rebuild —
@@ -2048,7 +2056,9 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		orderPromotedNote(s)
 		out = append(out, *s)
 	}
-	return out, nil
+	// The scoring and relevance tiers build their sessions here rather than
+	// through sessionsForMetas, so the ignore rule has to hold at both.
+	return ignoredByPolicy(out), nil
 }
 
 func cutPostingsBySession(posts []posting, m Manifest, o query.Options) []posting {
@@ -3293,7 +3303,7 @@ func retrievalKeys(keys []string) []string {
 }
 
 func queryKeys(s string) []string {
-	toks := expandCJKTokens(tokens(s))
+	toks := query.ExpandCJKTokens(tokens(s))
 	if len(toks) == 0 {
 		return nil
 	}

@@ -1,6 +1,6 @@
 # dsh-deja
 
-English | [中文](README.zh.md)
+English | [中文](docs/zh.md)
 
 DeepSeek Harness can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you

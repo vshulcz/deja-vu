@@ -1,6 +1,6 @@
 # dsh-deja
 
-[English](README.md) | 中文
+[English](../README.md) | 中文
 
 DeepSeek Harness 自带的 `session-query` 已经可以检索它自己的会话。这个插件回答的是另一个问题：你在这台机器上**其他**智能体里做过什么。
 

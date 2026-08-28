@@ -992,7 +992,11 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	// Recall at the moment of the action: before an edit or a command, hook-tool
 	// names the file's or command's prior decision. Scoped to the tools that
 	// change something so it never fires on a Read or a Glob.
-	nextRoot = updateClaudeHook(nextRoot, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit", uninstall)
+	// Task and Agent are the same event under two names: the parent spawning a
+	// subagent. That agent gets no session start and sends no user prompt, so
+	// its instructions are the only place memory can reach it, and hook-tool
+	// answers this one by rewriting them rather than by speaking to the parent.
+	nextRoot = updateClaudeHook(nextRoot, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", uninstall)
 	// The other half of the point of action: the pre-tool line speaks before a
 	// command runs, this one speaks when it failed and the store knows what
 	// followed that error before. Bash only — a failed edit does not carry a
