@@ -76,6 +76,10 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// RecallCount is how many injections the page carries and TotalRecalls how
+	// many the log holds, for the same reason the two note counts exist.
+	RecallCount  int
+	TotalRecalls int
 	// NoteCount is how many notes the page carries and TotalNotes how many
 	// there are, so the page can say when those differ (#2111).
 	NoteCount  int
@@ -195,8 +199,18 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		}
 		sessions = append(sessions, v)
 	}
-	recalls := make([]viewRecall, 0, viewRecalls)
-	for _, sn := range usage.Snapshots(dir, viewRecalls) {
+	// Every injection there is, so the page can say what it left behind: the
+	// tab used to claim it held all of them while carrying the newest hundred
+	// (#2313). Reading them all costs nothing extra — Snapshots parses the
+	// whole file and cuts at the end either way.
+	allRecalls := usage.Snapshots(dir, 0)
+	page.TotalRecalls = len(allRecalls)
+	if len(allRecalls) > viewRecalls {
+		allRecalls = allRecalls[:viewRecalls]
+	}
+	page.RecallCount = len(allRecalls)
+	recalls := make([]viewRecall, 0, len(allRecalls))
+	for _, sn := range allRecalls {
 		recalls = append(recalls, viewRecall{
 			Time: sn.Time.Local().Format("2006-01-02 15:04"), Kind: sn.Kind,
 			Sessions: sn.Sessions, Bytes: sn.Bytes, Policy: sn.Policy,
