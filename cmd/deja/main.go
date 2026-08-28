@@ -56,6 +56,15 @@ func rebuildWindowError(err error) error {
 		return err
 	}
 	if !rebuildInProgress(index.DefaultDir()) {
+		// Not a rebuild, so the manifest is missing for some other reason —
+		// and on a machine where the cache cannot be created that reached the
+		// reader as `open …/manifest.gob: no such file or directory`, which is
+		// the shape #798 replaced everywhere else (#2267).
+		if d := index.DefaultDir(); !dirExists(d) {
+			if a := nearestExistingDir(filepath.Dir(d)); a != "" && !dirWritable(a) {
+				return fmt.Errorf("cannot create the index directory (%s) — %s is not writable; check its permissions, or point DEJA_INDEX_DIR somewhere writable", filepath.Dir(d), a)
+			}
+		}
 		return err
 	}
 	return fmt.Errorf("the index is being rebuilt right now — run this again in a moment")
@@ -3420,6 +3429,39 @@ func existingNonDirAncestor(p string) string {
 	}
 }
 
+// nearestExistingDir walks up until it finds a directory that is there, so a
+// refusal can name the thing that actually refused rather than the path that
+// could not be created under it.
+func nearestExistingDir(p string) string {
+	for cur := filepath.Clean(p); ; {
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			if dirExists(cur) {
+				return cur
+			}
+			return ""
+		}
+		if dirExists(parent) {
+			return parent
+		}
+		cur = parent
+	}
+}
+
+// dirWritable reports whether this process can create something in dir.
+// Permission bits alone answer for the wrong user on the wrong platform, so it
+// asks the filesystem.
+func dirWritable(dir string) bool {
+	f, err := os.CreateTemp(dir, ".deja-probe-*")
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	_ = f.Close()
+	_ = os.Remove(name)
+	return true
+}
+
 // ensureError turns a failed build into something the reader can act on.
 // A denied write surfaced as `ensure: open /…/index.db.lock: permission
 // denied` — the path of an internal lock file and a syscall error, which says
@@ -3435,6 +3477,13 @@ func ensureError(dir string, err error) error {
 		// paths hit (#893, #906), and the reader is sent to check the
 		// permissions of a directory that no longer exists (#931).
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
+			// Unless something above it is there and simply refuses: a
+			// locked-down ~/.cache cannot be written into either, and reading
+			// that as an ejected volume sent the reader to reconnect a disk
+			// that never left (#2267).
+			if a := nearestExistingDir(parent); a != "" && !dirWritable(a) {
+				return fmt.Errorf("cannot create the index directory (%s) — %s is not writable; check its permissions, or point DEJA_INDEX_DIR somewhere writable", parent, a)
+			}
 			return fmt.Errorf("the index directory is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
 		}
 		// The denial is not always about the index: forget writes the
