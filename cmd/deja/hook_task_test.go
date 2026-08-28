@@ -137,7 +137,7 @@ func TestHookContextReceiptNamesTaskFiles(t *testing.T) {
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", repo)
 
-	digest, sessions, _, matched, _, _ := hookDigestResult(dir)
+	digest, sessions, _, matched, _, _, _ := hookDigestResult(dir)
 	if sessions == 0 || digest == "" {
 		t.Fatal("expected recall output")
 	}
