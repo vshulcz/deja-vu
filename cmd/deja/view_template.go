@@ -78,7 +78,10 @@ const S={{.SessionsJSON}},R={{.RecallsJSON}},N={{.NotesJSON}};
 const esc=s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function rowS(s){return '<div class="row" onclick="this.classList.toggle(\'open\')"><span class="h">['+esc(s.harness)+']</span> <span class="t">'+esc(s.title||s.id)+'</span> <span class="m">'+esc(s.project)+' · '+esc(s.updated)+'</span>'+(s.preview?'<pre>'+esc(s.preview)+'</pre>':'')+'</div>'}
 function rowR(r){return '<div class="row" onclick="this.classList.toggle(\'open\')"><span class="h">['+esc(r.kind)+']</span> <span class="t">'+r.sessions+' sessions · '+r.bytes+' B</span> <span class="m">'+esc(r.time)+(r.policy?' · '+esc(r.policy):'')+(r.terms&&r.terms.length?' · via: '+esc(r.terms.join(', ')):'')+'</span><pre>'+esc(r.digest)+'</pre></div>'}
-function rowN(n){return '<div class="row"><span class="badge '+esc(n.state)+'">'+esc(n.state)+'</span> <span class="t">'+esc(n.title)+'</span> <span class="m">'+esc(n.project)+' · '+esc(n.at)+(n.tags&&n.tags.length?' · #'+esc(n.tags.join(' #')):'')+'</span><pre style="display:block">'+esc(n.text)+'</pre></div>'}
+// The decision heads the row. A note's title is the session's own opening line
+// — the question — so leading with it put an "accepted" badge on the question
+// (#2460). The title stays under it, as what the decision answers.
+function rowN(n){var head=n.text||n.title,under=(n.text&&n.title)?n.title:'';return '<div class="row"><span class="badge '+esc(n.state)+'">'+esc(n.state)+'</span> <span class="t">'+esc(head)+'</span> <span class="m">'+esc(n.project)+' · '+esc(n.at)+(n.tags&&n.tags.length?' · #'+esc(n.tags.join(' #')):'')+'</span>'+(under?'<pre style="display:block">'+esc(under)+'</pre>':'')+'</div>'}
 function draw(){const q=(document.getElementById('q').value||'').toLowerCase();
 const hit=S.filter(s=>!q||[s.title,s.project,s.harness,s.preview,s.id].join(' ').toLowerCase().includes(q));
 document.getElementById('list').innerHTML=hit.length?hit.map(rowS).join(''):'<div class="empty">nothing matches — try deja "'+esc(q)+'" for full-text search</div>'}
