@@ -437,6 +437,12 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.id == "" {
 		return idPrefixNeeded(dir, "show needs an id-prefix", showNeedsID)
 	}
+	// A harness that does not exist matches nothing, and the refusal then
+	// blamed the id the reader typed correctly (#2251). search, last, blame
+	// and the MCP tools have always named the value they did not recognise.
+	if err := checkHarness(&o.harness); err != nil {
+		return err
+	}
 	var s model.Session
 	var ok bool
 	if o.harness != "" {
