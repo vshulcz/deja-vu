@@ -481,7 +481,12 @@ func IndexCommands() bool { return os.Getenv("DEJA_INDEX_COMMANDS") != "0" }
 // ecosystem: `git status` and `git log` missed it 2,270 times, and a person
 // working in LaTeX, Python or the JVM saw nothing at all. Widening it takes the
 // same store from 6,770 commands to 12,661, and 1.03 MB to 1.41 MB.
-var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run|mod|get|install|generate|work|clean)|brew (install|upgrade|uninstall|reinstall|tap)|golangci-lint|gofmt|pytest|python3? -m|uv (run|pip)|pip install|ruff|mypy|npm|npx|pnpm|yarn|bun |cargo |make\b|cmake|ctest|ninja|meson|bazel|buck2|gh (pr|run|release|issue|workflow|api)|git [a-z-]+|docker|kubectl|helm|terraform|psql|mysql|latexmk|mvn|gradle|dotnet|swift (build|test)|bundle exec|rails|rake|rspec|phpunit|composer (install|update|require)|tox|nox|jest|vitest|playwright|cypress|deno|tsc|sbt|stack (build|test|run|exec)|cabal|ghc|dune|zig|nix|rustc|clang\+\+|clang|g\+\+|gcc|pdm run|poetry run|deja )`)
+//
+// The service family — brew services, systemctl, launchctl, service — is here
+// for the same reason go mod tidy is: "start the thing that is not running" is
+// the answer to a refused connection, and it was the one remedy the list did
+// not carry while `brew install`, two words away, was carried (#2373).
+var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run|mod|get|install|generate|work|clean)|brew (install|upgrade|uninstall|reinstall|tap|services)|systemctl|launchctl|service [a-z0-9_.-]+ (start|stop|restart|reload|status)|golangci-lint|gofmt|pytest|python3? -m|uv (run|pip)|pip install|ruff|mypy|npm|npx|pnpm|yarn|bun |cargo |make\b|cmake|ctest|ninja|meson|bazel|buck2|gh (pr|run|release|issue|workflow|api)|git [a-z-]+|docker|kubectl|helm|terraform|psql|mysql|latexmk|mvn|gradle|dotnet|swift (build|test)|bundle exec|rails|rake|rspec|phpunit|composer (install|update|require)|tox|nox|jest|vitest|playwright|cypress|deno|tsc|sbt|stack (build|test|run|exec)|cabal|ghc|dune|zig|nix|rustc|clang\+\+|clang|g\+\+|gcc|pdm run|poetry run|deja )`)
 
 var trivialCommand = regexp.MustCompile(`^\s*(ls|cd|pwd|cat|head|tail|echo|grep|rg|find|which|wc|sed|awk|sleep|mkdir|rm|cp|mv|chmod|export|source|touch|open|printf)\b`)
 
