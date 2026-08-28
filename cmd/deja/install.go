@@ -207,6 +207,11 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			} else {
 				fmt.Printf("%s: %s %s\n", t, r.Action, r.Path)
 			}
+			// Under the action rather than in place of it, the way guidance
+			// prints its own note: the action is still what happened (#2218).
+			if r.Note != "" {
+				fmt.Printf("%s%s\n", strings.Repeat(" ", len(t)+2), r.Note)
+			}
 		}
 		if !uninstall && t != "statusline" {
 			mcpCount++
@@ -948,6 +953,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	path := sources.ClaudeJSONPath()
 	old, _ := os.ReadFile(path)
 	var root map[string]any
+	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
@@ -966,7 +972,9 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if uninstall {
 		delete(m, "deja")
 	} else {
-		m["deja"] = mcpServerEntry(exe)
+		entry := mcpServerEntry(exe)
+		note = replacedEntryNote(m["deja"], entry)
+		m["deja"] = entry
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -974,7 +982,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
@@ -1260,6 +1268,58 @@ func antigravityConfigHome() string {
 	return filepath.Join(homeDir(), ".gemini", "config")
 }
 
+// replacedEntryNote names the deja wiring someone had in a config before
+// install overwrote it. Replacing it is install's job — a stale entry is what
+// the command exists to fix — but reporting it in the same sentence deja
+// prints for a config that never mentioned deja reads as nothing having been
+// there (#2390). Empty when the entry is absent or already what deja writes.
+func replacedEntryNote(prev, entry any) string {
+	if prev == nil || sameEntry(prev, entry) {
+		return ""
+	}
+	was := entryCommandName(prev)
+	if was == "" {
+		return "replaced the deja entry that was already here"
+	}
+	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+}
+
+// sameEntry compares an entry read out of a config with the one deja is about
+// to write. Both sides go through the encoder first: a config's args decode as
+// []any while deja builds []string, and those two are the same wiring.
+func sameEntry(a, b any) bool {
+	x, err := json.Marshal(a)
+	if err != nil {
+		return false
+	}
+	y, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(x, y)
+}
+
+// entryCommandName reads the command out of an MCP entry deja did not write.
+// Configs spell it either as a string beside separate args or as one list, and
+// anything else is a shape deja has no name for.
+func entryCommandName(entry any) string {
+	m, ok := entry.(map[string]any)
+	if !ok {
+		return ""
+	}
+	switch c := m["command"].(type) {
+	case string:
+		return c
+	case []any:
+		if len(c) > 0 {
+			if first, ok := c[0].(string); ok {
+				return first
+			}
+		}
+	}
+	return ""
+}
+
 // mcpServerEntry is the JSON mcpServers value for deja. Windows stdio MCP
 // clients (Claude Code among them) spawn through cmd, so the entry uses the
 // cmd /c wrapper there; elsewhere it is the executable directly.
@@ -1290,6 +1350,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.Home(), ".copilot", "mcp-config.json")
 	old, _ := os.ReadFile(path)
 	var root map[string]any
+	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
@@ -1309,7 +1370,9 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 		delete(m, "deja")
 	} else {
 		command, args := mcpCommandArgs(exe)
-		m["deja"] = map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}
+		entry := map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}
+		note = replacedEntryNote(m["deja"], entry)
+		m["deja"] = entry
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1317,7 +1380,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
 // installOpenClawMCP wires deja into openclaw.json — OpenClaw keeps MCP
@@ -1326,6 +1389,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 	old, _ := os.ReadFile(path)
 	var root map[string]any
+	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
@@ -1345,7 +1409,9 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 		delete(servers, "deja")
 	} else {
 		command, args := mcpCommandArgs(exe)
-		servers["deja"] = map[string]any{"command": command, "args": args}
+		entry := map[string]any{"command": command, "args": args}
+		note = replacedEntryNote(servers["deja"], entry)
+		servers["deja"] = entry
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1353,12 +1419,13 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
 func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	old, _ := os.ReadFile(path)
 	var root map[string]any
+	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
@@ -1378,7 +1445,9 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 		delete(m, "deja")
 	} else {
 		command, args := mcpCommandArgs(exe)
-		m["deja"] = map[string]any{"command": command, "args": args}
+		entry := map[string]any{"command": command, "args": args}
+		note = replacedEntryNote(m["deja"], entry)
+		m["deja"] = entry
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1386,7 +1455,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
 func installOpencode(exe string, uninstall bool) (installResult, error) {
@@ -1399,6 +1468,7 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 	}
 	old, _ := os.ReadFile(path)
 	var next []byte
+	var note string
 	var err error
 	if strings.HasSuffix(path, ".jsonc") {
 		next, err = updateOpencodeJSONC(old, exe, uninstall)
@@ -1406,21 +1476,22 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 			return installResult{}, err
 		}
 	} else {
-		next, err = updateOpencodeJSON(old, exe, uninstall)
+		next, note, err = updateOpencodeJSON(old, exe, uninstall)
 		if err != nil {
 			return installResult{}, err
 		}
 	}
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
-func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, error) {
+func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string, error) {
 	var root map[string]any
+	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	m, _ := root["mcp"].(map[string]any)
 	if m == nil {
@@ -1430,13 +1501,15 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, error) 
 	if uninstall {
 		delete(m, "deja")
 	} else {
-		m["deja"] = map[string]any{"type": "local", "command": []string{exe, "mcp"}}
+		entry := map[string]any{"type": "local", "command": []string{exe, "mcp"}}
+		note = replacedEntryNote(m["deja"], entry)
+		m["deja"] = entry
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return append(next, '\n'), nil
+	return append(next, '\n'), note, nil
 }
 
 // jsoncLastCodeLine finds the last line of a .jsonc block that a parser would
