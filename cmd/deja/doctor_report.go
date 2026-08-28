@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -77,15 +78,20 @@ type doctorVersionReport struct {
 }
 
 type doctorReport struct {
-	SchemaVersion int                            `json:"schema_version"`
-	Stores        []doctorStore                  `json:"stores"`
-	Index         doctorIndexReport              `json:"index"`
-	MCP           []doctorMCPStatus              `json:"mcp"`
-	SQLite3       doctorComponent                `json:"sqlite3"`
-	Version       doctorVersionReport            `json:"version"`
-	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
-	Policy        doctorPolicyReport             `json:"policy"`
-	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
+	SchemaVersion int               `json:"schema_version"`
+	Stores        []doctorStore     `json:"stores"`
+	Index         doctorIndexReport `json:"index"`
+	MCP           []doctorMCPStatus `json:"mcp"`
+	SQLite3       doctorComponent   `json:"sqlite3"`
+	// Git is the other tool the text report names, and what it is needed for
+	// degrades in silence: changed-file notes, worktree names, the task signal.
+	// A machine checking this install could see a missing sqlite3 and not a
+	// missing git (#2411).
+	Git     doctorComponent                `json:"git"`
+	Version doctorVersionReport            `json:"version"`
+	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
+	Policy  doctorPolicyReport             `json:"policy"`
+	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 	// IngestFiles is where those counts came from. Without it the pointer at
 	// the end of doctor's ingest line led back to the numbers it had just
 	// printed, and the file to fix was never named (#2189).
@@ -292,6 +298,10 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
 		report.SQLite3.State = "ok"
+	}
+	report.Git.State = "missing"
+	if _, err := exec.LookPath("git"); err == nil {
+		report.Git.State = "ok"
 	}
 	report.Policy = collectDoctorPolicy(dir)
 	report.Sync = collectDoctorSync(dir)

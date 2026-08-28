@@ -36,7 +36,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	documented := map[string]bool{
 		// doctorReport
 		"schema_version": true, "stores": true, "index": true, "mcp": true,
-		"sqlite3": true, "version": true, "embed": true, "policy": true,
+		"sqlite3": true, "git": true, "version": true, "embed": true, "policy": true,
 		"ingest_health": true, "ingest_files": true, "deep": true,
 		// doctorStore
 		"name": true, "state": true, "paths": true, "files": true,
