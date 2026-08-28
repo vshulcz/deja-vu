@@ -76,6 +76,8 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// RecallsWithheld is how many stored digests a trust rule kept off the page.
+	RecallsWithheld int
 	// RecallCount is how many injections the page carries and TotalRecalls how
 	// many the log holds, for the same reason the two note counts exist.
 	RecallCount  int
@@ -170,6 +172,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	// consulted the policy and this one did not: it embedded imported sessions
 	// a local-only rule had already withheld from search, the listing, stats
 	// and the agent. Browsing, so the search activation governs it (#937).
+	hiddenProjects := policyHiddenProjects(policy.ActivationSearch, metas)
 	metas, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, metas)
 	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
 		fmt.Fprint(os.Stderr, note)
@@ -204,6 +207,13 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	// (#2313). Reading them all costs nothing extra — Snapshots parses the
 	// whole file and cuts at the end either way.
 	allRecalls := usage.Snapshots(dir, 0)
+	// A digest is titles, project names and message text already assembled —
+	// the three things the filter above keeps off this page — and it outlives
+	// the rule it was served under: content recalled while imported sessions
+	// were allowed stayed on the page after a local-only rule withheld them
+	// everywhere else (#2315). The record has no project field, so what is
+	// recognisable is the name of a project being withheld now.
+	allRecalls, page.RecallsWithheld = withoutHiddenProjects(allRecalls, hiddenProjects)
 	page.TotalRecalls = len(allRecalls)
 	if len(allRecalls) > viewRecalls {
 		allRecalls = allRecalls[:viewRecalls]
@@ -350,4 +360,27 @@ func openInBrowser(path string) {
 		cmd = exec.Command("xdg-open", path)
 	}
 	_ = cmd.Start()
+}
+
+// withoutHiddenProjects drops the digests that name a withheld project, and
+// says how many went. Substring rather than equality: the digest renders the
+// project inside a line of prose, and the name is what a reader would see.
+func withoutHiddenProjects(snaps []usage.Snapshot, hidden map[string]bool) ([]usage.Snapshot, int) {
+	if len(hidden) == 0 {
+		return snaps, 0
+	}
+	kept := make([]usage.Snapshot, 0, len(snaps))
+	for _, sn := range snaps {
+		withheld := false
+		for project := range hidden {
+			if strings.Contains(sn.Digest, project) {
+				withheld = true
+				break
+			}
+		}
+		if !withheld {
+			kept = append(kept, sn)
+		}
+	}
+	return kept, len(snaps) - len(kept)
 }
