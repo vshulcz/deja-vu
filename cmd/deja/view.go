@@ -76,6 +76,8 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// NotesWithheld is how many promoted notes a trust rule kept off the page.
+	NotesWithheld int
 	// RecallsWithheld is how many stored digests a trust rule kept off the page.
 	RecallsWithheld int
 	// RecallCount is how many injections the page carries and TotalRecalls how
@@ -228,6 +230,12 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		})
 	}
 	loaded := sources.LoadPromotedNotes()
+	// A promoted note is a session's decision in the reader's own words, and it
+	// keeps the project it came from — so a note promoted from an imported
+	// session stayed on this page after a local-only rule withheld that project
+	// from search, the listing and the agent. Same gap as the digests above,
+	// with the project known exactly rather than recognised in prose (#2317).
+	loaded, page.NotesWithheld = notesAllowedOnPage(loaded)
 	// By date, newest first: LoadPromotedNotes returns them in the order they
 	// were first written to the file, so cutting that keeps an arbitrary set
 	// rather than the newest — and the page's own order was the file's.
@@ -383,4 +391,19 @@ func withoutHiddenProjects(snaps []usage.Snapshot, hidden map[string]bool) ([]us
 		}
 	}
 	return kept, len(snaps) - len(kept)
+}
+
+// notesAllowedOnPage drops the promoted notes whose project a rule withholds,
+// and says how many went. Browsing, so the search activation governs it — the
+// same activation the session list on this page is filtered by.
+func notesAllowedOnPage(notes []sources.PromotedNote) ([]sources.PromotedNote, int) {
+	p := policy.Load()
+	kept := make([]sources.PromotedNote, 0, len(notes))
+	for _, n := range notes {
+		if n.Project != "" && !p.Allows(policy.ActivationSearch, n.Project) {
+			continue
+		}
+		kept = append(kept, n)
+	}
+	return kept, len(notes) - len(kept)
 }
