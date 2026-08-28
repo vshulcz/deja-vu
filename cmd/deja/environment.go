@@ -40,14 +40,25 @@ const (
 // received error text drawn from the sessions that denial had just hidden, plus
 // the harnesses and dates behind it (#659). The block reads the manifest
 // directly, so nothing upstream could have filtered it.
+// environmentBlock is environmentBlockFrom without the projects, for callers
+// that only print it.
 func environmentBlock(dir, activation string) string {
+	text, _ := environmentBlockFrom(dir, activation)
+	return text
+}
+
+// environmentBlockFrom also reports the projects whose sessions the walls came
+// from. The block names none of them in its text — it is about the machine —
+// so a record without them could not be reached when one of those projects was
+// forgotten (#2349).
+func environmentBlockFrom(dir, activation string) (string, []string) {
 	// Origin is a property of the sessions the walls came from, so the gate has
 	// to be per wall rather than one check up front: a machine can hold both
 	// local and imported sessions hitting the same error.
 	pol := policy.Load()
 	walls := index.TopFriction(dir, environmentWalls, nil)
 	if len(walls) == 0 {
-		return ""
+		return "", nil
 	}
 	var allowed []index.Friction
 	for _, w := range walls {
@@ -65,9 +76,22 @@ func environmentBlock(dir, activation string) string {
 		}
 	}
 	if len(allowed) == 0 {
-		return ""
+		return "", nil
 	}
 	walls = allowed
+	// The projects behind the walls, deduped in the order they appear: the
+	// block's own text names the errors and not where they came from.
+	var projects []string
+	seen := map[string]bool{}
+	for _, w := range walls {
+		for _, sess := range w.Sessions {
+			if sess.Project == "" || seen[sess.Project] {
+				continue
+			}
+			seen[sess.Project] = true
+			projects = append(projects, sess.Project)
+		}
+	}
 	var b strings.Builder
 	b.WriteString("This machine, from deja's index of past sessions across every agent used here:\n")
 	for _, w := range walls {
@@ -82,7 +106,7 @@ func environmentBlock(dir, activation string) string {
 	// reason the block is here.
 	b.WriteString("These are environment facts, not history: the tool or module is still missing. " +
 		"Check or use an alternative before running into them again.")
-	return b.String()
+	return b.String(), projects
 }
 
 // environmentSpent is per process, which is what makes "once" countable on

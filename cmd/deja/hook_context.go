@@ -239,15 +239,18 @@ func runHookContext(dir string, plain bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	digest, sessions, raw, taskMatched, withheld := cachedHookDigestFor(dir, input.CWD)
+	digest, sessions, raw, taskMatched, withheld, projects := cachedHookDigestFor(dir, input.CWD)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
 		// helps most. The block is about the machine, not the project, so it
 		// does not depend on the digest having found anything.
-		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
+		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 			out := frameRecall(env)
-			usage.RecordDigestPolicyInto(dir, usage.KindHook, out, input.SessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto))
+			// The block is about the machine and names no project, so without
+			// the projects behind its walls a forget of one of them could not
+			// reach the stored text (#2349).
+			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
 			if plain {
 				fmt.Fprintln(os.Stdout, out)
 				return nil
@@ -319,7 +322,7 @@ func runHookContext(dir string, plain bool) error {
 	}
 	digest = frameRecall(digest)
 	polName := policy.Load().Describe(policy.ActivationAuto)
-	usage.RecordDigestPolicyInto(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName)
+	usage.RecordDigestPolicyFrom(dir, usage.KindHook, digest, input.SessionID, sessions, raw, projects, polName)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -523,6 +526,11 @@ type hookCacheEntry struct {
 	Gate     string `json:"gate,omitempty"`
 	Digest   string `json:"digest"`
 	Sessions int    `json:"sessions"`
+	// Projects names what went into the digest, so the injection log can
+	// record it and a later forget or trust rule can be applied to the stored
+	// text without reading its prose (#2349). Old entries decode as none,
+	// which is what they carried.
+	Projects []string `json:"projects,omitempty"`
 	// Withheld counts the candidates the trust policy dropped for this
 	// digest. Old entries decode as zero, which reads as "nothing withheld"
 	// and is what they meant.
@@ -542,7 +550,11 @@ func hookCachePath(dir, cwd string) string {
 // hookDigestResult, which a cache hit never reaches.
 func hookGate() string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
-	return mode + "|" + policy.Load().Describe(policy.ActivationAuto)
+	// The gate carries what the entry was built under, and the shape of the
+	// entry itself is part of that: an entry written before the digest recorded
+	// its projects would be served for its whole TTL and logged as a digest
+	// that came from nowhere (#2349).
+	return "v2|" + mode + "|" + policy.Load().Describe(policy.ActivationAuto)
 }
 
 // hookCWD is where the hook is standing: what the payload says, else the
@@ -570,7 +582,7 @@ func hookCWD(fromPayload string) string {
 	return cwd
 }
 
-func cachedHookDigest(dir string) (string, int, int64, []string, int) {
+func cachedHookDigest(dir string) (string, int, int64, []string, int, []string) {
 	return cachedHookDigestFor(dir, "")
 }
 
@@ -578,10 +590,10 @@ func cachedHookDigest(dir string) (string, int, int64, []string, int) {
 // project the call is about. The payload is that authority: deja used to write
 // it into its own environment and read it back, which answered a second payload
 // in the same process with the first one's project (#2182, #2185).
-func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int) {
+func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int, []string) {
 	cwd := hookCWD(fromPayload)
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
-		return "", 0, 0, nil, 0
+		return "", 0, 0, nil, 0, nil
 	}
 	// Before the cache read: a hit returns without reaching the version guard
 	// in hookDigestResult, so an index left behind by an upgrade was served
@@ -605,19 +617,19 @@ func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string,
 				// the cache off the startup path.
 				requestHookRefresh(dir, cwd)
 			}
-			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld
+			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.Projects
 		}
 	}
-	digest, sessions, raw, taskMatched, withheld := hookDigestResultFor(dir, cwd)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld)
-	return digest, sessions, raw, taskMatched, withheld
+	digest, sessions, raw, taskMatched, withheld, projects := hookDigestResultFor(dir, cwd)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, projects)
+	return digest, sessions, raw, taskMatched, withheld, projects
 }
 
-func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string, withheld int) {
+func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string, withheld int, projects []string) {
 	if digest == "" {
 		return
 	}
-	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld}); err == nil {
+	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld, Projects: projects}); err == nil {
 		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
 	}
 }
@@ -672,17 +684,17 @@ func runHookRefresh(dir string) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		return
 	}
-	digest, sessions, raw, taskMatched, withheld := hookDigestResult(dir)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld)
+	digest, sessions, raw, taskMatched, withheld, projects := hookDigestResult(dir)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, projects)
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }
 
 func hookDigest(dir string) string {
-	digest, _, _, _, _ := hookDigestResult(dir)
+	digest, _, _, _, _, _ := hookDigestResult(dir)
 	return digest
 }
 
-func hookDigestResult(dir string) (string, int, int64, []string, int) {
+func hookDigestResult(dir string) (string, int, int64, []string, int, []string) {
 	return hookDigestResultFor(dir, "")
 }
 
@@ -690,7 +702,7 @@ func hookDigestResult(dir string) (string, int, int64, []string, int) {
 // project the call is about, rather than one reading it back out of the
 // environment, where a project deja itself had written stayed for every later
 // call in the process (#2182, #2185).
-func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int) {
+func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int, []string) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -704,7 +716,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	_ = mark
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
-		return "", 0, 0, nil, 0
+		return "", 0, 0, nil, 0, nil
 	}
 	// A store from an older index version must be rebuilt before it is read:
 	// this path never calls Ensure, so otherwise the first prompts after an
@@ -713,7 +725,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// manifest still describes, and this path answers from them (#800).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return "", 0, 0, nil, 0
+		return "", 0, 0, nil, 0, nil
 	}
 	cwd := fromPayload
 	if cwd == "" {
@@ -723,7 +735,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return "", 0, 0, nil, 0
+			return "", 0, 0, nil, 0, nil
 		}
 	}
 	// The two git probes (worktree list for identity, status/log for the
@@ -786,11 +798,13 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 		// The standing decisions still apply, so serve them alone rather than
 		// going out empty.
 		if conventions != "" {
-			return conventions, 0, 0, nil, withheld
+			// The conventions carry the project they belong to: this is the
+			// checkout's own memory even when no session survives to show it.
+			return conventions, 0, 0, nil, withheld, allowedNames
 		}
 		// withheld travels even with nothing to show: it is the only thing
 		// that separates "the rule hid all of it" from "no history here".
-		return "", 0, 0, nil, withheld
+		return "", 0, 0, nil, withheld, nil
 	}
 	scores, matched := taskScores(ss, taskFiles)
 	sort.Slice(ss, func(i, j int) bool {
@@ -826,9 +840,11 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// Inside the cached result, not after it: this costs a manifest scan plus
 	// one session read, which is ten times the rest of the hook, and the
 	// clusters it reports change over weeks rather than turns.
+	var envFrom []string
 	if !environmentServedRecently(dir) {
-		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
+		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 			text += "\n" + env + "\n"
+			envFrom = from
 			// Stamped on the way out rather than by the check: the check is
 			// also made by callers that may not deliver (#1806).
 			stampEnvironmentServed(dir)
@@ -846,7 +862,31 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// The candidates that never made it into the digest were never served:
 	// counting their transcripts here inflated the distillation ratio deja
 	// prints about itself (1 session distilled, 3 sessions' bytes claimed).
-	return text, result.Sessions, result.RawBytes, matched, withheld
+	// The projects behind what actually went out, so the injection log can be
+	// held to a rule or a forget without reading the digest's prose (#2349).
+	return text, result.Sessions, result.RawBytes, matched, withheld, digestProjects(ss, envFrom)
+}
+
+// digestProjects names the projects a session-start digest was built from: the
+// sessions it shows, plus the ones behind the environment block, which names
+// none of them in its own text.
+func digestProjects(ss []model.Session, env []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(p string) {
+		if p == "" || seen[p] {
+			return
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	for _, s := range ss {
+		add(s.Project)
+	}
+	for _, p := range env {
+		add(p)
+	}
+	return out
 }
 
 // warmupDeadAfter is how long a warmup may go without publishing progress

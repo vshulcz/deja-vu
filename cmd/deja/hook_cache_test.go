@@ -28,7 +28,7 @@ func TestCachedHookDigestServesWithinTTLAndInvalidates(t *testing.T) {
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 
-	d1, s1, _, _, _ := cachedHookDigest(dir)
+	d1, s1, _, _, _, _ := cachedHookDigest(dir)
 	if d1 == "" || s1 == 0 {
 		t.Fatal("first call must build a digest")
 	}
@@ -40,7 +40,7 @@ func TestCachedHookDigestServesWithinTTLAndInvalidates(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	d2, _, _, _, _ := cachedHookDigest(dir)
+	d2, _, _, _, _, _ := cachedHookDigest(dir)
 	if d2 != d1 {
 		t.Fatal("within TTL the cached digest must be served verbatim")
 	}
@@ -60,20 +60,20 @@ func TestCachedHookDigestServesWithinTTLAndInvalidates(t *testing.T) {
 	if err := os.WriteFile(cachePath, nb, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	d3, _, _, _, _ := cachedHookDigest(dir)
+	d3, _, _, _, _, _ := cachedHookDigest(dir)
 	if d3 != d1 {
 		t.Fatalf("expired cache must serve stale instantly, got:\n%s", d3)
 	}
 	// The refresh itself must produce the fresh view.
 	runHookRefresh(dir)
-	d3b, _, _, _, _ := cachedHookDigest(dir)
+	d3b, _, _, _, _, _ := cachedHookDigest(dir)
 	if !strings.Contains(d3b, "marker_beta") {
 		t.Fatalf("refresh must rebuild with fresh sessions:\n%s", d3b)
 	}
 	d3 = d3b
 	// A different cwd must never reuse another project's cache.
 	t.Setenv("CLAUDE_PROJECT_DIR", filepath.Join(t.TempDir(), "elsewhere"))
-	d4, _, _, _, _ := cachedHookDigest(dir)
+	d4, _, _, _, _, _ := cachedHookDigest(dir)
 	if d4 == d3 && d3 != "" {
 		t.Fatal("cache must be scoped to cwd")
 	}

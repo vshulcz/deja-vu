@@ -109,7 +109,7 @@ func refreshAiderContext(dir string) error {
 	// In-process rather than shelling out to hook-context: the wrapper stands
 	// between the user and their editor, and a subprocess here would also make
 	// the installer depend on its own binary being runnable.
-	digest, sessions, _, _, _ := cachedHookDigest(dir)
+	digest, sessions, _, _, _, _ := cachedHookDigest(dir)
 	body := digest
 	if sessions > 0 {
 		body = frameRecall(startLead(aiderLead) + digest)
