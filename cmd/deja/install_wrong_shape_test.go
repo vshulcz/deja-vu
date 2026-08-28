@@ -56,6 +56,15 @@ func TestInstallRefusesABlockOfTheWrongShape(t *testing.T) {
 					t.Errorf("%s went out with the write:\n%s", k, body)
 				}
 			}
+
+			// On the way out there is nothing of deja's in a block it never
+			// wrote, and refusing would leave the rest of the target wired.
+			r, err := installTarget(tc.target, "/usr/local/bin/deja", true)
+			if err != nil {
+				t.Errorf("uninstall refused a block it had nothing to remove from: %v", err)
+			} else if r.Action != "unchanged" {
+				t.Errorf("uninstall = %s %s, want unchanged", r.Action, r.Path)
+			}
 		})
 	}
 }

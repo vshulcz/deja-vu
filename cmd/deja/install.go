@@ -1055,6 +1055,11 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
+		// On the way out there is nothing of deja's in a block it never wrote,
+		// and refusing here would leave the rest of the target wired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		return installResult{}, err
 	}
 	if m == nil {
@@ -1455,6 +1460,11 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
+		// On the way out there is nothing of deja's in a block it never wrote,
+		// and refusing here would leave the rest of the target wired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		return installResult{}, err
 	}
 	if m == nil {
@@ -1497,6 +1507,9 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	mcp, _, err := mcpBlock(root, "mcp", path)
 	if err != nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		return installResult{}, err
 	}
 	if mcp == nil {
@@ -1505,6 +1518,9 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	}
 	servers, _, err := mcpBlock(mcp, "servers", path)
 	if err != nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		return installResult{}, err
 	}
 	if servers == nil {
@@ -1539,6 +1555,11 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	}
 	m, _, err := mcpBlock(root, "mcpServers", path)
 	if err != nil {
+		// On the way out there is nothing of deja's in a block it never wrote,
+		// and refusing here would leave the rest of the target wired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		return installResult{}, err
 	}
 	if m == nil {
@@ -1601,6 +1622,9 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 	}
 	m, _, err := mcpBlock(root, "mcp", "")
 	if err != nil {
+		if uninstall {
+			return old, "", nil
+		}
 		return nil, "", err
 	}
 	if m == nil {
