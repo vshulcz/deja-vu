@@ -295,7 +295,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 			if chain.Paraphrase != "" {
 				pterms := prompt.Terms(chain.Paraphrase)
 				report.Tied.Cases++
-				if pfired, pcorrect := promptBenchProbe(indexDir, scope, chain.ID, pterms); pfired {
+				if pfired, pcorrect := promptBenchProbeBlock(indexDir, scope, chain.ID, pterms); pfired {
 					report.Tied.Fired++
 					if pcorrect {
 						report.Tied.Correct++
@@ -650,6 +650,54 @@ func blockCarries(dir, project string, terms []string, fact, topic string) bool 
 // ask the index for this project's sessions ranked by them. Anything the hook
 // would discard downstream is discarded here too, so the number reported is
 // what a user would actually see.
+
+// promptBenchProbeBlock asks what the block would carry rather than what leads
+// it. The block has two slots, and for a question asked in other words the
+// first is often the session that explains the vocabulary — "the quorum read is
+// the one that asks every replica" — which is a better lexical match than any
+// answer can be, because it holds both vocabularies. Demanding it be beaten
+// measures the fixture; asking whether the answer travels with it measures the
+// search.
+func promptBenchProbeBlock(dir, project, chainID string, terms []string) (fired, correct bool) {
+	if !promptTermsWorthAsking(terms) {
+		return false, false
+	}
+	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	if err != nil {
+		return false, false
+	}
+	shown := 0
+	var chosen []model.Session
+	for i, s := range ranked {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+			continue
+		}
+		if len(s.Messages) > dejaVuMaxMessages {
+			if s = focusSession(s, terms); len(s.Messages) == 0 {
+				continue
+			}
+		}
+		// The same dedup the hook applies: two slots are two answers, and a
+		// store that said one thing in three sessions must not fill the block
+		// with it (#2328).
+		if sameAnswerAs(chosen, s, terms) {
+			continue
+		}
+		chosen = append(chosen, s)
+		fired = true
+		if strings.HasPrefix(s.ID, chainID) {
+			correct = true
+		}
+		shown++
+		if shown == promptBlockSlots {
+			break
+		}
+	}
+	return fired, correct
+}
+
+// promptBlockSlots is how many sessions the per-prompt block carries.
+const promptBlockSlots = 2
 
 func promptBenchProbe(dir, project, chainID string, terms []string) (fired, correct bool) {
 	if !promptTermsWorthAsking(terms) {

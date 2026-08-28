@@ -21,31 +21,46 @@ func TestTiedChainsCarryTheSentenceThatTiesTheVocabularies(t *testing.T) {
 		if c.Paraphrase == "" {
 			t.Fatalf("%s is tied and asks nothing in other words", c.ID)
 		}
-		var answer, tie int
+		answers, ties := 0, 0
 		for _, s := range c.Sessions {
 			text := ""
 			for _, m := range s.Messages {
 				text += " " + strings.ToLower(m.Text)
 			}
-			saysTerm := strings.Contains(text, strings.ToLower(c.Topic))
-			saysOther := strings.Contains(text, strings.ToLower(c.Paraphrase))
-			switch {
-			case saysTerm && saysOther:
-				tie++
-				// The tie explains; it must not be able to satisfy the arm on
-				// its own, and the probe counts only the chain's own ids.
-				if strings.HasPrefix(s.ID, c.ID) {
-					t.Errorf("%s: the tying session can pass the arm by itself", c.ID)
+			if !strings.Contains(text, strings.ToLower(c.Topic)) {
+				continue
+			}
+			// The tying sessions sit outside the chain's id prefix: the arm
+			// counts the chain's own sessions, and a session that explains the
+			// words while settling nothing must not pass it by itself.
+			if strings.HasPrefix(s.ID, c.ID) {
+				answers++
+				continue
+			}
+			ties++
+			// It says the term beside the question's ordinary words, not the
+			// whole question: a session repeating the question verbatim is the
+			// best lexical match there can be, and an arm it always wins
+			// measures the fixture rather than the search.
+			shared := 0
+			for _, w := range strings.Fields(strings.ToLower(c.Paraphrase)) {
+				if len(w) > 4 && strings.Contains(text, w) {
+					shared++
 				}
-			case saysTerm:
-				answer++
+			}
+			if shared < 2 {
+				t.Errorf("%s: the tying session shares too little of the wording", s.ID)
+			}
+			if strings.Contains(text, strings.ToLower(c.Paraphrase)) {
+				t.Errorf("%s: the tying session restates the whole question", s.ID)
 			}
 		}
-		if answer == 0 {
+		if answers == 0 {
 			t.Errorf("%s: no session settles anything in the term's own words", c.ID)
 		}
-		if tie == 0 {
-			t.Errorf("%s: no session ties the ordinary words to the term", c.ID)
+		// The map links two words only once they have shared three sessions.
+		if ties < cooccurTieCopies {
+			t.Errorf("%s: the tie is said %d times, below what the map learns from", c.ID, ties)
 		}
 	}
 	if tied != PromptTiedCount {

@@ -209,21 +209,40 @@ func promptCorpusHash(chains []PromptChain) string {
 	return hex.EncodeToString(h[:])
 }
 
+// cooccurTieCopies is how many sessions repeat the tying sentence. The map
+// links two words only once they have shared three sessions.
+const cooccurTieCopies = 3
+
 // PromptTiedCount is how many tied chains the corpus carries.
 const PromptTiedCount = 6
 
 // tiedTopics are the tied arm's own subjects. Separate from the plain topics
 // on purpose: sharing them would let a plain chain's sessions answer the tied
 // paraphrase, and the arm would measure the corpus rather than the bridge.
-func tiedTopics() []promptTopic {
-	return []promptTopic{
-		{"quorum", "quorum reads were turned off for the status endpoint", "what did we do about quorum reads?", "why does the status endpoint no longer ask every replica"},
-		{"debounce", "the debounce on the search box was set to 250ms", "what debounce did we settle on?", "how long do we wait before sending what someone typed"},
-		{"replay", "a replay guard was added to the payment retry path", "what did we add to the payment retry path?", "what stops a retried charge from taking the money twice"},
-		{"vacuum", "autovacuum was tuned per table for the events table", "what did we change about vacuum?", "how did we stop dead rows piling up in the biggest table"},
-		{"sharding", "sharding was keyed on tenant rather than on user", "what is the shard key now?", "by what are the rows split across the machines"},
-		{"watermark", "a watermark was added so the queue drops nothing", "what did we add so the queue stops dropping?", "how did we stop the queue from throwing work away"},
+func tiedTopics() []tiedTopic {
+	return []tiedTopic{
+		{promptTopic{"quorum", "quorum reads were turned off for the status endpoint", "what did we do about quorum reads?", "why does the status endpoint no longer ask every replica"},
+			"the quorum read is the one that asks every replica"},
+		{promptTopic{"debounce", "the debounce on the search box was set to 250ms", "what debounce did we settle on?", "how long do we wait before sending what someone typed"},
+			"the debounce is how long we wait before sending"},
+		{promptTopic{"replay", "a replay guard was added to the payment retry path", "what did we add to the payment retry path?", "what stops a retried charge from taking the money twice"},
+			"the replay guard is what stops a retried charge"},
+		{promptTopic{"vacuum", "autovacuum was tuned per table for the events table", "what did we change about vacuum?", "how did we stop dead rows piling up in the biggest table"},
+			"vacuum is what clears the dead rows piling up in a table"},
+		{promptTopic{"sharding", "sharding was keyed on tenant rather than on user", "what is the shard key now?", "by what are the rows split across the machines"},
+			"sharding is how the rows are split across machines"},
+		{promptTopic{"watermark", "a watermark was added so the queue drops nothing", "what did we add so the queue stops dropping?", "how did we stop the queue from throwing work away"},
+			"the watermark is what keeps the queue from throwing work away"},
 	}
+}
+
+// tiedTopic is a subject plus the sentence a team writes when it explains its
+// own word in passing. Not a restatement of the question: a session repeating
+// the question verbatim is the best lexical match there can be, and an arm it
+// always wins measures the fixture rather than the search.
+type tiedTopic struct {
+	promptTopic
+	tie string
 }
 
 // tiedChains repeat the plain shape with one addition: a short session where
@@ -258,7 +277,22 @@ func tiedChains(rng *rand.Rand, base time.Time) []PromptChain {
 		// The sentence that ties the two vocabularies, in a session of its own
 		// — it explains, it does not decide, so an arm that asks for the
 		// decision must not be satisfied by it.
-		tie := fmt.Sprintf("what we call %s is %s", topic.word, topic.paraphrase)
+		// Said in three sessions, which is the evidence the co-occurrence map
+		// asks for by construction (cooccurMinPair, "a pattern, not a
+		// one-off"). One sentence teaches it nothing, and a store where a
+		// team's own vocabulary appears exactly once does not exist.
+		tie := topic.tie
+		for copyN := 1; copyN < cooccurTieCopies; copyN++ {
+			chain.Sessions = append(chain.Sessions, model.Session{
+				ID:      fmt.Sprintf("prompt-tievocab-%02d-%d", i, copyN),
+				Harness: "claude", Project: chain.Project,
+				Updated: t.Add(time.Duration(10+copyN) * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: tie, Time: t.Add(time.Duration(5+copyN) * time.Minute)},
+					{Role: "assistant", Text: fillerText(rng, "same thing, different words"), Time: t.Add(time.Duration(6+copyN) * time.Minute)},
+				},
+			})
+		}
 		chain.Sessions = append(chain.Sessions, model.Session{
 			// Deliberately outside the chain's id prefix: the probe counts a
 			// hit only for the chain's own sessions, and a tie that explains
