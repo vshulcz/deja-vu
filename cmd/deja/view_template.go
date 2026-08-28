@@ -68,7 +68,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 <div id="tab-recalls" style="display:none"><div id="rlist"></div>
 <p class="note">the injections agents received, verbatim — the audit trail behind <b>deja log</b>.{{if lt .RecallCount .TotalRecalls}} The {{.RecallCount}} most recent of {{.TotalRecalls}} are on this page; older ones stay in the log until it rotates.{{end}}{{if .RecallsWithheld}} {{.RecallsWithheld}} more are held back by the trust policy.{{end}}</p></div>
 <div id="tab-notes" style="display:none"><div id="nlist"></div>
-<p class="note">curated notes from <b>deja promote</b> / <b>deja remember</b>; lifecycle states shown as badges.{{if lt .NoteCount .TotalNotes}} The {{.NoteCount}} most recent notes of {{.TotalNotes}} are on this page — the rest answer through <b>deja "query"</b> and the agents' recall tool.{{end}}</p></div>
+<p class="note">curated notes from <b>deja promote</b> / <b>deja remember</b>; lifecycle states shown as badges.{{if lt .NoteCount .TotalNotes}} The {{.NoteCount}} most recent notes of {{.TotalNotes}} are on this page — the rest answer through <b>deja "query"</b> and the agents' recall tool.{{end}}{{if .NotesWithheld}} {{.NotesWithheld}} more are held back by the trust policy.{{end}}</p></div>
 </div>
 <script>
 const S={{.SessionsJSON}},R={{.RecallsJSON}},N={{.NotesJSON}};
