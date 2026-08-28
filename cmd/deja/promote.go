@@ -90,7 +90,11 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	// into deja's own store and reported that the note now outranks the
 	// transcript in recall, while every reading surface filters that note out
 	// again for the same project (#2278).
-	if sources.ExcludedProject(s.Project) {
+	// Correcting a note that already exists is exempt: it copies nothing new
+	// out of the excluded project, and taking a mark back on work you have
+	// since excluded is exactly the cleanup someone would want. The note stays
+	// invisible either way, and `deja forget --session deja-note-…` removes it.
+	if s.Harness != "deja" && sources.ExcludedProject(s.Project) {
 		return fmt.Errorf("%s is in a project your exclude list covers — a note promoted from it is filtered out of recall too; `deja index --rebuild` drops the session, or remove the pattern to promote it", prefix)
 	}
 	src := s.Harness + ":" + s.ID

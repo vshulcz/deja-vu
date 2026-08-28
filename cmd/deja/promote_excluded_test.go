@@ -60,4 +60,11 @@ func TestPromoteRefusesAnExcludedProject(t *testing.T) {
 	if len(after) != len(before) {
 		t.Error("the refusal still wrote a note")
 	}
+
+	// Correcting the note written before the pattern existed is still allowed:
+	// it copies nothing new out of the excluded project, and taking a mark back
+	// on work you have since excluded is the cleanup someone would want.
+	if _, err := captureRun(t, "promote", "deja-note-claude-sec1", "--state", "rejected"); err != nil {
+		t.Errorf("correcting an existing note: %v", err)
+	}
 }
