@@ -48,9 +48,18 @@ func TestTheEventsLogStaysReadableUnderWriters(t *testing.T) {
 	seen := map[string]int{}
 	stale := 0
 	for i, line := range strings.Split(strings.TrimRight(string(body), "\n"), "\n") {
+		// A blank line is not a lost record: the writers close a line they
+		// find open before appending (#1901), and a rotation landing between
+		// that check and the write leaves the newline with nothing after it.
+		// The reader skips what it cannot parse, so an empty line costs
+		// nothing — what would cost something is a record cut in half, which
+		// is a non-empty line that will not parse.
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		var e Event
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			t.Fatalf("line %d is not a record deja can read: %v\n%.200s", i+1, err, line)
+			t.Fatalf("line %d is a record cut in half: %v\n%.200s", i+1, err, line)
 		}
 		if strings.HasPrefix(e.Kind, "seed") {
 			stale++
