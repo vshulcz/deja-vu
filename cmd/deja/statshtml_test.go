@@ -37,7 +37,7 @@ func TestStatsHTMLMetadataEscapingAndPrivacy(t *testing.T) {
 	}
 	// The note says what the file holds rather than denying it holds any
 	// message text, since the titles are the opening lines of sessions (#2275).
-	if !strings.Contains(output, "1") || !strings.Contains(output, "2") || !strings.Contains(output, "opening line of each session") {
+	if !strings.Contains(output, "1") || !strings.Contains(output, "2") || !strings.Contains(output, "title or its opening line") {
 		t.Fatalf("HTML totals/privacy note missing: %s", output)
 	}
 }
