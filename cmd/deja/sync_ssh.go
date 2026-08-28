@@ -190,7 +190,7 @@ func syncSSHPush(dir, host string, full bool) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "deja: exported %d records\n", n)
+	fmt.Fprint(os.Stdout, sshExportedLine(n))
 	if n == 0 {
 		fmt.Fprintln(os.Stdout, "deja: nothing new to push")
 		return errNothingToSend
@@ -320,4 +320,11 @@ func sshCapture(host, cmd string) (string, error) {
 
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+// sshExportedLine is the push's count, in the same words the local export
+// uses: this path had its own format string and said "exported 1 records" on
+// the first sync anyone runs against a new machine (#2290).
+func sshExportedLine(n int) string {
+	return fmt.Sprintf("deja: exported %d record%s\n", n, pluralS(n))
 }
