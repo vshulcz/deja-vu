@@ -524,6 +524,13 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 // printed and how many there are. Empty when the slice is the whole session,
 // because a reader who asked for everything needs no arithmetic.
 func showWindowNote(offset, returned, total int) string {
+	if total == 0 {
+		// Not the offset's fault, and asked before the full-window case below:
+		// a session deja holds with nothing readable in it answers every
+		// window the same way, and printing a bare header for it is the silent
+		// empty this note exists to end.
+		return "deja: this session has no messages to show"
+	}
 	if offset <= 0 && returned == total {
 		return ""
 	}
