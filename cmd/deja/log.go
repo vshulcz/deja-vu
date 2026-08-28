@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -61,11 +62,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			enc.SetIndent("", "  ")
 			return enc.Encode(s)
 		}
-		pol := ""
-		if s.Policy != "" {
-			pol = " · policy: " + s.Policy
-		}
-		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), pol)
+		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), snapshotTail(s))
 		fmt.Fprintln(w, s.Digest)
 		// This is the newest digest by its stamp (#2140), so a stamp from
 		// ahead of the clock holds the spot until the clock catches up — and
@@ -137,4 +134,24 @@ func eventsStampedAhead(events []usage.Event, now time.Time) int {
 		}
 	}
 	return n
+}
+
+// snapshotTail is the part of the header that depends on what the record
+// happens to carry. The record knows which agent session received the digest
+// and which terms fired it — both were added to explain an injection after the
+// fact (#1494) — and only --json ever said them, so the surface a person types
+// answered "what was injected" and never to whom or why (#2301). Fields the
+// record does not carry print nothing, the way policy already did.
+func snapshotTail(s usage.Snapshot) string {
+	var b strings.Builder
+	if s.Policy != "" {
+		b.WriteString(" · policy: " + s.Policy)
+	}
+	if s.Into != "" {
+		b.WriteString(" · into: " + s.Into)
+	}
+	if len(s.Terms) > 0 {
+		b.WriteString(" · terms: " + strings.Join(s.Terms, ", "))
+	}
+	return b.String()
 }
