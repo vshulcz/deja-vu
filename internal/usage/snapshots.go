@@ -277,23 +277,27 @@ func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, poli
 	if err != nil {
 		return
 	}
-	// The record's own size decides how much room the rotation has to leave.
-	rotateSnapshots(p, len(b)+1)
-	// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
-	// the reason the usage log opens the same way (#1901).
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
-	if err != nil {
-		return
-	}
-	defer func() { _ = f.Close() }()
-	// A process killed between a record and its newline costs that record. It
-	// cost every later one too: appended onto the partial line, the new digest
-	// parsed as nothing either, and `deja log --last` reported no injection at
-	// all on a machine that had just served two (#1965).
-	if atomicfile.EndsMidLine(f) {
-		b = append([]byte{'\n'}, b...)
-	}
-	_, _ = f.Write(append(b, '\n'))
+	// Under the lock with the rotation: both are this file's writers, and a
+	// forget sweep rewriting it in between wrote the append away (#2413).
+	withLogLock(p, func() {
+		// The record's own size decides how much room the rotation has to leave.
+		rotateSnapshots(p, len(b)+1)
+		// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
+		// the reason the usage log opens the same way (#1901).
+		f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+		if err != nil {
+			return
+		}
+		defer func() { _ = f.Close() }()
+		// A process killed between a record and its newline costs that record. It
+		// cost every later one too: appended onto the partial line, the new digest
+		// parsed as nothing either, and `deja log --last` reported no injection at
+		// all on a machine that had just served two (#1965).
+		if atomicfile.EndsMidLine(f) {
+			b = append([]byte{'\n'}, b...)
+		}
+		_, _ = f.Write(append(b, '\n'))
+	})
 }
 
 func rotateSnapshots(p string, incoming int) {
@@ -503,6 +507,16 @@ func boundTerms(terms []string) []string {
 // rather than left to be discovered.
 func ForgetSnapshots(indexDir string, drop func(Snapshot) bool) (int, error) {
 	p := SnapshotPath(indexDir)
+	var gone int
+	var err error
+	// The read and the replace are one operation: an injection appended
+	// between them was written over, and an agent's record of what it received
+	// went with it (#2413).
+	withLogLock(p, func() { gone, err = forgetSnapshotsLocked(p, drop) })
+	return gone, err
+}
+
+func forgetSnapshotsLocked(p string, drop func(Snapshot) bool) (int, error) {
 	snaps := snapshotsFrom(p, 0) // last appended first
 	if len(snaps) == 0 {
 		return 0, nil
