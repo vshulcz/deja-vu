@@ -93,6 +93,13 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "no replaced spans recorded for %q\n", path)
 		return nil
 	}
+	if want == 0 && out != "" && len(spans) == 1 {
+		// `-o` says where the bytes go, and with one span there is nothing to
+		// choose: asking for `--span 1` as well is asking someone to name the
+		// only door in the room. Without this the listing printed and the file
+		// was never written, which is the state #2253 closed one step over.
+		want = 1
+	}
 	if want == 0 {
 		fmt.Fprintf(stdout, "%d replaced spans recorded for %s\n", len(spans), path)
 		// The row carries a date, a harness, a session id and a size, and on a
@@ -112,6 +119,13 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "  %d  %s  %s %s  %d B replaced%s\n",
 				i+1, s.when.Format("Jan 02 15:04"), harness, shortID(s.session),
 				len(s.body), redactionNote(s.body))
+		}
+		if out != "" {
+			// The flag was given and could not be honoured. Silence here read
+			// as a file written (#2417).
+			fmt.Fprintf(stdout, "\nnothing was written to %s — name the span you want:\ndeja restore %s --span 1 -o %s\n",
+				out, path, out)
+			return nil
 		}
 		fmt.Fprintf(stdout, "\ndeja restore %s --span 1 -o recovered.txt\n", path)
 		return nil
