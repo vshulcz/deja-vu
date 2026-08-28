@@ -35,7 +35,9 @@ func TestStatsHTMLMetadataEscapingAndPrivacy(t *testing.T) {
 	if strings.Contains(output, "<script>alert(1)</script>") || !strings.Contains(output, `\u003cscript\u003e`) || strings.Contains(output, "http://") || strings.Contains(output, "https://") {
 		t.Fatalf("HTML escaping/network check failed: %s", output)
 	}
-	if !strings.Contains(output, "1") || !strings.Contains(output, "2") || !strings.Contains(output, "metadata-only") {
+	// The note says what the file holds rather than denying it holds any
+	// message text, since the titles are the opening lines of sessions (#2275).
+	if !strings.Contains(output, "1") || !strings.Contains(output, "2") || !strings.Contains(output, "opening line of each session") {
 		t.Fatalf("HTML totals/privacy note missing: %s", output)
 	}
 }
