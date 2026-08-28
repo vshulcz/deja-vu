@@ -858,6 +858,29 @@ func configParseError(path string, err error) error {
 	return fmt.Errorf("%s: %w", path, err)
 }
 
+// mcpBlock reads the object an MCP config keeps its servers in. A missing key
+// is an empty block deja fills in; a key holding something else — a list, a
+// string, null — is a config deja does not understand, and building a fresh
+// object over it dropped whatever was there and reported an ordinary write
+// (#2399). A config that will not parse is already refused this way, and the
+// wrong shape is the case where something is actually lost.
+func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, error) {
+	v, ok := root[key]
+	if !ok || v == nil {
+		return nil, false, nil
+	}
+	m, isObject := v.(map[string]any)
+	if !isObject {
+		// The writers that edit a file they opened themselves name it here;
+		// the one that hands bytes back to its caller leaves the naming to it.
+		if path == "" {
+			return nil, false, fmt.Errorf("%q is not an object deja can edit — left as it was", key)
+		}
+		return nil, false, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, key)
+	}
+	return m, true, nil
+}
+
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
 // The markers are what every generator writes: the subcommands the hooks call,
 // and the name of the MCP server and extension entries.
@@ -1030,7 +1053,15 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
-	m, _ := root["mcpServers"].(map[string]any)
+	m, _, err := mcpBlock(root, "mcpServers", path)
+	if err != nil {
+		// On the way out there is nothing of deja's in a block it never wrote,
+		// and refusing here would leave the rest of the target wired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{}, err
+	}
 	if m == nil {
 		// Adding the empty block on the way out rewrites a config that never
 		// mentioned deja, and leaves a .bak of it besides (#676).
@@ -1427,7 +1458,15 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
-	m, _ := root["mcpServers"].(map[string]any)
+	m, _, err := mcpBlock(root, "mcpServers", path)
+	if err != nil {
+		// On the way out there is nothing of deja's in a block it never wrote,
+		// and refusing here would leave the rest of the target wired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{}, err
+	}
 	if m == nil {
 		// Adding the empty block on the way out rewrites a config that never
 		// mentioned deja, and leaves a .bak of it besides (#676).
@@ -1466,12 +1505,24 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
-	mcp, _ := root["mcp"].(map[string]any)
+	mcp, _, err := mcpBlock(root, "mcp", path)
+	if err != nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{}, err
+	}
 	if mcp == nil {
 		mcp = map[string]any{}
 		root["mcp"] = mcp
 	}
-	servers, _ := mcp["servers"].(map[string]any)
+	servers, _, err := mcpBlock(mcp, "servers", path)
+	if err != nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{}, err
+	}
 	if servers == nil {
 		servers = map[string]any{}
 		mcp["servers"] = servers
@@ -1502,7 +1553,15 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
-	m, _ := root["mcpServers"].(map[string]any)
+	m, _, err := mcpBlock(root, "mcpServers", path)
+	if err != nil {
+		// On the way out there is nothing of deja's in a block it never wrote,
+		// and refusing here would leave the rest of the target wired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{}, err
+	}
 	if m == nil {
 		// Adding the empty block on the way out rewrites a config that never
 		// mentioned deja, and leaves a .bak of it besides (#676).
@@ -1543,14 +1602,11 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 	var err error
 	if strings.HasSuffix(path, ".jsonc") {
 		next, note, err = updateOpencodeJSONC(old, exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
 	} else {
 		next, note, err = updateOpencodeJSON(old, exe, uninstall)
-		if err != nil {
-			return installResult{}, err
-		}
+	}
+	if err != nil {
+		return installResult{}, configParseError(path, err)
 	}
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a, Note: note}, err
@@ -1564,7 +1620,13 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return nil, "", err
 	}
-	m, _ := root["mcp"].(map[string]any)
+	m, _, err := mcpBlock(root, "mcp", "")
+	if err != nil {
+		if uninstall {
+			return old, "", nil
+		}
+		return nil, "", err
+	}
 	if m == nil {
 		m = map[string]any{}
 		root["mcp"] = m
