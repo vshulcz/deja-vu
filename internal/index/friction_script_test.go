@@ -16,8 +16,8 @@ func TestFrictionBoundsCountCharactersNotBytes(t *testing.T) {
 	// Carries an English marker, as most real error lines do, so only the
 	// length decides.
 	for _, l := range []string{
-		"ОШИБКА при развёртывании: connection refused при подключении к очереди повторов",
-		"ОШИБКА при развёртывании сервиса доставки: connection refused при подключении к очереди",
+		"ОШИБКА при развёртывании сервиса доставки заказов: connection refused при подключении к очереди повторов на резервном узле",
+		"ОШИБКА при развёртывании сервиса доставки заказов и уведомлений: connection refused при подключении к очереди повторов узла",
 	} {
 		if n := utf8.RuneCountInString(l); n > frictionLineMax {
 			t.Fatalf("the fixture is %d characters, past the bound itself", n)
