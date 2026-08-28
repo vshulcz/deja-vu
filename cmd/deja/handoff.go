@@ -194,7 +194,7 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	// work in this project rather than handing over older work in silence.
 	var hiddenNewest time.Time
 	for _, name := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.RecentProject(dir, name, 3)
+		ss, err := index.RecentInProject(dir, name, 3)
 		if err != nil || len(ss) == 0 {
 			continue
 		}
