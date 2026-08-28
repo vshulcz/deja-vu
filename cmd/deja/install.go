@@ -1471,7 +1471,7 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 	var note string
 	var err error
 	if strings.HasSuffix(path, ".jsonc") {
-		next, err = updateOpencodeJSONC(old, exe, uninstall)
+		next, note, err = updateOpencodeJSONC(old, exe, uninstall)
 		if err != nil {
 			return installResult{}, err
 		}
@@ -1569,14 +1569,14 @@ func jsoncCodeOf(line string, inBlock bool) (code string, stillInBlock bool, end
 	return strings.TrimSpace(b.String()), inBlock, end
 }
 
-func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error) {
+func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string, error) {
 	line := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
 	s := string(old)
 	if strings.TrimSpace(s) == "" {
 		if uninstall {
-			return []byte("{}\n"), nil
+			return []byte("{}\n"), "", nil
 		}
-		return []byte("{\n  \"mcp\": {\n" + line + "\n  }\n}\n"), nil
+		return []byte("{\n  \"mcp\": {\n" + line + "\n  }\n}\n"), "", nil
 	}
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	start, end := -1, -1
@@ -1595,11 +1595,21 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error)
 		}
 	}
 	if start >= 0 && end > start {
-		var body []string
+		// The lines this drops are the entry that was already here. Naming what
+		// it ran is the same sentence the .json writer prints (#2390); without
+		// it, what install told you depended on which of the two names the
+		// config had (#2392).
+		var body, dropped []string
 		for _, l := range lines[start+1 : end] {
-			if !strings.Contains(l, `"deja"`) {
-				body = append(body, l)
+			if strings.Contains(l, `"deja"`) {
+				dropped = append(dropped, l)
+				continue
 			}
+			body = append(body, l)
+		}
+		note := ""
+		if !uninstall {
+			note = replacedJSONCLineNote(dropped, line)
 		}
 		if !uninstall {
 			// Only the last line that carries content decides whether a comma
@@ -1617,10 +1627,10 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error)
 		out := append([]string{}, lines[:start+1]...)
 		out = append(out, body...)
 		out = append(out, lines[end:]...)
-		return []byte(strings.Join(out, "\n") + "\n"), nil
+		return []byte(strings.Join(out, "\n") + "\n"), note, nil
 	}
 	if uninstall {
-		return []byte(strings.Join(lines, "\n") + "\n"), nil
+		return []byte(strings.Join(lines, "\n") + "\n"), "", nil
 	}
 	// An "mcp" key exists but brace-counting could not bound it — its opening
 	// brace is on a later line, or the braces are unbalanced. Adding a fresh
@@ -1628,7 +1638,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error)
 	// user's other servers. Refuse rather than corrupt a config that cannot be
 	// rebuilt; the caller surfaces this so the user can wire deja by hand.
 	if start >= 0 || opencodeHasMCPKey(lines) {
-		return nil, fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	insert := len(lines) - 1
 	comma := ""
@@ -1643,7 +1653,44 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, error)
 	out := append([]string{}, lines[:insert]...)
 	out = append(out, mcp...)
 	out = append(out, lines[insert:]...)
-	return []byte(strings.Join(out, "\n") + "\n"), nil
+	return []byte(strings.Join(out, "\n") + "\n"), "", nil
+}
+
+// replacedJSONCLineNote names the deja entry a line-editing write dropped.
+// The lines are text rather than a decoded entry, so the comparison is the
+// text deja would have written: same line, nothing replaced. Empty when the
+// entry was absent or already deja's own.
+func replacedJSONCLineNote(dropped []string, line string) string {
+	if len(dropped) == 0 {
+		return ""
+	}
+	if len(dropped) == 1 && strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(dropped[0]), ",")) ==
+		strings.TrimSpace(line) {
+		return ""
+	}
+	was := jsoncEntryCommand(strings.Join(dropped, " "))
+	if was == "" {
+		return "replaced the deja entry that was already here"
+	}
+	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+}
+
+// jsoncEntryCommand pulls the command out of an entry deja did not write. It
+// reads the text rather than the JSON: the block may carry comments and
+// trailing commas, which is why this writer exists at all.
+func jsoncEntryCommand(text string) string {
+	i := strings.Index(text, `"command"`)
+	if i < 0 {
+		return ""
+	}
+	rest := text[i+len(`"command"`):]
+	if j := strings.IndexAny(rest, `"`); j >= 0 {
+		rest = rest[j+1:]
+		if k := strings.IndexByte(rest, '"'); k > 0 {
+			return rest[:k]
+		}
+	}
+	return ""
 }
 
 // opencodeHasMCPKey reports whether any line declares an "mcp" key, so the
