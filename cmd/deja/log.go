@@ -73,7 +73,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		}
 		return nil
 	}
-	events := usage.Events(dir, n)
+	events, total := usage.EventsCounted(dir, n)
 	if jsonOut {
 		// A nil slice encodes as null, and null is not an empty list: len()
 		// raises, iteration raises, `jq '.[]'` errors. Every other
@@ -100,6 +100,13 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			sess = fmt.Sprintf(" · %d session%s", e.Sessions, pluralS(e.Sessions))
 		}
 		fmt.Fprintf(w, "%s  %-14s %s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, mark)
+	}
+	if total > len(events) {
+		// Nobody typed the 20 — it is the default above — and this is the
+		// audit trail, where a list that stops without saying so reads as
+		// everything deja served. The same sentence blame and show print
+		// (#2299, #2296, #2305).
+		fmt.Fprintf(w, "\nshowing %d of %d — `deja log %d` shows the rest\n", len(events), total, total)
 	}
 	fmt.Fprintln(w, "\nuse `deja log --last` to see the exact text of the most recent injected digest")
 	// The log's stamps are deja's own, written at recall time, so one in the
