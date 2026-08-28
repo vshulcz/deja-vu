@@ -112,7 +112,7 @@ func refreshAiderContext(dir string) error {
 	digest, sessions, _, _, _ := cachedHookDigest(dir)
 	body := digest
 	if sessions > 0 {
-		body = frameRecall(aiderLead + digest)
+		body = frameRecall(startLead(aiderLead) + digest)
 	}
 	if strings.TrimSpace(body) == "" {
 		// No history for this project yet. An empty file still has to exist:

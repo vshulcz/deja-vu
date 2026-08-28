@@ -56,7 +56,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		fmt.Fprintln(stdout, "{}")
 		return nil
 	}
-	digest = frameRecall(antigravityLead + digest)
+	digest = frameRecall(startLead(antigravityLead) + digest)
 	usage.RecordDigestPolicy(dir, usage.KindHook, digest, sessions, raw,
 		policy.Load().Describe(policy.ActivationAuto))
 	b, err := json.Marshal(antigravityHookResponse{
