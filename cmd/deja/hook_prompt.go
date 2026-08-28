@@ -214,9 +214,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// The one word of the question that identifies something, kept apart for
 	// the test below: asking whether any term was spoken lets "показал" answer
 	// for "v11", and nearly every session says a word like that.
+	// The words of the question that identify something, kept apart for the
+	// test below: asking whether ANY term was spoken lets "показал" answer for
+	// "v11", and nearly every session says a word like that.
+	//
+	// One word was too few. Rareness is measured against this corpus, and in a
+	// small or homogeneous one it crowns whichever ordinary noun happens to be
+	// uncommon: on a seeded store the question "the orders service runs out of
+	// db connections" led on "service", so the session that settled it — which
+	// says "orders worker" and never "service" — was dropped at this gate
+	// while a neighbour about the reporting service was served in its place.
+	// The ranking had already put the right one first with two strong terms.
 	leadTerms := terms
 	if ordered := byIdentifying(terms, idfOf); len(ordered) > 0 {
-		leadTerms = ordered[:1]
+		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
 	for i, s := range ranked {
@@ -288,6 +299,16 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			if len(s.Messages) == 0 {
 				continue
 			}
+		}
+		// Two slots, two answers. The same content reaches the block from
+		// several sessions all the time — a marathon that was split, a
+		// resumed session, a workflow run again — and spending both slots on
+		// it costs the reader the second answer entirely. Measured on a
+		// seeded store where the question drifted from the wording of the
+		// session that settled it, both slots went to two copies of one
+		// neighbour on every framing but the near-verbatim one.
+		if sameAnswerAs(ss, s, terms) {
+			continue
 		}
 		ss = append(ss, s)
 		if len(ss) == 2 {
@@ -405,6 +426,46 @@ func askedBeforeWhen(s model.Session) string {
 	}
 	return " (" + s.Updated.Local().Format("2006-01-02") + ")"
 }
+
+// sameAnswerAs reports whether this session would say what one already chosen
+// says. Judged on the lines the question actually matched rather than on the
+// whole transcript: two sessions of the same workflow differ everywhere else
+// and agree exactly where it matters.
+func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool {
+	next := matchedFingerprint(s, terms)
+	if next == "" {
+		return false
+	}
+	for _, c := range chosen {
+		if matchedFingerprint(c, terms) == next {
+			return true
+		}
+	}
+	return false
+}
+
+// matchedFingerprint is the session's matching lines, normalised, hashed. Empty
+// when nothing matched, which is not a duplicate of anything.
+func matchedFingerprint(s model.Session, terms []string) string {
+	var b strings.Builder
+	for _, m := range s.Messages {
+		if !search.SpeechCarriesAnyTerm(model.Session{Messages: []model.Message{m}}, terms) {
+			continue
+		}
+		b.WriteString(strings.Join(strings.Fields(strings.ToLower(m.Text)), " "))
+		b.WriteByte('\n')
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return blockFingerprint(b.String())
+}
+
+// leadTermsKept is how many of the question's identifying words a session may
+// be judged on. Three rather than one: the gate exists to reject a session
+// that matched only where a tool printed the subject, and three of the rarest
+// words still keep the ordinary ones out.
+const leadTermsKept = 3
 
 // promptTermsWorthAsking is the gate before the index is touched. Two terms
 // were required, which silenced the sharpest prompt there is: "do we need
