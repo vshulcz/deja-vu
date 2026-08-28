@@ -128,11 +128,25 @@ func TestFixPairsKeepTheRetryAfterAFailedAttempt(t *testing.T) {
 		{Role: "tool-output", Text: "200 OK", Time: now.Add(4 * time.Minute)},
 	}
 	pairs := fixPairsIn(ms, "claude:s1", "p")
-	if len(pairs) != 1 {
-		t.Fatalf("want the retry stored, got %d pairs: %+v", len(pairs), pairs)
+	// Both errors in the sequence are walls — the missing command and the
+	// permission denied the first attempt hit — and the retry is what followed
+	// each of them. Counted rather than pinned at one: the second used to be
+	// invisible, because a line opening with "Error: " never reached the
+	// phrase list (#2432).
+	if len(pairs) == 0 {
+		t.Fatalf("the retry was not stored for either error")
 	}
-	if pairs[0].Command != "curl --max-time 5 example.internal" {
-		t.Errorf("wrong command stored: %q", pairs[0].Command)
+	byError := map[string]string{}
+	for _, p := range pairs {
+		byError[p.Error] = p.Command
+	}
+	if got := byError["command not found: timeout"]; got != "curl --max-time 5 example.internal" {
+		t.Errorf("the retry after the missing command is %q", got)
+	}
+	for _, p := range pairs {
+		if p.Command == "brew install coreutils" {
+			t.Errorf("the attempt whose own output failed was stored as a fix: %+v", p)
+		}
 	}
 }
 
