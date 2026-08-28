@@ -33,8 +33,10 @@ func TestPrivacyCommandFlags(t *testing.T) {
 	if _, err := captureRun(t, "forget", "--before", "2020-01-01"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "forget", "--unforget", "missing"); err != nil {
-		t.Fatal(err)
+	// A restore that finds no tombstone refuses, so a script can tell it from
+	// one that worked (#2263).
+	if _, err := captureRun(t, "forget", "--unforget", "missing"); err == nil {
+		t.Fatal("unforget of a missing tombstone succeeded")
 	}
 	out, err := captureRun(t, "forget", "--list")
 	if err != nil || strings.Contains(out, "claude:") {
@@ -164,12 +166,11 @@ func TestUnforgetBringsTheSessionBackWithoutAFullRebuild(t *testing.T) {
 	if err != nil || len(back) != 2 {
 		t.Fatalf("after unforget: %d sessions err=%v — the session did not come back", len(back), err)
 	}
-	miss, err := captureRun(t, "forget", "--unforget", "nothing-like-this")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(miss, "no tombstone matches") {
-		t.Errorf("a prefix matching nothing said %q", miss)
+	_, err = captureRun(t, "forget", "--unforget", "nothing-like-this")
+	if err == nil {
+		t.Error("a prefix matching nothing was reported as a restore")
+	} else if !strings.Contains(err.Error(), "no tombstone matches") {
+		t.Errorf("a prefix matching nothing said %q", err)
 	}
 }
 

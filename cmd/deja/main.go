@@ -2700,8 +2700,7 @@ func runForget(dir string, args []string) error {
 			// this path went straight to Unforget, which lifts the tombstone
 			// and rebuilds. Name what it would restore and stop (#1066).
 			if len(lifting) == 0 {
-				fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
-				return nil
+				return fmt.Errorf("no tombstone matches %q — `deja forget --list` shows what is forgotten", unforget)
 			}
 			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould restore %d tombstone%s and rebuild the index — %s\n",
 				len(lifting), pluralS(len(lifting)), joinCapped(lifting, 5))
@@ -2715,8 +2714,11 @@ func runForget(dir string, args []string) error {
 			return err
 		}
 		if lifted == 0 {
-			fmt.Fprintf(os.Stdout, "no tombstone matches %q — `deja forget --list` shows what is forgotten\n", unforget)
-			return nil
+			// A restore that restored nothing used to exit 0, so a script
+			// could not tell it from a restore that worked: the typo, the id
+			// that was never forgotten and the session still gone all read as
+			// success (#2263). Every neighbour refuses what it cannot find.
+			return fmt.Errorf("no tombstone matches %q — `deja forget --list` shows what is forgotten", unforget)
 		}
 		// Lifting a tombstone brings a session back only if the transcript is
 		// still on this machine. An imported one lives only in the index, so
