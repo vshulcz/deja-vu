@@ -75,6 +75,99 @@ func normalizeFriction(l string) string {
 	return strings.TrimSpace(rest[second+2:])
 }
 
+// volatileDigits is how long a digit run has to be before it reads as something
+// the machine handed out rather than something the error says.
+const volatileDigits = 4
+
+// maskIPv4 replaces a dotted quad with a placeholder. The digit-run rule below
+// cannot reach it: an octet is one to three digits, which is the length an exit
+// code has, so `10.0.0.7` and `10.0.0.9` would stay two different walls for one
+// service being unreachable (#2369).
+func maskIPv4(l string) string {
+	var b strings.Builder
+	b.Grow(len(l))
+	for i := 0; i < len(l); {
+		if l[i] < '0' || l[i] > '9' {
+			b.WriteByte(l[i])
+			i++
+			continue
+		}
+		if end, ok := ipv4At(l, i); ok {
+			b.WriteString("<ip>")
+			i = end
+			continue
+		}
+		// Not a quad: copy the run whole so the scan cannot split a number.
+		j := i
+		for j < len(l) && l[j] >= '0' && l[j] <= '9' {
+			j++
+		}
+		b.WriteString(l[i:j])
+		i = j
+	}
+	return b.String()
+}
+
+// ipv4At reports where a dotted quad starting at i ends. Four groups of one to
+// three digits, separated by dots, not running into another digit or dot.
+func ipv4At(l string, i int) (int, bool) {
+	pos := i
+	for group := 0; group < 4; group++ {
+		if group > 0 {
+			if pos >= len(l) || l[pos] != '.' {
+				return 0, false
+			}
+			pos++
+		}
+		start := pos
+		for pos < len(l) && l[pos] >= '0' && l[pos] <= '9' {
+			pos++
+		}
+		if n := pos - start; n < 1 || n > 3 {
+			return 0, false
+		}
+	}
+	if pos < len(l) && (l[pos] == '.' || (l[pos] >= '0' && l[pos] <= '9')) {
+		return 0, false
+	}
+	return pos, true
+}
+
+// maskVolatileNumbers replaces long digit runs with a placeholder, so one
+// failure is one wall across the numbers a machine hands out: a port, a pid, an
+// epoch, a goroutine id. Without it `dial tcp 10.0.0.7:5432: connect:
+// connection refused` and the same failure on another port are two signatures
+// — one wall each, below the three-session floor `deja friction` needs, below
+// the second sighting a fix pair needs, and invisible to search's error tier,
+// all at once (#2369).
+//
+// Four digits, not two: an exit code and a status code say which failure this
+// is, and `make: *** [build] Error 1` must not become `Error 2`. Ports, pids,
+// epochs and ids are longer than that; 404 and 500 are not.
+func maskVolatileNumbers(l string) string {
+	l = maskIPv4(l)
+	var b strings.Builder
+	b.Grow(len(l))
+	for i := 0; i < len(l); {
+		if l[i] < '0' || l[i] > '9' {
+			b.WriteByte(l[i])
+			i++
+			continue
+		}
+		j := i
+		for j < len(l) && l[j] >= '0' && l[j] <= '9' {
+			j++
+		}
+		if j-i >= volatileDigits {
+			b.WriteString("<n>")
+		} else {
+			b.WriteString(l[i:j])
+		}
+		i = j
+	}
+	return b.String()
+}
+
 // trimLogPrefix drops the prefixes a runner puts in front of a line it did not
 // write: pytest's `E   ` marker on the failing line, and the timestamp docker,
 // journalctl and most CI add to everything. They carry nothing about the error,
@@ -218,8 +311,12 @@ func isFriction(l string) bool {
 }
 
 func frictionHash(line string) uint64 {
+	// Masked here rather than in FrictionLine: the numbers a machine hands out
+	// must not split one failure into a wall per run, and the line a reader is
+	// shown should still be the one that was printed, with its real port in it
+	// (#2369).
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(line))
+	_, _ = h.Write([]byte(maskVolatileNumbers(line)))
 	return h.Sum64()
 }
 

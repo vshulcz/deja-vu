@@ -62,7 +62,12 @@ import (
 // is one wall however it was printed. A store built before this holds both
 // spellings under different signatures, and nothing re-derives them without
 // the bump — the same shape as 27 and 28 (#1637).
-const version = 29
+// 30: a long digit run inside a line — a port, a pid, an epoch, a goroutine id
+// — is masked before the line is hashed, so one failure is one wall across the
+// numbers the machine hands out. A store built before this holds each run under
+// its own signature, and nothing re-derives them without the bump — the same
+// shape as 27, 28 and 29 (#2369).
+const version = 30
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
