@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -85,6 +86,17 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintln(stdout, "deja: one session ran something after that error, and nothing has confirmed it worked — deja waits for a second sighting before naming a remedy")
 			return nil
 		}
+		// The lookup hashes whole error lines, so the head of one — what a
+		// person types — is a different signature and matches nothing. Saying
+		// the machine never saw it is then a claim about the store rather than
+		// about the wording, and the store may hold exactly what was asked for
+		// (#2365).
+		if near := nearestRecordedError(dir, text, func(project string) bool {
+			return pol.Allows(policy.ActivationSearch, project)
+		}); near != "" {
+			fmt.Fprintf(stdout, "deja: nothing recorded for that line — deja matches a whole error line, and the closest it holds is:\n  %s\ntry: deja fix %q\n", near, near)
+			return nil
+		}
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
 		return nil
 	}
@@ -97,4 +109,32 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "  ran next: %s\n", search.SafeCommand(p.Command))
 	}
 	return nil
+}
+
+// nearestRecordedError names a recorded error line that contains what the
+// reader typed, newest first. Containment rather than similarity: the miss this
+// answers is a whole line typed short, and a reader who typed something else
+// entirely deserves the plain "nothing recorded" rather than a guess.
+func nearestRecordedError(dir, text string, allow func(string) bool) string {
+	want := strings.ToLower(strings.TrimSpace(text))
+	if len(want) < 8 {
+		return ""
+	}
+	best := ""
+	var bestWhen time.Time
+	for _, p := range index.ReadFixes(dir) {
+		if p.Candidate || p.Error == "" {
+			continue
+		}
+		if allow != nil && !allow(p.Project) {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(p.Error), want) {
+			continue
+		}
+		if best == "" || p.When.After(bestWhen) {
+			best, bestWhen = p.Error, p.When
+		}
+	}
+	return search.SafeLine(best)
 }
