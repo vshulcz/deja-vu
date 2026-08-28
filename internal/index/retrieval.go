@@ -507,6 +507,24 @@ func relevanceResult(ss []model.Session, matched int, idf map[string]float64) Se
 	}
 }
 
+// coverageCounts picks which count of matched terms coverage is paid on.
+//
+// When something in the query identifies on its own, coverage is counted over
+// those terms alone: the ordinary words a question is phrased with stop earning
+// a session credit for covering the query. When nothing does — a question made
+// entirely of ordinary words — counting them is all there is, and the generous
+// reading of the gate stands.
+//
+// Measured: LoCoMo 69.8% to 70.2% R@1 and MRR .768 to .770; on LongMemEval-S
+// the preference questions, which are ordinary words around one that matters,
+// go 33.3% to 36.7% hit@1 with the total unmoved.
+func coverageCounts(all, identifying map[uint32]int, identifyingTerms int) map[uint32]int {
+	if identifyingTerms == 0 {
+		return all
+	}
+	return identifying
+}
+
 // rankIDF is what a match is WORTH: documents counted in sessions, the unit
 // ranking has always used. Weighting by the gate's number instead lifts every
 // term a few long sessions happen to repeat, which reorders the top of the
@@ -826,6 +844,11 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// kept and the better place of the two is used, at a price.
 	focus := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
+	// Coverage counted over the terms that identify something on their own,
+	// kept alongside so the choice between the two can be made once the whole
+	// query has been read rather than term by term.
+	identifyingTerms := 0
+	matchedIdentifying := map[uint32]int{}
 	strongTerms := map[uint32]int{}
 	anyTerms := map[uint32]int{}
 	// perMessage tracks how many distinct terms hit each message (record
@@ -1023,6 +1046,19 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			rank = 0.1
 		}
 		informative := idf >= dejaVuIDFFloor || minSess <= 2
+		// Identifying is the same bar read against the number the score itself
+		// uses: rare counted in whole sessions. gateIDF deliberately takes the
+		// more generous of its two verdicts so that a subject word is never
+		// called filler, which is what a term has to clear to be spoken about
+		// at all. Coverage is a different question — it multiplies a session's
+		// score by how much of the query it covers — and answering it
+		// generously pays a session for the ordinary words a question is
+		// phrased with. "Can you suggest a hotel for my trip" is four such
+		// words and one that matters.
+		identifying := rank >= dejaVuIDFFloor || minSess <= 2
+		if identifying {
+			identifyingTerms++
+		}
 		// Rare enough to identify something on its own: either well past the
 		// ordinary bar, or living in a single session of the whole corpus.
 		strong := idf >= dejaVuStrongIDFFloor || minSess <= 1
@@ -1055,11 +1091,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			if informative {
 				matchedTerms[ord]++
 			}
+			if identifying {
+				matchedIdentifying[ord]++
+			}
 			if strong {
 				strongTerms[ord]++
 			}
 		}
 	}
+	matchedTerms = coverageCounts(matchedTerms, matchedIdentifying, identifyingTerms)
 	ranked := make([]relevanceScored, 0, len(score))
 	for ord, sc := range score {
 		if sc <= 0 {
