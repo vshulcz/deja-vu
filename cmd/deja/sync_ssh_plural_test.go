@@ -24,4 +24,12 @@ func TestTheSSHExportLineCountsInSingularToo(t *testing.T) {
 			t.Errorf("one record is still plural: %q", got)
 		}
 	}
+
+	// The pull line had the same shape and says it the same way now.
+	if got := sshCountLine("imported", 1); got != "deja: imported 1 record\n" {
+		t.Errorf("the pull line reads %q", got)
+	}
+	if got := sshCountLine("imported", 2); got != "deja: imported 2 records\n" {
+		t.Errorf("the pull line reads %q", got)
+	}
 }
