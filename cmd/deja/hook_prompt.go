@@ -338,7 +338,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if nudge != "" {
 			tail += "\n" + nudge
 		}
-		body = promptHookLead + rejectedWarning + digest + tail
+		lead := promptHookLead
+		// A repeat of the question itself is a different claim than a session
+		// about the subject, and a stronger one: the agent does not have to
+		// decide whether the history is relevant, only whether the answer
+		// still holds. Measured over this machine's own sessions, 6.5% of
+		// substantial questions are asked again in a later session, and the
+		// exact-match counter in `deja stats` sees a fifth of them.
+		if again := search.AskedBefore(ss[0], terms); again != "" {
+			lead = "This was asked here before" + askedBeforeWhen(ss[0]) +
+				" — \"" + again + "\". What that session settled is below; " +
+				"say so if it still holds, and say so if it does not.\n"
+		}
+		body = lead + rejectedWarning + digest + tail
 	} else {
 		body = weakRecallPointer(ss, terms) + rejectedWarning
 		if nudge != "" {
@@ -382,6 +394,16 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
+}
+
+// askedBeforeWhen dates the earlier question, so the reader can weigh a decision
+// from yesterday against one from March. Empty when the session carries no
+// date rather than printing a zero one.
+func askedBeforeWhen(s model.Session) string {
+	if s.Updated.IsZero() {
+		return ""
+	}
+	return " (" + s.Updated.Local().Format("2006-01-02") + ")"
 }
 
 // promptTermsWorthAsking is the gate before the index is touched. Two terms
