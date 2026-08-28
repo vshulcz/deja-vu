@@ -67,7 +67,17 @@ import (
 // numbers the machine hands out. A store built before this holds each run under
 // its own signature, and nothing re-derives them without the bump — the same
 // shape as 27, 28 and 29 (#2369).
-const version = 30
+// 31: what counts as a wall at all. A quote no longer drops a line as source
+// (#2430), a generic opening no longer hides the phrase behind it (#2432), the
+// list learned the walls a machine actually hits (#2434), a source line
+// carrying an error is not one (#2436), and the line cap went from 120 to 200
+// characters, which alone recovered a third again of what was recognised
+// (#2438). Measured over a real store: 7,053 signatures before, 8,885 after. A
+// store built under the old rules holds the old signatures and nothing
+// re-derives them — `deja friction` reads the records and sees the difference,
+// while `hook-tool-after` and the environment block read the manifest and stay
+// silent, which is the state this bump exists to end (#2444).
+const version = 31
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
