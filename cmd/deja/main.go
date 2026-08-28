@@ -1101,7 +1101,14 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		// list the cap has already trimmed.
 		detailed, rerr := search.RunDetailed(ss, o)
 		if rerr != nil {
-			return fmt.Errorf("run: %w", rerr)
+			// "run:" is the name of a function, and the reader of this line is
+			// someone who mistyped a pattern (#2286). The only error that
+			// reaches here in practice is the regexp compile, so it says which
+			// input to look at.
+			if o.Regex {
+				return fmt.Errorf("--re pattern: %w", rerr)
+			}
+			return rerr
 		}
 		hits, o.Total, o.Capped = detailed.Hits, detailed.Total, detailed.Capped
 	}

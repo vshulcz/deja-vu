@@ -486,7 +486,8 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 	if _, err := parseSearch([]string{"--all", "needle"}); err != nil {
 		t.Fatalf("parse --all: %v", err)
 	}
-	if out, err := captureRun(t, "--re", "("); err == nil || !strings.Contains(err.Error(), "run:") || out != "" {
+	// The refusal names the input rather than the function it came from (#2286).
+	if out, err := captureRun(t, "--re", "("); err == nil || !strings.Contains(err.Error(), "--re pattern") || out != "" {
 		t.Fatalf("bad regex out=%q err=%v", out, err)
 	}
 	badRoot := t.TempDir()
