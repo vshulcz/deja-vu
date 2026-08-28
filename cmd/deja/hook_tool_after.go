@@ -298,7 +298,16 @@ func fixLine(p index.FixPair) string {
 	if !p.When.IsZero() {
 		when = " (" + p.When.Local().Format("2006-01-02") + ")"
 	}
-	return "deja: this error came up here before" + when + " — what followed it: " + cmd
+	// "here" read as this project, and the lookup is machine-wide on purpose —
+	// an error signature is closer to an environment fact than to project
+	// history, which is what the command line and the environment block say out
+	// loud. The pair carries its project, so the line can name whose command it
+	// is offering rather than implying it is this checkout's (#2363).
+	where := "on this machine"
+	if project := strings.TrimSpace(search.SafeLine(p.Project)); project != "" {
+		where = "in " + project
+	}
+	return "deja: this error came up " + where + " before" + when + " — what followed it: " + cmd
 }
 
 // exitMarker is the shape a source appends when it knows what a command
