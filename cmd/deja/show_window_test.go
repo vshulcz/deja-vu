@@ -72,6 +72,18 @@ func TestShowSaysWhichSliceItPrinted(t *testing.T) {
 		t.Errorf("an offset past the end printed %q", said)
 	}
 
+	// An empty session is not an offset mistake.
+	if got := showWindowNote(0, 0, 0); !strings.Contains(got, "no messages") {
+		t.Errorf("an empty session reads as an offset error: %q", got)
+	}
+	// The arithmetic at the edges.
+	if got := showWindowNote(15, 5, 20); !strings.Contains(got, "16-20 of 20") {
+		t.Errorf("the last slice reads %q", got)
+	}
+	if got := showWindowNote(0, 20, 20); got != "" {
+		t.Errorf("a full window still printed a note: %q", got)
+	}
+
 	// A whole session says nothing extra.
 	said, err = captureRunStderr(t, "show", "paged", "--harness", "claude")
 	if err != nil {
