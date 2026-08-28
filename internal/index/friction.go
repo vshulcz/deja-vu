@@ -264,10 +264,21 @@ func isFriction(l string) bool {
 	// script, a diff, a heredoc. An `echo "App not found: $APP"` inside a
 	// deploy script reached second place on the first run: it is a line about
 	// an error, not an error.
-	for _, source := range []string{"echo ", "\"", "$(", "=~", "print("} {
+	for _, source := range []string{"echo ", "printf ", "$(", "=~", "print("} {
 		if strings.Contains(l, source) {
 			return false
 		}
+	}
+	// A bare double quote used to be on that list, and it cost more than it
+	// caught: tools quote the thing they could not find — `relation "orders"
+	// does not exist`, `repository "…" not found`, `pull access denied for
+	// "acme/api"` — so the same psql failure was friction without its quotes
+	// and invisible with them (#2431). What the quote was there to reject is
+	// still rejected by the markers above and by the two shapes below: a line
+	// that opens with a quoted string, and a JSON pair, which is what a
+	// payload printed into tool output looks like.
+	if strings.HasPrefix(l, "\"") || strings.Contains(l, "\": \"") {
+		return false
 	}
 	// A comment about an error is source too, and the wider marker list in
 	// #729 made these reachable: `// panic: this is a comment about panics`
