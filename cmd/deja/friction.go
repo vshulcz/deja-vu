@@ -134,6 +134,14 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			// someone lands when recall feels thin, so it is the worst place
 			// to say the history is not there (#1044).
 			fmt.Fprintln(stdout, strings.TrimPrefix(emptyIndexHint("nothing recurring"), "deja: "))
+		case len(sessions) == 0 && len(withheldSessions) > 0:
+			// The sessions that recorded tool output are exactly the ones a
+			// rule took away, and saying the machine never had them is a claim
+			// about the store rather than about the rule — the misread #637
+			// and #1044 closed elsewhere. The stderr note above says the same
+			// thing, and stdout is what a redirect keeps (#2319).
+			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
+				len(withheldSessions), pluralS(len(withheldSessions)))
 		case len(sessions) == 0:
 			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
 				total, pluralS(total))
