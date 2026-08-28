@@ -327,10 +327,26 @@ func isFriction(l string) bool {
 		"statement timeout", "connection reset", "connection timed out",
 		// Failed to build or run.
 		"] error ", "build failed", "compilation failed", "cannot be resolved",
+		// Measured against 24 errors an agent actually hits, the list above
+		// recognised 5 (#2434). These are the rest, each carrying the tool's
+		// own wording rather than the bare subject: "access denied for" is a
+		// server refusing a named user, where "access denied" alone is a
+		// sentence someone writes about roles.
+		"duplicate key value", "deadlock detected", "access denied for",
+		"failed to connect to", "cannot import name", "symbol(s) not found",
+		"failed to push some refs", "acquiring the state lock",
+		"no space left on device",
 	} {
 		if strings.Contains(low, p) {
 			return true
 		}
+	}
+	// A database saying a thing is not there says it in its own shape: the
+	// line opens with the server's ERROR marker. The phrase on its own is a
+	// sentence people write — "the orders table does not exist yet" — so it is
+	// only a wall where the server said it.
+	if strings.HasPrefix(low, "error") && strings.Contains(low, "does not exist") {
+		return true
 	}
 	return false
 }
