@@ -380,23 +380,37 @@ func openInBrowser(path string) {
 // says how many went. Substring rather than equality: the digest renders the
 // project inside a line of prose, and the name is what a reader would see.
 func withoutHiddenProjects(snaps []usage.Snapshot, hidden map[string]bool) ([]usage.Snapshot, int) {
-	if len(hidden) == 0 {
-		return snaps, 0
-	}
+	pol := policy.Load()
 	kept := make([]usage.Snapshot, 0, len(snaps))
 	for _, sn := range snaps {
-		withheld := false
-		for project := range hidden {
-			if strings.Contains(sn.Digest, project) {
-				withheld = true
-				break
-			}
+		if snapshotWithheld(pol, sn, hidden) {
+			continue
 		}
-		if !withheld {
-			kept = append(kept, sn)
-		}
+		kept = append(kept, sn)
 	}
 	return kept, len(snaps) - len(kept)
+}
+
+// snapshotWithheld decides whether a stored digest may go on the page. A record
+// that names its own projects is answered by the policy alone, which is what
+// makes it right when the sessions behind it have left the index (#2324). One
+// written before that field existed can only be recognised by the names of the
+// projects a rule is hiding now, and that is the older, weaker test.
+func snapshotWithheld(pol policy.Policy, sn usage.Snapshot, hidden map[string]bool) bool {
+	if len(sn.Projects) > 0 {
+		for _, project := range sn.Projects {
+			if !pol.Allows(policy.ActivationSearch, project) {
+				return true
+			}
+		}
+		return false
+	}
+	for project := range hidden {
+		if strings.Contains(sn.Digest, project) {
+			return true
+		}
+	}
+	return false
 }
 
 // notesAllowedOnPage drops the promoted notes whose project a rule withholds,

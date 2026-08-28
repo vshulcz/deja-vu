@@ -47,8 +47,11 @@ func TestLogJSONShapesAreStable(t *testing.T) {
 	// went to, which the log never recorded. Without it the only measure of
 	// whether a recall was used is the sentence the block asks the agent to
 	// say — 22 of 1218 injections on a real store, which counts reporting.
+	// "projects" is additive and optional: the trust policy answers for a
+	// project name with no index at all, so a record that names its own
+	// projects can be held to a rule tightened after it was written (#2324).
 	assertShape(t, "Snapshot", topLevelJSONKeys(Snapshot{}), map[string]bool{
 		"t": true, "kind": true, "sessions": true, "bytes": true,
-		"policy": true, "terms": true, "into": true, "digest": true,
+		"policy": true, "terms": true, "into": true, "projects": true, "digest": true,
 	})
 }

@@ -344,8 +344,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
 	rememberInjected(dir, input.SessionID, ss)
-	usage.RecordDigestInto(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
-		terms, sessionIDs(ss)...)
+	usage.RecordDigestFrom(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+		terms, sessionProjects(ss), sessionIDs(ss))
 	if plain {
 		fmt.Fprintln(stdout, out)
 		return nil
@@ -1018,6 +1018,22 @@ func densestMessages(msgs []model.Message, low, terms []string, cap int) []model
 		if keep[i] {
 			out = append(out, m)
 		}
+	}
+	return out
+}
+
+// sessionProjects names the projects behind a served digest, deduped in order.
+// The digest log records them so a rule tightened later can be applied to the
+// stored text without the sessions still being in the index (#2324).
+func sessionProjects(ss []model.Session) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if s.Project == "" || seen[s.Project] {
+			continue
+		}
+		seen[s.Project] = true
+		out = append(out, s.Project)
 	}
 	return out
 }

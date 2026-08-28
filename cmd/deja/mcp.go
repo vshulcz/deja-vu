@@ -307,11 +307,11 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// first recall of every session — the one an agent plans against — over
 		// the cap by its own length (#1806).
 		env, deliverEnv := environmentOnce(dir)
-		text, sessions, raw, ids, err := recallTextResult(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env))
+		text, sessions, raw, ids, projects, err := recallTextResultFrom(dir, a.Query, a.Harness, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env))
 		if err == nil {
 			text = frameRecall(text) + env
 			deliverEnv()
-			usage.RecordServedSnapshot(dir, usage.KindRecall, text, sessions, raw, ids, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedFrom(dir, usage.KindRecall, text, sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "recall_context":
@@ -331,10 +331,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
 		}
-		text, sessions, raw, ids, err := recallContextResult(dir, a.Query, a.Harness)
+		text, sessions, raw, ids, projects, err := recallContextResultFrom(dir, a.Query, a.Harness)
 		if err == nil {
 			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead))
-			usage.RecordServedSnapshot(dir, usage.KindContext, text, sessions, raw, ids, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedFrom(dir, usage.KindContext, text, sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "blame":
@@ -887,14 +887,23 @@ func twinSessionsFor(dir string) map[string][]string {
 	return index.TwinSessions(metas)
 }
 
+// recallTextResult keeps the four-value shape its callers and tests read.
 func recallTextResult(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, error) {
+	text, sessions, raw, ids, _, err := recallTextResultFrom(dir, q, harness, limit, offset, budget)
+	return text, sessions, raw, ids, err
+}
+
+// recallTextResultFrom is recallTextResult plus the projects the answer was
+// built from, which the digest log records so a stored digest can be checked
+// against a rule tightened later (#2324).
+func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (string, int, int64, []string, []string, error) {
 	if limit <= 0 {
 		limit = 5
 	}
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
 	if err != nil {
-		return "", 0, 0, nil, err
+		return "", 0, 0, nil, nil, err
 	}
 	if stale {
 		// A store rewrote itself (cline, cursor); rebuilding inline would
@@ -904,7 +913,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
-		return "", 0, 0, nil, err
+		return "", 0, 0, nil, nil, err
 	}
 	ss := result.Sessions
 	o.Tier = result.Tier
@@ -923,7 +932,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	} else if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF)
 	} else if hits, err = search.Run(ss, o); err != nil {
-		return "", 0, 0, nil, err
+		return "", 0, 0, nil, nil, err
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
 	if os.Getenv("DEJA_EMBED") != "off" {
@@ -939,7 +948,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	}
 	o.Semantic = semantic
 	if len(hits) == 0 {
-		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
+		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, nil
 	}
 	// Before the page is cut, not after: demoting inside the page is a no-op
 	// when every hit on it was rejected, and then the approaches the reader did
@@ -952,7 +961,7 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	demoted := demoteRejected(hits)
 	if offset > 0 {
 		if offset >= total {
-			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", clampEcho(q), total, offset), 0, 0, nil, nil
+			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", clampEcho(q), total, offset), 0, 0, nil, nil, nil
 		}
 		hits = hits[offset:]
 	}
@@ -1153,16 +1162,25 @@ func recallTextResult(dir, q, harness string, limit, offset, budget int) (string
 	out += more
 	var raw int64
 	var ids []string
+	// The projects behind the served hits, deduped in the order they appear —
+	// what the digest log records so a later rule can be applied to the digest
+	// without the sessions still being in the index (#2324).
+	var projects []string
+	seenProject := map[string]bool{}
 	for i, h := range hits {
 		if i >= served {
 			break
 		}
 		ids = append(ids, h.Session.ID)
+		if p := h.Session.Project; p != "" && !seenProject[p] {
+			seenProject[p] = true
+			projects = append(projects, p)
+		}
 		for _, m := range h.Session.Messages {
 			raw += int64(len(m.Text))
 		}
 	}
-	return out, served, raw, ids, nil
+	return out, served, raw, ids, projects, nil
 }
 
 // cutMarker ends a line the page budget cut, matching what an excerpt
@@ -1238,16 +1256,24 @@ func contextByID(dir, q string) (string, idContext, bool) {
 	return b.String(), idContext{session: whole.ID, size: rawSize([]model.Session{whole})}, true
 }
 
+// recallContextResult keeps the four-value shape its callers and tests read.
 func recallContextResult(dir, q, harness string) (string, int, int64, []string, error) {
+	text, sessions, raw, ids, _, err := recallContextResultFrom(dir, q, harness)
+	return text, sessions, raw, ids, err
+}
+
+// recallContextResultFrom is recallContextResult plus the project behind the
+// session it served, for the reason recallTextResultFrom exists (#2324).
+func recallContextResultFrom(dir, q, harness string) (string, int, int64, []string, []string, error) {
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
-		return "", 0, 0, nil, err
+		return "", 0, 0, nil, nil, err
 	} else if stale {
 		requestWarmup(dir)
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
-		return "", 0, 0, nil, err
+		return "", 0, 0, nil, nil, err
 	}
 	ss := result.Sessions
 	o.Tier = result.Tier
@@ -1266,7 +1292,7 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	} else if result.Tier == search.TierRelevance {
 		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF)
 	} else if hits, err = search.Run(ss, o); err != nil {
-		return "", 0, 0, nil, err
+		return "", 0, 0, nil, nil, err
 	}
 	hits, policyHidden := policyFilterHitsCounted(policy.ActivationMCP, hits)
 	var semantic bool
@@ -1285,9 +1311,9 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 		// After the search, like the CLI does since #1614: there is no answer
 		// left for the id to shadow.
 		if text, id, ok := contextByID(dir, q); ok {
-			return text, 1, id.size, []string{id.session}, nil
+			return text, 1, id.size, []string{id.session}, nil, nil
 		}
-		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil
+		return emptyRecallAnswerPolicy(dir, q, policyHidden), 0, 0, nil, nil, nil
 	}
 	// The same order the search screen shows: this handed the agent a session
 	// the reader had rejected, while search demoted it and said why (#1099).
@@ -1307,7 +1333,7 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 	if hits[0].Tier != search.TierExact {
 		text = "[" + hits[0].Tier + "]\n" + text
 	}
-	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, nil
+	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole), nil
 }
 
 func mcpProgress() io.Writer {
@@ -1421,4 +1447,13 @@ func buildingNowForBlockingTool(dir string) string {
 	// version, an index directory nobody can write — is the same sentence the
 	// reading tools get, so it is answered in one place rather than copied.
 	return buildingNowForAgent(dir)
+}
+
+// projectsOf names the project a session belongs to, as a list, for the digest
+// record. Empty for a session that carries none.
+func projectsOf(s model.Session) []string {
+	if s.Project == "" {
+		return nil
+	}
+	return []string{s.Project}
 }
