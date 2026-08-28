@@ -133,6 +133,12 @@ type doctorImportedReport struct {
 // doctorPeerReport is one machine, carrying what the text line carries.
 type doctorPeerReport struct {
 	Host string `json:"host"`
+	// Machine is the name that host turns out to be — what the sending machine
+	// calls itself, learned from the records a pull brings. It is the name
+	// `sessions_from_there` is counted by and the one every listing prints for
+	// imported work, so without it a consumer cannot join a peer row to the
+	// sessions that came from it (#2423). Absent until the machine has said.
+	Machine string `json:"machine,omitempty"`
 	// The two directions fail apart, and a host that takes what this machine
 	// sends while sending nothing back is a broken sync that reads as a
 	// working one — so they are separate keys rather than one "last exchange".
@@ -173,6 +179,7 @@ func collectDoctorSync(dir string) doctorSyncReport {
 			// which is the reason the text report needs a bound and this does
 			// not.
 			Host:      p.Host,
+			Machine:   p.Machine,
 			Sessions:  peerSessionCount(from, p),
 			LastError: safeForStatusline(p.LastError, 200),
 		}
