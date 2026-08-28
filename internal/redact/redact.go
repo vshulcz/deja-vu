@@ -74,7 +74,7 @@ var (
 	// At least one body line: a bare header carries nothing, and eating it
 	// alone would hide the marker that lets the whole-block pattern pair it
 	// with a body that arrives in the next field.
-	pemPrivateOpenRE = regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----(?:[ \t]*\r?\n[A-Za-z0-9+/=]{16,}[ \t]*)+[ \t]*\r?\n?`)
+	pemPrivateOpenRE = regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----(?:[ \t]*\r?\n[A-Za-z0-9+/=]{16,}[ \t]*)+`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
 	// sk-<alnum> keys. xai- stays alphanumeric-only: real xAI keys have no
