@@ -2488,12 +2488,37 @@ func printSources(dir string) {
 		size = fi.Size()
 	}
 	s, m, _ := sources.OpencodeCounts()
+	// The counts come out of sqlite, which knows nothing about the exclude
+	// list, so with a pattern in force this row kept reporting sessions that
+	// are not indexed, not searchable and not exported while every other row
+	// subtracted them (#2247). Only then is the store loaded: counting by SQL
+	// is why this row is cheap on a large database.
+	opencodeExcluded := 0
+	if len(sources.ExclusionPatterns()) > 0 {
+		raw := sources.LoadOpencode()
+		kept := sources.FilterSessions(raw)
+		opencodeExcluded = len(raw) - len(kept)
+		// Subtracted from the SQL numbers rather than recounted from what
+		// loaded: the loader drops a session holding no text at all, which the
+		// row has always counted, so recounting would move the numbers for a
+		// reason that has nothing to do with the exclude list.
+		dropped := 0
+		for _, x := range raw {
+			if sources.ExcludedProject(x.Project) {
+				dropped += len(x.Messages)
+			}
+		}
+		s, m = max(0, s-opencodeExcluded), max(0, m-dropped)
+	}
 	note = ""
 	if size > 0 && !sources.SQLite3Available() {
 		note = "\t(sqlite3 CLI not found — opencode sessions unavailable)"
 	}
 	if n := len(sources.ExclusionPatterns()); n > 0 {
 		note += fmt.Sprintf("\texcluded-patterns=%d", n)
+	}
+	if opencodeExcluded > 0 {
+		note += fmt.Sprintf("\texcluded-sessions=%d", opencodeExcluded)
 	}
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
