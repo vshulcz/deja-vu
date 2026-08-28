@@ -144,6 +144,17 @@ func planFindings(dir, plan, sessionID string) []string {
 		if line == "" {
 			continue
 		}
+		// What this machine ran after that error, when the census found no
+		// command of its own. The plan hook speaks before the agent walks into
+		// the wall, which is the best moment deja has, and it named the wall
+		// and stopped — while `deja fix` answered the same error with the way
+		// past it. Same source, same activation the walls above are filtered
+		// by, and only a confirmed pair (#2458).
+		if match.Command == "" {
+			if fix := planRemedy(dir, match.Wall.Text); fix != "" {
+				line += fmt.Sprintf("; what followed it: %s", strconv.Quote(neutralPlanEvidence(fix)))
+			}
+		}
 		findings = append(findings, planFinding{
 			line:     line,
 			sessions: wallSessions,
@@ -291,6 +302,28 @@ func planSearchSteps(plan string) [][]string {
 	}
 	return out
 }
+
+// planRemedy is the command recorded after a wall, for the finding above. Only
+// a confirmed pair — a candidate is a guess, and a guess handed to an agent
+// about to act is worse than silence.
+func planRemedy(dir, wall string) string {
+	pol := policy.Load()
+	fixes := index.FixesFor(dir, wall, 1, func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project)
+	})
+	if len(fixes) == 0 || fixes[0].Candidate {
+		return ""
+	}
+	cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(fixes[0].Command), "$ "))
+	if cmd == "" || len(cmd) > planCommandMax {
+		return ""
+	}
+	return cmd
+}
+
+// planCommandMax bounds the remedy clause: the finding rides in a block that
+// is budgeted, and a command longer than this is a script rather than a step.
+const planCommandMax = 120
 
 // formatPlanFinding reports the wall recurrence — the fact a census
 // verified (internal/index/plan.go's PlanCooccurrence doc) — and, only when
