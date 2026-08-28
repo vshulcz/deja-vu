@@ -2224,7 +2224,7 @@ func runBlame(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	hits, hidden, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
+	hits, hidden, total, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
 	}
@@ -2252,12 +2252,19 @@ func runBlame(dir string, args []string) error {
 		return nil
 	}
 	search.PrintBlame(os.Stdout, hits, false)
+	// blame answers "who touched this file". Ten blocks and nothing else reads
+	// as all of them, the misread search already avoids with the same sentence
+	// (#2299). --json keeps its bare array: a machine consumer reading a total
+	// would need a different shape, and that is a break, not a note.
+	if total > len(hits) {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), total)
+	}
 	return nil
 }
 
-func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, error) {
-	hits, hidden, _, err := blameHits(dir, target, o, activation, progress, false)
-	return hits, hidden, err
+func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, error) {
+	hits, hidden, total, _, err := blameHits(dir, target, o, activation, progress, false)
+	return hits, hidden, total, err
 }
 
 // findBlameHitsStale is findBlameHits for a caller that must not wait: it
@@ -2266,31 +2273,35 @@ func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions,
 // before editing a file, so declining for the length of a refresh means the
 // edit happens without the history (#1784). The CLI keeps the blocking path —
 // someone typed it and is watching the progress (#1306).
-func findBlameHitsStale(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, bool, error) {
+func findBlameHitsStale(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, bool, error) {
 	return blameHits(dir, target, o, activation, progress, true)
 }
 
-func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer, stale bool) ([]search.BlameHit, int, bool, error) {
+func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer, stale bool) ([]search.BlameHit, int, int, bool, error) {
 	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
 	refreshing := false
 	if stale {
 		var err error
 		if refreshing, err = index.EnsureForSearchStale(dir, query, progress); err != nil {
-			return nil, 0, false, err
+			return nil, 0, 0, false, err
 		} else if refreshing {
 			requestWarmup(dir)
 		}
 	} else if err := index.EnsureForSearch(dir, query, false, progress); err != nil {
-		return nil, 0, false, err
+		return nil, 0, 0, false, err
 	}
 	result, err := index.SearchWithRecoveryDetailed(dir, query, progress)
 	if err != nil {
-		return nil, 0, false, err
+		return nil, 0, 0, false, err
 	}
 	all := search.Blame(withFileTouchers(dir, result.Sessions, target), target, o)
-	hits := policyFilterBlame(activation, all)
+	visible := policyFilterBlame(activation, all)
+	// Cap after the trust filter, not before: cutting first meant a withheld
+	// session ate one of the ten slots, so a reader could get eight hits with
+	// forty sessions still waiting behind --all.
+	hits := search.CapBlame(visible, o)
 	attachBlameLifecycles(hits)
-	return hits, len(all) - len(hits), refreshing, nil
+	return hits, len(all) - len(visible), len(visible), refreshing, nil
 }
 
 // blameToucherCap bounds how many extra sessions a blame reads from the

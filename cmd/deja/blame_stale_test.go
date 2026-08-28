@@ -33,7 +33,7 @@ func TestBlameReadsWithoutWaitingForARebuild(t *testing.T) {
 	}
 
 	// The agent-facing path must not be the blocking one.
-	hits, _, _, err := findBlameHitsStale(dir, search.BlameTarget{Stem: "parser.go", Base: "parser.go"}, search.BlameOptions{All: true}, policy.ActivationMCP, nil)
+	hits, _, _, _, err := findBlameHitsStale(dir, search.BlameTarget{Stem: "parser.go", Base: "parser.go"}, search.BlameOptions{All: true}, policy.ActivationMCP, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
