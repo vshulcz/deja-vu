@@ -450,6 +450,7 @@ What deja has actually served on this machine, measured from the usage log:
   "raw_bytes": 150000,
   "reused_twice": 2,
   "dejavu_moments": 1,
+  "tool_lines": 12,
   "since": "2026-07-27T14:33:13Z",
   "credited_aloud": 3
 }
@@ -471,7 +472,9 @@ that block is a summary of what the machine keeps hitting rather than a digest
 of transcripts. `deja stats` counts its bytes, which is the number for
 everything deja handed over. `reused_twice` is
 sessions agents recalled two or more times, `dejavu_moments` prompts matched to
-prior work, and `credited_aloud` the recalls an agent said out loud.
+prior work, `tool_lines` the PreToolUse injections — one line about the command
+or file an agent was about to touch — and `credited_aloud` the recalls an agent
+said out loud.
 
 `since` is the oldest event still in the usage log, so no count above covers
 more than the period from then to now. On a quiet machine that is every event
