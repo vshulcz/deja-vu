@@ -389,7 +389,17 @@ func fileMetaInScope(meta index.SessionMeta, path string, projects []string) boo
 		if cand == "" {
 			continue
 		}
-		if proj == cand || strings.HasSuffix(proj, "/"+cand) || strings.HasSuffix(cand, "/"+proj) {
+		// The shared rule, so this scope cannot drift from the one the session
+		// start and the handoff use: a bare candidate is a suffix match only
+		// for a peer's project, whose path is not this machine's. Taking it
+		// for a local one answered an edit to /work/api/ledger.go with seven
+		// sessions from a client's acme/api, and their decision (#2339).
+		if index.ProjectInScope(meta.Project, cand) {
+			return true
+		}
+		// The other direction: a store that records the bare project name
+		// ("api") against a candidate that carries the parent ("work/api").
+		if strings.HasSuffix(cand, "/"+proj) {
 			return true
 		}
 	}
