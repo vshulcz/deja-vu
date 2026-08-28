@@ -1812,7 +1812,12 @@ func isSubcommand(word string) bool {
 // resolve the same way and still picked in silence — promote records a state
 // against whichever session it chose (#872).
 func noteAmbiguousPrefix(dir, id, action string) {
-	n := index.PrefixMatches(dir, id)
+	// Counted under the rule the reader is searching by: a session the policy
+	// withholds is not one they can reach with a longer prefix (#2401).
+	pol := policy.Load()
+	n := index.PrefixMatchesAllowed(dir, id, func(project string) bool {
+		return pol.Allows(policy.ActivationSearch, project)
+	})
 	if n <= 1 {
 		return
 	}

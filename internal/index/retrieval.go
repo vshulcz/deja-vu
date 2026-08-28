@@ -1611,6 +1611,16 @@ func idFoldMatches(id, p string) bool {
 // reader had no way to know they were looking at a choice rather than at the
 // only answer.
 func PrefixMatches(dir, p string) int {
+	return PrefixMatchesAllowed(dir, p, nil)
+}
+
+// PrefixMatchesAllowed counts the same way for the sessions a caller is
+// allowed to see. The note a reader gets about an ambiguous prefix used to
+// count every match, so a rule withholding a peer's work still announced that
+// the work exists, and the advice — reach for a longer prefix — led to a
+// session that answers with the rule instead (#2401). A nil allow counts
+// everything, which is what a caller with no rules of its own wants.
+func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1627,6 +1637,9 @@ func PrefixMatches(dir, p string) int {
 	// with the sign flipped.
 	n := 0
 	for _, meta := range m.Sessions {
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
 		if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
 			n++
 			continue
@@ -1639,6 +1652,9 @@ func PrefixMatches(dir, p string) int {
 		// The count and the resolver have to agree, or a reader is told an id
 		// matches nothing and then watches it open (#853).
 		for _, meta := range m.Sessions {
+			if allow != nil && !allow(meta.Project) {
+				continue
+			}
 			if idLooselyMatches(meta.ID, p) {
 				n++
 			}
@@ -1647,6 +1663,9 @@ func PrefixMatches(dir, p string) int {
 	if n == 0 {
 		// Same last rung as the resolver: the id in the other case (#1620).
 		for _, meta := range m.Sessions {
+			if allow != nil && !allow(meta.Project) {
+				continue
+			}
 			if idFoldMatches(meta.ID, p) || (meta.OrigID != "" && idFoldMatches(meta.OrigID, p)) {
 				n++
 			}

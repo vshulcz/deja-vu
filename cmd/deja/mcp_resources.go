@@ -113,7 +113,10 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// the transcript rather than inside it; here it goes above the recall
 	// frame, so it reads as deja's own words and not as recalled text.
 	note := ""
-	if n := index.PrefixMatches(dir, id); n > 1 {
+	pol := policy.Load()
+	if n := index.PrefixMatchesAllowed(dir, id, func(project string) bool {
+		return pol.Allows(policy.ActivationMCP, project)
+	}); n > 1 {
 		note = fmt.Sprintf("deja: %d sessions match %q — this is the most recent; ask for a longer prefix to read another.\n\n",
 			n, neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
 	}
