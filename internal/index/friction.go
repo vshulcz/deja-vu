@@ -281,6 +281,18 @@ func isFriction(l string) bool {
 	if strings.HasPrefix(l, "\"") || strings.Contains(l, "\": \"") {
 		return false
 	}
+	// Source that carries an error string is a line about an error, not one.
+	// A bare quote used to stand for this and cost far more than it caught
+	// (#2430): what is left is the punctuation source puts around the quote —
+	// an assignment, a call, a struct field, a code span — none of which
+	// appears in the output a tool prints. Measured over this repo: 130 of the
+	// 192 lines of its own docs and source that read as friction (#2436).
+	if strings.Contains(l, `("`) || strings.Contains(l, `, "`) ||
+		strings.Contains(l, `:= "`) || strings.Contains(l, `= "`) ||
+		strings.Contains(l, `: "`) && strings.HasSuffix(l, `"},`) ||
+		strings.HasPrefix(l, "`") {
+		return false
+	}
 	// A comment about an error is source too, and the wider marker list in
 	// #729 made these reachable: `// panic: this is a comment about panics`
 	// became the top wall on a store of shell snippets.
