@@ -13,6 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -81,6 +82,13 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	}
 	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
 		return err
+	}
+	// The exclude list is a privacy control that only runs at ingest, so an
+	// index built before the pattern still holds the session. share refuses it
+	// for that reason (#1307) and promote followed (#2278); handing the same
+	// session to another agent is the same move with a longer extract (#2280).
+	if sources.ExcludedProject(s.Project) {
+		return fmt.Errorf("%s is in a project your exclude list covers — `deja index --rebuild` drops it from the index, or remove the pattern to hand it off", prefix)
 	}
 	// Source receipt: the user must always see WHAT is being handed off —
 	// wrong-project or stale handoffs should be obvious before they land.
