@@ -311,8 +311,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err == nil {
 			text = frameRecall(text) + env
 			deliverEnv()
-			usage.RecordServedSessions(dir, usage.KindRecall, len(text), sessions, sessions == 0, raw, ids)
-			usage.SnapshotPolicy(dir, usage.KindRecall, text, sessions, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedSnapshot(dir, usage.KindRecall, text, sessions, raw, ids, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "recall_context":
@@ -335,8 +334,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		text, sessions, raw, ids, err := recallContextResult(dir, a.Query, a.Harness)
 		if err == nil {
 			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead))
-			usage.RecordServedSessions(dir, usage.KindContext, len(text), sessions, sessions == 0, raw, ids)
-			usage.SnapshotPolicy(dir, usage.KindContext, text, sessions, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedSnapshot(dir, usage.KindContext, text, sessions, raw, ids, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "blame":
@@ -379,8 +377,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// than either — whole sessions rather than budgeted snippets. Not
 			// recording it left `deja log` understating what the agent was
 			// given (#682).
-			usage.RecordResult(dir, usage.KindBlame, len(text), hits, hits == 0)
-			usage.SnapshotPolicy(dir, usage.KindBlame, text, hits, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedSnapshot(dir, usage.KindBlame, text, hits, 0, nil, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "fix":

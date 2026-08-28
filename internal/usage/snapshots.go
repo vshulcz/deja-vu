@@ -107,8 +107,12 @@ func RecordDigestTerms(indexDir, kind, digest string, sessions int, raw int64, t
 // RecordDigestInto is RecordDigestTerms knowing which agent session received
 // the injection, so a later reading of the store can ask whether it was used.
 func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int64, terms []string, ids ...string) {
-	RecordServedSessions(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids)
-	snapshotWriteInto(indexDir, kind, digest, into, sessions, "", terms)
+	// One instant for both logs: the event and the digest describe the same
+	// injection, and separate time.Now() calls left them microseconds apart
+	// with nothing else to join them on (#2294).
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, at)
 }
 
 // RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
@@ -123,8 +127,19 @@ func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, 
 // session-start hook, the commonest injection there is, was recording nothing
 // while holding the id (#1949).
 func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
-	RecordResultRaw(indexDir, kind, len(digest), sessions, sessions == 0, raw)
-	snapshotWriteInto(indexDir, kind, digest, into, sessions, policyName, nil)
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, at)
+}
+
+// RecordServedSnapshot writes the counting event and the digest snapshot for
+// one served answer, stamped alike. The MCP surfaces used to call the two
+// writers back to back, which took two instants for one act and left `deja
+// log` and `deja log --last` disagreeing about when it happened (#2294).
+func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, at)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
@@ -190,6 +205,12 @@ func runeBoundaryAt(s string, n int) int {
 }
 
 func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, terms, time.Now().UTC())
+}
+
+// snapshotWriteIntoAt is snapshotWriteInto with the instant supplied, so a
+// caller writing both logs for one injection can stamp them alike (#2294).
+func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, policyName string, terms []string, at time.Time) {
 	if digest == "" {
 		return
 	}
@@ -197,7 +218,7 @@ func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policy
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
 	}
-	b, err := marshalSnapshot(Snapshot{Time: time.Now().UTC(), Kind: kind, Sessions: sessions,
+	b, err := marshalSnapshot(Snapshot{Time: at, Kind: kind, Sessions: sessions,
 		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: clipDigest(digest)})
 	if err != nil {
 		return

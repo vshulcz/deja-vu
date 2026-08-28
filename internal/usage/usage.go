@@ -212,6 +212,14 @@ func RecordServedSessions(indexDir, kind string, bytes, sessions int, empty bool
 }
 
 func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {
+	recordFullAt(indexDir, kind, bytes, sessions, empty, raw, ids, time.Now().UTC())
+}
+
+// recordFullAt is recordFull with the instant supplied, so an injection that
+// writes an event AND a digest snapshot stamps both with one time. Two
+// time.Now() calls left the two logs disagreeing by microseconds about the same
+// injection, and nothing else joins them (#2294).
+func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, at time.Time) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
@@ -232,7 +240,7 @@ func recordFull(indexDir, kind string, bytes, sessions int, empty bool, raw int6
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Event{Time: time.Now().UTC(), Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids})
+	b, err := json.Marshal(Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids})
 	if err != nil {
 		return
 	}
