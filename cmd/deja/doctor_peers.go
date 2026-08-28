@@ -69,6 +69,10 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 	}
 }
 
+// doctorPeerNameMax bounds the machine name in a peer row. It is a string
+// another machine chose, like the imported line's names (#2364).
+const doctorPeerNameMax = 60
+
 const (
 	// doctorPeerColumn is the narrowest the name column gets, so a machine
 	// called "laptop" does not sit alone against the left margin.
@@ -122,12 +126,33 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 	if sessions > 0 {
 		line += fmt.Sprintf(", %s from there", doctorCount(sessions, "session"))
 	}
+	// A peer has two names — the ssh host it was added under, which heads this
+	// row, and the name it calls itself, which is what `deja last` and the
+	// recall lines print for work that came from it. Nothing joined them, so
+	// the row about quicksilver's sessions was headed vlad@10.0.0.7 (#2415).
+	// Said once: a machine added under the name it calls itself repeats
+	// nothing.
+	if m := strings.TrimSpace(p.Machine); m != "" && !sameMachineName(m, p.Host) {
+		line += fmt.Sprintf(" — calls itself %s", safeForStatusline(m, doctorPeerNameMax))
+	}
 	if p.LastError != "" {
 		// The stored error usually quotes the host back, so it carries whatever
 		// the name carried.
 		line += " — last attempt failed: " + safeForStatusline(p.LastError, 200)
 	}
 	return line
+}
+
+// sameMachineName reports whether a machine's own name is already what the
+// host says. The user part of an ssh target is not part of the name — a peer
+// added as vlad@quicksilver that calls itself quicksilver has one name, not
+// two, and saying it twice is noise.
+func sameMachineName(machine, host string) bool {
+	host = strings.TrimSpace(host)
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		host = host[at+1:]
+	}
+	return strings.EqualFold(machine, host)
 }
 
 // doctorAgo is a rough age. Anything under a minute is "just now": a sync that
