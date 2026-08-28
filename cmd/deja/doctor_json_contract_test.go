@@ -55,6 +55,8 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"sync": true, "peers": true, "host": true,
 		"last_push": true, "last_pull": true, "sessions_from_there": true,
 		"stamped_ahead": true,
+		// doctorImportedReport: the machines with no peer row of their own.
+		"imported": true, "machine": true, "sessions": true,
 		// index.HarnessIngest
 		"malformed_lines": true, "clipped_messages": true,
 		// index.FileIngest

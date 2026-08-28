@@ -109,6 +109,19 @@ type doctorSyncReport struct {
 	State string             `json:"state"`
 	Error string             `json:"error,omitempty"`
 	Peers []doctorPeerReport `json:"peers"`
+	// Imported is what arrived from machines with no peer row — the state a
+	// first exchange leaves, before `deja sync ssh` names a target. The text
+	// report says it since #2379, and a tool reading this saw a machine that
+	// had never exchanged anything (#2382). Omitted when there is none, so a
+	// reader can tell "nothing arrived" from a deja too old to report it.
+	Imported []doctorImportedReport `json:"imported,omitempty"`
+}
+
+// doctorImportedReport is one machine that sent work this one keeps, named as
+// the records name it.
+type doctorImportedReport struct {
+	Machine  string `json:"machine"`
+	Sessions int    `json:"sessions"`
 }
 
 // doctorPeerReport is one machine, carrying what the text line carries.
@@ -165,6 +178,27 @@ func collectDoctorSync(dir string) doctorSyncReport {
 		}
 		row.Ahead = peerStampedAhead(p.Last(), time.Now())
 		out.Peers = append(out.Peers, row)
+		// Counted against a peer row, so the imported list below carries what
+		// is left: the machines this one has no target for.
+		delete(from, peers.Identity(p.Host))
+		if p.Machine != "" {
+			delete(from, peers.Identity(p.Machine))
+		}
+	}
+	names := make([]string, 0, len(from))
+	for name := range from {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if from[names[i]] != from[names[j]] {
+			return from[names[i]] > from[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	for _, name := range names {
+		// The name as the records spell it, for the reason Host is: a reader
+		// may act on it, and the encoder escapes what a terminal would obey.
+		out.Imported = append(out.Imported, doctorImportedReport{Machine: name, Sessions: from[name]})
 	}
 	return out
 }
