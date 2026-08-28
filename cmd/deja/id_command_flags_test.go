@@ -73,4 +73,15 @@ func TestAMistypedHarnessIsNamedByTheCommandsThatTakeAnID(t *testing.T) {
 		strings.Contains(err.Error(), `matches "extra"`) {
 		t.Errorf("resume with a stray word: %v", err)
 	}
+
+	// handoff had the same shape, found by running the same input at it.
+	if err := runHandoff(dir, []string{"sess1", "extra"}, &out); err == nil ||
+		strings.Contains(err.Error(), `matches "extra"`) {
+		t.Errorf("handoff with a stray word: %v", err)
+	}
+	// And it still hands off the session it was given.
+	out.Reset()
+	if err := runHandoff(dir, []string{"sess1"}, &out); err != nil {
+		t.Errorf("handoff of a real id: %v", err)
+	}
 }

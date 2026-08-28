@@ -52,6 +52,11 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return fmt.Errorf("handoff: unknown flag %q", args[i])
 			}
+			// The last one used to win, so a stray word replaced the id and
+			// the refusal named it as the session that was missing (#2251).
+			if prefix != "" {
+				return fmt.Errorf("handoff takes one id-prefix — got %q and %q", prefix, args[i])
+			}
 			prefix = args[i]
 		}
 	}
