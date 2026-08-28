@@ -34,8 +34,13 @@ type Snapshot struct {
 	// tell whether a recall was used is the sentence the block asks the agent
 	// to say — measured on a real store, that sentence appears after 22 of 1218
 	// injections, which measures reporting rather than use.
-	Into   string `json:"into,omitempty"`
-	Digest string `json:"digest"`
+	Into string `json:"into,omitempty"`
+	// Projects names the projects the digest was built from. The trust policy
+	// answers for a project name with no index at all, so a record that names
+	// its own projects can be checked against a rule tightened after it was
+	// written — even when the sessions behind it are gone (#2324).
+	Projects []string `json:"projects,omitempty"`
+	Digest   string   `json:"digest"`
 }
 
 const (
@@ -104,6 +109,22 @@ func RecordDigestTerms(indexDir, kind, digest string, sessions int, raw int64, t
 	RecordDigestInto(indexDir, kind, digest, "", sessions, raw, terms, ids...)
 }
 
+// RecordDigestFrom is RecordDigestInto plus the projects the digest was built
+// from, for the reason RecordServedFrom exists.
+func RecordDigestFrom(indexDir, kind, digest, into string, sessions int, raw int64, terms, projects, ids []string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, projects, at)
+}
+
+// RecordDigestPolicyFrom is RecordDigestPolicyInto for a caller that knows the
+// projects behind the digest, for the reason RecordServedFrom exists.
+func RecordDigestPolicyFrom(indexDir, kind, digest, into string, sessions int, raw int64, projects []string, policyName string) {
+	at := time.Now().UTC()
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
+}
+
 // RecordDigestInto is RecordDigestTerms knowing which agent session received
 // the injection, so a later reading of the store can ask whether it was used.
 func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int64, terms []string, ids ...string) {
@@ -112,7 +133,7 @@ func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int
 	// with nothing else to join them on (#2294).
 	at := time.Now().UTC()
 	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
-	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, nil, at)
 }
 
 // RecordDigestPolicy is RecordDigest plus the name of the policy that allowed
@@ -129,7 +150,7 @@ func RecordDigestPolicy(indexDir, kind, digest string, sessions int, raw int64, 
 func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, raw int64, policyName string) {
 	at := time.Now().UTC()
 	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
-	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, nil, at)
 }
 
 // RecordServedSnapshot writes the counting event and the digest snapshot for
@@ -137,9 +158,17 @@ func RecordDigestPolicyInto(indexDir, kind, digest, into string, sessions int, r
 // writers back to back, which took two instants for one act and left `deja
 // log` and `deja log --last` disagreeing about when it happened (#2294).
 func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64, ids []string, policyName string) {
+	RecordServedFrom(indexDir, kind, digest, sessions, raw, ids, nil, policyName)
+}
+
+// RecordServedFrom is RecordServedSnapshot for a caller that knows which
+// projects the digest was built from. Without them a stored digest can only be
+// checked against a later rule by recognising project names inside its own
+// prose, which fails as soon as the sessions behind it leave the index (#2324).
+func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, ids, projects []string, policyName string) {
 	at := time.Now().UTC()
 	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, "", at)
-	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, projects, at)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
@@ -205,12 +234,12 @@ func runeBoundaryAt(s string, n int) int {
 }
 
 func snapshotWriteInto(indexDir, kind, digest, into string, sessions int, policyName string, terms []string) {
-	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, terms, time.Now().UTC())
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, terms, nil, time.Now().UTC())
 }
 
 // snapshotWriteIntoAt is snapshotWriteInto with the instant supplied, so a
 // caller writing both logs for one injection can stamp them alike (#2294).
-func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, policyName string, terms []string, at time.Time) {
+func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, policyName string, terms, projects []string, at time.Time) {
 	if digest == "" {
 		return
 	}
@@ -219,7 +248,8 @@ func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, poli
 		return
 	}
 	b, err := marshalSnapshot(Snapshot{Time: at, Kind: kind, Sessions: sessions,
-		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into, Digest: clipDigest(digest)})
+		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into,
+		Projects: projects, Digest: clipDigest(digest)})
 	if err != nil {
 		return
 	}

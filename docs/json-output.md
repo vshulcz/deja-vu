@@ -537,8 +537,10 @@ never disagree about whether something happened.
 `deja log --last --json` is a different shape: one object, the most recent
 injected digest itself. It carries `t` and `kind` as above, the `digest` text,
 `bytes`, and — each omitted when empty — `sessions`, the `policy` that allowed
-the injection, the `terms` behind a déjà vu firing, and `into`, the agent session
-it went to. It is `null` when no digest has been recorded: one object is the
+the injection, the `terms` behind a déjà vu firing, `into`, the agent session
+it went to, and `projects`, the projects the digest was built from. `projects`
+is absent on records written before it existed and on injections whose writer
+does not know them. It is `null` when no digest has been recorded: one object is the
 shape, and that is how a missing one is spelled.
 
 ## `deja blame <path> --json`
