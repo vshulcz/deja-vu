@@ -348,7 +348,7 @@ func refreshGooseHintsFor(cwd string) error {
 	digest, sessions, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
 	body := digest
 	if sessions > 0 {
-		body = frameRecall(gooseLead + digest)
+		body = frameRecall(startLead(gooseLead) + digest)
 	}
 	if strings.TrimSpace(body) == "" {
 		body = "No matching history yet.\n"
