@@ -253,13 +253,14 @@ func isFriction(l string) bool {
 	if namedTestFailure(l) {
 		return true
 	}
-	for _, generic := range []string{
-		"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL",
-	} {
-		if strings.HasPrefix(l, generic) {
-			return false
-		}
-	}
+	// A generic opening — "Error: ", "error: ", a traceback header, a go test
+	// summary line — used to end the question here. It says nothing on its
+	// own, which is why it was listed, but the check ran before the phrase
+	// list and so also threw away every line that goes on to name a wall the
+	// list knows: `Error: Cannot find module ./config` was dropped while
+	// `Cannot find module ./config` was kept (#2432). Nothing is needed in its
+	// place — a line with only a generic opening matches no phrase below and
+	// falls through to false, which is where it belonged.
 	// Tool output carries source as often as it carries results — a `cat` of a
 	// script, a diff, a heredoc. An `echo "App not found: $APP"` inside a
 	// deploy script reached second place on the first run: it is a line about
