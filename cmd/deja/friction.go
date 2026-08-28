@@ -143,6 +143,7 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		}
 		return nil
 	}
+	total := len(rows)
 	if len(rows) > limit {
 		rows = rows[:limit]
 	}
@@ -155,6 +156,12 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, " · last %s", r.when.Local().Format("Jan 2"))
 		}
 		fmt.Fprintln(stdout)
+	}
+	// The header claims to say what this machine keeps tripping over, so a cut
+	// list with nothing after it reads as all of it — the sentence `how` and
+	// `files` print for the same flag (#2311).
+	if total > len(rows) {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), total)
 	}
 	return nil
 }
