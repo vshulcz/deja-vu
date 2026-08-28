@@ -59,7 +59,7 @@ func TestRarityTakesTheRarerOfTheTwoVerdicts(t *testing.T) {
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, idfOf, err := ProjectRelevant(dir, []string{"app"}, []string{"quetzalcoatl", "branch"}, 8)
+	_, _, _, idfOf, err := ProjectRelevant(dir, []string{"work/app"}, []string{"quetzalcoatl", "branch"}, 8)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestRarityIsNotInvertedByMarathonSessions(t *testing.T) {
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, idfOf, err := ProjectRelevant(dir, []string{"app"}, []string{"pgbouncer", "branch"}, 8)
+	_, _, _, idfOf, err := ProjectRelevant(dir, []string{"work/app"}, []string{"pgbouncer", "branch"}, 8)
 	if err != nil {
 		t.Fatal(err)
 	}

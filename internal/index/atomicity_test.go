@@ -244,7 +244,7 @@ func TestProjectRelevantRanksByIDFNotFiller(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A prompt full of filler plus the one rare term must rank s1 first.
-	got, _, _, _, err := ProjectRelevant(dir, []string{"app"}, []string{"need", "the", "quetzalcoatl"}, 2)
+	got, _, _, _, err := ProjectRelevant(dir, []string{"tmp/app"}, []string{"need", "the", "quetzalcoatl"}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func TestStemFoldIsDecidedByTheProjectNotTheStore(t *testing.T) {
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	got, matched, _, _, err := ProjectRelevant(dir, []string{"app"}, []string{"write", "parquet"}, 3)
+	got, matched, _, _, err := ProjectRelevant(dir, []string{"tmp/app"}, []string{"write", "parquet"}, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestProjectRelevantDottedTermNeedsAllSubTokens(t *testing.T) {
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	got, matched, _, _, err := ProjectRelevant(dir, []string{"app"}, []string{"203.0.113.51"}, 4)
+	got, matched, _, _, err := ProjectRelevant(dir, []string{"tmp/app"}, []string{"203.0.113.51"}, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +388,7 @@ func termRarity(t *testing.T, dir, term string) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rank, err := relevantMetasCounts(dir, m, []string{"app"}, []string{term}, 8, nil)
+	rank, err := relevantMetasCounts(dir, m, []string{"tmp/app"}, []string{term}, 8, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
