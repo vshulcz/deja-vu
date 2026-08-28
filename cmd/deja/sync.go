@@ -169,7 +169,15 @@ func runSync(dir string, args []string) error {
 			if rs, rerr := index.Redactions(dir); rerr == nil {
 				masked = rs.Total
 			}
-			fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
+			// The count decides the sentence: saying records were redacted
+			// when none were is a claim about secrets that is not true, and
+			// this is the one line deja prints about them leaving the machine
+			// (#2255). The caution holds either way and is the point of it.
+			if masked > 0 {
+				fmt.Fprintf(os.Stderr, "deja: records were redacted at index time (%d masked). pattern redaction is a floor — review the export before moving it; rotate anything that leaked.\n", masked)
+			} else {
+				fmt.Fprintln(os.Stderr, "deja: nothing in these records matched deja's redaction patterns. pattern redaction is a floor — review the export before moving it; rotate anything that leaked.")
+			}
 		}
 		return nil
 	case "import":
