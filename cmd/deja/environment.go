@@ -94,19 +94,56 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 	}
 	var b strings.Builder
 	b.WriteString("This machine, from deja's index of past sessions across every agent used here:\n")
+	knownRemedy := false
 	for _, w := range walls {
 		text := w.Text
 		// Same cut, same reason as the conventions line: bytes, not runes, so a
 		// wall recorded in Russian or Chinese reached the model in pieces.
 		text = truncatePlanBytes(text, environmentMax)
 		fmt.Fprintf(&b, "- %d separate sessions hit `%s`\n", len(w.Sessions), text)
+		// What was run after it, when deja knows: the block exists to change
+		// the next tool call, and "find your own way past this" is poor advice
+		// from something holding the way past (#2440). Same source `deja fix`
+		// and the tool hook answer from, under the same rule this block is
+		// filtered by.
+		if fix := environmentRemedy(dir, w.Text, activation); fix != "" {
+			fmt.Fprintf(&b, "  what followed it: `%s`\n", fix)
+			knownRemedy = true
+		}
 	}
 	// Without this line the block reads as trivia. With it the model has
 	// something to do differently on its next tool call, which is the only
 	// reason the block is here.
-	b.WriteString("These are environment facts, not history: the tool or module is still missing. " +
-		"Check or use an alternative before running into them again.")
+	if knownRemedy {
+		b.WriteString("These are environment facts, not history. Where a command is named above, " +
+			"it is what this machine ran after that error before; check the rest or use an alternative " +
+			"before running into them again.")
+	} else {
+		b.WriteString("These are environment facts, not history: the tool or module is still missing. " +
+			"Check or use an alternative before running into them again.")
+	}
 	return b.String(), projects
+}
+
+// environmentRemedy is the command this machine ran after a wall, when one is
+// recorded twice or more — the same bar `deja fix` prints without hedging. The
+// block is bounded, so only the first candidate is named and only when it is
+// short enough to be a command rather than a script.
+func environmentRemedy(dir, wall string, activation string) string {
+	pol := policy.Load()
+	fixes := index.FixesFor(dir, wall, 1, func(project string) bool {
+		return pol.Allows(activation, project)
+	})
+	if len(fixes) == 0 || fixes[0].Candidate {
+		return ""
+	}
+	// Stored with the prompt the transcript showed it with; the block quotes it
+	// as a command to run.
+	cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(fixes[0].Command), "$ "))
+	if cmd == "" || len(cmd) > environmentMax {
+		return ""
+	}
+	return safeForStatusline(cmd, environmentMax)
 }
 
 // environmentSpent is per process, which is what makes "once" countable on
