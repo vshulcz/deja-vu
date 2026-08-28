@@ -72,6 +72,12 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	// (#1652). The verbs are already invariant.
 	fmt.Fprintf(w, "  recalls served     %d agent-initiated recall%s returned matches\n", r.Recalls, pluralS(r.Recalls))
 	fmt.Fprintf(w, "  memory at start    %d session start%s began with project memory\n", r.Injections, pluralS(r.Injections))
+	if r.ServedBytes > 0 && r.RawBytes == 0 {
+		// The tool-time line is recorded with no raw size behind it — it is a
+		// fact about the store rather than a digest of transcripts — so the
+		// ratio block below skipped it and the bytes went unsaid (#2309).
+		fmt.Fprintf(w, "  context served     %s, with no raw transcript size recorded behind it\n", humanBytes(int64(r.ServedBytes)))
+	}
 	if r.RawBytes > 0 && r.ServedBytes > 0 {
 		// The frame, the header and the session lines cost more than the text
 		// they wrap when sessions are short — which is exactly the state a new
@@ -94,10 +100,13 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	if r.ReusedTwice > 0 {
 		fmt.Fprintf(w, "  knowledge re-used  %d session%s recalled 2+ times — fixes that keep paying\n", r.ReusedTwice, pluralS(r.ReusedTwice))
 	}
+	if r.ToolLines > 0 {
+		fmt.Fprintf(w, "  tool-time lines    %d command%s or file%s deja had seen before\n", r.ToolLines, pluralS(r.ToolLines), pluralS(r.ToolLines))
+	}
 	if r.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  déjà vu moments    %d prompt%s matched work you had already done\n", r.DejaVuMoments, pluralS(r.DejaVuMoments))
 	}
-	served := r.Recalls + r.Injections + r.DejaVuMoments
+	served := r.Recalls + r.Injections + r.DejaVuMoments + r.ToolLines
 	switch {
 	case credits > 0:
 		fmt.Fprintf(w, "  credited aloud     %d of %d said \"deja-vu recalled\" — memory that was used, not just served\n", credits, served)
@@ -118,5 +127,5 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 // recorded" while `deja log`, the stats card and this report's own --json
 // listed the injections (#2303).
 func impactHasActivity(r usage.ImpactReport) bool {
-	return r.Recalls > 0 || r.Injections > 0 || r.DejaVuMoments > 0 || r.ServedBytes > 0
+	return r.Recalls > 0 || r.Injections > 0 || r.DejaVuMoments > 0 || r.ToolLines > 0 || r.ServedBytes > 0
 }

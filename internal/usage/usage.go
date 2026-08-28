@@ -703,6 +703,11 @@ type ImpactReport struct {
 	RawBytes      int64 `json:"raw_bytes"`      // source transcripts those digests distilled
 	ReusedTwice   int   `json:"reused_twice"`   // sessions agents recalled 2+ times
 	DejaVuMoments int   `json:"dejavu_moments"` // prompts matched to prior work
+	// ToolLines counts the PreToolUse injections — one line about the command
+	// or file an agent is about to touch. Their bytes were counted from the
+	// start and no counter named the door, so a machine served only through
+	// that hook read as two zeros (#2309).
+	ToolLines int `json:"tool_lines"`
 	// Since is the oldest event still in the log. The log is rewritten past
 	// 1MB keeping the last 14 days, so every count above is a window and not a
 	// lifetime — one rotation over a 30-day log halved them (#1889). The same
@@ -775,6 +780,9 @@ func Impact(indexDir string) ImpactReport {
 			// starts that began with project memory.
 			if e.Kind == KindHook {
 				r.Injections++
+			}
+			if e.Kind == KindTool {
+				r.ToolLines++
 			}
 			r.ServedBytes += e.Bytes
 			r.RawBytes += e.RawBytes
