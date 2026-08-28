@@ -34,13 +34,18 @@ func TestAgentFacingTextIsCutOnRuneBoundaries(t *testing.T) {
 	}
 }
 
-// A note that fits keeps its whole text, and a title still wins over the body.
+// A note that fits keeps its whole text, and the decision is what the line
+// carries — the title is the session's own opening line, which is the problem
+// rather than what was decided about it (#2456).
 func TestAShortConventionKeepsItsText(t *testing.T) {
 	if got := conventionLine(sources.PromotedNote{Text: "queue retries with full jitter"}); got != "queue retries with full jitter" {
 		t.Errorf("a short note was changed: %q", got)
 	}
-	if got := conventionLine(sources.PromotedNote{Title: "retry policy", Text: "long body"}); got != "retry policy" {
-		t.Errorf("the title should name the note: %q", got)
+	if got := conventionLine(sources.PromotedNote{Title: "retry policy", Text: "queue retries with full jitter"}); got != "queue retries with full jitter" {
+		t.Errorf("the decision should be the line, not the title: %q", got)
+	}
+	if got := conventionLine(sources.PromotedNote{Title: "retry policy"}); got != "retry policy" {
+		t.Errorf("a note with only a title should still say it: %q", got)
 	}
 	// The first sentence, when there is one.
 	if got := conventionLine(sources.PromotedNote{Text: "Retry three times. Then give up."}); got != "Retry three times." {
