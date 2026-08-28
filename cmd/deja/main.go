@@ -494,7 +494,15 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if o.sliced {
 		// Both flags are documented for `show` and only the JSON path honoured
 		// them; the text output printed the whole session (#709).
+		total := len(s.Messages)
 		s.Messages = sliceMessages(s.Messages, o.offset, o.limit)
+		// The JSON has reported the window all along; the terminal printed the
+		// slice and said nothing, so five turns of two hundred read the same as
+		// a session that is five turns long (#2296). search says it in this
+		// shape two commands away.
+		if line := showWindowNote(o.offset, len(s.Messages), total); line != "" {
+			fmt.Fprintln(os.Stderr, line)
+		}
 	} else if n := len(s.Messages); n > showLargeSession {
 		fmt.Fprintf(os.Stderr, "deja: %d messages — `--offset n --limit n` reads a slice\n", n)
 	}
@@ -510,6 +518,22 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	printSpawnEdges(os.Stderr, dir, s)
 	search.PrintSession(os.Stdout, s)
 	return nil
+}
+
+// showWindowNote is what the terminal says about a slice: which messages it
+// printed and how many there are. Empty when the slice is the whole session,
+// because a reader who asked for everything needs no arithmetic.
+func showWindowNote(offset, returned, total int) string {
+	if offset <= 0 && returned == total {
+		return ""
+	}
+	if returned == 0 {
+		return fmt.Sprintf("deja: --offset %d is past the end — the session has %d message%s", offset, total, pluralS(total))
+	}
+	first := offset + 1
+	last := offset + returned
+	return fmt.Sprintf("deja: showing message%s %d-%d of %d — `--offset %d` reads the next slice",
+		pluralS(returned), first, last, total, last)
 }
 
 // printSpawnEdges names the sessions around this one when an agent spawned it
