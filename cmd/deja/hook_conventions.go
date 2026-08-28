@@ -72,12 +72,15 @@ func projectConventions(names []string, maxNotes, budget int) string {
 // first sentence of its body when it has no title. Kept short — the block is a
 // reminder of what was decided, not the reasoning, which recall_context carries.
 func conventionLine(n sources.PromotedNote) string {
-	if t := strings.TrimSpace(n.Title); t != "" {
-		return t
-	}
+	// The decision first. A note's title is the session's own opening line —
+	// usually the problem someone brought — and the decision is what they
+	// wrote with `--note`, so leading with the title told an agent to follow
+	// "the migration keeps failing on retry" (#2456). The title is the
+	// fallback for a note that has nothing else, which is what `deja promote`
+	// writes without `--note`.
 	text := strings.TrimSpace(strings.ReplaceAll(n.Text, "\n", " "))
 	if text == "" {
-		return ""
+		return strings.TrimSpace(n.Title)
 	}
 	for i, r := range text {
 		if (r == '.' || r == '!' || r == '?') && (i+1 >= len(text) || text[i+1] == ' ') {
