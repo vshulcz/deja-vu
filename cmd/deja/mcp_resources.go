@@ -107,20 +107,22 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if !policy.Load().Allows(policy.ActivationMCP, s.Project) {
 		return nil, -32602, "blocked by trust policy"
 	}
-	var b bytes.Buffer
 	// Every door a person types says when a prefix reached more than one
 	// session; this one picked the newest in silence, which is a wrong answer
-	// an agent cannot see (#2388). The note goes inside the served text: the
-	// resources surface has nowhere else to put it.
+	// an agent cannot see (#2388). On the CLI the note goes to stderr, beside
+	// the transcript rather than inside it; here it goes above the recall
+	// frame, so it reads as deja's own words and not as recalled text.
+	note := ""
 	if n := index.PrefixMatches(dir, id); n > 1 {
-		fmt.Fprintf(&b, "deja: %d sessions match %q — this is the most recent; ask for a longer prefix to read another.\n\n",
+		note = fmt.Sprintf("deja: %d sessions match %q — this is the most recent; ask for a longer prefix to read another.\n\n",
 			n, neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
 	}
+	var b bytes.Buffer
 	search.PrintContext(&b, s, "")
 	// Same transcript, same frame as recall_context. Reading a session through
 	// the resources surface used to skip the untrusted-data wrapper and the
 	// marker neutralisation entirely (#1077).
-	text := frameRecall(b.String())
+	text := note + frameRecall(b.String())
 	// It also left no trace: a whole session reached the agent and `deja log`
 	// stayed empty — the gap #682 closed for blame.
 	usage.RecordServedFrom(dir, usage.KindResource, text, 1, rawSize([]model.Session{s}), []string{s.ID}, projectsOf(s), policy.Load().Describe(policy.ActivationMCP))

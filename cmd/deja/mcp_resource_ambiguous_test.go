@@ -52,7 +52,13 @@ func TestTheResourceReadNamesAnAmbiguousPrefix(t *testing.T) {
 	if !strings.Contains(text, "dupe-one") {
 		t.Fatalf("the read did not answer from the newest match:\n%s", text)
 	}
-	if !strings.Contains(text, "2 sessions match") {
-		t.Errorf("the reader is not told another session matched:\n%s", text)
+	note := strings.Index(text, "2 sessions match")
+	if note < 0 {
+		t.Fatalf("the reader is not told another session matched:\n%s", text)
+	}
+	// deja's own words, not recalled text: the note belongs above the frame the
+	// served transcript is wrapped in.
+	if frame := strings.Index(text, "<deja-recall>"); frame >= 0 && note > frame {
+		t.Errorf("the note sits inside the untrusted-data frame:\n%s", text)
 	}
 }
