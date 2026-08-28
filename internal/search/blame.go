@@ -356,7 +356,15 @@ func blameSnippet(text, role string, target BlameTarget) string {
 		// stopped existing and is prose as far as a snippet goes.
 		path, span, _ := strings.Cut(text, "\n")
 		if pathLineFor(path, target) != "" {
-			return strings.TrimSpace(SafePath(path) + " " + snippet(span, target.Base, nil))
+			// A space put nothing between the two, and this command is written
+			// for paths that contain spaces (the comment above), so the reader
+			// could not tell where the path ended — on the line they paste into
+			// `deja restore` (#2284). An em dash cannot occur in either half by
+			// accident.
+			if cut := snippet(span, target.Base, nil); strings.TrimSpace(cut) != "" {
+				return strings.TrimSpace(SafePath(path)) + " — " + strings.TrimSpace(cut)
+			}
+			return strings.TrimSpace(SafePath(path))
 		}
 	}
 	return snippet(text, target.Base, nil)
