@@ -180,6 +180,16 @@ func rewireNote(targets []string) string {
 // (#927).
 func buildNotice(dir string) string {
 	if st := readWarmupStatus(dir); st != nil {
+		// On a machine no agent has written to, "indexing your history —
+		// recall comes online in a few seconds" is deja's first word to an
+		// agent and none of it is so: there is nothing to read, and recall
+		// starts when some agent writes a transcript, not in a few seconds
+		// (#2407). Same claim the CLI makes about the same machine. A build
+		// that has counted work to do is believed over the store walk: it is
+		// reading something, whatever a later look at the stores finds.
+		if st.Total <= 0 && noAgentHistoryFound() {
+			return "deja: no agent history was found on this machine yet — recall starts once an agent writes a session here; `deja sources` shows where deja looked"
+		}
 		return st.line()
 	}
 	// A rebuild is pending either because one was asked for or because the
