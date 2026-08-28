@@ -360,6 +360,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     "peers": [
       {
         "host": "laptop",
+        "machine": "quicksilver",
         "last_push": "2026-08-22T10:00:00Z",
         "last_pull": "2026-08-22T10:00:00Z",
         "sessions_from_there": 12
@@ -430,7 +431,10 @@ apart, and a machine that takes what this one sends while sending nothing back
 is a broken sync that reads as a working one. A row carrying neither is a
 machine named once and never reached — the text report says "never exchanged"
 for it — and it is still a row, which is what distinguishes it from a deja too
-old to report peers at all: that one has no `sync` key. `last_error` is why the most
+old to report peers at all: that one has no `sync` key. `machine` is what that host calls itself, learned from the records a pull
+brings; it is the name `sessions_from_there` is counted by and the name every
+listing prints for imported work. Absent until the machine has said, and absent
+for a peer that has never been reached. `last_error` is why the most
 recent exchange failed and is absent once one succeeds. `last_error` is written by
 another machine and can be made arbitrarily long, so it is bounded before it is
 reported. `host` is not: it is a name to act on — `deja sync ssh <host>` — and a
