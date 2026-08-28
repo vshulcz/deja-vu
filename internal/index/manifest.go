@@ -515,6 +515,14 @@ func RebuildInProgress(dir string) bool {
 		unlock()
 		return false
 	}
+	// A lock that could not be created is not a lock somebody holds: tryLockDir
+	// answers "not acquired, no error" for a directory it may not write into,
+	// so a read-only index still serves readers — and that read as a rebuild in
+	// flight, telling people to wait for something that never finishes (#2267).
+	// A real holder left the file behind.
+	if _, err := os.Stat(dir + ".lock"); err != nil {
+		return false
+	}
 	return true
 }
 
