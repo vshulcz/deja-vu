@@ -29,6 +29,15 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 			doExec = true
 			continue
 		}
+		// The last argument used to win, so a flag resume does not take, or a
+		// stray word, silently replaced the id and the refusal named it as the
+		// session that was missing (#2251).
+		if strings.HasPrefix(a, "-") && a != "-" {
+			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix and --exec", a)
+		}
+		if prefix != "" {
+			return fmt.Errorf("resume takes one id-prefix — got %q and %q", prefix, a)
+		}
 		prefix = a
 	}
 	if prefix == "" {
