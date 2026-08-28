@@ -10,6 +10,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -96,10 +97,14 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 	b.WriteString("This machine, from deja's index of past sessions across every agent used here:\n")
 	knownRemedy := false
 	for _, w := range walls {
-		text := w.Text
-		// Same cut, same reason as the conventions line: bytes, not runes, so a
-		// wall recorded in Russian or Chinese reached the model in pieces.
-		text = truncatePlanBytes(text, environmentMax)
+		// Cut from the middle, not the right. What names a failure is usually
+		// at both ends — the tool at the front, what it could not do at the
+		// back — and a right-hand cut kept `connection to server at "…", port
+		// 5432 failed:` while dropping the "Connection refused" that says what
+		// happened (#2442). Bytes, not runes, for the reason the conventions
+		// line gives: a wall recorded in Russian or Chinese reached the model
+		// in pieces.
+		text := elideMiddleBytes(w.Text, environmentMax)
 		fmt.Fprintf(&b, "- %d separate sessions hit `%s`\n", len(w.Sessions), text)
 		// What was run after it, when deja knows: the block exists to change
 		// the next tool call, and "find your own way past this" is poor advice
@@ -123,6 +128,60 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 			"Check or use an alternative before running into them again.")
 	}
 	return b.String(), projects
+}
+
+// elideMiddleBytes keeps the head and the tail of a line, with an ellipsis
+// between them, inside a byte budget. A tail matters here because the phrase
+// that names a failure — "Connection refused", "no such file or directory",
+// "undefined: X" — is as often at the end of a line as at the front, while the
+// middle is a path or a host.
+func elideMiddleBytes(text string, limit int) string {
+	if limit <= 0 || len(text) <= limit {
+		if limit <= 0 {
+			return ""
+		}
+		return text
+	}
+	const ellipsis = "…"
+	if limit <= len(ellipsis) {
+		return ""
+	}
+	room := limit - len(ellipsis)
+	// A little more of the front than the back: the tool's own name and the
+	// first words are what a reader matches against, and the tail only has to
+	// carry the failing phrase.
+	head := room * 3 / 5
+	tail := room - head
+	return cutBytes(text, head) + ellipsis + cutBytesRight(text, tail)
+}
+
+// cutBytes and cutBytesRight take whole runes from each end.
+func cutBytes(text string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	if len(text) <= n {
+		return text
+	}
+	out := text[:n]
+	for len(out) > 0 && !utf8.ValidString(out) {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
+func cutBytesRight(text string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	if len(text) <= n {
+		return text
+	}
+	out := text[len(text)-n:]
+	for len(out) > 0 && !utf8.ValidString(out) {
+		out = out[1:]
+	}
+	return out
 }
 
 // environmentRemedy is the command this machine ran after a wall, when one is
