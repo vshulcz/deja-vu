@@ -76,6 +76,8 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// SessionsWithheld is how many sessions a trust rule kept off the page.
+	SessionsWithheld int
 	// NotesWithheld is how many promoted notes a trust rule kept off the page.
 	NotesWithheld int
 	// RecallsWithheld is how many stored digests a trust rule kept off the page.
@@ -184,6 +186,10 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		GeneratedAt:   time.Now().Format("2006-01-02 15:04"),
 		TotalSessions: report.TotalSessions,
 		Harnesses:     len(report.Harnesses),
+		// On the page too, not only on stderr: the file is what someone looks
+		// at and passes on, and a page a rule emptied read as a machine with
+		// no history at all — the misread #2319 closed on friction (#2321).
+		SessionsWithheld: policyHidden,
 	}
 	if len(metas) > 0 {
 		page.DateEnd = metas[0].Updated.Local().Format("2006-01-02")

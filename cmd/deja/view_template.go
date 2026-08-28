@@ -53,7 +53,7 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 <div class="stats">
 <div class="stat"><b>{{.TotalSessions}}</b><span>sessions</span></div>
 <div class="stat"><b>{{.Harnesses}}</b><span>agents</span></div>
-<div class="stat"><b>{{.DateStart}} → {{.DateEnd}}</b><span>covered</span></div>
+<div class="stat"><b>{{if .DateStart}}{{.DateStart}} → {{.DateEnd}}{{else}}—{{end}}</b><span>covered</span></div>
 </div>
 <div class="tabs">
 <button class="on" data-tab="sessions">Sessions</button>
@@ -63,12 +63,12 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 <div id="tab-sessions">
 <input type="search" id="q" placeholder="filter sessions — title, project, harness, preview text">
 <div id="list"></div>
-<p class="note">previews embedded for the {{.PreviewCount}} most recent sessions and capped — full-text search lives in <b>deja "query"</b> and the agents' recall tool.</p>
+<p class="note">{{if .TotalSessions}}previews embedded for the {{.PreviewCount}} most recent sessions and capped — full-text search lives in <b>deja "query"</b> and the agents' recall tool.{{else}}no sessions on this page.{{end}}{{if .SessionsWithheld}} Held back by the trust policy: {{.SessionsWithheld}}.{{end}}</p>
 </div>
 <div id="tab-recalls" style="display:none"><div id="rlist"></div>
-<p class="note">the injections agents received, verbatim — the audit trail behind <b>deja log</b>.{{if lt .RecallCount .TotalRecalls}} The {{.RecallCount}} most recent of {{.TotalRecalls}} are on this page; older ones stay in the log until it rotates.{{end}}{{if .RecallsWithheld}} {{.RecallsWithheld}} more are held back by the trust policy.{{end}}</p></div>
+<p class="note">the injections agents received, verbatim — the audit trail behind <b>deja log</b>.{{if lt .RecallCount .TotalRecalls}} The {{.RecallCount}} most recent of {{.TotalRecalls}} are on this page; older ones stay in the log until it rotates.{{end}}{{if .RecallsWithheld}} Held back by the trust policy: {{.RecallsWithheld}}.{{end}}</p></div>
 <div id="tab-notes" style="display:none"><div id="nlist"></div>
-<p class="note">curated notes from <b>deja promote</b> / <b>deja remember</b>; lifecycle states shown as badges.{{if lt .NoteCount .TotalNotes}} The {{.NoteCount}} most recent notes of {{.TotalNotes}} are on this page — the rest answer through <b>deja "query"</b> and the agents' recall tool.{{end}}{{if .NotesWithheld}} {{.NotesWithheld}} more are held back by the trust policy.{{end}}</p></div>
+<p class="note">curated notes from <b>deja promote</b> / <b>deja remember</b>; lifecycle states shown as badges.{{if lt .NoteCount .TotalNotes}} The {{.NoteCount}} most recent notes of {{.TotalNotes}} are on this page — the rest answer through <b>deja "query"</b> and the agents' recall tool.{{end}}{{if .NotesWithheld}} Held back by the trust policy: {{.NotesWithheld}}.{{end}}</p></div>
 </div>
 <script>
 const S={{.SessionsJSON}},R={{.RecallsJSON}},N={{.NotesJSON}};
