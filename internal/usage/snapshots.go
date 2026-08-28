@@ -340,9 +340,17 @@ func Snapshots(indexDir string, n int) []Snapshot {
 
 // Events returns up to n usage events, newest first. n <= 0 means all.
 func Events(indexDir string, n int) []Event {
+	events, _ := EventsCounted(indexDir, n)
+	return events
+}
+
+// EventsCounted is Events plus how many events the log holds, so a caller that
+// shows a window can say what it left out. The whole file is read either way —
+// the cut happens at the end — so the count costs nothing (#2305).
+func EventsCounted(indexDir string, n int) ([]Event, int) {
 	f, err := os.Open(Path(indexDir))
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	defer func() { _ = f.Close() }()
 	var out []Event
@@ -363,10 +371,11 @@ func Events(indexDir string, n int) []Event {
 		out[i], out[j] = out[j], out[i]
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Time.After(out[j].Time) })
+	total := len(out)
 	if n > 0 && len(out) > n {
 		out = out[:n]
 	}
-	return out
+	return out, total
 }
 
 // marshalSnapshot writes one record without encoding/json's HTML escaping. That
