@@ -166,6 +166,18 @@ func indexDirWritable(dir string) bool {
 	return true
 }
 
+// stuckWiringNote names what the repair could not write. Without it the reader
+// sees the same "deja rewrote its wiring" line on every session start — the
+// repair really is retried each time, because the record stays unstamped until
+// every target takes the new path (#2594).
+func stuckWiringNote(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja could not rewire %s — run `deja install %s` to see why; until then this line comes back every session",
+		strings.Join(targets, ", "), targets[0])
+}
+
 // rewireNote is the one line a session start spends on maintenance: which
 // targets were rewritten when the binary moved or upgraded.
 func rewireNote(targets []string) string {
@@ -300,7 +312,7 @@ func runHookContext(dir string, plain bool) error {
 			// The environment block is not the project's memory, and while a
 			// build runs it is all there is: without this the whole rebuild
 			// passed in silence on any machine with facts to report (#927).
-			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir)))
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
 			if b, err := json.Marshal(resp); err == nil {
 				fmt.Fprintln(os.Stdout, string(b))
 			}
@@ -330,7 +342,7 @@ func runHookContext(dir string, plain bool) error {
 			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
 				line = joinNotes(note, line)
 			}
-			line = joinNotes(rewireNote(rewired), joinNotes(withheldEverythingNote(dir, withheld), line))
+			line = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), line)))
 			if line != "" {
 				var resp sessionStartHookResponse
 				resp.HookSpecificOutput.HookEventName = "SessionStart"
@@ -434,15 +446,17 @@ func runHookContext(dir string, plain bool) error {
 		// receipt into "says: deja: recalled …" on screen. Without it the
 		// sentence reads whole after any host's prefix and still carries the
 		// name for hosts that add none.
-		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja recalled %d prior session%s %s%s%s%s%s",
-			sessions, plural, why, teaching, svc, polNote, earned)+fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest)))))
+		resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
+			fmt.Sprintf("deja recalled %d prior session%s %s%s%s%s%s",
+				sessions, plural, why, teaching, svc, polNote, earned)+
+				fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest))))))
 	}
 	// Nothing to recall yet because the index is still being built: say so
 	// rather than starting in silence. The build runs detached, so the agent
 	// is already usable — this only explains why memory is not here yet.
 	if resp.SystemMessage == "" {
 		if st := readWarmupStatus(dir); st != nil {
-			resp.SystemMessage = joinNotes(rewireNote(rewired), st.line())
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), st.line()))
 		}
 	}
 	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
