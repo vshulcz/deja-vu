@@ -409,6 +409,28 @@ const commandExitMarker = "  → exit "
 // the record log and split the same command the same way.
 func CommandWithoutExitStatus(s string) string { return withoutExitStatus(s) }
 
+// CommandExitStatus reads the outcome withoutExitStatus strips, for the
+// surfaces that group commands themselves and then have to say what those runs
+// did. The same strict shape: two spaces, the marker, digits to the end.
+func CommandExitStatus(s string) (int, bool) {
+	i := strings.LastIndex(s, commandExitMarker)
+	if i < 0 {
+		return 0, false
+	}
+	code := s[i+len(commandExitMarker):]
+	if code == "" {
+		return 0, false
+	}
+	n := 0
+	for _, r := range code {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n, true
+}
+
 // firstTextLine is the first line of a record, which for a command record is
 // the invocation itself.
 func firstTextLine(s string) string {
