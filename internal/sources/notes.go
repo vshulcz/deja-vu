@@ -530,6 +530,13 @@ type PromotedNote struct {
 // decision, once for the lifecycle states behind the conclusion scan (#2497).
 // Keyed on size and modification time, so a promotion made in one MCP call is
 // visible in the next; the manifest is remembered the same way.
+//
+// What that key cannot see: a hand edit that changes no byte count — swapping
+// `accepted` for `rejected` is the same eight characters — on a filesystem
+// whose modification times are whole seconds, read again by the same
+// long-lived process inside that second. Every write deja makes is an append,
+// so this needs a person editing the file by hand at exactly that moment; the
+// next read after that second sees it.
 var notesMemo struct {
 	sync.Mutex
 	path    string
