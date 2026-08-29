@@ -214,6 +214,17 @@ func buildNotice(dir string) string {
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
 			return fmt.Sprintf("deja cannot find the index (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
 		}
+		// Which of the two states this is decides the sentence. A rebuild
+		// writes the new index beside the old directory and replaces it, so a
+		// read-only index directory inside a writable parent is rebuilt by
+		// `deja index` — measured: permissions come back and the search
+		// answers. What the hook cannot do there is start that rebuild itself,
+		// since the sentinel requestWarmup writes lives inside the read-only
+		// directory. Blaming permissions sent the reader to look at something
+		// that is not the problem (#2502).
+		if dirWritable(filepath.Dir(dir)) {
+			return "deja: the index cannot answer — recall is quiet until `deja index` rebuilds it"
+		}
 		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", unwritableIndexDir(dir))
 	}
 	if !warmupJustRequested(dir) {
