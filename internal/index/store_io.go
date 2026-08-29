@@ -1032,6 +1032,70 @@ func HasRecordOfRole(dir, role string) bool {
 	return found
 }
 
+// betweenManifestAndRecords is the swap window, exposed so it can be entered
+// on purpose. Racing a rebuild to reach it took 27,531 reads and hit it zero
+// times; the window is real either way, and a test that cannot enter it pins
+// nothing (#2627). nil outside tests.
+var betweenManifestAndRecords func()
+
+// manifestStamp identifies the generation of the store on disk. mtime and size
+// rather than Manifest.Generation: it is the pair readManifestCached already
+// keys its cache on, it needs no decode, and it changes on any rewrite.
+func manifestStamp(dir string) string {
+	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d/%d", fi.ModTime().UnixNano(), fi.Size())
+}
+
+// walkRecordsStable runs a record walk and reports whether it read one
+// generation of the store.
+//
+// A reader takes the manifest, then opens records.bin by path and resolves
+// every record's key through the manifest it read. swapIndexDir can land
+// between those two steps; swap_window.go covers the ENOENT that produces, but
+// not this — a manifest from one generation against records from the next
+// resolves only the sessions both hold. Measured on a 20-session store rebuilt
+// to 60, the walk returned 20 records, no error, and nothing to tell the
+// caller. This walk feeds `deja how`, restore's inventory and the "no record of
+// that role" note, where a short answer reads as "this machine never did that"
+// (#2627).
+//
+// Reported rather than retried: the caller has already been handed the records
+// of the first pass, so walking again would hand it the store twice. Saying the
+// read straddled a rebuild lets the caller ask again, which is the only safe
+// version of the same idea.
+//
+// An incremental append is not that. It continues the interning table it found
+// (appendIncremental takes tablesFromManifest(old)) and carries the manifest
+// forward unchanged but for the new files, so the old manifest stays true of
+// the log it was written against and a record for a session it does not know
+// is skipped. That rewrites manifest.gob without being a straddle, which is why
+// the generation decides rather than the stamp: a full build stamps a new one,
+// an append keeps the old.
+func walkRecordsStable(dir string, walk func(m Manifest) error) error {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return err
+	}
+	before := manifestStamp(dir)
+	if betweenManifestAndRecords != nil {
+		betweenManifestAndRecords()
+	}
+	if err := walk(m); err != nil {
+		return err
+	}
+	if manifestStamp(dir) == before {
+		return nil
+	}
+	after, err := readManifestCached(dir)
+	if err != nil || after.Generation == m.Generation {
+		return nil
+	}
+	return errors.New("the index was rebuilt while this read was in flight — run it again")
+}
+
 // EachRecordOfRole streams every record of one role with the session it came
 // from. Ranked retrieval is the wrong instrument when the caller has an exact
 // key and needs every match rather than the best ones — restore is that case
@@ -1040,17 +1104,15 @@ func EachRecordOfRole(dir, role string, fn func(SessionMeta, Record)) error {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifestCached(dir)
-	if err != nil {
-		return err
-	}
-	return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		if r.Role != role {
-			return
-		}
-		if meta, ok := m.Sessions[r.Key]; ok {
-			fn(meta, r)
-		}
+	return walkRecordsStable(dir, func(m Manifest) error {
+		return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+			if r.Role != role {
+				return
+			}
+			if meta, ok := m.Sessions[r.Key]; ok {
+				fn(meta, r)
+			}
+		})
 	})
 }
 
