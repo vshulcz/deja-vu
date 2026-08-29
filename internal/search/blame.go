@@ -435,6 +435,11 @@ func BlameLifecycleLine(h BlameHit) string {
 	}
 	var head string
 	switch h.Lifecycle {
+	case "accepted":
+		// The one state that is not a warning. blame answers "who decided
+		// this", so a decision that still stands is the answer rather than a
+		// caveat about it (#2514).
+		head = "this is the standing decision"
 	case "rejected":
 		head = "this was tried and rejected"
 	case "superseded":
