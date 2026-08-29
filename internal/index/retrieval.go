@@ -587,6 +587,9 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 		// stays quiet on an error.
 		return nil, nil, nil, nil, rerr
 	}
+	if bm, bmatched, bstrong, bidf, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
+		metas, matched, strong, idf = bm, bmatched, bstrong, bidf
+	}
 	if len(metas) == 0 {
 		return nil, nil, nil, nil, nil
 	}
@@ -595,6 +598,124 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 		return nil, nil, nil, nil, err
 	}
 	return out, matched, strong, idf, nil
+}
+
+const bridgeTerms = 4
+
+// bridgedRetry answers a question asked in words the project does not use.
+//
+// The ranking has just read every term and nothing it found identifies
+// anything: no session holds a word of this question rare enough to be worth an
+// unprompted recall. That is what a rephrasing looks like from inside — the
+// answer is there in the words the project actually uses, and the question
+// shares none of them.
+//
+// The corpus knows the pairing: a session that says "the debounce is how long
+// we wait before sending" puts both vocabularies in one message, and the
+// co-occurrence map records it. But that map is built over the whole store,
+// and a question about something this project never held is made of ordinary
+// words whose neighbours are every subject any project ever had — so the map
+// alone answers both kinds of question with equal confidence. Measured on the
+// bench's negative controls, bridging on the map alone fired on three of
+// twelve questions with no answer to find.
+//
+// So the tie has to be the project's own. A candidate is kept only when some
+// record in this project says it in the same breath as the question's word,
+// which is the sentence that explains the term — the thing a rephrasing has
+// and an absent subject does not.
+func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool,
+	strong []int, idfOf map[string]float64) ([]SessionMeta, []int, []int, map[string]float64, bool) {
+	was := 0
+	for _, v := range strong {
+		if v > was {
+			was = v
+		}
+	}
+	neighbours := readCooccur(dir)
+	if neighbours == nil {
+		return nil, nil, nil, nil, false
+	}
+	inProject := map[uint32]bool{}
+	for key, meta := range m.Sessions {
+		_ = key
+		for _, want := range projects {
+			if projectInScope(meta.Project, want) {
+				inProject[meta.Ord] = true
+				break
+			}
+		}
+	}
+	have := make(map[string]bool, len(terms))
+	for _, t := range terms {
+		have[t] = true
+	}
+	added := make([]string, 0, bridgeTerms)
+	for _, t := range terms {
+		// Bridge from a word that means something. "open the file and read it"
+		// is three ordinary words, and the corpus's neighbours for ordinary
+		// words are its subjects — that sentence was the one negative control
+		// this fired on.
+		if idfOf[t] < dejaVuStrongIDFFloor {
+			continue
+		}
+		tPosts, terr := postingsFor(dir, "t"+t)
+		if terr != nil || len(tPosts) == 0 {
+			continue
+		}
+		at := make(map[int64]bool, len(tPosts))
+		for _, pp := range tPosts {
+			if inProject[pp.Sid] {
+				at[pp.Off] = true
+			}
+		}
+		if len(at) == 0 {
+			continue
+		}
+		for _, cand := range neighbours[t] {
+			if have[cand] || query.IsStopWord(cand) {
+				continue
+			}
+			cPosts, cerr := postingsFor(dir, "t"+cand)
+			if cerr != nil || len(cPosts) == 0 {
+				continue
+			}
+			tied := false
+			for _, pp := range cPosts {
+				if inProject[pp.Sid] && at[pp.Off] {
+					tied = true
+					break
+				}
+			}
+			if !tied {
+				continue
+			}
+			have[cand] = true
+			added = append(added, cand)
+			if len(added) == bridgeTerms {
+				break
+			}
+		}
+		if len(added) == bridgeTerms {
+			break
+		}
+	}
+	if len(added) == 0 {
+		return nil, nil, nil, nil, false
+	}
+	metas, matched, bstrong, idf, err := relevantMetasMatched(dir, m, projects,
+		append(append([]string{}, terms...), added...), n, skip)
+	if err != nil || len(metas) == 0 {
+		return nil, nil, nil, nil, false
+	}
+	// Taken only when the bridge found something more identifying than the
+	// question's own words did. Otherwise the project has no better answer and
+	// the first ranking stands.
+	for _, v := range bstrong {
+		if v > was {
+			return metas, matched, bstrong, idf, true
+		}
+	}
+	return nil, nil, nil, nil, false
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, map[string]float64, error) {
