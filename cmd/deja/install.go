@@ -1074,9 +1074,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	if uninstall {
 		delete(m, "deja")
 	} else {
-		entry := mcpServerEntry(exe)
-		note = replacedEntryNote(m["deja"], entry)
-		m["deja"] = entry
+		m["deja"], note = mergeDejaEntry(m["deja"], mcpServerEntry(exe))
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1468,7 +1466,78 @@ func replacedEntryNote(prev, entry any) string {
 	if was == "" {
 		return "replaced the deja entry that was already here"
 	}
+	// The same command is not a replacement anyone would want told about. An
+	// entry an older deja wrote differs from this one by a field or two the
+	// format gained since, and saying "replaced … which ran /bin/deja" of
+	// /bin/deja is noise sitting where a real takeover should stand out
+	// (#2479).
+	if was == entryCommandName(entry) {
+		return ""
+	}
 	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+}
+
+// entryRunsDeja reports whether an MCP entry runs the deja binary, wherever the
+// config keeps it: a command string, a command list, or the args behind a
+// wrapper like Windows' `cmd /c`.
+func entryRunsDeja(entry map[string]any) bool {
+	var words []string
+	switch c := entry["command"].(type) {
+	case string:
+		words = append(words, c)
+	case []any:
+		for _, v := range c {
+			if s, ok := v.(string); ok {
+				words = append(words, s)
+			}
+		}
+	}
+	if args, ok := entry["args"].([]any); ok {
+		for _, v := range args {
+			if s, ok := v.(string); ok {
+				words = append(words, s)
+			}
+		}
+	}
+	for _, w := range words {
+		if isDejaBinaryToken(w) {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeDejaEntry writes deja's wiring onto the entry that was already there.
+// deja owns the command, the args and the type; an env pointing at a store on
+// another disk, a timeout, a `disabled` the reader set — those are theirs, and
+// replacing the whole entry threw them away on every reinstall (#2479).
+func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
+	note := replacedEntryNote(prev, entry)
+	old, ok := prev.(map[string]any)
+	// Only onto an entry that was deja's. Keeping the fields of somebody
+	// else's entry — a `url` of a remote server, an env built for another
+	// program — would leave a mixed shape whose client has to guess which half
+	// to believe.
+	if !ok || !entryRunsDeja(old) {
+		return entry, note
+	}
+	out := make(map[string]any, len(old)+len(entry))
+	for k, v := range old {
+		out[k] = v
+	}
+	for k, v := range entry {
+		out[k] = v
+	}
+	if disabled, _ := out["disabled"].(bool); disabled {
+		// Switching it back on silently would undo a decision deja was not
+		// asked to revisit; leaving it off without a word looks like a install
+		// that worked.
+		if note != "" {
+			note += "; "
+		}
+		note += "left the entry disabled, the way it was — deja will not answer until you turn it back on"
+	}
+	return out, note
 }
 
 // sameEntry compares an entry read out of a config with the one deja is about
@@ -1565,9 +1634,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 		delete(m, "deja")
 	} else {
 		command, args := mcpCommandArgs(exe)
-		entry := map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}
-		note = replacedEntryNote(m["deja"], entry)
-		m["deja"] = entry
+		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}})
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1616,9 +1683,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 		delete(servers, "deja")
 	} else {
 		command, args := mcpCommandArgs(exe)
-		entry := map[string]any{"command": command, "args": args}
-		note = replacedEntryNote(servers["deja"], entry)
-		servers["deja"] = entry
+		servers["deja"], note = mergeDejaEntry(servers["deja"], map[string]any{"command": command, "args": args})
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1660,9 +1725,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 		delete(m, "deja")
 	} else {
 		command, args := mcpCommandArgs(exe)
-		entry := map[string]any{"command": command, "args": args}
-		note = replacedEntryNote(m["deja"], entry)
-		m["deja"] = entry
+		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"command": command, "args": args})
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
@@ -1719,9 +1782,7 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 	if uninstall {
 		delete(m, "deja")
 	} else {
-		entry := map[string]any{"type": "local", "command": []string{exe, "mcp"}}
-		note = replacedEntryNote(m["deja"], entry)
-		m["deja"] = entry
+		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
 	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
