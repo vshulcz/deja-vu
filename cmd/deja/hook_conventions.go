@@ -58,6 +58,11 @@ func projectConventions(names []string, maxNotes, budget int) string {
 	b.WriteString("standing decisions in this project (promoted and still accepted — follow them unless the user overrides):\n")
 	head := b.Len()
 	shown := 0
+	// One decision, one line. A decision promoted here and synced to a peer
+	// comes back as their copy of it, so both are in hand — and two peers who
+	// both took it send two. The block is six lines and a reminder; saying the
+	// same thing twice spends one of them and reads as two agreements.
+	seen := map[string]bool{}
 	for _, note := range picked {
 		if shown >= maxNotes {
 			break
@@ -66,6 +71,11 @@ func projectConventions(names []string, maxNotes, budget int) string {
 		if line == "" {
 			continue
 		}
+		key := conventionKey(line)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		row := "  · " + search.SafeLine(line) + "\n"
 		if b.Len()+len(row) > budget {
 			break
@@ -110,6 +120,18 @@ func importedConventions(names []string) []sources.PromotedNote {
 		})
 	}
 	return out
+}
+
+// conventionKey is what makes two renderings of one decision the same. A copy
+// that arrived from a peer carries the provenance the promoting machine wrote
+// into it — "… (from claude:dec, 2026-08-29)" — so the tail is dropped before
+// comparing, and the rest is compared without case.
+func conventionKey(line string) string {
+	s := strings.TrimSpace(line)
+	if i := strings.LastIndex(s, "(from "); i > 0 && strings.HasSuffix(s, ")") {
+		s = strings.TrimSpace(s[:i])
+	}
+	return strings.ToLower(s)
 }
 
 // inAnyProject asks the shared question: is this session's project the one the

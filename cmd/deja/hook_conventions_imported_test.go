@@ -69,3 +69,32 @@ func TestAWithheldImportedDecisionIsNotStanding(t *testing.T) {
 		t.Errorf("imported memory the auto rule withholds is standing anyway:\n%s", out)
 	}
 }
+
+// A decision promoted here and received back from a peer who imported it is one
+// decision. The block holds six lines at most and is a reminder, so saying it
+// twice costs one of them and reads as two separate agreements.
+func TestADecisionThatCameBackDoesNotStandTwice(t *testing.T) {
+	hermeticEnv(t)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-home-app")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+	rec := `{"type":"user","sessionId":"dec","timestamp":"` + at + `","cwd":"/home/app","message":{"role":"user","content":"should the retry budget go up to 10?"}}` + "\n" +
+		`{"type":"assistant","sessionId":"dec","timestamp":"` + at + `","cwd":"/home/app","message":{"role":"assistant","content":"no: the retry budget stays at 5"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "dec.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "promote", "dec", "--state", "accepted", "--note", "the retry budget stays at 5"); err != nil {
+		t.Fatal(err)
+	}
+	importDecision(t, "home/app", "the retry budget stays at 5")
+
+	out := projectConventions([]string{"home/app"}, 6, 800)
+	if n := strings.Count(out, "retry budget stays at 5"); n != 1 {
+		t.Errorf("one decision, %d lines:\n%s", n, out)
+	}
+}
