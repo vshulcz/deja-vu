@@ -1249,7 +1249,16 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// line, since a script reading deja wants the text and not the layout
 	// (#604).
 	o.Width = printableWidth(os.Stdout)
-	search.Print(os.Stdout, hits, o)
+	// Through a counter, so the log records what actually went out rather than
+	// a guess at it. `deja log` is the audit of what deja did, and the search
+	// kind has been named in the docs, in the comment over the kind constants
+	// and in the empty-log line since #47 while nothing ever wrote one (#2471).
+	// It stays out of every count: servedKind and injectedKind both exclude it,
+	// so the statusline and the impact screen still speak only for memory that
+	// reached an agent.
+	counted := &countingWriter{w: os.Stdout}
+	search.Print(counted, hits, o)
+	usage.RecordResult(dir, usage.KindSearch, counted.n, len(hits), len(hits) == 0)
 	// A wrong guess at a command name falls through to search, and the hint
 	// that names it ran only on an empty result — so a typo whose word happens
 	// to be in the history got a conversation back and nothing about the
