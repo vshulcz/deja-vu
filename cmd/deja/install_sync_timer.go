@@ -144,7 +144,7 @@ Description=deja: exchange memory with the machines this one syncs with
 [Service]
 Type=oneshot
 ExecStart="%s" sync
-`, exe)
+`, systemdEscape(exe))
 }
 
 func syncAutoTimer() string {
@@ -211,6 +211,16 @@ func removeOurUnit(path string) string {
 		return "unchanged"
 	}
 	return "removed"
+}
+
+// systemdEscape keeps a path from being read as anything but a path. The same
+// reason as xmlEscape below, for the other format: a unit file resolves %-
+// specifiers, substitutes $variables and reads C escapes in its values, so
+// /Users/50%off/bin/deja ran /Users/50<os-id>ff/bin/deja and a path holding a
+// quote did not parse at all (#2621).
+func systemdEscape(s string) string {
+	r := strings.NewReplacer("\\", "\\\\", "%", "%%", "$", "$$", `"`, `\"`)
+	return r.Replace(s)
 }
 
 // xmlEscape keeps a path with an ampersand or a quote in it from producing a
