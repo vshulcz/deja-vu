@@ -1403,6 +1403,21 @@ func (n *mcpNumber) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// rebuildRefusedForAgent is what an agent is told when this build cannot read
+// the index and cannot start a rebuild itself.
+//
+// Which of the two states it is decides the sentence, the way it does at
+// session start: a rebuild writes the new index beside the old directory and
+// replaces it, so a read-only index directory inside a writable parent is
+// rebuilt by `deja index` — measured in #2502. Saying it "cannot be rebuilt"
+// there denied in one half what the other half advised (#2506).
+func rebuildRefusedForAgent(dir string) string {
+	if dirWritable(filepath.Dir(dir)) {
+		return "deja's index was written by another version of deja and this session cannot rebuild it. Tell the user to run `deja index`; recall is quiet until they do."
+	}
+	return "deja's index was written by another version of deja and " + unwritableIndexDir(dir) + " is not writable, so it cannot be rebuilt. Tell the user to run `deja index`, which says what to change."
+}
+
 // buildingNowForAgent explains the one state an agent cannot ask a human about:
 // the index is not there yet because it is being built. Without this the tool
 // call failed with `manifest: open /…/manifest.gob: no such file or directory`
@@ -1436,7 +1451,7 @@ func buildingNowForAgent(dir string) string {
 		// one state that never repairs itself, and telling an agent to come
 		// back would loop it forever (the shape #1048 fixed at session start).
 		if !indexDirWritable(dir) {
-			return "deja's index was written by another version of deja and " + filepath.Dir(dir) + " is not writable, so it cannot be rebuilt. Tell the user to run `deja index`, which says what to change."
+			return rebuildRefusedForAgent(dir)
 		}
 		requestWarmup(dir)
 		return "deja is rebuilding its index for this version of deja. Recall comes online shortly; ask again then."
