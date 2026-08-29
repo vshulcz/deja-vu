@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
@@ -109,6 +110,12 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// mention it" reads as looked-and-absent, the same misread search and
 		// last already avoid by naming the rule (#686, #680).
 		if note := policyHiddenNote(policy.ActivationSearch, hidden); note != "" {
+			fmt.Fprint(stdout, note)
+			return nil
+		}
+		// The same for the rule that keeps a tree out of recall: it took the
+		// answer and left the sentence reading as looked-and-absent (#2632).
+		if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(q))); note != "" {
 			fmt.Fprint(stdout, note)
 			return nil
 		}

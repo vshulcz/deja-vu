@@ -1265,8 +1265,14 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// The answer can also be short for a reason no flag lifts. Counted over the
 	// sessions holding every term, so an ordinary search in a store with a big
 	// ignored tree stays quiet (#2562).
-	if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))); note != "" {
-		fmt.Fprint(os.Stderr, note)
+	//
+	// Only where there is an answer to be short: printNoMatches says the same
+	// thing on the way to "try fewer words", and a miss printed it twice
+	// (#2632).
+	if len(hits) > 0 {
+		if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))); note != "" {
+			fmt.Fprint(os.Stderr, note)
+		}
 	}
 	// The window this is being printed into, so the lines can be budgeted
 	// rather than assumed 80 wide. Only for a terminal: a pipe gets the whole
@@ -2322,6 +2328,15 @@ func runBlame(dir string, args []string) error {
 			fmt.Fprint(os.Stderr, note)
 			return nil
 		}
+		// And the other rule that empties this answer, which said nothing here
+		// while the listing and search both named it (#2632). Before the count
+		// below, for the same reason it goes before "try fewer words": a
+		// denominator that includes the ignored sessions reads as a store that
+		// was searched and came back empty.
+		if note := ignoredHiddenNoteFor("answer", ignoredTouching(dir, target)); note != "" {
+			fmt.Fprint(os.Stderr, note)
+			return nil
+		}
 		// "run deja index" is advice for an empty store. With sessions in the
 		// index it is advice for a state the tool is not in — indexing changes
 		// nothing and doctor reports the stores as found — and it sends the
@@ -2390,6 +2405,33 @@ func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, act
 // manifest. Measured on 500 sessions all touching one file: 0.08s uncapped
 // against 0.02s capped, with the same ten at the top.
 const blameToucherCap = 50
+
+// ignoredTouching counts the sessions that touched this file and are covered by
+// the ignore rule. Not IgnoredWithAllTerms, which the other surfaces use: that
+// reads the text postings, and a file path reaches the index as a `files`
+// record, which is served by role and never ranked — so the count for a blame
+// has to come from the same Touched lists blame itself reads (#2632).
+func ignoredTouching(dir string, target search.BlameTarget) int {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return 0
+	}
+	pol := policy.Load()
+	base := strings.ToLower(filepath.Base(target.FullPath))
+	n := 0
+	for _, meta := range metas {
+		if !pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		for _, p := range meta.Touched {
+			if strings.ToLower(filepath.Base(filepath.FromSlash(p))) == base {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
 
 // withFileTouchers adds the sessions that edited or opened the file but never
 // said its name.
