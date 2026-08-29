@@ -46,6 +46,18 @@ func RecallWorthShowing(terms []string, matched, strong int, known map[string]fl
 // checked against the store.
 const identifierKnownFrom = 3
 
+// identifierIDFFloor is how rare a word has to be in this store before its
+// shape may carry a match on its own. Shape alone admits any word of three
+// letters that is not on the working-word list, and that list is written by
+// hand — "passed", "rows", "delay" are not on it and name nothing.
+//
+// Asking the store instead of the list: measured by cross-pairing 400 real
+// prompts against a project that cannot hold their answer, where every fire is
+// a false one, this takes them from 129 to 89 while the same questions asked at
+// home still fire 398 times out of 400. Higher costs the home rate — at 5.5 it
+// is 396 — and buys nothing: 91.
+const identifierIDFFloor = 4.0
+
 // HasIdentifierTermKnown is HasIdentifierTerm over the words the corpus
 // actually holds.
 //
@@ -70,7 +82,7 @@ func HasIdentifierTermKnown(terms []string, known map[string]float64) bool {
 	}
 	kept := make([]string, 0, len(terms))
 	for _, t := range terms {
-		if _, ok := known[t]; ok {
+		if v, ok := known[t]; ok && v >= identifierIDFFloor {
 			kept = append(kept, t)
 		}
 	}

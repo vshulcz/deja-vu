@@ -19,12 +19,17 @@ func TestASubjectTheStoreNeverSawCarriesNothing(t *testing.T) {
 	if !RecallWorthShowing(terms, 2, 1, known) {
 		t.Error("the two-word rule was lost")
 	}
-	// Whether anything else in the question carries on its own stays the shape
-	// rule's business. "passed" is not on the working-word list and is long
-	// enough to pass it, so a question holding it still fires — which is why
-	// this removes one of the benchmark's three false fires and not all three.
-	if !RecallWorthShowing(terms, 1, 1, map[string]float64{"branch": 2.4, "suite": 2.1, "passed": 2.0}) {
-		t.Error("a known word of identifier shape stopped carrying")
+	// Known is not enough on its own: the word also has to be rare here. The
+	// working-word list is written by hand and "passed" is not on it, so shape
+	// alone let it carry a match; the store says it is ordinary.
+	ordinary := map[string]float64{"branch": 2.4, "suite": 2.1, "passed": 2.0}
+	if RecallWorthShowing(terms, 1, 1, ordinary) {
+		t.Error("a word the store calls ordinary carried a match on its shape")
+	}
+	// Rare here, and it carries — which is the rule this must not weaken.
+	rare := map[string]float64{"branch": 2.4, "suite": 2.1, "passed": 5.1}
+	if !RecallWorthShowing(terms, 1, 1, rare) {
+		t.Error("a rare word the store holds stopped carrying a match")
 	}
 }
 
