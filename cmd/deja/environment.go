@@ -30,7 +30,34 @@ const (
 	// turns, so the block is not a nag that fires per action.
 	environmentWalls = 3
 	environmentMax   = 96
+	// environmentMinProjects is how many projects a wall has to appear in
+	// before it is called a fact about the machine. Two is not enough: a
+	// project's own name arrives in several forms — a worktree, a temporary
+	// checkout, the bare directory — so a string that only ever appeared in one
+	// repository still reads as two. Measured here, a name from deja's own test
+	// fixtures cleared a two-project bar on `run` and `compare/fixes`, both
+	// path fragments of the same tree.
+	environmentMinProjects = 3
 )
+
+// spansProjects reports whether a wall was hit in more than one project.
+//
+// The block claims something about the machine — "the tool or module is still
+// missing" — and an error that only ever appeared while working on one
+// repository is that repository's business. Counted in sessions alone, a string
+// this project's own tests print reads as a fact about the machine and is then
+// told to an agent working somewhere else: measured here, a name from deja's
+// own test fixtures was one of the three walls shown in sixteen unrelated
+// projects, in a block that had nothing else in it.
+func spansProjects(ss []index.SessionMeta) bool {
+	seen := map[string]bool{}
+	for _, s := range ss {
+		if s.Project != "" {
+			seen[s.Project] = true
+		}
+	}
+	return len(seen) >= environmentMinProjects
+}
 
 // environmentBlock names what the machine keeps failing on, or "" when nothing
 // has failed in enough separate sessions to be worth an agent's attention.
@@ -45,7 +72,10 @@ func environmentBlock(dir, activation string) string {
 	// to be per wall rather than one check up front: a machine can hold both
 	// local and imported sessions hitting the same error.
 	pol := policy.Load()
-	walls := index.TopFriction(dir, environmentWalls, nil)
+	// With room to spare: a wall can fail the policy gate or the project bar
+	// below, and asking for exactly three meant one rejection left the block
+	// short of what it had to say.
+	walls := index.TopFriction(dir, environmentWalls*4, nil)
 	if len(walls) == 0 {
 		return ""
 	}
@@ -59,13 +89,16 @@ func environmentBlock(dir, activation string) string {
 		}
 		// The count is what the reader acts on, so a wall whose evidence is
 		// mostly hidden must not keep claiming the full number.
-		if len(keep) >= index.FrictionMinSessions {
+		if len(keep) >= index.FrictionMinSessions && spansProjects(keep) {
 			w.Sessions = keep
 			allowed = append(allowed, w)
 		}
 	}
 	if len(allowed) == 0 {
 		return ""
+	}
+	if len(allowed) > environmentWalls {
+		allowed = allowed[:environmentWalls]
 	}
 	walls = allowed
 	var b strings.Builder
