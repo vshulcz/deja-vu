@@ -81,7 +81,7 @@ func buildCommands(tmp string, ss []model.Session) {
 			if m.Role != roleCommand {
 				continue
 			}
-			cmd := strings.TrimSpace(firstTextLine(m.Text))
+			cmd := withoutExitStatus(strings.TrimSpace(firstTextLine(m.Text)))
 			if cmd == "" || len(cmd) > commandTextMax {
 				continue
 			}
@@ -174,7 +174,7 @@ func buildCommandsFromIndex(tmp string) {
 			collided = true
 			return
 		}
-		cmd := strings.TrimSpace(firstTextLine(r.Text))
+		cmd := withoutExitStatus(strings.TrimSpace(firstTextLine(r.Text)))
 		if cmd == "" || len(cmd) > commandTextMax {
 			return
 		}
@@ -366,10 +366,48 @@ func FileSessions(dir, path string) []SessionMeta {
 // the first line, without the "$ " every parser prefixes a stored invocation
 // with, lowercased.
 func normalizeCommand(s string) string {
-	s = strings.TrimSpace(firstTextLine(s))
+	s = withoutExitStatus(strings.TrimSpace(firstTextLine(s)))
 	s = strings.TrimPrefix(s, "$ ")
 	return strings.ToLower(strings.TrimSpace(s))
 }
+
+// withoutExitStatus drops the outcome codex and opencode append to the command
+// line — "$ make test  → exit 2". It is what the command did, not what it was,
+// and keying the table on it split one command into two rows: the runs that
+// worked and the runs that did not, counted apart, with the failing ones
+// invisible to a lookup made with the command as a harness hands it over. On a
+// real store four commands were split this way, `git status --short` into 445
+// runs and 7 (#2590). The status stays in the records, where the fix-pair miner
+// reads it (commandFailed).
+func withoutExitStatus(s string) string {
+	i := strings.LastIndex(s, commandExitMarker)
+	if i < 0 {
+		return s
+	}
+	code := s[i+len(commandExitMarker):]
+	if code == "" {
+		return s
+	}
+	// Digits to the end, or it is not the marker: looking for it anywhere cut
+	// `echo "→ exit 0"` down to `echo "`, the trap #2048 already recorded for
+	// the after-hook's reading of the same suffix.
+	for _, r := range code {
+		if r < '0' || r > '9' {
+			return s
+		}
+	}
+	return strings.TrimSpace(s[:i])
+}
+
+// commandExitMarker is the shape a source appends when it knows what a command
+// returned: two spaces, the marker, the digits, end of string
+// (internal/sources/codex.go, internal/sources/opencode.go).
+const commandExitMarker = "  → exit "
+
+// CommandWithoutExitStatus is withoutExitStatus for the surfaces outside this
+// package that group commands themselves — `deja how` counts its own rows over
+// the record log and split the same command the same way.
+func CommandWithoutExitStatus(s string) string { return withoutExitStatus(s) }
 
 // firstTextLine is the first line of a record, which for a command record is
 // the invocation itself.

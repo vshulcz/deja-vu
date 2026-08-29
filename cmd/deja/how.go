@@ -153,7 +153,10 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
 			return
 		}
-		cmd := strings.TrimSpace(firstCommandLine(r.Text))
+		// Without the outcome codex and opencode append: "$ make test  → exit
+		// 2" is the same command as "$ make test", and counting them apart put
+		// one command on two rows of this screen (#2590).
+		cmd := index.CommandWithoutExitStatus(strings.TrimSpace(firstCommandLine(r.Text)))
 		if cmd == "" || len(cmd) > howCommandMax {
 			return
 		}
