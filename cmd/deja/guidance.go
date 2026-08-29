@@ -691,12 +691,20 @@ var restoredGuidance = map[string]bool{}
 // file, and leaving deja's own words behind after an uninstall is what #2575
 // was about.
 func restoreReplacedGuidance(path, harness string) (bool, error) {
+	return restoreReplacedFile(path, func(b []byte) bool { return isOurGuidance(b, harness) })
+}
+
+// restoreReplacedFile is the shared shape: put back the copy install made, or
+// drop it when it holds deja's own words rather than the reader's. ours decides
+// which, per kind of file — a skill by its frontmatter, a command file by the
+// subcommands it names (#2600).
+func restoreReplacedFile(path string, ours func([]byte) bool) (bool, error) {
 	bak := path + ".bak"
 	b, err := os.ReadFile(bak)
 	if err != nil {
 		return false, nil
 	}
-	if isOurGuidance(b, harness) {
+	if ours(b) {
 		return false, os.Remove(bak)
 	}
 	if err := os.WriteFile(path, b, 0o644); err != nil {
@@ -706,7 +714,7 @@ func restoreReplacedGuidance(path, harness string) (bool, error) {
 		return false, err
 	}
 	restoredGuidance[path] = true
-	fmt.Printf("skill: put back %s, the copy install replaced\n", shortHome(path))
+	fmt.Printf("deja: put back %s, the copy install replaced\n", shortHome(path))
 	return true, nil
 }
 

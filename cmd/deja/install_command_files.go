@@ -114,8 +114,24 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 		if _, err := os.Stat(path); err != nil {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
+		// `uninstall cursor` runs cursor-auto too, and the second pass met the
+		// file the first pass had just put back (#2600, the shape #2581 hit).
+		if restoredGuidance[path] {
+			return installResult{Path: path, Action: "kept"}, nil
+		}
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
+		}
+		// The same rules the skills have since #2581 and #2585: put back what
+		// install replaced, and drop a backup that holds deja's own text. A
+		// full round used to destroy eight files of the reader's this way, the
+		// command files among them (#2600).
+		restored, rerr := restoreReplacedFile(path, isOurCommandFile)
+		if rerr != nil {
+			return installResult{}, rerr
+		}
+		if restored {
+			return installResult{Path: path, Action: "restored"}, nil
 		}
 		return installResult{Path: path, Action: "removed"}, nil
 	}
@@ -126,3 +142,8 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 	a, err := writeIfChanged(path, old, []byte(commandFileText(harness, exe)))
 	return installResult{Path: path, Action: a}, err
 }
+
+// isOurCommandFile reports that a command file is one deja generated rather than
+// one the reader wrote at the same path. Every generated one names the binary's
+// own subcommands, which is what mentionsDeja reads.
+func isOurCommandFile(b []byte) bool { return mentionsDeja(b) }
