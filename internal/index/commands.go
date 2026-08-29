@@ -297,6 +297,26 @@ func CommandHistory(dir, cmd string) (CommandUse, bool) {
 	return CommandUse{}, false
 }
 
+// SessionRanCommand reports whether this session ran the command, comparing the
+// way CommandHistory does. It is how a caller with a session in hand — the tool
+// hook, holding the promoted decisions of a project — can ask whether the
+// decision is about the command about to run (#2516).
+func SessionRanCommand(s model.Session, cmd string) bool {
+	want := normalizeCommand(cmd)
+	if want == "" || hasSecondLine(cmd) {
+		return false
+	}
+	for _, m := range s.Messages {
+		if m.Role != roleCommand {
+			continue
+		}
+		if normalizeCommand(m.Text) == want {
+			return true
+		}
+	}
+	return false
+}
+
 // CrossBase is filepath.Base that splits on both separators regardless of the
 // host OS. A store synced from Windows holds paths like C:\src\main.go; on a
 // Unix host filepath.Base leaves them whole, so a same-file lookup missed and

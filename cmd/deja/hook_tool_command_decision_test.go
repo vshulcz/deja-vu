@@ -1,79 +1,79 @@
 package main
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// Before a command that failed here last time, the count is not the useful
-// part — the cause is. The file path already carries the prior decision for
-// exactly this reason; the command path said only how often it had been run.
-func TestToolHookCommandLineCarriesWhatHappenedLastTime(t *testing.T) {
+// The line before a command has the same shape as the line before an edit, and
+// #2496 taught only the second one to carry a promoted decision. Here the
+// decision is about that exact command and the line said only how often the
+// machine had run it (#2516).
+func TestTheCommandLineCarriesThePromotedDecision(t *testing.T) {
 	tmp := hermeticEnv(t)
-	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
-	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	// Two sessions ran it; the second says how it was resolved.
-	writeClaudeFixture(t, filepath.Join(root, "alpha", "run1.jsonl"), "run1", []string{
-		`{"type":"user","sessionId":"run1","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"build it"}}`,
-		`{"type":"assistant","sessionId":"run1","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"pnpm run bundle"}}]}}`,
-	})
-	writeClaudeFixture(t, filepath.Join(root, "alpha", "run2.jsonl"), "run2", []string{
-		`{"type":"user","sessionId":"run2","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"pnpm run bundle is failing again"}}`,
-		`{"type":"assistant","sessionId":"run2","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"pnpm run bundle"}}]}}`,
-		`{"type":"assistant","sessionId":"run2","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:07Z","message":{"role":"assistant","content":[{"type":"text","text":"Decision: pnpm run bundle needs the ARENAGUARD lockfile refreshed first."}]}}`,
-	})
-	if _, err := captureRun(t, "index"); err != nil {
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	store := filepath.Join(root, "-work-app")
+	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
-	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"pnpm run bundle"},"session_id":"now","cwd":"/work/alpha"}`)
-	if out == "" {
-		t.Fatal("no line for a command with history")
+	now := time.Now().UTC()
+	at := func(m int) string { return now.Add(-time.Duration(m) * time.Minute).Format(time.RFC3339) }
+	write := func(sid string, lines []string) {
+		if err := os.WriteFile(filepath.Join(store, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	var resp sessionStartHookResponse
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+	bash := func(sid, when string) string {
+		return `{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + when + `","cwd":"/work/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"make migrate-orders"}}]}}`
+	}
+	write("dec", []string{
+		`{"type":"user","sessionId":"dec","timestamp":"` + at(401) + `","cwd":"/work/app","message":{"role":"user","content":"should we keep running the orders migration against production directly?"}}`,
+		bash("dec", at(400)),
+		`{"type":"assistant","sessionId":"dec","timestamp":"` + at(399) + `","cwd":"/work/app","message":{"role":"assistant","content":"no: run the orders migration against the replica first"}}`,
+	})
+	for k := 0; k < 5; k++ {
+		sid := fmt.Sprintf("f%d", k)
+		write(sid, []string{
+			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(200-20*k) + `","cwd":"/work/app","message":{"role":"user","content":"run the orders migration again"}}`,
+			bash(sid, at(199-20*k)),
+			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(198-20*k) + `","cwd":"/work/app","message":{"role":"assistant","content":"ran the migration"}}`,
+		})
+	}
+	// Sessions about other work, so the command's words carry weight: in a
+	// store where every session says the same thing no term is informative and
+	// the ranking matches nothing — the lesson of 430 and 437.
+	topics := []string{"the sidebar layout", "the invoice pdf renderer", "the webpack config",
+		"the login throttle", "the avatar uploader", "the search autocomplete", "the cron scheduler",
+		"the email templates", "the feature flags", "the toast component", "the graphql schema",
+		"the docker base image", "the css variables", "the storybook snapshots", "the i18n strings"}
+	for i, top := range topics {
+		sid := fmt.Sprintf("t%d", i)
+		write(sid, []string{
+			`{"type":"user","sessionId":"` + sid + `","timestamp":"` + at(900-10*i) + `","cwd":"/work/app","message":{"role":"user","content":"work on ` + top + ` today"}}`,
+			`{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + at(899-10*i) + `","cwd":"/work/app","message":{"role":"assistant","content":"changed ` + top + ` and the tests pass"}}`,
+		})
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	ctx := resp.HookSpecificOutput.AdditionalContext
-	if !strings.Contains(ctx, "ARENAGUARD") {
-		t.Errorf("the line says the command has run before but not what happened:\n%s", ctx)
+	if _, err := captureRunStderr(t, "promote", "dec", "--state", "accepted",
+		"--note", "run the orders migration against the replica first; production needs the pool drained"); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(ctx, "last time:") {
-		t.Errorf("the outcome is not labelled as the prior one:\n%s", ctx)
-	}
-}
 
-// A command whose history holds no conclusion keeps the plain count rather
-// than borrowing a decision from a session about something else.
-func TestToolHookCommandLineStaysACountWithoutAConclusion(t *testing.T) {
-	tmp := hermeticEnv(t)
-	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
-	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	writeClaudeFixture(t, filepath.Join(root, "alpha", "quiet.jsonl"), "quiet", []string{
-		`{"type":"user","sessionId":"quiet","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"run it"}}`,
-		`{"type":"assistant","sessionId":"quiet","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"pnpm run bundle"}}]}}`,
-	})
-	// A session that decided something unrelated, which must not be borrowed.
-	writeClaudeFixture(t, filepath.Join(root, "alpha", "other.jsonl"), "other", []string{
-		`{"type":"user","sessionId":"other","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"the avatar flashes on reload"}}`,
-		`{"type":"assistant","sessionId":"other","cwd":"/work/alpha","timestamp":"2026-01-03T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"Decision: the ARENAGUARD image needs an explicit width."}]}}`,
-	})
-	if _, err := captureRun(t, "index"); err != nil {
-		t.Fatal(err)
+	line := commandHookLine(dir, "/work/app", "make migrate-orders")
+	if line == "" {
+		t.Fatal("the fixture produced no line at all")
 	}
-	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
-	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"pnpm run bundle"},"session_id":"now","cwd":"/work/alpha"}`)
-	if out == "" {
-		return // saying nothing is also acceptable here
-	}
-	var resp sessionStartHookResponse
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if ctx := resp.HookSpecificOutput.AdditionalContext; strings.Contains(ctx, "ARENAGUARD") {
-		t.Errorf("a decision about something else was attached to the command:\n%s", ctx)
+	if !strings.Contains(line, "replica first") {
+		t.Errorf("the decision about this command is not in the line:\n  %s", line)
 	}
 }
