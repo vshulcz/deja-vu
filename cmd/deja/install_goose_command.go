@@ -129,8 +129,17 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 	// to rewrite the config would leave a command pointing at a file that is
 	// no longer there, which fails when someone types /deja rather than now.
 	if uninstall {
-		if err := os.Remove(recipe); err != nil && !os.IsNotExist(err) {
-			return installResult{}, err
+		if !restoredGuidance[recipe] {
+			if err := os.Remove(recipe); err != nil && !os.IsNotExist(err) {
+				return installResult{}, err
+			}
+			// And put back the recipe install replaced, or drop the copy when
+			// it holds deja's own — the rules the skills and command files
+			// have since #2581 and #2600. Without it the reader's recipe was
+			// destroyed and their copy left as a .bak beside nothing (#2602).
+			if _, err := restoreReplacedFile(recipe, mentionsDeja); err != nil {
+				return installResult{}, err
+			}
 		}
 	}
 	return installResult{Path: path, Action: a}, nil
