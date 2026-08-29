@@ -233,6 +233,15 @@ func commandHookLine(dir, cwd, cmd string) string {
 // sessions of the project — few, and bounded here — and asks each whether it
 // ran this command, which is the same question CommandHistory answers in
 // aggregate.
+//
+// What that costs, measured on a store the size of a working machine (1,500
+// sessions, the command run in 188 of them): this path and the ranking path
+// below add 3–5 ms to a hook that already cost ~19 ms, six session reads in the
+// worst case, three per path (#2522). In the common case the two read the same
+// sessions — one to ask whether a promoted note belongs to it, one to ask
+// whether it ran the command — and passing the session between them would halve
+// that. Not done: 5 ms is not worth the coupling, and this is where a reader
+// would look for the number.
 func promotedCommandDecision(dir, cwd, cmd string) string {
 	names := digest.ProjectNameCandidates(cwd)
 	if len(names) == 0 {
