@@ -30,5 +30,5 @@ To name a specific binary:
 ```
 
 The first query builds the index over whatever history is already on the
-machine, which takes a few seconds; later queries answer in about a
-millisecond.
+machine — seconds on a fresh one, about a minute on a large history; later
+queries answer in about a millisecond.
