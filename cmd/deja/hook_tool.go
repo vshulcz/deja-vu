@@ -371,9 +371,17 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 			want[meta.Harness+":"+meta.OrigID] = true
 		}
 	}
+	// The note's own project as well as the session it came from. The metas
+	// are already scoped by the auto activation, so a note is reached only
+	// through an allowed session — but the note carries a project of its own,
+	// and every other reader of these notes checks it (#2506).
+	pol := policy.Load()
 	var best sources.PromotedNote
 	for _, note := range sources.LoadPromotedNotes() {
 		if note.State != "accepted" || !want[note.Session] {
+			continue
+		}
+		if note.Project != "" && !pol.Allows(policy.ActivationAuto, note.Project) {
 			continue
 		}
 		if best.Session == "" || note.At.After(best.At) {
@@ -405,7 +413,7 @@ func clipDecision(s string, budget int) string {
 	return s[:end]
 }
 
-// decisionUsable rejects a session whose decision should not be reused:// decisionUsable rejects a session whose decision should not be reused: one that
+// decisionUsable rejects a session whose decision should not be reused: one that
 // says in its own words it backed the approach out (GaveUp), and one a later
 // state marked rejected, superseded or stale. Surfacing either at the point of an
 // edit would push the agent to redo exactly what was undone.
