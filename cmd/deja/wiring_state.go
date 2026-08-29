@@ -139,6 +139,10 @@ func recordWiring(targets []string, uninstall bool) {
 // a caller with somewhere to print can say so; the hook paths call it and stay
 // quiet, because a session start is not the place for maintenance chatter.
 func refreshWiringAfterUpgrade() []string {
+	// Each run answers for itself: the list is process state, and a second call
+	// in one process — the test binary, a long-lived host — must not inherit
+	// the first one's failures.
+	stuckWiring = nil
 	st := readWiringState()
 	if len(st.Targets) == 0 || version == "" {
 		return nil
@@ -168,7 +172,12 @@ func refreshWiringAfterUpgrade() []string {
 		if err != nil {
 			// A harness the user has since removed is not an error worth
 			// surfacing: the next install run will drop it from the record.
+			// One whose config cannot be written is: the record is left
+			// unstamped on purpose (#2212), so every later start repeats the
+			// repair and the same line, and nothing said which target was
+			// stuck or that anything had failed (#2594).
 			failed = true
+			stuckWiring = append(stuckWiring, target)
 			continue
 		}
 		if res.Action != "" && res.Action != "unchanged" {
@@ -201,3 +210,7 @@ func wiringCreated(path string) bool {
 	}
 	return false
 }
+
+// stuckWiring is what this process could not rewire. Read by the session start,
+// which is the only surface a person sees on an ordinary day.
+var stuckWiring []string
