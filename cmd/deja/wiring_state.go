@@ -27,6 +27,13 @@ type wiringState struct {
 	// set of configs into a home nobody installed into, left the real ones
 	// pointing at the old binary, and marked the record repaired (#885).
 	Home string `json:"home,omitempty"`
+	// Created are the config paths that did not exist before deja wrote them.
+	// #840 established that a file which turns out to be entirely deja's is
+	// deleted on the way out rather than left empty; that test is byte-emptiness,
+	// which the structured writers never reach — they leave `{"mcpServers":{}}`.
+	// Knowing which files deja made is what lets the same rule apply to them
+	// without ever removing a config the reader already had (#2583).
+	Created []string `json:"created,omitempty"`
 	// Exe is the binary path the configs were written with. A move without a
 	// version change is ordinary — a relink, a reinstall of the same release,
 	// a `go install` over a manual download — and left every config pointing
@@ -99,7 +106,23 @@ func recordWiring(targets []string, uninstall bool) {
 			return
 		}
 	}
-	st = wiringState{Version: version, Targets: kept, Exe: exe, Home: homeDir()}
+	created := append([]string(nil), st.Created...)
+	seen := map[string]bool{}
+	for _, p := range created {
+		seen[p] = true
+	}
+	for _, p := range createdByThisRun {
+		if !seen[p] {
+			created = append(created, p)
+			seen[p] = true
+		}
+	}
+	// A path deja no longer wired is not one it will be asked about again.
+	if len(kept) == 0 {
+		created = nil
+	}
+	sort.Strings(created)
+	st = wiringState{Version: version, Targets: kept, Created: created, Exe: exe, Home: homeDir()}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -162,4 +185,19 @@ func refreshWiringAfterUpgrade() []string {
 	}
 	recordWiring(st.Targets, false)
 	return changed
+}
+
+// wiringCreated reports that deja created this config rather than finding it.
+func wiringCreated(path string) bool {
+	for _, p := range readWiringState().Created {
+		if p == path {
+			return true
+		}
+	}
+	for _, p := range createdByThisRun {
+		if p == path {
+			return true
+		}
+	}
+	return false
 }

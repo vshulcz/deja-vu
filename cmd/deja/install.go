@@ -942,6 +942,32 @@ func matchLineEndings(old, next []byte) []byte {
 	return b.Bytes()
 }
 
+// createdByThisRun collects the configs this process created, so the record can
+// keep them and a later uninstall can take back a file that turns out to hold
+// nothing but empty containers (#2583).
+var createdByThisRun []string
+
+// structurallyEmptyConfig reports that a config holds nothing but the empty
+// containers deja's writers leave behind. #840 deletes a file whose content is
+// gone entirely; the structured writers never produce zero bytes — an emptied
+// mcp.json is `{"mcpServers":{}}` — so the same rule needs the same reading of
+// "nothing left in it".
+func structurallyEmptyConfig(b []byte) bool {
+	trimmed := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\n' || r == '\t' || r == '\r' {
+			return -1
+		}
+		return r
+	}, string(b))
+	switch trimmed {
+	case "", "{}", "[]", "null",
+		`{"mcpServers":{}}`, `{"mcp":{}}`, `{"mcp":{"servers":{}}}`,
+		`{"context_servers":{}}`, `{"servers":{}}`, "mcp_servers:":
+		return true
+	}
+	return false
+}
+
 func writeIfChanged(path string, old, next []byte) (string, error) {
 	// Before the comparison, not after: a CRLF config converted afterwards
 	// would differ from `old` on every run, so each repeat install would
@@ -969,6 +995,24 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			}
 			return "removed", nil
 		}
+		// The same rule for the structured writers, which never reach zero
+		// bytes. Only for a file deja created: a config the reader already had
+		// keeps its place, emptied of deja and of nothing else (#2583).
+		if structurallyEmptyConfig(next) && wiringCreated(path) {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return "", err
+			}
+			// The directory too, when deja made it and nothing else is in it.
+			// os.Remove fails on a directory that is not empty, which is the
+			// condition wanted (same rule as pruneGuidanceDirs).
+			if dir := filepath.Dir(path); isRealDir(dir) {
+				_ = os.Remove(dir)
+			}
+			return "removed", nil
+		}
+	}
+	if _, err := os.Stat(path); os.IsNotExist(err) && !removingWiring {
+		createdByThisRun = append(createdByThisRun, path)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
