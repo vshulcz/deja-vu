@@ -296,14 +296,16 @@ func attachBlameLifecycles(hits []search.BlameHit) {
 		}
 		lc, ok := states[key]
 		if !ok || lc.State == "" {
-			if h.Session.Lifecycle != "" && h.Session.Lifecycle != "accepted" {
+			if h.Session.Lifecycle != "" {
 				h.Lifecycle, h.LifecycleNote, h.LifecycleAt = h.Session.Lifecycle, h.Session.LifecycleNote, h.Session.LifecycleAt
 			}
 			continue
 		}
-		if lc.State == "accepted" {
-			continue
-		}
+		// Accepted too, since #2514. This started as a warning about a decision
+		// that had been taken back, and the result was a tool that spoke up
+		// about a decision no longer standing and stayed silent about the one
+		// that does — on a file whose whole history is that decision, the row
+		// carrying the answer read as the oldest and least relevant.
 		h.Lifecycle, h.LifecycleNote = lc.State, lc.Note
 		if !lc.At.IsZero() {
 			h.LifecycleAt = lc.At.Format("2006-01-02")

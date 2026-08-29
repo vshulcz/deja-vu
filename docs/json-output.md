@@ -586,4 +586,10 @@ Returns a JSON array of blame hits (same stability rules as exact search):
 ]
 ```
 
+A hit for a session whose decision was promoted also carries `lifecycle`,
+`lifecycle_note` and `lifecycle_at`. Every state appears there, `accepted`
+included: the field says which decision this is, not that something is wrong
+with it. A consumer reading its presence as "this was withdrawn" wants
+`lifecycle != "accepted"`.
+
 The MCP `blame` tool returns the same array shape.
