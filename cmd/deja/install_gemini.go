@@ -24,15 +24,22 @@ const geminiExtensionName = "deja"
 func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	dir := filepath.Join(sources.GeminiHome(), "extensions", geminiExtensionName)
 	if uninstall {
+		// hooksConfig stays: other extensions may rely on it, and turning it
+		// off would silently disable them. Said aloud, because the rest of
+		// this uninstall names what it keeps — "guidance kept …" — so silence
+		// here reads as "nothing of deja's is left in settings.json", and a
+		// switch deja turned on is (#2487).
+		note := ""
+		if geminiHooksEnabled() {
+			note = "left hooksConfig.enabled on in gemini's settings.json — other extensions may be running on it"
+		}
 		if _, err := os.Stat(dir); err != nil {
-			return installResult{Path: dir, Action: "unchanged"}, nil
+			return installResult{Path: dir, Action: "unchanged", Note: note}, nil
 		}
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
-		// hooksConfig stays: other extensions may rely on it, and turning it
-		// off would silently disable them.
-		return installResult{Path: dir, Action: "removed"}, nil
+		return installResult{Path: dir, Action: "removed", Note: note}, nil
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "hooks"), 0o755); err != nil {
 		return installResult{}, err
@@ -87,6 +94,23 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	return installResult{Path: dir, Action: a}, nil
+}
+
+// geminiHooksEnabled reports whether the master switch is on right now, which
+// is all an uninstall can honestly say about it: deja cannot tell its own flip
+// from one the reader made before ever installing.
+func geminiHooksEnabled() bool {
+	b, err := os.ReadFile(filepath.Join(sources.GeminiHome(), "settings.json"))
+	if err != nil {
+		return false
+	}
+	var root map[string]any
+	if err := json.Unmarshal(b, &root); err != nil {
+		return false
+	}
+	cfg, _ := root["hooksConfig"].(map[string]any)
+	enabled, _ := cfg["enabled"].(bool)
+	return enabled
 }
 
 // enableGeminiHooks flips the master switch. Without it the extension is
