@@ -919,7 +919,12 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if err := checkRole(o.Role); err != nil {
 		return err
 	}
-	ss, err := recentMatching(dir, n, o)
+	// Uncut, because the count the reader is told about has to be the count
+	// they would get by asking again — and the trust policy filters below,
+	// after the cut, so a total taken before it promised rows the policy would
+	// not hand over (#2638). RecentMatching builds the whole matching set
+	// before cutting anyway, so nothing is read twice.
+	ss, _, err := recentMatchingCounted(dir, 0, o)
 	if err != nil {
 		return err
 	}
@@ -928,6 +933,10 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	// consulted it, while `search` under the same rule refused and said so
 	// (#937). Listing counts as browsing: the search activation governs it.
 	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, ss)
+	total := len(ss)
+	if n > 0 && len(ss) > n {
+		ss = ss[:n]
+	}
 	// Printing nothing at all and exiting 0 leaves no way to tell whether the
 	// command worked, found nothing, or failed silently — which is what a
 	// fresh install sees. blame already answers this shape of question.
@@ -972,6 +981,13 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	}
 	if o.JSON {
 		return printRecentJSONWithheld(os.Stdout, ss, sourceInstance, policyHidden)
+	}
+	// The cut is silent everywhere else on this screen: ten rows read as the
+	// whole answer, and the two rules that withhold rows here already have a
+	// line above the list. `last` takes its count as a bare argument, so that
+	// is the form the way out takes (#2638).
+	if total > len(ss) {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — `deja last %d` shows the rest\n", len(ss), total, total)
 	}
 	for _, s := range ss {
 		// A session whose timestamp was missing or unparseable carries the Go
@@ -2078,6 +2094,13 @@ func recent(dir string, n int) ([]model.Session, error) {
 }
 
 func recentMatching(dir string, n int, o search.Options) ([]model.Session, error) {
+	ss, _, err := recentMatchingCounted(dir, n, o)
+	return ss, err
+}
+
+// recentMatchingCounted is recentMatching with how many matched before the cut,
+// so the listing can say what it left out (#2638).
+func recentMatchingCounted(dir string, n int, o search.Options) ([]model.Session, int, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if o.Role != "" {
 			// The role has to travel into the index query, not just the filter
@@ -2088,17 +2111,17 @@ func recentMatching(dir string, n int, o search.Options) ([]model.Session, error
 			ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: o.Role}, io.Discard)
 			if err == nil {
 				ss = filterRecentSources(ss, o)
-				return search.Recent(ss, n), nil
+				return search.Recent(ss, n), len(ss), nil
 			}
-		} else if ss, err := index.RecentMatching(dir, n, o); err == nil {
-			return ss, nil
+		} else if ss, total, err := index.RecentMatchingCounted(dir, n, o); err == nil {
+			return ss, total, nil
 		}
 	}
 	ss := filterRecentSources(loadFileSources(), o)
 	if o.Harness == "" || o.Harness == "opencode" {
 		ss = append(ss, filterRecentSources(sources.LoadOpencodeRecent(n), o)...)
 	}
-	return search.Recent(ss, n), nil
+	return search.Recent(ss, n), len(ss), nil
 }
 
 func parseLast(args []string) (int, search.Options, string, error) {
