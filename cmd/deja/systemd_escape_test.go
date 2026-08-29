@@ -40,3 +40,35 @@ func TestSyncTimerFilesNameTheSameUnit(t *testing.T) {
 		t.Fatalf("the timer file changed shape:\n%s", syncAutoTimer())
 	}
 }
+
+// The path is read back out of the unit to report on the timer (#2636), so the
+// two directions have to meet.
+func TestSystemdEscapeRoundTrips(t *testing.T) {
+	for _, p := range []string{
+		"/usr/local/bin/deja",
+		`/Users/me/a\b/deja`,
+		`/Users/me/"q"/deja`,
+		"/Users/50%off/bin/deja",
+		"/Users/me/$HOME/deja",
+		`/a\"b%c$d/deja`,
+		"/Users/My Tools/deja",
+	} {
+		if got := systemdUnescape(systemdEscape(p)); got != p {
+			t.Errorf("round trip changed the path:\n in  %q\n out %q\n via %q", p, got, systemdEscape(p))
+		}
+	}
+}
+
+// And the plist's, which is the same question for the other format.
+func TestXMLEscapeRoundTrips(t *testing.T) {
+	for _, p := range []string{
+		"/usr/local/bin/deja",
+		`/Users/John & "Jane" Smith/bin/deja`,
+		"/Users/&amp;lt;/deja",
+		"/Users/o'brien/bin/deja",
+	} {
+		if got := xmlUnescape(xmlEscape(p)); got != p {
+			t.Errorf("round trip changed the path:\n in  %q\n out %q\n via %q", p, got, xmlEscape(p))
+		}
+	}
+}

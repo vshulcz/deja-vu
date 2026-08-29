@@ -213,6 +213,69 @@ func removeOurUnit(path string) string {
 	return "removed"
 }
 
+// syncTimerBinary returns the binary the scheduled timer names, and whether a
+// timer is scheduled at all.
+//
+// Read back out of the file rather than remembered: the file is what the
+// service manager runs, and the failure worth catching is that it disagrees
+// with where deja is now — an upgrade or a move leaves the old path behind and
+// the hourly sync stops without a word (#2636). The same staleness
+// refreshWiringAfterUpgrade handles on the harness side.
+func syncTimerBinary(goos string) (exe string, scheduled bool) {
+	switch goos {
+	case "darwin":
+		b, err := os.ReadFile(syncAutoPlistPath())
+		if err != nil {
+			return "", false
+		}
+		// The first <string> under ProgramArguments is the binary; install
+		// writes it XML-escaped, so it comes back unescaped here.
+		body := string(b)
+		i := strings.Index(body, "<array>")
+		if i < 0 {
+			return "", true
+		}
+		rest := body[i:]
+		start := strings.Index(rest, "<string>")
+		end := strings.Index(rest, "</string>")
+		if start < 0 || end < start {
+			return "", true
+		}
+		return xmlUnescape(rest[start+len("<string>") : end]), true
+	case "linux":
+		b, err := os.ReadFile(filepath.Join(syncAutoUnitDir(), "deja-sync.service"))
+		if err != nil {
+			return "", false
+		}
+		for _, line := range strings.Split(string(b), "\n") {
+			if !strings.HasPrefix(line, "ExecStart=") {
+				continue
+			}
+			v := strings.TrimPrefix(line, "ExecStart=")
+			if !strings.HasPrefix(v, `"`) {
+				return "", true
+			}
+			v = v[1:]
+			if j := strings.LastIndex(v, `" `); j >= 0 {
+				v = v[:j]
+			}
+			return systemdUnescape(v), true
+		}
+		return "", true
+	}
+	return "", false
+}
+
+// xmlUnescape and systemdUnescape undo what the two writers escape, so the path
+// read back out of a file is the path that was put in.
+func xmlUnescape(s string) string {
+	return strings.NewReplacer("&lt;", "<", "&gt;", ">", "&quot;", `"`, "&apos;", "'", "&amp;", "&").Replace(s)
+}
+
+func systemdUnescape(s string) string {
+	return strings.NewReplacer(`\"`, `"`, "$$", "$", "%%", "%", `\\`, `\`).Replace(s)
+}
+
 // systemdEscape keeps a path from being read as anything but a path. The same
 // reason as xmlEscape below, for the other format: a unit file resolves %-
 // specifiers, substitutes $variables and reads C escapes in its values, so
