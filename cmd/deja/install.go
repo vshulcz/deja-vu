@@ -1667,13 +1667,13 @@ func dropJSONCEntry(lines []string) (body, dropped []string) {
 			continue
 		}
 		dropped = append(dropped, lines[i])
-		depth := strings.Count(code, "{") - strings.Count(code, "}")
+		depth := jsoncBraceDelta(code)
 		for depth > 0 && i+1 < len(lines) {
 			i++
 			c, nb, _ := jsoncCodeOf(lines[i], inBlock)
 			inBlock = nb
 			dropped = append(dropped, lines[i])
-			depth += strings.Count(c, "{") - strings.Count(c, "}")
+			depth += jsoncBraceDelta(c)
 		}
 	}
 	return body, dropped
@@ -1736,6 +1736,35 @@ func jsoncCodeOf(line string, inBlock bool) (code string, stillInBlock bool, end
 	return strings.TrimSpace(b.String()), inBlock, end
 }
 
+// jsoncBraceDelta counts the braces of one line's code that a parser reads as
+// structure. Comments are already out — jsoncCodeOf strips them, and keeps
+// string contents because the `"deja"` match and the comma offset both need
+// them — so what is left to skip here is quoted text. A command path holding a
+// brace is ordinary (`${VENDOR}` left literal, `/opt/{a,b}/bin`, a Windows GUID
+// directory), and counting one as structure moved the end of the "mcp" block:
+// deja's entry landed outside it, or inside it without a comma, or the drop
+// loop swallowed the server underneath (#2475).
+func jsoncBraceDelta(code string) int {
+	depth := 0
+	inString, escaped := false, false
+	for i := 0; i < len(code); i++ {
+		switch c := code[i]; {
+		case escaped:
+			escaped = false
+		case c == '\\' && inString:
+			escaped = true
+		case c == '"':
+			inString = !inString
+		case inString:
+		case c == '{':
+			depth++
+		case c == '}':
+			depth--
+		}
+	}
+	return depth
+}
+
 func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string, error) {
 	line := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
 	s := string(old)
@@ -1747,12 +1776,18 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	}
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	start, end := -1, -1
+	inBlock := false
 	for i, l := range lines {
-		if strings.Contains(l, `"mcp"`) && strings.Contains(l, "{") {
+		code, next, _ := jsoncCodeOf(l, inBlock)
+		inBlock = next
+		if strings.Contains(code, `"mcp"`) && strings.Contains(code, "{") {
 			start = i
-			depth := strings.Count(l, "{") - strings.Count(l, "}")
+			depth := jsoncBraceDelta(code)
+			block := inBlock
 			for j := i + 1; j < len(lines); j++ {
-				depth += strings.Count(lines[j], "{") - strings.Count(lines[j], "}")
+				c, nb, _ := jsoncCodeOf(lines[j], block)
+				block = nb
+				depth += jsoncBraceDelta(c)
 				if depth <= 0 {
 					end = j
 					break
