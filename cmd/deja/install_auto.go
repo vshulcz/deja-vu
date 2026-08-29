@@ -101,7 +101,10 @@ func adoptCodexHookEntry(entry map[string]any, cmd, event string) {
 	hs, _ := entry["hooks"].([]any)
 	for _, hAny := range hs {
 		h, _ := hAny.(map[string]any)
-		if h == nil || h["type"] != "command" || !isDejaHookCommand(h["command"], cmd) {
+		// hookDejas, not "deja runs in here somewhere": a line the reader
+		// wrote around our hook is theirs, and rewriting it throws away the
+		// rest of what it does (#2477).
+		if h == nil || h["type"] != "command" || hookCommandKindOf(h["command"], cmd) != hookDejas {
 			continue
 		}
 		h["command"] = cmd

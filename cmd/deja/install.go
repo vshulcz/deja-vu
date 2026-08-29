@@ -1146,20 +1146,92 @@ func hookStatusMessage(event string) string {
 	return ""
 }
 
-// isDejaHookCommand reports whether an existing hook entry is one of ours for
-// the same subcommand. Matching on the trailing subcommand rather than the
-// whole string means moving the binary replaces the old entry instead of
-// leaving a duplicate that fires alongside the new one.
-func isDejaHookCommand(existing any, cmd string) bool {
+// hookCommandKind says whose a hook command is. The word "deja" anywhere in the
+// line is not the test: a tool living under /home/deja is somebody else's, and
+// a line the reader wrote around deja's own invocation is theirs even though it
+// runs ours (#2477). What decides it is the token in front of the subcommand.
+type hookCommandKind int
+
+const (
+	// hookNotDejas: deja did not write this and does not run in it.
+	hookNotDejas hookCommandKind = iota
+	// hookDejas: the line deja writes — the binary and the subcommand, nothing
+	// else. Install repoints it at the current path; uninstall takes it out.
+	hookDejas
+	// hookWrapsDejas: the reader's own line, which runs deja's hook as part of
+	// something larger. It is already installed, so adding deja's line beside
+	// it would run the hook twice at every session start; and it is not deja's
+	// to rewrite or to delete.
+	hookWrapsDejas
+)
+
+func hookCommandKindOf(existing any, cmd string) hookCommandKind {
 	s, ok := existing.(string)
-	if !ok {
-		return false
+	if !ok || s == "" {
+		return hookNotDejas
 	}
 	if s == cmd {
-		return true
+		return hookDejas
 	}
 	sub := cmd[strings.LastIndex(cmd, " ")+1:]
-	return strings.HasSuffix(s, " "+sub) && strings.Contains(s, "deja")
+	for i := 0; i < len(s); {
+		j := strings.Index(s[i:], " "+sub)
+		if j < 0 {
+			return hookNotDejas
+		}
+		at := i + j
+		end := at + 1 + len(sub)
+		if isDejaBinaryToken(lastShellToken(s[:at])) && subcommandEndsAt(s[end:]) {
+			if strings.TrimSpace(s) == strings.TrimSpace(lastShellToken(s[:at])+" "+sub) {
+				return hookDejas
+			}
+			return hookWrapsDejas
+		}
+		i = end
+	}
+	return hookNotDejas
+}
+
+// isDejaHookCommand reports whether deja's hook runs in this command at all,
+// whether as the line deja wrote or inside one the reader did. Callers that go
+// on to rewrite the command ask for hookDejas instead.
+func isDejaHookCommand(existing any, cmd string) bool {
+	return hookCommandKindOf(existing, cmd) != hookNotDejas
+}
+
+// lastShellToken is the word a command name would occupy: the last run of
+// non-space characters before the subcommand.
+func lastShellToken(s string) string {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return ""
+	}
+	return f[len(f)-1]
+}
+
+// isDejaBinaryToken reports whether a token names the deja binary, quoted or
+// not, under any directory, on either platform's separator.
+func isDejaBinaryToken(tok string) bool {
+	tok = strings.Trim(tok, `"'`)
+	if i := strings.LastIndexAny(tok, `/\`); i >= 0 {
+		tok = tok[i+1:]
+	}
+	return tok == "deja" || tok == "deja.exe"
+}
+
+// subcommandEndsAt reports whether the subcommand really ended where it was
+// found, rather than being the head of a longer word: "hook-prompt" must not
+// match inside "hook-prompt-extra". A quote, a shell separator or the end of
+// the line all end it.
+func subcommandEndsAt(rest string) bool {
+	if rest == "" {
+		return true
+	}
+	switch rest[0] {
+	case ' ', '\t', '\'', '"', ';', '&', '|', ')', '`', '\n':
+		return true
+	}
+	return false
 }
 
 func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall bool) map[string]any {
@@ -1188,7 +1260,20 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		removed := false
 		for _, hAny := range hs {
 			h, _ := hAny.(map[string]any)
-			if h != nil && h["type"] == "command" && isDejaHookCommand(h["command"], cmd) {
+			kind := hookNotDejas
+			if h != nil && h["type"] == "command" {
+				kind = hookCommandKindOf(h["command"], cmd)
+			}
+			if kind == hookWrapsDejas {
+				// This hook is already installed, inside a line deja did not
+				// write. Leaving it alone is the whole of what to do: a second
+				// entry would inject memory twice, and rewriting it would throw
+				// away whatever else the reader put on that line.
+				found = true
+				kept = append(kept, hAny)
+				continue
+			}
+			if kind == hookDejas {
 				if uninstall {
 					removed = true
 					continue
