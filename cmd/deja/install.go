@@ -1651,18 +1651,29 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 // the rest of it in the block and the config stopped parsing (#2394), so the
 // entry is bounded by counting braces the way the block itself is.
 func dropJSONCEntry(lines []string) (body, dropped []string) {
+	// On the code a parser reads, not the raw line. A comment that only names
+	// deja — a parked entry someone commented out, a note saying who wrote the
+	// block — is not an entry to replace, and dropping its first line leaves a
+	// /* … */ closing on its own, which costs the reader every server in the
+	// file (#2473). The same reading keeps a brace inside a comment out of the
+	// depth count. jsoncLastCodeLine already reads the block this way to place
+	// its comma.
+	inBlock := false
 	for i := 0; i < len(lines); i++ {
-		l := lines[i]
-		if !strings.Contains(l, `"deja"`) {
-			body = append(body, l)
+		code, next, _ := jsoncCodeOf(lines[i], inBlock)
+		inBlock = next
+		if !strings.Contains(code, `"deja"`) {
+			body = append(body, lines[i])
 			continue
 		}
-		dropped = append(dropped, l)
-		depth := strings.Count(l, "{") - strings.Count(l, "}")
+		dropped = append(dropped, lines[i])
+		depth := strings.Count(code, "{") - strings.Count(code, "}")
 		for depth > 0 && i+1 < len(lines) {
 			i++
+			c, nb, _ := jsoncCodeOf(lines[i], inBlock)
+			inBlock = nb
 			dropped = append(dropped, lines[i])
-			depth += strings.Count(lines[i], "{") - strings.Count(lines[i], "}")
+			depth += strings.Count(c, "{") - strings.Count(c, "}")
 		}
 	}
 	return body, dropped
