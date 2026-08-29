@@ -60,6 +60,15 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
 	if !planIndexReady(dir) {
+		// Ask, do not build. #777 gave the per-prompt and session-start hooks
+		// this: an index in a format this build cannot read answers nothing,
+		// which reads as a user with no history, and nothing else asks for the
+		// rebuild that fixes it. A spawned subagent reaches only these hooks —
+		// install.go says so where it wires Task and Agent — so without this a
+		// fleet works against a stale index until its parent types something
+		// (#2567). requestWarmup writes a sentinel and detaches a child; the
+		// action pays neither the read nor the wait.
+		requestWarmup(dir)
 		return nil
 	}
 	// A payload the decoder could not read has no tool name either, and the
