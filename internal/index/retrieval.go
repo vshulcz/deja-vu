@@ -594,7 +594,40 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
+	// Paired by identity, not by position. The counts belong to the ranking,
+	// which works on metas; the sessions come back from sessionsServable, which
+	// drops what the policy ignores and what the query may not be served. Every
+	// caller reads the three positionally, so a single drop had the per-prompt
+	// hook judging each session by its neighbour's terms (#2546).
+	matched, strong = countsFor(out, metas, matched, strong)
 	return out, matched, strong, idf, nil
+}
+
+// countsFor re-pairs the per-session counts with the sessions that survived
+// loading, keeping their order.
+func countsFor(out []model.Session, metas []SessionMeta, matched, strong []int) ([]int, []int) {
+	if len(out) == len(metas) {
+		return matched, strong
+	}
+	at := make(map[string]int, len(metas))
+	for i, meta := range metas {
+		at[meta.Harness+":"+meta.ID] = i
+	}
+	m := make([]int, len(out))
+	st := make([]int, len(out))
+	for j, s := range out {
+		i, ok := at[s.Harness+":"+s.ID]
+		if !ok {
+			continue
+		}
+		if i < len(matched) {
+			m[j] = matched[i]
+		}
+		if i < len(strong) {
+			st[j] = strong[i]
+		}
+	}
+	return m, st
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, map[string]float64, error) {
