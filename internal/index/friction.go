@@ -217,6 +217,9 @@ func isFriction(l string) bool {
 	return false
 }
 
+// FrictionHash is frictionHash for callers outside the package.
+func FrictionHash(line string) uint64 { return frictionHash(line) }
+
 func frictionHash(line string) uint64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(line))

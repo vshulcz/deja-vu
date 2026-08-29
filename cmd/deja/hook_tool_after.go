@@ -298,6 +298,14 @@ func fixLine(p index.FixPair) string {
 	if !p.When.IsZero() {
 		when = " (" + p.When.Local().Format("2006-01-02") + ")"
 	}
+	// A single sighting is said as one. Two sessions doing the same thing after
+	// the same error is evidence it worked; one session doing something is what
+	// one session did, and an agent handed it at the moment it is stuck has to
+	// be told which of the two it is holding.
+	if p.Candidate {
+		return "deja: this error came up here before" + when +
+			" — one session ran this after it, and nothing confirms it worked: " + cmd
+	}
 	return "deja: this error came up here before" + when + " — what followed it: " + cmd
 }
 

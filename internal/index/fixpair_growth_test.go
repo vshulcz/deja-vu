@@ -54,8 +54,9 @@ func TestACrossSessionPairSurvivesOneAtATimeArrival(t *testing.T) {
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := FixesFor(dir, errText, 3, nil); len(got) != 0 {
-		t.Fatalf("one session is not evidence yet, got %d pairs", len(got))
+	// One session is a sighting, and it is served as one.
+	if got := FixesFor(dir, errText, 3, nil); len(got) != 1 || !got[0].Candidate {
+		t.Fatalf("one session should come back marked unconfirmed, got %+v", got)
 	}
 
 	writePairSession(t, proj, "two", errText, cmd)
@@ -65,6 +66,12 @@ func TestACrossSessionPairSurvivesOneAtATimeArrival(t *testing.T) {
 	got := FixesFor(dir, errText, 3, nil)
 	if len(got) == 0 {
 		t.Fatalf("the second session confirmed the remedy and the pair is still missing")
+	}
+	// And the confirmed pair replaces the sighting rather than sitting beside it.
+	for _, g := range got {
+		if g.Candidate {
+			t.Errorf("a sighting was still served after the pair was confirmed: %+v", g)
+		}
 	}
 }
 
@@ -100,15 +107,19 @@ func TestPairsAgreeWhicheverWayTheIndexGotThere(t *testing.T) {
 
 // A candidate is not an answer. Until a second session confirms it, nothing
 // serves it — one session doing something after an error is half the evidence.
-func TestACandidateIsNeverServed(t *testing.T) {
+func TestASightingIsServedAndKeptForConfirmation(t *testing.T) {
 	dir, proj := pairStore(t)
 	const errText = "undefined: renderInvoice in vendor/billing/api.go"
 	writePairSession(t, proj, "one", errText, "go mod vendor \\u0026\\u0026 go build ./...")
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := FixesFor(dir, errText, 3, nil); len(got) != 0 {
-		t.Errorf("a single sighting was served as a pair: %+v", got)
+	// Served, and served as what it is: the caller marks it, because the store
+	// holds a sighting for four of every five real failures and silence was
+	// costing all of them.
+	got := FixesFor(dir, errText, 3, nil)
+	if len(got) != 1 || !got[0].Candidate {
+		t.Errorf("a sighting was withheld and the failure answered with silence: %+v", got)
 	}
 	// It is on file, though — that is the point.
 	held := 0
@@ -174,8 +185,8 @@ func TestTheIncrementalMergeKeepsAFirstSighting(t *testing.T) {
 		}}
 	}
 	mergeFixes(dir, dir, []model.Session{session("one", time.Now().Add(-time.Hour))}, map[string]bool{})
-	if got := FixesFor(dir, errText, 3, nil); len(got) != 0 {
-		t.Fatalf("one sighting was served as a pair: %+v", got)
+	if got := FixesFor(dir, errText, 3, nil); len(got) != 1 || !got[0].Candidate {
+		t.Fatalf("one sighting should come back marked unconfirmed: %+v", got)
 	}
 	mergeFixes(dir, dir, []model.Session{session("two", time.Now())}, map[string]bool{})
 	if got := FixesFor(dir, errText, 3, nil); len(got) == 0 {
