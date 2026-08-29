@@ -193,6 +193,14 @@ func findRestoreSpans(dir string, path string) ([]restoreSpan, error) {
 		if !pol.Allows(policy.ActivationSearch, meta.Project) {
 			return
 		}
+		// Same rule, same reason as how and friction: this walks the record log
+		// rather than ranking, so it never reached the place the ignore rule is
+		// applied and offered spans out of a tree deja was asked to skip
+		// (#2630). Silently: restore names files, and a file it cannot restore
+		// is better absent than listed.
+		if pol.Ignored(meta.Path, meta.Project) {
+			return
+		}
 		if len(seen) >= restoreMaxSessions && !seen[meta.Harness+":"+meta.ID] {
 			return
 		}

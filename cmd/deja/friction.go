@@ -69,12 +69,21 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	// counting the callback's firings reported one hidden session with ten
 	// error lines as ten (#1639).
 	withheldSessions := map[string]bool{}
+	// And the rule that keeps a tree out of recall altogether. friction reads
+	// the record log rather than ranking, so it never passed through the place
+	// the rule is applied and read the ignored tree's errors as this machine's
+	// own (#2630).
+	ignoredSessions := map[string]bool{}
 	// One pass over the record log rather than a load per session: loading by
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
 		if !pol.Allows(policy.ActivationSearch, meta.Project) {
 			withheldSessions[meta.Harness+":"+meta.ID] = true
+			return
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
+			ignoredSessions[meta.Harness+":"+meta.ID] = true
 			return
 		}
 		key := meta.Harness + ":" + meta.ID
@@ -101,6 +110,9 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	}
 	if note := policyHiddenNote(policy.ActivationSearch, len(withheldSessions)); note != "" {
 		fmt.Fprintln(os.Stderr, note)
+	}
+	if note := ignoredHiddenNoteFor("answer", len(ignoredSessions)); note != "" {
+		fmt.Fprint(os.Stderr, note)
 	}
 
 	type row struct {
