@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where prime-agent (PrimeIntellect) stores its history — session format</title>
+<meta name="description" content="Where prime-agent (PrimeIntellect) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/prime.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where prime-agent (PrimeIntellect) stores its history — session format">
+<meta property="og:description" content="Where prime-agent (PrimeIntellect) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/prime.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where prime-agent (PrimeIntellect) stores its history — session format">
+<meta name="twitter:description" content="Where prime-agent (PrimeIntellect) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where prime-agent (PrimeIntellect) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"prime-agent (PrimeIntellect)","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/prime.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/prime.html","name":"prime-agent (PrimeIntellect)","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html" aria-current="page">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>prime-agent (PrimeIntellect)</h1>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Value</th></tr>
+<tr><td><strong>Format</strong></td><td>JSONL transcript</td></tr>
+<tr><td><strong>Default store path</strong></td><td><code>~/.prime/agent/sessions/&lt;uuid7&gt;.jsonl</code></td></tr>
+<tr><td><strong>Env override</strong></td><td><code>DEJA_PRIME_ROOT</code>, <code>PRIME_AGENT_SESSION_DIR</code>, <code>PRIME_AGENT_CODING_AGENT_SESSION_DIR</code></td></tr>
+<tr><td><strong>deja parser</strong></td><td><code>internal/sources/prime.go</code></td></tr>
+<tr><td><strong>Last verified</strong></td><td>2026-08-30</td></tr>
+</table></div>
+<h2 id="discovery">Discovery</h2>
+<p>prime-agent (<code>PrimeIntellect-ai/prime-agent</code>) keeps one file per session</p>
+<p>directly under <code>~/.prime/agent/sessions/</code>, named by the session&#39;s uuid7. The</p>
+<p>root is flat: unlike pi and omp there is no encoded project directory, so the</p>
+<p>project comes from the <code>cwd</code> the header line carries.</p>
+<p>prime-agent relocates the root with two variables of its own,</p>
+<p><code>PRIME_AGENT_SESSION_DIR</code> and <code>PRIME_AGENT_CODING_AGENT_SESSION_DIR</code>, and deja</p>
+<p>reads both — a machine that has moved its sessions has moved them for deja too.</p>
+<p><code>DEJA_PRIME_ROOT</code> overrides all of it.</p>
+<p>Older installs kept sessions under <code>~/.pi/agent/*.jsonl</code> and in a <code>--cwd--</code></p>
+<p>directory beneath this root. prime-agent migrates both into the flat root when</p>
+<p>it starts, so the flat layout is what a live install has.</p>
+<h2 id="shape">Shape</h2>
+<p>The first line is the session header:</p>
+<pre><code class="language-json">{&#34;type&#34;:&#34;session&#34;,&#34;version&#34;:3,&#34;id&#34;:&#34;&lt;uuid7&gt;&#34;,&#34;timestamp&#34;:&#34;...&#34;,&#34;cwd&#34;:&#34;...&#34;,&#34;parentSession&#34;:null,&#34;rlmDepth&#34;:0}</code></pre>
+<p>The lines after it are typed entries — <code>message</code>, <code>model_change</code>,</p>
+<p><code>thinking_level_change</code>, <code>service_tier_change</code>, <code>compaction</code>, <code>branch_summary</code> —</p>
+<p>chained by <code>parentId</code>. Message entries carry <code>content</code> text blocks.</p>
+<p>That is the envelope pi writes, which is why deja reads it with the same parser</p>
+<p>pi and omp share: prime-agent descends from the same codebase</p>
+<p>(<code>@earendil-works/pi-coding-agent</code>) and kept the format.</p>
+<h2 id="what-deja-does-with-it">What deja does with it</h2>
+<p>Sessions are indexed and searchable like any other harness. Wiring — MCP,</p>
+<p>hooks, skills, commands, resume, handoff — is not implemented for prime-agent;</p>
+<p><code>deja install</code> does not write to its config.</p>
+<p>Reported and specified from source by @iMaxTomas in #2529.</p>
+<p><strong>Last verified:</strong> 2026-08-30</p>
+
+<hr>
+<p>deja reads this format and twenty others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

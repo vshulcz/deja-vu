@@ -728,6 +728,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// now holds these rows to it.
 	ompRoot := sources.OmpRoot()
 	printFiles("omp", ompRoot, doctorExists(ompRoot), sources.OmpSessionFiles())
+	primeRoot := sources.PrimeRoot()
+	printFiles("prime", primeRoot, doctorExists(primeRoot), sources.PrimeSessionFiles())
 	dshRoot := sources.DeepSeekRoot()
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
 	zedDB := sources.ZedDB()

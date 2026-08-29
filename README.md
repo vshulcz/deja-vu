@@ -109,7 +109,7 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Twenty coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Twenty-one coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -232,32 +232,33 @@ The server exposes `recall`, `recall_context`, `blame`, `fix`, `how` and `rememb
 ## Supported harnesses
 
 <!-- matrix:start -->
-Claude Code &middot; Cline &middot; Codex CLI &middot; opencode &middot; aider &middot; Gemini CLI &middot; Cursor &middot; Antigravity &middot; Grok Build &middot; Hermes &middot; Goose &middot; Qwen Code &middot; Kimi Code &middot; pi &middot; omp (Oh My Pi) &middot; OpenClaw &middot; Copilot CLI &middot; Roo Code &middot; DeepSeek Harness &middot; Zed.
+aider &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
 
 | Harness | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
+| aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
+| Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
-| Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats) |
-| Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Grok Build | ✅ | ✅ | ✅ | ✅ | ? | ✅ | sqlite3 (grok-dev store) |
-| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 |
+| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
+| Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Goose | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | deja goose |
-| Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Grok Build | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (grok-dev store) |
+| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
-| Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
+| opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
+| pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| prime-agent (PrimeIntellect) | — | — | — | — | ? | paste | — |
+| Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |
-| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated
