@@ -696,7 +696,7 @@ func restoreReplacedGuidance(path, harness string) (bool, error) {
 	if err != nil {
 		return false, nil
 	}
-	if bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace([]byte(guidanceText(harness)))) {
+	if isOurGuidance(b, harness) {
 		return false, os.Remove(bak)
 	}
 	if err := os.WriteFile(path, b, 0o644); err != nil {
@@ -708,4 +708,24 @@ func restoreReplacedGuidance(path, harness string) (bool, error) {
 	restoredGuidance[path] = true
 	fmt.Printf("skill: put back %s, the copy install replaced\n", shortHome(path))
 	return true, nil
+}
+
+// dejaSkillDescription is the line deja writes into every skill's frontmatter.
+// A file carrying it is deja's own — from this build or an older one, which is
+// the case that matters: an older skill has no marks, so install treats it as a
+// stranger's and backs it up, and putting that back on the way out leaves deja's
+// words on a machine deja was just removed from (#2585, the shape of #2575).
+//
+// What it costs: a reader who rewrote the body and kept deja's description
+// verbatim is read as deja rather than as themselves. Their own description —
+// one line, the part a person changes first when they make the skill theirs —
+// is what separates the two.
+const dejaSkillDescription = "description: Search the user's past AI coding sessions."
+
+func isOurGuidance(b []byte, harness string) bool {
+	if bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace([]byte(guidanceText(harness)))) {
+		return true
+	}
+	head, _, _ := strings.Cut(string(b), "\n---")
+	return strings.Contains(head, dejaSkillDescription)
 }
