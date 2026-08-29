@@ -75,9 +75,15 @@ func TestTheTruncationMarkIsAnEllipsis(t *testing.T) {
 // block itself, since that is where the cut lives.
 func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 	tmp := hermeticEnv(t)
-	root := filepath.Join(tmp, "claude", "proj-w")
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		t.Fatal(err)
+	// Three project directories: a wall of one repository is no longer a fact
+	// about the machine.
+	var roots []string
+	for i := 0; i < environmentMinProjects; i++ {
+		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, root)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// English shape so it is recognised as a wall, Cyrillic tail so the 96-byte
@@ -93,7 +99,7 @@ func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 			`{"type":"user","sessionId":"` + sid + `","cwd":"/w/w","timestamp":"2026-07-2` +
 			fmt.Sprint(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
 			`"content":"` + wall + `"}]}}` + "\n"
-		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(roots[i%len(roots)], sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

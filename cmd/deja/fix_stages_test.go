@@ -77,11 +77,18 @@ func TestTheFixLadderSpeaksAtTheRightStage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(asked, "nothing has confirmed it worked") {
+	if !strings.Contains(asked, "unconfirmed") {
 		t.Errorf("stage two, asked: %q", asked)
 	}
-	if got := afterHook("a2"); strings.TrimSpace(got) != "" {
-		t.Errorf("stage two, the hook offered a remedy nothing has confirmed:\n%s", got)
+	// Served, and served as one sighting. Silence here was measured against the
+	// failures it was costing: of 1057 real ones, 112 had a confirmed pair and
+	// 373 more had only this (#2589).
+	got := afterHook("a2")
+	if !strings.Contains(got, "nothing confirms it worked") {
+		t.Errorf("stage two, the hook withheld the sighting it is holding:\n%s", got)
+	}
+	if strings.Contains(got, "what followed it:") {
+		t.Errorf("stage two, a sighting was offered as a confirmed remedy:\n%s", got)
 	}
 
 	// Stage three: a second session did the same, so both doors answer.

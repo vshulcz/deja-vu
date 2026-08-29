@@ -106,7 +106,13 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			when = " · " + p.When.Local().Format("2006-01-02")
 		}
 		fmt.Fprintf(stdout, "%s%s\n", search.SafeLine(p.Error), when)
-		fmt.Fprintf(stdout, "  ran next: %s\n", search.SafeCommand(p.Command))
+		ran := "ran next"
+		if p.Candidate {
+			// One session doing something after an error is half the evidence,
+			// and the reader has to be told which half they are holding.
+			ran = "ran next, unconfirmed"
+		}
+		fmt.Fprintf(stdout, "  %s: %s\n", ran, search.SafeCommand(p.Command))
 	}
 	return nil
 }

@@ -19,9 +19,15 @@ import (
 func TestHookReportsTheBuildEvenWhenItHasOnlyEnvironmentFacts(t *testing.T) {
 	tmp := hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	store := filepath.Join(root, "-elsewhere")
-	if err := os.MkdirAll(store, 0o755); err != nil {
-		t.Fatal(err)
+	// One directory per project: a wall of one repository is no longer a fact
+	// about the machine, and this block is built from other projects' walls.
+	var stores []string
+	for i := 0; i < environmentMinProjects; i++ {
+		store := filepath.Join(root, "-elsewhere"+strconv.Itoa(i))
+		if err := os.MkdirAll(store, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		stores = append(stores, store)
 	}
 	// Sessions from another project, each hitting the same missing tool: that
 	// is what the environment block is built from, and none of it is this
@@ -30,11 +36,11 @@ func TestHookReportsTheBuildEvenWhenItHasOnlyEnvironmentFacts(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		id := "env" + strconv.Itoa(i)
 		b.Reset()
-		b.WriteString(`{"type":"user","message":{"role":"user","content":"run the thing"},"timestamp":"2026-07-0` + strconv.Itoa(i+1) + `T10:00:00Z","sessionId":"` + id + `","cwd":"/elsewhere"}` + "\n")
+		b.WriteString(`{"type":"user","message":{"role":"user","content":"run the thing"},"timestamp":"2026-07-0` + strconv.Itoa(i+1) + `T10:00:00Z","sessionId":"` + id + `","cwd":"/elsewhere` + strconv.Itoa(i%environmentMinProjects) + `"}` + "\n")
 		// Claude files tool results inside user messages, and friction is
 		// counted from tool output only.
-		b.WriteString(`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"zsh:1: command not found: shellcheck"}]},"timestamp":"2026-07-0` + strconv.Itoa(i+1) + `T10:01:00Z","sessionId":"` + id + `","cwd":"/elsewhere"}` + "\n")
-		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(b.String()), 0o644); err != nil {
+		b.WriteString(`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"zsh:1: command not found: shellcheck"}]},"timestamp":"2026-07-0` + strconv.Itoa(i+1) + `T10:01:00Z","sessionId":"` + id + `","cwd":"/elsewhere` + strconv.Itoa(i%environmentMinProjects) + `"}` + "\n")
+		if err := os.WriteFile(filepath.Join(stores[i%len(stores)], id+".jsonl"), []byte(b.String()), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

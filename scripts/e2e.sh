@@ -74,6 +74,6 @@ A="$(mktemp -d)"
 mkdir -p "$A/.claude"
 printf '{}\n' > "$A/.claude/settings.json"
 HOME="$A" USERPROFILE="$A" $D install --auto >/dev/null 2>&1 || fail "install --auto"
-HOME="$A" USERPROFILE="$A" $D doctor | grep -q "precompact   wired" || fail "doctor disagrees with install --auto"
+HOME="$A" USERPROFILE="$A" $D doctor | grep -q "claude-code  wired" || fail "doctor disagrees with install --auto"
 
 echo "e2e OK"
