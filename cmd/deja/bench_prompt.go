@@ -223,6 +223,26 @@ type promptReport struct {
 	CrossPaired promptArmReport `json:"cross_paired"`
 }
 
+// awayFor picks where a chain's question is asked: forward to the first chain
+// of another project, not merely the next one. Several chains share a project —
+// the Russian ones do — so a single step lands back at home, and the two
+// projects built to hold everything are no better. The haystack keeps one
+// session that mentions every subject in the corpus and the bucket is the
+// catch-all scope; asking either is not asking somewhere the answer cannot be.
+// Measured: pairing without this counted eleven false fires where six were.
+func awayFor(crossed []PromptChainRef, i int) (PromptChainRef, bool) {
+	c := crossed[i]
+	for step := 1; step < len(crossed); step++ {
+		cand := crossed[(i+step)%len(crossed)]
+		if cand.Project == c.Project || cand.Project == bench.PromptHaystackProject ||
+			cand.Project == bench.PromptBucketProject {
+			continue
+		}
+		return cand, true
+	}
+	return PromptChainRef{}, false
+}
+
 // PromptChainRef is a chain reduced to what cross-pairing needs.
 type PromptChainRef struct {
 	Question string
@@ -530,9 +550,9 @@ func measurePrompt(seed int64) (promptReport, error) {
 	}
 	sort.Slice(crossed, func(i, j int) bool { return crossed[i].ID < crossed[j].ID })
 	for i, c := range crossed {
-		away := crossed[(i+1)%len(crossed)]
-		if away.Project == c.Project {
-			away = crossed[(i+2)%len(crossed)]
+		away, found := awayFor(crossed, i)
+		if !found {
+			continue
 		}
 		report.CrossPaired.Cases++
 		if fired, _ := promptBenchProbe(indexDir, away.Project, away.ID, prompt.Terms(c.Question)); fired {
