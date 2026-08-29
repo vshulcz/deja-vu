@@ -930,6 +930,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		if a := askedFromRecords(recsByKey[key]); len(a) > 0 {
 			meta.Asked = a
 		}
+		// And the two counts ranking divides by. A batch carries the records it
+		// carries, so these add up across batches the way the local
+		// incremental path adds them up across appends (#2569).
+		batchCounted := countedFromRecords(recsByKey[key])
+		batchWords := wordsFromRecords(recsByKey[key])
 		// And the friction signal, for the same reason: without meta.Hit the
 		// brief's one wall line never counted an error a peer kept hitting,
 		// though `deja friction` and stats both did.
@@ -965,8 +970,12 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// this one, so OR with what the row already carried rather than
 			// letting a later batch clear the mark.
 			meta.GaveUp = old.GaveUp || batchGaveUp
+			meta.Counted = old.Counted + batchCounted
+			meta.Words = old.Words + batchWords
 		} else {
 			meta.GaveUp = batchGaveUp
+			meta.Counted = batchCounted
+			meta.Words = batchWords
 			meta.Ord = nextOrd
 			nextOrd++
 		}

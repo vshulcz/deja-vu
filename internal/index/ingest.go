@@ -1551,6 +1551,35 @@ func askedFromRecords(recs []Record) []uint64 {
 	return out
 }
 
+// countedFromRecords is the message count local ingest keeps as Counted: the
+// records that are a turn of the conversation, not the work records deja
+// derives beside them. It feeds the corpus size the ranking divides by, so an
+// imported session with none counted as a single document (#2569).
+func countedFromRecords(recs []Record) int {
+	n := 0
+	for _, r := range recs {
+		if r.Role == roleFiles || r.Role == roleCommand || r.Role == roleEdit {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
+// wordsFromRecords is sessionWords over the same records: the document length
+// BM25 normalises by. Without it an imported session is scored on the length of
+// the match alone, which is the marathon-wins case search.go describes.
+func wordsFromRecords(recs []Record) int {
+	ms := make([]model.Message, 0, len(recs))
+	for _, r := range recs {
+		if r.Role == roleFiles || r.Role == roleCommand || r.Role == roleEdit {
+			continue
+		}
+		ms = append(ms, model.Message{Role: r.Role, Text: r.Text})
+	}
+	return sessionWords(ms)
+}
+
 // notAsked rejects the text a harness writes under the user role: hook
 // envelopes, interruption notices, resume preambles, the compaction summary.
 // It repeats across sessions by construction, so without this the most
