@@ -17,7 +17,7 @@
 <p align="center"><b>其他记忆工具都从空白开始，往后记录。deja 一开始就是满的。</b></p>
 
 <p align="center">
-LongMemEval-S 上 <b>85.3% hit@1</b> &middot; LoCoMo 上 <b>69.6%</b> &middot; 5&nbsp;GB 历史上的查询在<b>亚毫秒</b>级<br>
+LongMemEval-S 上 <b>85.3% hit@1</b> &middot; LoCoMo 上 <b>69.6%</b> &middot; 5&nbsp;GB 历史上的查询在<b>毫秒</b>级<br>
 <sub>两套评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
 </p>
