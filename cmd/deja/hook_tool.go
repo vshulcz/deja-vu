@@ -288,19 +288,31 @@ func commandDecisionLine(dir, cwd, cmd string) string {
 	if len(terms) == 0 {
 		return ""
 	}
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
+	ranked, _, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
 	if err != nil {
 		return ""
 	}
 	pol := policy.Load()
 	states := sources.PromotedLifecycles()
-	for i, s := range ranked {
-		// Every term or nothing: a build command's words are common, and one
-		// of them matching finds a session about something else entirely.
-		if matched[i] < len(terms) {
+	for _, s := range ranked {
+		// The old rule wanted every one of the command's words to be rare.
+		// Measured on 1,696 sessions, none of the fifteen most-run commands
+		// clears that: a command's words are common by construction, which is
+		// what makes it one this machine runs. `go test ./...` reduces to the
+		// single term "test", and no bar built on rarity admits it (#2520).
+		//
+		// What the rule was after — is this session about this command — is a
+		// fact rather than a ranking: did the session run it. The words still
+		// choose the candidates; running the command earns the line. A session
+		// that merely says "apply" is not the history of `terraform apply`.
+		if !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
 			continue
 		}
-		if !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
+		// The ranked sessions are served without their command records, so the
+		// question is asked of the session as the index holds it. Bounded by
+		// the same scan the ranking is.
+		whole, ok, ferr := index.FindByIdentity(dir, s.Harness, s.ID)
+		if ferr != nil || !ok || !index.SessionRanCommand(whole, cmd) {
 			continue
 		}
 		if len(s.Messages) > toolHookMsgTail {
