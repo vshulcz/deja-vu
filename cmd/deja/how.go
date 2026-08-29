@@ -129,9 +129,12 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	entries, hidden, err := howEntries(dir, terms, project, policy.ActivationSearch)
+	entries, hidden, ignored, err := howEntries(dir, terms, project, policy.ActivationSearch)
 	if err != nil {
 		return err
+	}
+	if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
+		fmt.Fprint(os.Stderr, note)
 	}
 	if len(entries) == 0 {
 		if note := policyHiddenNote(policy.ActivationSearch, hidden); note != "" {
@@ -175,13 +178,23 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 // The count of what was withheld travels with it, because filtering alone turns
 // a leak into a confident "no command mentions that" over records the policy
 // hid, and an agent told nothing exists invents something.
-func howEntries(dir string, terms []string, project, activation string) ([]howEntry, int, error) {
+func howEntries(dir string, terms []string, project, activation string) ([]howEntry, int, int, error) {
 	pol := policy.Load()
 	hidden := 0
+	// The other rule that takes sessions out of an answer. It is applied inside
+	// retrieval, and this screen reads the record log instead of ranking, so it
+	// was not applied here at all: a tree the reader asked deja to stay out of
+	// answered "how do I run this here" — and the default rule is the temp tree
+	// a background agent makes for itself (#2630).
+	ignored := map[string]bool{}
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
 		if !pol.Allows(activation, meta.Project) {
 			hidden++
+			return
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
+			ignored[meta.Harness+":"+meta.ID] = true
 			return
 		}
 		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
@@ -223,7 +236,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 	})
 	if err != nil {
-		return nil, hidden, fmt.Errorf("read: %w", err)
+		return nil, hidden, len(ignored), fmt.Errorf("read: %w", err)
 	}
 	out := make([]howEntry, 0, len(byCmd))
 	for _, e := range byCmd {
@@ -241,7 +254,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 		return out[i].Command < out[j].Command
 	})
-	return out, hidden, nil
+	return out, hidden, len(ignored), nil
 }
 
 func pluralRuns(n int) string {

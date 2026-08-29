@@ -69,12 +69,21 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	// counting the callback's firings reported one hidden session with ten
 	// error lines as ten (#1639).
 	withheldSessions := map[string]bool{}
+	// And the rule that keeps a tree out of recall altogether. friction reads
+	// the record log rather than ranking, so it never passed through the place
+	// the rule is applied and read the ignored tree's errors as this machine's
+	// own (#2630).
+	ignoredSessions := map[string]bool{}
 	// One pass over the record log rather than a load per session: loading by
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
 		if !pol.Allows(policy.ActivationSearch, meta.Project) {
 			withheldSessions[meta.Harness+":"+meta.ID] = true
+			return
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
+			ignoredSessions[meta.Harness+":"+meta.ID] = true
 			return
 		}
 		key := meta.Harness + ":" + meta.ID
@@ -101,6 +110,9 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	}
 	if note := policyHiddenNote(policy.ActivationSearch, len(withheldSessions)); note != "" {
 		fmt.Fprintln(os.Stderr, note)
+	}
+	if note := ignoredHiddenNoteFor("answer", len(ignoredSessions)); note != "" {
+		fmt.Fprint(os.Stderr, note)
 	}
 
 	type row struct {
@@ -150,6 +162,12 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			// thing, and stdout is what a redirect keeps (#2319).
 			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
 				len(withheldSessions), pluralS(len(withheldSessions)))
+		case len(sessions) == 0 && len(ignoredSessions) > 0:
+			// The same claim about the store rather than about the rule, for
+			// the other rule: the sessions with the tool output are there and
+			// the ignore rule is what keeps them out (#2630).
+			fmt.Fprintf(stdout, "nothing recurring — the ignore rule keeps the %d session%s that recorded tool output out of recall, which is what friction reads errors from\n",
+				len(ignoredSessions), pluralS(len(ignoredSessions)))
 		case len(sessions) == 0:
 			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
 				total, pluralS(total))
