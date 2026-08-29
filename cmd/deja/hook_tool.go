@@ -457,7 +457,7 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 	// through an allowed session — but the note carries a project of its own,
 	// and every other reader of these notes checks it (#2506).
 	pol := policy.Load()
-	var best sources.PromotedNote
+	var found []sources.PromotedNote
 	keep := func(note sources.PromotedNote) {
 		if note.State != "accepted" {
 			return
@@ -465,9 +465,7 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 		if note.Project != "" && !pol.Allows(policy.ActivationAuto, note.Project) {
 			return
 		}
-		if best.At.IsZero() || note.At.After(best.At) {
-			best = note
-		}
+		found = append(found, note)
 	}
 	for _, note := range sources.LoadPromotedNotes() {
 		if !want[note.Session] {
@@ -503,14 +501,50 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 			keep(noteFromMeta(note))
 		}
 	}
-	text := strings.TrimSpace(best.Text)
-	if text == "" {
-		text = strings.TrimSpace(best.Title)
+	return decisionLineOf(found, toolHookDecisionBudget)
+}
+
+// decisionLineOf words what this file or command has standing, newest first.
+//
+// Two, when they fit. A file often has a broad rule and a narrow exception, and
+// the exception is newer almost by definition — it is an exception to something
+// — so showing only the newest handed the agent the half that reverses the
+// rule, with nothing to say the rule existed (#2524). When the second does not
+// fit, the line says one was left out rather than leaving the narrower half
+// standing alone.
+func decisionLineOf(notes []sources.PromotedNote, budget int) string {
+	sort.SliceStable(notes, func(i, j int) bool { return notes[i].At.After(notes[j].At) })
+	var lines []string
+	seen := map[string]bool{}
+	for _, note := range notes {
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			text = strings.TrimSpace(note.Title)
+		}
+		if text == "" {
+			continue
+		}
+		text = trimTrailingFragment(search.SafeText(clipDecision(text, budget)))
+		if text == "" || seen[strings.ToLower(text)] {
+			continue
+		}
+		seen[strings.ToLower(text)] = true
+		lines = append(lines, text)
 	}
-	if text == "" {
+	if len(lines) == 0 {
 		return ""
 	}
-	return trimTrailingFragment(search.SafeText(clipDecision(text, toolHookDecisionBudget)))
+	out := lines[0]
+	rest := len(lines) - 1
+	if rest > 0 {
+		if joined := out + "; also: " + lines[1]; len(joined) <= budget {
+			out, rest = joined, rest-1
+		}
+	}
+	if rest > 0 {
+		out += fmt.Sprintf(" (+%d more standing here)", rest)
+	}
+	return out
 }
 
 // noteFromMeta reads the decision a session carries as a promoted note, so the
