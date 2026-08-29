@@ -49,6 +49,40 @@ type howEntry struct {
 	Runs     int
 	Sessions map[string]bool
 	Last     time.Time
+	// Outcomes is the number of runs a source recorded an exit status for —
+	// on a real store about one in a hundred — and Failures how many of those
+	// were not zero. Both, because "every run failed" is only true when deja
+	// knows what every run did.
+	Outcomes  int
+	Failures  int
+	ExitCode  int
+	MixedExit bool
+}
+
+// failedEveryTime reports whether deja knows the outcome of every run of this
+// command and every one of them failed. A command that sometimes fails is
+// ordinary; a command deja has no outcome for is most of the store.
+func (e howEntry) failedEveryTime() bool {
+	return e.Outcomes > 0 && e.Outcomes == e.Runs && e.Failures == e.Outcomes
+}
+
+// failureNote is what the count line says about a command that never once
+// worked here. `how` answers "how do I run this here", so offering such a
+// command in the shape of one that has always worked is the sharpest miss the
+// screen can make (#2624). It is not a ranking signal: one command record in a
+// hundred carries an outcome at all, so ordering on it would be arbitrary.
+func (e howEntry) failureNote() string {
+	if !e.failedEveryTime() {
+		return ""
+	}
+	what := "every run recorded here failed"
+	if e.Runs == 1 {
+		what = "the one run recorded here failed"
+	}
+	if e.MixedExit {
+		return " · " + what
+	}
+	return fmt.Sprintf(" · %s (exit %d)", what, e.ExitCode)
 }
 
 func runHow(dir string, args []string, stdout io.Writer) error {
@@ -116,8 +150,8 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			when = " · last " + e.Last.Local().Format("2006-01-02")
 		}
 		fmt.Fprintf(stdout, "%s\n", search.SafeCommand(e.Command))
-		fmt.Fprintf(stdout, "  ran %s in %s%s\n",
-			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
+		fmt.Fprintf(stdout, "  ran %s in %s%s%s\n",
+			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when, e.failureNote())
 	}
 	// The cap said nothing, so eight of thirteen ways to run the tests read as
 	// thirteen — the misread the search screen already avoids (#1632). On
@@ -156,7 +190,8 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		// Without the outcome codex and opencode append: "$ make test  → exit
 		// 2" is the same command as "$ make test", and counting them apart put
 		// one command on two rows of this screen (#2590).
-		cmd := index.CommandWithoutExitStatus(strings.TrimSpace(firstCommandLine(r.Text)))
+		line := strings.TrimSpace(firstCommandLine(r.Text))
+		cmd := index.CommandWithoutExitStatus(line)
 		if cmd == "" || len(cmd) > howCommandMax {
 			return
 		}
@@ -172,6 +207,16 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 			byCmd[low] = e
 		}
 		e.Runs++
+		if code, ok := index.CommandExitStatus(line); ok {
+			e.Outcomes++
+			if code != 0 {
+				if e.Failures > 0 && code != e.ExitCode {
+					e.MixedExit = true
+				}
+				e.ExitCode = code
+				e.Failures++
+			}
+		}
 		e.Sessions[r.Key] = true
 		if r.Time.After(e.Last) {
 			e.Last = r.Time

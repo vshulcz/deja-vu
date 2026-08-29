@@ -472,7 +472,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if !e.Last.IsZero() {
 				when = ", last " + e.Last.Local().Format("2006-01-02")
 			}
-			fmt.Fprintf(&hb, "%s\n  ran %s in %s%s\n", commandListingLine(e.Command), pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when)
+			// The same note the CLI prints: the agent reading this is the
+			// one most likely to run the command back without looking.
+			fmt.Fprintf(&hb, "%s\n  ran %s in %s%s%s\n", commandListingLine(e.Command), pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when, e.failureNote())
 		}
 		return strings.TrimRight(hb.String(), "\n"), nil
 	case "remember":
