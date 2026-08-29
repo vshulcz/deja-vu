@@ -2447,26 +2447,51 @@ func IgnoredWithAllTerms(dir string, terms []string) int {
 	if len(terms) == 0 {
 		return 0
 	}
-	keys := make([]string, 0, len(terms))
-	for _, t := range terms {
-		keys = append(keys, "t"+t)
-	}
-	posts, err := intersectPostings(dir, keys)
-	if err != nil || len(posts) == 0 {
-		return 0
-	}
 	servable := servableSids(dir)
 	if servable == nil {
 		return 0
 	}
-	seen := map[uint32]bool{}
-	for _, p := range posts {
-		if servable[p.Sid] || seen[p.Sid] {
-			continue
+	// Each term matches any of its forms, the way the tiers match. Counting the
+	// exact spelling alone left the line silent for a reader who typed "pool"
+	// while the withheld session wrote "pools" — the moment it is most needed,
+	// since search then serves nothing and the rule is why (#2573).
+	forms := OtherWordForms(dir, terms)
+	var per []map[uint32]bool
+	for _, term := range terms {
+		hit := map[uint32]bool{}
+		for _, form := range append([]string{term}, forms[term]...) {
+			posts, err := postingsFor(dir, "t"+form)
+			if err != nil {
+				continue
+			}
+			for _, p := range posts {
+				if !servable[p.Sid] {
+					hit[p.Sid] = true
+				}
+			}
 		}
-		seen[p.Sid] = true
+		if len(hit) == 0 {
+			return 0
+		}
+		per = append(per, hit)
 	}
-	return len(seen)
+	if len(per) == 0 {
+		return 0
+	}
+	n := 0
+	for sid := range per[0] {
+		all := true
+		for _, hit := range per[1:] {
+			if !hit[sid] {
+				all = false
+				break
+			}
+		}
+		if all {
+			n++
+		}
+	}
+	return n
 }
 
 func intersectPostings(dir string, keys []string) ([]posting, error) {
