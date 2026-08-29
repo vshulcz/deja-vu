@@ -365,10 +365,13 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 		return ""
 	}
 	want := make(map[string]bool, len(metas))
+	noteKeys := make(map[string]bool, len(metas))
 	for _, meta := range metas {
 		want[meta.Harness+":"+meta.ID] = true
+		noteKeys["deja-note-"+meta.Harness+"-"+meta.ID] = true
 		if meta.OrigID != "" {
 			want[meta.Harness+":"+meta.OrigID] = true
+			noteKeys["deja-note-"+meta.Harness+"-"+meta.OrigID] = true
 		}
 	}
 	// The note's own project as well as the session it came from. The metas
@@ -377,15 +380,49 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 	// and every other reader of these notes checks it (#2506).
 	pol := policy.Load()
 	var best sources.PromotedNote
-	for _, note := range sources.LoadPromotedNotes() {
-		if note.State != "accepted" || !want[note.Session] {
-			continue
+	keep := func(note sources.PromotedNote) {
+		if note.State != "accepted" {
+			return
 		}
 		if note.Project != "" && !pol.Allows(policy.ActivationAuto, note.Project) {
+			return
+		}
+		if best.At.IsZero() || note.At.After(best.At) {
+			best = note
+		}
+	}
+	for _, note := range sources.LoadPromotedNotes() {
+		if !want[note.Session] {
 			continue
 		}
-		if best.Session == "" || note.At.After(best.At) {
-			best = note
+		keep(note)
+	}
+	// And the decisions that arrived by sync. Those are not in this machine's
+	// notes file at all — a promotion crosses as a session of its own, carrying
+	// the state, which is how the view page reads them (#2421). It touched no
+	// file, so it is never among the sessions this file has; what ties it back
+	// is the id a note is built from, `deja-note-<harness>-<id>`, derived here
+	// from the session rather than parsed out of the note (harness names carry
+	// dashes, so the id does not invert). Without this a decision promoted on
+	// one machine was a decision in search on the other and filler prose at the
+	// moment of the edit (#2510).
+	for _, meta := range metas {
+		if meta.Lifecycle != "" {
+			keep(noteFromMeta(meta))
+		}
+	}
+	if len(noteKeys) > 0 {
+		for _, note := range index.PromotedNoteMetas(index.DefaultDir(), func(project string) bool {
+			return pol.Allows(policy.ActivationAuto, project)
+		}) {
+			id := note.OrigID
+			if id == "" {
+				id = note.ID
+			}
+			if !noteKeys[id] {
+				continue
+			}
+			keep(noteFromMeta(note))
 		}
 	}
 	text := strings.TrimSpace(best.Text)
@@ -396,6 +433,21 @@ func promotedDecisionFor(metas []index.SessionMeta) string {
 		return ""
 	}
 	return trimTrailingFragment(search.SafeText(clipDecision(text, toolHookDecisionBudget)))
+}
+
+// noteFromMeta reads the decision a session carries as a promoted note, so the
+// two sources — this machine's notes file and what arrived by sync — can be
+// weighed against each other by one rule.
+func noteFromMeta(meta index.SessionMeta) sources.PromotedNote {
+	when := meta.Updated
+	if t, err := time.Parse(time.RFC3339, meta.LifecycleAt); err == nil {
+		when = t
+	}
+	text := meta.LifecycleNote
+	if strings.TrimSpace(text) == "" {
+		text = meta.Title
+	}
+	return sources.PromotedNote{Project: meta.Project, State: meta.Lifecycle, Title: meta.Title, Text: text, At: when}
 }
 
 // clipDecision keeps a promoted note inside the same budget a scanned
