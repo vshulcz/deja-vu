@@ -29,7 +29,10 @@ func TestThePageCarriesTheNewestNotesAndSaysSo(t *testing.T) {
 			"kind": "promoted", "session": fmt.Sprintf("claude:s%04d", i),
 			"state": "accepted", "project": "app",
 			"title": fmt.Sprintf("decision %04d", i),
-			"text":  fmt.Sprintf("body-marker-%04d ", i) + body,
+			// The marker sits below the first line, which is the note's own
+			// display row and is on the page for every session (#2539); the
+			// bound this measures is the one on the body.
+			"text": fmt.Sprintf("decision %04d\nbody-marker-%04d ", i, i) + body,
 		})
 		if err != nil {
 			t.Fatal(err)

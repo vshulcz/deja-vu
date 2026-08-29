@@ -303,6 +303,15 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 				s = &model.Session{ID: PromotedNoteID(src), Harness: "deja", Project: project, Path: path}
 				byDay[key] = s
 			}
+			// The display line is the decision, not the question it answers.
+			// `promote` borrows the session's opening line as the title, so
+			// `deja last` showed "should the retry budget go up to 10?
+			// [accepted]" for a note that says it stays at 5 — the inverse of
+			// what was decided (#2539). The borrowed title is the fallback for
+			// a note whose text is gone, and it is also what `forget` clears.
+			if line := firstNoteLine(text); line != "" {
+				title = line
+			}
 			if title == "" {
 				title = "promoted from " + src
 			}
@@ -833,4 +842,13 @@ func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error)
 		return 0, err
 	}
 	return changed, nil
+}
+
+// firstNoteLine is the one line of a note that stands for it in a listing. A
+// note is written by hand and can run to paragraphs; every one-line surface
+// clips it for its own layout, and the clip should not be the first thing that
+// notices a newline.
+func firstNoteLine(text string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+	return strings.TrimSpace(line)
 }
