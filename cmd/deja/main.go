@@ -922,6 +922,12 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
 		fmt.Fprintln(os.Stderr, note)
 	}
+	// And the other rule that withholds rows here. It filters inside the index
+	// (#2541), so the count comes from the manifest rather than from what came
+	// back — the same walk the listing has just done, over metas already read.
+	if note := ignoredHiddenNote(index.IgnoredMatching(dir, o)); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
 	if len(ss) == 0 {
 		if o.JSON {
 			return printRecentJSONWithheld(os.Stdout, nil, sourceInstance, policyHidden)
