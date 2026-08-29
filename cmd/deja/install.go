@@ -890,11 +890,14 @@ func mentionsDeja(b []byte) bool {
 	for _, marker := range []string{
 		"hook-prompt", "hook-context", "hook-tool", "hook-goose", "hook-plan",
 		"hook-precompact", "hook-antigravity", "deja:", "\"deja\"", "deja-recall",
-		// The two harnesses that do not write the word on its own: zed names
-		// the server, dsh opens a block. Without them their snapshots survived
-		// an uninstall carrying deja's whole entry, which is the one thing
-		// this test exists to prevent (#2575).
-		zedServerID, dshBlockStart,
+		// The harnesses that do not write the word on its own: zed names the
+		// server, dsh opens a block, codex and grok put the name in a TOML
+		// table header, and aider only points at deja's context file. Without
+		// them their snapshots survived an uninstall carrying deja's whole
+		// entry, which is the one thing this exists to prevent (#2575, #2578).
+		// TestEveryInstalledConfigIsRecognisableAsDejas installs every target
+		// and holds this list against what they actually write.
+		zedServerID, dshBlockStart, "[mcp_servers.deja]", "aider-context.md",
 	} {
 		if bytes.Contains(b, []byte(marker)) {
 			return true
