@@ -47,3 +47,17 @@ func TestFilesAndBlameSayWhatTheIgnoreRuleKeptOut(t *testing.T) {
 		})
 	}
 }
+
+// A miss under an active filter takes its own branch and never reaches
+// printNoMatches, so it says the line itself rather than losing it with the
+// guard that stopped the doubling (#2632).
+func TestSearchUnderAFilterStillNamesTheIgnoreRule(t *testing.T) {
+	ignoredTreeStore(t)
+	out, err := captureRunStderr(t, "--project", "keep", "widget pipeline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(out, "the ignore rule keeps"); n != 1 {
+		t.Fatalf("the line is printed %d times, want once:\n%s", n, out)
+	}
+}

@@ -1242,6 +1242,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 			fmt.Fprintf(os.Stderr, "deja: %q matched nothing under %s\n", o.Query, activeFilters(o, sinceRaw, harnessRaw))
 			fmt.Fprint(os.Stderr, emptyRoleNote(dir, o.Role))
 			fmt.Fprint(os.Stderr, olderThanWindow(dir, o.Since))
+			// This branch does not go through printNoMatches, which is where
+			// the line lives for the other miss, so it says it itself.
+			fmt.Fprint(os.Stderr, ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))))
 		default:
 			printNoMatches(os.Stderr, dir, o.Query, o.Regex)
 		}
