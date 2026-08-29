@@ -45,12 +45,19 @@ func policyHiddenNote(activation string, hidden int) string {
 // user-editable, and a broad pattern took rows off every screen with nothing
 // anywhere connecting the two (#2554).
 func ignoredHiddenNote(hidden int) string {
+	return ignoredHiddenNoteFor("listing", hidden)
+}
+
+// ignoredHiddenNoteWhere names the surface, because the same rule takes rows
+// out of an answer as well as out of a listing and the reader is looking at one
+// of them, not at both (#2562).
+func ignoredHiddenNoteFor(where string, hidden int) string {
 	if hidden <= 0 {
 		return ""
 	}
 	pats := policy.Load().IgnorePatterns()
-	return fmt.Sprintf("deja: the ignore rule keeps %d session%s out of this listing (%s) — see %s\n",
-		hidden, pluralS(hidden), strings.Join(pats, ", "), policy.Path())
+	return fmt.Sprintf("deja: the ignore rule keeps %d session%s out of this %s (%s) — see %s\n",
+		hidden, pluralS(hidden), where, strings.Join(pats, ", "), policy.Path())
 }
 
 // policyFilterBlame is policyFilterHits for blame results, which carry whole

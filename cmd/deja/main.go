@@ -1250,6 +1250,12 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 			fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
 		}
 	}
+	// The answer can also be short for a reason no flag lifts. Counted over the
+	// sessions holding every term, so an ordinary search in a store with a big
+	// ignored tree stays quiet (#2562).
+	if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
 	// The window this is being printed into, so the lines can be budgeted
 	// rather than assumed 80 wide. Only for a terminal: a pipe gets the whole
 	// line, since a script reading deja wants the text and not the layout
@@ -1482,6 +1488,12 @@ func printNoMatches(w io.Writer, dir, q string, regex bool) {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
 	} else {
 		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
+	}
+	// Before advising fewer words: the sessions that hold every one of them may
+	// exist and be covered by the ignore rule, in which case rewording is the
+	// wrong advice and the count is the answer (#2562).
+	if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(q))); note != "" {
+		fmt.Fprint(w, note)
 	}
 	// Which word to drop is the reader's next question, and deja read the
 	// per-term counts to decide there was no intersection (#826).

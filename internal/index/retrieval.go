@@ -2389,6 +2389,11 @@ func TermSessionCounts(dir string, terms []string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	// Counted over what search would serve. Postings hold every session, the
+	// answer holds none the ignore rule covers, and counting the two
+	// differently had deja say "no session has them together" about a phrase
+	// two withheld sessions carry word for word (#2562).
+	servable := servableSids(dir)
 	out := make(map[string]int, len(terms))
 	for _, t := range terms {
 		key := "t" + t
@@ -2403,11 +2408,65 @@ func TermSessionCounts(dir string, terms []string) map[string]int {
 		}
 		seen := map[uint32]bool{}
 		for _, p := range posts {
+			if servable != nil && !servable[p.Sid] {
+				continue
+			}
 			seen[p.Sid] = true
 		}
 		out[t] = len(seen)
 	}
 	return out
+}
+
+// servableSids is the set of session ordinals the ignore rule leaves in reach.
+// nil when the manifest cannot be read, which the callers treat as "count
+// everything" rather than "count nothing".
+func servableSids(dir string) map[uint32]bool {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	pol := policy.Load()
+	out := make(map[uint32]bool, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		if !pol.Ignored(meta.Path, meta.Project) {
+			out[meta.Ord] = true
+		}
+	}
+	return out
+}
+
+// IgnoredWithAllTerms counts the sessions that hold every one of these terms
+// and that the ignore rule keeps out of the answer. The listing says what the
+// rule withheld from it (#2554); a search that comes back short or empty owes
+// the reader the same sentence (#2562).
+func IgnoredWithAllTerms(dir string, terms []string) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if len(terms) == 0 {
+		return 0
+	}
+	keys := make([]string, 0, len(terms))
+	for _, t := range terms {
+		keys = append(keys, "t"+t)
+	}
+	posts, err := intersectPostings(dir, keys)
+	if err != nil || len(posts) == 0 {
+		return 0
+	}
+	servable := servableSids(dir)
+	if servable == nil {
+		return 0
+	}
+	seen := map[uint32]bool{}
+	for _, p := range posts {
+		if servable[p.Sid] || seen[p.Sid] {
+			continue
+		}
+		seen[p.Sid] = true
+	}
+	return len(seen)
 }
 
 func intersectPostings(dir string, keys []string) ([]posting, error) {
