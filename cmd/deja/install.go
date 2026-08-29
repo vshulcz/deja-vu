@@ -1042,7 +1042,16 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if removingWiring {
 		defer func() {
 			bak := path + ".bak"
-			if b, err := os.ReadFile(bak); err == nil && mentionsDeja(b) {
+			b, err := os.ReadFile(bak)
+			if err != nil {
+				return
+			}
+			// Only deja's own. A snapshot of the reader's config stays even
+			// when the live file has come back to exactly it: that copy is
+			// theirs, and TestUninstallLeavesNoFileOrDirItCreated has said so
+			// since #840 — "the user's own config and its snapshot are not
+			// ours to delete" (#2604).
+			if mentionsDeja(b) {
 				_ = os.Remove(bak)
 			}
 		}()
@@ -1122,9 +1131,18 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 		}
 		m = map[string]any{}
 		root["mcpServers"] = m
+		noteBlockAdded(path, "mcpServers")
 	}
 	if uninstall {
 		delete(m, "deja")
+		// And the block itself, when deja is what put it there: a config the
+		// reader owned came back with an empty `mcpServers` they never wrote,
+		// while the copy install promised sat beside it holding the real thing
+		// (#2604). A block they wrote stays, empty or not.
+		if len(m) == 0 && blockWasAdded(path, "mcpServers") {
+			delete(root, "mcpServers")
+			forgetBlockAdded(path, "mcpServers")
+		}
 	} else {
 		m["deja"], note = mergeDejaEntry(m["deja"], mcpServerEntry(exe))
 	}
@@ -1687,9 +1705,15 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 		}
 		m = map[string]any{}
 		root["mcpServers"] = m
+		noteBlockAdded(path, "mcpServers")
 	}
 	if uninstall {
 		delete(m, "deja")
+		// And the block, when deja is what put it there (#2604).
+		if len(m) == 0 && blockWasAdded(path, "mcpServers") {
+			delete(root, "mcpServers")
+			forgetBlockAdded(path, "mcpServers")
+		}
 	} else {
 		command, args := mcpCommandArgs(exe)
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}})
@@ -1736,9 +1760,17 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	if servers == nil {
 		servers = map[string]any{}
 		mcp["servers"] = servers
+		noteBlockAdded(path, "mcp.servers")
 	}
 	if uninstall {
 		delete(servers, "deja")
+		if len(servers) == 0 && blockWasAdded(path, "mcp.servers") {
+			delete(mcp, "servers")
+			if len(mcp) == 0 {
+				delete(root, "mcp")
+			}
+			forgetBlockAdded(path, "mcp.servers")
+		}
 	} else {
 		command, args := mcpCommandArgs(exe)
 		servers["deja"], note = mergeDejaEntry(servers["deja"], map[string]any{"command": command, "args": args})
@@ -1778,9 +1810,15 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 		}
 		m = map[string]any{}
 		root["mcpServers"] = m
+		noteBlockAdded(path, "mcpServers")
 	}
 	if uninstall {
 		delete(m, "deja")
+		// And the block, when deja is what put it there (#2604).
+		if len(m) == 0 && blockWasAdded(path, "mcpServers") {
+			delete(root, "mcpServers")
+			forgetBlockAdded(path, "mcpServers")
+		}
 	} else {
 		command, args := mcpCommandArgs(exe)
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"command": command, "args": args})
