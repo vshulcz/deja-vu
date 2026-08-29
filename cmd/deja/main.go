@@ -516,8 +516,46 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		fmt.Fprintln(os.Stderr, note)
 	}
 	printSpawnEdges(os.Stderr, dir, s)
+	// A pasted log is one message, and the index keeps the head of it. The
+	// window note above says when messages were left out; nothing said when a
+	// message was, so a reader searching a log for the line that explains a
+	// failure searched one they believed was whole (#2467).
+	if line := clippedMessageNote(dir, s); line != "" {
+		fmt.Fprintln(os.Stderr, line)
+	}
 	search.PrintSession(os.Stdout, s)
 	return nil
+}
+
+// clippedMessageNote says that a message in this session was stored short of
+// what the transcript holds. The count is the store's, not this session's —
+// deja records it per file at ingest — so the line names the session's own
+// file and leaves the arithmetic to `deja doctor`.
+func clippedMessageNote(dir string, s model.Session) string {
+	if s.Path == "" {
+		return ""
+	}
+	files := index.IngestFilesReport(dir)
+	e, ok := files[s.Path]
+	if !ok || e.Clipped == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja: %s stored short of what the transcript holds — the rest of %s is in the file itself",
+		pluralMessages(e.Clipped), pluralThem(e.Clipped))
+}
+
+func pluralMessages(n int) string {
+	if n == 1 {
+		return "one message was"
+	}
+	return fmt.Sprintf("%d messages were", n)
+}
+
+func pluralThem(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
 }
 
 // showWindowNote is what the terminal says about a slice: which messages it
