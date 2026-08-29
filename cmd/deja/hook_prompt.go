@@ -448,12 +448,22 @@ func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool 
 // matchedFingerprint is the session's matching lines, normalised, hashed. Empty
 // when nothing matched, which is not a duplicate of anything.
 func matchedFingerprint(s model.Session, terms []string) string {
+	// Lines that carry the question, not lines that brush it. A session says
+	// the thing once and talks around it for the rest, and the talk differs
+	// session to session — so hashing every line that held any query word gave
+	// two sessions that settled the same thing two fingerprints, and the block
+	// spent both its slots saying it twice. A line holding one ordinary word of
+	// the question is that talk.
 	var b strings.Builder
 	for _, m := range s.Messages {
+		line := strings.Join(strings.Fields(strings.ToLower(m.Text)), " ")
+		if search.TermHitsLowered(line, terms) < fingerprintTermsPerLine {
+			continue
+		}
 		if !search.SpeechCarriesAnyTerm(model.Session{Messages: []model.Message{m}}, terms) {
 			continue
 		}
-		b.WriteString(strings.Join(strings.Fields(strings.ToLower(m.Text)), " "))
+		b.WriteString(line)
 		b.WriteByte('\n')
 	}
 	if b.Len() == 0 {
@@ -461,6 +471,10 @@ func matchedFingerprint(s model.Session, terms []string) string {
 	}
 	return blockFingerprint(b.String())
 }
+
+// fingerprintTermsPerLine is how much of the question a line has to carry
+// before it counts toward what a session is saying.
+const fingerprintTermsPerLine = 2
 
 // leadTermsKept is how many of the question's identifying words a session may
 // be judged on. Three rather than one: the gate exists to reject a session
