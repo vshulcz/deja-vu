@@ -152,6 +152,9 @@ var commands = map[string]command{
 	"forget":        runForget,
 	"mcp":           func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
 	"hook-prompt": func(dir string, rest []string) error {
+		if sayIfTypedByHand("hook-prompt") {
+			return nil
+		}
 		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
 		return runHookPromptMode(dir, os.Stdin, os.Stdout, plain)
 	},
@@ -159,12 +162,21 @@ var commands = map[string]command{
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},
 	"hook-plan": func(dir string, _ []string) error {
+		if sayIfTypedByHand("hook-plan") {
+			return nil
+		}
 		return runHookPlan(dir, os.Stdin, os.Stdout)
 	},
 	"hook-tool": func(dir string, _ []string) error {
+		if sayIfTypedByHand("hook-tool") {
+			return nil
+		}
 		return runHookTool(dir, os.Stdin, os.Stdout)
 	},
 	"hook-tool-after": func(dir string, _ []string) error {
+		if sayIfTypedByHand("hook-tool-after") {
+			return nil
+		}
 		return runHookToolAfter(dir, os.Stdin, os.Stdout)
 	},
 	"check": func(dir string, rest []string) error {
