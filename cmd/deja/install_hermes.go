@@ -159,6 +159,16 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 				next += "\n"
 			}
 			next += "\nmcp_servers:\n" + entry
+			noteBlockAdded(path, "mcp_servers")
+		}
+	} else if blockWasAdded(path, "mcp_servers") {
+		// The container goes with the entry when deja is what put it there —
+		// a config the reader owned came back carrying an `mcp_servers:` they
+		// never wrote (#2606, the shape #2604 fixed for the JSON writers). One
+		// they wrote stays, with or without entries under it.
+		if trimmed := dropEmptyYAMLKey(next, "mcp_servers:"); trimmed != next {
+			next = trimmed
+			forgetBlockAdded(path, "mcp_servers")
 		}
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))

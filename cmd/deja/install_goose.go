@@ -121,6 +121,7 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
+	next = keepTrailingNewline(string(old), next)
 	if crlf {
 		next = strings.ReplaceAll(next, "\n", "\r\n")
 	}
