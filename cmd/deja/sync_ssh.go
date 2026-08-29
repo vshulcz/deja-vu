@@ -203,10 +203,17 @@ func syncSSHPush(dir, host string, full bool) error {
 	if err != nil {
 		return err
 	}
-	scpArgs := append(append(sshOpts(), "-q"), batches...)
-	scpArgs = append(scpArgs, host+":"+rtmp+"/")
-	if out, err := sshRunner("scp", scpArgs...); err != nil {
-		return fmt.Errorf("scp: %v: %s", err, remoteOutputForEcho(out))
+	// One scp per batch of paths, not one for all of them. Export writes a file
+	// per source transcript, so a machine with tens of thousands of records
+	// hands scp thousands of paths — and Windows refuses a command line over
+	// 32,767 characters with "The filename or extension is too long", after the
+	// export has already run (#2002).
+	for _, chunk := range scpChunks(batches, sshArgsBudget(sshOpts(), host, rtmp)) {
+		scpArgs := append(append(sshOpts(), "-q"), chunk...)
+		scpArgs = append(scpArgs, host+":"+rtmp+"/")
+		if out, err := sshRunner("scp", scpArgs...); err != nil {
+			return fmt.Errorf("scp: %v: %s", err, remoteOutputForEcho(out))
+		}
 	}
 	remote := fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" sync import %s; rc=$?; rm -rf %s; exit $rc`,
 		shellQuote(rtmp), shellQuote(rtmp))
@@ -331,3 +338,49 @@ func sshCountLine(verb string, n int) string {
 }
 
 func sshExportedLine(n int) string { return sshCountLine("exported", n) }
+
+// scpCommandLineMax is the bound a single scp invocation's paths must stay
+// under. Windows refuses a command line over 32,767 characters outright; the
+// margin below it leaves room for the flags, the destination, and the quoting
+// the shim adds. Unix allows far more, and one bound for both keeps the
+// batching identical everywhere — the failure this exists for was reported
+// after an export had already finished, which is the worst moment to find out.
+const scpCommandLineMax = 24000
+
+// sshArgsBudget is what is left for paths once the fixed part of the command
+// line is counted.
+func sshArgsBudget(opts []string, host, rtmp string) int {
+	fixed := len("scp") + len(" -q ") + len(host) + len(rtmp) + 4
+	for _, o := range opts {
+		fixed += len(o) + 1
+	}
+	budget := scpCommandLineMax - fixed
+	if budget < 512 {
+		// A pathological set of options should still move one file at a time
+		// rather than produce an empty chunk and loop forever.
+		budget = 512
+	}
+	return budget
+}
+
+// scpChunks splits paths into groups whose command line stays inside budget.
+// A single path longer than the budget still gets its own chunk: refusing to
+// send it would be worse than letting the platform complain about that one.
+func scpChunks(paths []string, budget int) [][]string {
+	var out [][]string
+	var cur []string
+	n := 0
+	for _, p := range paths {
+		cost := len(p) + 1
+		if len(cur) > 0 && n+cost > budget {
+			out = append(out, cur)
+			cur, n = nil, 0
+		}
+		cur = append(cur, p)
+		n += cost
+	}
+	if len(cur) > 0 {
+		out = append(out, cur)
+	}
+	return out
+}
