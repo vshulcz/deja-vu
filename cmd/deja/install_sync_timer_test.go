@@ -134,9 +134,13 @@ func TestSyncTimerUnitsSurviveAnAwkwardPath(t *testing.T) {
 		}
 		// systemd takes the first whitespace-delimited word as the binary
 		// unless it is quoted, so an unquoted path with a space runs the
-		// wrong thing — or nothing.
-		if !strings.Contains(line, `"`+exe+`"`) {
+		// wrong thing — or nothing. Quoted, and with the quotes inside the
+		// path escaped, or the string ends early (#2621).
+		if !strings.Contains(line, `"`+systemdEscape(exe)+`"`) {
 			t.Errorf("ExecStart does not quote the path: %s", line)
+		}
+		if strings.Contains(line, `/Users/John & "Jane" Smith/`) {
+			t.Errorf("ExecStart carries the quotes unescaped: %s", line)
 		}
 	}
 }
