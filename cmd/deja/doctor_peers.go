@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +25,7 @@ import (
 func doctorPeers(w io.Writer, dir string, now time.Time) {
 	list, why := peers.Snapshot()
 	fmt.Fprintln(w, "Sync:")
+	doctorSyncTimer(w)
 	if why != "" {
 		// Load treats a malformed file as "no peers" so a sync cannot be
 		// stopped by one, and says doctor is where that surfaces. Without this
@@ -264,3 +268,39 @@ func importedFromLine(from map[string]int) string {
 // doctorImportedNames bounds how many machine names the line carries; the rest
 // are counted rather than listed.
 const doctorImportedNames = 4
+
+// doctorSyncTimer reports the schedule that runs the sync.
+//
+// The section above exists because a sync that stops does not announce itself,
+// and the thing that runs it was the one piece of wiring with no row anywhere:
+// `install --all` writes a launchd plist or a systemd unit and nothing
+// afterwards looked at it. The failure worth catching is not exotic — deja is
+// upgraded or moved, the file keeps naming the old path, and the hourly sync
+// stops (#2636).
+func doctorSyncTimer(w io.Writer) {
+	if !syncTimerSchedulable(runtime.GOOS) {
+		return
+	}
+	exe, scheduled := syncTimerBinary(runtime.GOOS)
+	if !scheduled {
+		fmt.Fprintf(w, "  %-12s not scheduled — `deja install sync-timer` runs `deja sync` every %d min\n",
+			"timer", syncAutoInterval/60)
+		return
+	}
+	if exe != "" {
+		if _, err := os.Stat(exe); err != nil {
+			fmt.Fprintf(w, "  %-12s scheduled, but %s is no longer there — run `deja install sync-timer` again\n",
+				"timer", exe)
+			return
+		}
+	}
+	fmt.Fprintf(w, "  %-12s every %d min · %s\n", "timer", syncAutoInterval/60, syncTimerPath(runtime.GOOS))
+}
+
+// syncTimerPath names the file the reader would open to check for themselves.
+func syncTimerPath(goos string) string {
+	if goos == "linux" {
+		return filepath.Join(syncAutoUnitDir(), "deja-sync.timer")
+	}
+	return syncAutoPlistPath()
+}
