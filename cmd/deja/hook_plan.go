@@ -144,16 +144,21 @@ func planFindings(dir, plan, sessionID string) []string {
 		if line == "" {
 			continue
 		}
-		// What this machine ran after that error, when the census found no
-		// command of its own. The plan hook speaks before the agent walks into
-		// the wall, which is the best moment deja has, and it named the wall
-		// and stopped — while `deja fix` answered the same error with the way
-		// past it. Same source, same activation the walls above are filtered
-		// by, and only a confirmed pair (#2458).
-		if match.Command == "" {
-			if fix := planRemedy(dir, match.Wall.Text); fix != "" {
-				line += fmt.Sprintf("; what followed it: %s", strconv.Quote(neutralPlanEvidence(fix)))
-			}
+		// What this machine ran after that error. The plan hook speaks before
+		// the agent walks into the wall, which is the best moment deja has,
+		// and it named the wall and stopped — while `deja fix` answered the
+		// same error with the way past it. Same source, same activation the
+		// walls above are filtered by, and only a confirmed pair (#2458).
+		//
+		// Beside the census command, not instead of it. The two are different
+		// claims — one is what the plan's own step matched in those sessions,
+		// which is usually the command about to be run again; the other is
+		// what followed the error. Withholding the second whenever the first
+		// was found meant the closer the plan came to repeating the failure,
+		// the less deja said (#2485).
+		if fix := planRemedy(dir, match.Wall.Text); fix != "" &&
+			!strings.EqualFold(strings.TrimSpace(fix), strings.TrimSpace(strings.TrimPrefix(match.Command, "$ "))) {
+			line += fmt.Sprintf("; what followed it: %s", strconv.Quote(neutralPlanEvidence(fix)))
 		}
 		findings = append(findings, planFinding{
 			line:     line,
