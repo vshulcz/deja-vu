@@ -419,6 +419,14 @@ type SearchResult struct {
 	// inside retrieval, so a caller counting Sessions is measuring the
 	// window rather than the match. Zero Total means the tier reports no
 	// figure of its own and the caller's count stands.
+	//
+	// "Matched" means different things per tier, and the number a reader sees
+	// in "showing 33 of 414" is this one. Measured on a 1,365-session store,
+	// for "what did we decide about the retry budget": 2 sessions hold every
+	// term, 819 hold at least one, and 414 cleared the relevance tier's own
+	// bar — so Total counts what the tier was willing to rank, which is why
+	// the line above it says the answer is ranked by relevance rather than
+	// matched (#2612).
 	Total  int
 	Capped bool
 	// TermIDF is what the relevance ranking judged each query term to be worth.
