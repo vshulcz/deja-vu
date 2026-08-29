@@ -580,6 +580,10 @@ func Short(s string) string {
 // sessions, where 95% of the transcript is status chatter around a few
 // sentences that actually explain what happened and why.
 var decisionMarkers = []string{
+	// "decision:" with the colon, which is how an agent labels one when it is
+	// writing for a reader rather than talking: the bare word is ordinary
+	// ("that decision is yours"), the labelled one is the line itself (#2526).
+	"decision:", "решение:",
 	"root cause", "because", "the fix", "fixed", "decided", "instead of",
 	"turned out", "the problem was", "solution", "so the answer", "conclusion",
 	"works now", "passes now", "merged", "released", "chose", "won't work",
