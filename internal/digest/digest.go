@@ -267,6 +267,10 @@ func looksLikeDataDump(t string) bool {
 // it carries the paragraph break with it.
 const cutMarker = "…\n\n"
 
+// cutMark is the marker without its trailing blank line, for a caller checking
+// how a block ended.
+const cutMark = "…"
+
 // cutMarked trims a passage to n bytes and says that it was cut. A block handed
 // to a person or an agent that simply stops reads as a finished thought, and the
 // end of a message is where a session says it changed its mind — the same defect
@@ -460,6 +464,27 @@ func Handoff(s model.Session, budget int) string {
 	// Drop the share header line; the framing above replaces it.
 	if i := strings.Index(body, "\n"); i > 0 && strings.HasPrefix(body, "# deja share:") {
 		body = strings.TrimSpace(body[i:])
+	}
+	// The marker says the passage before it was cut and that the block ends
+	// there — that is the rule Share and the tail each keep on their own. The
+	// handoff composes them, and put a whole section, four messages and a
+	// closing paragraph after it, so the marker stopped meaning anything
+	// (#2464). Ending the body at the last thing said in full costs the
+	// fragment and keeps the promise; what the block loses, its closing
+	// sentence already says how to fetch.
+	if trimmed := strings.TrimRight(body, " \t\n"); strings.HasSuffix(trimmed, cutMark) {
+		// Back to the last thing said in full. Only a marker Share itself
+		// wrote is treated as one, and it is always the last thing in the
+		// body — searching for the character anywhere would cut the block at
+		// an ellipsis somebody typed.
+		body = strings.TrimRight(trimmed[:len(trimmed)-len(cutMark)], " \t\n")
+		if i := strings.LastIndex(body, "\n\n"); i >= 0 {
+			body = strings.TrimRight(body[:i], " \t\n")
+		}
+		// A section header with nothing left under it says less than nothing.
+		if i := strings.LastIndex(body, "\n\n## "); i >= 0 && !strings.Contains(body[i+4:], "\n\n") {
+			body = strings.TrimRight(body[:i], " \t\n")
+		}
 	}
 	b.WriteString(body)
 	if tail := tailSection(s, budget-b.Len()); tail != "" {
