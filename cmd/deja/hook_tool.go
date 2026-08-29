@@ -391,8 +391,24 @@ func fileHookLine(dir, cwd, path string) string {
 	// it: a line that said "deja blame X has the history" drove no reuse, while
 	// the same moment carrying the prior decision did. So surface the decision
 	// here, and fall back to the pointer only when none can be extracted.
-	if d := fileDecisionLine(dir, inScope); d != "" {
+	// Named for what it is. A promoted note is the user's own decision; a line
+	// the conclusion scan found is the last thing a session said about the
+	// file, which is often "changed the renderer (5)". The line was built on a
+	// measurement — an agent follows a decision where it ignores a pointer —
+	// and calling filler a decision spends exactly that credibility (#2526).
+	// The command line has said the weaker "last time:" all along.
+	if d := promotedDecisionFor(inScope); d != "" {
 		return head + " — prior decision: " + d
+	}
+	if d := fileDecisionLine(dir, inScope); d != "" {
+		// A scanned line is called a decision only when it reads as one. The
+		// scan's own fallback is the newest session's closing sentence, which
+		// is as often "changed the renderer (5)" as it is a decision, and the
+		// same marker list the digest uses can tell them apart.
+		if digest.CarriesDecision(d) {
+			return head + " — prior decision: " + d
+		}
+		return head + " — last session on it ended: " + d
 	}
 	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, name)
 }
