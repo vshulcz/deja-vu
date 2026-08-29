@@ -1647,7 +1647,11 @@ func topTouchedFiles(ms []model.Message) []string {
 // session as records rather than messages. Imported sessions used to carry no
 // Touched, so `deja blame` — which reads it — could not attribute a peer's
 // edits even though `search --role files` surfaced the same records.
-func touchedFromRecords(recs []Record) []string {
+// touchedFromRecords derives the touched-file ranking and the counts behind it.
+// The counts were computed here and thrown away, so an imported session carried
+// a ranking nothing could merge — the shape #1333 fixed for local ingest, still
+// standing for peers (#2558).
+func touchedFromRecords(recs []Record) ([]string, []int) {
 	count := map[string]int{}
 	for _, r := range recs {
 		if r.Role != roleFiles {
@@ -1655,7 +1659,7 @@ func touchedFromRecords(recs []Record) []string {
 		}
 		countTouchedPaths(count, r.Text)
 	}
-	return rankTouched(count)
+	return rankTouchedCounted(count)
 }
 
 // countTouchedPaths tallies the file paths in one `files` record's text, one
