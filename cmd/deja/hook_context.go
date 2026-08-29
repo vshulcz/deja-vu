@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -604,7 +605,25 @@ func hookGate() string {
 	// The shape of the entry is part of what it was built under: one written
 	// before the digest recorded its projects would be served for its whole
 	// TTL and logged as a digest that came from nowhere (#2349).
-	return "v2|" + mode + "|" + policy.Load().Describe(policy.ActivationAuto)
+	//
+	// And the notes file, because the block leads with the decisions promoted
+	// in this project. Without it a decision the reader had just removed with
+	// `deja forget` kept being handed to every session start until the TTL ran
+	// out — search agreed it was gone and the block went on quoting it, which
+	// is the one thing the privacy command must not do (#2537). A promotion
+	// made a moment ago has the same problem in reverse. Stat, not read.
+	return "v3|" + mode + "|" + policy.Load().Describe(policy.ActivationAuto) + "|" + notesStamp()
+}
+
+// notesStamp identifies the notes file as it is now. A file that cannot be
+// stat'd stamps as absent, which is itself a state worth telling apart from a
+// file with content in it.
+func notesStamp() string {
+	fi, err := os.Stat(sources.NotesFile())
+	if err != nil {
+		return "none"
+	}
+	return strconv.FormatInt(fi.Size(), 10) + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
 }
 
 // hookCWD is where the hook is standing: what the payload says, else the
