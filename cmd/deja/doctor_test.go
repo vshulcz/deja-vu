@@ -558,7 +558,15 @@ func TestDoctorCodexHookStates(t *testing.T) {
 	if !strings.Contains(out.String(), "codex-hook   missing") {
 		t.Fatalf("missing state wrong:\n%s", out.String())
 	}
-	if err := os.WriteFile(filepath.Join(codexHome, "hooks.json"), []byte(`{"hooks":{"SessionStart":[]}}`), 0o644); err != nil {
+	// Every event deja installs, so what this measures is the trust state and
+	// not whether the wiring is complete.
+	var entries []string
+	for _, h := range codexHookWiring {
+		entries = append(entries, `"`+h.Event+`":[{"matcher":"","hooks":[{"type":"command","command":"/x/deja `+
+			h.Sub+`"}]}]`)
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "hooks.json"),
+		[]byte(`{"hooks":{`+strings.Join(entries, ",")+`}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("[hooks.state.\"/x/hooks.json:session_start:0:0\"]\ntrusted_hash = \"sha256:aa\"\nenabled = false\n"), 0o644); err != nil {

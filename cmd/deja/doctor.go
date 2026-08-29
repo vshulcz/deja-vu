@@ -280,7 +280,28 @@ func doctorCodexHook(w io.Writer) {
 			status = "wired"
 		}
 	}
+	// Trusted is not the same as complete: the entry codex approved may be one
+	// written before the other events existed.
+	var missing []string
+	if status == "wired" {
+		var root map[string]any
+		if b, rerr := os.ReadFile(hooksPath); rerr == nil && json.Unmarshal(b, &root) == nil {
+			hooks, _ := root["hooks"].(map[string]any)
+			for _, h := range codexHookWiring {
+				if !hookEventWired(hooks, h.Event, h.Sub) {
+					missing = append(missing, h.Event)
+				}
+			}
+		}
+		if len(missing) > 0 {
+			status = "out of date"
+		}
+	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
+	if len(missing) > 0 {
+		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install`",
+			len(codexHookWiring)-len(missing), len(codexHookWiring), strings.Join(missing, ", "))
+	}
 	if status == "untrusted" {
 		line += "  (codex has not been shown it — open codex once and approve it, or run /hooks; until then `codex exec` runs no hook at all)"
 	}
