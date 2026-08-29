@@ -1264,6 +1264,11 @@ func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error)
 		}
 		out = append(out, sessionFromMeta(meta))
 	}
+	// This walk serves sessions without going through sessionsForMetas, so it
+	// is the one path #2070's rule never reached: `deja last` led with the
+	// background agents' own temp tree, 253 rows of 400 on a real store, while
+	// every ranked surface filtered it out (#2541).
+	out = ignoredByPolicy(out)
 	sort.Slice(out, func(i, j int) bool { return newestFirstSession(out[i], out[j]) })
 	if n > 0 && len(out) > n {
 		out = out[:n]
@@ -1308,6 +1313,7 @@ func RecentInProject(dir, project string, n int) ([]model.Session, error) {
 			metas = append(metas, meta)
 		}
 	}
+	metas = metasNotIgnored(metas)
 	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 	if n > 0 && len(metas) > n {
 		metas = metas[:n]
@@ -1342,6 +1348,7 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 			metas = append(metas, meta)
 		}
 	}
+	metas = metasNotIgnored(metas)
 	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 	if n > 0 && len(metas) > n {
 		metas = metas[:n]
@@ -1426,6 +1433,23 @@ func ignoredByPolicy(ss []model.Session) []model.Session {
 	return out
 }
 
+// metasNotIgnored is ignoredByPolicy one step earlier, on the metas a walk is
+// about to cut a window out of. sessionsForMetas filters what it loads, which
+// is right, but by then the window is chosen: three ignored sessions at the top
+// of a project left `handoff` and the session-start block with nothing while
+// three real ones sat below the cut (#2541).
+func metasNotIgnored(metas []SessionMeta) []SessionMeta {
+	pol := policy.Load()
+	out := metas[:0:0]
+	for _, meta := range metas {
+		if pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		out = append(out, meta)
+	}
+	return out
+}
+
 // sessionsForMetas loads full sessions for the given metas in ONE pass over
 // records.bin. The per-session variant re-scanned the whole log for every
 // session, which turned a session-start hook into hundreds of milliseconds.
@@ -1488,6 +1512,7 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 				mine = append(mine, meta)
 			}
 		}
+		mine = metasNotIgnored(mine)
 		sort.Slice(mine, func(i, j int) bool { return newestFirstMeta(mine[i], mine[j]) })
 		if perName > 0 && len(mine) > perName {
 			mine = mine[:perName]
