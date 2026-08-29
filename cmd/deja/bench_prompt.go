@@ -253,7 +253,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	if err != nil {
 		return promptReport{}, err
 	}
-	defer func() { _ = os.RemoveAll(root) }()
+	defer func() { releaseBenchTempDir(root) }()
 	claudeRoot := filepath.Join(root, "claude")
 	indexDir := filepath.Join(root, "index.db")
 	var sessions []model.Session

@@ -89,7 +89,7 @@ func measureContext(seed int64) (contextReport, error) {
 	if err != nil {
 		return contextReport{}, err
 	}
-	defer func() { _ = os.RemoveAll(root) }()
+	defer func() { releaseBenchTempDir(root) }()
 	claudeRoot := filepath.Join(root, "claude")
 	indexDir := filepath.Join(root, "index.db")
 	var sessions []model.Session
