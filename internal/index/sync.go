@@ -921,8 +921,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		// imported session carried no Touched, so `deja blame` — which reads
 		// Touched to find who edited a file — could not attribute a peer's edits
 		// even though `search --role files` surfaced the same records.
-		if t := touchedFromRecords(recsByKey[key]); len(t) > 0 {
-			meta.Touched = t
+		if t, hits := touchedFromRecords(recsByKey[key]); len(t) > 0 {
+			meta.Touched, meta.TouchHits = t, hits
 		}
 		// Same reason for the asked-twice signal: without meta.Asked an imported
 		// session can never contribute a repeat to the brief, so a question a
@@ -958,7 +958,7 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// on hardest (#1333). Six slots mean some earlier path does lose its
 			// place — to a path the session worked on more, which is what the field
 			// holds.
-			meta.Touched = mergeTouched(old.Touched, meta.Touched)
+			meta.Touched, meta.TouchHits = mergeTouchedCounted(old.Touched, old.TouchHits, meta.Touched, meta.TouchHits)
 			meta.Asked = mergeCappedU64(old.Asked, meta.Asked, askedQuestionCap)
 			meta.Hit = mergeCappedU64(old.Hit, meta.Hit, frictionSessionCap)
 			// Same reason: a reversal reported in an earlier batch is not in
