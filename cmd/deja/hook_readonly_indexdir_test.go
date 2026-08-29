@@ -12,8 +12,14 @@ import (
 // #1048's line hangs on `indexDirWritable`, which probed the index directory's
 // parent. A read-only index directory inside a writable parent — a cache
 // directory owned by another user, a read-only subtree — was therefore read as
-// writable, and the session start went out silent in the one state deja never
-// recovers from on its own (#2499).
+// writable, and the session start went out silent (#2499).
+//
+// What it must say there is not what it says for an unwritable parent: `deja
+// index` rebuilds this one, because the build writes beside the directory and
+// replaces it. The hook itself cannot start that rebuild — the sentinel it
+// would write lives inside the read-only directory — so recall stays quiet
+// until the command runs, which is what the statusline says for the same state
+// (#2502).
 func TestHookNamesAReadOnlyIndexDirInsideAWritableParent(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("directory permissions do not deny writes on Windows")
@@ -56,10 +62,10 @@ func TestHookNamesAReadOnlyIndexDirInsideAWritableParent(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &resp); err != nil {
 		t.Fatalf("hook output is not JSON: %q", out)
 	}
-	if !strings.Contains(resp.SystemMessage, "is not writable") {
-		t.Errorf("the hook did not name the directory that cannot be written: %q", resp.SystemMessage)
+	if !strings.Contains(resp.SystemMessage, "recall is quiet until `deja index` rebuilds it") {
+		t.Errorf("the hook does not say what this state is: %q", resp.SystemMessage)
 	}
-	if !strings.Contains(resp.SystemMessage, dir) {
-		t.Errorf("the hook named a directory that is not the one at fault: %q", resp.SystemMessage)
+	if strings.Contains(resp.SystemMessage, "is not writable") {
+		t.Errorf("the hook blames permissions where `deja index` rebuilds fine: %q", resp.SystemMessage)
 	}
 }
