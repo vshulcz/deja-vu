@@ -619,6 +619,15 @@ func Import(dir, inDir string) (int, error) {
 					titleAt[key] = sr.Time
 					titleRankOf[key] = rank
 				}
+			} else if meta.Title == "" && titleRank(sr.Role) > 0 {
+				// The same last resort ingest has: a session of nothing but
+				// harness plumbing arrives titleless and lists as a bare id
+				// here too. A real turn later in the stream replaces the
+				// stand-in, which is what the branch above does (#2548).
+				if t := strings.TrimSpace(text); t != "" {
+					meta.Title = harnessOutputTitle(t)
+					meta.AgentTitle = false
+				}
 			}
 			// A promoted note carries its state in the text: "[rejected] …".
 			// The states themselves live in the other machine's notes.jsonl,

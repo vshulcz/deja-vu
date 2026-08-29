@@ -64,7 +64,10 @@ func TestIncrementalTitleFallbackRedacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := m.Sessions["claude:s1"].Title; got != "" {
+	// The first pass has nothing but the slash command to go on, so the row
+	// carries the stand-in #2548 gave it rather than a bare id — and the real
+	// first turn, when it arrives, still replaces it.
+	if got := m.Sessions["claude:s1"].Title; !titlePlaceholder(got) {
 		t.Fatalf("precondition: the first pass already titled the session %q", got)
 	}
 	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -88,5 +91,8 @@ func TestIncrementalTitleFallbackRedacts(t *testing.T) {
 	}
 	if strings.Contains(title, "AKIAIOSFODNN7EXAMPLE") {
 		t.Fatalf("the incremental fallback stored an unredacted key: %q", title)
+	}
+	if titlePlaceholder(title) {
+		t.Fatalf("the stand-in outlived the turn that should have replaced it: %q", title)
 	}
 }
