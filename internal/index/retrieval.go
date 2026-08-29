@@ -1466,6 +1466,32 @@ func ignoredByPolicy(ss []model.Session) []model.Session {
 	return out
 }
 
+// IgnoredMatching counts the sessions a listing would have shown if the ignore
+// rule did not cover them. Every other rule that withholds rows in deja says
+// how many; this one dropped 253 of 400 on a real store and said nothing
+// (#2554). Manifest only, so the listing pays a walk over metas it has just
+// read from the same cached manifest.
+func IgnoredMatching(dir string, o query.Options) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0
+	}
+	pol := policy.Load()
+	n := 0
+	for _, meta := range m.Sessions {
+		if !sessionMetaMatches(meta, o) {
+			continue
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
+			n++
+		}
+	}
+	return n
+}
+
 // metasNotIgnored is ignoredByPolicy one step earlier, on the metas a walk is
 // about to cut a window out of. sessionsForMetas filters what it loads, which
 // is right, but by then the window is chosen: three ignored sessions at the top
