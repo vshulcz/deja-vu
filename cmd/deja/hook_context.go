@@ -147,14 +147,21 @@ func joinNotes(a, b string) string {
 // itself, which is why a store can rebuild fine while its own directory is
 // read-only.
 func indexDirWritable(dir string) bool {
-	parent := filepath.Dir(dir)
-	f, err := os.CreateTemp(parent, ".deja-probe-")
-	if err != nil {
+	// The directory the rebuild actually writes into. Probing the parent alone
+	// read a read-only index directory inside a writable parent as writable —
+	// a cache directory owned by another user, a read-only subtree — and the
+	// session start went silent again in the one state that never repairs
+	// itself (#2499). The parent is still the right probe when the index
+	// directory does not exist yet, since deja creates it.
+	// Both, when both exist: a build writes its files inside the index
+	// directory and its lock and temporaries beside it, so either one refusing
+	// is enough to stop it.
+	if !dirWritable(filepath.Dir(dir)) {
 		return false
 	}
-	name := f.Name()
-	_ = f.Close()
-	_ = os.Remove(name)
+	if dirExists(dir) {
+		return dirWritable(dir)
+	}
 	return true
 }
 
@@ -207,12 +214,22 @@ func buildNotice(dir string) string {
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
 			return fmt.Sprintf("deja cannot find the index (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
 		}
-		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
+		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", unwritableIndexDir(dir))
 	}
 	if !warmupJustRequested(dir) {
 		return ""
 	}
 	return "deja is indexing your history — recall comes online in a few seconds"
+}
+
+// unwritableIndexDir names the directory to fix: the index directory when that
+// is what cannot be written, its parent when the index directory does not
+// exist yet and the parent is what refuses to hold it.
+func unwritableIndexDir(dir string) string {
+	if dirExists(dir) {
+		return dir
+	}
+	return filepath.Dir(dir)
 }
 
 // indexNeedsRebuild reports that the index on disk cannot answer as it stands:
