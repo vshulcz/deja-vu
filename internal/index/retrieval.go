@@ -1420,6 +1420,20 @@ func recordServable(role string, o query.Options) bool {
 // allowed to see — a file list, a command, or, under --role, the other side of
 // the conversation. Returning it with no messages would be worse than dropping
 // it: the count would say a match exists and the result would show nothing.
+// What this costs, measured on a 1,365-session index (170 MB of record text,
+// 43% of it tool output, 63% of the messages recall hands back):
+//
+//   - a relevance-tier search materialises every message of every session it
+//     ranked — 104 to 124 MB across 29 to 50 sessions per query, 200-400 ms —
+//     to print a few clipped lines. `Limit` does not bound it: it governs what
+//     is shown, not what is loaded.
+//   - the per-prompt hook, which cuts its ranking to twelve first, still loads
+//     41 MB across seven sessions on this project, one of them 37,289 messages,
+//     in 60 ms warm and 385 ms cold.
+//
+// The whole session is loaded because the caller picks which message to show
+// after ranking, and it reads the text to do it. Bounding that — a window
+// around the match rather than the session — is the open question (#2592).
 func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model.Session, error) {
 	all, err := sessionsForMetas(dir, metas)
 	if err != nil {
