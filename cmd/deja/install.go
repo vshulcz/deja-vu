@@ -890,6 +890,11 @@ func mentionsDeja(b []byte) bool {
 	for _, marker := range []string{
 		"hook-prompt", "hook-context", "hook-tool", "hook-goose", "hook-plan",
 		"hook-precompact", "hook-antigravity", "deja:", "\"deja\"", "deja-recall",
+		// The two harnesses that do not write the word on its own: zed names
+		// the server, dsh opens a block. Without them their snapshots survived
+		// an uninstall carrying deja's whole entry, which is the one thing
+		// this test exists to prevent (#2575).
+		zedServerID, dshBlockStart,
 	} {
 		if bytes.Contains(b, []byte(marker)) {
 			return true
