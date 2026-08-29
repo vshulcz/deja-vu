@@ -162,6 +162,12 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			// thing, and stdout is what a redirect keeps (#2319).
 			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
 				len(withheldSessions), pluralS(len(withheldSessions)))
+		case len(sessions) == 0 && len(ignoredSessions) > 0:
+			// The same claim about the store rather than about the rule, for
+			// the other rule: the sessions with the tool output are there and
+			// the ignore rule is what keeps them out (#2630).
+			fmt.Fprintf(stdout, "nothing recurring — the ignore rule keeps the %d session%s that recorded tool output out of recall, which is what friction reads errors from\n",
+				len(ignoredSessions), pluralS(len(ignoredSessions)))
 		case len(sessions) == 0:
 			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
 				total, pluralS(total))

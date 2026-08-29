@@ -86,3 +86,17 @@ func TestTheRecordLogSurfacesSayWhatTheIgnoreRuleKeptOut(t *testing.T) {
 		})
 	}
 }
+
+// And the sentence on stdout, which is what a redirect keeps: saying the
+// machine never recorded tool output is a claim about the store when the truth
+// is a claim about the rule (#637, #1044, and now #2630).
+func TestFrictionNamesTheRuleRatherThanTheStore(t *testing.T) {
+	ignoredTreeStore(t)
+	out, err := captureRun(t, "friction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "the ignore rule keeps the 3 sessions that recorded tool output out of recall") {
+		t.Fatalf("stdout blames the store for what the rule did:\n%s", out)
+	}
+}
