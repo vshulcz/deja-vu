@@ -977,6 +977,32 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a}, err
 }
 
+// claudeHookWiring is every event deja installs into Claude Code, in one place
+// because two commands read it: install writes them, and doctor says which of
+// them the machine actually has. They used to be a list of calls here and a
+// single check over there, so a settings.json written by an older deja — three
+// events where there are now five — was reported as "wired" and the features
+// added since reached nobody until they happened to reinstall.
+var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
+	{"SessionStart", "hook-context", ""},
+	{"PreCompact", "hook-precompact", "manual|auto"},
+	{"UserPromptSubmit", "hook-prompt", ""},
+	// Recall at the moment of the action: before an edit or a command,
+	// hook-tool names the file's or command's prior decision. Scoped to the
+	// tools that change something so it never fires on a Read or a Glob.
+	//
+	// Task and Agent are the same event under two names: the parent spawning a
+	// subagent. That agent gets no session start and sends no user prompt, so
+	// its instructions are the only place memory can reach it, and hook-tool
+	// answers this one by rewriting them rather than by speaking to the parent.
+	{"PreToolUse", "hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent"},
+	// The other half of the point of action: the pre-tool line speaks before a
+	// command runs, this one speaks when it failed and the store knows what
+	// followed that error before. Bash only — a failed edit does not carry a
+	// shell error signature.
+	{"PostToolUse", "hook-tool-after", "Bash"},
+}
+
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	old, _ := os.ReadFile(path)
@@ -986,22 +1012,10 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
-	nextRoot := updateClaudeSessionStartHook(root, exe, uninstall)
-	nextRoot = updateClaudeHook(nextRoot, "PreCompact", exe+" hook-precompact", "manual|auto", uninstall)
-	nextRoot = updateClaudeHook(nextRoot, "UserPromptSubmit", exe+" hook-prompt", "", uninstall)
-	// Recall at the moment of the action: before an edit or a command, hook-tool
-	// names the file's or command's prior decision. Scoped to the tools that
-	// change something so it never fires on a Read or a Glob.
-	// Task and Agent are the same event under two names: the parent spawning a
-	// subagent. That agent gets no session start and sends no user prompt, so
-	// its instructions are the only place memory can reach it, and hook-tool
-	// answers this one by rewriting them rather than by speaking to the parent.
-	nextRoot = updateClaudeHook(nextRoot, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", uninstall)
-	// The other half of the point of action: the pre-tool line speaks before a
-	// command runs, this one speaks when it failed and the store knows what
-	// followed that error before. Bash only — a failed edit does not carry a
-	// shell error signature.
-	nextRoot = updateClaudeHook(nextRoot, "PostToolUse", exe+" hook-tool-after", "Bash", uninstall)
+	nextRoot := root
+	for _, h := range claudeHookWiring {
+		nextRoot = updateClaudeHook(nextRoot, h.Event, exe+" "+h.Sub, h.Matcher, uninstall)
+	}
 	next, err := json.MarshalIndent(nextRoot, "", "  ")
 	if err != nil {
 		return installResult{}, err
