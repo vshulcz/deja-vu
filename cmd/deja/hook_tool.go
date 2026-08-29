@@ -213,10 +213,67 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// exists changes nothing. A command deserves the same: before `npm run
 	// build`, what matters is that it failed here last time and why, not that
 	// it has been run twice.
+	// A decision the user promoted about this very command comes first. The
+	// ranking below asks whether a session's words match the command's, which
+	// on a store where several sessions ran it makes those words too common to
+	// clear the idf floor — measured: every candidate at 0 informative terms,
+	// so the scan never ran and the count printed alone. Whether the promoted
+	// session ran the command is a fact rather than a ranking (#2516).
+	if d := promotedCommandDecision(dir, cwd, cmd); d != "" {
+		return head + " — last time: " + d
+	}
 	if d := commandDecisionLine(dir, cwd, cmd); d != "" {
 		return head + " — last time: " + d
 	}
 	return head + "."
+}
+
+// promotedCommandDecision is the decision this project promoted about the
+// command about to run, or "" when there is none. It reads the promoted
+// sessions of the project — few, and bounded here — and asks each whether it
+// ran this command, which is the same question CommandHistory answers in
+// aggregate.
+func promotedCommandDecision(dir, cwd, cmd string) string {
+	names := digest.ProjectNameCandidates(cwd)
+	if len(names) == 0 {
+		return ""
+	}
+	pol := policy.Load()
+	notes := importedConventions(names)
+	for _, n := range sources.LoadPromotedNotes() {
+		if n.State != "accepted" || !inAnyProject(n.Project, names) {
+			continue
+		}
+		if n.Project != "" && !pol.Allows(policy.ActivationAuto, n.Project) {
+			continue
+		}
+		notes = append(notes, n)
+	}
+	sort.Slice(notes, func(i, j int) bool { return notes[i].At.After(notes[j].At) })
+	read := 0
+	for _, note := range notes {
+		if read >= toolHookDecisionScan {
+			break
+		}
+		harness, id, ok := strings.Cut(note.Session, ":")
+		if !ok {
+			continue
+		}
+		read++
+		s, found, err := index.FindByIdentity(dir, harness, id)
+		if err != nil || !found || !index.SessionRanCommand(s, cmd) {
+			continue
+		}
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			text = strings.TrimSpace(note.Title)
+		}
+		if text == "" {
+			continue
+		}
+		return trimTrailingFragment(search.SafeText(clipDecision(text, toolHookDecisionBudget)))
+	}
+	return ""
 }
 
 // commandDecisionLine returns what happened the last time this command ran, or
