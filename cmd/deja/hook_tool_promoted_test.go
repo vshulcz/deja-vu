@@ -76,3 +76,52 @@ func TestTheEditLineCarriesThePromotedDecision(t *testing.T) {
 		t.Errorf("the promoted decision about this file is not in the line:\n  %s", line)
 	}
 }
+
+// The metas reaching fileDecisionLine are already scoped by the auto
+// activation, but LoadPromotedNotes reads every note on the machine. A rule
+// that withholds this memory has to take its promoted decision with it.
+func TestAWithheldPromotedDecisionStaysOut(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	store := filepath.Join(root, "-work-app")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	for k := 0; k < 6; k++ {
+		var lines []string
+		for i, m := range [][2]any{
+			{"user", fmt.Sprintf("work on retry.go (%d)", k)},
+			{"assistant", []any{map[string]any{"type": "tool_use", "name": "Edit",
+				"input": map[string]any{"file_path": "/work/app/retry.go", "old_string": fmt.Sprintf("x%d", k), "new_string": "y"}}}},
+			{"assistant", "no: the retry budget stays at 5"},
+		} {
+			rec := map[string]any{"type": m[0], "sessionId": fmt.Sprintf("p%d", k),
+				"timestamp": now.Add(-time.Duration(100-i) * time.Minute).Format(time.RFC3339),
+				"cwd":       "/work/app", "message": map[string]any{"role": m[0], "content": m[1]}}
+			b, err := json.Marshal(rec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lines = append(lines, string(b))
+		}
+		if err := os.WriteFile(filepath.Join(store, fmt.Sprintf("p%d.jsonl", k)),
+			[]byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := sources.AppendPromoted("app", "retry", "the retry budget stays at 5",
+		"claude:p0", "accepted", now); err != nil {
+		t.Fatal(err)
+	}
+	writePolicy(t, `{"activations":{"auto":{"local":false}}}`)
+
+	if line := fileHookLine(dir, "/work/app", "/work/app/retry.go"); line != "" {
+		t.Errorf("memory the auto rule withholds still speaks before the edit:\n  %s", line)
+	}
+}
