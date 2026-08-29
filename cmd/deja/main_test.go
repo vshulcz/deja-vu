@@ -1083,7 +1083,9 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 	}
 	for _, tc := range []struct{ name, old, want string }{
 		{"empty", "", `"mcp"`},
-		{"existing mcp no comma", "{\n  \"mcp\": {\n    \"other\": {\"type\":\"local\"}\n  }\n}\n", `"other": {"type":"local"},`},
+		// The separator sits on our own line, so removing our entry gives the
+		// reader's line back exactly as they wrote it (#2617).
+		{"existing mcp no comma", "{\n  \"mcp\": {\n    \"other\": {\"type\":\"local\"}\n  }\n}\n", `"mcp"]},`},
 		{"top trailing", "{\n  \"theme\": \"dark\",\n}\n", `"mcp"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

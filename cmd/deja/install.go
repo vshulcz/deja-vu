@@ -1892,7 +1892,7 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 // lines carries `"deja"` on its first one only; dropping just that line left
 // the rest of it in the block and the config stopped parsing (#2394), so the
 // entry is bounded by counting braces the way the block itself is.
-func dropJSONCEntry(lines []string) (body, dropped []string) {
+func dropJSONCEntry(lines []string) (body, dropped []string, wasLast bool) {
 	// On the code a parser reads, not the raw line. A comment that only names
 	// deja — a parked entry someone commented out, a note saying who wrote the
 	// block — is not an entry to replace, and dropping its first line leaves a
@@ -1906,9 +1906,13 @@ func dropJSONCEntry(lines []string) (body, dropped []string) {
 		inBlock = next
 		if !strings.Contains(code, `"deja"`) {
 			body = append(body, lines[i])
+			if code != "" {
+				wasLast = false
+			}
 			continue
 		}
 		dropped = append(dropped, lines[i])
+		wasLast = true
 		depth := jsoncBraceDelta(code)
 		for depth > 0 && i+1 < len(lines) {
 			i++
@@ -1918,7 +1922,23 @@ func dropJSONCEntry(lines []string) (body, dropped []string) {
 			depth += jsoncBraceDelta(c)
 		}
 	}
-	return body, dropped
+	return body, dropped, wasLast
+}
+
+// jsoncFirstCodeLine finds the first line of a .jsonc block that a parser
+// would read as code, so our entry goes under any comment the reader wrote
+// above their first one rather than between the comment and what it annotates.
+// It returns -1 when the block holds no code at all.
+func jsoncFirstCodeLine(body []string) int {
+	inBlock := false
+	for i, line := range body {
+		c, nextBlock, _ := jsoncCodeOf(line, inBlock)
+		inBlock = nextBlock
+		if c != "" {
+			return i
+		}
+	}
+	return -1
 }
 
 // jsoncLastCodeLine finds the last line of a .jsonc block that a parser would
@@ -2043,23 +2063,38 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// it ran is the same sentence the .json writer prints (#2390); without
 		// it, what install told you depended on which of the two names the
 		// config had (#2392).
-		body, dropped := dropJSONCEntry(lines[start+1 : end])
+		body, dropped, wasLast := dropJSONCEntry(lines[start+1 : end])
+		// Our entry used to go last, so the comma joining it to the block sat
+		// on the line above — the reader's. Taking ours out leaves that comma
+		// with nothing after it, which a strict reader of the file rejects, so
+		// a comma we put there once has to come back out with the entry it was
+		// written for (#2617). Only where ours ended the block: a comma
+		// anywhere else is still separating two things.
+		if wasLast {
+			if i, code, trim := jsoncLastCodeLine(body); i >= 0 && strings.HasSuffix(trim, ",") {
+				body[i] = body[i][:code-1] + body[i][code:]
+			}
+		}
 		note := ""
 		if !uninstall {
 			note = replacedJSONCLineNote(dropped, line)
 		}
 		if !uninstall {
-			// Only the last line that carries content decides whether a comma
-			// is needed. Walking on past it — which is what looking for the
-			// first line not ending in a comma did — runs through an entry
-			// whose every line ends in one, which is what a .jsonc written
-			// with trailing commas looks like, and puts the comma on the line
-			// that opens the entry: `"mine": {,` (#1695).
-			if i, code, trim := jsoncLastCodeLine(body); i >= 0 &&
-				!strings.HasSuffix(trim, ",") && !strings.HasSuffix(trim, "{") && !strings.HasSuffix(trim, "[") {
-				body[i] = body[i][:code] + "," + body[i][code:]
+			// Ours goes first, carrying its own comma. Written last it needed
+			// one on the line above — the reader's — and uninstall has no way
+			// to tell that comma from one they wrote, so it stayed behind in a
+			// file that was not ours to change (#2617). A comma of ours leaves
+			// with our line, and the placement rules that a comma on someone
+			// else's line needed — not on an opening brace, not after a
+			// trailing comment, not inside a block comment (#1695) — stop
+			// applying at all.
+			entry := line
+			at := len(body)
+			if i := jsoncFirstCodeLine(body); i >= 0 {
+				entry += ","
+				at = i
 			}
-			body = append(body, line)
+			body = append(body[:at:at], append([]string{entry}, body[at:]...)...)
 		}
 		out := append([]string{}, lines[:start+1]...)
 		out = append(out, body...)
