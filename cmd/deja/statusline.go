@@ -58,7 +58,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		if index.HasManifest(dir) {
 			fmt.Fprint(stdout, "deja · rebuilding the index · recall is quiet until it finishes")
 		} else {
-			fmt.Fprint(stdout, "deja · indexing your history · recall comes online in a few seconds")
+			fmt.Fprint(stdout, "deja · indexing your history · recall comes online when it finishes")
 		}
 		return nil
 	}

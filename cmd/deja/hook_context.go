@@ -201,7 +201,7 @@ func rewireNote(targets []string) string {
 func buildNotice(dir string) string {
 	if st := readWarmupStatus(dir); st != nil {
 		// On a machine no agent has written to, "indexing your history —
-		// recall comes online in a few seconds" is deja's first word to an
+		// recall comes online when it finishes" is deja's first word to an
 		// agent and none of it is so: there is nothing to read, and recall
 		// starts when some agent writes a transcript, not in a few seconds
 		// (#2407). Same claim the CLI makes about the same machine. A build
@@ -243,7 +243,7 @@ func buildNotice(dir string) string {
 	if !warmupJustRequested(dir) {
 		return ""
 	}
-	return "deja is indexing your history — recall comes online in a few seconds"
+	return "deja is indexing your history — recall comes online when it finishes"
 }
 
 // unwritableIndexDir names the directory to fix: the index directory when that

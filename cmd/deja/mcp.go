@@ -519,7 +519,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if line := buildingNowForBlockingTool(dir); line != "" {
 				return "Saved. " + line, nil
 			}
-			return "Saved. deja is refreshing its index; this note becomes findable when that finishes, in a few seconds.", nil
+			return "Saved. " + rememberSavedNote(dir), nil
 		}
 		// The journal is where the user sees what the agent did with their
 		// store; a write belongs there at least as much as a read.
@@ -1435,10 +1435,10 @@ func buildingNowForAgent(dir string) string {
 		return ""
 	}
 	if st := readWarmupStatus(dir); st != nil {
-		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
+		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online when it finishes; ask again then."
 	}
 	if index.RebuildInProgress(dir) || warmupJustRequested(dir) {
-		return "deja is indexing this machine's history. Recall comes online in a few seconds; ask again then."
+		return "deja is indexing this machine's history. Recall comes online when it finishes; ask again then."
 	}
 	// An index this build cannot read is not one it can answer from, and that
 	// is the state a version bump leaves behind. HasManifest called it present,
@@ -1469,10 +1469,10 @@ func buildingNowForAgent(dir string) string {
 // rather than to hang.
 func buildingNowForBlockingTool(dir string) string {
 	if st := readWarmupStatus(dir); st != nil {
-		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online in a few seconds; ask again then."
+		return "deja is indexing this machine's history (" + st.progress() + "). Recall comes online when it finishes; ask again then."
 	}
 	if index.RebuildInProgress(dir) || warmupJustRequested(dir) {
-		return "deja is indexing this machine's history. Recall comes online in a few seconds; ask again then."
+		return "deja is indexing this machine's history. Recall comes online when it finishes; ask again then."
 	}
 	// Everything else these two have to say — an index written by another
 	// version, an index directory nobody can write — is the same sentence the
@@ -1487,4 +1487,15 @@ func projectsOf(s model.Session) []string {
 		return nil
 	}
 	return []string{s.Project}
+}
+
+// rememberSavedNote is what a remember says when the index is mid-refresh. Not
+// "in a few seconds": the same build measured 59 seconds on a 177 MB index, and
+// what the writer needs to know is that the note is safe and will be findable,
+// not how long that takes (#2598).
+func rememberSavedNote(dir string) string {
+	if line := buildingNowForBlockingTool(dir); line != "" {
+		return line
+	}
+	return "deja is refreshing its index; this note becomes findable when that finishes."
 }

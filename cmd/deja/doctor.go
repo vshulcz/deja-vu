@@ -1256,7 +1256,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// the command people run when memory looks absent, so this is the
 		// worst place to describe it as absent (#873).
 		if st := readWarmupStatus(dir); st != nil {
-			fmt.Fprintf(w, "  status   building now (%s) — recall comes online in a few seconds\n", st.progress())
+			fmt.Fprintf(w, "  status   building now (%s) — recall comes online when it finishes\n", st.progress())
 			return
 		}
 		// A build requested moments ago has published no progress yet, and
@@ -1264,7 +1264,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// running — the first build after install is exactly that state
 		// (#925).
 		if warmupJustRequested(dir) {
-			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online in a few seconds")
+			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online when it finishes")
 			return
 		}
 		// An index whose disk was unplugged is not a missing index, and

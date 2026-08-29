@@ -162,7 +162,12 @@ func (s *warmupStatus) line() string {
 		}
 		pct = fmt.Sprintf(" %d%%", p)
 	}
-	return fmt.Sprintf("deja: indexing your history (%s%s) — recall comes online in a few seconds", s.phaseName(), pct)
+	// Not "in a few seconds": a full rebuild of a 177 MB index measured 59
+	// seconds, and the progress in this very line says when that claim is
+	// false — 3% of the sessions read is not a few seconds from done. The
+	// reader is told what deja is doing and that recall follows it, which is
+	// the true part (#2598).
+	return fmt.Sprintf("deja: indexing your history (%s%s) — recall comes online when it finishes", s.phaseName(), pct)
 }
 
 // publishBuildProgress installs the file sink for the work that happens before
@@ -226,7 +231,10 @@ func emptyRecallAnswer(dir, q string) string { return emptyRecallAnswerPolicy(di
 func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	q = clampEcho(q)
 	if st := readWarmupStatus(dir); st != nil {
-		return fmt.Sprintf("deja is still building its index (%s). Nothing can be recalled yet — it finishes within a few seconds, so ask again later in this session rather than concluding there is no history.", st.progress())
+		// The instruction is the useful part — ask again rather than conclude
+		// there is no history — and it does not need a duration deja cannot
+		// know: the same build measured 59 seconds on a 177 MB index (#2598).
+		return fmt.Sprintf("deja is still building its index (%s). Nothing can be recalled yet — ask again later in this session rather than concluding there is no history.", st.progress())
 	}
 	if hidden > 0 {
 		return fmt.Sprintf("%d prior session%s matched %q, but this machine's trust policy (%s) does not allow them on this path. There is prior work here; it is not being shown.",
