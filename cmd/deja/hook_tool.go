@@ -326,6 +326,14 @@ func fileHookLine(dir, cwd, path string) string {
 // digest surfaces, but delivered at the moment the file is about to change.
 func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	// A promoted note first. It is the user's own statement about this work,
+	// which is why the session-start block leads with it and calls it standing;
+	// scanning for a conclusion instead handed back whatever the newest session
+	// happened to end with — "looked at retry.go again (5)" in front of "the
+	// retry budget stays at 5" (#2495).
+	if line := promotedDecisionFor(metas); line != "" {
+		return line
+	}
 	states := sources.PromotedLifecycles()
 	for i, meta := range metas {
 		if i >= toolHookDecisionScan {
@@ -348,7 +356,56 @@ func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 	return ""
 }
 
-// decisionUsable rejects a session whose decision should not be reused: one that
+// promotedDecisionFor returns the newest accepted promoted note belonging to one
+// of these sessions. Accepted only, for the reason projectConventions gives: a
+// decision later reversed carries a non-accepted state, and LoadPromotedNotes
+// keeps the latest state per source.
+func promotedDecisionFor(metas []index.SessionMeta) string {
+	if len(metas) == 0 {
+		return ""
+	}
+	want := make(map[string]bool, len(metas))
+	for _, meta := range metas {
+		want[meta.Harness+":"+meta.ID] = true
+		if meta.OrigID != "" {
+			want[meta.Harness+":"+meta.OrigID] = true
+		}
+	}
+	var best sources.PromotedNote
+	for _, note := range sources.LoadPromotedNotes() {
+		if note.State != "accepted" || !want[note.Session] {
+			continue
+		}
+		if best.Session == "" || note.At.After(best.At) {
+			best = note
+		}
+	}
+	text := strings.TrimSpace(best.Text)
+	if text == "" {
+		text = strings.TrimSpace(best.Title)
+	}
+	if text == "" {
+		return ""
+	}
+	return trimTrailingFragment(search.SafeText(clipDecision(text, toolHookDecisionBudget)))
+}
+
+// clipDecision keeps a promoted note inside the same budget a scanned
+// conclusion is held to, so one long note cannot take the line over.
+func clipDecision(s string, budget int) string {
+	if len(s) <= budget {
+		return s
+	}
+	// On a rune boundary: a note in Russian or Japanese cut mid-character puts
+	// invalid UTF-8 into the payload an agent is handed.
+	end := budget
+	for end > 0 && !utf8.ValidString(s[:end]) {
+		end--
+	}
+	return s[:end]
+}
+
+// decisionUsable rejects a session whose decision should not be reused:// decisionUsable rejects a session whose decision should not be reused: one that
 // says in its own words it backed the approach out (GaveUp), and one a later
 // state marked rejected, superseded or stale. Surfacing either at the point of an
 // edit would push the agent to redo exactly what was undone.
