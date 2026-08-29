@@ -968,11 +968,26 @@ func structurallyEmptyConfig(b []byte) bool {
 	return false
 }
 
+// matchFinalNewline gives a file back ending as it came in. Every writer here
+// finishes with a newline, and some editors never write one, so a config
+// someone owned came back changed for nothing — #2606 the other way round
+// (#2619). Beside matchLineEndings because it is the same rule: what the file
+// was written in is not ours to convert. A file deja creates has no ending to
+// keep and gets the newline every text file wants.
+func matchFinalNewline(old, next []byte) []byte {
+	if len(old) == 0 || bytes.HasSuffix(old, []byte("\n")) {
+		return next
+	}
+	next = bytes.TrimSuffix(next, []byte("\n"))
+	return bytes.TrimSuffix(next, []byte("\r"))
+}
+
 func writeIfChanged(path string, old, next []byte) (string, error) {
 	// Before the comparison, not after: a CRLF config converted afterwards
 	// would differ from `old` on every run, so each repeat install would
 	// rewrite the file and report it changed.
 	next = matchLineEndings(old, next)
+	next = matchFinalNewline(old, next)
 	if bytes.Equal(old, next) {
 		return "unchanged", nil
 	}
