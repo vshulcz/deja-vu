@@ -184,7 +184,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if cands := digest.ProjectNameCandidates(cwd); len(cands) > 0 {
 		projectKey = cands[0]
 	}
-	inProject := recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+	// Except for a spawned agent. The cooldown above counts servings across
+	// agent sessions, which is right for a reader working through a run of
+	// messages — #2038 measured 92% repeats and one marathon served 110 times.
+	// A fleet is the other shape: ten agents spawned together are ten readers,
+	// each seeing a session once, and the answer they all need is the one the
+	// cooldown has just spent. Measured: of three agents spawned on the same
+	// work, the first was given it and the other two were sent out with
+	// nothing (#2534). Their own per-reader key and the block fingerprint still
+	// stop the same agent being handed the same thing twice.
+	var inProject map[string]bool
+	if !isSpawnedReader(input.SessionID) {
+		inProject = recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+	}
 	skip := make(map[string]bool, len(recent)+len(inProject)+1)
 	for id := range recent {
 		skip[id] = true
@@ -648,6 +660,11 @@ func blockFingerprint(body string) string {
 	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(body), " ")))
 	return hex.EncodeToString(sum[:8])
 }
+
+// isSpawnedReader reports whether this recall is for an agent the parent just
+// spawned rather than for someone typing. spawnRecall builds the id, and the
+// prefix is the only thing that separates the two readers here.
+func isSpawnedReader(sid string) bool { return strings.HasPrefix(sid, "task:") }
 
 // injectionCooldown is how many later injections a session sits out after
 // being shown. Counted in injections rather than minutes because that is what
