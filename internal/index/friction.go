@@ -443,6 +443,33 @@ func hitFromRecords(recs []Record) []uint64 {
 	return out
 }
 
+// PromotedNoteMetas returns the sessions that carry a promoted note's state —
+// the shape a decision has after it crosses a machine boundary, where the local
+// notes file knows nothing about it. Manifest only, so a caller in a hook pays a
+// map walk rather than a read (#2510).
+//
+// allow gates a session's project the way TopFriction's does.
+func PromotedNoteMetas(dir string, allow func(project string) bool) []SessionMeta {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	var out []SessionMeta
+	for _, meta := range m.Sessions {
+		if meta.Lifecycle == "" {
+			continue
+		}
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		out = append(out, meta)
+	}
+	return out
+}
+
 // FrictionSessions counts the sessions that hit one wall, by the signature a
 // FixPair carries. The manifest already holds every session's hashes and is
 // cached, so a caller in a hook pays a map walk rather than a read — which is
