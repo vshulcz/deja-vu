@@ -33,6 +33,32 @@ func Share(s model.Session, budget int) string {
 	fmt.Fprintf(&b, "- Project: %s\n", oneLine(s.Project))
 	fmt.Fprintf(&b, "- Harness: %s\n", s.Harness)
 	fmt.Fprintf(&b, "- Date: %s\n\n", date)
+	// appendSectionWithin is appendSection held to a smaller ceiling, so a
+	// section that could fill the block leaves room for the one after it.
+	appendSectionWithin := func(title string, messages []model.Message, ceiling int) {
+		if len(messages) == 0 || b.Len() >= ceiling {
+			return
+		}
+		fmt.Fprintf(&b, "## %s\n\n", title)
+		for _, m := range messages {
+			if b.Len() >= ceiling {
+				break
+			}
+			text := MessageText(m.Text)
+			if text == "" {
+				continue
+			}
+			chunk := fmt.Sprintf("%s\n\n", text)
+			// At a message boundary, with no cut marker: the marker promises
+			// that nothing follows it, and something does — the section this
+			// ceiling exists to leave room for. The block's closing sentence
+			// already tells the reader it is a compact slice.
+			if b.Len()+len(chunk) > ceiling {
+				break
+			}
+			b.WriteString(chunk)
+		}
+	}
 	appendSection := func(title string, messages []model.Message) {
 		if len(messages) == 0 || b.Len() >= budget {
 			return
@@ -72,8 +98,23 @@ func Share(s model.Session, budget int) string {
 			assistants = append(assistants, m)
 		}
 	}
-	appendSection("User problem statement(s)", dedupeStatus(users))
-	appendSection("Key assistant conclusions / code blocks", dedupeStatus(selectConclusions(assistants)))
+	// Half the budget for the question, half for the answer. The sections were
+	// written in order until the budget ran out, so a long session — where the
+	// user side is mostly "go on" — spent the whole block on problem
+	// statements and handed over no conclusions at all, which is the half a
+	// receiving agent cannot re-derive (#2462). A short session is unaffected:
+	// the reserve only binds when the first section would have eaten it.
+	conclusions := dedupeStatus(selectConclusions(assistants))
+	if len(conclusions) > 0 {
+		if reserved := budget / 2; reserved > 0 {
+			appendSectionWithin("User problem statement(s)", dedupeStatus(users), budget-reserved)
+		} else {
+			appendSection("User problem statement(s)", dedupeStatus(users))
+		}
+	} else {
+		appendSection("User problem statement(s)", dedupeStatus(users))
+	}
+	appendSection("Key assistant conclusions / code blocks", conclusions)
 	return strings.TrimSpace(b.String()) + "\n"
 }
 
