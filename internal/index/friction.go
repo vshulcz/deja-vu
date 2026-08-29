@@ -559,27 +559,30 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 		}
 		return cs[i].hash < cs[j].hash
 	})
-	if n > 0 && len(cs) > n {
-		cs = cs[:n]
-	}
-	// Recover every winning text in one pass per session rather than one pass
-	// per wall: the same session usually carries several of them.
+	// Recovered as the ranking is walked, not after a cut: `meta.Hit` is a
+	// union that never forgets while the text is read back out of the records,
+	// so a rewritten transcript leaves a hash nothing can show. Cutting first
+	// spent the slot on it — a wall like that at the top left `deja brief`
+	// with no friction line at all and the next wall unreported (#2544).
+	//
+	// Every hash still shares one pass per session: a session usually carries
+	// several walls, and each read fills in whatever it holds.
 	want := map[uint64]string{}
 	for _, c := range cs {
 		want[c.hash] = ""
 	}
-	for _, c := range cs {
-		if want[c.hash] != "" {
-			continue
-		}
-		frictionTexts(dir, m, c.metas, want, c.hash)
-	}
 	var out []Friction
 	for _, c := range cs {
+		if want[c.hash] == "" {
+			frictionTexts(dir, m, c.metas, want, c.hash)
+		}
 		if want[c.hash] == "" {
 			continue
 		}
 		out = append(out, Friction{Text: want[c.hash], Sessions: c.metas, Last: c.metas[0].Updated})
+		if n > 0 && len(out) == n {
+			break
+		}
 	}
 	return out
 }
