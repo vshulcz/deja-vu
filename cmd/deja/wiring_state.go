@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 )
 
@@ -34,6 +35,11 @@ type wiringState struct {
 	// Knowing which files deja made is what lets the same rule apply to them
 	// without ever removing a config the reader already had (#2583).
 	Created []string `json:"created,omitempty"`
+	// Blocks are the containers deja added to a config that had none —
+	// "<path>#mcpServers". Removing only deja's entry left the reader with an
+	// empty block they never wrote (#2604); knowing deja added it is what
+	// allows taking it back without touching one they wrote themselves.
+	Blocks []string `json:"blocks,omitempty"`
 	// Exe is the binary path the configs were written with. A move without a
 	// version change is ordinary — a relink, a reinstall of the same release,
 	// a `go install` over a manual download — and left every config pointing
@@ -122,7 +128,18 @@ func recordWiring(targets []string, uninstall bool) {
 		created = nil
 	}
 	sort.Strings(created)
-	st = wiringState{Version: version, Targets: kept, Created: created, Exe: exe, Home: homeDir()}
+	blocks := append([]string(nil), st.Blocks...)
+	for _, b := range blocksAddedThisRun {
+		if !slices.Contains(blocks, b) {
+			blocks = append(blocks, b)
+		}
+	}
+	blocks = slices.DeleteFunc(blocks, func(b string) bool { return blocksForgottenThisRun[b] })
+	if len(kept) == 0 {
+		blocks = nil
+	}
+	sort.Strings(blocks)
+	st = wiringState{Version: version, Targets: kept, Created: created, Blocks: blocks, Exe: exe, Home: homeDir()}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -214,3 +231,28 @@ func wiringCreated(path string) bool {
 // stuckWiring is what this process could not rewire. Read by the session start,
 // which is the only surface a person sees on an ordinary day.
 var stuckWiring []string
+
+// blocksAddedThisRun and blocksForgottenThisRun carry what this process added to
+// or took back from a config, until recordWiring folds them into the record.
+var (
+	blocksAddedThisRun     []string
+	blocksForgottenThisRun = map[string]bool{}
+)
+
+func blockKey(path, name string) string { return path + "#" + name }
+
+// noteBlockAdded records that deja, not the reader, put this container there.
+func noteBlockAdded(path, name string) {
+	blocksAddedThisRun = append(blocksAddedThisRun, blockKey(path, name))
+}
+
+// blockWasAdded reports whether deja added it, in this run or an earlier one.
+func blockWasAdded(path, name string) bool {
+	key := blockKey(path, name)
+	if slices.Contains(blocksAddedThisRun, key) {
+		return true
+	}
+	return slices.Contains(readWiringState().Blocks, key)
+}
+
+func forgetBlockAdded(path, name string) { blocksForgottenThisRun[blockKey(path, name)] = true }
