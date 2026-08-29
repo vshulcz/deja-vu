@@ -723,9 +723,12 @@ func restoreReplacedGuidance(path, harness string) (bool, error) {
 const dejaSkillDescription = "description: Search the user's past AI coding sessions."
 
 func isOurGuidance(b []byte, harness string) bool {
-	if bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace([]byte(guidanceText(harness)))) {
+	if harness != "" && bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace([]byte(guidanceText(harness)))) {
 		return true
 	}
 	head, _, _ := strings.Cut(string(b), "\n---")
-	return strings.Contains(head, dejaSkillDescription)
+	// Either skill deja writes: the MCP one and the CLI one carry their own
+	// fixed description, and a person making one of them theirs edits that line
+	// first (#2585, #2596).
+	return strings.Contains(head, dejaSkillDescription) || strings.Contains(head, cliSkillDesc)
 }
