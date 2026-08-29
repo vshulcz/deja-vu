@@ -52,3 +52,26 @@ func TestTheNotesFileIsParsedOncePerProcess(t *testing.T) {
 		t.Fatalf("a changed file was answered from the memo: %+v", got)
 	}
 }
+
+// The caller owns the slice it gets: the view page appends to it and sorts it.
+func TestAMemoisedReadCannotBeReorderedByItsCaller(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "notes.jsonl")
+	t.Setenv("DEJA_NOTES_FILE", path)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	writeNotesFile(t, path,
+		`{"kind":"promoted","session":"claude:a","project":"app","state":"accepted","title":"a","text":"first","ts":"`+now+`"}`+"\n"+
+			`{"kind":"promoted","session":"claude:b","project":"app","state":"accepted","title":"b","text":"second","ts":"`+now+`"}`+"\n")
+
+	first := LoadPromotedNotes()
+	if len(first) != 2 {
+		t.Fatalf("fixture: %d notes", len(first))
+	}
+	first[0], first[1] = first[1], first[0]
+	first[0].Text = "clobbered"
+
+	again := LoadPromotedNotes()
+	if again[0].Text != "first" || again[1].Text != "second" {
+		t.Errorf("one caller's edit reached the next read: %+v", again)
+	}
+}

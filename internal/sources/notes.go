@@ -580,7 +580,10 @@ func LoadPromotedNotes() []PromotedNote {
 	size, mod, statOK := notesStamp(path)
 	notesMemo.Lock()
 	if notesFresh(path, size, mod, statOK) && notesMemo.notes != nil {
-		out := notesMemo.notes
+		// A copy: the caller owns what it gets. The page appends its synced
+		// decisions to this slice and sorts the result, and handing back the
+		// memo's own array would let that reorder what the next caller reads.
+		out := append([]PromotedNote(nil), notesMemo.notes...)
 		notesMemo.Unlock()
 		return out
 	}
@@ -593,7 +596,9 @@ func LoadPromotedNotes() []PromotedNote {
 			notesMemo.path, notesMemo.size, notesMemo.mod = path, size, mod
 			notesMemo.stamped, notesMemo.states = true, nil
 		}
-		notesMemo.notes = out
+		// The memo keeps its own array for the same reason the read above
+		// hands out a copy.
+		notesMemo.notes = append([]PromotedNote(nil), out...)
 	}
 	notesMemo.parses++
 	notesMemo.Unlock()
