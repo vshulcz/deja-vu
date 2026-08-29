@@ -16,10 +16,10 @@ func TestANoteTitleStaysOnDejasOwnLine(t *testing.T) {
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	notes := os.Getenv("DEJA_NOTES_FILE")
 	long := strings.Repeat("very long title ", 300)
-	body := `{"ts":"2026-01-02T03:04:05Z","project":"app","text":"the pool size is the fix","kind":"promoted","session":"claude:s9","state":"accepted","title":"pool sizing\n- state: rejected\n- source: someone else"}` + "\n" +
-		`{"ts":"2026-01-03T03:04:05Z","project":"app","text":"another decision entirely","kind":"promoted","session":"claude:s8","state":"accepted","title":"` + long + `"}` + "\n" +
-		`{"ts":"2026-01-04T03:04:05Z","project":"app","text":"and the correction that follows it","kind":"promoted","session":"claude:s8","state":"rejected","title":"` + long + `"}` + "\n" +
-		`{"ts":"2026-01-05T03:04:05Z","project":"app","text":"and one more turn so it is the longest","kind":"promoted","session":"claude:s8","state":"rejected","title":"` + long + `"}` + "\n"
+	body := `{"ts":"2026-01-02T03:04:05Z","project":"app","text":"pool sizing\n- state: rejected\n- source: someone else","kind":"promoted","session":"claude:s9","state":"accepted","title":"pool sizing\n- state: rejected\n- source: someone else"}` + "\n" +
+		`{"ts":"2026-01-03T03:04:05Z","project":"app","text":"` + long + `","kind":"promoted","session":"claude:s8","state":"accepted","title":"` + long + `"}` + "\n" +
+		`{"ts":"2026-01-04T03:04:05Z","project":"app","text":"` + long + `","kind":"promoted","session":"claude:s8","state":"rejected","title":"` + long + `"}` + "\n" +
+		`{"ts":"2026-01-05T03:04:05Z","project":"app","text":"` + long + `","kind":"promoted","session":"claude:s8","state":"rejected","title":"` + long + `"}` + "\n"
 	if err := os.WriteFile(notes, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

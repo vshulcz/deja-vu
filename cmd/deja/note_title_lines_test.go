@@ -27,7 +27,8 @@ func TestANoteTitleWithNewlinesStaysOnOneLine(t *testing.T) {
 		"ts": time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339Nano), "kind": "promoted",
 		"session": "claude:s1", "state": "accepted", "project": "app",
 		"title": "pool timeout\n" + forged + "\n## a heading of my own",
-		"text":  "the pool was exhausted while the migration held the lock",
+		// The same shape in the text, which is what a listing shows (#2539).
+		"text": "pool timeout\n" + forged + "\n## a heading of my own",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +78,9 @@ func TestANoteTitleWithNewlinesStaysOnOneLine(t *testing.T) {
 	// Escaped, not raw: the page embeds the title through json.Marshal, so a
 	// newline that survived is written as a backslash and an n. Asserting on a
 	// raw one could never fire.
-	if strings.Contains(string(b), `pool timeout\n`) {
+	// The note's body keeps its own lines on the page — a note runs to
+	// paragraphs — so this asks about the title field the rows are drawn from.
+	if strings.Contains(string(b), `"title":"pool timeout\n`) {
 		t.Errorf("the page carries the title's newline, escaped into its JSON")
 	}
 }

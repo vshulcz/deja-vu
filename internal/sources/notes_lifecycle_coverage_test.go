@@ -20,14 +20,14 @@ func TestPromotedNoteTitleRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Read the record's own title, not the note session's display line: since
+	// #2539 that line is the decision, so the borrowed title is only visible
+	// in the store these three commands rewrite.
 	titleOf := func() (string, bool) {
-		ss, err := ParseNotesFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, s := range ss {
-			if s.ID == PromotedNoteID(src) {
-				return s.Title, true
+		notes := LoadPromotedNotes()
+		for _, n := range notes {
+			if PromotedNoteID(n.Session) == PromotedNoteID(src) {
+				return n.Title, true
 			}
 		}
 		return "", false
@@ -35,6 +35,16 @@ func TestPromotedNoteTitleRoundTrip(t *testing.T) {
 
 	if title, ok := titleOf(); !ok || !strings.Contains(title, "Borrowed Title") {
 		t.Fatalf("after promote, title = %q (present=%v)", title, ok)
+	}
+	// What a listing shows is the decision itself.
+	ss, err := ParseNotesFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range ss {
+		if s.ID == PromotedNoteID(src) && s.Title != "the decision text [accepted]" {
+			t.Fatalf("display line = %q", s.Title)
+		}
 	}
 
 	// forget strips the borrowed title.
