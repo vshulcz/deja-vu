@@ -80,17 +80,22 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	next = dropEmptyYAMLKey(next, "extensions:")
 	if !uninstall {
 		cmd, args := mcpCommandArgs(exe)
+		pad := yamlBlockIndent(gooseExtensionsBlock(next))
+		if pad == "" {
+			pad = "  "
+		}
+		key, val := pad, pad+"  "
 		var b strings.Builder
-		b.WriteString("  deja:\n    enabled: true\n    type: stdio\n    name: deja\n")
+		fmt.Fprintf(&b, "%sdeja:\n%senabled: true\n%stype: stdio\n%sname: deja\n", key, val, val, val)
 		// Quote both: on Unix cmd is the exe path, on Windows the exe lands in
 		// args — either way a YAML metacharacter in the path (a ": ", a " #")
 		// would break the config Goose has to read back.
-		fmt.Fprintf(&b, "    cmd: %s\n", yamlQuote(cmd))
-		b.WriteString("    args:\n")
+		fmt.Fprintf(&b, "%scmd: %s\n", val, yamlQuote(cmd))
+		fmt.Fprintf(&b, "%sargs:\n", val)
 		for _, a := range args {
-			fmt.Fprintf(&b, "      - %s\n", yamlQuote(a))
+			fmt.Fprintf(&b, "%s  - %s\n", val, yamlQuote(a))
 		}
-		b.WriteString("    timeout: 60\n")
+		fmt.Fprintf(&b, "%stimeout: 60\n", val)
 		entry := b.String()
 		// An inline value — `extensions: [a, b]` or `extensions: {…}` — is not
 		// followed by a block, so the insert below missed it and appended a
@@ -140,16 +145,22 @@ func normaliseNewlines(s string) (string, bool) {
 
 // removeGooseExtension drops our entry and stops at the next key at the same
 // indent, so a neighbouring extension survives.
+//
+// The entry is looked for at the indent the block itself uses, and at two
+// spaces as well: that is what every build before #2614 wrote, whatever the
+// rest of the block was indented by, and those files still have to come apart.
 func removeGooseExtension(s string) string {
 	lines := strings.Split(s, "\n")
+	pad := yamlBlockIndent(gooseExtensionsBlock(s))
 	out := make([]string, 0, len(lines))
 	for i := 0; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) != "deja:" || !strings.HasPrefix(lines[i], "  ") || strings.HasPrefix(lines[i], "   ") {
+		indent := lines[i][:len(lines[i])-len(strings.TrimLeft(lines[i], " "))]
+		if strings.TrimSpace(lines[i]) != "deja:" || indent == "" || (indent != pad && indent != "  ") {
 			out = append(out, lines[i])
 			continue
 		}
 		i++
-		for i < len(lines) && (strings.HasPrefix(lines[i], "    ") || strings.TrimSpace(lines[i]) == "") {
+		for i < len(lines) && (strings.HasPrefix(lines[i], indent+" ") || strings.TrimSpace(lines[i]) == "") {
 			i++
 		}
 		i--
@@ -158,6 +169,35 @@ func removeGooseExtension(s string) string {
 	// An extensions key with nothing under it parses as null and Goose then
 	// refuses the config.
 	return strings.Replace(s, "extensions:\n\n", "\n", 1)
+}
+
+// gooseExtensionsBlock returns the text after the extensions key, or "" when
+// there is no block form of it to read an indent from.
+func gooseExtensionsBlock(s string) string {
+	i := strings.Index("\n"+s, "\nextensions:\n")
+	if i < 0 {
+		return ""
+	}
+	return s[i+len("\nextensions:\n")-1:]
+}
+
+// yamlBlockIndent returns the indent the entries under a key are written at.
+// YAML accepts any consistent amount and people use four as readily as two, so
+// an entry spliced in at a fixed two spaces would leave the entry after it
+// nested inside ours rather than beside it (#2614). An empty block has no
+// indent to follow and gives "".
+func yamlBlockIndent(block string) string {
+	for _, line := range strings.Split(block, "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+		if indent == "" {
+			return ""
+		}
+		return indent
+	}
+	return ""
 }
 
 func gooseConfigDir() string {
