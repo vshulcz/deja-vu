@@ -183,6 +183,24 @@ func applyPatchFiles(patch string) []string {
 	return out
 }
 
+// The line says how many sessions ran this command and stops there. The obvious
+// next sentence — "and every one of them ended at the same error" — was measured
+// on a 1,365-session store and does not hold:
+//
+//   - joining by session, 359 of the 393 commands run in three or more sessions
+//     share a wall two of those sessions hit, and the pairs are nonsense:
+//     `git status --short` with "command not found: python", `cd <repo>` with
+//     "command not found: timeout". Sessions hit many walls; sharing one says
+//     nothing about the command. The commands table holds no session ids either,
+//     so the join needs a full pass over records.bin (248 ms for 275k records).
+//   - joining by adjacency — the error record that follows the command inside
+//     one session — is honest but thin: 3,489 commands are followed by an error
+//     at least once, and only 29 of them were run four times or more and ended
+//     at one error three times or more. `deja fix` and hook-tool-after already
+//     serve that shape from the other side, keyed on the error rather than on
+//     the command.
+//
+// So the count stands alone on purpose (#2587).
 func commandHookLine(dir, cwd, cmd string) string {
 	// "You have run this before" is worthless for an inspection command the
 	// agent runs constantly — git status, git diff, ls, cat. On a real store
