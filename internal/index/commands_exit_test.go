@@ -50,6 +50,14 @@ func TestTheCommandsTableIgnoresTheExitStatus(t *testing.T) {
 	if strings.Contains(found[0].Command, "exit") {
 		t.Errorf("the row deja shows carries the outcome: %q", found[0].Command)
 	}
+	// A command that merely mentions the marker is still that command: cutting
+	// on the marker anywhere turned `echo "→ exit 0"` into `echo "` once (#2048).
+	if got := withoutExitStatus(`echo "→ exit 0"`); got != `echo "→ exit 0"` {
+		t.Errorf("a command naming the marker was cut to %q", got)
+	}
+	if got := withoutExitStatus("$ make test  → exit 2"); got != "$ make test" {
+		t.Errorf("the real suffix survived: %q", got)
+	}
 	// And the lookup the tool hook makes, with the command as a harness hands
 	// it over, finds all of it.
 	use, ok := CommandHistory(dir, "make test")

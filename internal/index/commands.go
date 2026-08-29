@@ -380,11 +380,29 @@ func normalizeCommand(s string) string {
 // runs and 7 (#2590). The status stays in the records, where the fix-pair miner
 // reads it (commandFailed).
 func withoutExitStatus(s string) string {
-	if i := strings.Index(s, "→ exit "); i >= 0 {
-		return strings.TrimSpace(s[:i])
+	i := strings.LastIndex(s, commandExitMarker)
+	if i < 0 {
+		return s
 	}
-	return s
+	code := s[i+len(commandExitMarker):]
+	if code == "" {
+		return s
+	}
+	// Digits to the end, or it is not the marker: looking for it anywhere cut
+	// `echo "→ exit 0"` down to `echo "`, the trap #2048 already recorded for
+	// the after-hook's reading of the same suffix.
+	for _, r := range code {
+		if r < '0' || r > '9' {
+			return s
+		}
+	}
+	return strings.TrimSpace(s[:i])
 }
+
+// commandExitMarker is the shape a source appends when it knows what a command
+// returned: two spaces, the marker, the digits, end of string
+// (internal/sources/codex.go, internal/sources/opencode.go).
+const commandExitMarker = "  → exit "
 
 // CommandWithoutExitStatus is withoutExitStatus for the surfaces outside this
 // package that group commands themselves — `deja how` counts its own rows over
