@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/bench"
@@ -215,6 +216,18 @@ type promptReport struct {
 	// present one changes nothing. It earns its keep the day the number moves,
 	// and until then it says how far there is to go.
 	AbsentSubject promptArmReport `json:"absent_subject"`
+	// Every question of the corpus asked in someone else's project. The
+	// hand-written controls are twelve sentences a person thought of; this is
+	// the whole corpus turned against itself, and it grows whenever a chain is
+	// added.
+	CrossPaired promptArmReport `json:"cross_paired"`
+}
+
+// PromptChainRef is a chain reduced to what cross-pairing needs.
+type PromptChainRef struct {
+	Question string
+	Project  string
+	ID       string
 }
 
 func runBenchPrompt(args []string) error {
@@ -240,6 +253,8 @@ func runBenchPrompt(args []string) error {
 		report.Fresh.Fired, report.Fresh.Cases, report.Fresh.Correct, report.Fresh.Precision)
 	fmt.Printf("negative controls  %2d/%-2d  —        false fires: %d\n",
 		report.Negative.Fired, report.Negative.Cases, report.Negative.FalseFires)
+	fmt.Printf("cross-paired       %2d/%-2d  —        false fires: %d\n",
+		report.CrossPaired.Fired, report.CrossPaired.Cases, report.CrossPaired.FalseFires)
 	fmt.Printf("reworded           %2d/%-2d  %2d       %.2f\n",
 		report.Paraphrase.Fired, report.Paraphrase.Cases, report.Paraphrase.Correct, report.Paraphrase.Precision)
 	fmt.Printf("reworded, tied     %2d/%-2d  %2d       %.2f\n",
@@ -496,6 +511,36 @@ func measurePrompt(seed int64) (promptReport, error) {
 			}
 		}
 	}
+	// Cross-paired: every question asked in a project that is not the one it
+	// belongs to. The answer is somewhere else, so a fire is a false one — and
+	// unlike the hand-written controls these are the corpus's own questions,
+	// so the arm grows with it and cannot be written around.
+	//
+	// Measured this way on a real store of 1696 sessions, 400 prompts asked in
+	// another project fired 84 times while the same questions asked at home
+	// fired 398 of 400. That is the number this arm exists to bring down.
+	var crossed []PromptChainRef
+	for _, chain := range corpus.Chains {
+		if chain.Negative || chain.Question == "" || chain.Kind == "background" ||
+			chain.Kind == "bucket" || chain.Kind == "haystack-noise" ||
+			chain.Kind == "concluded-noise" {
+			continue
+		}
+		crossed = append(crossed, PromptChainRef{chain.Question, chain.Project, chain.ID})
+	}
+	sort.Slice(crossed, func(i, j int) bool { return crossed[i].ID < crossed[j].ID })
+	for i, c := range crossed {
+		away := crossed[(i+1)%len(crossed)]
+		if away.Project == c.Project {
+			away = crossed[(i+2)%len(crossed)]
+		}
+		report.CrossPaired.Cases++
+		if fired, _ := promptBenchProbe(indexDir, away.Project, away.ID, prompt.Terms(c.Question)); fired {
+			report.CrossPaired.Fired++
+			report.CrossPaired.FalseFires++
+		}
+	}
+	finishPromptArm(&report.CrossPaired, nil)
 	finishPromptArm(&report.Real, realTerms)
 	finishPromptArm(&report.Negative, negTerms)
 	finishPromptArm(&report.Marathon, nil)
