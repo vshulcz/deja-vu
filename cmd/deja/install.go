@@ -1228,6 +1228,12 @@ func subcommandEndsAt(rest string) bool {
 	switch rest[0] {
 	case ' ', '\t', '\'', '"', ';', '&', '|', ')', '`', '\n':
 		return true
+	// A redirect glued to the word ends it the same way a pipe does, and no
+	// subcommand contains one. Left out at first, so `deja hook-context>>/tmp/x`
+	// read as somebody else's command and deja installed its hook beside it —
+	// two session starts, memory injected twice (#2493).
+	case '>', '<':
+		return true
 	}
 	return false
 }
