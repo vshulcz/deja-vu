@@ -792,6 +792,19 @@ func Conclusions(s model.Session, budget int, max int) []string {
 			// options" arrived without the "and then reverted that" it ended on,
 			// which is the opposite of what the session concluded (#1336).
 			if line = firstSentences(line, 1); spent+len(line) > budget {
+				// Unless one line is the whole answer. Measured on this
+				// machine's index at the tool hook's budget: of 120 sessions,
+				// 29 yielded no conclusion and 16 of those had one — a sentence
+				// a few bytes too long, answered with silence (#2518). A caller
+				// asking for one line is the shape where nothing follows the
+				// cut, so it can be marked the way every other surface marks
+				// one; a caller asking for several keeps the old rule, since
+				// there text would follow the marker.
+				if max == 1 && len(out) == 0 {
+					if cut := markedCut(line, budget); cut != "" {
+						out = append(out, cut)
+					}
+				}
 				break
 			}
 		}
@@ -821,6 +834,21 @@ func isCJKSentenceEnd(r rune) bool {
 		return true
 	}
 	return false
+}
+
+// markedCut is a conclusion held to a budget it does not fit, ending in the
+// marker that says so. Rune-safe, and it gives back nothing when the budget
+// leaves no room for a readable line rather than a bare marker.
+func markedCut(line string, budget int) string {
+	const mark = "…"
+	if budget <= len(mark)+8 {
+		return ""
+	}
+	cut := strings.TrimRight(UTF8SafeCut(line, budget-len(mark)), " \t")
+	if cut == "" {
+		return ""
+	}
+	return cut + mark
 }
 
 // firstSentences keeps the opening n sentences of a message: a conclusion
