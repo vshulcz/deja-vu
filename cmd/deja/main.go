@@ -1529,9 +1529,122 @@ func printNoMatches(w io.Writer, dir, q string, regex bool) {
 	if hint := commandHint(q); hint != "" {
 		fmt.Fprint(w, hint)
 	}
+	// Last of the reasons a miss is not a miss, and the only one where deja is
+	// holding the answer rather than withholding it.
+	if hint := roleServedHint(dir, q); hint != "" {
+		fmt.Fprint(w, hint)
+	}
 	if note := hiddenByOwnSettings(); note != "" {
 		fmt.Fprint(w, note)
 	}
+}
+
+// roleServedHint names the answer deja is holding but ranking will never
+// return.
+//
+// Commands, file lists and edits are 38% of the record log and none of it
+// reaches ranking, on purpose: a path that happens to contain the words of a
+// question is not an answer to it. `how` and `blame` serve those roles when
+// asked for by role — so a word that lives only in a command or a filename
+// misses here while both of them answer it, and "try fewer words" is counsel no
+// rewording can follow, the same wrong turn #2562 and #686 closed for the other
+// reasons a miss is not a miss (#2634).
+//
+// Neither half costs a record-log scan: the commands table is a prebuilt
+// artefact and the touched-file lists are one metadata read.
+func roleServedHint(dir, q string) string {
+	terms := query.Tokens(q)
+	if len(terms) == 0 {
+		return ""
+	}
+	var out strings.Builder
+	if n := commandsMatchingWords(dir, terms); n > 0 {
+		match := "match"
+		if n == 1 {
+			match = "matches"
+		}
+		fmt.Fprintf(&out, "deja: %d command%s this machine ran %s it — `deja how %s`\n",
+			n, pluralS(n), match, q)
+	}
+	if n, name := sessionsTouchingWords(dir, terms); n > 0 {
+		fmt.Fprintf(&out, "deja: %d session%s touched %s — `deja blame %s`\n", n, pluralS(n), name, name)
+	}
+	return out.String()
+}
+
+// commandsMatchingWords counts the commands in the recurring-command table that
+// hold every one of these words.
+//
+// Commands rather than sessions, because the table cannot give an honest
+// session count here: one session that ran two matching commands appears under
+// both, ByProject is capped at commandProjectCap, and summing either would
+// state a number that is wrong in a direction the reader cannot see. How many
+// commands match is exact, and it is the number that decides whether `deja how`
+// is worth typing.
+//
+// The trust policy keys on the project, which is what the table carries, so a
+// command is counted only where a project this path may read has it. The ignore
+// rule matches on path or project and the table has no path, so a session
+// ignored by path alone is not excluded here — the same gap `hook-tool` has.
+func commandsMatchingWords(dir string, terms []string) int {
+	pol := policy.Load()
+	n := 0
+	for _, u := range index.ReadCommands(dir) {
+		low := strings.ToLower(u.Command)
+		matched := true
+		for _, t := range terms {
+			if !commandMentions(low, strings.ToLower(t)) {
+				matched = false
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		for proj := range u.ByProject {
+			if pol.Allows(policy.ActivationSearch, proj) && !pol.Ignored("", proj) {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
+
+// sessionsTouchingWords counts the sessions that touched a file whose name
+// holds every one of these words, and names one such file so the reader has
+// something to hand to blame.
+func sessionsTouchingWords(dir string, terms []string) (int, string) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return 0, ""
+	}
+	pol := policy.Load()
+	n, name := 0, ""
+	for _, meta := range metas {
+		if !pol.Allows(policy.ActivationSearch, meta.Project) || pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		for _, p := range meta.Touched {
+			base := filepath.Base(filepath.FromSlash(p))
+			low := strings.ToLower(base)
+			matched := true
+			for _, t := range terms {
+				if !strings.Contains(low, strings.ToLower(t)) {
+					matched = false
+					break
+				}
+			}
+			if matched {
+				n++
+				if name == "" {
+					name = base
+				}
+				break
+			}
+		}
+	}
+	return n, name
 }
 
 // hiddenByOwnSettings names the states the reader created themselves and can
