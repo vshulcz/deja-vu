@@ -639,7 +639,7 @@ func passHookGates(ranked []model.Session, matched, strong []int, terms []string
 		if i < len(strong) {
 			st = strong[i]
 		}
-		if i < len(matched) && !search.RecallWorthShowing(terms, matched[i], st) {
+		if i < len(matched) && !search.RecallWorthShowing(terms, matched[i], st, nil) {
 			continue
 		}
 		if !search.SpeechCarriesAnyTerm(s, terms) {
@@ -810,7 +810,7 @@ func runHookPrecision(questions []lmeQuestion, limit int) {
 		about := 0
 		// One match, and no claim about how rare it was: -1 keeps the
 		// question-side reading this arm has always used.
-		if len(ranked) > 0 && search.RecallWorthShowing(terms, 1, -1) {
+		if len(ranked) > 0 && search.RecallWorthShowing(terms, 1, -1, nil) {
 			about = 1
 		}
 		switch {
