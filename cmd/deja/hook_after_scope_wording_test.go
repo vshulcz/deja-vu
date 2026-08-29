@@ -17,7 +17,7 @@ func TestTheAfterErrorLineSaysWhoseCommandItIs(t *testing.T) {
 	other := fixLine(index.FixPair{
 		Error: "panic: quaxbolt overflow", Command: "make acme-widen-cast",
 		Key: "claude:acme0", When: when, Project: "clients/acme/api",
-	})
+	}, 1)
 	if other == "" {
 		t.Fatal("no line for a usable pair, so this measures nothing")
 	}
@@ -36,7 +36,7 @@ func TestTheAfterErrorLineSaysWhoseCommandItIs(t *testing.T) {
 	old := fixLine(index.FixPair{
 		Error: "panic: quaxbolt overflow", Command: "make widen-cast",
 		Key: "claude:s0", When: when,
-	})
+	}, 1)
 	if old == "" || !strings.Contains(old, "make widen-cast") {
 		t.Errorf("a pair without a project lost its line: %q", old)
 	}

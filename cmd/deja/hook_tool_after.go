@@ -276,14 +276,28 @@ func fixPairLine(dir, output string) string {
 		return pol.Allows(policy.ActivationAuto, project)
 	})
 	for _, p := range pairs {
-		if line := fixLine(p); line != "" {
+		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
 			return line
 		}
 	}
 	return ""
 }
 
-func fixLine(p index.FixPair) string {
+// frictionCount is how many sessions hit this error, scoped the way the line
+// that reports it is scoped: the pair names a project, so the count is that
+// project's, and a machine-wide pair counts machine-wide. Same trust rule as
+// the pair itself.
+func frictionCount(dir string, p index.FixPair, pol policy.Policy) int {
+	project := strings.TrimSpace(p.Project)
+	return index.FrictionSessions(dir, p.Sig, func(proj string) bool {
+		if !pol.Allows(policy.ActivationAuto, proj) {
+			return false
+		}
+		return project == "" || proj == project
+	})
+}
+
+func fixLine(p index.FixPair, sessions int) string {
 	// Some harnesses store the command with the prompt they printed it after;
 	// the line reads as an instruction, so it should not start with a shell
 	// prompt the reader would have to mentally strip.
@@ -307,7 +321,16 @@ func fixLine(p index.FixPair) string {
 	if project := strings.TrimSpace(search.SafeLine(p.Project)); project != "" {
 		where = "in " + project
 	}
-	return "deja: this error came up " + where + " before" + when + " — what followed it: " + cmd
+	// How often, not just that it happened: "came up before" reads as a
+	// coincidence where "came up in 12 sessions" reads as a property of this
+	// machine. friction, the environment block and the plan finding all lead
+	// with the count; this line, the one that arrives at the moment of the
+	// failure, said only "before" (#2491).
+	how := ""
+	if sessions > 1 {
+		how = " in " + toolSessionCount(sessions)
+	}
+	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }
 
 // exitMarker is the shape a source appends when it knows what a command

@@ -443,6 +443,36 @@ func hitFromRecords(recs []Record) []uint64 {
 	return out
 }
 
+// FrictionSessions counts the sessions that hit one wall, by the signature a
+// FixPair carries. The manifest already holds every session's hashes and is
+// cached, so a caller in a hook pays a map walk rather than a read — which is
+// what lets the line that arrives at the moment of a failure say how often this
+// machine has been here (#2491).
+//
+// allow gates a session's project the way TopFriction's does.
+func FrictionSessions(dir string, sig uint64, allow func(project string) bool) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, meta := range m.Sessions {
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		for _, h := range meta.Hit {
+			if h == sig {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
+
 // FindFriction picks the wall worth showing on a screen with room for one. See
 // TopFriction for allow.
 func FindFriction(dir string, allow func(project string) bool) (Friction, bool) {
