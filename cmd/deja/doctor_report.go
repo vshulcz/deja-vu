@@ -41,6 +41,12 @@ type doctorStore struct {
 	// Skipped is why part of the store could not be read at all — a missing
 	// sqlite3 or zstd CLI. The text row has carried it in its detail; a reader
 	// of --json saw a state and no reason (#1758).
+	// Error is what the parser said when it refused the store. Without it the
+	// report told a person their format may have changed and asked them to
+	// report it, and the report they could send carried no more than the word
+	// "unreadable" — neither they nor we could tell a renamed column from a
+	// locked database from a missing CLI (#1642).
+	Error     string `json:"error,omitempty"`
 	Denied    string `json:"denied,omitempty"`
 	Skipped   string `json:"skipped,omitempty"`
 	Partial   bool   `json:"partial,omitempty"`
@@ -634,6 +640,10 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	// showed up here as a healthy store while its recall was empty.
 	if parseErr != nil {
 		store.State = "unreadable"
+		// Bounded: a sqlite3 error can quote the query, and the query is a
+		// screenful. The head of it names the cause — a missing column, a
+		// locked database, a file that is not a database at all.
+		store.Error = boundedStoreError(parseErr.Error())
 		return store, mod
 	}
 	// A session someone opened and closed without typing parses to nothing,
@@ -795,4 +805,20 @@ func doctorProbeOpencode(db string) ([]model.Session, error) {
 	// time, so sqlite sorts the whole join before it can take the first row.
 	// Narrowing to the newest session first is what makes this cheap.
 	return sources.ParseOpencodeNewest(db)
+}
+
+// storeErrorMax is how much of a parser's complaint the report carries. Long
+// enough for the sentence sqlite3 leads with, short enough that a quoted query
+// does not become the report.
+const storeErrorMax = 300
+
+func boundedStoreError(msg string) string {
+	msg = strings.TrimSpace(msg)
+	if i := strings.IndexAny(msg, "\r\n"); i >= 0 {
+		msg = strings.TrimSpace(msg[:i])
+	}
+	if len(msg) > storeErrorMax {
+		msg = strings.TrimSpace(msg[:storeErrorMax]) + "…"
+	}
+	return msg
 }

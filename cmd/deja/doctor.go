@@ -426,7 +426,15 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 			// The store is there and deja cannot read it — usually a harness
 			// that changed its format. Silence here reads as "you have no
 			// history with that agent".
-			fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
+			// With the reason. "Please report it" and nothing to report is how
+			// #1642 arrived: a store deja refused, and no way for its owner or
+			// for us to tell which refusal it was.
+			if store.Error != "" {
+				fmt.Fprintf(w, "  warning      %s store cannot be read — %s; please report it\n",
+					store.Name, store.Error)
+			} else {
+				fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
+			}
 		case "denied":
 			// Not a format change and not an empty history: deja is not
 			// allowed to read the files. On macOS this is usually Full Disk
