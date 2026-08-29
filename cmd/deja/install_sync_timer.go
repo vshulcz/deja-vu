@@ -228,13 +228,20 @@ func syncTimerBinary(goos string) (exe string, scheduled bool) {
 		if err != nil {
 			return "", false
 		}
-		// The first <string> under ProgramArguments is the binary; install
-		// writes it XML-escaped, so it comes back unescaped here.
+		// Anchored on the key, not on the first <array>: a hand-edited plist
+		// can carry another array above this one, and reading the wrong
+		// element would have doctor call a healthy timer broken. install
+		// writes the path XML-escaped, so it comes back unescaped here.
 		body := string(b)
-		i := strings.Index(body, "<array>")
+		k := strings.Index(body, "<key>ProgramArguments</key>")
+		if k < 0 {
+			return "", true
+		}
+		i := strings.Index(body[k:], "<array>")
 		if i < 0 {
 			return "", true
 		}
+		i += k
 		rest := body[i:]
 		start := strings.Index(rest, "<string>")
 		end := strings.Index(rest, "</string>")
