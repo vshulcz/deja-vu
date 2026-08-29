@@ -225,9 +225,21 @@ func dropRetiredGuidance(harness string, uninstall bool) (note string, err error
 			// deleted, so a skill someone wrote themselves is never touched.
 			if filepath.Base(path) == "SKILL.md" &&
 				filepath.Base(filepath.Dir(path)) == "deja-history" &&
+				!restoredGuidance[path] &&
 				strings.Contains(string(old), "name: deja-history") {
 				if err := os.Remove(path); err != nil {
 					return note, err
+				}
+				// Put back what install replaced, before the directory is
+				// considered empty: install promised the reader's copy was
+				// kept, and removing deja's file without restoring it left
+				// that copy as a .bak beside nothing (#2581).
+				restored, rerr := restoreReplacedGuidance(path, harness)
+				if rerr != nil {
+					return note, rerr
+				}
+				if restored {
+					continue
 				}
 				// Take the directory too, but only if we emptied it.
 				_ = os.Remove(filepath.Dir(path))
@@ -388,8 +400,22 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 			if sharedSkillHarnesses[harness] && sharedSkillStillWanted(harness) {
 				return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
 			}
+			if restoredGuidance[path] {
+				return installResult{Path: path, Action: "kept", Note: retiredNote}, nil
+			}
 			if err := os.Remove(path); err != nil {
 				return installResult{}, err
+			}
+			// And put back what install replaced. It said where the copy went
+			// — "your copy is at …SKILL.md.bak" — and removing deja's file
+			// without restoring it left the reader's own skill as a backup
+			// beside nothing (#2581).
+			restored, rerr := restoreReplacedGuidance(path, harness)
+			if rerr != nil {
+				return installResult{}, rerr
+			}
+			if restored {
+				return installResult{Path: path, Action: "restored", Note: retiredNote}, nil
 			}
 			return installResult{Path: path, Action: "removed", Note: retiredNote}, nil
 		} else {
@@ -651,4 +677,35 @@ func guidanceOutput(harness string, result installResult) string {
 		line += "\n" + strings.Repeat(" ", len(harness)+2) + result.Note
 	}
 	return line
+}
+
+// restoredGuidance is what this run has already put back. `uninstall claude-code`
+// runs the auto variant too, and the second pass met the reader's own file,
+// matched it on `name: deja-history` — which it must, to be that skill — and
+// deleted what the first pass had just restored (#2581).
+var restoredGuidance = map[string]bool{}
+
+// restoreReplacedGuidance puts back the file install replaced, and reports
+// whether it did. A backup holding deja's own text — an older guidance version,
+// snapshotted by a later install — is dropped instead: nobody asked for that
+// file, and leaving deja's own words behind after an uninstall is what #2575
+// was about.
+func restoreReplacedGuidance(path, harness string) (bool, error) {
+	bak := path + ".bak"
+	b, err := os.ReadFile(bak)
+	if err != nil {
+		return false, nil
+	}
+	if bytes.Equal(bytes.TrimSpace(b), bytes.TrimSpace([]byte(guidanceText(harness)))) {
+		return false, os.Remove(bak)
+	}
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		return false, err
+	}
+	if err := os.Remove(bak); err != nil {
+		return false, err
+	}
+	restoredGuidance[path] = true
+	fmt.Printf("skill: put back %s, the copy install replaced\n", shortHome(path))
+	return true, nil
 }
