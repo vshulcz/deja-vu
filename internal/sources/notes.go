@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -523,11 +524,91 @@ type PromotedNote struct {
 	At      time.Time
 }
 
+// notesMemo remembers one parse of the notes file. The file only grows — every
+// promotion, every sync import, for the life of the machine — and it is read
+// twice by a single `hook-tool` run before an edit: once for the promoted
+// decision, once for the lifecycle states behind the conclusion scan (#2497).
+// Keyed on size and modification time, so a promotion made in one MCP call is
+// visible in the next; the manifest is remembered the same way.
+//
+// What that key cannot see: a hand edit that changes no byte count — swapping
+// `accepted` for `rejected` is the same eight characters — on a filesystem
+// whose modification times are whole seconds, read again by the same
+// long-lived process inside that second. Every write deja makes is an append,
+// so this needs a person editing the file by hand at exactly that moment; the
+// next read after that second sees it.
+var notesMemo struct {
+	sync.Mutex
+	path    string
+	size    int64
+	mod     time.Time
+	notes   []PromotedNote
+	states  map[string]Lifecycle
+	parses  int
+	stamped bool
+}
+
+// notesParses counts the parses that actually read the file, for the test that
+// pins the memo.
+func notesParses() int {
+	notesMemo.Lock()
+	defer notesMemo.Unlock()
+	return notesMemo.parses
+}
+
+// notesStamp identifies the file a memo was built from. A file that cannot be
+// stat'd is never memoized: the read below answers with nothing and remembering
+// that would hide the file arriving a moment later.
+func notesStamp(path string) (int64, time.Time, bool) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0, time.Time{}, false
+	}
+	return fi.Size(), fi.ModTime(), true
+}
+
+// notesFresh reports whether the memo still describes the file, and takes the
+// lock's word for it — callers hold the lock.
+func notesFresh(path string, size int64, mod time.Time, ok bool) bool {
+	return ok && notesMemo.stamped && notesMemo.path == path &&
+		notesMemo.size == size && notesMemo.mod.Equal(mod)
+}
+
 // LoadPromotedNotes returns the latest state per promoted source session.
 func LoadPromotedNotes() []PromotedNote {
+	path := NotesFile()
+	size, mod, statOK := notesStamp(path)
+	notesMemo.Lock()
+	if notesFresh(path, size, mod, statOK) && notesMemo.notes != nil {
+		// A copy: the caller owns what it gets. The page appends its synced
+		// decisions to this slice and sorts the result, and handing back the
+		// memo's own array would let that reorder what the next caller reads.
+		out := append([]PromotedNote(nil), notesMemo.notes...)
+		notesMemo.Unlock()
+		return out
+	}
+	notesMemo.Unlock()
+
+	out := loadPromotedNotesFrom(path)
+	notesMemo.Lock()
+	if statOK {
+		if !notesFresh(path, size, mod, statOK) {
+			notesMemo.path, notesMemo.size, notesMemo.mod = path, size, mod
+			notesMemo.stamped, notesMemo.states = true, nil
+		}
+		// The memo keeps its own array for the same reason the read above
+		// hands out a copy.
+		notesMemo.notes = append([]PromotedNote(nil), out...)
+	}
+	notesMemo.parses++
+	notesMemo.Unlock()
+	return out
+}
+
+func loadPromotedNotesFrom(path string) []PromotedNote {
 	latest := map[string]*PromotedNote{}
 	var order []string
-	_ = scanJSONLFromOffset(NotesFile(), 0, func(m map[string]any) {
+	_ = scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		kind, _ := m["kind"].(string)
 		if kind != "promoted" {
 			return
