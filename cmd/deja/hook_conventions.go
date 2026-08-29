@@ -3,7 +3,10 @@ package main
 import (
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -37,6 +40,14 @@ func projectConventions(names []string, maxNotes, budget int) string {
 		}
 		picked = append(picked, n)
 	}
+	// And the ones the team agreed on elsewhere. A promotion that arrived by
+	// sync is not in this machine's notes file — it is a session carrying its
+	// state, under the source machine's project name (#975), so neither half of
+	// the loop above can see it and the block quietly stopped naming the
+	// decisions syncing exists to share (#2512). Scoped by the rule every
+	// automatic surface shares (#2333) and by the auto activation, since this
+	// block is read unasked.
+	picked = append(picked, importedConventions(names)...)
 	if len(picked) == 0 {
 		return ""
 	}
@@ -66,6 +77,52 @@ func projectConventions(names []string, maxNotes, budget int) string {
 		return ""
 	}
 	return b.String()
+}
+
+// importedConventions reads the standing decisions that arrived by sync. The
+// manifest holds them, so this costs a map walk rather than a read; the same
+// shape the view page (#2421) and the line before an edit (#2511) read.
+func importedConventions(names []string) []sources.PromotedNote {
+	pol := policy.Load()
+	metas := index.PromotedNoteMetas(index.DefaultDir(), func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project)
+	})
+	var out []sources.PromotedNote
+	for _, meta := range metas {
+		if meta.Lifecycle != "accepted" {
+			continue
+		}
+		if !inAnyProject(meta.Project, names) {
+			continue
+		}
+		when := meta.Updated
+		if t, err := time.Parse(time.RFC3339, meta.LifecycleAt); err == nil {
+			when = t
+		} else if t, err := time.Parse("2006-01-02", meta.LifecycleAt); err == nil {
+			when = t
+		}
+		text := meta.LifecycleNote
+		if strings.TrimSpace(text) == "" {
+			text = meta.Title
+		}
+		out = append(out, sources.PromotedNote{
+			Project: meta.Project, State: meta.Lifecycle, Title: meta.Title, Text: text, At: when,
+		})
+	}
+	return out
+}
+
+// inAnyProject asks the shared question: is this session's project the one the
+// reader is standing in. It strips `imported:` and matches a peer's project by
+// suffix, which is what makes a decision from another machine belong to the
+// project it was made in rather than to a name that happens to match.
+func inAnyProject(project string, names []string) bool {
+	for _, n := range names {
+		if n != "" && index.ProjectInScope(project, n) {
+			return true
+		}
+	}
+	return false
 }
 
 // conventionLine is the one line to show for a promoted note: its title, or the
