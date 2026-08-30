@@ -48,9 +48,14 @@ func TestAnErrorThatIsNotAboutThePatternIsLeftAlone(t *testing.T) {
 // pattern did: an escape byte there reached the terminal through the one line
 // written to keep it off (#1794's shape, in #1602's fix).
 func TestTheFragmentInTheRefusalCarriesNoControlByte(t *testing.T) {
-	// Built rather than written inline: a literal that cannot compile is what
-	// staticcheck's SA1000 exists to catch, and here it is the input.
-	pattern := "[" + string(rune(0x1b)) + "-" + string(rune(0x01)) + "]"
+	// Assembled at run time: a pattern that cannot compile is what
+	// staticcheck's SA1000 exists to catch, and here it is the input, so it
+	// must not be a constant it can fold.
+	var b []byte
+	for _, c := range []byte{'[', 0x1b, '-', 0x01, ']'} {
+		b = append(b, c)
+	}
+	pattern := string(b)
 	_, err := regexp.Compile(pattern)
 	if err == nil {
 		t.Fatal("that pattern compiles now; pick another")
