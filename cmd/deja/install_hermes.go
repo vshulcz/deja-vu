@@ -32,12 +32,18 @@ func installHermesPlugin(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	manifestPath := filepath.Join(dir, "plugin.yaml")
-	oldManifest, _ := os.ReadFile(manifestPath)
+	oldManifest, err := readConfig(manifestPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	if _, err := writeIfChanged(manifestPath, oldManifest, []byte(hermesPluginManifest)); err != nil {
 		return installResult{}, err
 	}
 	codePath := filepath.Join(dir, "__init__.py")
-	oldCode, _ := os.ReadFile(codePath)
+	oldCode, err := readConfig(codePath)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(codePath, oldCode, []byte(hermesPluginPy(exe)))
 	if err != nil {
 		return installResult{}, err

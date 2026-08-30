@@ -46,12 +46,18 @@ func installAntigravityPlugin(exe string, uninstall bool) (installResult, error)
 	}
 	manifest = append(manifest, '\n')
 	manifestPath := filepath.Join(dir, "plugin.json")
-	oldManifest, _ := os.ReadFile(manifestPath)
+	oldManifest, err := readConfig(manifestPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	if _, err := writeIfChanged(manifestPath, oldManifest, manifest); err != nil {
 		return installResult{}, err
 	}
 	hooksPath := filepath.Join(dir, "hooks.json")
-	oldHooks, _ := os.ReadFile(hooksPath)
+	oldHooks, err := readConfig(hooksPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	next, err := json.MarshalIndent(map[string]any{
 		"deja-recall": map[string]any{
 			"PreInvocation": []any{map[string]any{

@@ -50,7 +50,10 @@ func syncAutoPlistPath() string {
 
 func installSyncTimerLaunchd(exe string, uninstall bool) (installResult, error) {
 	path := syncAutoPlistPath()
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	if uninstall {
 		if len(old) > 0 {
 			_, _ = runLaunchctl("unload", path)
@@ -109,8 +112,14 @@ func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) 
 	dir := syncAutoUnitDir()
 	service := filepath.Join(dir, "deja-sync.service")
 	timer := filepath.Join(dir, "deja-sync.timer")
-	oldService, _ := os.ReadFile(service)
-	oldTimer, _ := os.ReadFile(timer)
+	oldService, err := readConfig(service)
+	if err != nil {
+		return installResult{}, err
+	}
+	oldTimer, err := readConfig(timer)
+	if err != nil {
+		return installResult{}, err
+	}
 	if uninstall {
 		if len(oldTimer) > 0 {
 			_, _ = runSystemctl("--user", "disable", "--now", "deja-sync.timer")

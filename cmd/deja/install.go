@@ -161,9 +161,6 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	}
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
-		if err == nil {
-			err = configWasReadable(r.Path)
-		}
 		if err != nil {
 			note(t, err)
 			continue
@@ -1075,34 +1072,28 @@ func matchFinalNewline(old, next []byte) []byte {
 	return bytes.TrimSuffix(next, []byte("\r"))
 }
 
-// configWasReadable refuses a target whose config could not be read.
+// readConfig reads a config a writer is about to edit.
 //
-// The writers read the old config with `old, _ := os.ReadFile`, and an
-// unreadable file is empty to all of them. writeIfChanged refuses before it
-// writes over one, but a writer that decides there is nothing to do never gets
-// that far: `uninstall cursor` found no entry to remove and reported the target
-// unwired while its config still named deja (#2751).
-func configWasReadable(path string) error {
-	if path == "" {
-		return nil
+// Every writer used to read it with `old, _ := os.ReadFile`, so a file that
+// exists but cannot be read was empty to all of them and deja wrote a config
+// holding only deja over it. A file that is not there is still empty — that is
+// the ordinary first install — but anything else is the reader's config, and
+// deja cannot edit what it cannot read (#2751).
+func readConfig(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	return f.Close()
+	return b, nil
 }
 
 func writeIfChanged(path string, old, next []byte) (string, error) {
-	// Every writer reads the old config with `old, _ := os.ReadFile`, so a
-	// file that exists but cannot be read arrived here as an empty one and was
-	// written over with a config holding deja and nothing else. backupOnce
-	// used to catch it by reading the file itself — but it takes one snapshot
-	// per file and returns early once a `.bak` is beside it, which is the
-	// ordinary state after any earlier install (#2751).
+	// The last guard for a file deja could not read: the writers go through
+	// readConfig now, but this also covers the ones that write a file they
+	// never read. An unreadable config used to be an empty one here, and
+	// backupOnce hid it — it takes one snapshot per file and returns early
+	// once a `.bak` is beside it, which is the ordinary state after any
+	// earlier install (#2751).
 	if f, err := os.Open(path); err == nil {
 		_ = f.Close()
 	} else if !os.IsNotExist(err) {
@@ -1246,7 +1237,10 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 
 func installClaude(exe string, uninstall bool) (installResult, error) {
 	path := sources.ClaudeJSONPath()
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -1332,7 +1326,10 @@ var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
@@ -1580,7 +1577,10 @@ func combinedStatusline(existing, exe string) string {
 // ccstatusline or their own script) — printing how to combine instead.
 func installStatusline(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
@@ -1670,7 +1670,10 @@ type tomlMCPBlock struct {
 }
 
 func installTOML(path, block string, uninstall bool) (installResult, error) {
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	text := lfText(old)
 	blocks := tomlMCPBlocks(text)
 	hasDeja := false
@@ -2362,7 +2365,10 @@ func installCursor(exe string, uninstall bool) (installResult, error) {
 // mcpServers shape: entries carry a type and an enabled-tools list.
 func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.Home(), ".copilot", "mcp-config.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -2420,7 +2426,10 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 // servers under mcp.servers, not the common mcpServers root.
 func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -2481,7 +2490,10 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 }
 
 func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
@@ -2548,10 +2560,12 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 			path = filepath.Join(dir, "opencode.jsonc")
 		}
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var next []byte
 	var note string
-	var err error
 	if strings.HasSuffix(path, ".jsonc") {
 		next, note, err = updateOpencodeJSONC(old, exe, uninstall)
 	} else {

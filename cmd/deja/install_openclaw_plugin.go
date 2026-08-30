@@ -44,13 +44,19 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 		{"openclaw.plugin.json", openclawPluginManifest()},
 	} {
 		path := filepath.Join(dir, f.name)
-		old, _ := os.ReadFile(path)
+		old, err := readConfig(path)
+		if err != nil {
+			return installResult{}, err
+		}
 		if _, err := writeIfChanged(path, old, []byte(f.body)); err != nil {
 			return installResult{}, err
 		}
 	}
 	entry := filepath.Join(dir, "index.mjs")
-	old, _ := os.ReadFile(entry)
+	old, err := readConfig(entry)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(entry, old, []byte(openclawPluginJS(exe)))
 	if err != nil {
 		return installResult{}, err
@@ -65,7 +71,10 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 // leaving every other plugin — and the user's allow list — untouched.
 func setOpenClawPluginEnabled(on bool) (string, error) {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return "", err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		if !on {

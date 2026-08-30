@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -16,8 +17,8 @@ import (
 // earlier install, and then the user's config went with nothing left of it
 // (#2751).
 func TestAConfigThatCannotBeReadIsNotOverwritten(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root reads it anyway")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod does not take a file's read away here")
 	}
 	hermeticEnv(t)
 	path := filepath.Join(sources.CursorCLIHome(), "mcp.json")
@@ -59,8 +60,8 @@ func TestAConfigThatCannotBeReadIsNotOverwritten(t *testing.T) {
 // And the same on the way out: what cannot be read cannot be edited down to
 // "the file without deja in it" either.
 func TestUninstallDoesNotWriteOverAConfigItCannotRead(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root reads it anyway")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod does not take a file's read away here")
 	}
 	hermeticEnv(t)
 	if _, err := captureRun(t, "install", "cursor", "--no-index"); err != nil {
@@ -81,6 +82,8 @@ func TestUninstallDoesNotWriteOverAConfigItCannotRead(t *testing.T) {
 
 	if _, err := captureRun(t, "uninstall", "cursor"); err == nil {
 		t.Error("a config deja could not read was reported as unwired")
+	} else if !strings.Contains(err.Error(), path) {
+		t.Errorf("the refusal does not name the config: %v", err)
 	}
 	if err := os.Chmod(path, 0o644); err != nil {
 		t.Fatal(err)
@@ -91,5 +94,42 @@ func TestUninstallDoesNotWriteOverAConfigItCannotRead(t *testing.T) {
 	}
 	if string(after) != string(before) {
 		t.Errorf("the config was written over on the way out:\n%s", after)
+	}
+}
+
+// A target that wires more than one file has to be refused on the file that
+// cannot be read, not on whichever one it happens to report: `uninstall
+// claude-auto` read no entry to remove from an unreadable ~/.claude.json and
+// said the target was unwired while the file still named deja.
+func TestAMultiFileTargetIsRefusedOnTheFileItCannotRead(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod does not take a file's read away here")
+	}
+	hermeticEnv(t)
+	if _, err := captureRun(t, "install", "claude-auto", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	path := sources.ClaudeJSONPath()
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+
+	if _, err := captureRun(t, "uninstall", "claude-auto"); err == nil {
+		t.Error("a target was reported unwired while a config it could not read still names deja")
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after, rerr := os.ReadFile(path)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	if string(after) != string(before) {
+		t.Errorf("the config was written over:\n%s", after)
 	}
 }

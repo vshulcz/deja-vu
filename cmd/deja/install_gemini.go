@@ -53,7 +53,10 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	manifestPath := filepath.Join(dir, "gemini-extension.json")
-	oldManifest, _ := os.ReadFile(manifestPath)
+	oldManifest, err := readConfig(manifestPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	if _, err := writeIfChanged(manifestPath, oldManifest, append(manifest, '\n')); err != nil {
 		return installResult{}, err
 	}
@@ -85,7 +88,10 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	hooksPath := filepath.Join(dir, "hooks", "hooks.json")
-	oldHooks, _ := os.ReadFile(hooksPath)
+	oldHooks, err := readConfig(hooksPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(hooksPath, oldHooks, append(hooks, '\n'))
 	if err != nil {
 		return installResult{}, err
@@ -117,7 +123,10 @@ func geminiHooksEnabled() bool {
 // loaded and its hooks are never run.
 func enableGeminiHooks() error {
 	path := filepath.Join(sources.GeminiHome(), "settings.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}

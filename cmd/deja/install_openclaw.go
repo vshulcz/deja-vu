@@ -44,12 +44,18 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	docPath := filepath.Join(dir, "HOOK.md")
-	oldDoc, _ := os.ReadFile(docPath)
+	oldDoc, err := readConfig(docPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	if _, err := writeIfChanged(docPath, oldDoc, []byte(openclawHookDoc())); err != nil {
 		return installResult{}, err
 	}
 	handlerPath := filepath.Join(dir, "handler.js")
-	oldHandler, _ := os.ReadFile(handlerPath)
+	oldHandler, err := readConfig(handlerPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(handlerPath, oldHandler, []byte(openclawHandlerJS(exe)))
 	if err != nil {
 		return installResult{}, err
@@ -64,7 +70,10 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 // both, the pack is discovered and listed as ready but never invoked.
 func setOpenClawHookEnabled(on bool) (string, error) {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return "", err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		if !on {

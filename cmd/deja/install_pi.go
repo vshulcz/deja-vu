@@ -31,7 +31,10 @@ func installPiExtension(exe string, uninstall bool) (installResult, error) {
 		}
 		return installResult{Path: path, Action: "removed"}, nil
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	next := []byte(piExtensionTS(exe))
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a}, err

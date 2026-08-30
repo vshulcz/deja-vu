@@ -339,13 +339,19 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if err := os.MkdirAll(filepath.Dir(cmdPath), 0o755); err != nil {
 		return installResult{}, err
 	}
-	oldCmd, _ := os.ReadFile(cmdPath)
+	oldCmd, err := readConfig(cmdPath)
+	if err != nil {
+		return installResult{}, err
+	}
 	if _, err := writeIfChanged(cmdPath, oldCmd, []byte(dshCommandJS(exe))); err != nil {
 		return installResult{}, err
 	}
 	if withAuto {
 		autoPath := dshAutoPath()
-		oldAuto, _ := os.ReadFile(autoPath)
+		oldAuto, err := readConfig(autoPath)
+		if err != nil {
+			return installResult{}, err
+		}
 		if _, err := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(exe))); err != nil {
 			return installResult{}, err
 		}

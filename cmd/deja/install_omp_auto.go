@@ -44,7 +44,10 @@ func installOmpAuto(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(path, old, []byte(ompExtensionJS(exe)))
 	return installResult{Path: path, Action: a}, err
 }

@@ -138,7 +138,10 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(path, old, []byte(commandFileText(harness, exe)))
 	return installResult{Path: path, Action: a}, err
 }

@@ -295,7 +295,10 @@ func writeGooseHook() error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
 	_, werr := writeIfChanged(path, old, body)
 	return werr
 }
@@ -364,7 +367,10 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
 	_, err = writeIfChanged(path, old, []byte(out.String()))
 	return err
 }
@@ -398,8 +404,11 @@ func refreshGooseHintsFor(cwd string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	old, _ := os.ReadFile(path)
-	_, err := writeIfChanged(path, old, []byte(body))
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
+	_, err = writeIfChanged(path, old, []byte(body))
 	return err
 }
 

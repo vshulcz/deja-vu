@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -19,7 +18,10 @@ import (
 // with both installed still gets one injection, not two.
 func installCursorHooks(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.CursorCLIHome(), "hooks.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}

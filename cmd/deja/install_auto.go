@@ -39,7 +39,10 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	// codex home gets its hooks written where codex actually reads them. Every
 	// other codex path already goes through it (e.g. doctor.go). See #850.
 	path := filepath.Join(sources.CodexHome(), "hooks.json")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
@@ -153,7 +156,10 @@ func installOpencodePlugin(exe string, uninstall bool) (installResult, error) {
 		}
 		return installResult{Path: path, Action: "removed"}, nil
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	next := []byte(opencodePluginJS(exe))
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a}, err
@@ -333,7 +339,10 @@ func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string
 // no longer uses. Without it a generator fix ships and the old, dead entry
 // keeps firing next to the new one for everyone who installed before.
 func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd string, uninstall bool, retire map[string]bool) (installResult, error) {
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	var root map[string]any
 	// A settings file carrying comments cannot be rewritten without losing
 	// them, and a hook entry is an element in an event array rather than a key
@@ -465,7 +474,10 @@ const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`
 // this look like a harness that cannot take context at all.
 func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	s := strings.TrimRight(removeKimiHookBlock(lfText(old)), "\n")
 	if !uninstall {
 		block := kimiHookMarker + "\n[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = " +

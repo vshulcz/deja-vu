@@ -707,6 +707,11 @@ func restoreReplacedFile(path string, ours func([]byte) bool) (bool, error) {
 	if ours(b) {
 		return false, os.Remove(bak)
 	}
+	// The one write that does not go through writeIfChanged: a file deja
+	// cannot read is not one to put the snapshot back over (#2751).
+	if _, err := readConfig(path); err != nil {
+		return false, err
+	}
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		return false, err
 	}

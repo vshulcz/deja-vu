@@ -157,7 +157,10 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		if err := os.MkdirAll(filepath.Dir(recipe), 0o755); err != nil {
 			return installResult{}, err
 		}
-		oldRecipe, _ := os.ReadFile(recipe)
+		oldRecipe, err := readConfig(recipe)
+		if err != nil {
+			return installResult{}, err
+		}
 		if _, err := writeIfChanged(recipe, oldRecipe, []byte(gooseRecipe(exe))); err != nil {
 			return installResult{}, err
 		}

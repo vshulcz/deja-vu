@@ -38,7 +38,10 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}
-	old, _ := os.ReadFile(path)
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
 	a, err := writeIfChanged(path, old, []byte(clinePluginJS(exe)))
 	if err != nil {
 		return installResult{}, err
@@ -52,7 +55,10 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(skill, 0o755); err != nil {
 		return installResult{}, err
 	}
-	oldSkill, _ := os.ReadFile(filepath.Join(skill, "SKILL.md"))
+	oldSkill, err := readConfig(filepath.Join(skill, "SKILL.md"))
+	if err != nil {
+		return installResult{}, err
+	}
 	if _, err := writeGuidanceFile(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(skillFile(skillBody))); err != nil {
 		return installResult{}, err
 	}
