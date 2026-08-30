@@ -107,7 +107,7 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	q := `select session_id,role,content,timestamp from messages ` +
 		`where role in ('user','assistant') and content is not null and content <> ''` + where +
 		` order by session_id,timestamp,id`
-	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err

@@ -195,7 +195,7 @@ func zedSinceWhere(t time.Time) string {
 
 func zedRows(db, cols, where string) ([]zedRow, error) {
 	q := "select " + cols + " from threads" + where + " order by updated_at"
-	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err

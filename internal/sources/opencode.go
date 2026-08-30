@@ -136,7 +136,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
 	// What sqlite3 says when it refuses, not merely that it did. "exit status
 	// 1" is what a person was asked to report, and it names neither a renamed
 	// column nor a locked database nor a file that is not a database (#1642).
@@ -272,7 +272,7 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	if fi, e := os.Stat(OpencodeDB()); e != nil || fi.Size() == 0 {
 		return 0, 0, nil
 	}
-	cmd := exec.Command("sqlite3", "-readonly", OpencodeDB(), ".timeout 5000", "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(OpencodeDB()), ".timeout 5000", "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
 	b, err := cmd.Output()
 	if err != nil {
 		return 0, 0, err
@@ -319,7 +319,7 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	probe := exec.Command("sqlite3", "-readonly", db, ".timeout 5000",
+	probe := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
 		"select id from session order by time_created desc limit 1")
 	var whyNot bytes.Buffer
 	probe.Stderr = &whyNot

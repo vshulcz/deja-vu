@@ -281,7 +281,7 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 }
 
 func cursorQuery(db, q string) ([]map[string]any, error) {
-	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
 	b, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("cursor sqlite: %w", err)
