@@ -22,7 +22,9 @@ func TestUnderTempDirKnowsAScratchBuild(t *testing.T) {
 		{"/private/tmp/scratch/deja", true},
 		{"/usr/local/bin/deja", false},
 		{"/opt/homebrew/bin/deja", false},
-		{filepath.Join(os.Getenv("HOME"), ".local", "bin", "deja"), false},
+		// A literal home, not this process's: the suite runs with HOME under a
+		// temp directory, where ~/.local/bin really is temporary.
+		{"/home/someone/.local/bin/deja", false},
 		{"", false},
 	} {
 		if got := underTempDir(tc.path); got != tc.temp {
@@ -80,9 +82,15 @@ func TestTheRepairRefusesToAdoptATempBinary(t *testing.T) {
 		t.Fatalf("the config was rewritten for a build in a temp directory:\nwas:\n%s\nnow:\n%s", before, after)
 	}
 
-	// And a real upgrade still repairs itself.
+	// And a real upgrade still repairs itself. If the environment stopped the
+	// repair for a reason of its own — a target that cannot be written — say so
+	// rather than blame the guard, which is what this test is about.
 	exeIsTemporary = func(string) bool { return false }
-	if rewired := refreshWiringAfterUpgrade(); len(rewired) == 0 {
+	rewired := refreshWiringAfterUpgrade()
+	if len(stuckWiring) > 0 && len(rewired) == 0 {
+		t.Skipf("the repair could not write here: %v", stuckWiring)
+	}
+	if len(rewired) == 0 {
 		t.Fatal("a binary that moved to a real location was not adopted")
 	}
 }
