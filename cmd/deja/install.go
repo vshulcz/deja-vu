@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -2737,6 +2738,10 @@ func jsoncBraceDelta(code string) int {
 	return depth
 }
 
+// emptyJSONCBlockRE matches an "mcp" block with nothing in it, however the
+// reader spaced the braces.
+var emptyJSONCBlockRE = regexp.MustCompile(`"mcp"\s*:\s*\{\s*\}`)
+
 func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string, error) {
 	line := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
 	s := string(old)
@@ -2748,6 +2753,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	}
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	start, end := -1, -1
+	sameLine := false
 	inBlock := false
 	for i, l := range lines {
 		code, next, _ := jsoncCodeOf(l, inBlock)
@@ -2755,6 +2761,15 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		if strings.Contains(code, `"mcp"`) && strings.Contains(code, "{") {
 			start = i
 			depth := jsoncBraceDelta(code)
+			if depth <= 0 {
+				// The block opens and closes on the line that names it. There
+				// are no lines between the braces to insert between, and the
+				// general path below wrote the entry after the block instead —
+				// outside it, and leaving a file no parser would read (#2742).
+				sameLine = true
+				end = i
+				break
+			}
 			block := inBlock
 			for j := i + 1; j < len(lines); j++ {
 				c, nb, _ := jsoncCodeOf(lines[j], block)
@@ -2767,6 +2782,24 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			}
 			break
 		}
+	}
+	if sameLine && !uninstall {
+		code, _, _ := jsoncCodeOf(lines[start], false)
+		// Only an empty one. A block with entries already on that line is a
+		// shape this text path cannot edit safely, and the refusal below says
+		// so rather than guessing where the commas go.
+		if !emptyJSONCBlockRE.MatchString(code) {
+			return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+		}
+		indent := lines[start][:len(lines[start])-len(strings.TrimLeft(lines[start], " \t"))]
+		at := strings.LastIndex(lines[start], "{")
+		head := lines[start][:at+1]
+		tail := lines[start][at+1:]
+		tail = strings.Replace(tail, "}", "", 1)
+		out := append([]string{}, lines[:start]...)
+		out = append(out, head, line, indent+"}"+tail)
+		out = append(out, lines[start+1:]...)
+		return []byte(strings.Join(out, "\n") + "\n"), "", nil
 	}
 	if start >= 0 && end > start {
 		// The lines this drops are the entry that was already here. Naming what
