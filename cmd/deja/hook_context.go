@@ -451,12 +451,19 @@ func runHookContext(dir string, plain bool) error {
 				sessions, plural, why, teaching, svc, polNote, earned)+
 				fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest))))))
 	}
-	// Nothing to recall yet because the index is still being built: say so
-	// rather than starting in silence. The build runs detached, so the agent
-	// is already usable — this only explains why memory is not here yet.
-	if resp.SystemMessage == "" {
-		if st := readWarmupStatus(dir); st != nil {
-			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), st.line()))
+	// A build under way is said whether or not there is a receipt. Gating it on
+	// an empty message covered the session with nothing to recall and left out
+	// the one that has something: the digest there came from the cache, which
+	// is the user's own history and right to serve (#874), while the store
+	// behind it cannot answer a term until the build lands. What that session
+	// printed was "the agent starts already knowing them" and nothing else
+	// (#2697) — the silence #927 fixed on the environment-facts path, reached
+	// from the other side.
+	if note := buildNotice(dir); note != "" {
+		if resp.SystemMessage == "" {
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), note))
+		} else {
+			resp.SystemMessage = joinNotes(resp.SystemMessage, note)
 		}
 	}
 	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
