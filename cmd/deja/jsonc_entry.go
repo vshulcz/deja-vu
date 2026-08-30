@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -295,4 +297,26 @@ func jsoncIsKey(text string, end int) bool {
 		}
 	}
 	return false
+}
+
+// readableStrictJSON refuses before anything is written when a config the
+// target is about to edit cannot be parsed.
+//
+// A target that wires more than one file wrote the first and refused the
+// second, so a run reported as refused had already changed a config and left a
+// snapshot beside it (#2744). The writers that edit an entry take a file with
+// comments; the hook writers cannot, and this is where that is found out —
+// before the first write rather than after it.
+func readableStrictJSON(paths ...string) error {
+	for _, path := range paths {
+		b, err := os.ReadFile(path)
+		if err != nil || len(bytes.TrimSpace(b)) == 0 {
+			continue
+		}
+		var probe any
+		if err := json.Unmarshal(b, &probe); err != nil {
+			return configParseError(path, err)
+		}
+	}
+	return nil
 }
