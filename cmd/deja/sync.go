@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // importedSessionTotal counts the sessions this index holds that came from
@@ -226,6 +227,13 @@ func runSync(dir string, args []string) error {
 				what = "them"
 			}
 			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — no session id to attribute %s to; the batch may be from a different tool or damaged\n", inc, pluralS(inc), what)
+		}
+		// The reader's own pattern, and the drop most likely to empty a batch
+		// entirely — after which "imported 0 records" is the whole story they
+		// get (#2666).
+		if ex := index.ImportSkippedExcluded(); ex > 0 {
+			fmt.Fprintf(os.Stdout, "deja: %d record%s left out — your exclude list covers their project (%s)\n",
+				ex, pluralS(ex), reportPath(sources.ExcludePath()))
 		}
 		if err != nil {
 			return err

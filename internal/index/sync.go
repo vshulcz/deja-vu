@@ -322,6 +322,16 @@ var lastImportSkippedForgotten int
 // leave alone (#968).
 func ImportSkippedForgotten() int { return lastImportSkippedForgotten }
 
+// lastImportSkippedExcluded holds how many records the last Import dropped
+// because the reader's own exclude list covers their project. Its three
+// neighbours in the same loop are each counted and reported; this one was not,
+// so a batch dropped in full read as an empty or already-synced one — the
+// misread #1118 recorded for the drop beside it (#2666).
+var lastImportSkippedExcluded int
+
+// ImportSkippedExcluded reports that count.
+func ImportSkippedExcluded() int { return lastImportSkippedExcluded }
+
 // lastImportSkippedIncomplete holds how many records the last Import dropped
 // because they could not be attributed to a session — no harness or no
 // session_id. deja's own exports always carry both; a hand-made or foreign
@@ -465,9 +475,11 @@ func Import(dir, inDir string) (int, error) {
 	ownSkipped := 0
 	forgottenSkipped := 0
 	incompleteSkipped := 0
+	excludedSkipped := 0
 	defer func() { lastImportSkippedForgotten = forgottenSkipped }()
 	defer func() { lastImportSkippedOwn = ownSkipped }()
 	defer func() { lastImportSkippedIncomplete = incompleteSkipped }()
+	defer func() { lastImportSkippedExcluded = excludedSkipped }()
 	for _, p := range paths {
 		// A file is imported whole or not at all, so what it contributed is
 		// remembered before it is read and rolled back if it turns out to be
@@ -580,8 +592,10 @@ func Import(dir, inDir string) (int, error) {
 				}
 			}
 			// The exclude list keeps a project out of this machine's memory;
-			// a sync from another machine must not put it back.
+			// a sync from another machine must not put it back. Counted, so
+			// the batch it empties does not read as an empty batch (#2666).
 			if ex.Match(sr.Project) {
+				excludedSkipped++
 				return nil
 			}
 			key := sr.Harness + ":" + importID
