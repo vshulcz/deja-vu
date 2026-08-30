@@ -191,6 +191,13 @@ func rewireNote(targets []string) string {
 	return fmt.Sprintf("deja rewrote its wiring for %s after an upgrade — `deja install` is what writes those commands", strings.Join(targets, ", "))
 }
 
+// recallIsOff reports the documented kill switch. One reader rather than a
+// string compare per call site: the second site is what let the environment
+// block past it (#2699).
+func recallIsOff() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_RECALL")), search.RecallOff)
+}
+
 // buildNotice is what a session start says while a build runs: the published
 // progress if there is any, the bare promise if the build was only just asked
 // for, and the reason instead when the index cannot be written at all. It is
@@ -296,7 +303,12 @@ func runHookContext(dir string, plain bool) error {
 		// checkout — and exactly where knowing what this machine is missing
 		// helps most. The block is about the machine, not the project, so it
 		// does not depend on the digest having found anything.
-		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
+		// The switch, again: the digest above is empty either because there is
+		// nothing to recall or because recall is off, and this branch cannot
+		// tell those apart. It used to build the block regardless, so a
+		// machine with the kill switch set still had text drawn from its
+		// indexed sessions injected into every session start (#2699).
+		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" && !recallIsOff() {
 			out := frameRecall(env)
 			// The block is about the machine and names no project, so without
 			// the projects behind its walls a forget of one of them could not
@@ -682,7 +694,7 @@ func cachedHookDigest(dir string) (string, int, int64, []string, int, []string, 
 // in the same process with the first one's project (#2182, #2185).
 func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int, []string, []string) {
 	cwd := hookCWD(fromPayload)
-	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
+	if recallIsOff() {
 		return "", 0, 0, nil, 0, nil, nil
 	}
 	// Before the cache read: a hit returns without reaching the version guard
