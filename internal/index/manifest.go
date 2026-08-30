@@ -382,21 +382,32 @@ func recordsReadable(dir string, m Manifest) bool {
 }
 
 func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
+	return recordsDamage(dir, m, tolerateLonger) == ""
+}
+
+// recordsDamage is recordsIntactSized with the answer said out loud: "" when
+// the store holds what the manifest committed, and otherwise which file is not
+// what it should be. One sentence covered all of these, and named records and
+// postings for breakages that were neither (#2695).
+func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
 	if m.RecordsSize <= 0 {
-		return true // empty index, or one written before the size stamp existed
+		return "" // empty index, or one written before the size stamp existed
 	}
 	// Plain stat, deliberately: every caller reads the manifest first, and that
 	// read waits the swap out — measured, removing the wait here changes
 	// nothing (#1319).
 	fi, err := os.Stat(filepath.Join(dir, "records.bin"))
 	if err != nil {
-		return false
+		return "the record log is not there"
 	}
 	// Shorter: a crash truncated the log. Longer: a crash landed records the
 	// manifest never committed, or an incremental append is in flight; either
 	// way the tail is unreferenced, so a reader may treat it as a snapshot.
-	if fi.Size() < m.RecordsSize || (!tolerateLonger && fi.Size() != m.RecordsSize) {
-		return false
+	if fi.Size() < m.RecordsSize {
+		return "the record log is shorter than the manifest committed"
+	}
+	if !tolerateLonger && fi.Size() != m.RecordsSize {
+		return "the record log is longer than the manifest committed"
 	}
 	// The postings live in buckets/, and losing that directory is not
 	// hypothetical: a partial copy, an interrupted sync, a `find -delete` that
@@ -411,7 +422,7 @@ func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
 	if len(m.Sessions) > 0 {
 		bi, err := os.Stat(filepath.Join(dir, "buckets"))
 		if err != nil || !bi.IsDir() {
-			return false
+			return "the postings directory is not there"
 		}
 		// An empty directory is the same loss as a missing one, and it is what
 		// `rm buckets/*.bin` and a copy that skipped the contents both leave
@@ -419,7 +430,7 @@ func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
 		// search answered "no matches in 3 indexed sessions" about text that
 		// was still in the record log (#946).
 		if !hasBucketFile(filepath.Join(dir, "buckets")) {
-			return false
+			return "the postings directory is empty"
 		}
 		// Losing part of the directory is the same loss spread thinner, and it
 		// is the shape a partial copy or an interrupted sync actually leaves.
@@ -429,10 +440,10 @@ func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
 		// larger count belongs to a build this manifest does not describe, and
 		// the freshness check already covers that.
 		if m.BucketFiles > 0 && countBucketFiles(filepath.Join(dir, "buckets")) < m.BucketFiles {
-			return false
+			return "some postings files are missing"
 		}
 	}
-	return true
+	return ""
 }
 
 // countBucketFiles counts the postings files a buckets directory holds.
@@ -458,6 +469,15 @@ func countBucketFiles(dir string) int {
 // What was wrong is the answer `doctor` gave: "built, up to date" about a store
 // that could not return a single result (#735).
 func Damaged(dir string) bool {
+	return DamageReason(dir) != ""
+}
+
+// DamageReason is Damaged with the finding named: "" for a store that is
+// whole, and otherwise the file that is not what the manifest says. The
+// remedy is the same either way — the next search rebuilds — but a reader,
+// and whoever reads the doctor output they paste into an issue, is sent after
+// the right file (#2695).
+func DamageReason(dir string) string {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -471,12 +491,20 @@ func Damaged(dir string) bool {
 		// doctor stats the file, calls the index built and up to date, and the
 		// next search rebuilds it from scratch.
 		if _, statErr := statIndexFile(filepath.Join(dir, "manifest.gob")); statErr == nil {
-			return true
+			// Which of the two: readManifest reads manifest.gob and then the
+			// session table beside it, and either can be the one that will not
+			// decode.
+			var core manifestCore
+			if readGob(filepath.Join(dir, "manifest.gob"), &core) != nil {
+				return "the manifest will not decode"
+			}
+			return "the session table will not decode"
 		}
-		return false
+		return ""
 	}
-	if recordsIntact(dir, m) {
-		return false
+	reason := recordsDamage(dir, m, false)
+	if reason == "" {
+		return ""
 	}
 	// The manifest and the record log were read a moment apart, and a rebuild
 	// can land between them: the manifest is the old one, records.bin is the
@@ -488,17 +516,21 @@ func Damaged(dir string) bool {
 	// Only while a build actually holds the lock: a store that is short with
 	// nothing running is short, and answering that immediately is what every
 	// other caller depends on.
+	// The reason from above, not a second look: asking twice does the stat and
+	// the directory read again on every hook against a damaged store, and a
+	// rebuild that lands between the two calls would answer "whole" for a store
+	// this one already found short.
 	if !RebuildInProgress(dir) {
-		return true
+		return reason
 	}
 	waitOutSwapWindow()
 	m2, err := readManifest(dir)
 	if err != nil {
 		// The manifest went away under us, which is the swap itself rather than
 		// damage; the next call sees the new one.
-		return false
+		return ""
 	}
-	return !recordsIntact(dir, m2)
+	return recordsDamage(dir, m2, false)
 }
 
 // RebuildInProgress reports whether another process holds the index lock. A
