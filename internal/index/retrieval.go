@@ -1490,6 +1490,36 @@ func ignoredByPolicy(ss []model.Session) []model.Session {
 	return out
 }
 
+// ProjectsTouchedByIgnore names the projects holding at least one session the
+// ignore rule keeps out of recall.
+//
+// For the callers that read the commands table rather than the sessions. That
+// table keys by project, and the rule matches on the session's path or its
+// project — measured on a real store under the default `*/.claude/jobs/*`, all
+// 305 ignored sessions matched by path and none by project, and the project
+// they sit in is called "run". So a table keyed by project cannot apply the
+// rule exactly, and the honest approximation is to drop a project the rule
+// touches at all: a project mixing ignored and kept sessions is under-reported,
+// which is the right way to be wrong for a line that speaks without being asked
+// (#2652).
+func ProjectsTouchedByIgnore(dir string) map[string]bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	metas, err := AllMeta(dir)
+	if err != nil {
+		return nil
+	}
+	pol := policy.Load()
+	out := map[string]bool{}
+	for _, meta := range metas {
+		if pol.Ignored(meta.Path, meta.Project) {
+			out[meta.Project] = true
+		}
+	}
+	return out
+}
+
 // IgnoredMatching counts the sessions a listing would have shown if the ignore
 // rule did not cover them. Every other rule that withholds rows in deja says
 // how many; this one dropped 253 of 400 on a real store and said nothing
