@@ -532,6 +532,18 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		return nil
 	}
 	var out []FixPair
+	// The ignore rule, applied here rather than by the seven callers: a FixPair
+	// carries the project and the rule matches on the session's path, so no
+	// caller can apply it — the same shape #2652 measured for the commands
+	// table. Three of those callers speak unasked (the session-start block,
+	// hook-plan, hook-tool-after), and `deja fix` offered a remedy out of the
+	// tree the reader excluded while `deja how` refused to name the very same
+	// command (#2660).
+	//
+	// Loaded only once something matched, so an error nobody has hit pays
+	// nothing for the manifest read.
+	var ignored map[string]bool
+	loaded := false
 	for _, p := range ReadFixes(dir) {
 		if !sigs[p.Sig] {
 			continue
@@ -542,6 +554,12 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
+			continue
+		}
+		if !loaded {
+			ignored, loaded = ProjectsTouchedByIgnore(dir), true
+		}
+		if ignored[p.Project] {
 			continue
 		}
 		out = append(out, p)
@@ -571,6 +589,11 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
+			continue
+		}
+		// The same rule as FixesFor: saying deja holds a sighting it will not
+		// show is worse than saying nothing (#2660).
+		if ProjectsTouchedByIgnore(dir)[p.Project] {
 			continue
 		}
 		return true
