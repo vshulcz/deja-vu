@@ -24,7 +24,7 @@ func marshalConfigLike(old []byte, root map[string]any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return reorderTopLevel(old, next, jsonIndentOf(old)), nil
+	return keepInlineBlocks(old, reorderTopLevel(old, next, jsonIndentOf(old))), nil
 }
 
 // jsonIndentOf is the indent unit the file already used. Two spaces for a file
