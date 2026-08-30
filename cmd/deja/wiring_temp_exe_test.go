@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -43,25 +44,25 @@ func TestTheRepairRefusesToAdoptATempBinary(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	for _, d := range []string{".claude", ".codex", ".cursor"} {
-		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte("{}\n"), 0o644); err != nil {
+	codex := filepath.Join(home, ".codex", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(codex), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	installed := filepath.Join(home, "opt", "bin", "deja")
-	if err := os.MkdirAll(filepath.Dir(installed), 0o755); err != nil {
+	if err := os.WriteFile(codex, []byte("[tools]\nweb = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := captureRun(t, "install", "--all", "--no-index"); err != nil {
-		t.Fatalf("install: %v", err)
+	// The state written by hand, the way TestWiringRefreshTouchesOnlyRecorded-
+	// Targets does: what install records depends on which harnesses a machine
+	// happens to have, and this test is about the guard, not about detection.
+	if err := os.MkdirAll(filepath.Dir(wiringStatePath()), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	// The wiring was recorded for a binary that lives somewhere real, and the
-	// configs say whatever this in-process install wrote.
-	writeWiringExe(t, installed)
-	before, err := os.ReadFile(filepath.Join(home, ".claude.json"))
+	state := `{"version":"0.0.1","targets":["codex"],"exe":"/opt/deja/bin/deja","home":` +
+		strconv.Quote(homeDir()) + `}`
+	if err := os.WriteFile(wiringStatePath(), []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(codex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +75,7 @@ func TestTheRepairRefusesToAdoptATempBinary(t *testing.T) {
 	if rewired := refreshWiringAfterUpgrade(); len(rewired) != 0 {
 		t.Fatalf("a build in a temp directory was adopted: %v", rewired)
 	}
-	after, err := os.ReadFile(filepath.Join(home, ".claude.json"))
+	after, err := os.ReadFile(codex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,15 +83,17 @@ func TestTheRepairRefusesToAdoptATempBinary(t *testing.T) {
 		t.Fatalf("the config was rewritten for a build in a temp directory:\nwas:\n%s\nnow:\n%s", before, after)
 	}
 
-	// And a real upgrade still repairs itself. If the environment stopped the
-	// repair for a reason of its own — a target that cannot be written — say so
-	// rather than blame the guard, which is what this test is about.
+	// And a real upgrade still repairs itself.
 	exeIsTemporary = func(string) bool { return false }
 	rewired := refreshWiringAfterUpgrade()
-	if len(stuckWiring) > 0 && len(rewired) == 0 {
-		t.Skipf("the repair could not write here: %v", stuckWiring)
-	}
 	if len(rewired) == 0 {
-		t.Fatal("a binary that moved to a real location was not adopted")
+		t.Fatalf("a binary that moved to a real location was not adopted (stuck: %v)", stuckWiring)
+	}
+	repaired, err := os.ReadFile(codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(before, repaired) {
+		t.Fatalf("the repair reported %v and changed nothing:\n%s", rewired, repaired)
 	}
 }
