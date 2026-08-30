@@ -1232,7 +1232,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 			noteBlockAdded(path, "mcpServers."+key)
 		}
 		m[key], note = mergeDejaEntry(m[key], mcpServerEntry(exe))
-		note = withOtherDejaEntries(note, m)
+		note = withOtherDejaEntries(note, m, key)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -2073,8 +2073,11 @@ func entryRunsDeja(entry map[string]any) bool {
 // withOtherDejaEntries folds the note about a second deja server into whatever
 // the write already had to say. Every MCP writer needs it: the file it edits is
 // the one that would hold the other entry.
-func withOtherDejaEntries(note string, servers map[string]any) string {
-	other := otherDejaEntriesNote(servers, "deja")
+func withOtherDejaEntries(note string, servers map[string]any, mine string) string {
+	// Everything past the entry install just took over. One of them is now
+	// deja's own — adopting it is what keeps the harness from starting two
+	// servers — so naming it here would report deja's own wiring as a stranger.
+	other := otherDejaEntriesNote(servers, mine)
 	if other == "" {
 		return note
 	}
@@ -2335,7 +2338,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 			noteBlockAdded(path, "mcpServers."+key)
 		}
 		m[key], note = mergeDejaEntry(m[key], map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}})
-		note = withOtherDejaEntries(note, m)
+		note = withOtherDejaEntries(note, m, key)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -2399,7 +2402,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 			noteBlockAdded(path, "mcp.servers."+key)
 		}
 		servers[key], note = mergeDejaEntry(servers[key], map[string]any{"command": command, "args": args})
-		note = withOtherDejaEntries(note, servers)
+		note = withOtherDejaEntries(note, servers, key)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -2454,7 +2457,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 			noteBlockAdded(path, "mcpServers."+key)
 		}
 		m[key], note = mergeDejaEntry(m[key], map[string]any{"command": command, "args": args})
-		note = withOtherDejaEntries(note, m)
+		note = withOtherDejaEntries(note, m, key)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -2518,7 +2521,7 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 			noteBlockAdded(path, "mcp."+key)
 		}
 		m[key], note = mergeDejaEntry(m[key], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
-		note = withOtherDejaEntries(note, m)
+		note = withOtherDejaEntries(note, m, key)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
