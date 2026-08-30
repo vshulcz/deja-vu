@@ -2598,12 +2598,16 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 	return append(next, '\n'), note, nil
 }
 
-// dropJSONCEntry takes the deja entry out of an "mcp" block written as lines,
-// and hands back what is left beside what it removed. An entry spelled across
+// dropJSONCEntry takes one entry out of an "mcp" block written as lines, and
+// hands back what is left beside what it removed. The key is the caller's:
+// somebody who wired deja by hand may have written it under another name, and
+// install has to update that entry rather than add a sibling (#2742). An entry
+// spelled across
 // lines carries `"deja"` on its first one only; dropping just that line left
 // the rest of it in the block and the config stopped parsing (#2394), so the
 // entry is bounded by counting braces the way the block itself is.
-func dropJSONCEntry(lines []string) (body, dropped []string, wasLast bool) {
+func dropJSONCEntry(lines []string, key string) (body, dropped []string, wasLast bool) {
+	name := `"` + key + `"`
 	// On the code a parser reads, not the raw line. A comment that only names
 	// deja — a parked entry someone commented out, a note saying who wrote the
 	// block — is not an entry to replace, and dropping its first line leaves a
@@ -2615,7 +2619,7 @@ func dropJSONCEntry(lines []string) (body, dropped []string, wasLast bool) {
 	for i := 0; i < len(lines); i++ {
 		code, next, _ := jsoncCodeOf(lines[i], inBlock)
 		inBlock = next
-		if !strings.Contains(code, `"deja"`) {
+		if !strings.Contains(code, name) {
 			body = append(body, lines[i])
 			if code != "" {
 				wasLast = false
@@ -2634,6 +2638,79 @@ func dropJSONCEntry(lines []string) (body, dropped []string, wasLast bool) {
 		}
 	}
 	return body, dropped, wasLast
+}
+
+// jsoncBlockEntries reads the servers out of an "mcp" block written as lines:
+// the key each one is written under, and the value a parser would read there.
+//
+// The text writer knew the literal key "deja" and nothing else, so an entry
+// wired by hand under another name was invisible to it — install wrote a
+// sibling and the harness started two servers, one of them possibly naming a
+// binary that is gone (#2742). Reading past the key at what an entry runs is
+// what doctor and the .json writer already do; this is the same reading, off
+// text that may carry comments and trailing commas.
+//
+// Entries whose text does not parse are left out. They are the shapes this
+// writer cannot act on anyway, and guessing at one is how a config stops
+// loading.
+func jsoncBlockEntries(lines []string) map[string]any {
+	out := map[string]any{}
+	inBlock := false
+	for i := 0; i < len(lines); i++ {
+		code, next, _ := jsoncCodeOf(lines[i], inBlock)
+		inBlock = next
+		key, rest := jsoncEntryKeyOf(code)
+		if key == "" {
+			continue
+		}
+		parts := []string{rest}
+		depth := jsoncBraceDelta(rest)
+		for depth > 0 && i+1 < len(lines) {
+			i++
+			c, nb, _ := jsoncCodeOf(lines[i], inBlock)
+			inBlock = nb
+			parts = append(parts, c)
+			depth += jsoncBraceDelta(c)
+		}
+		var v any
+		text := strings.TrimSuffix(strings.TrimSpace(strings.Join(parts, " ")), ",")
+		if json.Unmarshal([]byte(text), &v) != nil {
+			continue
+		}
+		out[key] = v
+	}
+	return out
+}
+
+// jsoncEntryKeyOf splits a line of code into the key it opens and the value
+// text after the colon. It answers empty for anything that does not start with
+// a quoted key, which inside an "mcp" block means a line that is not the start
+// of a server.
+func jsoncEntryKeyOf(code string) (key, rest string) {
+	t := strings.TrimSpace(code)
+	if !strings.HasPrefix(t, `"`) {
+		return "", ""
+	}
+	escaped := false
+	for i := 1; i < len(t); i++ {
+		switch {
+		case escaped:
+			escaped = false
+		case t[i] == '\\':
+			escaped = true
+		case t[i] == '"':
+			after := strings.TrimSpace(t[i+1:])
+			if !strings.HasPrefix(after, ":") {
+				return "", ""
+			}
+			k, err := strconv.Unquote(t[:i+1])
+			if err != nil {
+				return "", ""
+			}
+			return k, strings.TrimSpace(after[1:])
+		}
+	}
+	return "", ""
 }
 
 // jsoncFirstCodeLine finds the first line of a .jsonc block that a parser
@@ -2746,8 +2823,8 @@ var emptyJSONCBlockRE = regexp.MustCompile(`"mcp"\s*:\s*\{\s*\}`)
 // the reader had on deja's own entry. Falls back to the plain line when the
 // dropped text is not one entry this can read: a shape it cannot parse is not a
 // reason to refuse the install, only to write the entry deja knows.
-func mergedJSONCEntryLine(dropped []string, exe string) (string, string) {
-	plain := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
+func mergedJSONCEntryLine(dropped []string, key, exe string) (string, string) {
+	plain := fmt.Sprintf(`    %q: {"type":"local","command":[%q,"mcp"]}`, key, exe)
 	next := map[string]any{"type": "local", "command": []string{exe, "mcp"}}
 	joined := strings.TrimSpace(strings.Join(dropped, " "))
 	at := strings.Index(joined, ":")
@@ -2764,7 +2841,7 @@ func mergedJSONCEntryLine(dropped []string, exe string) (string, string) {
 	if err != nil {
 		return plain, ""
 	}
-	return `    "deja": ` + string(b), note
+	return fmt.Sprintf("    %q: ", key) + string(b), note
 }
 
 func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string, error) {
@@ -2831,14 +2908,25 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// it ran is the same sentence the .json writer prints (#2390); without
 		// it, what install told you depended on which of the two names the
 		// config had (#2392).
-		body, dropped, wasLast := dropJSONCEntry(lines[start+1 : end])
+		block := lines[start+1 : end]
+		// Which entry is deja's. Somebody may have wired it by hand under
+		// another name, and updating that one is what keeps the harness from
+		// starting two servers (#2269). Uninstall stays on deja's own key: an
+		// entry deja never wrote is not deja's to delete, and the note below
+		// says it is still there.
+		servers := jsoncBlockEntries(block)
+		key := "deja"
+		if !uninstall {
+			key = dejaEntryKey(servers)
+		}
+		body, dropped, wasLast := dropJSONCEntry(block, key)
 		// What the reader put on our own entry is theirs: an environment
 		// pointing at a store on another disk, an entry switched off. The
 		// parsed path has merged those since #2479; this one rewrote the line
 		// and dropped them without a word (#2742).
 		mergeNote := ""
 		if !uninstall {
-			line, mergeNote = mergedJSONCEntryLine(dropped, exe)
+			line, mergeNote = mergedJSONCEntryLine(dropped, key, exe)
 		}
 		// Our entry used to go last, so the comma joining it to the block sat
 		// on the line above — the reader's. Taking ours out leaves that comma
@@ -2852,13 +2940,16 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			}
 		}
 		note := ""
-		if !uninstall {
+		if uninstall {
+			note = leftDejaEntriesNote(servers)
+		} else {
 			// mergeDejaEntry says the same sentence when it takes an entry
 			// over, so prefer its note: it also carries what merging found.
 			note = mergeNote
 			if note == "" {
 				note = replacedJSONCLineNote(dropped, line)
 			}
+			note = withOtherDejaEntries(note, servers, key)
 		}
 		if !uninstall {
 			// Ours goes first, carrying its own comma. Written last it needed
