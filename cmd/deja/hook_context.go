@@ -1139,15 +1139,40 @@ func limitHandoffTip(dir string) string {
 // serviceReceipt appends today's tally when there is one — the moment memory
 // lands is the moment to say what it has been doing all day.
 func serviceReceipt(dir string) string {
-	recalls, bytes, _ := usage.TodayWithInjections(dir)
-	if recalls < 2 || bytes == 0 {
+	// The same two counts the statusline prints, and the same names for them:
+	// what an agent asked for and got is a recall, and what deja sent unasked
+	// is memory arriving. Folding the second into the first made the receipt
+	// and the statusline disagree in one session, and the receipt is the one
+	// that rides into the model's context (#1575, following #1569).
+	n := usage.StatusCounters(dir)
+	served, bytes := n.Recalls, n.Bytes+n.Injected
+	if served+n.Injections < 2 || bytes == 0 {
 		return ""
 	}
-	raw := usage.TodayRaw(dir)
-	if raw/int64(bytes) < 2 {
-		return fmt.Sprintf(" · today: %d recall%s", recalls, pluralS(recalls))
+	var parts []string
+	if served > 0 {
+		parts = append(parts, fmt.Sprintf("%d recall%s", served, pluralS(served)))
 	}
-	return fmt.Sprintf(" · today: %d recall%s, %s distilled from %s", recalls, pluralS(recalls), humanBytes(int64(bytes)), humanBytes(raw))
+	if n.Injections > 0 {
+		parts = append(parts, fmt.Sprintf("memory arrived %s", timesToday(n.Injections)))
+	}
+	tail := ""
+	if n.RawToday/int64(bytes) >= 2 {
+		tail = fmt.Sprintf(", %s distilled from %s", humanBytes(int64(bytes)), humanBytes(n.RawToday))
+	}
+	return " · today: " + strings.Join(parts, ", ") + tail
+}
+
+// timesToday counts arrivals in words, so the receipt reads as a sentence
+// rather than a gauge: "memory arrived twice" beats "memory arrived 2 times".
+func timesToday(n int) string {
+	switch n {
+	case 1:
+		return "once"
+	case 2:
+		return "twice"
+	}
+	return fmt.Sprintf("%d times", n)
 }
 
 // staleReadOnlyNote is the one line for an index that is behind and cannot

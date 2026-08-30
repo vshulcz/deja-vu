@@ -296,6 +296,11 @@ type StatusNumbers struct {
 	Recalls  int
 	Bytes    int
 	Injected int
+	// Injections is how many times memory arrived unasked, where Injected is
+	// how much of it. The receipt counts events, not bytes, and used to fold
+	// them into Recalls — so the statusline said "no agent recalls today"
+	// while the receipt called the same five injections recalls (#1575).
+	Injections int
 	// This week, for the line the quiet days print.
 	WeekRecalls int
 	WeekBytes   int
@@ -335,6 +340,7 @@ func StatusCounters(indexDir string) StatusNumbers {
 				out.Bytes += e.Bytes
 			case injectedKind(e.Kind):
 				out.Injected += e.Bytes
+				out.Injections++
 			}
 		}
 		if !e.Time.Before(cut) && servedKind(e.Kind) {
