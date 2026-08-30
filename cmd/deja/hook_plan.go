@@ -45,6 +45,11 @@ type planFinding struct {
 	sessions []index.SessionMeta
 }
 
+// indexDamaged is a variable for the same reason indexFormatDirection is: a
+// test can put `check` in front of a damaged store without shipping a way to
+// break one (#2682).
+var indexDamaged = index.Damaged
+
 var planIndexReady = func(dir string) bool {
 	return index.HasManifest(dir) &&
 		index.IsCurrentVersion(dir) &&

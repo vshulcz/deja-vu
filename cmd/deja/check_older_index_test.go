@@ -12,24 +12,32 @@ import (
 // (#2680).
 func TestCheckTellsAnOlderIndexFromNoIndex(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		ready bool
-		older bool
-		want  string
+		name    string
+		ready   bool
+		older   bool
+		damaged bool
+		want    string
 	}{
 		{name: "no index at all", want: "no index to check against yet"},
 		{name: "an index an older build wrote", older: true, want: "written by an older deja"},
+		// The third condition planIndexReady folds in. doctor says "integrity
+		// damaged" on the same store while search answers from the snapshot
+		// and rebuilds behind it (#2682).
+		{name: "a damaged index", damaged: true, want: "the index is damaged"},
 		{name: "a healthy index with nothing to say", ready: true, want: "nothing found for this plan"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			hermeticEnv(t)
 			restoreReady := planIndexReady
 			restoreOlder := indexFormatDirection
+			restoreDamaged := indexDamaged
 			t.Cleanup(func() {
 				planIndexReady = restoreReady
 				indexFormatDirection = restoreOlder
+				indexDamaged = restoreDamaged
 			})
 			planIndexReady = func(string) bool { return tc.ready }
+			indexDamaged = func(string) bool { return tc.damaged }
 			indexFormatDirection = func(string) int {
 				if tc.older {
 					return -1
