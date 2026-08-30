@@ -533,6 +533,12 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		if hits == 0 {
 			continue
 		}
+		// An envelope can carry the query's words and say nothing a reader
+		// wanted: a wrapped inter-agent notification quoting a session id
+		// matched, and the block opened with truncated JSON (#2735).
+		if digest.IsPlumbing(line) {
+			continue
+		}
 		matchedAt[i] = true
 		// Among lines that carry the question words, prefer the one that
 		// concluded something. Five ways of choosing by where and how often a
@@ -976,14 +982,13 @@ func relativeDay(updated, now time.Time) string {
 	}
 }
 
+// noiseMessage is the digest's own check, kept as one rule rather than a second
+// copy of the list. The copy here matched only at the start of a message, so a
+// harness that introduces the envelope — "Another Claude session sent a
+// message: <teammate-message ...>" — put truncated inter-agent JSON into the
+// session-start block, among the first lines an agent reads (#2735).
 func noiseMessage(s string) bool {
-	t := strings.TrimSpace(s)
-	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "Caveat:", "<system-reminder"} {
-		if strings.HasPrefix(t, p) {
-			return true
-		}
-	}
-	return false
+	return digest.IsPlumbing(s)
 }
 
 // digestLine is one row of the digest this file injects into an agent's

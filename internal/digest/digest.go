@@ -224,15 +224,31 @@ func looksLikeListingDump(line string) bool {
 	return true
 }
 
+// IsPlumbing reports whether a message is a harness envelope rather than
+// something a person or an agent said — an inter-agent notification, a tool
+// frame, a pasted blob. The digest has always dropped these; recall quoted them
+// into the session-start block, where they were among the first lines an agent
+// read.
+func IsPlumbing(s string) bool { return noisyMessage(s) }
+
 func noisyMessage(s string) bool {
 	t := strings.TrimSpace(s)
 	if t == "" {
 		return true
 	}
-	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "Caveat:", "<system-reminder"} {
-		if strings.HasPrefix(t, p) {
+	// Tag-shaped envelopes anywhere in the line, not only at its start. A
+	// harness that wraps one — "Another Claude session sent a message:
+	// <teammate-message ...>" — slipped past the prefix check and reached the
+	// session-start block, where truncated inter-agent JSON was among the first
+	// things an agent read. Nobody writes these tags in prose.
+	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "<system-reminder"} {
+		if strings.Contains(t, p) {
 			return true
 		}
+	}
+	// Prose, so only where it opens the message.
+	if strings.HasPrefix(t, "Caveat:") {
+		return true
 	}
 	if strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result") {
 		return true
