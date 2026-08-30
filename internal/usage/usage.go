@@ -300,6 +300,11 @@ type StatusNumbers struct {
 	// how much of it. The receipt counts events, not bytes, and used to fold
 	// them into Recalls — so the statusline said "no agent recalls today"
 	// while the receipt called the same five injections recalls (#1575).
+	//
+	// Every injecting kind, which is a wider set than the field of the same
+	// name in stats --impact: that one is session starts, with tool lines and
+	// déjà vu moments counted beside it. Here they are arrivals, because the
+	// receipt is answering "how often did memory turn up today".
 	Injections int
 	// This week, for the line the quiet days print.
 	WeekRecalls int

@@ -22,7 +22,7 @@ func TestTheReceiptCallsInjectionsWhatTheStatuslineCallsThem(t *testing.T) {
 	if strings.Contains(got, "recall") {
 		t.Errorf("injections are counted as recalls again: %q", got)
 	}
-	if !strings.Contains(got, "5") {
+	if !strings.Contains(got, "memory arrived 5 times") {
 		t.Errorf("the day the reader had is not in the receipt: %q", got)
 	}
 	n := usage.StatusCounters(dir)
@@ -58,7 +58,7 @@ func TestTheReceiptSeparatesWhatWasAskedForFromWhatArrived(t *testing.T) {
 	if !strings.Contains(got, "3 recalls") {
 		t.Errorf("the recalls are gone: %q", got)
 	}
-	if !strings.Contains(got, "2") {
+	if !strings.Contains(got, "memory arrived twice") {
 		t.Errorf("the injections are folded into the recalls: %q", got)
 	}
 }
