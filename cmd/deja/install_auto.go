@@ -16,6 +16,23 @@ import (
 // Claude Code, so the existing `deja hook-context` output works unchanged.
 // We merge one SessionStart entry into ~/.codex/hooks.json and leave
 // everything else in the file alone.
+// codexHookWiring is every event deja installs into Codex, in one place because
+// install writes from it and doctor reads it. A hooks.json written by an older
+// deja — SessionStart alone, where there are now three — was reported as wired
+// on the strength of the trust entry, and the two events added since reached
+// nobody.
+var codexHookWiring = []struct{ Event, Sub, Matcher string }{
+	// SessionStart carries the project digest.
+	{"SessionStart", "hook-context", "startup|resume"},
+	// PreToolUse carries the prior decision for the file or command about to
+	// change, scoped to the tools that run a command or change a file (codex
+	// edits via apply_patch) so the hook does not spawn on every read.
+	{"PreToolUse", "hook-tool", "Bash|apply_patch"},
+	// And the fix pair when a command fails, which is the moment an agent never
+	// thinks to ask for it.
+	{"PostToolUse", "hook-tool-after", "Bash"},
+}
+
 func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	// Use CodexHome() (honours CODEX_HOME / DEJA_CODEX_ROOT) rather than a raw
 	// ~/.codex join, so a sandboxed install stays sandboxed and a non-default
@@ -29,16 +46,9 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
-	// SessionStart carries the project digest; PreToolUse (hook-tool) carries
-	// the prior decision for the file or command about to change. Codex uses the
-	// same hooks.json shape as Claude Code, so both wire the same way.
-	updateCodexHook(root, "SessionStart", exe+" hook-context", "startup|resume", uninstall)
-	// Scoped to the tools that run a command or change a file (codex edits via
-	// apply_patch), so the hook does not spawn on every read.
-	updateCodexHook(root, "PreToolUse", exe+" hook-tool", "Bash|apply_patch", uninstall)
-	// And the fix pair when a command fails, which is the moment an agent never
-	// thinks to ask for it.
-	updateCodexHook(root, "PostToolUse", exe+" hook-tool-after", "Bash", uninstall)
+	for _, h := range codexHookWiring {
+		updateCodexHook(root, h.Event, exe+" "+h.Sub, h.Matcher, uninstall)
+	}
 	if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
 		delete(root, "hooks")
 	}

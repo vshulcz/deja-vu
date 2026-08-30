@@ -131,6 +131,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "prime",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.prime/agent/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "openclaw",
       "state": "missing",
       "paths": [

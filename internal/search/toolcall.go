@@ -63,3 +63,38 @@ func isOwnCallLine(line string) bool {
 	}
 	return false
 }
+
+// dejaReportLine reports whether a transcript line is deja's own output rather
+// than someone talking about a file. An agent exercising deja from a shell
+// writes headers and results into its own transcript — `=== deja blame
+// internal/index/retrieval.go ===` and the report under it — and every one of
+// those lines names the file, so blame ranked them as that file's history and
+// quoted them back. Measured on this store: the top two snippets for
+// `internal/index/retrieval.go` were deja's own help output.
+//
+// The same rule the report guard and the fix miner already apply (#2067,
+// #2068, #2169): deja's own words must not become what it knows.
+//
+// Only the command echo, not the report body: a line opening `deja: ` is how
+// deja addresses a terminal, but it is also how a person writes about deja,
+// and dropping it changed nothing measurable here.
+func dejaReportLine(line string) bool {
+	l := strings.TrimSpace(line)
+	return strings.HasPrefix(l, "=== deja ") || strings.HasPrefix(l, "$ deja ")
+}
+
+// withoutOwnReport drops those lines, leaving everything a person wrote.
+func withoutOwnReport(text string) string {
+	if !strings.Contains(text, "deja") {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	kept := lines[:0]
+	for _, l := range lines {
+		if dejaReportLine(l) {
+			continue
+		}
+		kept = append(kept, l)
+	}
+	return strings.Join(kept, "\n")
+}

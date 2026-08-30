@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/bench"
@@ -215,6 +216,38 @@ type promptReport struct {
 	// present one changes nothing. It earns its keep the day the number moves,
 	// and until then it says how far there is to go.
 	AbsentSubject promptArmReport `json:"absent_subject"`
+	// Every question of the corpus asked in someone else's project. The
+	// hand-written controls are twelve sentences a person thought of; this is
+	// the whole corpus turned against itself, and it grows whenever a chain is
+	// added.
+	CrossPaired promptArmReport `json:"cross_paired"`
+}
+
+// awayFor picks where a chain's question is asked: forward to the first chain
+// of another project, not merely the next one. Several chains share a project —
+// the Russian ones do — so a single step lands back at home, and the two
+// projects built to hold everything are no better. The haystack keeps one
+// session that mentions every subject in the corpus and the bucket is the
+// catch-all scope; asking either is not asking somewhere the answer cannot be.
+// Measured: pairing without this counted eleven false fires where six were.
+func awayFor(crossed []PromptChainRef, i int) (PromptChainRef, bool) {
+	c := crossed[i]
+	for step := 1; step < len(crossed); step++ {
+		cand := crossed[(i+step)%len(crossed)]
+		if cand.Project == c.Project || cand.Project == bench.PromptHaystackProject ||
+			cand.Project == bench.PromptBucketProject {
+			continue
+		}
+		return cand, true
+	}
+	return PromptChainRef{}, false
+}
+
+// PromptChainRef is a chain reduced to what cross-pairing needs.
+type PromptChainRef struct {
+	Question string
+	Project  string
+	ID       string
 }
 
 func runBenchPrompt(args []string) error {
@@ -240,6 +273,8 @@ func runBenchPrompt(args []string) error {
 		report.Fresh.Fired, report.Fresh.Cases, report.Fresh.Correct, report.Fresh.Precision)
 	fmt.Printf("negative controls  %2d/%-2d  —        false fires: %d\n",
 		report.Negative.Fired, report.Negative.Cases, report.Negative.FalseFires)
+	fmt.Printf("cross-paired       %2d/%-2d  —        false fires: %d\n",
+		report.CrossPaired.Fired, report.CrossPaired.Cases, report.CrossPaired.FalseFires)
 	fmt.Printf("reworded           %2d/%-2d  %2d       %.2f\n",
 		report.Paraphrase.Fired, report.Paraphrase.Cases, report.Paraphrase.Correct, report.Paraphrase.Precision)
 	fmt.Printf("reworded, tied     %2d/%-2d  %2d       %.2f\n",
@@ -496,6 +531,36 @@ func measurePrompt(seed int64) (promptReport, error) {
 			}
 		}
 	}
+	// Cross-paired: every question asked in a project that is not the one it
+	// belongs to. The answer is somewhere else, so a fire is a false one — and
+	// unlike the hand-written controls these are the corpus's own questions,
+	// so the arm grows with it and cannot be written around.
+	//
+	// Measured this way on a real store of 1696 sessions, 400 prompts asked in
+	// another project fired 84 times while the same questions asked at home
+	// fired 398 of 400. That is the number this arm exists to bring down.
+	var crossed []PromptChainRef
+	for _, chain := range corpus.Chains {
+		if chain.Negative || chain.Question == "" || chain.Kind == "background" ||
+			chain.Kind == "bucket" || chain.Kind == "haystack-noise" ||
+			chain.Kind == "concluded-noise" {
+			continue
+		}
+		crossed = append(crossed, PromptChainRef{chain.Question, chain.Project, chain.ID})
+	}
+	sort.Slice(crossed, func(i, j int) bool { return crossed[i].ID < crossed[j].ID })
+	for i, c := range crossed {
+		away, found := awayFor(crossed, i)
+		if !found {
+			continue
+		}
+		report.CrossPaired.Cases++
+		if fired, _ := promptBenchProbe(indexDir, away.Project, away.ID, prompt.Terms(c.Question)); fired {
+			report.CrossPaired.Fired++
+			report.CrossPaired.FalseFires++
+		}
+	}
+	finishPromptArm(&report.CrossPaired, nil)
 	finishPromptArm(&report.Real, realTerms)
 	finishPromptArm(&report.Negative, negTerms)
 	finishPromptArm(&report.Marathon, nil)
@@ -540,13 +605,13 @@ func measurePrompt(seed int64) (promptReport, error) {
 // opening line came from the top of a long transcript does not, and that line
 // is the whole frame an agent reads before deciding to ignore the rest.
 func shownLineCarriesATerm(dir, project string, terms []string) bool {
-	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
 	var keep []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		keep = append(keep, s)
@@ -587,7 +652,7 @@ func firstShownLineCarries(dir, project string, terms []string, topic string) bo
 	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		keep = append(keep, ranked[i])
@@ -616,7 +681,7 @@ func blockCarries(dir, project string, terms []string, fact, topic string) bool 
 	terms = byIdentifying(terms, idfOf)
 	var keep []model.Session
 	for i := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		keep = append(keep, ranked[i])
@@ -662,14 +727,14 @@ func promptBenchProbeBlock(dir, project, chainID string, terms []string) (fired,
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}
 	shown := 0
 	var chosen []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		if len(s.Messages) > dejaVuMaxMessages {
@@ -703,7 +768,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 	if !promptTermsWorthAsking(terms) {
 		return false, false
 	}
-	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false, false
 	}
@@ -711,7 +776,7 @@ func promptBenchProbe(dir, project, chainID string, terms []string) (fired, corr
 		// The same bar the hook applies, from the same function — kept in one
 		// place because the two drifted: this one asked whether the query held
 		// an identifier, the hook asked whether the session did.
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		if len(s.Messages) > dejaVuMaxMessages {
@@ -743,13 +808,13 @@ func finishPromptArm(arm *promptArmReport, terms []int) {
 // blockOpensOnEcho reports whether the first line the agent would read is the
 // question it just asked, handed back.
 func blockOpensOnEcho(dir, project string, terms []string, question string) bool {
-	ranked, matched, strong, _, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
+	ranked, matched, strong, idfOf, err := index.ProjectRelevant(dir, []string{project}, terms, 8)
 	if err != nil {
 		return false
 	}
 	var keep []model.Session
 	for i, s := range ranked {
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		keep = append(keep, s)

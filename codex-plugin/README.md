@@ -9,7 +9,7 @@ codex plugin marketplace add vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
 It carries deja's MCP server and the `deja-history` skill.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
-twenty coding agents already write to disk, including sessions from before it
+twenty-one coding agents already write to disk, including sessions from before it
 was installed, and answers from them locally: BM25 over the transcripts, no
 model and no embeddings, credentials redacted as the index is built.
 

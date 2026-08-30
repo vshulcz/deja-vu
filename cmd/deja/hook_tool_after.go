@@ -346,6 +346,14 @@ func fixLine(p index.FixPair, sessions int) string {
 	if sessions > 1 {
 		how = " in " + toolSessionCount(sessions)
 	}
+	// A single sighting is said as one. Two sessions doing the same thing after
+	// the same error is evidence it worked; one session doing something is what
+	// one session did, and an agent handed it at the moment it is stuck has to
+	// be told which of the two it is holding.
+	if p.Candidate {
+		return "deja: this error came up" + how + " " + where + " before" + when +
+			" — one session ran this after it, and nothing confirms it worked: " + cmd
+	}
 	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }
 

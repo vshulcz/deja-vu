@@ -58,7 +58,7 @@ func TestDoctorFullReport(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{
-		"Harness stores:", "Tools:", "MCP wiring:", "Hooks:", "precompact", "Index:", "Version:",
+		"Harness stores:", "Tools:", "MCP wiring:", "Hooks:", "claude-code", "Index:", "Version:",
 		"claude", "opencode", "aider", "gemini", "cursor", "antigravity", "grok", "hermes",
 		"1 file", mcpLine("claude-code", "wired"), "config missing",
 		"not built", "current  1.0.0", "latest   v9.9.9", "update available",
@@ -530,13 +530,19 @@ func TestDoctorHooksMatchAbsolutePathCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Real installs write the absolute binary path, not the bare subcommand.
-	if err := os.WriteFile(settings, []byte(`{"hooks":{"PreCompact":[{"matcher":"manual|auto","hooks":[{"type":"command","command":"/Users/x/.local/bin/deja hook-precompact"}]}]}}`), 0o644); err != nil {
+	var entries []string
+	for _, h := range claudeHookWiring {
+		entries = append(entries, `"`+h.Event+`":[{"matcher":"`+h.Matcher+
+			`","hooks":[{"type":"command","command":"/Users/x/.local/bin/deja `+h.Sub+`"}]}]`)
+	}
+	body := `{"hooks":{` + strings.Join(entries, ",") + `}}`
+	if err := os.WriteFile(settings, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
 	doctorHooks(&out)
-	if !strings.Contains(out.String(), "precompact   wired") {
-		t.Fatalf("absolute-path hook must count as wired:\n%s", out.String())
+	if !strings.Contains(out.String(), "claude-code  wired") {
+		t.Fatalf("absolute-path hooks must count as wired:\n%s", out.String())
 	}
 }
 
@@ -552,7 +558,15 @@ func TestDoctorCodexHookStates(t *testing.T) {
 	if !strings.Contains(out.String(), "codex-hook   missing") {
 		t.Fatalf("missing state wrong:\n%s", out.String())
 	}
-	if err := os.WriteFile(filepath.Join(codexHome, "hooks.json"), []byte(`{"hooks":{"SessionStart":[]}}`), 0o644); err != nil {
+	// Every event deja installs, so what this measures is the trust state and
+	// not whether the wiring is complete.
+	var entries []string
+	for _, h := range codexHookWiring {
+		entries = append(entries, `"`+h.Event+`":[{"matcher":"","hooks":[{"type":"command","command":"/x/deja `+
+			h.Sub+`"}]}]`)
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "hooks.json"),
+		[]byte(`{"hooks":{`+strings.Join(entries, ",")+`}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("[hooks.state.\"/x/hooks.json:session_start:0:0\"]\ntrusted_hash = \"sha256:aa\"\nenabled = false\n"), 0o644); err != nil {

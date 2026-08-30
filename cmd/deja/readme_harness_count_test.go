@@ -40,7 +40,7 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 
 	words := map[int]string{
 		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
-		19: "nineteen", 20: "twenty",
+		19: "nineteen", 20: "twenty", 21: "twenty-one",
 	}
 	want, ok := words[n]
 	if !ok {
@@ -74,8 +74,12 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		// own voice — "eighteen coding agents", "the eighteen harnesses deja
 		// installs into", "the eighteen the loader registers" — and pinning one
 		// phrasing meant the other two were never checked at all.
+		// The wanted word first: "twenty-one" contains "twenty", so scanning the
+		// raw text for stale words reported every correct document as stale the
+		// day the count crossed twenty.
+		rest := strings.ReplaceAll(text, want, "")
 		for _, stale := range words {
-			if stale != want && strings.Contains(text, stale) {
+			if stale != want && strings.Contains(rest, stale) {
 				t.Errorf("%s still counts %q; the registry has %d (%s)", name, stale, n, want)
 			}
 		}

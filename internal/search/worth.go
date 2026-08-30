@@ -26,7 +26,7 @@ import "unicode/utf8"
 // fires on the benchmark's negative controls. Threading it changes nothing
 // today; using it is the next rule's decision, and it will now land in every
 // instrument at once.
-func RecallWorthShowing(terms []string, matched, strong int) bool {
+func RecallWorthShowing(terms []string, matched, strong int, known map[string]float64) bool {
 	_ = strong // see the note above: taken so the instruments cannot drift
 	if matched < 1 {
 		return false
@@ -36,10 +36,57 @@ func RecallWorthShowing(terms []string, matched, strong int) bool {
 	// applying all along while the hook applied only the first — measured on
 	// the corpus, the pair answers 11 of 12 real questions with no false fire,
 	// where the session-only rule answers 7 and fires on 2 controls.
-	if HasIdentifierTerm(terms) {
+	if HasIdentifierTermKnown(terms, known) {
 		return true
 	}
 	return matched >= 2
+}
+
+// identifierKnownFrom is how many words a question needs before its subject is
+// checked against the store.
+const identifierKnownFrom = 3
+
+// identifierIDFFloor is how rare a word has to be in this store before its
+// shape may carry a match on its own. Shape alone admits any word of three
+// letters that is not on the working-word list, and that list is written by
+// hand — "passed", "rows", "delay" are not on it and name nothing.
+//
+// Asking the store instead of the list: measured by cross-pairing 400 real
+// prompts against a project that cannot hold their answer, where every fire is
+// a false one, this takes them from 129 to 89 while the same questions asked at
+// home still fire 398 times out of 400. Higher costs the home rate — at 5.5 it
+// is 396 — and buys nothing: 91.
+const identifierIDFFloor = 4.0
+
+// HasIdentifierTermKnown is HasIdentifierTerm over the words the corpus
+// actually holds.
+//
+// A word is judged a term of art by its shape, which says nothing about whether
+// this store has ever seen it. So a question naming something that lives in
+// another project entirely — "which branch was the oauth rotation on when the
+// suite passed" — cleared the bar on "oauth", and then a single match on
+// "branch" was enough to answer it. The subject contributed nothing: what
+// matched was the vocabulary every working session is made of, and the session
+// that says those words most often is whichever session is longest.
+//
+// known is the idf of each term the corpus contains; a term missing from it
+// appears nowhere in the store. Nil means the caller has no such map and every
+// term is taken as known, which is the behaviour this had before.
+func HasIdentifierTermKnown(terms []string, known map[string]float64) bool {
+	// A short question is all subject: "как там pr, смержился?" names the thing
+	// and one working verb, and there is nothing else in it for a candidate to
+	// have matched instead. The vocabulary a session is carried by only exists
+	// in a question long enough to hold it.
+	if known == nil || len(terms) <= identifierKnownFrom {
+		return HasIdentifierTerm(terms)
+	}
+	kept := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if v, ok := known[t]; ok && v >= identifierIDFFloor {
+			kept = append(kept, t)
+		}
+	}
+	return HasIdentifierTerm(kept)
 }
 
 // HasIdentifierTerm reports whether the question contains a word specific

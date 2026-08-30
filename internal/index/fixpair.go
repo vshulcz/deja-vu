@@ -531,7 +531,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	if len(sigs) == 0 {
 		return nil
 	}
-	var out []FixPair
+	var out, held []FixPair
 	// The ignore rule, applied here rather than by the seven callers: a FixPair
 	// carries the project and the rule matches on the session's path, so no
 	// caller can apply it — the same shape #2652 measured for the commands
@@ -549,8 +549,13 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 			continue
 		}
 		// One session doing something after an error is not evidence that it
-		// worked; it is half of it.
+		// worked; it is half of it. Held back, not thrown away: a caller that
+		// says so when it speaks can have them once the confirmed pairs are
+		// exhausted, which is most of the time — measured over 1057 real
+		// failures on one machine, 112 had a confirmed pair and 373 more had
+		// only this.
 		if p.Candidate {
+			held = append(held, p)
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
@@ -565,6 +570,20 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		out = append(out, p)
 		if len(out) >= limit {
 			break
+		}
+	}
+	// Confirmed first, always. What is held goes behind them and only when
+	// nothing was confirmed, so a pair two sessions agree on is never displaced
+	// by a single sighting.
+	if len(out) == 0 {
+		for _, p := range held {
+			if allow != nil && !allow(p.Project) {
+				continue
+			}
+			out = append(out, p)
+			if len(out) >= limit {
+				break
+			}
 		}
 	}
 	return out

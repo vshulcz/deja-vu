@@ -257,10 +257,21 @@ type SessionMeta struct {
 	Hit []uint64 `json:",omitempty"`
 }
 
-// touchedFileCap bounds what goes in SessionMeta.Touched. Enough to say
-// something useful about a session, small enough that a store of a thousand
-// sessions pays kilobytes for it.
-const touchedFileCap = 6
+// touchedFileCap bounds what goes in SessionMeta.Touched.
+//
+// Six was enough to say something about a session and wrong for the thing that
+// reads it: the line before an edit asks how many sessions touched this file,
+// and a session that worked on forty recorded six. Measured over 334 distinct
+// files an agent really edited on this machine, 257 of them had been touched by
+// no session at all as far as the index knew, while 268 were spoken about in
+// sessions the store holds. The surface was blind to three files in four.
+//
+// Forty, from the three points measured: files with no history 257 -> 218 -> 190
+// at 6, 20 and 40, and files the hook can speak about 26 -> 30 -> 36. It costs
+// 700 KB of a 195 MB index and 3 ms on the hook that reads it — measured on the
+// same store, where the line went from silent on 12 of 12 real edits to
+// speaking on 4.
+const touchedFileCap = 40
 
 // askedQuestionCap bounds the hashes stored per session.
 const askedQuestionCap = 8

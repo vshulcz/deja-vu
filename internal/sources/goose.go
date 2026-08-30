@@ -145,7 +145,7 @@ func gooseText(v any) string {
 // exists only on newer stores, and naming it on an older one fails the whole
 // query, so it is probed rather than assumed.
 func gooseTypeFilter(db string) string {
-	out, err := exec.Command("sqlite3", "-readonly", db, ".timeout 5000", "pragma table_info(sessions)").Output()
+	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", "pragma table_info(sessions)").Output()
 	if err != nil || !bytes.Contains(out, []byte("session_type")) {
 		return ""
 	}
@@ -191,7 +191,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		`from sessions s join messages m on m.session_id=s.id ` +
 		`where m.role in ('user','assistant')` + gooseTypeFilter(db) + where +
 		` order by s.id,m.created_timestamp,m.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err

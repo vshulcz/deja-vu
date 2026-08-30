@@ -424,7 +424,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if !p.When.IsZero() {
 				when = " (" + p.When.Local().Format("2006-01-02") + ")"
 			}
-			fmt.Fprintf(&fb, "%s%s\n  ran next: %s\n", recallListingLine(p.Error), when, commandListingLine(p.Command))
+			ran := "ran next"
+			if p.Candidate {
+				ran = "ran next, unconfirmed"
+			}
+			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
+				commandListingLine(p.Command))
 		}
 		return strings.TrimRight(fb.String(), "\n"), nil
 	case "how":
