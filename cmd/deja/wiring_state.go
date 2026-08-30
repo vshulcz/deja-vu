@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 )
 
 // A hook or plugin deja wrote is a copy of what this binary generates, frozen
@@ -151,6 +152,46 @@ func recordWiring(targets []string, uninstall bool) {
 	_ = os.WriteFile(path, append(b, '\n'), 0o644)
 }
 
+// exeIsTemporary reports whether the running binary is one the wiring must not
+// adopt. A variable so a test can drive both answers: the test binary itself
+// always lives in a temp directory, so the check has to be exercised rather
+// than inherited (#2684).
+var exeIsTemporary = func(p string) bool {
+	if underTestBinary() {
+		return false
+	}
+	return underTempDir(p)
+}
+
+// underTempDir reports whether a path sits under this machine's temp directory,
+// or under the two that are temp everywhere regardless of what TMPDIR says.
+func underTempDir(p string) bool {
+	if p == "" {
+		return false
+	}
+	p = filepath.Clean(p)
+	// Both forms of each root: /tmp resolves to /private/tmp on macOS and
+	// /var/folders to /private/var/folders, and the path being judged may be
+	// written either way — it need not exist, so it cannot be resolved itself.
+	var roots []string
+	for _, root := range []string{os.TempDir(), "/tmp", "/private/tmp"} {
+		if root == "" || root == "/" {
+			continue
+		}
+		root = filepath.Clean(root)
+		roots = append(roots, root)
+		if resolved, err := filepath.EvalSymlinks(root); err == nil && resolved != root {
+			roots = append(roots, resolved)
+		}
+	}
+	for _, root := range roots {
+		if p == root || strings.HasPrefix(p, root+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
 // refreshWiringAfterUpgrade rewrites the recorded targets when the binary that
 // wrote them is not the one running now. It returns the targets it changed, so
 // a caller with somewhere to print can say so; the hook paths call it and stay
@@ -175,6 +216,15 @@ func refreshWiringAfterUpgrade() []string {
 	// Either the version or the path: a binary that moved writes the same
 	// version into configs that now name a file which is not there (#773).
 	if st.Version == version && (st.Exe == "" || st.Exe == exe) {
+		return nil
+	}
+	// But not a binary that will be gone tomorrow. The repair exists because
+	// deja moves — a release replaces it, a package manager relocates it — and
+	// it cannot tell that from one run of a build somewhere else: a `go run`, a
+	// colleague's checkout, a CI job, a scratch build in a temp directory. Each
+	// of those rewrote every config on the machine to a path that stops
+	// existing, and the reader found out when recall went quiet (#2684).
+	if exeIsTemporary(exe) {
 		return nil
 	}
 	// Only the home the targets were written under: this repairs, it does not
