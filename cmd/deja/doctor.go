@@ -1246,7 +1246,17 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		loc = dir
 	}
 	fmt.Fprintf(w, "  location %s\n", reportPath(loc))
-	fmt.Fprintf(w, "  exclusions %d active patterns\n", len(sources.ExclusionPatterns()))
+	// "Active" is what a reader checks this screen for, and it was false in the
+	// one state they check it in: the pattern is written, the index is not
+	// rebuilt, and the next search still serves the project they meant to hide.
+	// The list applies at ingest, so it covers nothing already indexed until a
+	// rebuild — the sentence `deja index` prints for the same reason (#1307,
+	// #2664).
+	if n := len(sources.ExclusionPatterns()); n > 0 && index.ExclusionsChanged(dir) {
+		fmt.Fprintf(w, "  exclusions %d pattern%s, not applied to sessions already indexed — `deja index --rebuild`\n", n, pluralS(n))
+	} else {
+		fmt.Fprintf(w, "  exclusions %d active patterns\n", n)
+	}
 	// A precise non-claim: users deciding what to trust deserve to read the
 	// boundary in the tool itself, not only in the security docs.
 	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
