@@ -36,9 +36,10 @@ type Snapshot struct {
 	// injections, which measures reporting rather than use.
 	Into string `json:"into,omitempty"`
 	// Unreadable marks an injection whose host sent a payload deja could not
-	// decode, so the session it went to went with it. The row is written
-	// either way — the memory did go out — and without this it is identical to
-	// a row from a host that sent nothing at all (#2161).
+	// decode. The row is written either way — the memory did go out — and
+	// without this it is identical to a row from a host that sent nothing at
+	// all (#2161). A decode that fails on one field keeps the ones it read, so
+	// this can stand beside a receiver rather than instead of one.
 	Unreadable bool `json:"unreadable,omitempty"`
 	// Projects names the projects the digest was built from. The trust policy
 	// answers for a project name with no index at all, so a record that names

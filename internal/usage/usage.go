@@ -109,9 +109,10 @@ type Event struct {
 	Into string `json:"into,omitempty"`
 	// Unreadable marks an injection whose host sent a payload deja could not
 	// decode. The memory still goes out — an agent that asked for context gets
-	// it — but the session it went to is lost with the payload, and without
-	// this the row is identical to one from a host that sent nothing at all
-	// (#2161).
+	// it — and without this the row is identical to one from a host that sent
+	// nothing at all (#2161). It says nothing about the receiver: a decode
+	// that fails on one field keeps the ones it read, so `into` can be there
+	// beside it.
 	Unreadable bool `json:"unreadable,omitempty"`
 }
 

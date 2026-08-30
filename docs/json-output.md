@@ -550,8 +550,9 @@ and carries its `bytes`. `into` names the agent session an injection went to,
 as the harness names it, and is absent when the writer did not know one — an
 MCP recall answers a tool call, not a session start. `unreadable` is true when
 a hook was sent a payload deja could not decode: the memory went out anyway, so
-the row exists, and the session it went to went with the payload. Without it
-that row is identical to one from a host that sent nothing at all.
+the row exists, and without this it is identical to one from a host that sent
+nothing at all. It says nothing about `into` — a decode that fails on one field
+keeps the ones it read, so a payload that named its session carries both.
 
 A line needs both `t` and `kind` to appear here at all: a half-written line, or
 one from something that is not deja, is skipped rather than shown with a missing

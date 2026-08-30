@@ -111,6 +111,15 @@ func TestAPayloadThatNamesItsSessionKeepsTheReceiver(t *testing.T) {
 	if !strings.Contains(out, "into: ses_half") {
 		t.Errorf("a receiver the payload did name was thrown away:\n%s", out)
 	}
+	// The header is written by the other writer, and only it would show a
+	// receiver dropped there.
+	last, err := captureRun(t, "log", "--last")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(last, "into: ses_half") {
+		t.Errorf("the header dropped a receiver the list kept:\n%s", last)
+	}
 }
 
 // --last carries the same answer as the list: the header is where #2301 put
