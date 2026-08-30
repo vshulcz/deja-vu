@@ -1397,22 +1397,25 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	// handed an agent "the http client hammered the server on failure" and
 	// dropped "we decided to cap retries at 3" from the turn below it. That
 	// is the problem statement without its resolution (#R8).
+	parts := contextQueryParts(terms, phrases, qlow)
 	prevKept := false
-	written := printContextChunks(w, s, budget, func(m model.Message) (bool, int) {
-		weight := 0
-		if qlow != "" {
-			low := strings.ToLower(m.Text)
-			// How much of the query the turn carries, counted the way the hit
-			// snippets already rank passages: a turn that says the word once in
-			// passing must not outrank the exchange that keeps returning to it.
-			weight = countIn(m.Text, low, terms, phrases, nil)
-			if weight == 0 && strings.Contains(low, qlow) {
-				weight = 1
+	written := printContextChunks(w, s, budget, func(m model.Message) (bool, []int) {
+		// How much of each part of the query the turn carries, counted
+		// separately. countIn scores a turn only when it carries the whole
+		// query, so on a two-word question the turns holding the identifying
+		// word alone weighed nothing, no turn qualified, and the window fell
+		// back to the session's opening — 8 KB about something else (#2726).
+		hits := contextPartHits(m.Text, parts)
+		carries := false
+		for _, h := range hits {
+			if h > 0 {
+				carries = true
+				break
 			}
 		}
-		keep := weight > 0 || m.Role == "user" || (m.Role == "assistant" && prevKept)
+		keep := carries || m.Role == "user" || (m.Role == "assistant" && prevKept)
 		prevKept = keep
-		return keep, weight
+		return keep, hits
 	})
 	if written > 0 {
 		return
@@ -1422,14 +1425,100 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, int) { return true, 0 })
+	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil })
+}
+
+// contextQueryParts is what the digest weighs a turn against: the query's terms
+// and phrases, or the raw query when tokenising left nothing — a reader who
+// typed punctuation still gets scored against what they typed.
+func contextQueryParts(terms, phrases []string, qlow string) []string {
+	parts := make([]string, 0, len(terms)+len(phrases)+1)
+	parts = append(parts, terms...)
+	parts = append(parts, phrases...)
+	if len(parts) == 0 && qlow != "" {
+		parts = append(parts, qlow)
+	}
+	return parts
+}
+
+// contextPartHits counts each part of the query in one turn.
+func contextPartHits(text string, parts []string) []int {
+	if len(parts) == 0 {
+		return nil
+	}
+	low := strings.ToLower(text)
+	hits := make([]int, len(parts))
+	for i, p := range parts {
+		hits[i] = strings.Count(low, p)
+	}
+	return hits
 }
 
 // contextTurn is a turn the digest keeps, before it is rendered.
 type contextTurn struct {
-	role   string
-	raw    string
-	weight int
+	role string
+	raw  string
+	// hits is how often the turn says each part of the query. Kept per part
+	// rather than summed, because how much a part is worth is not known until
+	// every kept turn has been seen: see contextTurnWeights.
+	hits []int
+}
+
+// carriesQuery reports whether the turn says any part of the query at all.
+func (t contextTurn) carriesQuery() bool {
+	for _, h := range t.hits {
+		if h > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// contextTurnWeights scores each kept turn by the rarity of the query parts it
+// carries, so the budget window lands where the identifying word is.
+//
+// A word the session repeats on every turn says nothing about which passage was
+// wanted; the word that picked this session out of the index says everything.
+// Rarity is measured across the kept turns themselves — no index lookup, and it
+// is the same reasoning the ranking uses for identifying words (#2480).
+// Repetition inside one turn is damped: a turn returning to the subject should
+// outrank one that mentions it once, but not forty turns of scaffolding.
+func contextTurnWeights(turns []contextTurn, parts int) []float64 {
+	weights := make([]float64, len(turns))
+	if parts == 0 {
+		return weights
+	}
+	df := make([]int, parts)
+	for _, t := range turns {
+		for i, h := range t.hits {
+			if i < parts && h > 0 {
+				df[i]++
+			}
+		}
+	}
+	idf := make([]float64, parts)
+	for i, n := range df {
+		if n > 0 {
+			idf[i] = math.Log(1 + float64(len(turns))/float64(n))
+		}
+	}
+	// How much of the query the turn covers multiplies what it is worth. The
+	// turn that says every word of the question is the one the reader meant,
+	// and demanding all of them was the whole strength of the old rule; keeping
+	// it as a multiplier holds that strength while still letting a turn with
+	// one identifying word anchor the window when no turn carries them all.
+	for j, t := range turns {
+		var sum float64
+		covered := 0
+		for i, h := range t.hits {
+			if i < parts && h > 0 {
+				sum += idf[i] * math.Log1p(float64(h))
+				covered++
+			}
+		}
+		weights[j] = sum * float64(covered)
+	}
+	return weights
 }
 
 // renderContextTurnsWorkers is how many turns render at once. One worker per
@@ -1448,7 +1537,7 @@ func renderContextTurns(turns []contextTurn) []string {
 	}
 	if workers < 2 || len(turns) < 32 {
 		for i, t := range turns {
-			out[i] = SafeText(contextText(t.raw, t.weight > 0))
+			out[i] = SafeText(contextText(t.raw, t.carriesQuery()))
 		}
 		return out
 	}
@@ -1463,7 +1552,7 @@ func renderContextTurns(turns []contextTurn) []string {
 				if i >= len(turns) {
 					return
 				}
-				out[i] = SafeText(contextText(turns[i].raw, turns[i].weight > 0))
+				out[i] = SafeText(contextText(turns[i].raw, turns[i].carriesQuery()))
 			}
 		}()
 	}
@@ -1471,7 +1560,7 @@ func renderContextTurns(turns []contextTurn) []string {
 	return out
 }
 
-func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, weight int)) int {
+func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, hits []int)) int {
 	// A digest is what someone pipes into a prompt, so it carries the
 	// conversation. The work records — tool output, the files a turn touched, the
 	// commands it ran, the spans it replaced — are indexed and searchable by role
@@ -1481,9 +1570,10 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	// prevKept bookkeeping still runs left to right.
 	type chunk struct {
 		text string
-		// weight is how much of the query this turn carries, so the window can
-		// sit where the matches are rather than where the first one is.
-		weight int
+		// weight is how much of the query this turn carries, by rarity, so the
+		// window can sit where the identifying words are rather than where the
+		// common ones repeat.
+		weight float64
 	}
 	// The include callback carries state from turn to turn (prevKept), so which
 	// turns are kept is decided in one ordered pass. Rendering them is not:
@@ -1494,16 +1584,21 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	// from predicted ones and the window moves. Spreading the same renders
 	// across cores keeps the output identical by construction.
 	var kept []contextTurn
+	parts := 0
 	for _, m := range s.Messages {
 		if isWorkRecord(m.Role) {
 			continue
 		}
-		ok, weight := include(m)
+		ok, hits := include(m)
 		if !ok {
 			continue
 		}
-		kept = append(kept, contextTurn{role: m.Role, raw: m.Text, weight: weight})
+		if len(hits) > parts {
+			parts = len(hits)
+		}
+		kept = append(kept, contextTurn{role: m.Role, raw: m.Text, hits: hits})
 	}
+	weights := contextTurnWeights(kept, parts)
 	rendered := renderContextTurns(kept)
 	var chunks []chunk
 	for i, k := range kept {
@@ -1511,7 +1606,7 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", k.role, text), k.weight})
+		chunks = append(chunks, chunk{fmt.Sprintf("\n## %s\n\n%s\n", k.role, text), weights[i]})
 	}
 	if len(chunks) == 0 {
 		return 0
@@ -1525,8 +1620,9 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	// pinned the window there, and the exchange that settled the question — every
 	// later mention of it — fell outside the budget again (#1322). No match means
 	// the fallback overview, which wants the session's start, so it stays at 0.
-	start, best, span := 0, 0, 0
-	sum, bytes, left := 0, 0, 0
+	start, span := 0, 0
+	best := 0.0
+	sum, bytes, left := 0.0, 0, 0
 	for right, c := range chunks {
 		sum += c.weight
 		bytes += len(c.text)

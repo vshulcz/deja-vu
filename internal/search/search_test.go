@@ -256,11 +256,23 @@ func TestPrintContextTokenMatchAndFallback(t *testing.T) {
 		{Role: "assistant", Text: "then we redeployed on vercel"},
 	}}
 	b.Reset()
-	// Terms spread across messages: no single message qualifies, so the
-	// digest falls back to an overview instead of a header-only result.
+	// Terms spread across messages: each turn qualifies on the term it does
+	// carry, so both are printed as matches rather than as an apologetic
+	// overview. Requiring the whole query per turn is what sent a two-word
+	// question to the session's opening (#2726).
 	PrintContext(&b, spread, "turso vercel")
 	out := b.String()
-	if !strings.Contains(out, "opening exchange") || !strings.Contains(out, "turso token") || !strings.Contains(out, "redeployed") {
+	if !strings.Contains(out, "turso token") || !strings.Contains(out, "redeployed") {
+		t.Fatalf("spread terms missing: %q", out)
+	}
+	if strings.Contains(out, "opening exchange") {
+		t.Fatalf("matched turns reported as a fallback overview: %q", out)
+	}
+	b.Reset()
+	// Nothing of the query anywhere: no turn qualifies and there is no user
+	// turn to keep, so the overview is what is left to show.
+	PrintContext(&b, spread, "planetscale")
+	if out := b.String(); !strings.Contains(out, "opening exchange") || !strings.Contains(out, "turso token") {
 		t.Fatalf("fallback overview missing: %q", out)
 	}
 }
