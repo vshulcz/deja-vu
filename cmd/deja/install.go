@@ -161,6 +161,9 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	}
 	for _, t := range targets {
 		r, err := installTarget(t, exe, uninstall)
+		if err == nil {
+			err = configWasReadable(r.Path)
+		}
 		if err != nil {
 			note(t, err)
 			continue
@@ -1072,7 +1075,39 @@ func matchFinalNewline(old, next []byte) []byte {
 	return bytes.TrimSuffix(next, []byte("\r"))
 }
 
+// configWasReadable refuses a target whose config could not be read.
+//
+// The writers read the old config with `old, _ := os.ReadFile`, and an
+// unreadable file is empty to all of them. writeIfChanged refuses before it
+// writes over one, but a writer that decides there is nothing to do never gets
+// that far: `uninstall cursor` found no entry to remove and reported the target
+// unwired while its config still named deja (#2751).
+func configWasReadable(path string) error {
+	if path == "" {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return f.Close()
+}
+
 func writeIfChanged(path string, old, next []byte) (string, error) {
+	// Every writer reads the old config with `old, _ := os.ReadFile`, so a
+	// file that exists but cannot be read arrived here as an empty one and was
+	// written over with a config holding deja and nothing else. backupOnce
+	// used to catch it by reading the file itself — but it takes one snapshot
+	// per file and returns early once a `.bak` is beside it, which is the
+	// ordinary state after any earlier install (#2751).
+	if f, err := os.Open(path); err == nil {
+		_ = f.Close()
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
 	// Before the comparison, not after: a CRLF config converted afterwards
 	// would differ from `old` on every run, so each repeat install would
 	// rewrite the file and report it changed.
