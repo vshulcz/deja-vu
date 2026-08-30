@@ -546,6 +546,11 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		// shard later" and "we moved the shard to the region" are the same line
 		// to all of them. These markers are what the session-start digest
 		// already uses to tell one from the other.
+		// One bullet of a document the agent wrote is not what the session
+		// concluded, however well it matches (#2740).
+		if digest.IsDocumentItem(m.Text, line) {
+			continue
+		}
 		if digest.CarriesDecision(line) {
 			hits++
 		}

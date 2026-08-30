@@ -207,6 +207,52 @@ var shareStopwords = map[string]bool{
 	"это": true, "у": true, "с": true, "по": true, "а": true, "но": true,
 }
 
+// IsDocumentItem reports whether a line is one item of a document the agent
+// wrote rather than something it said about the work.
+//
+// A message can be a draft, a spec, a checklist — a text produced during the
+// session rather than a statement about it. Measured on a real store, the
+// session-start block recalled "- Keep responses concise by default; caveman
+// mode active: lite." to a later agent as a past decision; it is one bullet of
+// a 130-line specification the agent had just written. The prose around such a
+// document still describes the work and is left alone, and so is a short list
+// inside an ordinary reply — this asks that the message be mostly structure.
+func IsDocumentItem(message, line string) bool {
+	if !isStructureLine(line) {
+		return false
+	}
+	lines, marked := 0, 0
+	for _, l := range strings.Split(message, "\n") {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		lines++
+		if isStructureLine(l) {
+			marked++
+		}
+	}
+	return lines >= documentLines && marked*10 >= lines*documentShare
+}
+
+// documentLines is how long a message must be before its shape says anything.
+// A four-line reply with three bullets is a normal answer.
+const documentLines = 20
+
+// documentShare is how much of it must be structure, in tenths.
+const documentShare = 8
+
+func isStructureLine(l string) bool {
+	t := strings.TrimSpace(l)
+	if t == "" {
+		return false
+	}
+	switch t[0] {
+	case '-', '*', '#', '|', '+':
+		return true
+	}
+	return false
+}
+
 func looksLikeListingDump(line string) bool {
 	fields := strings.Fields(line)
 	if len(fields) < 8 {
