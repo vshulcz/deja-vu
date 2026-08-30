@@ -175,3 +175,23 @@ func TestThePreflightPassesOnAReadErrorRatherThanSkippingIt(t *testing.T) {
 		t.Error("a file that could not be read was taken for a readable one")
 	}
 }
+
+// grok's hook file is read on the way in and removed on the way out, so a
+// file the install refuses is one the uninstall still has to take — otherwise
+// grok keeps calling a binary that is no longer wired anywhere else.
+func TestUninstallStillTakesAHookFileTheInstallWouldRefuse(t *testing.T) {
+	hermeticEnv(t)
+	if _, err := captureRun(t, "install", "grok-auto", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	hooks := grokHooksPath()
+	if err := os.WriteFile(hooks, []byte("{\n  // mine\n  \"hooks\": []\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "uninstall", "grok-auto"); err != nil {
+		t.Fatalf("uninstall refused a hook file it only had to remove: %v", err)
+	}
+	if _, err := os.Stat(hooks); !os.IsNotExist(err) {
+		t.Errorf("the hook file survived the uninstall")
+	}
+}

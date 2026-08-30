@@ -646,10 +646,13 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "grok":
 		return installGrok(exe, uninstall)
 	case "grok-auto":
-		if err := readableStrictJSON(
-			filepath.Join(sources.GrokHome(), "user-settings.json"),
-			filepath.Join(sources.GrokHome(), "hooks", "deja.json"),
-		); err != nil {
+		probe := []string{filepath.Join(sources.GrokHome(), "user-settings.json")}
+		if !uninstall {
+			// Uninstall removes the hook file rather than reading it, so a
+			// file it can still take is not one to refuse over.
+			probe = append(probe, grokHooksPath())
+		}
+		if err := readableStrictJSON(probe...); err != nil {
 			return installResult{}, err
 		}
 		if _, err := installGrok(exe, uninstall); err != nil {
