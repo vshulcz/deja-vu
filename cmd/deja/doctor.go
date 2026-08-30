@@ -204,6 +204,9 @@ func doctorHooks(w io.Writer) {
 		status = "wired"
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, reportPath(path))
+	if note := hookExeNote(path, "claude-auto"); note != "" && (precompact || hookEventWired(hooks, "SessionStart", "hook-context")) {
+		fmt.Fprintf(w, "  %-12s %s\n", "", note)
+	}
 }
 
 // doctorWiringExe reports configs that name a binary which is no longer there.
