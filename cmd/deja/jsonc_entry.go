@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -310,12 +311,24 @@ func jsoncIsKey(text string, end int) bool {
 func readableStrictJSON(paths ...string) error {
 	for _, path := range paths {
 		b, err := os.ReadFile(path)
-		if err != nil || len(bytes.TrimSpace(b)) == 0 {
+		if os.IsNotExist(err) {
 			continue
 		}
-		var probe any
+		if err != nil {
+			return err
+		}
+		if len(bytes.TrimSpace(b)) == 0 {
+			continue
+		}
+		// An object, the way the writers read it: `null` decodes into a nil
+		// map without an error and the writer then panics assigning into it,
+		// and a list refuses one write too late.
+		var probe map[string]any
 		if err := json.Unmarshal(b, &probe); err != nil {
 			return configParseError(path, err)
+		}
+		if probe == nil {
+			return configParseError(path, errors.New("the file holds null, not an object"))
 		}
 	}
 	return nil

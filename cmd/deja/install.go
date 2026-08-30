@@ -646,7 +646,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "grok":
 		return installGrok(exe, uninstall)
 	case "grok-auto":
-		if err := readableStrictJSON(filepath.Join(sources.GrokHome(), "user-settings.json")); err != nil {
+		if err := readableStrictJSON(
+			filepath.Join(sources.GrokHome(), "user-settings.json"),
+			filepath.Join(sources.GrokHome(), "hooks", "deja.json"),
+		); err != nil {
 			return installResult{}, err
 		}
 		if _, err := installGrok(exe, uninstall); err != nil {

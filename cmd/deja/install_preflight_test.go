@@ -33,8 +33,13 @@ func TestATargetThatWillRefuseWritesNothing(t *testing.T) {
 		{"grok-auto",
 			func() string { return filepath.Join(sources.GrokHome(), "user-settings.json") },
 			func() string { return filepath.Join(sources.GrokHome(), "config.toml") }},
+		// grok wires a third file, and it is the last one: a refusal there
+		// used to land after both of the others were written.
+		{"grok-auto",
+			func() string { return filepath.Join(sources.GrokHome(), "hooks", "deja.json") },
+			func() string { return filepath.Join(sources.GrokHome(), "user-settings.json") }},
 	} {
-		t.Run(c.target, func(t *testing.T) {
+		t.Run(c.target+" "+filepath.Base(c.unreadable()), func(t *testing.T) {
 			hermeticEnv(t)
 			bad, first := c.unreadable(), c.written()
 			for _, dir := range []string{filepath.Dir(bad), filepath.Dir(first)} {
@@ -120,5 +125,53 @@ func TestReadableStrictJSONNamesOnlyWhatItCannotRead(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), bad) {
 		t.Errorf("the refusal does not name the file: %v", err)
+	}
+}
+
+// A config that parses is not yet a config the writers can use: they decode
+// into a map, so `null` left them assigning into a nil map — a panic — and a
+// list refused one write too late.
+func TestThePreflightRefusesJSONThatIsNotAnObject(t *testing.T) {
+	for _, body := range []string{"null", "[1, 2]", `"a string"`} {
+		t.Run(body, func(t *testing.T) {
+			hermeticEnv(t)
+			hooks := filepath.Join(sources.CursorCLIHome(), "hooks.json")
+			mcp := filepath.Join(sources.CursorCLIHome(), "mcp.json")
+			if err := os.MkdirAll(filepath.Dir(hooks), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(hooks, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			before := "{\n  \"mcpServers\": {}\n}\n"
+			if err := os.WriteFile(mcp, []byte(before), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := captureRun(t, "install", "cursor-auto", "--no-index"); err == nil {
+				t.Fatal("a config the writers cannot use was accepted")
+			}
+			b, err := os.ReadFile(mcp)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(b) != before {
+				t.Errorf("the other config was written first:\n%s", b)
+			}
+		})
+	}
+}
+
+// A file that is there but cannot be read is not a file that is absent.
+func TestThePreflightPassesOnAReadErrorRatherThanSkippingIt(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "unreadable.json")
+	if err := os.WriteFile(path, []byte(`{"a":1}`), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads it anyway")
+	}
+	if err := readableStrictJSON(path); err == nil {
+		t.Error("a file that could not be read was taken for a readable one")
 	}
 }
