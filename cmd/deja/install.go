@@ -2732,15 +2732,35 @@ func removeTOMLMCPBlock(s, key string) string {
 	var out []string
 	for i := 0; i < len(lines); i++ {
 		found, ok := tomlMCPHeader(lines[i])
-		if !ok || found != key {
+		if !ok || !tomlBlockOwnedBy(found, key) {
 			out = append(out, lines[i])
 			continue
 		}
+		// To the next header, whatever it is. A sub-table of this same server
+		// opens one of its own, and the loop above takes it on the next turn
+		// because it belongs to the key being removed — which is the whole of
+		// the fix for #2716, and why there is no second skip here.
 		i++
-		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[i]), "[") {
+		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(tomlCode(lines[i])), "[") {
 			i++
 		}
 		i--
 	}
 	return strings.Join(out, "\n")
+}
+
+// tomlBlockOwnedBy reports whether a header names the block being removed or
+// one of its sub-tables.
+//
+// TOML lets a server carry sub-tables, and `[mcp_servers.deja.env]` opens with
+// `[` like any other header — so removing the block by walking to the next one
+// stopped there and left the sub-table behind, naming a server that had just
+// gone (#2716). Reading the sub-table as part of the block is enough: the walk
+// stops at its header and the caller's next turn removes it in the same way.
+//
+// The dot is what decides. `deja.env` belongs to `deja`; `deja-vu` does not,
+// and a bare prefix test would take a hand-wired server with it.
+
+func tomlBlockOwnedBy(found, key string) bool {
+	return found == key || strings.HasPrefix(found, key+".")
 }
