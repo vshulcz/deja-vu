@@ -93,3 +93,49 @@ func TestTheOpencodeJSONCWriterSaysNothingAboutAnEntryThatIsOn(t *testing.T) {
 		}
 	}
 }
+
+// The switch is read out of the entry, not out of the reader's words about it
+// and not out of a block nested inside it: both switched a running server off
+// and said deja had left it as it was.
+func TestTheOpencodeJSONCWriterReadsTheEntrysOwnSwitch(t *testing.T) {
+	for _, entry := range []string{
+		`"deja": {"type":"local","command":["/old/deja","mcp"]} // "enabled": false when I travel`,
+		`"deja": {"type":"local","command":["/old/deja","mcp"]} /* "disabled": true once */`,
+		`"deja": {"type":"local","command":["/old/deja","mcp"],"options":{"enabled":false},"enabled":true}`,
+		`"deja": {"type":"local","command":["/old/deja","mcp"],"enabled":"false"}`,
+		// A comment inside the entry, at the depth its own keys sit at.
+		"\"deja\": {\"type\":\"local\", // \"enabled\": false when I travel\n      \"command\":[\"/old/deja\",\"mcp\"]}",
+		"\"deja\": {\"type\":\"local\", /* \"disabled\": true once */ \"command\":[\"/old/deja\",\"mcp\"]}",
+	} {
+		old := "{\n  \"mcp\": {\n    " + entry + "\n  }\n}\n"
+		next, note, err := updateOpencodeJSONC([]byte(old), "/new/deja", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(next), `"enabled":false`) || strings.Contains(string(next), `"disabled":true`) {
+			t.Errorf("%s\n  was switched off:\n%s", entry, next)
+		}
+		if strings.Contains(note, "switched off") {
+			t.Errorf("%s\n  was reported off: %q", entry, note)
+		}
+	}
+}
+
+// deja's own switched-off entry is not a stranger's on the next install: the
+// note compares against what deja writes, switch and all.
+func TestASwitchedOffEntryOfDejasIsNotReportedReplacedEveryRun(t *testing.T) {
+	old := []byte("{\n  \"mcp\": {\n    \"deja\": {\"type\":\"local\",\"command\":[\"/bin/deja\",\"mcp\"],\"enabled\":false}\n  }\n}\n")
+	next, note, err := updateOpencodeJSONC(old, "/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(note, "replaced") {
+		t.Errorf("deja's own entry was reported as somebody else's: %q", note)
+	}
+	if !strings.Contains(note, "switched off") {
+		t.Errorf("the entry is still off and nothing says so: %q", note)
+	}
+	if string(next) != string(old) {
+		t.Errorf("a repeat install rewrote the entry:\n%s", next)
+	}
+}

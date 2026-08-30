@@ -2913,13 +2913,19 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		note := ""
 		entryLine := line
 		if !uninstall {
-			note = replacedJSONCLineNote(dropped, line)
 			// opencode's other writer rewrites deja's entry as one line, so a
 			// switch the reader had set was dropped with the rest of it: the
 			// entry came back on and install said nothing (#2757). Carry it
 			// through and say so, the way the merge does.
-			if off := jsoncEntrySwitch(strings.Join(dropped, " ")); off != "" {
+			off := jsoncEntrySwitch(strings.Join(dropped, "\n"))
+			if off != "" {
 				entryLine = strings.TrimSuffix(line, "}") + "," + off + "}"
+			}
+			// Against what is about to be written, not against the line
+			// without the switch: otherwise deja's own switched-off entry
+			// never matches itself and every repeat install says "replaced".
+			note = replacedJSONCLineNote(dropped, entryLine)
+			if off != "" {
 				if note != "" {
 					note += "; "
 				}
@@ -3001,21 +3007,49 @@ func replacedJSONCLineNote(dropped []string, line string) string {
 // Text rather than JSON, for the same reason jsoncEntryCommand is: the block
 // may carry comments and trailing commas.
 func jsoncEntrySwitch(text string) string {
+	// The reader's comments come out first: a line reading
+	// `// "enabled": false when I travel` is a note about the entry, not the
+	// entry, and reading it switched off a server that was running.
+	code := stripJSONComments(text)
 	for _, sw := range []struct{ key, off string }{
 		{"enabled", "false"},
 		{"disabled", "true"},
 	} {
-		i := strings.Index(text, `"`+sw.key+`"`)
-		if i < 0 {
-			continue
-		}
-		rest := strings.TrimSpace(text[i+len(sw.key)+2:])
-		if !strings.HasPrefix(rest, ":") {
-			continue
-		}
-		rest = strings.TrimSpace(rest[1:])
-		if strings.HasPrefix(rest, sw.off) {
+		if at := jsoncEntryKeyValue(code, sw.key); strings.HasPrefix(at, sw.off) {
 			return `"` + sw.key + `":` + sw.off
+		}
+	}
+	return ""
+}
+
+// jsoncEntryKeyValue returns what follows `"key":` in the entry's own object,
+// or empty when the key is not there. Its own: a nested block carries its own
+// settings, and taking the first match anywhere let `"options":{"enabled":
+// false}` switch off an entry that says it is on.
+func jsoncEntryKeyValue(code, key string) string {
+	depth, inString, escaped := 0, false, false
+	for i := 0; i < len(code); i++ {
+		switch c := code[i]; {
+		case escaped:
+			escaped = false
+		case c == '\\' && inString:
+			escaped = true
+		case c == '"' && !inString:
+			inString = true
+			// The entry is `"deja": { … }`, so its own keys sit one brace in.
+			if depth == 1 && strings.HasPrefix(code[i:], `"`+key+`"`) {
+				rest := strings.TrimSpace(code[i+len(key)+2:])
+				if strings.HasPrefix(rest, ":") {
+					return strings.TrimSpace(rest[1:])
+				}
+			}
+		case c == '"':
+			inString = false
+		case inString:
+		case c == '{':
+			depth++
+		case c == '}':
+			depth--
 		}
 	}
 	return ""
