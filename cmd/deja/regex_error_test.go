@@ -19,9 +19,13 @@ func TestABadRegexIsReportedWithoutAnInternalName(t *testing.T) {
 		t.Fatal("a broken regex was accepted")
 	}
 	msg := err.Error()
-	// The premise: it is the regex it is complaining about.
-	if !strings.Contains(msg, "parsing regexp") {
+	// The premise: it is the regex it is complaining about, in deja's own
+	// words rather than Go's (#1602).
+	if !strings.Contains(msg, "is not a pattern deja can use") {
 		t.Fatalf("the refusal is about something else: %q", msg)
+	}
+	if strings.Contains(msg, "parsing regexp") {
+		t.Errorf("the refusal still carries Go's own prefix: %q", msg)
 	}
 	if strings.Contains(msg, "run:") {
 		t.Errorf("the refusal carries an internal function name: %q", msg)

@@ -1229,9 +1229,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 			// "run:" is the name of a function, and the reader of this line is
 			// someone who mistyped a pattern (#2286). The only error that
 			// reaches here in practice is the regexp compile, so it says which
-			// input to look at.
+			// input to look at, in the words the other bad flags use (#1602).
 			if o.Regex {
-				return fmt.Errorf("--re pattern: %w", rerr)
+				return rePatternError(o.Query, rerr)
 			}
 			return rerr
 		}
