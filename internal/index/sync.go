@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -168,6 +169,13 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	// where data leaves, and a pattern set after the index was built has to
 	// hold at that boundary whether or not the index has been rebuilt.
 	ex := sources.NewExcluder()
+	// And the other privacy control, for the same reason at the same boundary.
+	// The ignore rule is what a reader sets when a tree should stay out of
+	// recall — its own documentation calls it the one directory deja never
+	// recalls from without being asked — and it was applied everywhere except
+	// where memory actually leaves the machine, so the export shipped it to a
+	// peer that then served it as imported memory (#2654).
+	pol := policy.Load()
 	// The oldest instant held back per source. A watermark that ran past an
 	// excluded record would settle it forever: remove the pattern later and
 	// that work never syncs again, because the source resumes from a point
@@ -198,7 +206,10 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		if !ok {
 			return
 		}
-		if !ex.Empty() && ex.Match(meta.Project) {
+		if (!ex.Empty() && ex.Match(meta.Project)) || pol.Ignored(meta.Path, meta.Project) {
+			// Held, not settled, for both: a watermark that ran past a
+			// withheld record would settle it forever, so lifting the rule
+			// later would never send that work.
 			if tn := r.Time.UnixNano(); !r.Time.IsZero() {
 				if cur, seen := heldFrom[wk]; !seen || tn < cur {
 					heldFrom[wk] = tn
