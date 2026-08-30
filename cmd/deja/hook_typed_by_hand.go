@@ -5,6 +5,41 @@ import (
 	"os"
 )
 
+// What a hook may spend, measured on a 1,367-session store with the index
+// settled, five runs each (#2668):
+//
+//	per action, and the ones that must stay cheap
+//	  hook-tool          10 ms
+//	  hook-tool-after    10 ms
+//	  hook-plan          under 10 ms
+//	  hook-prompt        60 to 110 ms
+//	  statusline         10 ms
+//	  hook-goose         20 to 40 ms
+//	  hook-goose-prompt  20 to 30 ms
+//	  hook-precompact    10 to 40 ms
+//
+//	once per session, allowed one expensive run
+//	  hook-context       0.85 s, then 50 ms
+//	  hook-antigravity   0.56 s, then 10 ms
+//
+//	detached, off every blocking path
+//	  hook-refresh       0.42 to 0.74 s, by design (see runHookRefresh)
+//
+// The shape matters more than the numbers. A change that adds a read to a
+// per-action hook has to keep it behind the checks that decide there is nothing
+// to say — which is why #2652 pays for its manifest read only after finding
+// something worth saying. The session-start hooks are allowed their one
+// expensive run because it happens once and its answer is the whole reason the
+// session has memory.
+//
+// Measure with the index settled or the number is the warmup's: with a rebuild
+// running, hook-context measured 0.54 to 0.83 s on every run and hook-prompt
+// answered with nothing at all, both by design.
+//
+// This list sits beside hookAdvice because that map is the only other place
+// that names hooks one by one; a hook dispatched without a line here has no
+// budget to be held to, and a test says so.
+//
 // hookAdvice is what to reach for instead, for the hooks a person is most
 // likely to type after reading them in `deja help`.
 var hookAdvice = map[string]string{
