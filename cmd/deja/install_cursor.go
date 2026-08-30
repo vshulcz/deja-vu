@@ -60,11 +60,36 @@ func setCursorHook(hooks map[string]any, event, cmd string, uninstall bool) {
 	found := false
 	for _, entryAny := range entries {
 		entry, _ := entryAny.(map[string]any)
-		if entry != nil && entry["command"] == cmd {
+		kind := hookNotDejas
+		if entry != nil {
+			kind = hookCommandKindOf(entry["command"], cmd)
+		}
+		// A wrapper the reader built around deja is theirs to keep — and it
+		// already calls the hook, so writing deja's own line beside it would
+		// run the same thing twice.
+		if kind == hookWrapsDejas {
 			found = true
+			kept = append(kept, entryAny)
+			continue
+		}
+		// An entry deja wrote from a path it no longer runs from is still
+		// deja's. Comparing the whole command read it as a stranger's hook
+		// worth keeping, so a move left cursor running the binary that is
+		// gone alongside the one that is there, and appended one more entry
+		// every time (#2691).
+		if kind == hookDejas {
 			if uninstall {
+				found = true
 				continue
 			}
+			// A file that already collected several of them converges here:
+			// the first becomes this binary's line and the rest go, rather
+			// than being rewritten into byte-identical copies of it.
+			if found {
+				continue
+			}
+			found = true
+			entry["command"] = cmd
 		}
 		kept = append(kept, entryAny)
 	}
