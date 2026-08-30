@@ -133,7 +133,7 @@ func enableGeminiHooks() error {
 		return nil
 	}
 	cfg["enabled"] = true
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return err
 	}

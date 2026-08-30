@@ -73,7 +73,7 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 	} else {
 		root["mcp"] = mcp
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
