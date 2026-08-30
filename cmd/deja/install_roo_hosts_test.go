@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -127,5 +128,106 @@ func TestUninstallRooTakesDejaOutOfTheHostsItCanRead(t *testing.T) {
 	}
 	if strings.Contains(string(b), "\"deja\"") {
 		t.Errorf("deja was left in a host that could be read:\n%s", b)
+	}
+}
+
+// The JSONC writer refuses more than the parsed one does, and the check has to
+// refuse the same shapes: a commented host whose block is not an object, or
+// whose top level is not an object at all, used to pass the check and refuse
+// one host too late.
+func TestRooAsksTheJSONCWriterWhatItWouldRefuse(t *testing.T) {
+	for _, bad := range []string{
+		"{\n  // mine\n  \"mcpServers\": [1, 2]\n}\n",
+		"{\n  // mine\n  \"mcpServers\": null\n}\n",
+		"// mine\n[1, 2]\n",
+		"// mine\n5\n",
+		"// mine\nnull\n",
+		"null\n",
+	} {
+		t.Run(strings.TrimSpace(bad), func(t *testing.T) {
+			hermeticEnv(t)
+			dir := t.TempDir()
+			good := rooHost(t, filepath.Join(dir, "a"), "{\n  \"mcpServers\": {}\n}\n")
+			other := rooHost(t, filepath.Join(dir, "b"), bad)
+			t.Setenv("DEJA_ROO_ROOTS", strings.Join([]string{good, other}, string(os.PathListSeparator)))
+
+			first := filepath.Join(good, "settings", "mcp_settings.json")
+			before, err := os.ReadFile(first)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := captureRun(t, "install", "roo", "--no-index"); err == nil {
+				t.Fatal("a host the writer would refuse was accepted")
+			}
+			after, rerr := os.ReadFile(first)
+			if rerr != nil {
+				t.Fatal(rerr)
+			}
+			if string(after) != string(before) {
+				t.Errorf("the first host was written before the refusal:\n%s", after)
+			}
+			if _, err := os.Stat(first + ".bak"); err == nil {
+				t.Errorf("a snapshot was left beside a file that was never changed")
+			}
+		})
+	}
+}
+
+// Reading the settings is not the whole question: the snapshot and the write
+// both land in the host's settings directory.
+func TestRooAsksWhetherItCanWriteTheHostAtAll(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop a write here")
+	}
+	hermeticEnv(t)
+	dir := t.TempDir()
+	good := rooHost(t, filepath.Join(dir, "a"), "{\n  \"mcpServers\": {}\n}\n")
+	other := rooHost(t, filepath.Join(dir, "b"), "{\n  \"mcpServers\": {}\n}\n")
+	closed := filepath.Join(other, "settings")
+	if err := os.Chmod(closed, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(closed, 0o755) })
+	t.Setenv("DEJA_ROO_ROOTS", strings.Join([]string{good, other}, string(os.PathListSeparator)))
+
+	first := filepath.Join(good, "settings", "mcp_settings.json")
+	before, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "roo", "--no-index"); err == nil {
+		t.Fatal("a host deja cannot write was accepted")
+	}
+	after, rerr := os.ReadFile(first)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	if string(after) != string(before) {
+		t.Errorf("the first host was written before the refusal:\n%s", after)
+	}
+}
+
+// A host that is there and cannot be read still has deja in it, so the run
+// says so rather than reporting no host at all.
+func TestUninstallRooNamesTheHostItCouldNotRead(t *testing.T) {
+	hermeticEnv(t)
+	dir := t.TempDir()
+	good := rooHost(t, filepath.Join(dir, "a"), "{\n  \"mcpServers\": {}\n}\n")
+	t.Setenv("DEJA_ROO_ROOTS", good)
+	if _, err := captureRun(t, "install", "roo", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	bad := rooHost(t, filepath.Join(dir, "b"), "{ not json ]\n")
+	t.Setenv("DEJA_ROO_ROOTS", strings.Join([]string{good, bad}, string(os.PathListSeparator)))
+
+	out, err := captureRun(t, "uninstall", "roo")
+	if err != nil {
+		t.Fatalf("uninstall refused over a host it was not asked to edit: %v", err)
+	}
+	if strings.Contains(out, "no Roo host found") {
+		t.Errorf("a host that is there was reported as no host at all:\n%s", out)
+	}
+	if !strings.Contains(out, "could not read") {
+		t.Errorf("the host deja could not read is not named:\n%s", out)
 	}
 }

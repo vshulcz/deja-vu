@@ -2489,6 +2489,22 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a, Note: note}, err
 }
 
+// firstDirThatIsThere is the directory a write would actually land in: the
+// settings directory itself once it exists, and otherwise the nearest parent
+// that does, since install creates what is missing under it.
+func firstDirThatIsThere(dir string) string {
+	for {
+		if isRealDir(dir) {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return dir
+		}
+		dir = parent
+	}
+}
+
 // mcpEntryWritable asks whether installMCPJSON could write its entry into this
 // config, without writing anything.
 //
@@ -2501,12 +2517,36 @@ func mcpEntryWritable(path, blockKey string) error {
 	if err != nil {
 		return err
 	}
-	if len(bytes.TrimSpace(old)) == 0 || configIsJSONC(old) {
+	if len(bytes.TrimSpace(old)) == 0 {
 		return nil
 	}
+	text := string(old)
+	jsonc := configIsJSONC(old)
+	if jsonc {
+		text = stripJSONComments(text)
+	}
 	var root map[string]any
-	if err := json.Unmarshal(old, &root); err != nil {
+	if err := json.Unmarshal([]byte(text), &root); err != nil {
 		return configParseError(path, err)
+	}
+	if root == nil {
+		// `null` decodes into a nil map without an error, and the writer then
+		// assigns into it.
+		return configParseError(path, errors.New("the file holds null, not an object"))
+	}
+	if jsonc {
+		// The text writer inserts rather than replaces, so a key holding
+		// anything but an object would end up in the file twice with the
+		// reader's value winning — writeJSONCEntry refuses those, and so must
+		// this (#2740). It also needs a top-level object to insert into.
+		if v, present := root[blockKey]; present {
+			if _, isObject := v.(map[string]any); !isObject {
+				return fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, blockKey)
+			}
+		}
+		if zedTopLevelOpen(string(old)) < 0 {
+			return fmt.Errorf("%s: does not look like a settings object; add %q by hand", path, blockKey)
+		}
 	}
 	_, _, err = mcpBlock(root, blockKey, path)
 	return err
