@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // earlierNameJointCap bounds how many files the one session that saw both may
@@ -16,6 +18,12 @@ import (
 // thirteen-file refactor touches everything, and naming whichever of them
 // happened to stop first is a coin toss dressed as a finding.
 const earlierNameJointCap = 3
+
+// earlierNameReadCap bounds how many candidate sessions are read to confirm a
+// move. The candidates are tried newest first, so the cap costs only the
+// oldest of a crowded field — and a crowded field is the case where the answer
+// was least worth trusting anyway.
+const earlierNameReadCap = 3
 
 // earlierNameNote points at a file this one's history may continue from.
 //
@@ -90,8 +98,24 @@ func earlierNameNote(dir, typed string, target search.BlameTarget) string {
 	if targetFirst.IsZero() {
 		return ""
 	}
-	best, bestWhen := "", time.Time{}
-	for p, j := range together {
+	// Newest first, then by path: a map's order is not an order, and on equal
+	// timestamps — one per session, so ties are ordinary — the same command
+	// answered with a different file on each run.
+	candidates := make([]string, 0, len(together))
+	for p := range together {
+		candidates = append(candidates, p)
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		a, b := together[candidates[i]], together[candidates[j]]
+		if !a.when.Equal(b.when) {
+			return a.when.After(b.when)
+		}
+		return candidates[i] < candidates[j]
+	})
+	best := ""
+	reads := 0
+	for _, p := range candidates {
+		j := together[p]
 		// It stopped where this one carried on: the joint session is the last
 		// time anything touched it, and this file outlived it.
 		if !lastTouch[p].Equal(j.when) || !j.when.Before(targetLast) {
@@ -115,12 +139,19 @@ func earlierNameNote(dir, typed string, target search.BlameTarget) string {
 		// to the other. Prose alone would be guesswork, which is why #1627
 		// rejected it; prose as the second signal is what separates the two
 		// shapes the first one cannot.
+		//
+		// Each of these reads a session, so the field is bounded: a hub file
+		// with ten one-off neighbours cost ten reads and most of blame's own
+		// wall-clock.
+		if reads >= earlierNameReadCap {
+			break
+		}
+		reads++
 		if !sessionSaysItMoved(dir, j.session, path.Base(p), target.Base) {
 			continue
 		}
-		if best == "" || j.when.After(bestWhen) {
-			best, bestWhen = p, j.when
-		}
+		best = p
+		break
 	}
 	if best == "" {
 		return ""
@@ -167,16 +198,49 @@ func sessionSaysItMoved(dir, id, from, to string) bool {
 	if err != nil || !ok {
 		return false
 	}
+	from, to = strings.ToLower(from), strings.ToLower(to)
 	for _, m := range s.Messages {
-		text := strings.ToLower(m.Text)
-		if !strings.Contains(text, strings.ToLower(from)) || !strings.Contains(text, strings.ToLower(to)) {
+		// Not what a file says about itself: an edit's payload is carried in
+		// the message text, so a file whose contents read "renamed from x" was
+		// voting for a rename nobody performed.
+		if m.Role == sources.RoleFiles || m.Role == "tool_result" {
 			continue
 		}
-		for _, verb := range []string{"rename", "renaming", "mv ", "moved", "move "} {
-			if strings.Contains(text, verb) {
-				return true
-			}
+		text := strings.ToLower(m.Text)
+		i, j := strings.Index(text, from), strings.Index(text, to)
+		if i < 0 || j < 0 {
+			continue
+		}
+		if movedBetween(text, min(i, j), max(i, j)+len(to)) {
+			return true
 		}
 	}
 	return false
 }
+
+// movedBetween looks for the verb in the span that holds both names, rather
+// than anywhere in the message: a turn that renames two other files and
+// mentions ours in passing said nothing about ours (#1627).
+//
+// "remove" is not "move": it contains it, and matching the substring made the
+// deletion case — the one thing this note cannot tell from a rename — vote
+// for itself.
+func movedBetween(text string, from, to int) bool {
+	span := text[max(0, from-moveVerbReach):min(len(text), to+moveVerbReach)]
+	for _, verb := range []string{"rename", "renaming", "renamed", "git mv ", "mv "} {
+		if strings.Contains(span, verb) {
+			return true
+		}
+	}
+	for _, verb := range []string{" move ", " moved ", " moving "} {
+		if strings.Contains(" "+span+" ", verb) {
+			return true
+		}
+	}
+	return false
+}
+
+// moveVerbReach is how far either side of the two names the verb may sit. A
+// rename sentence puts it next to them; a paragraph that happens to hold both
+// puts it anywhere.
+const moveVerbReach = 40

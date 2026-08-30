@@ -133,3 +133,36 @@ func TestBlameNamesTheFileTheHistoryStopsAt(t *testing.T) {
 		}
 	}
 }
+
+// The verb has to be about these two names. A turn that renames two other
+// files and mentions ours in passing said nothing about ours; "remove" is not
+// "move" — matching the substring made the deletion case, the one thing this
+// note cannot tell from a rename, vote for itself; and a file whose own
+// contents read "renamed from x" is not somebody saying so.
+func TestOnlyASentenceAboutTheseTwoNamesCounts(t *testing.T) {
+	for _, c := range []struct {
+		text string
+		want bool
+	}{
+		{"rename old_name.go to new_name.go", true},
+		{"git mv internal/search/old_name.go internal/search/new_name.go", true},
+		{"moving old_name.go to new_name.go now", true},
+		{"rename helper.go to helpers.go, and while you are there old_name.go and new_name.go both need the retry fix", false},
+		{"remove old_name.go, new_name.go covers everything it did", false},
+		{"old_name.go removed, new_name.go takes over", false},
+		{"old_name.go and new_name.go both call the same helper", false},
+	} {
+		span := c.text
+		i, j := strings.Index(span, "old_name.go"), strings.Index(span, "new_name.go")
+		if i < 0 || j < 0 {
+			t.Fatalf("fixture does not name both files: %q", c.text)
+		}
+		from, to := i, j+len("new_name.go")
+		if j < i {
+			from, to = j, i+len("old_name.go")
+		}
+		if got := movedBetween(span, from, to); got != c.want {
+			t.Errorf("movedBetween(%q) = %v, want %v", c.text, got, c.want)
+		}
+	}
+}
