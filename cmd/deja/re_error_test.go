@@ -51,11 +51,7 @@ func TestTheFragmentInTheRefusalCarriesNoControlByte(t *testing.T) {
 	// Assembled at run time: a pattern that cannot compile is what
 	// staticcheck's SA1000 exists to catch, and here it is the input, so it
 	// must not be a constant it can fold.
-	var b []byte
-	for _, c := range []byte{'[', 0x1b, '-', 0x01, ']'} {
-		b = append(b, c)
-	}
-	pattern := string(b)
+	pattern := badRangePattern()
 	_, err := regexp.Compile(pattern)
 	if err == nil {
 		t.Fatal("that pattern compiles now; pick another")
@@ -66,4 +62,12 @@ func TestTheFragmentInTheRefusalCarriesNoControlByte(t *testing.T) {
 			t.Fatalf("the refusal carries a control byte: %q", msg)
 		}
 	}
+}
+
+// badRangePattern is a character class whose ends are the wrong way round,
+// built rather than written: as a literal, staticcheck reads it as a mistake
+// instead of as this test's input.
+func badRangePattern() string {
+	ends := []byte{0x1b, 0x01}
+	return "[" + string(ends[0]) + "-" + string(ends[1]) + "]"
 }
