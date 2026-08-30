@@ -475,19 +475,17 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			limit = 8
 		}
 		var hb strings.Builder
-		for i, e := range entries {
-			if i >= limit {
-				break
-			}
-			when := ""
-			if !e.Last.IsZero() {
-				when = ", last " + e.Last.Local().Format("2006-01-02")
-			}
-			// The same note the CLI prints: the agent reading this is the
-			// one most likely to run the command back without looking.
-			fmt.Fprintf(&hb, "%s\n  ran %s in %s%s%s\n", commandListingLine(e.Command), pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when, e.failureNote())
+		// The same lines the CLI prints, from the same writer: this tool used
+		// to keep its own copy of the loop, so a note the CLI learned never
+		// reached the agent (#1634).
+		writeHowEntries(&hb, entries, limit, commandListingLine, ", last ")
+		out := strings.TrimRight(hb.String(), "\n")
+		if note := howCapNote(len(entries), limit); note != "" {
+			// The agent cannot ask a follow-up of its own, so the cut has to
+			// travel with the answer rather than to a terminal it never sees.
+			out += "\n\n" + note
 		}
-		return strings.TrimRight(hb.String(), "\n"), nil
+		return out, nil
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`
