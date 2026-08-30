@@ -540,22 +540,15 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 			continue
 		}
 		matchedAt[i] = true
-		// Among lines that carry the question words, prefer the one that
-		// concluded something. Five ways of choosing by where and how often a
-		// word fell were measured and none moved the number; these markers are
-		// what the session-start digest already uses to tell a decision from a
-		// passing mention.
-		// Among lines that carry the question words, prefer the one that
-		// concluded something.
-		if digest.CarriesDecision(line) {
-			hits++
-		}
 		// Among lines that carry the question's words, prefer the one that
 		// concluded something. Five ways of choosing by where and how often a
 		// word fell were measured and none moved the number: "I'll look at the
 		// shard later" and "we moved the shard to the region" are the same line
 		// to all of them. These markers are what the session-start digest
 		// already uses to tell one from the other.
+		if digest.CarriesDecision(line) {
+			hits++
+		}
 		// Terms arrive most-identifying first when the caller knows the order,
 		// so a line carrying the word that identified the match beats one
 		// carrying an ordinary word the same session happens to use. Without
