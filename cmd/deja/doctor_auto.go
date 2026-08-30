@@ -128,26 +128,48 @@ func doctorAutoRecall(w io.Writer) {
 // both nest ours under a key: a plain "deja appears in the file" check would
 // pass on a disabled entry.
 func doctorGooseWired(path string) bool {
-	return yamlHasNestedKey(path, "deja:")
+	return yamlHasChildKey(path, "extensions:", "deja:")
 }
 
 func doctorHermesWired(path string) bool {
-	return yamlHasKey(path, "mcp_servers:") && yamlHasNestedKey(path, "deja:")
+	return yamlHasChildKey(path, "mcp_servers:", "deja:")
 }
 
-// yamlHasNestedKey is yamlHasKey for a key that has to sit under something.
+// yamlHasChildKey reports whether a key sits directly under a top-level parent.
+//
 // The indent is whatever the reader wrote the block at, and asking for exactly
 // two called a goose deja had just wired at four unwired — while the writer
-// itself follows the block (#2614, #2727). Nested, not top level: `deja:` in
-// the first column is not an entry in anybody's server list.
-func yamlHasNestedKey(path, key string) bool {
+// itself follows the block (#2614, #2727). "Anywhere below the top level" was
+// the other end of the same mistake: `deja:` in another server's env, or in a
+// comment-shaped example under `notes:`, then read as a wired server (#2730).
+func yamlHasChildKey(path, parent, key string) bool {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	for _, line := range strings.Split(string(b), "\n") {
-		trimmed := strings.TrimRight(line, " \t\r")
-		if strings.TrimSpace(trimmed) == key && yamlIndentWidth(trimmed) > 0 {
+	lines := strings.Split(string(b), "\n")
+	inBlock := false
+	child := -1
+	for _, raw := range lines {
+		line := strings.TrimRight(raw, " \t\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if strings.TrimSpace(line) == parent && yamlIndentWidth(line) == 0 {
+			inBlock, child = true, -1
+			continue
+		}
+		if !inBlock {
+			continue
+		}
+		if yamlIndentWidth(line) == 0 {
+			inBlock = false
+			continue
+		}
+		if child < 0 {
+			child = yamlIndentWidth(line)
+		}
+		if strings.TrimSpace(line) == key && yamlIndentWidth(line) == child {
 			return true
 		}
 	}
