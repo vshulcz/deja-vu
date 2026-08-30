@@ -3061,7 +3061,8 @@ func runForget(dir string, args []string) error {
 			fmt.Fprintln(os.Stderr, "deja: nothing is forgotten on this machine")
 		}
 		if len(keys) > 0 {
-			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index\n", pasteSafe(keys[0]))
+			quoted := pasteSafe(keys[0])
+			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index%s\n", quoted, pasteSafeCaveat(quoted))
 		}
 		return nil
 	}
@@ -3117,7 +3118,11 @@ func runForget(dir string, args []string) error {
 			// The ids, not just the count: this is the moment someone checks
 			// that they got back exactly what they lost, and both the list and
 			// the ambiguity refusal name them a step earlier (#1095, #1014).
-			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index — %s\n", back, pluralS(back), joinCapped(names, 5))
+			// Prose, not a command: the names are read, not pasted, so they
+			// are neutralised rather than quoted. Raw, an escape byte in a
+			// project name landed here on the line after the hint that told
+			// the reader to run this (#1794).
+			fmt.Fprintf(os.Stdout, "restored %d session%s and rebuilt the index — %s\n", back, pluralS(back), safeForStatusline(joinCapped(names, 5), 200))
 		}
 		for _, line := range unforgetGoneLines(missing) {
 			fmt.Fprintln(os.Stdout, line)

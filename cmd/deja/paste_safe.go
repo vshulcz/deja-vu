@@ -102,6 +102,9 @@ func actsOnATerminal(r rune) bool {
 // `proj&&id` produced `deja forget --unforget deja:…-proj&&id`, and pasting it
 // ran `id`. The name is not always the reader's own; it comes from a directory
 // name or from an MCP tool call.
+//
+// `=` is not in the set: zsh's EQUALS option is on by default, so a value that
+// starts a word with it — `=ls` — is replaced by the path of that command.
 func shellQuoteForPaste(s string) string {
 	if s == "" {
 		return "''"
@@ -113,11 +116,23 @@ func shellQuoteForPaste(s string) string {
 			// matters when it does not.
 			continue
 		}
-		if !strings.ContainsRune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@%+=:,./-", r) {
+		if !strings.ContainsRune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@%+:,./-", r) {
 			return shellQuote(s)
 		}
 	}
 	return s
+}
+
+// pasteSafeCaveat is the shell the quoted form needs, or empty when any shell
+// takes it. Only bash and zsh read `$'…'`; dash and fish pass the `$` and the
+// backslashes through literally, so the command matches nothing and says so
+// with a straight face. Every line that hands over a quoted value carries the
+// caveat, not just the first one that needed it.
+func pasteSafeCaveat(quoted string) string {
+	if strings.HasPrefix(quoted, "$'") {
+		return " (in bash or zsh)"
+	}
+	return ""
 }
 
 // tombstoneHint is the sentence both writers print when the note they just
@@ -125,13 +140,6 @@ func shellQuoteForPaste(s string) string {
 // and `promote` each had their own copy of it.
 func tombstoneHint(what, id string) string {
 	quoted := pasteSafe(id)
-	where := ""
-	if strings.HasPrefix(quoted, "$'") {
-		// Only bash and zsh read this form; dash and fish would take the `$`
-		// literally and match nothing. Saying which shell is what makes the
-		// line honest for the reader who is not in one of them.
-		where = " (in bash or zsh)"
-	}
 	return fmt.Sprintf("deja: %s but stays hidden — %s was forgotten, and its tombstone lifts only through `deja forget --unforget deja:%s`%s\n",
-		what, safeForStatusline(id, 200), quoted, where)
+		what, safeForStatusline(id, 200), quoted, pasteSafeCaveat(quoted))
 }

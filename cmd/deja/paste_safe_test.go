@@ -18,6 +18,10 @@ func TestAPastedIdShowsItsControlBytesAndStillPastes(t *testing.T) {
 		{"it's", `'it'"'"'s'`},
 		{"tab\there", `$'tab\there'`},
 		{"nl\nhere", `$'nl\nhere'`},
+		// A rendering rather than a round-trip: bash and dash drop a NUL
+		// from an argument. Unreachable — argv cannot carry one and
+		// Tombstones() filters keys that do — and pinned so the escape is
+		// visible rather than raw if it ever arrives.
 		{"nul\x00here", `$'nul\x00here'`},
 		// A shell acts on more than quotes and spaces. Pasting the first of
 		// these used to run `id`, and the second truncated a file.
@@ -31,6 +35,9 @@ func TestAPastedIdShowsItsControlBytesAndStillPastes(t *testing.T) {
 		// C1 controls and the format characters: the prose half strips these,
 		// so the command half cannot carry them raw. U+009B is CSI.
 		{"proj\u009bX", `$'proj\u009bX'`},
+		// zsh replaces a word-initial `=word` with the path of that command.
+		{"=ls", `'=ls'`},
+		{"a=b", `'a=b'`},
 		{"proj\u202eX", `$'proj\u202eX'`},
 		// A byte that is not valid UTF-8 stays that byte: decoding it to
 		// U+FFFD wrote three different bytes back, so the pasted command
@@ -93,5 +100,20 @@ func TestTheHintNamesTheShellsThatCanPasteIt(t *testing.T) {
 	plain := tombstoneHint("it is written", "deja-2026-08-25-notes")
 	if strings.Contains(plain, "bash or zsh") {
 		t.Errorf("an ordinary id was given a shell caveat it does not need:\n%s", plain)
+	}
+}
+
+// Every line that hands over a quoted value carries the shell caveat, not just
+// the tombstone hint: dash takes `$'…'` literally and the command then matches
+// nothing, silently.
+func TestEveryQuotedPasteSaysWhichShellReadsIt(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"deja-2026-08-25-p\x1b[31mX", " (in bash or zsh)"},
+		{"deja-2026-08-25-has space", ""},
+		{"deja-2026-08-25-plain", ""},
+	} {
+		if got := pasteSafeCaveat(pasteSafe(c.in)); got != c.want {
+			t.Errorf("pasteSafeCaveat(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }
