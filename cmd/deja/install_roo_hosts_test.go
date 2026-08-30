@@ -231,3 +231,107 @@ func TestUninstallRooNamesTheHostItCouldNotRead(t *testing.T) {
 		t.Errorf("the host deja could not read is not named:\n%s", out)
 	}
 }
+
+// The write follows a symlinked settings directory, so the question of whether
+// the host takes a write has to follow it too: a Lstat walked past the link,
+// answered about the host root, and refused a host that installs fine.
+func TestRooFollowsASymlinkedSettingsDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop a write here")
+	}
+	hermeticEnv(t)
+	dir := t.TempDir()
+	host := rooHost(t, filepath.Join(dir, "a"), "")
+	elsewhere := filepath.Join(dir, "elsewhere")
+	if err := os.MkdirAll(elsewhere, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settings := filepath.Join(host, "settings")
+	if err := os.RemoveAll(settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(host, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(host, 0o755) })
+	t.Setenv("DEJA_ROO_ROOTS", host)
+
+	if _, err := captureRun(t, "install", "roo", "--no-index"); err != nil {
+		t.Fatalf("a host whose settings directory is a writable symlink was refused: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(elsewhere, "mcp_settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "\"deja\"") {
+		t.Errorf("the entry was not written:\n%s", b)
+	}
+}
+
+// A host deja cannot write is skipped on the way out rather than aborting the
+// run: the loop used to stop at the first one and leave every later host wired.
+func TestUninstallRooCleansTheHostsItCanAndNamesTheRest(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop a write here")
+	}
+	hermeticEnv(t)
+	dir := t.TempDir()
+	a := rooHost(t, filepath.Join(dir, "a"), "{\n  \"mcpServers\": {}\n}\n")
+	b := rooHost(t, filepath.Join(dir, "b"), "{\n  \"mcpServers\": {}\n}\n")
+	t.Setenv("DEJA_ROO_ROOTS", strings.Join([]string{a, b}, string(os.PathListSeparator)))
+	if _, err := captureRun(t, "install", "roo", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	closed := filepath.Join(a, "settings")
+	if err := os.Chmod(closed, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(closed, 0o755) })
+
+	out, err := captureRun(t, "uninstall", "roo")
+	if err != nil {
+		t.Fatalf("uninstall stopped at the host it could not write: %v", err)
+	}
+	if !strings.Contains(out, "cannot write") {
+		t.Errorf("the host deja could not write is not named:\n%s", out)
+	}
+	left, rerr := os.ReadFile(filepath.Join(b, "settings", "mcp_settings.json"))
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	if strings.Contains(string(left), "\"deja\"") {
+		t.Errorf("a host deja could clean was left wired:\n%s", left)
+	}
+}
+
+// A block deja never wrote is left alone and reported unchanged (#2399), so it
+// is not a host the uninstall gave up on and must not be named as one.
+func TestUninstallRooDoesNotNameAHostItNeverTouched(t *testing.T) {
+	hermeticEnv(t)
+	for _, shape := range []string{
+		"{\"mcpServers\": [1, 2]}\n",
+		"{\n  // mine\n  \"mcpServers\": [1, 2]\n}\n",
+	} {
+		t.Run(strings.TrimSpace(shape), func(t *testing.T) {
+			dir := t.TempDir()
+			a := rooHost(t, filepath.Join(dir, "a"), "{\n  \"mcpServers\": {}\n}\n")
+			t.Setenv("DEJA_ROO_ROOTS", a)
+			if _, err := captureRun(t, "install", "roo", "--no-index"); err != nil {
+				t.Fatal(err)
+			}
+			b := rooHost(t, filepath.Join(dir, "b"), shape)
+			t.Setenv("DEJA_ROO_ROOTS", strings.Join([]string{a, b}, string(os.PathListSeparator)))
+
+			out, err := captureRun(t, "uninstall", "roo")
+			if err != nil {
+				t.Fatalf("uninstall refused over a block it never wrote: %v", err)
+			}
+			if strings.Contains(out, "could not read") || strings.Contains(out, "cannot write") {
+				t.Errorf("a host deja never touched was named as one it gave up on:\n%s", out)
+			}
+		})
+	}
+}

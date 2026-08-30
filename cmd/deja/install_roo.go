@@ -30,7 +30,8 @@ func rooMCPSettingsPaths() []string {
 func installRoo(exe string, uninstall bool) (installResult, error) {
 	paths := rooMCPSettingsPaths()
 	var last installResult
-	var skipped []string
+	var unread, unwritable []string
+	skip := map[string]bool{}
 	wrote := false
 	seen := 0
 	for _, p := range paths {
@@ -40,36 +41,48 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 			continue
 		}
 		seen++
-		err := mcpEntryWritable(p, "mcpServers")
-		if err == nil && !uninstall {
-			// Reading the settings is not enough: the snapshot and the write
-			// both land in the host's settings directory, so a directory deja
-			// cannot write is the same half-install shape one host later.
-			if dir := firstDirThatIsThere(filepath.Dir(p)); !dirWritable(dir) {
-				err = fmt.Errorf("%s: deja cannot write in that directory — check its permissions", shortHome(dir))
-			}
+		// Reading the settings is not the whole question: the snapshot and the
+		// config both land in the host's settings directory, so a directory
+		// deja cannot write is the same half-install shape one host later.
+		dir := firstDirThatTakesAWrite(filepath.Dir(p))
+		readErr := mcpConfigReadable(p)
+		writeErr := error(nil)
+		if !dirWritable(dir) {
+			writeErr = fmt.Errorf("%s: deja cannot write in that directory — check its permissions", shortHome(dir))
 		}
-		if err == nil {
+		if !uninstall {
+			// One settings file per host, written in turn: a refusal on the
+			// second host used to leave the first one wired with a .bak beside
+			// it while the run reported the target refused (#2750). Every host
+			// is asked before any is written — including the shapes the writer
+			// refuses, which are install's business alone.
+			for _, err := range []error{readErr, writeErr, mcpEntryWritable(p, "mcpServers")} {
+				if err != nil {
+					return installResult{}, err
+				}
+			}
 			continue
 		}
-		// One settings file per host, written in turn: a refusal on the second
-		// host used to leave the first one wired with a .bak beside it while
-		// the run reported the target refused (#2750). Every host is asked
-		// before any is written.
-		if !uninstall {
-			return installResult{}, err
+		// On the way out, a host deja cannot read or write is one it cannot
+		// take its entry out of — and refusing there would leave the hosts it
+		// can wired, which is what the run was asked to undo. Named, so the
+		// reader knows which one still has deja in it. A shape deja does not
+		// edit is not named here: installMCPJSON leaves a block it never wrote
+		// alone and reports it unchanged (#2399).
+		switch {
+		case readErr != nil:
+			unread = append(unread, shortHome(p))
+			skip[p] = true
+		case writeErr != nil:
+			unwritable = append(unwritable, shortHome(p))
+			skip[p] = true
 		}
-		// On the way out, a host deja cannot read is one it cannot take its
-		// entry out of — and refusing there would leave the hosts it can read
-		// wired, which is what the run was asked to undo. Named, so the reader
-		// knows which one still has deja in it.
-		skipped = append(skipped, shortHome(p))
 	}
 	for _, p := range paths {
 		if _, err := os.Stat(filepath.Dir(filepath.Dir(p))); err != nil {
 			continue
 		}
-		if uninstall && mcpEntryWritable(p, "mcpServers") != nil {
+		if skip[p] {
 			continue
 		}
 		res, err := installMCPJSON(p, exe, uninstall)
@@ -81,11 +94,10 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 			wrote = true
 		}
 	}
-	if len(skipped) > 0 {
-		// A host that was there and could not be read is not "no host found":
-		// deja is still wired in it, and saying nothing would leave the reader
+	if note := rooLeftNote(unread, unwritable); note != "" {
+		// A host that was there and was skipped is not "no host found": deja
+		// is still wired in it, and saying nothing would leave the reader
 		// thinking the uninstall was complete.
-		note := "left " + strings.Join(skipped, ", ") + " — deja could not read " + pluralWhich(len(skipped))
 		if last.Path == "" {
 			return installResult{Action: note}, nil
 		}
@@ -119,4 +131,18 @@ func rooFirstRoot() string {
 		}
 	}
 	return filepath.Join(os.DevNull, "roo")
+}
+
+// rooLeftNote names the hosts an uninstall did not clean, and why. Two
+// reasons, two strings: a file deja could not read at all, and one it read but
+// cannot write where it sits.
+func rooLeftNote(unread, unwritable []string) string {
+	var parts []string
+	if len(unread) > 0 {
+		parts = append(parts, "left "+strings.Join(unread, ", ")+" — deja could not read "+pluralWhich(len(unread)))
+	}
+	if len(unwritable) > 0 {
+		parts = append(parts, "left "+strings.Join(unwritable, ", ")+" — deja cannot write "+pluralWhich(len(unwritable)))
+	}
+	return strings.Join(parts, "; ")
 }

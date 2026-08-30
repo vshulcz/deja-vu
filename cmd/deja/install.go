@@ -2489,12 +2489,14 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a, Note: note}, err
 }
 
-// firstDirThatIsThere is the directory a write would actually land in: the
-// settings directory itself once it exists, and otherwise the nearest parent
-// that does, since install creates what is missing under it.
-func firstDirThatIsThere(dir string) string {
+// firstDirThatTakesAWrite is the directory a write would actually land in: the
+// config's own directory once it exists, and otherwise the nearest parent that
+// does, since install creates what is missing under it. os.Stat rather than a
+// Lstat: the write follows a symlinked directory, so the question has to
+// follow it too.
+func firstDirThatTakesAWrite(dir string) string {
 	for {
-		if isRealDir(dir) {
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
 			return dir
 		}
 		parent := filepath.Dir(dir)
@@ -2503,6 +2505,40 @@ func firstDirThatIsThere(dir string) string {
 		}
 		dir = parent
 	}
+}
+
+// mcpConfigReadable asks only whether the config can be read and parsed —
+// deliberately not whether its block is a shape deja edits. On the way out,
+// a block deja never wrote is left alone and reported unchanged (#2399), so
+// naming it as a host deja gave up on would be wrong.
+func mcpConfigReadable(path string) error {
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
+	if len(bytes.TrimSpace(old)) == 0 {
+		return nil
+	}
+	_, err = parseConfigRoot(path, old)
+	return err
+}
+
+// parseConfigRoot decodes a config the writers edit, comments and all. It
+// returns a nil root only for an empty file; `null` is an error, since it
+// decodes into a nil map without one and the writer then assigns into it.
+func parseConfigRoot(path string, old []byte) (map[string]any, error) {
+	text := string(old)
+	if configIsJSONC(old) {
+		text = stripJSONComments(text)
+	}
+	var root map[string]any
+	if err := json.Unmarshal([]byte(text), &root); err != nil {
+		return nil, configParseError(path, err)
+	}
+	if root == nil {
+		return nil, configParseError(path, errors.New("the file holds null, not an object"))
+	}
+	return root, nil
 }
 
 // mcpEntryWritable asks whether installMCPJSON could write its entry into this
@@ -2520,19 +2556,13 @@ func mcpEntryWritable(path, blockKey string) error {
 	if len(bytes.TrimSpace(old)) == 0 {
 		return nil
 	}
-	text := string(old)
 	jsonc := configIsJSONC(old)
-	if jsonc {
-		text = stripJSONComments(text)
-	}
-	var root map[string]any
-	if err := json.Unmarshal([]byte(text), &root); err != nil {
-		return configParseError(path, err)
+	root, err := parseConfigRoot(path, old)
+	if err != nil {
+		return err
 	}
 	if root == nil {
-		// `null` decodes into a nil map without an error, and the writer then
-		// assigns into it.
-		return configParseError(path, errors.New("the file holds null, not an object"))
+		return nil
 	}
 	if jsonc {
 		// The text writer inserts rather than replaces, so a key holding
