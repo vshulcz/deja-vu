@@ -139,7 +139,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	defer recordWiring(targets, uninstall)
 	saidNotes := map[string]bool{}
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
-	type lineItem struct{ target, action, path string }
+	type lineItem struct{ target, action, path, note string }
 	// The real paths, not the display ones: an uninstall reports the snapshots
 	// it left beside the configs it handled, and ~ does not stat (#2676).
 	var touchedPaths []string
@@ -204,7 +204,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 		touchedPaths = append(touchedPaths, r.Path)
 		if banner {
-			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
+			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note})
 		} else {
 			if r.Path == "" {
 				fmt.Printf("%s: %s\n", t, r.Action)
@@ -277,6 +277,13 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 		for _, d := range done {
 			info = append(info, fmt.Sprintf("%-*s  %s%-9s%s %s", nameW, d.target, logoBold, d.action, logoReset, logoDim+d.path+logoReset))
+			// Under its own row. The table is the documented path — the README
+			// tells people to run `deja install --auto` — so a note that only
+			// the line-by-line output carried was a note almost nobody read
+			// (#2712).
+			if d.note != "" {
+				info = append(info, fmt.Sprintf("%-*s  %s", nameW, "", d.note))
+			}
 		}
 		mood := moodReady
 		if hint := installIndexHint(dir); hint != "" {
@@ -1206,6 +1213,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 		}
 	} else {
 		m["deja"], note = mergeDejaEntry(m["deja"], mcpServerEntry(exe))
+		note = withOtherDejaEntries(note, m)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -1644,6 +1652,116 @@ func entryRunsDeja(entry map[string]any) bool {
 	return false
 }
 
+// withOtherDejaEntries folds the note about a second deja server into whatever
+// the write already had to say. Every MCP writer needs it: the file it edits is
+// the one that would hold the other entry.
+func withOtherDejaEntries(note string, servers map[string]any) string {
+	other := otherDejaEntriesNote(servers, "deja")
+	if other == "" {
+		return note
+	}
+	if note != "" {
+		return note + "; " + other
+	}
+	return other
+}
+
+// otherDejaEntriesNote names entries in the same file that also run deja under
+// another key.
+//
+// doctor already reads past the key at what an entry runs, and calls `deja-vu`
+// deja's wiring; install did not, so it wrote a second server beside one it
+// recognised and said only "updated". The harness then starts two on every
+// session, one of them possibly naming a binary that is gone (#2712).
+//
+// Said, not taken: a second entry can be deliberate — another index directory,
+// a pinned older binary — and removing one deja did not write is the damage
+// #2583 and #2600 were about. What the reader cannot do is act on a file whose
+// state nothing reports.
+func otherDejaEntriesNote(servers map[string]any, mine string) string {
+	var names []string
+	for name, entry := range servers {
+		if name == mine {
+			continue
+		}
+		m, _ := entry.(map[string]any)
+		if m != nil && entryIsDejaServer(m) {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	sort.Strings(names)
+	noun, verb, it := "the entry ", "runs", "it"
+	if len(names) > 1 {
+		noun, verb, it = "the entries ", "run", "them"
+	}
+	return fmt.Sprintf("%s%s also %s deja — this harness will start %s alongside deja's own; remove what you do not want",
+		noun, quotedList(names, 3), verb, it)
+}
+
+// entryIsDejaServer is entryRunsDeja for a claim about somebody else's entry.
+//
+// entryRunsDeja answers "may this be merged onto", where a false positive costs
+// a merge onto an entry deja then overwrites anyway. This answers "should the
+// reader be told to remove it", where a false positive is deja pointing at a
+// config line that is none of its business: a filesystem server told to serve
+// `~/code/deja` has the binary's name in its arguments and is not deja.
+//
+// So the name has to be the command — or, for the wrapper shapes where it
+// cannot be (`cmd /c … deja mcp`), it has to be running deja's server rather
+// than appearing in a path.
+func entryIsDejaServer(entry map[string]any) bool {
+	switch c := entry["command"].(type) {
+	case string:
+		if isDejaBinaryToken(c) {
+			return dejaServerArgs(entry)
+		}
+	case []any:
+		if len(c) > 0 {
+			if head, ok := c[0].(string); ok && isDejaBinaryToken(head) {
+				return dejaServerArgs(entry)
+			}
+			for _, v := range c {
+				if s, ok := v.(string); ok && isDejaBinaryToken(s) {
+					return commandListRunsMCP(c)
+				}
+			}
+		}
+	}
+	if args, ok := entry["args"].([]any); ok {
+		for _, v := range args {
+			if s, ok := v.(string); ok && isDejaBinaryToken(s) {
+				return commandListRunsMCP(args)
+			}
+		}
+	}
+	return false
+}
+
+// dejaServerArgs reports whether an entry whose command is deja runs the MCP
+// server rather than something else someone wired by hand.
+func dejaServerArgs(entry map[string]any) bool {
+	args, ok := entry["args"].([]any)
+	if !ok {
+		// A command with no arguments at all is deja's own shape from before
+		// the subcommand was written into the entry.
+		return entry["args"] == nil
+	}
+	return commandListRunsMCP(args)
+}
+
+// commandListRunsMCP reports whether `mcp` is one of these words.
+func commandListRunsMCP(words []any) bool {
+	for _, v := range words {
+		if s, ok := v.(string); ok && s == "mcp" {
+			return true
+		}
+	}
+	return false
+}
+
 // mergeDejaEntry writes deja's wiring onto the entry that was already there.
 // deja owns the command, the args and the type; an env pointing at a store on
 // another disk, a timeout, a `disabled` the reader set — those are theirs, and
@@ -1778,6 +1896,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	} else {
 		command, args := mcpCommandArgs(exe)
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}})
+		note = withOtherDejaEntries(note, m)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -1835,6 +1954,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	} else {
 		command, args := mcpCommandArgs(exe)
 		servers["deja"], note = mergeDejaEntry(servers["deja"], map[string]any{"command": command, "args": args})
+		note = withOtherDejaEntries(note, servers)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -1883,6 +2003,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	} else {
 		command, args := mcpCommandArgs(exe)
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"command": command, "args": args})
+		note = withOtherDejaEntries(note, m)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -1940,6 +2061,7 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 		delete(m, "deja")
 	} else {
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
+		note = withOtherDejaEntries(note, m)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
