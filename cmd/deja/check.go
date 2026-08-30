@@ -39,6 +39,12 @@ func runCheckTo(dir string, args []string, stdin io.Reader, stdout, stderr io.Wr
 	switch {
 	case len(planSearchSteps(string(plan))) == 0:
 		fmt.Fprintln(stderr, "deja: nothing in this plan to check — it needs a step naming what it will do")
+	case !planIndexReady(dir) && indexFormatDirection(dir) < 0:
+		// An index this build will not read is not a missing index, and saying
+		// it is tells someone who has used deja for months that their history
+		// was never indexed. doctor has said this properly all along; the
+		// command a person typed owes the same answer (#2680).
+		fmt.Fprintln(stderr, "deja: the index was written by an older deja — this build cannot read it; the next session rebuilds it, or run `deja index` now")
 	case !planIndexReady(dir):
 		fmt.Fprintln(stderr, "deja: no index to check against yet — `deja index` builds one")
 	default:
