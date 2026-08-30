@@ -2257,6 +2257,23 @@ func commandListRunsMCP(words []any) bool {
 	return false
 }
 
+// entryIsOff reports whether the reader has switched an MCP entry off, in
+// either spelling the configs use. The note about leaving one off was keyed to
+// `disabled`, and opencode, grok and openclaw all write `enabled` — so on those
+// files install reported success on a config where deja will not run (#2757).
+//
+// Only an explicit off. An entry with neither key is on, which is what every
+// entry deja writes looks like.
+func entryIsOff(entry map[string]any) bool {
+	if off, ok := entry["disabled"].(bool); ok && off {
+		return true
+	}
+	if on, ok := entry["enabled"].(bool); ok && !on {
+		return true
+	}
+	return false
+}
+
 // mergeDejaEntry writes deja's wiring onto the entry that was already there.
 // deja owns the command, the args and the type; an env pointing at a store on
 // another disk, a timeout, a `disabled` the reader set — those are theirs, and
@@ -2287,14 +2304,14 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 	if _, ok := out["command"]; ok {
 		delete(out, "transport")
 	}
-	if disabled, _ := out["disabled"].(bool); disabled {
+	if entryIsOff(out) {
 		// Switching it back on silently would undo a decision deja was not
 		// asked to revisit; leaving it off without a word looks like a install
 		// that worked.
 		if note != "" {
 			note += "; "
 		}
-		note += "left the entry disabled, the way it was — deja will not answer until you turn it back on"
+		note += "left the entry switched off, the way it was — deja will not answer until you turn it back on"
 	}
 	return out, note
 }

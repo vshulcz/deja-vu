@@ -36,6 +36,9 @@ func TestJSONCKeepsWhatTheReaderPutOnDejasEntry(t *testing.T) {
 	if strings.Count(note, "/old/deja") != 1 {
 		t.Errorf("the note says it twice: %q", note)
 	}
-	// Not asserted: the "still off" line. It is keyed to `disabled`, and
-	// opencode writes `enabled`, so it does not fire here — a gap of its own.
+	// And the entry is off, so the note says so rather than reporting a plain
+	// success on a config where deja will not run (#2757).
+	if !strings.Contains(note, "turn it back on") {
+		t.Errorf("nothing said the entry is still off: %q", note)
+	}
 }
