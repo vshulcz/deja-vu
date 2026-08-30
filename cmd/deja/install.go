@@ -2911,8 +2911,20 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			}
 		}
 		note := ""
+		entryLine := line
 		if !uninstall {
 			note = replacedJSONCLineNote(dropped, line)
+			// opencode's other writer rewrites deja's entry as one line, so a
+			// switch the reader had set was dropped with the rest of it: the
+			// entry came back on and install said nothing (#2757). Carry it
+			// through and say so, the way the merge does.
+			if off := jsoncEntrySwitch(strings.Join(dropped, " ")); off != "" {
+				entryLine = strings.TrimSuffix(line, "}") + "," + off + "}"
+				if note != "" {
+					note += "; "
+				}
+				note += "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+			}
 		}
 		if !uninstall {
 			// Ours goes first, carrying its own comma. Written last it needed
@@ -2923,7 +2935,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			// else's line needed — not on an opening brace, not after a
 			// trailing comment, not inside a block comment (#1695) — stop
 			// applying at all.
-			entry := line
+			entry := entryLine
 			at := len(body)
 			if i := jsoncFirstCodeLine(body); i >= 0 {
 				entry += ","
@@ -2980,6 +2992,33 @@ func replacedJSONCLineNote(dropped []string, line string) string {
 		return "replaced the deja entry that was already here"
 	}
 	return fmt.Sprintf("replaced the deja entry that was already here, which ran %s", safeForStatusline(was, 200))
+}
+
+// jsoncEntrySwitch reads an off switch out of the entry text, and returns it
+// the way it will be written back — `"enabled":false` or `"disabled":true`.
+// Empty when the entry is on.
+//
+// Text rather than JSON, for the same reason jsoncEntryCommand is: the block
+// may carry comments and trailing commas.
+func jsoncEntrySwitch(text string) string {
+	for _, sw := range []struct{ key, off string }{
+		{"enabled", "false"},
+		{"disabled", "true"},
+	} {
+		i := strings.Index(text, `"`+sw.key+`"`)
+		if i < 0 {
+			continue
+		}
+		rest := strings.TrimSpace(text[i+len(sw.key)+2:])
+		if !strings.HasPrefix(rest, ":") {
+			continue
+		}
+		rest = strings.TrimSpace(rest[1:])
+		if strings.HasPrefix(rest, sw.off) {
+			return `"` + sw.key + `":` + sw.off
+		}
+	}
+	return ""
 }
 
 // jsoncEntryCommand pulls the command out of an entry deja did not write. It

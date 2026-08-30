@@ -52,3 +52,44 @@ func TestAnEntryThatIsOnSaysNothingAboutASwitch(t *testing.T) {
 		}
 	}
 }
+
+// opencode.jsonc is written by a second writer that rewrites deja's entry as
+// one line, so a switch the reader had set went out with the old line and the
+// entry came back on with install reporting success (#2757).
+func TestTheOpencodeJSONCWriterKeepsASwitchTheReaderSet(t *testing.T) {
+	for _, sw := range []string{`"enabled":false`, `"disabled":true`} {
+		t.Run(sw, func(t *testing.T) {
+			old := "{\n  \"mcp\": {\n    \"deja\": {\"type\":\"local\",\"command\":[\"/old/deja\",\"mcp\"]," + sw + "}\n  }\n}\n"
+			next, note, err := updateOpencodeJSONC([]byte(old), "/new/deja", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(next), sw) {
+				t.Errorf("the switch was dropped:\n%s", next)
+			}
+			if !strings.Contains(string(next), "/new/deja") {
+				t.Errorf("the entry was not updated:\n%s", next)
+			}
+			if !strings.Contains(note, "switched off") {
+				t.Errorf("the reader is not told the entry is off: %q", note)
+			}
+		})
+	}
+}
+
+// An entry that is on keeps its shape and says nothing.
+func TestTheOpencodeJSONCWriterSaysNothingAboutAnEntryThatIsOn(t *testing.T) {
+	for _, on := range []string{"", `,"enabled":true`, `,"disabled":false`} {
+		old := "{\n  \"mcp\": {\n    \"deja\": {\"type\":\"local\",\"command\":[\"/old/deja\",\"mcp\"]" + on + "}\n  }\n}\n"
+		next, note, err := updateOpencodeJSONC([]byte(old), "/new/deja", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(note, "switched off") {
+			t.Errorf("%q: an entry that is on was reported as off: %q", on, note)
+		}
+		if strings.Contains(string(next), "\"enabled\":false") || strings.Contains(string(next), "\"disabled\":true") {
+			t.Errorf("%q: an entry that is on was written off:\n%s", on, next)
+		}
+	}
+}
