@@ -29,6 +29,19 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 	paths := rooMCPSettingsPaths()
 	var last installResult
 	wrote := false
+	if !uninstall {
+		// One settings file per host, written in turn: a refusal on the second
+		// host used to leave the first one wired with a .bak beside it while
+		// the run reported the target refused (#2750). Ask every host first.
+		for _, p := range paths {
+			if _, err := os.Stat(filepath.Dir(filepath.Dir(p))); err != nil {
+				continue
+			}
+			if err := mcpEntryWritable(p, "mcpServers"); err != nil {
+				return installResult{}, err
+			}
+		}
+	}
 	for _, p := range paths {
 		// Only hosts Roo has actually run in: creating the directory would
 		// leave settings behind for an editor that is not installed.
@@ -37,6 +50,12 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 		}
 		res, err := installMCPJSON(p, exe, uninstall)
 		if err != nil {
+			// On the way out, a host deja cannot read is one it cannot take
+			// its entry out of — and refusing there would leave the hosts it
+			// can read wired, which is what the run was asked to undo.
+			if uninstall {
+				continue
+			}
 			return installResult{}, err
 		}
 		last = res

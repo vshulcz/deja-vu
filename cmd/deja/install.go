@@ -2489,6 +2489,29 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	return installResult{Path: path, Action: a, Note: note}, err
 }
 
+// mcpEntryWritable asks whether installMCPJSON could write its entry into this
+// config, without writing anything.
+//
+// It has to accept exactly what the writer accepts: a comment is not a broken
+// file (#1664), so a JSONC config passes here and is edited as text. What it
+// catches is the config the writer would refuse — one that does not parse, or
+// whose block is something other than an object.
+func mcpEntryWritable(path, blockKey string) error {
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
+	if len(bytes.TrimSpace(old)) == 0 || configIsJSONC(old) {
+		return nil
+	}
+	var root map[string]any
+	if err := json.Unmarshal(old, &root); err != nil {
+		return configParseError(path, err)
+	}
+	_, _, err = mcpBlock(root, blockKey, path)
+	return err
+}
+
 func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	old, err := readConfig(path)
 	if err != nil {
