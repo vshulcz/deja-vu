@@ -145,9 +145,21 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		// sessions-indexed: a store with six conversations reported zero,
 		// which is the sentence #637 was about — a reader told the index holds
 		// nothing concludes the tool is broken (#705).
-		total, err := index.SessionCount(dir)
+		// Two counts, because they answer two questions. What is on disk
+		// decides whether this machine has any history at all, and what the
+		// rules leave decides how much friction had to read: naming the store
+		// for the second put "none of the 4 indexed sessions" over a note
+		// saying two of them are withheld (#2709, the shape #2707 fixed on the
+		// empty search). Reading the store count for the first is what keeps a
+		// machine whose history is entirely behind a rule from being told it
+		// has none.
+		stored, err := index.SessionCount(dir)
+		total := stored
+		if reach, _, _, ok := reachableSessionCount(dir); ok {
+			total = reach
+		}
 		switch {
-		case err != nil || total == 0:
+		case err != nil || stored == 0:
 			// "no sessions are indexed yet" is a claim about the machine, and
 			// a store deja is not allowed to open produces the same zero —
 			// the failure #1020 closed on last and search. friction is where
@@ -168,9 +180,22 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			// the ignore rule is what keeps them out (#2630).
 			fmt.Fprintf(stdout, "nothing recurring — the ignore rule keeps the %d session%s that recorded tool output out of recall, which is what friction reads errors from\n",
 				len(ignoredSessions), pluralS(len(ignoredSessions)))
+		case len(sessions) == 0 && total == 0:
+			// Every session on this machine is behind a rule, and none of them
+			// recorded tool output — so neither arm above fired and the count
+			// is zero. "none of the 0 indexed sessions" is arithmetic; what
+			// the reader needs is which rule leaves friction nothing to read.
+			fmt.Fprintf(stdout, "nothing recurring — %s keeps every one of the %d indexed session%s out of recall, and friction reads errors from what it may open\n",
+				emptiedBy(pol), stored, pluralS(stored))
 		case len(sessions) == 0:
 			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
 				total, pluralS(total))
+		case len(sessions) == total:
+			// The parenthetical is there to say how much was not read. When
+			// the rules leave exactly the sessions that recorded tool output,
+			// it repeats the number beside it.
+			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output — no error hit %d separate sessions\n",
+				len(sessions), pluralS(len(sessions)), index.FrictionMinSessions)
 		default:
 			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output (of %d indexed) — no error hit %d separate sessions\n",
 				len(sessions), pluralS(len(sessions)), total, index.FrictionMinSessions)
@@ -205,4 +230,14 @@ func trimFriction(l string) string {
 	// and printed as a broken byte (#1319). The bound includes the mark, so a
 	// line loses one character rather than gaining one.
 	return truncatePlanBytes(l, 79)
+}
+
+// emptiedBy names the rule that leaves a path nothing to read. Both can be in
+// force; the ignore rule is named first because it is the one written by hand
+// in a file the reader edits.
+func emptiedBy(pol policy.Policy) string {
+	if len(pol.IgnorePatterns()) > 0 {
+		return "the ignore rule (" + strings.Join(pol.IgnorePatterns(), ", ") + ")"
+	}
+	return "the trust policy (" + policy.ActivationSearch + ": " + pol.Describe(policy.ActivationSearch) + ")"
 }
