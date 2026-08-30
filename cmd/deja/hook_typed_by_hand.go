@@ -69,7 +69,11 @@ func hookTypedByHandNote(name string, terminal bool) string {
 // stdinIsTerminal reports that nothing is piped in. Same test `fix` uses before
 // reading stdin, for the same reason: reading a terminal blocks with no prompt
 // and reads as a hang.
-func stdinIsTerminal() bool {
+//
+// A variable so a test can be the reader as well as the harness: a test binary
+// never has a terminal on stdin, so the branch written for a person typing
+// could not otherwise be exercised (#2718).
+var stdinIsTerminal = func() bool {
 	fi, err := os.Stdin.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }

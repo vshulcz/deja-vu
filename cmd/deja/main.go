@@ -259,6 +259,28 @@ func run(args []string) error {
 	if cmd, ok := commands[args[0]]; ok {
 		return cmd(dir, args[1:])
 	}
+	// A `hook-…` this build does not have is a line in a config an older deja
+	// wrote, not a query: reading it as one ran a search on every session
+	// start — and built the whole index to answer it — while stdout, where a
+	// hook's output is read from, stayed empty (#2718). commandHint already
+	// treats these names as plumbing nobody types.
+	//
+	// Only when a harness is calling: at a terminal this is somebody who
+	// mistyped `hook-context`, and telling them a config calls it is a claim
+	// about their machine that is not true — they keep the search and the near
+	// miss every other mistyped word gets (#674). And only when it is the whole
+	// command line: `deja hook-session timeout` is a query somebody typed, and
+	// no harness passes a retired hook extra arguments.
+	if len(args) == 1 && strings.HasPrefix(args[0], "hook-") && !stdinIsTerminal() {
+		// On stderr: a harness reads stdout as the hook's answer, and on some
+		// of them a bare line there lands in the model's context. This is a
+		// note for whoever reads the logs, not something to inject.
+		// What to do, and only what is true: install writes the hooks this
+		// build has and leaves a line under a name it does not recognise where
+		// it is (#2719), so pointing at it would be advice that does nothing.
+		fmt.Fprintf(os.Stderr, "deja: %q is not a hook this build has — a config still calls it on every session; that line is safe to delete\n", args[0])
+		return nil
+	}
 	return runBareSearch(dir, args, sourceInstance)
 }
 
