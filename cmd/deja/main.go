@@ -2989,6 +2989,14 @@ func runForget(dir string, args []string) error {
 				}
 			}
 		default:
+			// An id is not a flag, and every other command that takes one
+			// takes it bare — `show`, `handoff` and `ctx` all do. forget asks
+			// for --session because it is the destructive one, and saying so
+			// is the whole difference between a dead end and one more word to
+			// type (#2656, the lesson #2191 recorded for --harness).
+			if !strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("forget: a session id goes after --session — `deja forget --session %s`", args[i])
+			}
 			return fmt.Errorf("forget: unknown flag %q", args[i])
 		}
 	}
