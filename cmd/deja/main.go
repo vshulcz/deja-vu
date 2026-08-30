@@ -894,7 +894,7 @@ func cmdCtx(dir string, rest []string) error {
 	// A short selector never reaches the id branch above, so a forgotten
 	// session's note arrives as an ordinary hit — and the answer still has to
 	// say the session is gone (#971).
-	noteForgottenSource(hits[0].Session, q)
+	noteForgottenSource(hits[0].Session, q, false)
 	// The hit carries the matching snippets, not the session: for a promoted
 	// note that meant the correction — which rarely repeats the words of the
 	// decision — was missing, and the command whose whole job is packaging
@@ -2107,7 +2107,7 @@ func findByPrefix(dir, p string) (model.Session, bool, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if s, ok, err := index.FindByPrefix(dir, p); err == nil {
 			if ok {
-				noteForgottenSource(s, p)
+				noteForgottenSource(s, p, true)
 			}
 			return s, ok, nil
 		}
@@ -4122,18 +4122,21 @@ func sharedRowsAmong(dir string, keys []string) int {
 // session that has been forgotten. Asking for the session by the id you
 // remember answered with the note and said nothing, so the reply looked like
 // the session itself until you noticed the id had changed (#971).
-func noteForgottenSource(s model.Session, selector string) {
-	if line := forgottenSourceNote(s, selector); line != "" {
+func noteForgottenSource(s model.Session, selector string, resolved bool) {
+	if line := forgottenSourceNote(s, selector, resolved); line != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", line)
 	}
 }
 
 // forgottenSourceNote is the sentence itself, so every surface can carry it.
+// resolved says the selector reached this session through a prefix lookup: on
+// that path any prefix is honest by construction, and a length rule would only
+// guess at what the resolver already answered.
 // It lived inside the printer, which meant the CLI said a session was
 // forgotten and the MCP tools handed an agent the same note with the fact
 // removed — and "forgotten" is a decision the reader made about that session,
 // which is the kind of fact recall exists to carry (#1624).
-func forgottenSourceNote(s model.Session, selector string) string {
+func forgottenSourceNote(s model.Session, selector string, resolved bool) string {
 	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") {
 		return ""
 	}
@@ -4156,7 +4159,7 @@ func forgottenSourceNote(s model.Session, selector string) string {
 	// character, while the reverse case never fired at all: over MCP the
 	// selector is usually a sentence, and "what did we decide in s15" is a
 	// reader naming the session as plainly as `s15` is (#1624).
-	if !selectorNamesSession(selector, key) {
+	if !selectorNamesSession(selector, key, resolved) {
 		return ""
 	}
 	if !index.Tombstoned(key) {
@@ -4168,7 +4171,7 @@ func forgottenSourceNote(s model.Session, selector string) string {
 // selectorNamesSession reports whether the reader's selector names this
 // session: the whole key, an id prefix long enough to mean it, or one of the
 // words of a sentence being either of those.
-func selectorNamesSession(selector, key string) bool {
+func selectorNamesSession(selector, key string, resolved bool) bool {
 	if strings.TrimSpace(selector) == "" {
 		return false
 	}
@@ -4177,9 +4180,13 @@ func selectorNamesSession(selector, key string) bool {
 		if word == key || word == id {
 			return true
 		}
-		// Four characters before a prefix counts: shorter than that and an
-		// ordinary word — "the", "in" — would name a session by accident.
-		if len(word) >= 4 && strings.HasPrefix(id, word) {
+		// A prefix counts only where something resolved it: `deja ctx 3f2a9c`
+		// reached this session and nothing else. Where nothing resolved — a
+		// search query — a prefix is a guess, and the ids real harnesses write
+		// make it a bad one: codex ids start with a year, cline ids start with
+		// the harness name, so "what did we ship in 2026" and "cline" would
+		// each name a session (#1624).
+		if resolved && strings.HasPrefix(id, word) {
 			return true
 		}
 	}

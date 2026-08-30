@@ -335,13 +335,18 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		text, sessions, raw, ids, projects, note, err := recallContextResultFrom(dir, a.Query, a.Harness)
 		if err == nil {
-			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead))
+			// Above the frame, the way the resource reader puts its own note:
+			// inside it, deja's statement of fact would read as recalled text
+			// the agent has just been told not to trust. Its room comes out of
+			// the budget before the trim, not after — added afterwards it put
+			// the reply over the size this tool documents, which is what
+			// #1797 fixed for the frame itself.
+			lead := ""
 			if note != "" {
-				// Above the frame, the way the resource reader puts its own
-				// note: inside it, deja's statement of fact would read as
-				// recalled text the agent has just been told not to trust.
-				text = "deja: " + note + "\n\n" + text
+				lead = "deja: " + note + "\n\n"
 			}
+			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead-len(lead)))
+			text = lead + text
 			usage.RecordServedFrom(dir, usage.KindContext, text, sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
@@ -1297,7 +1302,9 @@ func contextByID(dir, q string) (string, idContext, bool) {
 	// deja's own words do not belong inside a frame that tells the reader to
 	// treat what it holds as untrusted.
 	return b.String(), idContext{session: whole.ID, size: rawSize([]model.Session{whole}),
-		note: forgottenSourceNote(whole, q)}, true
+		// FindByPrefix resolved this session from the selector, so a prefix
+		// here is honest by construction.
+		note: forgottenSourceNote(whole, q, true)}, true
 }
 
 // recallContextResult keeps the four-value shape its callers and tests read.
@@ -1380,7 +1387,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
 		// The search path reaches a promoted note as often as the id path
 		// does — the note carries the id in its own text.
-		forgottenSourceNote(whole, q), nil
+		forgottenSourceNote(whole, q, false), nil
 }
 
 func mcpProgress() io.Writer {

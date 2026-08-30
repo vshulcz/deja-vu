@@ -107,24 +107,59 @@ func TestAnAgentAskingForAForgottenSessionIsToldSo(t *testing.T) {
 // the harness name and on any single character while never firing for the
 // sentence an agent actually sends.
 func TestOnlyASelectorThatNamesTheSessionFires(t *testing.T) {
-	const key = "claude:s15"
 	for _, c := range []struct {
-		selector string
-		want     bool
+		key, selector string
+		resolved      bool
+		want          bool
 	}{
-		{"s15", true},
-		{"claude:s15", true},
-		{"what did we decide in s15", true},
-		{"s15abc", false},
-		{"claude", false},
-		{"a", false},
-		{":s1", false},
-		{"s1", false},
-		{"", false},
-		{"   ", false},
+		{"claude:s15", "s15", false, true},
+		{"claude:s15", "claude:s15", false, true},
+		{"claude:s15", "what did we decide in s15", false, true},
+		{"claude:s15", "s15abc", false, false},
+		{"claude:s15", "claude", false, false},
+		{"claude:s15", "a", false, false},
+		{"claude:s15", ":s1", false, false},
+		{"claude:s15", "", false, false},
+		{"claude:s15", "   ", false, false},
+		// A prefix counts where a resolver answered with this session and
+		// nothing else — `deja ctx s1` — and nowhere else.
+		{"claude:s15", "s1", true, true},
+		{"claude:s15", "s1", false, false},
+		// The ids real harnesses write are why: a search query would
+		// otherwise name a session by starting with a year or a harness name.
+		{"codex:2026-07-31T00-00-00-abc", "what did we ship in 2026", false, false},
+		{"cline:cline-task-1767225600000", "cline", false, false},
+		{"cline:cline-task-1767225600000", "cline-task-1767225600000", false, true},
+		// A short id is still named by naming it, resolver or not.
+		{"gemini:s1", "s1", false, true},
 	} {
-		if got := selectorNamesSession(c.selector, key); got != c.want {
-			t.Errorf("selectorNamesSession(%q, %q) = %v, want %v", c.selector, key, got, c.want)
+		if got := selectorNamesSession(c.selector, c.key, c.resolved); got != c.want {
+			t.Errorf("selectorNamesSession(%q, %q, resolved=%v) = %v, want %v",
+				c.selector, c.key, c.resolved, got, c.want)
 		}
+	}
+}
+
+// The line is deja's own and goes above the frame, so its room has to come out
+// of the budget before the digest is trimmed — added afterwards it put the
+// reply over the size the tool documents, which is what #1797 fixed for the
+// frame itself.
+func TestTheForgottenLineIsInsideTheBudget(t *testing.T) {
+	dir := seedContextDigestSession(t, "proj", "wobble")
+	if _, err := captureRunStderr(t, "promote", "wobble", "--note", strings.Repeat("a long note about the shard budget ", 300)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRunStderr(t, "forget", "--session", "wobble"); err != nil {
+		t.Fatal(err)
+	}
+	framed, err := callMCPTool(dir, "recall_context", []byte(`{"query":"wobble"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(framed, "is forgotten") {
+		t.Fatalf("the reply does not carry the line this test is about:\n%s", framed[:200])
+	}
+	if len(framed) > contextMCPBudget {
+		t.Errorf("recall_context returned %d bytes, budget is %d", len(framed), contextMCPBudget)
 	}
 }

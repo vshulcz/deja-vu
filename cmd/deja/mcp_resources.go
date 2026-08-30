@@ -122,7 +122,9 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	}
 	// The same word the CLI and recall_context carry: this door takes an id,
 	// so a reader here has named the session as plainly as anyone can (#1624).
-	if line := forgottenSourceNote(s, id); line != "" {
+	// This door takes an id and FindByPrefix resolved it, so a prefix here
+	// is honest by construction.
+	if line := forgottenSourceNote(s, id, true); line != "" {
 		note += "deja: " + line + "\n\n"
 	}
 	var b bytes.Buffer
