@@ -316,7 +316,7 @@ func runHookContext(dir string, plain bool) error {
 			// the projects behind its walls a forget of one of them could not
 			// reach the stored text (#2349).
 			if unreadable {
-				usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
+				usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, input.SessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
 			} else {
 				usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
 			}
@@ -392,7 +392,7 @@ func runHookContext(dir string, plain bool) error {
 	digest = frameRecall(digest)
 	polName := policy.Load().Describe(policy.ActivationAuto)
 	if unreadable {
-		usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, digest, sessions, raw, polName, servedIDs, servedProjects)
+		usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs, servedProjects)
 	} else {
 		usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs, servedProjects)
 	}

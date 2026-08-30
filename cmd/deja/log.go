@@ -164,8 +164,13 @@ func snapshotTail(s usage.Snapshot) string {
 	if s.Policy != "" {
 		b.WriteString(" · policy: " + s.Policy)
 	}
-	if s.Into != "" {
+	switch {
+	case s.Into != "":
 		b.WriteString(" · into: " + s.Into)
+	case s.Unreadable:
+		// The list row says this; the header has to as well, or --last is
+		// back to the ambiguity #2301 added it to remove (#2161).
+		b.WriteString(" · into: unknown (the host sent a payload deja could not read)")
 	}
 	if len(s.Terms) > 0 {
 		b.WriteString(" · terms: " + strings.Join(s.Terms, ", "))

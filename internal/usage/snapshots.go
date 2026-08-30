@@ -202,13 +202,17 @@ func RecordDigestPolicySessionsFrom(indexDir, kind, digest, into string, session
 
 // RecordDigestPolicySessionsUnread is RecordDigestPolicySessionsFrom for a
 // hook whose payload could not be decoded. The memory goes out regardless — an
-// agent that asked for context gets it — and the row says the receiver is
-// unknown because the payload was unreadable, rather than looking exactly like
-// a row from a host that sent nothing (#2161).
-func RecordDigestPolicySessionsUnread(indexDir, kind, digest string, sessions int, raw int64, policyName string, ids, projects []string) {
+// agent that asked for context gets it — and the row says the payload was
+// unreadable rather than looking exactly like a row from a host that sent
+// nothing (#2161).
+//
+// into is still passed: a decode that fails on one field keeps the ones it
+// read, so a payload naming its session and mistyping something else has a
+// receiver worth recording.
+func RecordDigestPolicySessionsUnread(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids, projects []string) {
 	at := time.Now().UTC()
-	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, "", at, true)
-	snapshotWriteAt(indexDir, kind, digest, "", sessions, policyName, nil, projects, at, true)
+	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at, true)
+	snapshotWriteAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at, true)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
