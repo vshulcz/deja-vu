@@ -50,15 +50,19 @@ func syncAutoPlistPath() string {
 
 func installSyncTimerLaunchd(exe string, uninstall bool) (installResult, error) {
 	path := syncAutoPlistPath()
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
 	if uninstall {
-		if len(old) > 0 {
+		// Removal never reads the unit: it unloads the job and deletes the
+		// file by path, so a plist deja cannot read is still one it can take
+		// out — and refusing here left a launchd job loaded against a binary
+		// the user was removing (#2751).
+		if _, err := os.Stat(path); err == nil {
 			_, _ = runLaunchctl("unload", path)
 		}
 		return installResult{Path: path, Action: removeOurUnit(path)}, nil
+	}
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
@@ -112,6 +116,15 @@ func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) 
 	dir := syncAutoUnitDir()
 	service := filepath.Join(dir, "deja-sync.service")
 	timer := filepath.Join(dir, "deja-sync.timer")
+	if uninstall {
+		// As above: the units come out by path, so an unreadable one is no
+		// reason to leave a timer running (#2751).
+		if _, err := os.Stat(timer); err == nil {
+			_, _ = runSystemctl("--user", "disable", "--now", "deja-sync.timer")
+		}
+		removeOurUnit(service)
+		return installResult{Path: timer, Action: removeOurUnit(timer)}, nil
+	}
 	oldService, err := readConfig(service)
 	if err != nil {
 		return installResult{}, err
@@ -119,13 +132,6 @@ func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) 
 	oldTimer, err := readConfig(timer)
 	if err != nil {
 		return installResult{}, err
-	}
-	if uninstall {
-		if len(oldTimer) > 0 {
-			_, _ = runSystemctl("--user", "disable", "--now", "deja-sync.timer")
-		}
-		removeOurUnit(service)
-		return installResult{Path: timer, Action: removeOurUnit(timer)}, nil
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err

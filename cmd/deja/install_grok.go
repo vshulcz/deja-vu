@@ -21,8 +21,8 @@ import (
 // integration that looked installed and did nothing.
 func installGrokUserSettings(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.GrokHome(), "user-settings.json")
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	// Round-tripping through a map keeps every key this CLI version has that

@@ -133,3 +133,34 @@ func TestAMultiFileTargetIsRefusedOnTheFileItCannotRead(t *testing.T) {
 		t.Errorf("the config was written over:\n%s", after)
 	}
 }
+
+// The sync timer's unit is read only to decide whether the job is loaded; the
+// removal itself is by path. Refusing to read it left a launchd job running
+// against a binary the user was removing.
+func TestUninstallTakesOutASyncUnitItCannotRead(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("chmod does not take a file's read away here")
+	}
+	hermeticEnv(t)
+	if _, err := captureRun(t, "install", "sync-timer", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	unit := syncAutoPlistPath()
+	if runtime.GOOS != "darwin" {
+		unit = filepath.Join(syncAutoUnitDir(), "deja-sync.timer")
+	}
+	if _, err := os.Stat(unit); err != nil {
+		t.Skipf("no unit written here: %v", err)
+	}
+	if err := os.Chmod(unit, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unit, 0o644) })
+
+	if _, err := captureRun(t, "uninstall", "sync-timer"); err != nil {
+		t.Fatalf("uninstall refused a unit it only had to remove: %v", err)
+	}
+	if _, err := os.Stat(unit); !os.IsNotExist(err) {
+		t.Errorf("the unit survived the uninstall")
+	}
+}
