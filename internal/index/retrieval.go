@@ -2152,7 +2152,7 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
 			return
 		}
-		if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
+		if !query.ProjectMatches(meta.Project, meta.From, o.Project) {
 			return
 		}
 		if !fromMatches(meta.From, o.From) {
@@ -2319,7 +2319,7 @@ func sessionMetaMatches(meta SessionMeta, o query.Options) bool {
 	if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
 		return false
 	}
-	if o.Project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(o.Project)) {
+	if !query.ProjectMatches(meta.Project, meta.From, o.Project) {
 		return false
 	}
 	if !fromMatches(meta.From, o.From) {

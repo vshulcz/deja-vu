@@ -1,9 +1,8 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // displayProject is the project label a reader sees. A session that arrived by
@@ -16,12 +15,12 @@ import (
 // what resume checks before offering a command for another machine's session,
 // and what the note lifecycle keys on. This is the rendering, not the record.
 func displayProject(s model.Session) string {
-	if s.From == "" {
-		return s.Project
-	}
-	rest, ok := strings.CutPrefix(s.Project, "imported:")
-	if !ok {
-		return s.Project
-	}
-	return s.From + ":" + rest
+	return query.DisplayProject(s.Project, s.From)
+}
+
+// projectFilterMatches is the other half of the same rule: what the screen
+// shows has to be a string a filter accepts, or the label is a dead end
+// (#2644).
+func projectFilterMatches(project, from, want string) bool {
+	return query.ProjectMatches(project, from, want)
 }

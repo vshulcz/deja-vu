@@ -12,6 +12,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 type BlameTarget struct {
@@ -124,7 +126,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		if o.Harness != "" && session.Harness != o.Harness {
 			continue
 		}
-		if o.Project != "" && !strings.Contains(strings.ToLower(session.Project), strings.ToLower(o.Project)) {
+		if !query.ProjectMatches(session.Project, session.From, o.Project) {
 			continue
 		}
 		if !cut.IsZero() && session.Updated.Before(cut) {
