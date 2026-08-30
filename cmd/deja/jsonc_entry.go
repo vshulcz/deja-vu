@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // A config with a `//` line in it is not JSON, and five writers refused the
@@ -58,7 +59,7 @@ func stripJSONComments(text string) string {
 
 // jsoncSetEntry writes deja's entry into a JSONC object under blockKey, or
 // takes it out, leaving every other byte of the file alone.
-func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool) (string, error) {
+func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) (string, error) {
 	open := zedTopLevelOpen(text)
 	if open < 0 {
 		return "", fmt.Errorf("does not look like a settings object; add %q by hand", blockKey)
@@ -83,11 +84,26 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool) (string, er
 		if rest := text[block.valueOpen+1:]; rest != "" && rest[0] != '\n' && rest[0] != '}' {
 			tail = "\n   "
 		}
-		insert := fmt.Sprintf("\n    %q: %s,%s", id, entry, tail)
+		// And no comma into an empty block: `{"deja": {…},}` is not JSON, and
+		// the file was then refused on every later run with a message pointing
+		// at the reader's comment (#2740).
+		comma := ","
+		if strings.TrimSpace(stripJSONComments(text[block.valueOpen+1:block.valueEnd-1])) == "" {
+			comma, tail = "", "\n  "
+		}
+		insert := fmt.Sprintf("\n    %q: %s%s%s", id, entry, comma, tail)
 		return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
 	}
 	if uninstall {
-		return zedDropEntry(text, block, found), nil
+		if dropBlock {
+			return zedDropEntry(text, block, found), nil
+		}
+		// The entry alone. zedDropEntry takes the block with the last entry in
+		// it, which is right for a block deja created and wrong for one the
+		// reader wrote — the rule #2604 and #2583 settled for the other
+		// writers (#2740).
+		cut := zedEntrySpan(text, found)
+		return text[:cut[0]] + text[cut[1]:], nil
 	}
 	return text[:found.valueOpen] + entry + text[found.valueEnd:], nil
 }
@@ -102,18 +118,75 @@ func jsoncEntryText(entry map[string]any) (string, error) {
 	return string(b), nil
 }
 
-// writeJSONCEntry is the install path for a config that carries comments: the
-// entry is edited as text and every other byte stays where the reader put it.
+// writeJSONCEntry is the install path for a config that carries comments.
+//
+// What to write is decided the same way as for a config without them — the
+// same block reader, the same merge onto an entry that is already there, the
+// same notes — and only the writing is done by text, so the reader's comments,
+// key order and formatting stay where they are. Deciding it twice is what left
+// this path dropping an env block, flipping `disabled`, writing a second entry
+// beside one under another name, and saying none of it (#2740).
 func writeJSONCEntry(path string, old []byte, blockKey, exe string, uninstall bool) (installResult, error) {
-	command, args := mcpCommandArgs(exe)
-	entry, err := jsoncEntryText(map[string]any{"command": command, "args": args})
+	text := string(old)
+	var root map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(text)), &root); err != nil {
+		return installResult{}, configParseError(path, err)
+	}
+	// A key that is there but holds something else — null, a list, a string.
+	// mcpBlock reads null as "no block", which is right where the writer can
+	// replace the value; here the write is a text insert, so it would leave a
+	// second key of the same name with the reader's value winning (#2740).
+	if v, present := root[blockKey]; present {
+		if _, isObject := v.(map[string]any); !isObject {
+			if uninstall {
+				return installResult{Path: path, Action: "unchanged"}, nil
+			}
+			return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, blockKey)
+		}
+	}
+	m, _, err := mcpBlock(root, blockKey, path)
 	if err != nil {
+		// A block that is not an object is a config deja does not understand,
+		// and writing a second key of the same name would leave the reader's
+		// value winning and deja unwired (#2399).
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		return installResult{}, err
 	}
-	next, err := jsoncSetEntry(string(old), blockKey, "deja", entry, uninstall)
+	if m == nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		m = map[string]any{}
+		noteBlockAdded(path, blockKey)
+	}
+	key := dejaEntryKey(m)
+	var note string
+	var next string
+	if uninstall {
+		delete(m, key)
+		removeAdoptedDejaEntries(path, blockKey, m)
+		note = leftDejaEntriesNote(m)
+		if len(m) == 0 && blockWasAdded(path, blockKey) {
+			forgetBlockAdded(path, blockKey)
+		}
+		next, err = jsoncSetEntry(text, blockKey, key, "", true, blockWasAdded(path, blockKey))
+	} else {
+		command, args := mcpCommandArgs(exe)
+		var merged map[string]any
+		merged, note = mergeDejaEntry(m[key], map[string]any{"command": command, "args": args})
+		note = withOtherDejaEntries(note, m, key)
+		var entry string
+		entry, err = jsoncEntryText(merged)
+		if err != nil {
+			return installResult{}, err
+		}
+		next, err = jsoncSetEntry(text, blockKey, key, entry, false, false)
+	}
 	if err != nil {
 		return installResult{}, configParseError(path, err)
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))
-	return installResult{Path: path, Action: a}, werr
+	return installResult{Path: path, Action: a, Note: note}, werr
 }
