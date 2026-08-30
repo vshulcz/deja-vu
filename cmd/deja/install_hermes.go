@@ -218,6 +218,16 @@ func setHermesPluginEnabled(on bool) error {
 		return nil
 	case !on:
 		s = strings.Replace(s, "\n    - deja", "", 1)
+		// And the block itself, when deja is what put it there. Taking back
+		// only the entry left `plugins:\n  enabled:` behind on every machine
+		// that had no plugins block — an empty key that parses as null — while
+		// the MCP writer one function above already drops what it created
+		// (#2604, #2672). A block the reader wrote stays, empty or not.
+		if blockWasAdded(path, "plugins") {
+			s = strings.Replace(s, "\nplugins:\n  enabled:\n", "\n", 1)
+			s = strings.TrimSuffix(s, "\n\n") + "\n"
+			forgetBlockAdded(path, "plugins")
+		}
 	case strings.Contains(s, "\nplugins:\n  enabled:\n"):
 		s = strings.Replace(s, "\nplugins:\n  enabled:\n", "\nplugins:\n  enabled:\n    - deja\n", 1)
 	case strings.Contains(s, "\nplugins:\n  enabled: []\n"):
@@ -227,6 +237,7 @@ func setHermesPluginEnabled(on bool) error {
 			s += "\n"
 		}
 		s += "\nplugins:\n  enabled:\n    - deja\n"
+		noteBlockAdded(path, "plugins")
 	}
 	_, err = writeIfChanged(path, old, []byte(s))
 	return err
