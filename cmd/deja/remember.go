@@ -84,7 +84,7 @@ func runRemember(dir string, args []string) error {
 	// path. Name the restore command rather than lose the line quietly.
 	dayNote := "deja-" + now.Local().Format("2006-01-02") + "-" + strings.TrimSpace(project)
 	if index.Tombstoned("deja:" + dayNote) {
-		fmt.Fprintf(os.Stderr, "deja: it is written but stays hidden — %s was forgotten, and its tombstone lifts only through `deja forget --unforget deja:%s`\n", dayNote, dayNote)
+		fmt.Fprint(os.Stderr, tombstoneHint("it is written", dayNote))
 	}
 	suffix := ""
 	if norm := sources.NormalizeTags(tags); len(norm) > 0 {
