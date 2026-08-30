@@ -114,7 +114,10 @@ func doctorAutoRecall(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — reinstall)\n", a.name, "stale", reportPath(path), a.marker)
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
-			if exe := hookExeNote(path, a.name+"-auto"); exe != "" {
+			// Only the rows that run the binary. aider's file is a digest of
+			// past sessions and roo's is guidance — neither executes anything,
+			// and both can quote a path for reasons of their own.
+			if exe := hookExeNote(path, a.name+"-auto"); a.marker != "" && exe != "" {
 				fmt.Fprintf(w, "  %-12s %s\n", "", exe)
 			}
 		}
