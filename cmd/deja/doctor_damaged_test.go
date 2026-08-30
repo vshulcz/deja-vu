@@ -48,6 +48,11 @@ func TestDoctorReportsADamagedIndex(t *testing.T) {
 	if !strings.Contains(out, "the next search rebuilds") {
 		t.Errorf("no recovery named:\n%s", out)
 	}
+	// And which file: one sentence for four breakages named records and
+	// postings for two that were neither (#2695).
+	if !strings.Contains(out, "postings") {
+		t.Errorf("the line does not say what broke:\n%s", out)
+	}
 	// "up to date" must not sit under a damage line.
 	if strings.Contains(out, "freshness up to date") {
 		t.Errorf("still claims freshness:\n%s", out)

@@ -1329,8 +1329,12 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	// answer anything, and said "up to date" until #735. The next search
 	// rebuilds it, which is worth saying too — the reader has not lost memory,
 	// only this build of the index.
-	if index.Damaged(dir) {
-		fmt.Fprintln(w, "  integrity damaged — records or postings are missing; the next search rebuilds the index")
+	if reason := indexDamageReason(dir); reason != "" {
+		// What broke, not a summary of the four ways it can: a manifest that
+		// will not decode is not missing records, and the sentence sent the
+		// reader — and whoever reads the doctor output they paste into an
+		// issue — after the wrong file (#2695).
+		fmt.Fprintf(w, "  integrity damaged — %s; the next search rebuilds the index\n", reason)
 		return
 	}
 	switch idx.State {
