@@ -190,3 +190,109 @@ func writeJSONCEntry(path string, old []byte, blockKey, exe string, uninstall bo
 	a, werr := writeIfChanged(path, old, []byte(next))
 	return installResult{Path: path, Action: a, Note: note}, werr
 }
+
+// jsoncSetFlag turns a boolean setting on inside a block, in a config that
+// carries comments. The switch is one key deep — `hooksConfig.enabled` — and
+// it lives in the same file the MCP entry does, so refusing it there meant a
+// target that wrote half its wiring and then reported itself refused (#2744).
+func jsoncSetFlag(text, blockKey, key string, value bool) (string, error) {
+	open := zedTopLevelOpen(text)
+	if open < 0 {
+		return "", fmt.Errorf("does not look like a settings object; set %q by hand", blockKey+"."+key)
+	}
+	rendered := "false"
+	if value {
+		rendered = "true"
+	}
+	block := zedFindKey(text, open+1, blockKey)
+	if block == nil {
+		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  },", blockKey, key, rendered)
+		return text[:open+1] + insert + text[open+1:], nil
+	}
+	if at := jsoncScalarValue(text, block, key); at != nil {
+		return text[:at[0]] + rendered + text[at[1]:], nil
+	}
+	tail := ""
+	if rest := text[block.valueOpen+1:]; rest != "" && rest[0] != '\n' && rest[0] != '}' {
+		tail = "\n   "
+	}
+	comma := ","
+	if strings.TrimSpace(stripJSONComments(text[block.valueOpen+1:block.valueEnd-1])) == "" {
+		comma, tail = "", "\n  "
+	}
+	insert := fmt.Sprintf("\n    %q: %s%s%s", key, rendered, comma, tail)
+	return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
+}
+
+// jsoncScalarValue is where a scalar setting's value sits inside a block, or
+// nil when the block does not have that key. Scalars, because zedFindKey looks
+// for an object and a switch is a bare `true`.
+func jsoncScalarValue(text string, block *zedSpan, key string) *[2]int {
+	want := `"` + key + `"`
+	depth := 0
+	for i := block.valueOpen + 1; i < block.valueEnd-1; i++ {
+		if j := zedSkipComment(text, i); j != i {
+			i = j - 1
+			continue
+		}
+		switch text[i] {
+		case '"':
+			end := zedStringEnd(text, i)
+			if end < 0 {
+				return nil
+			}
+			if depth == 0 && text[i:end] == want && jsoncIsKey(text, end) {
+				v := end
+				for v < len(text) && (text[v] == ' ' || text[v] == '\t' || text[v] == '\n' || text[v] == ':') {
+					v++
+				}
+				// A scalar, and only a scalar: an object or a list under this
+				// key would be spliced through the middle, leaving a file no
+				// parser reads and an install that said it worked (#2745).
+				if v >= block.valueEnd-1 || text[v] == '{' || text[v] == '[' {
+					return nil
+				}
+				stop := v
+				for stop < block.valueEnd-1 && text[stop] != ',' && text[stop] != '}' && text[stop] != '\n' {
+					// A comment after the value belongs to the reader, not to
+					// the value.
+					if text[stop] == '/' && zedSkipComment(text, stop) != stop {
+						break
+					}
+					stop++
+				}
+				for stop > v && (text[stop-1] == ' ' || text[stop-1] == '\t') {
+					stop--
+				}
+				span := [2]int{v, stop}
+				return &span
+			}
+			i = end - 1
+		case '{', '[':
+			depth++
+		case '}', ']':
+			depth--
+		}
+	}
+	return nil
+}
+
+// jsoncIsKey reports whether the string that ends at `end` is a key rather
+// than a value. A string value equal to the key's name is not the key, and
+// writing over it left `{"label": "enabled"true}` behind (#2745).
+func jsoncIsKey(text string, end int) bool {
+	for i := end; i < len(text); i++ {
+		if j := zedSkipComment(text, i); j != i {
+			i = j - 1
+			continue
+		}
+		switch text[i] {
+		case ' ', '\t', '\n', '\r':
+		case ':':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}

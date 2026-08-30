@@ -335,10 +335,29 @@ func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string
 func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd string, uninstall bool, retire map[string]bool) (installResult, error) {
 	old, _ := os.ReadFile(path)
 	var root map[string]any
-	if len(bytes.TrimSpace(old)) == 0 {
+	// A settings file carrying comments cannot be rewritten without losing
+	// them, and a hook entry is an element in an event array rather than a key
+	// in an object, so the text path the MCP writers take does not reach here
+	// (#2744). What it can do is answer honestly: read the file with its
+	// comments blanked, and when there is nothing of deja's to change, say
+	// unchanged rather than refuse a file it was never going to touch.
+	jsonc := configIsJSONC(old)
+	source := old
+	if jsonc {
+		source = []byte(stripJSONComments(string(old)))
+	}
+	if len(bytes.TrimSpace(source)) == 0 {
 		root = map[string]any{}
-	} else if err := json.Unmarshal(old, &root); err != nil {
+	} else if err := json.Unmarshal(source, &root); err != nil {
 		return installResult{}, configParseError(path, err)
+	}
+	before := ""
+	if jsonc {
+		b, err := json.Marshal(root)
+		if err != nil {
+			return installResult{}, err
+		}
+		before = string(b)
 	}
 	hooks, _ := root["hooks"].(map[string]any)
 	if hooks == nil {
@@ -409,6 +428,18 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 	}
 	if len(hooks) == 0 {
 		delete(root, "hooks")
+	}
+	if jsonc {
+		after, err := json.Marshal(root)
+		if err != nil {
+			return installResult{}, err
+		}
+		if string(after) == before {
+			// Nothing of deja's here either way: leave the reader's comments
+			// where they are and report the truth.
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		return installResult{}, fmt.Errorf("%s: deja cannot edit hooks in a file that carries comments — add or remove the hook by hand, or take the comments out", path)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {

@@ -624,10 +624,12 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		// without the tools: its own `gemini mcp list` said "No MCP servers
 		// configured" on a machine that had just run `deja install --auto`.
 		// grok-auto pairs them the same way.
-		if _, err := installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall); err != nil {
+		// Same file, same reason as qwen-auto: whichever half may refuse goes
+		// first (#2745).
+		if _, err := installGeminiAuto(exe, uninstall); err != nil {
 			return installResult{}, err
 		}
-		return installGeminiAuto(exe, uninstall)
+		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
 	case "antigravity-auto":
@@ -642,10 +644,14 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
-		if _, err := installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall); err != nil {
+		// The hook first: it lives in the same file as the MCP entry, and a
+		// refusal after the entry was written left the target reported as
+		// refused with half its wiring in the file and a .bak beside it
+		// (#2745, the shape #2744 was about).
+		if _, err := installQwenAuto(exe, uninstall); err != nil {
 			return installResult{}, err
 		}
-		return installQwenAuto(exe, uninstall)
+		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
 	case "kimi-auto":

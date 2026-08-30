@@ -105,7 +105,7 @@ func geminiHooksEnabled() bool {
 		return false
 	}
 	var root map[string]any
-	if err := json.Unmarshal(b, &root); err != nil {
+	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
 		return false
 	}
 	cfg, _ := root["hooksConfig"].(map[string]any)
@@ -121,6 +121,11 @@ func enableGeminiHooks() error {
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// The same file the MCP entry went into a moment ago. Refusing it here
+		// left the target reported as refused with half its wiring written and
+		// a .bak beside it (#2744).
+		return enableGeminiHooksJSONC(path, old)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return fmt.Errorf("gemini settings: %w", err)
 	}
@@ -138,5 +143,38 @@ func enableGeminiHooks() error {
 		return err
 	}
 	_, err = writeIfChanged(path, old, append(next, '\n'))
+	return err
+}
+
+// enableGeminiHooksJSONC is enableGeminiHooks for a settings file carrying
+// comments: the same decision, read from the file with its comments blanked,
+// and the switch written by text so everything else stays put.
+func enableGeminiHooksJSONC(path string, old []byte) error {
+	var root map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(string(old))), &root); err != nil {
+		return fmt.Errorf("gemini settings: %w", err)
+	}
+	cfg, _ := root["hooksConfig"].(map[string]any)
+	if enabled, ok := cfg["enabled"].(bool); ok && enabled {
+		return nil
+	}
+	// A key holding something else — a list, a string, null. zedFindKey does
+	// not match those either, so the write would fall through to inserting a
+	// second `hooksConfig` and the reader's value would win (#2745, the shape
+	// #2740 closed for entries).
+	if v, present := root["hooksConfig"]; present && cfg == nil {
+		_ = v
+		return fmt.Errorf("gemini settings: %q is not an object deja can edit — left as it was", "hooksConfig")
+	}
+	if v, present := cfg["enabled"]; present {
+		if _, ok := v.(bool); !ok {
+			return fmt.Errorf("gemini settings: %q is not a switch deja can turn on — left as it was", "hooksConfig.enabled")
+		}
+	}
+	next, err := jsoncSetFlag(string(old), "hooksConfig", "enabled", true)
+	if err != nil {
+		return fmt.Errorf("gemini settings: %w", err)
+	}
+	_, err = writeIfChanged(path, old, []byte(next))
 	return err
 }
