@@ -667,11 +667,19 @@ var decisionMarkers = []string{
 	"решили", "в итоге", "оказалось", "причина", "выяснилось", "вывод:", "мой вывод",
 	"выбрали", "остановились", "исправил", "починил", "заработало",
 	"не будем", "убрали", "переделали", "смержил", "выкатили",
-	// Mirrors of entries already in the English half: "works now", "passes
-	// now", "fixed". Measured over forty thousand assistant lines from a real
-	// store, Russian lines were marked 3.1% of the time against 4.3% for
-	// English, and these three phrases account for most of the gap.
-	"заработал", "готово", "зелёный",
+	// A mirror of "works now" and "fixed", added when Russian lines were the
+	// under-marked half. It went in beside "готово" and "зелёный"; those two
+	// are gone and this one stays, because the three were measured apart and
+	// only this one marks outcomes. Of the lines it alone marks, most read
+	// like "механизм наконец заработал полностью" or "SSH заработал 3/3 с
+	// keepalive" — what ended up working, which is the shape the list is for.
+	//
+	// "зелёный" alone marked 543 lines of 4901, and they were "CI зелёный, жду
+	// ревьюера", "PR #1566 зелёный целиком": the status chatter this list
+	// exists to see past, not what a session concluded. "готово" alone marked
+	// 221, mostly checklist ticks and table cells — and it fires inside
+	// "готового" and "полуготовое", where it means nothing at all (#2734).
+	"заработал",
 	// A decision is as often reported as the state something ended up in as by
 	// the act of deciding. Measured over 4000 assistant lines from a real
 	// store, the list above marks 4% of them, and lines like "прод-пины теперь
@@ -681,14 +689,6 @@ var decisionMarkers = []string{
 	// live questions turns into a pointer.
 	"теперь ", "стало ", "становится", "лежит в", "работает через",
 	"по умолчанию", "переехал", "now lives", "now goes", "by default",
-	// A decision is as often reported as the state something ended up in as by
-	// the act of deciding. Measured over 4000 assistant lines from a real
-	// store, the list above marks 4% of them, and lines like "прод-пины теперь
-	// ложатся на deploy/prod" or "бывшая ведущая становится ведомой" — plainly
-	// the outcome of a decision — were read as passing mentions. With these the
-	// share is 9%, the benchmark does not move, and one off-topic block of 58
-	// live questions turns into a pointer.
-
 }
 
 // CarriesDecision reports whether a line reads as something concluded rather
@@ -698,12 +698,6 @@ var decisionMarkers = []string{
 func CarriesDecision(text string) bool {
 	return CarriesDecisionExcept(text, nil)
 }
-
-// CarriesDecisionExcept is the same, ignoring markers the asker used. A marker
-// that is also a word of the question makes the check circular: "в итоге" is
-// both, so a line matched on that phrase then counted as a conclusion because
-// of it. Measured on the benchmark, the question "по чему у нас в итоге
-// шардирование" promoted a session about something else entirely.
 
 // planAfterMarker are what follows a state word when the sentence is a plan
 // rather than an outcome: "теперь давай", "now let's". The state markers were
@@ -760,6 +754,11 @@ func isWordByte(b byte) bool {
 	return false
 }
 
+// CarriesDecisionExcept is the same, ignoring markers the asker used. A marker
+// that is also a word of the question makes the check circular: "в итоге" is
+// both, so a line matched on that phrase then counted as a conclusion because
+// of it. Measured on the benchmark, the question "по чему у нас в итоге
+// шардирование" promoted a session about something else entirely.
 func CarriesDecisionExcept(text string, asked []string) bool {
 	low := strings.ToLower(text)
 	for _, p := range planAfterMarker {
