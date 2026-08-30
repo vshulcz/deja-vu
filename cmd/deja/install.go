@@ -1192,6 +1192,8 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		return writeJSONCEntry(path, old, "mcpServers", exe, uninstall)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
@@ -2425,6 +2427,11 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// A comment is not a broken file, and refusing the target over one is
+		// how somebody who annotated their config could not install deja at
+		// all (#1664).
+		return writeJSONCEntry(path, old, "mcpServers", exe, uninstall)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}

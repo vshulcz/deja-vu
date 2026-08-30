@@ -35,16 +35,21 @@ func TestRefusalRemedyMatchesTheFailure(t *testing.T) {
 	}
 }
 
-// The end-to-end shape: a JSON config carrying a comment is refused, and the
-// sentence that closes the run does not blame permissions.
-func TestInstallCommentedJSONDoesNotBlamePermissions(t *testing.T) {
+// The end-to-end shape: a config deja cannot parse is refused, and the sentence
+// that closes the run does not blame permissions.
+//
+// It used to be a commented config that stood here. A comment is no longer a
+// refusal — the entry is edited as text and the comment survives (#1664) — so
+// the case is a file that is genuinely broken, which is what the message was
+// always about.
+func TestInstallUnparseableJSONDoesNotBlamePermissions(t *testing.T) {
 	hermeticEnv(t)
 	root := filepath.Join(os.Getenv("HOME"), ".gemini")
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	settings := filepath.Join(root, "settings.json")
-	if err := os.WriteFile(settings, []byte("{\n  // mine\n  \"theme\": \"dark\"\n}\n"), 0o644); err != nil {
+	if err := os.WriteFile(settings, []byte("{\n  \"theme\": \"dark\",\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +61,34 @@ func TestInstallCommentedJSONDoesNotBlamePermissions(t *testing.T) {
 	if strings.Contains(msg, "permissions") {
 		t.Errorf("a parse error is reported as a permissions problem: %s", msg)
 	}
-	if !strings.Contains(msg, "invalid character") {
+	if !strings.Contains(msg, "unexpected end of JSON input") && !strings.Contains(msg, "invalid character") {
 		t.Errorf("the refusal does not carry the parse error: %s", msg)
+	}
+}
+
+// And the comment itself: the same target takes it now, and gives it back.
+func TestInstallTakesACommentedGeminiConfig(t *testing.T) {
+	hermeticEnv(t)
+	root := filepath.Join(os.Getenv("HOME"), ".gemini")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settings := filepath.Join(root, "settings.json")
+	before := "{\n  // mine\n  \"theme\": \"dark\"\n}\n"
+	if err := os.WriteFile(settings, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "gemini", "--no-index"); err != nil {
+		t.Fatalf("a comment refused the target: %v", err)
+	}
+	b, err := os.ReadFile(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "// mine") || !strings.Contains(string(b), `"theme": "dark"`) {
+		t.Errorf("the reader's file did not survive:\n%s", b)
+	}
+	if !strings.Contains(string(b), `"deja"`) {
+		t.Errorf("deja's entry was not written:\n%s", b)
 	}
 }
