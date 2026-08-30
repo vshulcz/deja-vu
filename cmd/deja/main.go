@@ -1514,10 +1514,18 @@ func printNoMatches(w io.Writer, dir, q string, regex bool) {
 	// a trust rule the two differ, and "no matches in 1 indexed session — try
 	// fewer words" sent the reader after a wording problem in a session the
 	// rule never let search open (#986).
-	if reach, total, ok := reachableSessionCount(dir); ok && reach == 0 && total > 0 {
+	if reach, trusted, total, ok := reachableSessionCount(dir); ok && reach == 0 && total > 0 {
 		fmt.Fprintf(w, "deja: no matches for %q\n", q)
-		fmt.Fprintf(w, "deja: the trust policy withholds every indexed session from this path (%s: %s) — see %s\n",
-			policy.ActivationSearch, policy.Load().Describe(policy.ActivationSearch), policy.Path())
+		// Which rule emptied the path. Counting the ignore rule here (#2707)
+		// put a store hidden by a path pattern under a sentence about the
+		// trust policy, quoting a trust rule that allows everything.
+		if trusted == 0 {
+			fmt.Fprintf(w, "deja: the trust policy withholds every indexed session from this path (%s: %s) — see %s\n",
+				policy.ActivationSearch, policy.Load().Describe(policy.ActivationSearch), policy.Path())
+		} else {
+			fmt.Fprintf(w, "deja: the ignore rule withholds every indexed session from this path (%s) — see %s\n",
+				strings.Join(policy.Load().IgnorePatterns(), ", "), policy.Path())
+		}
 		return
 	} else if ok {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", reach, pluralS(reach), q)
@@ -4127,21 +4135,30 @@ func forgetKeyOf(dir string, o index.ForgetOptions) string {
 	return ""
 }
 
-// reachableSessionCount reports how many indexed sessions the search
-// activation may read, and how many are indexed in all.
-func reachableSessionCount(dir string) (int, int, bool) {
+// reachableSessionCount reports how many indexed sessions this path may read,
+// how many of those the trust policy alone allows, and how many there are.
+//
+// Both rules withhold, so both are counted (#2707): the trust policy was here
+// from the start (#986) and the ignore rule was not counted at all, which had
+// the empty answer naming twice the history search would open. The trust-only
+// figure is kept because the reader has to be told which of the two emptied
+// their search.
+func reachableSessionCount(dir string) (reach, trusted, total int, ok bool) {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 	pol := policy.Load()
-	reach := 0
 	for _, m := range metas {
-		if pol.Allows(policy.ActivationSearch, m.Project) {
+		if !pol.Allows(policy.ActivationSearch, m.Project) {
+			continue
+		}
+		trusted++
+		if !pol.Ignored(m.Path, m.Project) {
 			reach++
 		}
 	}
-	return reach, len(metas), true
+	return reach, trusted, len(metas), true
 }
 
 // joinCapped lists at most n items and says how many it left out, so a refusal
