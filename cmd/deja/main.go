@@ -240,7 +240,10 @@ func run(args []string) error {
 	warnBrokenPolicy(args[0], os.Stderr)
 	if wantsHelp(args[1:]) {
 		if h := helpForCommand(args[0]); h != "" {
-			fmt.Print(h)
+			// The same width the page itself respects: `deja last --help`
+			// quotes the widest line in it, so a single command's help was
+			// the one most likely to wrap (#1661).
+			fmt.Print(wrapUsage(h, printableWidth(os.Stdout)))
 			return nil
 		}
 	}
@@ -3439,7 +3442,7 @@ var helpHidden = map[string]bool{
 }
 
 func printUsage() {
-	fmt.Print(usageText())
+	fmt.Print(wrapUsage(usageText(), printableWidth(os.Stdout)))
 }
 
 // usageText renders the usage block so `--help` on a single command can quote
