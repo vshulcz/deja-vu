@@ -69,3 +69,20 @@ func TestASingleCommandsHelpFitsToo(t *testing.T) {
 		}
 	}
 }
+
+// The wiring, not just the wrapper: `deja help` and `deja <cmd> --help` are
+// the two surfaces that have to ask the terminal how wide it is.
+func TestBothHelpSurfacesAreWrappedForTheTerminal(t *testing.T) {
+	t.Setenv("COLUMNS", "80")
+	for _, args := range [][]string{{"help"}, {"last", "--help"}} {
+		out, err := captureRun(t, args...)
+		if err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		for _, line := range strings.Split(out, "\n") {
+			if len([]rune(line)) > 80 {
+				t.Errorf("%v printed a line %d wide:\n%s", args, len([]rune(line)), line)
+			}
+		}
+	}
+}

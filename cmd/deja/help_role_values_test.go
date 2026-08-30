@@ -42,6 +42,10 @@ func roleStore(t *testing.T) string {
 // ordinary results by design, so the flag is the only way to them and help is
 // where someone looks for the flag (#1096).
 func TestHelpNamesEveryRoleThatMatches(t *testing.T) {
+	// The page is reflowed to the terminal since #1661, and a narrow COLUMNS
+	// in the environment would split the line this reads.
+	t.Setenv("COLUMNS", "")
+
 	roleStore(t)
 
 	// Each role has to actually reach a record of its own kind, or the help
