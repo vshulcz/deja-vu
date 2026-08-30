@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp/syntax"
-	"strings"
+	"strconv"
 )
 
 // rePatternError says a pattern cannot be used, in the same voice the other
@@ -25,7 +25,10 @@ func rePatternError(pattern string, err error) error {
 	}
 	what := string(perr.Code)
 	if perr.Expr != "" && perr.Expr != pattern {
-		what += ": " + perr.Expr
+		// Quoted like the pattern itself: Go prints the offending fragment
+		// raw, so a pattern holding an escape byte put one on the terminal
+		// through the very line that exists to keep them off it.
+		what += ": " + strconv.Quote(perr.Expr)
 	}
-	return fmt.Errorf("--re %q is not a pattern deja can use — %s", pattern, strings.TrimSpace(what))
+	return fmt.Errorf("--re %q is not a pattern deja can use — %s", pattern, what)
 }

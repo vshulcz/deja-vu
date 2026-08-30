@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 // Every bad invocation answers in deja's own voice — "is not a duration deja
@@ -13,8 +14,8 @@ import (
 func TestABadPatternIsRefusedInDejasOwnVoice(t *testing.T) {
 	for _, c := range []struct{ pattern, want string }{
 		{"retry(", `--re "retry(" is not a pattern deja can use — missing closing )`},
-		{"a**", `--re "a**" is not a pattern deja can use — invalid nested repetition operator: **`},
-		{"[z-a]", `--re "[z-a]" is not a pattern deja can use — invalid character class range: z-a`},
+		{"a**", `--re "a**" is not a pattern deja can use — invalid nested repetition operator: "**"`},
+		{"[z-a]", `--re "[z-a]" is not a pattern deja can use — invalid character class range: "z-a"`},
 	} {
 		_, err := regexp.Compile(c.pattern)
 		if err == nil {
@@ -40,5 +41,21 @@ func TestAnErrorThatIsNotAboutThePatternIsLeftAlone(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "is not a pattern") {
 		t.Errorf("an unrelated failure was reported as a bad pattern: %v", err)
+	}
+}
+
+// The fragment Go names is part of the pattern, so it carries whatever the
+// pattern did: an escape byte there reached the terminal through the one line
+// written to keep it off (#1794's shape, in #1602's fix).
+func TestTheFragmentInTheRefusalCarriesNoControlByte(t *testing.T) {
+	_, err := regexp.Compile("[\x1b-\x01]")
+	if err == nil {
+		t.Fatal("that pattern compiles now; pick another")
+	}
+	msg := rePatternError("[\x1b-\x01]", err).Error()
+	for _, r := range msg {
+		if unicode.IsControl(r) {
+			t.Fatalf("the refusal carries a control byte: %q", msg)
+		}
 	}
 }
