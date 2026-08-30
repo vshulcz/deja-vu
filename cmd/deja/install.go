@@ -1349,10 +1349,14 @@ func lastShellToken(s string) string {
 // isDejaBinaryToken reports whether a token names the deja binary, quoted or
 // not, under any directory, on either platform's separator.
 func isDejaBinaryToken(tok string) bool {
-	tok = strings.Trim(tok, `"'`)
+	tok = strings.Trim(strings.TrimSpace(tok), `"'`)
+	// Both separators whatever this build was compiled for, because configs
+	// travel between machines, and folded because a filesystem that does not
+	// care about case still runs /opt/Deja (#2713).
 	if i := strings.LastIndexAny(tok, `/\`); i >= 0 {
 		tok = tok[i+1:]
 	}
+	tok = strings.ToLower(tok)
 	return tok == "deja" || tok == "deja.exe"
 }
 
@@ -1626,6 +1630,12 @@ func replacedEntryNote(prev, entry any) string {
 // config keeps it: a command string, a command list, or the args behind a
 // wrapper like Windows' `cmd /c`.
 func entryRunsDeja(entry map[string]any) bool {
+	// The shape a client nests: doctor read it and install did not, so one
+	// command called a file wired while the other wrote a second server into
+	// it (#2713).
+	if t, ok := entry["transport"].(map[string]any); ok && entryRunsDeja(t) {
+		return true
+	}
 	var words []string
 	switch c := entry["command"].(type) {
 	case string:
@@ -1713,6 +1723,12 @@ func otherDejaEntriesNote(servers map[string]any, mine string) string {
 // cannot be (`cmd /c … deja mcp`), it has to be running deja's server rather
 // than appearing in a path.
 func entryIsDejaServer(entry map[string]any) bool {
+	// The nested shape, on the same terms: this asks whether the entry is
+	// deja's server, so the answer has to reach wherever the launch is written
+	// (#2713).
+	if t, ok := entry["transport"].(map[string]any); ok && entryIsDejaServer(t) {
+		return true
+	}
 	switch c := entry["command"].(type) {
 	case string:
 		if isDejaBinaryToken(c) {
@@ -1782,6 +1798,15 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 	}
 	for k, v := range entry {
 		out[k] = v
+	}
+	// deja owns how the entry is launched, and it writes that at the top level.
+	// An entry written in the nested shape kept its `transport` beside the
+	// command deja had just written, and a client that prefers the nested one
+	// went on launching the old binary while install reported success — the
+	// mixed shape this function exists to avoid, reached through the wider gate
+	// #2713 opened (#2716).
+	if _, ok := out["command"]; ok {
+		delete(out, "transport")
 	}
 	if disabled, _ := out["disabled"].(bool); disabled {
 		// Switching it back on silently would undo a decision deja was not
