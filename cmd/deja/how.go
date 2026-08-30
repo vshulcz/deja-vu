@@ -180,7 +180,10 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 // hid, and an agent told nothing exists invents something.
 func howEntries(dir string, terms []string, project, activation string) ([]howEntry, int, int, error) {
 	pol := policy.Load()
-	hidden := 0
+	// Sessions, not records: the sentence this feeds says "matching sessions",
+	// and one withheld session that ran a command five times was reported as
+	// five (#1641, the shape #1639 fixed for friction).
+	hidden := map[string]bool{}
 	// The other rule that takes sessions out of an answer. It is applied inside
 	// retrieval, and this screen reads the record log instead of ranking, so it
 	// was not applied here at all: a tree the reader asked deja to stay out of
@@ -190,7 +193,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
 		if !pol.Allows(activation, meta.Project) {
-			hidden++
+			hidden[meta.Harness+":"+meta.ID] = true
 			return
 		}
 		if pol.Ignored(meta.Path, meta.Project) {
@@ -236,7 +239,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 	})
 	if err != nil {
-		return nil, hidden, len(ignored), fmt.Errorf("read: %w", err)
+		return nil, len(hidden), len(ignored), fmt.Errorf("read: %w", err)
 	}
 	out := make([]howEntry, 0, len(byCmd))
 	for _, e := range byCmd {
@@ -254,7 +257,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 		return out[i].Command < out[j].Command
 	})
-	return out, hidden, len(ignored), nil
+	return out, len(hidden), len(ignored), nil
 }
 
 func pluralRuns(n int) string {
