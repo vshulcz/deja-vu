@@ -59,6 +59,13 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input toolAfterInput
 	raw := readHookPayload(stdin, hookStdinWait)
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
+	// The kill switch, before anything is read. It reached the session-start
+	// hook and nothing else, so a machine with recall off still had text drawn
+	// from its own indexed sessions injected here (#2701).
+	if recallIsOff() {
+		return nil
+	}
+
 	if !planIndexReady(dir) {
 		// Ask, do not build. #777 gave the per-prompt and session-start hooks
 		// this: an index in a format this build cannot read answers nothing,

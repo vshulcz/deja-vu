@@ -53,6 +53,14 @@ func environmentBlock(dir, activation string) string {
 // record without them could not be reached when one of those projects was
 // forgotten (#2349).
 func environmentBlockFrom(dir, activation string) (string, []string) {
+	// The kill switch belongs here rather than at the call sites: two of the
+	// three asked and one did not, which is how a machine with recall off kept
+	// receiving this block — on every session start (#2699) and from the MCP
+	// recall tool (#2701). Ahead of the manifest scan, which the comment at
+	// the hook's call site calls ten times the cost of the rest of the hook.
+	if recallIsOff() {
+		return "", nil
+	}
 	// Origin is a property of the sessions the walls came from, so the gate has
 	// to be per wall rather than one check up front: a machine can hold both
 	// local and imported sessions hitting the same error.

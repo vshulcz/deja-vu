@@ -74,6 +74,13 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
+	// The kill switch, before anything is read. It reached the session-start
+	// hook and nothing else, so a machine with recall off still had text drawn
+	// from its own indexed sessions injected here (#2701).
+	if recallIsOff() {
+		return nil
+	}
+
 	// Spawning an agent is the one action whose reply has to reach someone
 	// other than the caller, so it answers in its own shape. See hook_spawn.go.
 	if isSpawnTool(input.ToolName) {
