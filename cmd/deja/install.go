@@ -1335,6 +1335,67 @@ const (
 	hookWrapsDejas
 )
 
+// retiredDejaHook reports whether a command line is deja's own, calling a hook
+// this build no longer has: `<binary> hook-something` and nothing else.
+//
+// The writers recognise the subcommand they are installing and nothing else, so
+// a line deja wrote under a name that has since gone was invisible to them. It
+// sat beside the new one and ran on every session start forever, and since the
+// build has no such command it did nothing but cost a process (#2719).
+//
+// Deja's own line only. A wrapper someone built around a hook is theirs, and so
+// is a line with anything else on it.
+func retiredDejaHook(existing any) bool {
+	s, ok := existing.(string)
+	if !ok {
+		return false
+	}
+	fields := strings.Fields(s)
+	if len(fields) != 2 || !strings.HasPrefix(fields[1], "hook-") {
+		return false
+	}
+	// The whole field has to be the name and nothing else. A reader's line can
+	// end in a redirect — deja hook-context>>/tmp/deja.log — which splits the
+	// same way and is theirs to keep.
+	for _, r := range fields[1] {
+		if (r < 'a' || r > 'z') && r != '-' {
+			return false
+		}
+	}
+	if !isDejaBinaryToken(fields[0]) {
+		return false
+	}
+	if hookNames[fields[1]] {
+		return false
+	}
+	// A name that merely extends one of ours is not ours: `hook-context-extra`
+	// is somebody else's subcommand that happens to start like deja's, and
+	// TestALongerSubcommandIsNotOurs has held that line since before this.
+	for name := range hookNames {
+		if strings.HasPrefix(fields[1], name) {
+			return false
+		}
+	}
+	return true
+}
+
+// hookNames is every hook subcommand this build has. Written out rather than
+// derived from the dispatch table, which cannot be read from here without an
+// initialisation cycle; TestHookNamesMatchTheDispatchTable is what keeps the
+// two from drifting, the same arrangement helpHidden uses.
+var hookNames = map[string]bool{
+	"hook-antigravity":  true,
+	"hook-context":      true,
+	"hook-goose":        true,
+	"hook-goose-prompt": true,
+	"hook-plan":         true,
+	"hook-precompact":   true,
+	"hook-prompt":       true,
+	"hook-refresh":      true,
+	"hook-tool":         true,
+	"hook-tool-after":   true,
+}
+
 func hookCommandKindOf(existing any, cmd string) hookCommandKind {
 	s, ok := existing.(string)
 	if !ok || s == "" {
@@ -1442,6 +1503,12 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 			h, _ := hAny.(map[string]any)
 			kind := hookNotDejas
 			if h != nil && h["type"] == "command" {
+				// A line of ours calling a hook this build dropped is not a
+				// third-party entry to leave alone; it is ours to take out.
+				if retiredDejaHook(h["command"]) {
+					removed = true
+					continue
+				}
 				kind = hookCommandKindOf(h["command"], cmd)
 			}
 			if kind == hookWrapsDejas {
