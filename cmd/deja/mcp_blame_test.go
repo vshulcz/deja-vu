@@ -34,7 +34,18 @@ func TestMCPBlameLeavesTheTranscriptBehind(t *testing.T) {
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatal(err)
 	}
-	sess := got[0]["session"].(map[string]any)
+	// The payload leads with notes — a refresh warning, and the line saying
+	// what this text is — so the hit is the first element carrying a session.
+	var sess map[string]any
+	for _, item := range got {
+		if s, ok := item["session"].(map[string]any); ok {
+			sess = s
+			break
+		}
+	}
+	if sess == nil {
+		t.Fatalf("no hit in the payload: %s", out)
+	}
 	if _, ok := sess["messages"]; ok {
 		t.Fatal("the message list must not travel to an agent")
 	}
@@ -44,7 +55,14 @@ func TestMCPBlameLeavesTheTranscriptBehind(t *testing.T) {
 			t.Errorf("session lost %q", want)
 		}
 	}
-	if len(got[0]["snippets"].([]any)) != 1 {
+	var hit map[string]any
+	for _, item := range got {
+		if _, ok := item["session"]; ok {
+			hit = item
+			break
+		}
+	}
+	if len(hit["snippets"].([]any)) != 1 {
 		t.Error("snippets are the part an agent actually reads")
 	}
 }

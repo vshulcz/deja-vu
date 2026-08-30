@@ -58,7 +58,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		if index.HasManifest(dir) {
 			fmt.Fprint(stdout, "deja · rebuilding the index · recall is quiet until it finishes")
 		} else {
-			fmt.Fprint(stdout, "deja · indexing your history · recall comes online in a few seconds")
+			fmt.Fprint(stdout, "deja · indexing your history · recall comes online when it finishes")
 		}
 		return nil
 	}
@@ -78,6 +78,17 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 	// true together (#2224).
 	n := usage.StatusCounters(dir)
 	recalls, bytes, injected := n.Recalls, n.Bytes, n.Injected
+	// An index that cannot answer on a machine that has history to answer
+	// from: a cleared cache, a directory someone moved, a volume not mounted,
+	// or a store the last build left damaged. Recall answers nothing until it
+	// is rebuilt, and this line — the surface somebody is already watching —
+	// read as an ordinary quiet day (#2419). The history is what separates it
+	// from a fresh install, where there is nothing to index and the session
+	// start already says so (#2407).
+	if indexNeedsRebuild(dir) && !noAgentHistoryFound() {
+		fmt.Fprint(stdout, withFileMemory(dir, in, "deja · the index cannot answer · recall is quiet until `deja index` rebuilds it"))
+		return nil
+	}
 	if recalls == 0 {
 		// Injections are not recalls, but they are the whole day for someone
 		// who lives on auto-recall: saying "0 B injected" while memory has

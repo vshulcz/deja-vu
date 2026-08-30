@@ -223,6 +223,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParsePiFile(path)
 	case "omp":
 		sessions, err = ParseOmpFile(path)
+	case "prime":
+		sessions, err = ParsePrimeFile(path)
 	case "openclaw":
 		sessions, err = ParseOpenClawFile(path)
 	case "copilot":

@@ -307,6 +307,15 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "prime", Load: LoadPrime, Files: PrimeSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "prime",
+				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, PrimeRoot()) },
+				Parse:     fullParse(ParsePrimeFile),
+				ParseFrom: offsetParse(ParsePrimeFileFromOffset),
+			}},
+		},
+		{
 			Name: "omp", Load: LoadOmp, Files: OmpSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "omp",

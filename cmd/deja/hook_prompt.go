@@ -184,7 +184,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if cands := digest.ProjectNameCandidates(cwd); len(cands) > 0 {
 		projectKey = cands[0]
 	}
-	inProject := recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+	// Except for a spawned agent. The cooldown above counts servings across
+	// agent sessions, which is right for a reader working through a run of
+	// messages — #2038 measured 92% repeats and one marathon served 110 times.
+	// A fleet is the other shape: ten agents spawned together are ten readers,
+	// each seeing a session once, and the answer they all need is the one the
+	// cooldown has just spent. Measured: of three agents spawned on the same
+	// work, the first was given it and the other two were sent out with
+	// nothing (#2534). Their own per-reader key and the block fingerprint still
+	// stop the same agent being handed the same thing twice.
+	var inProject map[string]bool
+	if !isSpawnedReader(input.SessionID) {
+		inProject = recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+	}
 	skip := make(map[string]bool, len(recent)+len(inProject)+1)
 	for id := range recent {
 		skip[id] = true
@@ -246,7 +258,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// hook pays its cost on every message the user sends. Measured on
 		// cross-paired prompts whose answer is absent, the old bar injected on
 		// 94% of them; half of those rested on one ordinary word.
-		if !search.RecallWorthShowing(terms, matched[i], strong[i]) {
+		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
 			continue
 		}
 		// A word rare enough to identify something is a real match on its own —
@@ -448,12 +460,22 @@ func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool 
 // matchedFingerprint is the session's matching lines, normalised, hashed. Empty
 // when nothing matched, which is not a duplicate of anything.
 func matchedFingerprint(s model.Session, terms []string) string {
+	// Lines that carry the question, not lines that brush it. A session says
+	// the thing once and talks around it for the rest, and the talk differs
+	// session to session — so hashing every line that held any query word gave
+	// two sessions that settled the same thing two fingerprints, and the block
+	// spent both its slots saying it twice. A line holding one ordinary word of
+	// the question is that talk.
 	var b strings.Builder
 	for _, m := range s.Messages {
+		line := strings.Join(strings.Fields(strings.ToLower(m.Text)), " ")
+		if search.TermHitsLowered(line, terms) < fingerprintTermsPerLine {
+			continue
+		}
 		if !search.SpeechCarriesAnyTerm(model.Session{Messages: []model.Message{m}}, terms) {
 			continue
 		}
-		b.WriteString(strings.Join(strings.Fields(strings.ToLower(m.Text)), " "))
+		b.WriteString(line)
 		b.WriteByte('\n')
 	}
 	if b.Len() == 0 {
@@ -461,6 +483,10 @@ func matchedFingerprint(s model.Session, terms []string) string {
 	}
 	return blockFingerprint(b.String())
 }
+
+// fingerprintTermsPerLine is how much of the question a line has to carry
+// before it counts toward what a session is saying.
+const fingerprintTermsPerLine = 2
 
 // leadTermsKept is how many of the question's identifying words a session may
 // be judged on. Three rather than one: the gate exists to reject a session
@@ -648,6 +674,11 @@ func blockFingerprint(body string) string {
 	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(body), " ")))
 	return hex.EncodeToString(sum[:8])
 }
+
+// isSpawnedReader reports whether this recall is for an agent the parent just
+// spawned rather than for someone typing. spawnRecall builds the id, and the
+// prefix is the only thing that separates the two readers here.
+func isSpawnedReader(sid string) bool { return strings.HasPrefix(sid, "task:") }
 
 // injectionCooldown is how many later injections a session sits out after
 // being shown. Counted in injections rather than minutes because that is what

@@ -327,6 +327,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     }
   ],
   "sqlite3": {"state": "ok"},
+  "git": {"state": "ok"},
   "version": {
     "state": "ok",
     "current": "0.14.1",
@@ -359,6 +360,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     "peers": [
       {
         "host": "laptop",
+        "machine": "quicksilver",
         "last_push": "2026-08-22T10:00:00Z",
         "last_pull": "2026-08-22T10:00:00Z",
         "sessions_from_there": 12
@@ -369,6 +371,9 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
         "sessions_from_there": 0,
         "last_error": "ssh build-box: exit status 255"
       }
+    ],
+    "imported": [
+      {"machine": "desktop", "sessions": 5}
     ]
   }
 }
@@ -391,6 +396,11 @@ values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
 but empty store directory reports `missing`. A store also carries `indexed_sessions`
 and, when it holds peer-synced work, `indexed_from_elsewhere`; a store whose
 permission walk was cut short or blocked carries `partial` or `unchecked`.
+`sqlite3` and `git` are the two tools deja shells out to, each `ok` or
+`missing`: sqlite3 reads the opencode, Cursor, grok, hermes, goose and zed
+stores, and git supplies changed-file notes, worktree names and the task
+signal. Both degrade quietly, which is why the report names them.
+
 Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `--offline`), or `unknown`. `policy.state` is `default`, `active` or
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and
@@ -421,13 +431,24 @@ apart, and a machine that takes what this one sends while sending nothing back
 is a broken sync that reads as a working one. A row carrying neither is a
 machine named once and never reached — the text report says "never exchanged"
 for it — and it is still a row, which is what distinguishes it from a deja too
-old to report peers at all: that one has no `sync` key. `last_error` is why the most
+old to report peers at all: that one has no `sync` key. `machine` is what that host calls itself, learned from the records a pull
+brings; it is the name `sessions_from_there` is counted by and the name every
+listing prints for imported work. Absent until the machine has said, and absent
+for a peer that has never been reached. `last_error` is why the most
 recent exchange failed and is absent once one succeeds. `last_error` is written by
 another machine and can be made arbitrarily long, so it is bounded before it is
 reported. `host` is not: it is a name to act on — `deja sync ssh <host>` — and a
 bounded name names no machine, so it is reported exactly as the config file
 spells it, however long. Neither can carry a raw control byte into a terminal:
 the JSON encoder escapes those in any string.
+`sync.imported` names the machines whose work is in this index without a peer
+row of their own — the state a first exchange leaves, when a batch was carried
+by hand or by a shared folder and no `deja sync ssh` target has been named yet.
+A machine counted in a `peers` row is not repeated here. The key is absent when
+nothing has arrived that way, so a reader can tell that from a deja too old to
+report it, and `machine` is the name the records carry, reported as they spell
+it for the reason `host` is.
+
 `stamped_ahead` appears when the newer of the two timestamps is more than a
 minute later than this machine's clock: the age would be negative and the row
 would otherwise read as a sync that just happened, so a consumer should treat
@@ -564,5 +585,11 @@ Returns a JSON array of blame hits (same stability rules as exact search):
   }
 ]
 ```
+
+A hit for a session whose decision was promoted also carries `lifecycle`,
+`lifecycle_note` and `lifecycle_at`. Every state appears there, `accepted`
+included: the field says which decision this is, not that something is wrong
+with it. A consumer reading its presence as "this was withdrawn" wants
+`lifecycle != "accepted"`.
 
 The MCP `blame` tool returns the same array shape.

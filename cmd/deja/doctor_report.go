@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -40,6 +41,12 @@ type doctorStore struct {
 	// Skipped is why part of the store could not be read at all — a missing
 	// sqlite3 or zstd CLI. The text row has carried it in its detail; a reader
 	// of --json saw a state and no reason (#1758).
+	// Error is what the parser said when it refused the store. Without it the
+	// report told a person their format may have changed and asked them to
+	// report it, and the report they could send carried no more than the word
+	// "unreadable" — neither they nor we could tell a renamed column from a
+	// locked database from a missing CLI (#1642).
+	Error     string `json:"error,omitempty"`
 	Denied    string `json:"denied,omitempty"`
 	Skipped   string `json:"skipped,omitempty"`
 	Partial   bool   `json:"partial,omitempty"`
@@ -77,15 +84,20 @@ type doctorVersionReport struct {
 }
 
 type doctorReport struct {
-	SchemaVersion int                            `json:"schema_version"`
-	Stores        []doctorStore                  `json:"stores"`
-	Index         doctorIndexReport              `json:"index"`
-	MCP           []doctorMCPStatus              `json:"mcp"`
-	SQLite3       doctorComponent                `json:"sqlite3"`
-	Version       doctorVersionReport            `json:"version"`
-	Embed         *doctorEmbedReport             `json:"embed,omitempty"`
-	Policy        doctorPolicyReport             `json:"policy"`
-	Ingest        map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
+	SchemaVersion int               `json:"schema_version"`
+	Stores        []doctorStore     `json:"stores"`
+	Index         doctorIndexReport `json:"index"`
+	MCP           []doctorMCPStatus `json:"mcp"`
+	SQLite3       doctorComponent   `json:"sqlite3"`
+	// Git is the other tool the text report names, and what it is needed for
+	// degrades in silence: changed-file notes, worktree names, the task signal.
+	// A machine checking this install could see a missing sqlite3 and not a
+	// missing git (#2411).
+	Git     doctorComponent                `json:"git"`
+	Version doctorVersionReport            `json:"version"`
+	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
+	Policy  doctorPolicyReport             `json:"policy"`
+	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 	// IngestFiles is where those counts came from. Without it the pointer at
 	// the end of doctor's ingest line led back to the numbers it had just
 	// printed, and the file to fix was never named (#2189).
@@ -109,11 +121,30 @@ type doctorSyncReport struct {
 	State string             `json:"state"`
 	Error string             `json:"error,omitempty"`
 	Peers []doctorPeerReport `json:"peers"`
+	// Imported is what arrived from machines with no peer row — the state a
+	// first exchange leaves, before `deja sync ssh` names a target. The text
+	// report says it since #2379, and a tool reading this saw a machine that
+	// had never exchanged anything (#2382). Omitted when there is none, so a
+	// reader can tell "nothing arrived" from a deja too old to report it.
+	Imported []doctorImportedReport `json:"imported,omitempty"`
+}
+
+// doctorImportedReport is one machine that sent work this one keeps, named as
+// the records name it.
+type doctorImportedReport struct {
+	Machine  string `json:"machine"`
+	Sessions int    `json:"sessions"`
 }
 
 // doctorPeerReport is one machine, carrying what the text line carries.
 type doctorPeerReport struct {
 	Host string `json:"host"`
+	// Machine is the name that host turns out to be — what the sending machine
+	// calls itself, learned from the records a pull brings. It is the name
+	// `sessions_from_there` is counted by and the one every listing prints for
+	// imported work, so without it a consumer cannot join a peer row to the
+	// sessions that came from it (#2423). Absent until the machine has said.
+	Machine string `json:"machine,omitempty"`
 	// The two directions fail apart, and a host that takes what this machine
 	// sends while sending nothing back is a broken sync that reads as a
 	// working one — so they are separate keys rather than one "last exchange".
@@ -154,6 +185,7 @@ func collectDoctorSync(dir string) doctorSyncReport {
 			// which is the reason the text report needs a bound and this does
 			// not.
 			Host:      p.Host,
+			Machine:   p.Machine,
 			Sessions:  peerSessionCount(from, p),
 			LastError: safeForStatusline(p.LastError, 200),
 		}
@@ -165,6 +197,27 @@ func collectDoctorSync(dir string) doctorSyncReport {
 		}
 		row.Ahead = peerStampedAhead(p.Last(), time.Now())
 		out.Peers = append(out.Peers, row)
+		// Counted against a peer row, so the imported list below carries what
+		// is left: the machines this one has no target for.
+		delete(from, peers.Identity(p.Host))
+		if p.Machine != "" {
+			delete(from, peers.Identity(p.Machine))
+		}
+	}
+	names := make([]string, 0, len(from))
+	for name := range from {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if from[names[i]] != from[names[j]] {
+			return from[names[i]] > from[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	for _, name := range names {
+		// The name as the records spell it, for the reason Host is: a reader
+		// may act on it, and the encoder escapes what a terminal would obey.
+		out.Imported = append(out.Imported, doctorImportedReport{Machine: name, Sessions: from[name]})
 	}
 	return out
 }
@@ -258,6 +311,10 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
 		report.SQLite3.State = "ok"
+	}
+	report.Git.State = "missing"
+	if _, err := exec.LookPath("git"); err == nil {
+		report.Git.State = "ok"
 	}
 	report.Policy = collectDoctorPolicy(dir)
 	report.Sync = collectDoctorSync(dir)
@@ -378,6 +435,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"goose", []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles(), parseDoctorGoose},
 		{"pi", []string{sources.PiRoot()}, sources.PiSessionFiles(), sources.ParsePiFile},
 		{"omp", []string{sources.OmpRoot()}, sources.OmpSessionFiles(), sources.ParseOmpFile},
+		{"prime", []string{sources.PrimeRoot()}, sources.PrimeSessionFiles(), sources.ParsePrimeFile},
 		{"openclaw", []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles(), sources.ParseOpenClawFile},
 		{"copilot", []string{sources.CopilotRoot()}, sources.CopilotSessionFiles(), sources.ParseCopilotFile},
 		// Both were listed by the text rows and by nothing else: absent here,
@@ -583,6 +641,10 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	// showed up here as a healthy store while its recall was empty.
 	if parseErr != nil {
 		store.State = "unreadable"
+		// Bounded: a sqlite3 error can quote the query, and the query is a
+		// screenful. The head of it names the cause — a missing column, a
+		// locked database, a file that is not a database at all.
+		store.Error = boundedStoreError(parseErr.Error())
 		return store, mod
 	}
 	// A session someone opened and closed without typing parses to nothing,
@@ -744,4 +806,20 @@ func doctorProbeOpencode(db string) ([]model.Session, error) {
 	// time, so sqlite sorts the whole join before it can take the first row.
 	// Narrowing to the newest session first is what makes this cheap.
 	return sources.ParseOpencodeNewest(db)
+}
+
+// storeErrorMax is how much of a parser's complaint the report carries. Long
+// enough for the sentence sqlite3 leads with, short enough that a quoted query
+// does not become the report.
+const storeErrorMax = 300
+
+func boundedStoreError(msg string) string {
+	msg = strings.TrimSpace(msg)
+	if i := strings.IndexAny(msg, "\r\n"); i >= 0 {
+		msg = strings.TrimSpace(msg[:i])
+	}
+	if len(msg) > storeErrorMax {
+		msg = strings.TrimSpace(msg[:storeErrorMax]) + "…"
+	}
+	return msg
 }

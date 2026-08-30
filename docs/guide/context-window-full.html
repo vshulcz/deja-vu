@@ -99,7 +99,7 @@
 <p>The pre-compaction turns are still on disk in full — compaction rewrites the agent's context, not its transcript. deja reads the transcript, so the commands and errors the summary dropped are still searchable, and <a href="after-compaction.html">getting them back</a> is one query.</p>
 
 <h2>Why not a bigger window</h2>
-<p>A larger window moves the wall without removing it, and every token in context is paid on every turn of the session. A 5 GB history searched in under a millisecond and returned as a 1.5 KB digest is a different shape of answer than a 200k-token window that holds the same history and charges for it continuously.</p>
+<p>A larger window moves the wall without removing it, and every token in context is paid on every turn of the session. A 5 GB history searched in milliseconds and returned as a 1.5 KB digest is a different shape of answer than a 200k-token window that holds the same history and charges for it continuously.</p>
 
 <h2>The part that is not about this</h2>
 <p>The index covers every agent's transcripts on the machine — <a href="where-sessions-are-stored.html">each in its own format</a> — including sessions from before deja was installed. Indexing and search are local: no model, no embeddings, nothing leaves the machine (<a href="privacy.html">privacy</a>).</p>

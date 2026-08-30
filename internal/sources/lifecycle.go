@@ -31,7 +31,28 @@ type Lifecycle struct {
 // Binding the state to the session rather than hoping the correction wins the
 // ranking is the difference between recording a lifecycle and using one.
 func PromotedLifecycles() map[string]Lifecycle {
-	return promotedLifecyclesFrom(NotesFile())
+	path := NotesFile()
+	size, mod, statOK := notesStamp(path)
+	notesMemo.Lock()
+	if notesFresh(path, size, mod, statOK) && notesMemo.states != nil {
+		out := notesMemo.states
+		notesMemo.Unlock()
+		return out
+	}
+	notesMemo.Unlock()
+
+	out := promotedLifecyclesFrom(path)
+	notesMemo.Lock()
+	if statOK {
+		if !notesFresh(path, size, mod, statOK) {
+			notesMemo.path, notesMemo.size, notesMemo.mod = path, size, mod
+			notesMemo.stamped, notesMemo.notes = true, nil
+		}
+		notesMemo.states = out
+	}
+	notesMemo.parses++
+	notesMemo.Unlock()
+	return out
 }
 
 func promotedLifecyclesFrom(path string) map[string]Lifecycle {

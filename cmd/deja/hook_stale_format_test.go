@@ -48,8 +48,8 @@ func TestStaleFormatHooksAskForARebuild(t *testing.T) {
 	// request has to happen ahead of the cache read — and the cached digest is
 	// the user's own history, so it must still be served.
 	cwd, _ := os.Getwd()
-	writeHookCache(dir, cwd, "an earlier digest", 1, 10, nil, 0, nil)
-	if d, _, _, _, _, _ := cachedHookDigest(dir); d == "" {
+	writeHookCache(dir, cwd, "an earlier digest", 1, 10, nil, 0, nil, nil)
+	if d, _, _, _, _, _, _ := cachedHookDigest(dir); d == "" {
 		t.Error("a cache hit stopped serving the user's own history")
 	}
 	if spawned != 2 {
@@ -106,7 +106,7 @@ func TestDamagedIndexHooksAskForARebuild(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "warmup.sentinel")); err != nil {
 		t.Fatal(err)
 	}
-	if d, _, _, _, _, _ := hookDigestResult(dir); d != "" {
+	if d, _, _, _, _, _, _ := hookDigestResult(dir); d != "" {
 		t.Errorf("hook-context answered from a damaged index: %q", d)
 	}
 	if spawned != 2 {

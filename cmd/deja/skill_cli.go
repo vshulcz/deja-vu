@@ -123,6 +123,16 @@ func removeCLISkill() error {
 	if err := os.Remove(path); err != nil {
 		return err
 	}
+	// The same two rules the deja-history skill has: put back what install
+	// replaced, and drop a backup that is deja's own words rather than leaving
+	// them on a machine deja was removed from (#2581, #2585, #2596).
+	restored, rerr := restoreReplacedGuidance(path, "")
+	if rerr != nil {
+		return rerr
+	}
+	if restored {
+		return nil
+	}
 	// Only the directory deja named itself, and only a real one: os.Remove
 	// unlinks a symlink whatever stands behind it, so a skills tree someone
 	// keeps in their dotfiles would go while the skills it points at stayed

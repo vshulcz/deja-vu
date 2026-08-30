@@ -88,6 +88,17 @@ func dropEmptyYAMLKey(s, key string) string {
 	return strings.Join(out, "\n")
 }
 
+// keepTrailingNewline gives back what the reader's file ended with. Dropping an
+// empty key takes the blank lines after it, and the last of those is the file's
+// own final newline — so a config someone owned came back without it, a diff in
+// their dotfiles for nothing (#2606).
+func keepTrailingNewline(old, next string) string {
+	if strings.HasSuffix(old, "\n") && next != "" && !strings.HasSuffix(next, "\n") {
+		return next + "\n"
+	}
+	return next
+}
+
 func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(gooseConfigDir(), "config.yaml")
 	old, err := os.ReadFile(path)
@@ -121,7 +132,7 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
-	a, err := writeIfChanged(path, old, []byte(next))
+	a, err := writeIfChanged(path, old, []byte(keepTrailingNewline(string(old), next)))
 	if err != nil {
 		return installResult{}, err
 	}
@@ -129,8 +140,17 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 	// to rewrite the config would leave a command pointing at a file that is
 	// no longer there, which fails when someone types /deja rather than now.
 	if uninstall {
-		if err := os.Remove(recipe); err != nil && !os.IsNotExist(err) {
-			return installResult{}, err
+		if !restoredGuidance[recipe] {
+			if err := os.Remove(recipe); err != nil && !os.IsNotExist(err) {
+				return installResult{}, err
+			}
+			// And put back the recipe install replaced, or drop the copy when
+			// it holds deja's own — the rules the skills and command files
+			// have since #2581 and #2600. Without it the reader's recipe was
+			// destroyed and their copy left as a .bak beside nothing (#2602).
+			if _, err := restoreReplacedFile(recipe, mentionsDeja); err != nil {
+				return installResult{}, err
+			}
 		}
 	}
 	return installResult{Path: path, Action: a}, nil

@@ -36,11 +36,33 @@ const (
 	// field costs 2.7 KB across that corpus — the exactness is nearly free.
 	frictionSessionCap = 256
 	frictionLineMin    = 20
-	frictionLineMax    = 120
+	// The cap is about recognising a line, not about how much of it fits on a
+	// screen — every surface that prints one clips it to the width it has. Set
+	// at 120 it dropped the errors that carry a path: a build naming a module
+	// and a file, a registry naming an image, a database naming a host. Over
+	// the store on this machine that was 2,319 lines naming a wall the list
+	// knows, against 7,053 it recognised — a third again, thrown away for
+	// length alone, and 1,406 of them fit inside 160 (#2438). A bound there
+	// still is: a page of output pasted as one line is nobody's recognisable
+	// wall, and hashing it makes a new wall every run.
+	frictionLineMax = 200
 	// FrictionMinSessions is how many separate sessions must hit an error
 	// before it is worth saying. Twice is a coincidence.
 	FrictionMinSessions = 3
 )
+
+// FrictionSignature is FrictionLine plus the signature the line hashes to, for
+// a caller that groups runs of one failure rather than lines of text. The
+// numbers a machine hands out — a port, a pid, an ip — are masked in the
+// signature and kept in the line, so a listing can count the runs together and
+// still show one that was really printed (#2375).
+func FrictionSignature(l string) (string, uint64, bool) {
+	line, ok := FrictionLine(l)
+	if !ok {
+		return line, 0, false
+	}
+	return line, frictionHash(line), true
+}
 
 // FrictionLine reports whether a line of tool output names something specific
 // that went wrong, and returns it in the form two sessions can be compared on.
@@ -73,6 +95,99 @@ func normalizeFriction(l string) string {
 		return l
 	}
 	return strings.TrimSpace(rest[second+2:])
+}
+
+// volatileDigits is how long a digit run has to be before it reads as something
+// the machine handed out rather than something the error says.
+const volatileDigits = 4
+
+// maskIPv4 replaces a dotted quad with a placeholder. The digit-run rule below
+// cannot reach it: an octet is one to three digits, which is the length an exit
+// code has, so `10.0.0.7` and `10.0.0.9` would stay two different walls for one
+// service being unreachable (#2369).
+func maskIPv4(l string) string {
+	var b strings.Builder
+	b.Grow(len(l))
+	for i := 0; i < len(l); {
+		if l[i] < '0' || l[i] > '9' {
+			b.WriteByte(l[i])
+			i++
+			continue
+		}
+		if end, ok := ipv4At(l, i); ok {
+			b.WriteString("<ip>")
+			i = end
+			continue
+		}
+		// Not a quad: copy the run whole so the scan cannot split a number.
+		j := i
+		for j < len(l) && l[j] >= '0' && l[j] <= '9' {
+			j++
+		}
+		b.WriteString(l[i:j])
+		i = j
+	}
+	return b.String()
+}
+
+// ipv4At reports where a dotted quad starting at i ends. Four groups of one to
+// three digits, separated by dots, not running into another digit or dot.
+func ipv4At(l string, i int) (int, bool) {
+	pos := i
+	for group := 0; group < 4; group++ {
+		if group > 0 {
+			if pos >= len(l) || l[pos] != '.' {
+				return 0, false
+			}
+			pos++
+		}
+		start := pos
+		for pos < len(l) && l[pos] >= '0' && l[pos] <= '9' {
+			pos++
+		}
+		if n := pos - start; n < 1 || n > 3 {
+			return 0, false
+		}
+	}
+	if pos < len(l) && (l[pos] == '.' || (l[pos] >= '0' && l[pos] <= '9')) {
+		return 0, false
+	}
+	return pos, true
+}
+
+// maskVolatileNumbers replaces long digit runs with a placeholder, so one
+// failure is one wall across the numbers a machine hands out: a port, a pid, an
+// epoch, a goroutine id. Without it `dial tcp 10.0.0.7:5432: connect:
+// connection refused` and the same failure on another port are two signatures
+// — one wall each, below the three-session floor `deja friction` needs, below
+// the second sighting a fix pair needs, and invisible to search's error tier,
+// all at once (#2369).
+//
+// Four digits, not two: an exit code and a status code say which failure this
+// is, and `make: *** [build] Error 1` must not become `Error 2`. Ports, pids,
+// epochs and ids are longer than that; 404 and 500 are not.
+func maskVolatileNumbers(l string) string {
+	l = maskIPv4(l)
+	var b strings.Builder
+	b.Grow(len(l))
+	for i := 0; i < len(l); {
+		if l[i] < '0' || l[i] > '9' {
+			b.WriteByte(l[i])
+			i++
+			continue
+		}
+		j := i
+		for j < len(l) && l[j] >= '0' && l[j] <= '9' {
+			j++
+		}
+		if j-i >= volatileDigits {
+			b.WriteString("<n>")
+		} else {
+			b.WriteString(l[i:j])
+		}
+		i = j
+	}
+	return b.String()
 }
 
 // trimLogPrefix drops the prefixes a runner puts in front of a line it did not
@@ -147,21 +262,45 @@ func isFriction(l string) bool {
 	if namedTestFailure(l) {
 		return true
 	}
-	for _, generic := range []string{
-		"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL",
-	} {
-		if strings.HasPrefix(l, generic) {
-			return false
-		}
-	}
+	// A generic opening — "Error: ", "error: ", a traceback header, a go test
+	// summary line — used to end the question here. It says nothing on its
+	// own, which is why it was listed, but the check ran before the phrase
+	// list and so also threw away every line that goes on to name a wall the
+	// list knows: `Error: Cannot find module ./config` was dropped while
+	// `Cannot find module ./config` was kept (#2432). Nothing is needed in its
+	// place — a line with only a generic opening matches no phrase below and
+	// falls through to false, which is where it belonged.
 	// Tool output carries source as often as it carries results — a `cat` of a
 	// script, a diff, a heredoc. An `echo "App not found: $APP"` inside a
 	// deploy script reached second place on the first run: it is a line about
 	// an error, not an error.
-	for _, source := range []string{"echo ", "\"", "$(", "=~", "print("} {
+	for _, source := range []string{"echo ", "printf ", "$(", "=~", "print("} {
 		if strings.Contains(l, source) {
 			return false
 		}
+	}
+	// A bare double quote used to be on that list, and it cost more than it
+	// caught: tools quote the thing they could not find — `relation "orders"
+	// does not exist`, `repository "…" not found`, `pull access denied for
+	// "acme/api"` — so the same psql failure was friction without its quotes
+	// and invisible with them (#2431). What the quote was there to reject is
+	// still rejected by the markers above and by the two shapes below: a line
+	// that opens with a quoted string, and a JSON pair, which is what a
+	// payload printed into tool output looks like.
+	if strings.HasPrefix(l, "\"") || strings.Contains(l, "\": \"") {
+		return false
+	}
+	// Source that carries an error string is a line about an error, not one.
+	// A bare quote used to stand for this and cost far more than it caught
+	// (#2430): what is left is the punctuation source puts around the quote —
+	// an assignment, a call, a struct field, a code span — none of which
+	// appears in the output a tool prints. Measured over this repo: 130 of the
+	// 192 lines of its own docs and source that read as friction (#2436).
+	if strings.Contains(l, `("`) || strings.Contains(l, `, "`) ||
+		strings.Contains(l, `:= "`) || strings.Contains(l, `= "`) ||
+		strings.Contains(l, `: "`) && strings.HasSuffix(l, `"},`) ||
+		strings.HasPrefix(l, "`") {
+		return false
 	}
 	// A comment about an error is source too, and the wider marker list in
 	// #729 made these reachable: `// panic: this is a comment about panics`
@@ -209,17 +348,40 @@ func isFriction(l string) bool {
 		"statement timeout", "connection reset", "connection timed out",
 		// Failed to build or run.
 		"] error ", "build failed", "compilation failed", "cannot be resolved",
+		// Measured against 24 errors an agent actually hits, the list above
+		// recognised 5 (#2434). These are the rest, each carrying the tool's
+		// own wording rather than the bare subject: "access denied for" is a
+		// server refusing a named user, where "access denied" alone is a
+		// sentence someone writes about roles.
+		"duplicate key value", "deadlock detected", "access denied for",
+		"failed to connect to", "cannot import name", "symbol(s) not found",
+		"failed to push some refs", "acquiring the state lock",
+		"no space left on device",
 	} {
 		if strings.Contains(low, p) {
 			return true
 		}
 	}
+	// A database saying a thing is not there says it in its own shape: the
+	// line opens with the server's ERROR marker. The phrase on its own is a
+	// sentence people write — "the orders table does not exist yet" — so it is
+	// only a wall where the server said it.
+	if strings.HasPrefix(low, "error") && strings.Contains(low, "does not exist") {
+		return true
+	}
 	return false
 }
 
+// FrictionHash is frictionHash for callers outside the package.
+func FrictionHash(line string) uint64 { return frictionHash(line) }
+
 func frictionHash(line string) uint64 {
+	// Masked here rather than in FrictionLine: the numbers a machine hands out
+	// must not split one failure into a wall per run, and the line a reader is
+	// shown should still be the one that was printed, with its real port in it
+	// (#2369).
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(line))
+	_, _ = h.Write([]byte(maskVolatileNumbers(line)))
 	return h.Sum64()
 }
 
@@ -284,6 +446,63 @@ func hitFromRecords(recs []Record) []uint64 {
 	return out
 }
 
+// PromotedNoteMetas returns the sessions that carry a promoted note's state —
+// the shape a decision has after it crosses a machine boundary, where the local
+// notes file knows nothing about it. Manifest only, so a caller in a hook pays a
+// map walk rather than a read (#2510).
+//
+// allow gates a session's project the way TopFriction's does.
+func PromotedNoteMetas(dir string, allow func(project string) bool) []SessionMeta {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	var out []SessionMeta
+	for _, meta := range m.Sessions {
+		if meta.Lifecycle == "" {
+			continue
+		}
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		out = append(out, meta)
+	}
+	return out
+}
+
+// FrictionSessions counts the sessions that hit one wall, by the signature a
+// FixPair carries. The manifest already holds every session's hashes and is
+// cached, so a caller in a hook pays a map walk rather than a read — which is
+// what lets the line that arrives at the moment of a failure say how often this
+// machine has been here (#2491).
+//
+// allow gates a session's project the way TopFriction's does.
+func FrictionSessions(dir string, sig uint64, allow func(project string) bool) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, meta := range m.Sessions {
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		for _, h := range meta.Hit {
+			if h == sig {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
+
 // FindFriction picks the wall worth showing on a screen with room for one. See
 // TopFriction for allow.
 func FindFriction(dir string, allow func(project string) bool) (Friction, bool) {
@@ -343,27 +562,30 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 		}
 		return cs[i].hash < cs[j].hash
 	})
-	if n > 0 && len(cs) > n {
-		cs = cs[:n]
-	}
-	// Recover every winning text in one pass per session rather than one pass
-	// per wall: the same session usually carries several of them.
+	// Recovered as the ranking is walked, not after a cut: `meta.Hit` is a
+	// union that never forgets while the text is read back out of the records,
+	// so a rewritten transcript leaves a hash nothing can show. Cutting first
+	// spent the slot on it — a wall like that at the top left `deja brief`
+	// with no friction line at all and the next wall unreported (#2544).
+	//
+	// Every hash still shares one pass per session: a session usually carries
+	// several walls, and each read fills in whatever it holds.
 	want := map[uint64]string{}
 	for _, c := range cs {
 		want[c.hash] = ""
 	}
-	for _, c := range cs {
-		if want[c.hash] != "" {
-			continue
-		}
-		frictionTexts(dir, m, c.metas, want, c.hash)
-	}
 	var out []Friction
 	for _, c := range cs {
+		if want[c.hash] == "" {
+			frictionTexts(dir, m, c.metas, want, c.hash)
+		}
 		if want[c.hash] == "" {
 			continue
 		}
 		out = append(out, Friction{Text: want[c.hash], Sessions: c.metas, Last: c.metas[0].Updated})
+		if n > 0 && len(out) == n {
+			break
+		}
 	}
 	return out
 }

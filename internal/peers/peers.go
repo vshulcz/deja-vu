@@ -288,7 +288,13 @@ func forgetLocked(host string) (bool, error) {
 	out := list[:0:0]
 	found := false
 	for _, p := range list {
-		if identity(p.Host) == identity(host) {
+		// Either name reaches the row. The ssh host is what the peer was added
+		// under; the machine name is what it calls itself, and it is the word
+		// every surface prints for work that came from there — `deja last`,
+		// recall lines, the doctor imported rows — so it is the word a reader
+		// is likeliest to have in hand (#2405).
+		if identity(p.Host) == identity(host) ||
+			(p.Machine != "" && identity(p.Machine) == identity(host)) {
 			found = true
 			continue
 		}

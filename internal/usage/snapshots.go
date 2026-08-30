@@ -178,12 +178,21 @@ func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, id
 // does record ids — turned out to be re-serving 74 sessions at a 92% repeat
 // rate (#2038). A number nobody can compute is a number nobody fixes.
 func RecordDigestPolicySessions(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids []string) {
+	RecordDigestPolicySessionsFrom(indexDir, kind, digest, into, sessions, raw, policyName, ids, nil)
+}
+
+// RecordDigestPolicySessionsFrom also records which projects the digest was
+// built from. A session-start block can carry content that names no project at
+// all — the environment block is aggregated from every project's walls — and
+// without the field a forget of one of them could not reach the stored text
+// (#2349).
+func RecordDigestPolicySessionsFrom(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids, projects []string) {
 	// One instant for one act: the two writers used to take their own, which
 	// left `deja log` and `deja log --last` disagreeing about when an
 	// injection happened (#2294).
 	at := time.Now().UTC()
 	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
-	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, nil, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
 // SnapshotOnly stores the digest text without writing a counting event, for
@@ -268,23 +277,27 @@ func snapshotWriteIntoAt(indexDir, kind, digest, into string, sessions int, poli
 	if err != nil {
 		return
 	}
-	// The record's own size decides how much room the rotation has to leave.
-	rotateSnapshots(p, len(b)+1)
-	// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
-	// the reason the usage log opens the same way (#1901).
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
-	if err != nil {
-		return
-	}
-	defer func() { _ = f.Close() }()
-	// A process killed between a record and its newline costs that record. It
-	// cost every later one too: appended onto the partial line, the new digest
-	// parsed as nothing either, and `deja log --last` reported no injection at
-	// all on a machine that had just served two (#1965).
-	if atomicfile.EndsMidLine(f) {
-		b = append([]byte{'\n'}, b...)
-	}
-	_, _ = f.Write(append(b, '\n'))
+	// Under the lock with the rotation: both are this file's writers, and a
+	// forget sweep rewriting it in between wrote the append away (#2413).
+	withLogLock(p, func() {
+		// The record's own size decides how much room the rotation has to leave.
+		rotateSnapshots(p, len(b)+1)
+		// O_RDWR rather than O_WRONLY: the append needs to read the last byte, for
+		// the reason the usage log opens the same way (#1901).
+		f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
+		if err != nil {
+			return
+		}
+		defer func() { _ = f.Close() }()
+		// A process killed between a record and its newline costs that record. It
+		// cost every later one too: appended onto the partial line, the new digest
+		// parsed as nothing either, and `deja log --last` reported no injection at
+		// all on a machine that had just served two (#1965).
+		if atomicfile.EndsMidLine(f) {
+			b = append([]byte{'\n'}, b...)
+		}
+		_, _ = f.Write(append(b, '\n'))
+	})
 }
 
 func rotateSnapshots(p string, incoming int) {
@@ -494,6 +507,16 @@ func boundTerms(terms []string) []string {
 // rather than left to be discovered.
 func ForgetSnapshots(indexDir string, drop func(Snapshot) bool) (int, error) {
 	p := SnapshotPath(indexDir)
+	var gone int
+	var err error
+	// The read and the replace are one operation: an injection appended
+	// between them was written over, and an agent's record of what it received
+	// went with it (#2413).
+	withLogLock(p, func() { gone, err = forgetSnapshotsLocked(p, drop) })
+	return gone, err
+}
+
+func forgetSnapshotsLocked(p string, drop func(Snapshot) bool) (int, error) {
 	snaps := snapshotsFrom(p, 0) // last appended first
 	if len(snaps) == 0 {
 		return 0, nil

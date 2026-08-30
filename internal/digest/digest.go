@@ -33,6 +33,32 @@ func Share(s model.Session, budget int) string {
 	fmt.Fprintf(&b, "- Project: %s\n", oneLine(s.Project))
 	fmt.Fprintf(&b, "- Harness: %s\n", s.Harness)
 	fmt.Fprintf(&b, "- Date: %s\n\n", date)
+	// appendSectionWithin is appendSection held to a smaller ceiling, so a
+	// section that could fill the block leaves room for the one after it.
+	appendSectionWithin := func(title string, messages []model.Message, ceiling int) {
+		if len(messages) == 0 || b.Len() >= ceiling {
+			return
+		}
+		fmt.Fprintf(&b, "## %s\n\n", title)
+		for _, m := range messages {
+			if b.Len() >= ceiling {
+				break
+			}
+			text := MessageText(m.Text)
+			if text == "" {
+				continue
+			}
+			chunk := fmt.Sprintf("%s\n\n", text)
+			// At a message boundary, with no cut marker: the marker promises
+			// that nothing follows it, and something does — the section this
+			// ceiling exists to leave room for. The block's closing sentence
+			// already tells the reader it is a compact slice.
+			if b.Len()+len(chunk) > ceiling {
+				break
+			}
+			b.WriteString(chunk)
+		}
+	}
 	appendSection := func(title string, messages []model.Message) {
 		if len(messages) == 0 || b.Len() >= budget {
 			return
@@ -72,8 +98,23 @@ func Share(s model.Session, budget int) string {
 			assistants = append(assistants, m)
 		}
 	}
-	appendSection("User problem statement(s)", dedupeStatus(users))
-	appendSection("Key assistant conclusions / code blocks", dedupeStatus(selectConclusions(assistants)))
+	// Half the budget for the question, half for the answer. The sections were
+	// written in order until the budget ran out, so a long session — where the
+	// user side is mostly "go on" — spent the whole block on problem
+	// statements and handed over no conclusions at all, which is the half a
+	// receiving agent cannot re-derive (#2462). A short session is unaffected:
+	// the reserve only binds when the first section would have eaten it.
+	conclusions := dedupeStatus(selectConclusions(assistants))
+	if len(conclusions) > 0 {
+		if reserved := budget / 2; reserved > 0 {
+			appendSectionWithin("User problem statement(s)", dedupeStatus(users), budget-reserved)
+		} else {
+			appendSection("User problem statement(s)", dedupeStatus(users))
+		}
+	} else {
+		appendSection("User problem statement(s)", dedupeStatus(users))
+	}
+	appendSection("Key assistant conclusions / code blocks", conclusions)
 	return strings.TrimSpace(b.String()) + "\n"
 }
 
@@ -225,6 +266,10 @@ func looksLikeDataDump(t string) bool {
 // cutMarker is how this package says a passage was cut. It ends the block, so
 // it carries the paragraph break with it.
 const cutMarker = "…\n\n"
+
+// cutMark is the marker without its trailing blank line, for a caller checking
+// how a block ended.
+const cutMark = "…"
 
 // cutMarked trims a passage to n bytes and says that it was cut. A block handed
 // to a person or an agent that simply stops reads as a finished thought, and the
@@ -420,6 +465,27 @@ func Handoff(s model.Session, budget int) string {
 	if i := strings.Index(body, "\n"); i > 0 && strings.HasPrefix(body, "# deja share:") {
 		body = strings.TrimSpace(body[i:])
 	}
+	// The marker says the passage before it was cut and that the block ends
+	// there — that is the rule Share and the tail each keep on their own. The
+	// handoff composes them, and put a whole section, four messages and a
+	// closing paragraph after it, so the marker stopped meaning anything
+	// (#2464). Ending the body at the last thing said in full costs the
+	// fragment and keeps the promise; what the block loses, its closing
+	// sentence already says how to fetch.
+	if trimmed := strings.TrimRight(body, " \t\n"); strings.HasSuffix(trimmed, cutMark) {
+		// Back to the last thing said in full. Only a marker Share itself
+		// wrote is treated as one, and it is always the last thing in the
+		// body — searching for the character anywhere would cut the block at
+		// an ellipsis somebody typed.
+		body = strings.TrimRight(trimmed[:len(trimmed)-len(cutMark)], " \t\n")
+		if i := strings.LastIndex(body, "\n\n"); i >= 0 {
+			body = strings.TrimRight(body[:i], " \t\n")
+		}
+		// A section header with nothing left under it says less than nothing.
+		if i := strings.LastIndex(body, "\n\n## "); i >= 0 && !strings.Contains(body[i+4:], "\n\n") {
+			body = strings.TrimRight(body[:i], " \t\n")
+		}
+	}
 	b.WriteString(body)
 	if tail := tailSection(s, budget-b.Len()); tail != "" {
 		b.WriteString("\n\n## Where it stopped\n\n")
@@ -514,6 +580,10 @@ func Short(s string) string {
 // sessions, where 95% of the transcript is status chatter around a few
 // sentences that actually explain what happened and why.
 var decisionMarkers = []string{
+	// "decision:" with the colon, which is how an agent labels one when it is
+	// writing for a reader rather than talking: the bare word is ordinary
+	// ("that decision is yours"), the labelled one is the line itself (#2526).
+	"decision:", "решение:",
 	"root cause", "because", "the fix", "fixed", "decided", "instead of",
 	"turned out", "the problem was", "solution", "so the answer", "conclusion",
 	"works now", "passes now", "merged", "released", "chose", "won't work",
@@ -726,6 +796,19 @@ func Conclusions(s model.Session, budget int, max int) []string {
 			// options" arrived without the "and then reverted that" it ended on,
 			// which is the opposite of what the session concluded (#1336).
 			if line = firstSentences(line, 1); spent+len(line) > budget {
+				// Unless one line is the whole answer. Measured on this
+				// machine's index at the tool hook's budget: of 120 sessions,
+				// 29 yielded no conclusion and 16 of those had one — a sentence
+				// a few bytes too long, answered with silence (#2518). A caller
+				// asking for one line is the shape where nothing follows the
+				// cut, so it can be marked the way every other surface marks
+				// one; a caller asking for several keeps the old rule, since
+				// there text would follow the marker.
+				if max == 1 && len(out) == 0 {
+					if cut := markedCut(line, budget); cut != "" {
+						out = append(out, cut)
+					}
+				}
 				break
 			}
 		}
@@ -755,6 +838,21 @@ func isCJKSentenceEnd(r rune) bool {
 		return true
 	}
 	return false
+}
+
+// markedCut is a conclusion held to a budget it does not fit, ending in the
+// marker that says so. Rune-safe, and it gives back nothing when the budget
+// leaves no room for a readable line rather than a bare marker.
+func markedCut(line string, budget int) string {
+	const mark = "…"
+	if budget <= len(mark)+8 {
+		return ""
+	}
+	cut := strings.TrimRight(UTF8SafeCut(line, budget-len(mark)), " \t")
+	if cut == "" {
+		return ""
+	}
+	return cut + mark
 }
 
 // firstSentences keeps the opening n sentences of a message: a conclusion

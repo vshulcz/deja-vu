@@ -196,6 +196,19 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 // planWallSharesTerm reports whether the wall's own text names one of the
 // plan's informative terms. This is the cooccurrence claim itself, so unlike
 // a command match it is never optional.
+//
+// What it costs, measured on a real index of 24 recurring walls (#2489): 3 of
+// them share a word of four characters or more with the title of a session
+// that hit them or with one of that session's touched files. The rest are tool
+// vocabulary — "ModuleNotFoundError: No module named 'yaml'", "make: ***
+// [test] Error 1", "Connection timed out during banner exchange" — while the
+// work around them is named in project words. A plan step often names a
+// command, which meets a wall the title never would, so 3 of 24 is a floor
+// rather than the rate; the shape holds either way. The session selection
+// above already carries a cooccurrence claim of its own — these sessions,
+// doing work this plan names, hit this wall — and this gate is a second filter
+// on top of it. Loosening it trades silence for false alarms, with
+// FrictionMinSessions standing between the two.
 func planWallSharesTerm(wallText string, steps [][]planIndexedTerm) bool {
 	for _, terms := range steps {
 		for _, term := range terms {

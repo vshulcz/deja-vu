@@ -60,6 +60,15 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
 	if !planIndexReady(dir) {
+		// Ask, do not build. #777 gave the per-prompt and session-start hooks
+		// this: an index in a format this build cannot read answers nothing,
+		// which reads as a user with no history, and nothing else asks for the
+		// rebuild that fixes it. A spawned subagent reaches only these hooks —
+		// install.go says so where it wires Task and Agent — so without this a
+		// fleet works against a stale index until its parent types something
+		// (#2567). requestWarmup writes a sentinel and detaches a child; the
+		// action pays neither the read nor the wait.
+		requestWarmup(dir)
 		return nil
 	}
 	// A payload the decoder could not read has no tool name either, and the
@@ -276,14 +285,28 @@ func fixPairLine(dir, output string) string {
 		return pol.Allows(policy.ActivationAuto, project)
 	})
 	for _, p := range pairs {
-		if line := fixLine(p); line != "" {
+		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
 			return line
 		}
 	}
 	return ""
 }
 
-func fixLine(p index.FixPair) string {
+// frictionCount is how many sessions hit this error, scoped the way the line
+// that reports it is scoped: the pair names a project, so the count is that
+// project's, and a machine-wide pair counts machine-wide. Same trust rule as
+// the pair itself.
+func frictionCount(dir string, p index.FixPair, pol policy.Policy) int {
+	project := strings.TrimSpace(p.Project)
+	return index.FrictionSessions(dir, p.Sig, func(proj string) bool {
+		if !pol.Allows(policy.ActivationAuto, proj) {
+			return false
+		}
+		return project == "" || proj == project
+	})
+}
+
+func fixLine(p index.FixPair, sessions int) string {
 	// Some harnesses store the command with the prompt they printed it after;
 	// the line reads as an instruction, so it should not start with a shell
 	// prompt the reader would have to mentally strip.
@@ -298,7 +321,33 @@ func fixLine(p index.FixPair) string {
 	if !p.When.IsZero() {
 		when = " (" + p.When.Local().Format("2006-01-02") + ")"
 	}
-	return "deja: this error came up here before" + when + " — what followed it: " + cmd
+	// "here" read as this project, and the lookup is machine-wide on purpose —
+	// an error signature is closer to an environment fact than to project
+	// history, which is what the command line and the environment block say out
+	// loud. The pair carries its project, so the line can name whose command it
+	// is offering rather than implying it is this checkout's (#2363).
+	where := "on this machine"
+	if project := strings.TrimSpace(search.SafeLine(p.Project)); project != "" {
+		where = "in " + project
+	}
+	// How often, not just that it happened: "came up before" reads as a
+	// coincidence where "came up in 12 sessions" reads as a property of this
+	// machine. friction, the environment block and the plan finding all lead
+	// with the count; this line, the one that arrives at the moment of the
+	// failure, said only "before" (#2491).
+	how := ""
+	if sessions > 1 {
+		how = " in " + toolSessionCount(sessions)
+	}
+	// A single sighting is said as one. Two sessions doing the same thing after
+	// the same error is evidence it worked; one session doing something is what
+	// one session did, and an agent handed it at the moment it is stuck has to
+	// be told which of the two it is holding.
+	if p.Candidate {
+		return "deja: this error came up" + how + " " + where + " before" + when +
+			" — one session ran this after it, and nothing confirms it worked: " + cmd
+	}
+	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }
 
 // exitMarker is the shape a source appends when it knows what a command

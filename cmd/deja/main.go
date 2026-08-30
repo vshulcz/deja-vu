@@ -150,8 +150,11 @@ var commands = map[string]command{
 	"remember":      runRemember,
 	"promote":       func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
 	"forget":        runForget,
-	"mcp":           func(dir string, _ []string) error { return serveMCP(dir, os.Stdin, os.Stdout) },
+	"mcp":           func(dir string, _ []string) error { return serveMCPProcess(dir, os.Stdin, os.Stdout) },
 	"hook-prompt": func(dir string, rest []string) error {
+		if sayIfTypedByHand("hook-prompt") {
+			return nil
+		}
 		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
 		return runHookPromptMode(dir, os.Stdin, os.Stdout, plain)
 	},
@@ -159,12 +162,21 @@ var commands = map[string]command{
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},
 	"hook-plan": func(dir string, _ []string) error {
+		if sayIfTypedByHand("hook-plan") {
+			return nil
+		}
 		return runHookPlan(dir, os.Stdin, os.Stdout)
 	},
 	"hook-tool": func(dir string, _ []string) error {
+		if sayIfTypedByHand("hook-tool") {
+			return nil
+		}
 		return runHookTool(dir, os.Stdin, os.Stdout)
 	},
 	"hook-tool-after": func(dir string, _ []string) error {
+		if sayIfTypedByHand("hook-tool-after") {
+			return nil
+		}
 		return runHookToolAfter(dir, os.Stdin, os.Stdout)
 	},
 	"check": func(dir string, rest []string) error {
@@ -516,8 +528,46 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		fmt.Fprintln(os.Stderr, note)
 	}
 	printSpawnEdges(os.Stderr, dir, s)
+	// A pasted log is one message, and the index keeps the head of it. The
+	// window note above says when messages were left out; nothing said when a
+	// message was, so a reader searching a log for the line that explains a
+	// failure searched one they believed was whole (#2467).
+	if line := clippedMessageNote(dir, s); line != "" {
+		fmt.Fprintln(os.Stderr, line)
+	}
 	search.PrintSession(os.Stdout, s)
 	return nil
+}
+
+// clippedMessageNote says that a message in this session was stored short of
+// what the transcript holds. The count is the store's, not this session's —
+// deja records it per file at ingest — so the line names the session's own
+// file and leaves the arithmetic to `deja doctor`.
+func clippedMessageNote(dir string, s model.Session) string {
+	if s.Path == "" {
+		return ""
+	}
+	files := index.IngestFilesReport(dir)
+	e, ok := files[s.Path]
+	if !ok || e.Clipped == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja: %s stored short of what the transcript holds — the rest of %s is in the file itself",
+		pluralMessages(e.Clipped), pluralThem(e.Clipped))
+}
+
+func pluralMessages(n int) string {
+	if n == 1 {
+		return "one message was"
+	}
+	return fmt.Sprintf("%d messages were", n)
+}
+
+func pluralThem(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
 }
 
 // showWindowNote is what the terminal says about a slice: which messages it
@@ -884,6 +934,12 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
 		fmt.Fprintln(os.Stderr, note)
 	}
+	// And the other rule that withholds rows here. It filters inside the index
+	// (#2541), so the count comes from the manifest rather than from what came
+	// back — the same walk the listing has just done, over metas already read.
+	if note := ignoredHiddenNote(index.IgnoredMatching(dir, o)); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
 	if len(ss) == 0 {
 		if o.JSON {
 			return printRecentJSONWithheld(os.Stdout, nil, sourceInstance, policyHidden)
@@ -1206,12 +1262,27 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 			fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), o.Total)
 		}
 	}
+	// The answer can also be short for a reason no flag lifts. Counted over the
+	// sessions holding every term, so an ordinary search in a store with a big
+	// ignored tree stays quiet (#2562).
+	if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(o.Query))); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
 	// The window this is being printed into, so the lines can be budgeted
 	// rather than assumed 80 wide. Only for a terminal: a pipe gets the whole
 	// line, since a script reading deja wants the text and not the layout
 	// (#604).
 	o.Width = printableWidth(os.Stdout)
-	search.Print(os.Stdout, hits, o)
+	// Through a counter, so the log records what actually went out rather than
+	// a guess at it. `deja log` is the audit of what deja did, and the search
+	// kind has been named in the docs, in the comment over the kind constants
+	// and in the empty-log line since #47 while nothing ever wrote one (#2471).
+	// It stays out of every count: servedKind and injectedKind both exclude it,
+	// so the statusline and the impact screen still speak only for memory that
+	// reached an agent.
+	counted := &countingWriter{w: os.Stdout}
+	search.Print(counted, hits, o)
+	usage.RecordResult(dir, usage.KindSearch, counted.n, len(hits), len(hits) == 0)
 	// A wrong guess at a command name falls through to search, and the hint
 	// that names it ran only on an empty result — so a typo whose word happens
 	// to be in the history got a conversation back and nothing about the
@@ -1429,6 +1500,12 @@ func printNoMatches(w io.Writer, dir, q string, regex bool) {
 		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
 	} else {
 		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
+	}
+	// Before advising fewer words: the sessions that hold every one of them may
+	// exist and be covered by the ignore rule, in which case rewording is the
+	// wrong advice and the count is the answer (#2562).
+	if note := ignoredHiddenNoteFor("answer", index.IgnoredWithAllTerms(dir, query.Tokens(q))); note != "" {
+		fmt.Fprint(w, note)
 	}
 	// Which word to drop is the reader's next question, and deja read the
 	// per-term counts to decide there was no intersection (#826).
@@ -1812,7 +1889,12 @@ func isSubcommand(word string) bool {
 // resolve the same way and still picked in silence — promote records a state
 // against whichever session it chose (#872).
 func noteAmbiguousPrefix(dir, id, action string) {
-	n := index.PrefixMatches(dir, id)
+	// Counted under the rule the reader is searching by: a session the policy
+	// withholds is not one they can reach with a longer prefix (#2401).
+	pol := policy.Load()
+	n := index.PrefixMatchesAllowed(dir, id, func(project string) bool {
+		return pol.Allows(policy.ActivationSearch, project)
+	})
 	if n <= 1 {
 		return
 	}
@@ -2517,6 +2599,7 @@ func printSources(dir string) {
 		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.RooTaskFiles, sources.LoadRoo},
 		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},
 		{"omp", sources.OmpRoot(), []string{sources.OmpRoot()}, sources.OmpSessionFiles, sources.LoadOmp},
+		{"prime", sources.PrimeRoot(), []string{sources.PrimeRoot()}, sources.PrimeSessionFiles, sources.LoadPrime},
 		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles, sources.LoadOpenClaw},
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},

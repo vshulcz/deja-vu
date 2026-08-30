@@ -76,6 +76,11 @@ type viewPage struct {
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
 	PreviewCount  int
+	// PolicyRule names the rule that held things back, as the CLI note names
+	// it — the activation and what it allows. Not the file it lives in: that
+	// path sits under the reader's home directory and this page is meant to be
+	// passed around (#2354).
+	PolicyRule string
 	// SessionsWithheld is how many sessions a trust rule kept off the page.
 	SessionsWithheld int
 	// NotesWithheld is how many promoted notes a trust rule kept off the page.
@@ -190,6 +195,10 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		// at and passes on, and a page a rule emptied read as a machine with
 		// no history at all — the misread #2319 closed on friction (#2321).
 		SessionsWithheld: policyHidden,
+		// The activation as well as the rule, the way the CLI note reads it:
+		// on a machine whose activations differ, "local-only" alone reads as
+		// deja's one rule rather than the browsing one (#2367).
+		PolicyRule: policy.ActivationSearch + ": " + policy.Load().Describe(policy.ActivationSearch),
 	}
 	if len(metas) > 0 {
 		page.DateEnd = metas[0].Updated.Local().Format("2006-01-02")
@@ -242,6 +251,13 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	// from search, the listing and the agent. Same gap as the digests above,
 	// with the project known exactly rather than recognised in prose (#2317).
 	loaded, page.NotesWithheld = notesAllowedOnPage(loaded)
+	// A decision promoted on another machine arrives as a session carrying its
+	// state, and recall and the tool hook both read it as a decision (#975).
+	// The tab that holds decisions was built from this machine's notes file
+	// alone, so the one place a synced decision is named as one was the one
+	// place it did not appear (#2421). metas is already filtered by the same
+	// rule the local notes are.
+	loaded = append(loaded, importedDecisions(metas)...)
 	// By date, newest first: LoadPromotedNotes returns them in the order they
 	// were first written to the file, so cutting that keeps an arbitrary set
 	// rather than the newest — and the page's own order was the file's.
@@ -418,6 +434,32 @@ func snapshotWithheld(pol policy.Policy, sn usage.Snapshot, hidden map[string]bo
 // digest of your own work missing from a page you can regenerate. forget looks
 // only where a digest renders a project, because there the cost is deleting a
 // record that cannot come back (#2330).
+
+// importedDecisions turns the sessions that arrived carrying a lifecycle state
+// into notes the page can render beside the local ones. The session's own text
+// opens with the state and the source, which the note fields carry separately,
+// so the title is the state's own note and the text is what the other machine
+// wrote.
+func importedDecisions(metas []model.Session) []sources.PromotedNote {
+	out := make([]sources.PromotedNote, 0)
+	for _, m := range metas {
+		if m.Lifecycle == "" || !sources.NoteStates[m.Lifecycle] {
+			continue
+		}
+		when := m.Updated
+		if t, err := time.Parse(time.RFC3339, m.LifecycleAt); err == nil {
+			when = t
+		}
+		text := m.LifecycleNote
+		if strings.TrimSpace(text) == "" {
+			text = m.Title
+		}
+		out = append(out, sources.PromotedNote{
+			Project: m.Project, State: m.Lifecycle, Title: m.Title, Text: text, At: when,
+		})
+	}
+	return out
+}
 
 // notesAllowedOnPage drops the promoted notes whose project a rule withholds,
 // and says how many went. Browsing, so the search activation governs it — the

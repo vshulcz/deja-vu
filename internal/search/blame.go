@@ -144,7 +144,15 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		}
 		var mentions []mention
 		for _, message := range session.Messages {
-			count, level := mentionScore(message.Text, base, forms)
+			// The transcript's record of a past `deja blame` names the file in
+			// every line of its own output, so blame ranked its own answer as
+			// the history of the file and quoted it back. Recall was fixed for
+			// this in #2068 and blame reads the same transcripts: measured on
+			// the paths agents actually asked about, the top snippet came back
+			// as "=== deja blame internal/index/retrieval.go …" — deja's own
+			// output, written into the transcript by an agent exercising it.
+			text := withoutOwnReport(withoutOwnCallLog(message.Text))
+			count, level := mentionScore(text, base, forms)
 			if count == 0 {
 				continue
 			}
@@ -152,7 +160,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			if level > specificity {
 				specificity = level
 			}
-			mentions = append(mentions, mention{message.Text, count, level, message.Role})
+			mentions = append(mentions, mention{text, count, level, message.Role})
 		}
 		// A path-shaped mention outranks a bare filename however often the bare
 		// name is repeated; among equally specific ones, the message that keeps
@@ -435,6 +443,11 @@ func BlameLifecycleLine(h BlameHit) string {
 	}
 	var head string
 	switch h.Lifecycle {
+	case "accepted":
+		// The one state that is not a warning. blame answers "who decided
+		// this", so a decision that still stands is the answer rather than a
+		// caveat about it (#2514).
+		head = "this is the standing decision"
 	case "rejected":
 		head = "this was tried and rejected"
 	case "superseded":

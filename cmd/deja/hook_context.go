@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -147,15 +148,34 @@ func joinNotes(a, b string) string {
 // itself, which is why a store can rebuild fine while its own directory is
 // read-only.
 func indexDirWritable(dir string) bool {
-	parent := filepath.Dir(dir)
-	f, err := os.CreateTemp(parent, ".deja-probe-")
-	if err != nil {
+	// The directory the rebuild actually writes into. Probing the parent alone
+	// read a read-only index directory inside a writable parent as writable —
+	// a cache directory owned by another user, a read-only subtree — and the
+	// session start went silent again in the one state that never repairs
+	// itself (#2499). The parent is still the right probe when the index
+	// directory does not exist yet, since deja creates it.
+	// Both, when both exist: a build writes its files inside the index
+	// directory and its lock and temporaries beside it, so either one refusing
+	// is enough to stop it.
+	if !dirWritable(filepath.Dir(dir)) {
 		return false
 	}
-	name := f.Name()
-	_ = f.Close()
-	_ = os.Remove(name)
+	if dirExists(dir) {
+		return dirWritable(dir)
+	}
 	return true
+}
+
+// stuckWiringNote names what the repair could not write. Without it the reader
+// sees the same "deja rewrote its wiring" line on every session start — the
+// repair really is retried each time, because the record stays unstamped until
+// every target takes the new path (#2594).
+func stuckWiringNote(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("deja could not rewire %s — run `deja install %s` to see why; until then this line comes back every session",
+		strings.Join(targets, ", "), targets[0])
 }
 
 // rewireNote is the one line a session start spends on maintenance: which
@@ -180,6 +200,16 @@ func rewireNote(targets []string) string {
 // (#927).
 func buildNotice(dir string) string {
 	if st := readWarmupStatus(dir); st != nil {
+		// On a machine no agent has written to, "indexing your history —
+		// recall comes online when it finishes" is deja's first word to an
+		// agent and none of it is so: there is nothing to read, and recall
+		// starts when some agent writes a transcript, not in a few seconds
+		// (#2407). Same claim the CLI makes about the same machine. A build
+		// that has counted work to do is believed over the store walk: it is
+		// reading something, whatever a later look at the stores finds.
+		if st.Total <= 0 && noAgentHistoryFound() {
+			return "deja: no agent history was found on this machine yet — recall starts once an agent writes a session here; `deja sources` shows where deja looked"
+		}
 		return st.line()
 	}
 	// A rebuild is pending either because one was asked for or because the
@@ -197,12 +227,33 @@ func buildNotice(dir string) string {
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
 			return fmt.Sprintf("deja cannot find the index (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
 		}
-		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", filepath.Dir(dir))
+		// Which of the two states this is decides the sentence. A rebuild
+		// writes the new index beside the old directory and replaces it, so a
+		// read-only index directory inside a writable parent is rebuilt by
+		// `deja index` — measured: permissions come back and the search
+		// answers. What the hook cannot do there is start that rebuild itself,
+		// since the sentinel requestWarmup writes lives inside the read-only
+		// directory. Blaming permissions sent the reader to look at something
+		// that is not the problem (#2502).
+		if dirWritable(filepath.Dir(dir)) {
+			return "deja: the index cannot answer — recall is quiet until `deja index` rebuilds it"
+		}
+		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", unwritableIndexDir(dir))
 	}
 	if !warmupJustRequested(dir) {
 		return ""
 	}
-	return "deja is indexing your history — recall comes online in a few seconds"
+	return "deja is indexing your history — recall comes online when it finishes"
+}
+
+// unwritableIndexDir names the directory to fix: the index directory when that
+// is what cannot be written, its parent when the index directory does not
+// exist yet and the parent is what refuses to hold it.
+func unwritableIndexDir(dir string) string {
+	if dirExists(dir) {
+		return dir
+	}
+	return filepath.Dir(dir)
 }
 
 // indexNeedsRebuild reports that the index on disk cannot answer as it stands:
@@ -239,15 +290,18 @@ func runHookContext(dir string, plain bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	digest, sessions, raw, taskMatched, withheld, servedIDs := cachedHookDigestFor(dir, input.CWD)
+	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, input.CWD)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
 		// helps most. The block is about the machine, not the project, so it
 		// does not depend on the digest having found anything.
-		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
+		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 			out := frameRecall(env)
-			usage.RecordDigestPolicyInto(dir, usage.KindHook, out, input.SessionID, 0, 0, policy.Load().Describe(policy.ActivationAuto))
+			// The block is about the machine and names no project, so without
+			// the projects behind its walls a forget of one of them could not
+			// reach the stored text (#2349).
+			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
 			if plain {
 				fmt.Fprintln(os.Stdout, out)
 				return nil
@@ -258,7 +312,7 @@ func runHookContext(dir string, plain bool) error {
 			// The environment block is not the project's memory, and while a
 			// build runs it is all there is: without this the whole rebuild
 			// passed in silence on any machine with facts to report (#927).
-			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir)))
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
 			if b, err := json.Marshal(resp); err == nil {
 				fmt.Fprintln(os.Stdout, string(b))
 			}
@@ -288,7 +342,7 @@ func runHookContext(dir string, plain bool) error {
 			if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
 				line = joinNotes(note, line)
 			}
-			line = joinNotes(rewireNote(rewired), joinNotes(withheldEverythingNote(dir, withheld), line))
+			line = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), line)))
 			if line != "" {
 				var resp sessionStartHookResponse
 				resp.HookSpecificOutput.HookEventName = "SessionStart"
@@ -319,7 +373,7 @@ func runHookContext(dir string, plain bool) error {
 	}
 	digest = frameRecall(digest)
 	polName := policy.Load().Describe(policy.ActivationAuto)
-	usage.RecordDigestPolicySessions(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs)
+	usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs, servedProjects)
 	// What this project was told, so the next session start can say something
 	// else. Without this the novelty ordering has nothing to read and every
 	// start serves the same three sessions (#2038).
@@ -392,15 +446,17 @@ func runHookContext(dir string, plain bool) error {
 		// receipt into "says: deja: recalled …" on screen. Without it the
 		// sentence reads whole after any host's prefix and still carries the
 		// name for hosts that add none.
-		resp.SystemMessage = joinNotes(rewireNote(rewired), fmt.Sprintf("deja recalled %d prior session%s %s%s%s%s%s",
-			sessions, plural, why, teaching, svc, polNote, earned)+fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest)))))
+		resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
+			fmt.Sprintf("deja recalled %d prior session%s %s%s%s%s%s",
+				sessions, plural, why, teaching, svc, polNote, earned)+
+				fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest))))))
 	}
 	// Nothing to recall yet because the index is still being built: say so
 	// rather than starting in silence. The build runs detached, so the agent
 	// is already usable — this only explains why memory is not here yet.
 	if resp.SystemMessage == "" {
 		if st := readWarmupStatus(dir); st != nil {
-			resp.SystemMessage = joinNotes(rewireNote(rewired), st.line())
+			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), st.line()))
 		}
 	}
 	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
@@ -537,6 +593,10 @@ type hookCacheEntry struct {
 	Withheld    int      `json:"withheld,omitempty"`
 	Raw         int64    `json:"raw"`
 	TaskMatched []string `json:"task_matched,omitempty"`
+	// Projects names the projects behind the digest, so the injection log can
+	// be held to a rule or a forget without reading its prose (#2349). Old
+	// entries decode as none, which is what they carried.
+	Projects []string `json:"projects,omitempty"`
 	// IDs are the sessions this digest carries, so a cache hit logs the same
 	// thing a fresh build does. Without them the session-start hook was the
 	// one surface whose repetition could not be counted at all: 606 injections
@@ -556,7 +616,28 @@ func hookCachePath(dir, cwd string) string {
 // hookDigestResult, which a cache hit never reaches.
 func hookGate() string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
-	return mode + "|" + policy.Load().Describe(policy.ActivationAuto)
+	// The shape of the entry is part of what it was built under: one written
+	// before the digest recorded its projects would be served for its whole
+	// TTL and logged as a digest that came from nowhere (#2349).
+	//
+	// And the notes file, because the block leads with the decisions promoted
+	// in this project. Without it a decision the reader had just removed with
+	// `deja forget` kept being handed to every session start until the TTL ran
+	// out — search agreed it was gone and the block went on quoting it, which
+	// is the one thing the privacy command must not do (#2537). A promotion
+	// made a moment ago has the same problem in reverse. Stat, not read.
+	return "v3|" + mode + "|" + policy.Load().Describe(policy.ActivationAuto) + "|" + notesStamp()
+}
+
+// notesStamp identifies the notes file as it is now. A file that cannot be
+// stat'd stamps as absent, which is itself a state worth telling apart from a
+// file with content in it.
+func notesStamp() string {
+	fi, err := os.Stat(sources.NotesFile())
+	if err != nil {
+		return "none"
+	}
+	return strconv.FormatInt(fi.Size(), 10) + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
 }
 
 // hookCWD is where the hook is standing: what the payload says, else the
@@ -584,7 +665,7 @@ func hookCWD(fromPayload string) string {
 	return cwd
 }
 
-func cachedHookDigest(dir string) (string, int, int64, []string, int, []string) {
+func cachedHookDigest(dir string) (string, int, int64, []string, int, []string, []string) {
 	return cachedHookDigestFor(dir, "")
 }
 
@@ -592,10 +673,10 @@ func cachedHookDigest(dir string) (string, int, int64, []string, int, []string) 
 // project the call is about. The payload is that authority: deja used to write
 // it into its own environment and read it back, which answered a second payload
 // in the same process with the first one's project (#2182, #2185).
-func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int, []string) {
+func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int, []string, []string) {
 	cwd := hookCWD(fromPayload)
 	if strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL"))) == search.RecallOff {
-		return "", 0, 0, nil, 0, nil
+		return "", 0, 0, nil, 0, nil, nil
 	}
 	// Before the cache read: a hit returns without reaching the version guard
 	// in hookDigestResult, so an index left behind by an upgrade was served
@@ -619,15 +700,15 @@ func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string,
 				// the cache off the startup path.
 				requestHookRefresh(dir, cwd)
 			}
-			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs
+			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
 		}
 	}
-	digest, sessions, raw, taskMatched, withheld, ids := hookDigestResultFor(dir, cwd)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids)
-	return digest, sessions, raw, taskMatched, withheld, ids
+	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
+	return digest, sessions, raw, taskMatched, withheld, ids, projects
 }
 
-func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string, withheld int, ids []string) {
+func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string, withheld int, ids, projects []string) {
 	if digest == "" {
 		return
 	}
@@ -686,17 +767,17 @@ func runHookRefresh(dir string) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		return
 	}
-	digest, sessions, raw, taskMatched, withheld, ids := hookDigestResult(dir)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids)
+	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResult(dir)
+	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }
 
 func hookDigest(dir string) string {
-	digest, _, _, _, _, _ := hookDigestResult(dir)
+	digest, _, _, _, _, _, _ := hookDigestResult(dir)
 	return digest
 }
 
-func hookDigestResult(dir string) (string, int, int64, []string, int, []string) {
+func hookDigestResult(dir string) (string, int, int64, []string, int, []string, []string) {
 	return hookDigestResultFor(dir, "")
 }
 
@@ -704,7 +785,7 @@ func hookDigestResult(dir string) (string, int, int64, []string, int, []string) 
 // project the call is about, rather than one reading it back out of the
 // environment, where a project deja itself had written stayed for every later
 // call in the process (#2182, #2185).
-func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int, []string) {
+func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int, []string, []string) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -718,7 +799,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	_ = mark
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
-		return "", 0, 0, nil, 0, nil
+		return "", 0, 0, nil, 0, nil, nil
 	}
 	// A store from an older index version must be rebuilt before it is read:
 	// this path never calls Ensure, so otherwise the first prompts after an
@@ -727,7 +808,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// manifest still describes, and this path answers from them (#800).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return "", 0, 0, nil, 0, nil
+		return "", 0, 0, nil, 0, nil, nil
 	}
 	cwd := fromPayload
 	if cwd == "" {
@@ -737,7 +818,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return "", 0, 0, nil, 0, nil
+			return "", 0, 0, nil, 0, nil, nil
 		}
 	}
 	// The two git probes (worktree list for identity, status/log for the
@@ -800,11 +881,11 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 		// The standing decisions still apply, so serve them alone rather than
 		// going out empty.
 		if conventions != "" {
-			return conventions, 0, 0, nil, withheld, nil
+			return conventions, 0, 0, nil, withheld, nil, allowedNames
 		}
 		// withheld travels even with nothing to show: it is the only thing
 		// that separates "the rule hid all of it" from "no history here".
-		return "", 0, 0, nil, withheld, nil
+		return "", 0, 0, nil, withheld, nil, nil
 	}
 	scores, matched := taskScores(ss, taskFiles)
 	sort.Slice(ss, func(i, j int) bool {
@@ -841,9 +922,11 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// Inside the cached result, not after it: this costs a manifest scan plus
 	// one session read, which is ten times the rest of the hook, and the
 	// clusters it reports change over weeks rather than turns.
+	var envFrom []string
 	if !environmentServedRecently(dir) {
-		if env := environmentBlock(dir, policy.ActivationAuto); env != "" {
+		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 			text += "\n" + env + "\n"
+			envFrom = from
 			// Stamped on the way out rather than by the check: the check is
 			// also made by callers that may not deliver (#1806).
 			stampEnvironmentServed(dir)
@@ -861,7 +944,31 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// The candidates that never made it into the digest were never served:
 	// counting their transcripts here inflated the distillation ratio deja
 	// prints about itself (1 session distilled, 3 sessions' bytes claimed).
-	return text, result.Sessions, result.RawBytes, matched, withheld, result.IDs
+	// The projects behind what actually went out, so the injection log can be
+	// held to a rule or a forget without reading the digest's prose (#2349).
+	return text, result.Sessions, result.RawBytes, matched, withheld, result.IDs, digestProjects(ss, envFrom)
+}
+
+// digestProjects names the projects a session-start digest was built from: the
+// sessions it shows, plus the ones behind the environment block, which names
+// none of them in its own text.
+func digestProjects(ss []model.Session, env []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(p string) {
+		if p == "" || seen[p] {
+			return
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	for _, s := range ss {
+		add(s.Project)
+	}
+	for _, p := range env {
+		add(p)
+	}
+	return out
 }
 
 // warmupDeadAfter is how long a warmup may go without publishing progress

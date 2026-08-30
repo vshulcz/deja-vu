@@ -507,6 +507,24 @@ func relevanceResult(ss []model.Session, matched int, idf map[string]float64) Se
 	}
 }
 
+// coverageCounts picks which count of matched terms coverage is paid on.
+//
+// When something in the query identifies on its own, coverage is counted over
+// those terms alone: the ordinary words a question is phrased with stop earning
+// a session credit for covering the query. When nothing does — a question made
+// entirely of ordinary words — counting them is all there is, and the generous
+// reading of the gate stands.
+//
+// Measured: LoCoMo 69.8% to 70.2% R@1 and MRR .768 to .770; on LongMemEval-S
+// the preference questions, which are ordinary words around one that matters,
+// go 33.3% to 36.7% hit@1 with the total unmoved.
+func coverageCounts(all, identifying map[uint32]int, identifyingTerms int) map[uint32]int {
+	if identifyingTerms == 0 {
+		return all
+	}
+	return identifying
+}
+
 // rankIDF is what a match is WORTH: documents counted in sessions, the unit
 // ranking has always used. Weighting by the gate's number instead lifts every
 // term a few long sessions happen to repeat, which reorders the top of the
@@ -587,6 +605,9 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 		// stays quiet on an error.
 		return nil, nil, nil, nil, rerr
 	}
+	if bm, bmatched, bstrong, bidf, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
+		metas, matched, strong, idf = bm, bmatched, bstrong, bidf
+	}
 	if len(metas) == 0 {
 		return nil, nil, nil, nil, nil
 	}
@@ -594,7 +615,158 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
+	// Paired by identity, not by position. The counts belong to the ranking,
+	// which works on metas; the sessions come back from sessionsServable, which
+	// drops what the policy ignores and what the query may not be served. Every
+	// caller reads the three positionally, so a single drop had the per-prompt
+	// hook judging each session by its neighbour's terms (#2546).
+	matched, strong = countsFor(out, metas, matched, strong)
 	return out, matched, strong, idf, nil
+}
+
+// countsFor re-pairs the per-session counts with the sessions that survived
+// loading, keeping their order.
+func countsFor(out []model.Session, metas []SessionMeta, matched, strong []int) ([]int, []int) {
+	if len(out) == len(metas) {
+		return matched, strong
+	}
+	at := make(map[string]int, len(metas))
+	for i, meta := range metas {
+		at[meta.Harness+":"+meta.ID] = i
+	}
+	m := make([]int, len(out))
+	st := make([]int, len(out))
+	for j, s := range out {
+		i, ok := at[s.Harness+":"+s.ID]
+		if !ok {
+			continue
+		}
+		if i < len(matched) {
+			m[j] = matched[i]
+		}
+		if i < len(strong) {
+			st[j] = strong[i]
+		}
+	}
+	return m, st
+}
+
+const bridgeTerms = 4
+
+// bridgedRetry answers a question asked in words the project does not use.
+//
+// The ranking has just read every term and nothing it found identifies
+// anything: no session holds a word of this question rare enough to be worth an
+// unprompted recall. That is what a rephrasing looks like from inside — the
+// answer is there in the words the project actually uses, and the question
+// shares none of them.
+//
+// The corpus knows the pairing: a session that says "the debounce is how long
+// we wait before sending" puts both vocabularies in one message, and the
+// co-occurrence map records it. But that map is built over the whole store,
+// and a question about something this project never held is made of ordinary
+// words whose neighbours are every subject any project ever had — so the map
+// alone answers both kinds of question with equal confidence. Measured on the
+// bench's negative controls, bridging on the map alone fired on three of
+// twelve questions with no answer to find.
+//
+// So the tie has to be the project's own. A candidate is kept only when some
+// record in this project says it in the same breath as the question's word,
+// which is the sentence that explains the term — the thing a rephrasing has
+// and an absent subject does not.
+func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool,
+	strong []int, idfOf map[string]float64) ([]SessionMeta, []int, []int, map[string]float64, bool) {
+	was := 0
+	for _, v := range strong {
+		if v > was {
+			was = v
+		}
+	}
+	neighbours := readCooccur(dir)
+	if neighbours == nil {
+		return nil, nil, nil, nil, false
+	}
+	inProject := map[uint32]bool{}
+	for key, meta := range m.Sessions {
+		_ = key
+		for _, want := range projects {
+			if projectInScope(meta.Project, want) {
+				inProject[meta.Ord] = true
+				break
+			}
+		}
+	}
+	have := make(map[string]bool, len(terms))
+	for _, t := range terms {
+		have[t] = true
+	}
+	added := make([]string, 0, bridgeTerms)
+	for _, t := range terms {
+		// Bridge from a word that means something. "open the file and read it"
+		// is three ordinary words, and the corpus's neighbours for ordinary
+		// words are its subjects — that sentence was the one negative control
+		// this fired on.
+		if idfOf[t] < dejaVuStrongIDFFloor {
+			continue
+		}
+		tPosts, terr := postingsFor(dir, "t"+t)
+		if terr != nil || len(tPosts) == 0 {
+			continue
+		}
+		at := make(map[int64]bool, len(tPosts))
+		for _, pp := range tPosts {
+			if inProject[pp.Sid] {
+				at[pp.Off] = true
+			}
+		}
+		if len(at) == 0 {
+			continue
+		}
+		for _, cand := range neighbours[t] {
+			if have[cand] || query.IsStopWord(cand) {
+				continue
+			}
+			cPosts, cerr := postingsFor(dir, "t"+cand)
+			if cerr != nil || len(cPosts) == 0 {
+				continue
+			}
+			tied := false
+			for _, pp := range cPosts {
+				if inProject[pp.Sid] && at[pp.Off] {
+					tied = true
+					break
+				}
+			}
+			if !tied {
+				continue
+			}
+			have[cand] = true
+			added = append(added, cand)
+			if len(added) == bridgeTerms {
+				break
+			}
+		}
+		if len(added) == bridgeTerms {
+			break
+		}
+	}
+	if len(added) == 0 {
+		return nil, nil, nil, nil, false
+	}
+	metas, matched, bstrong, idf, err := relevantMetasMatched(dir, m, projects,
+		append(append([]string{}, terms...), added...), n, skip)
+	if err != nil || len(metas) == 0 {
+		return nil, nil, nil, nil, false
+	}
+	// Taken only when the bridge found something more identifying than the
+	// question's own words did. Otherwise the project has no better answer and
+	// the first ranking stands.
+	for _, v := range bstrong {
+		if v > was {
+			return metas, matched, bstrong, idf, true
+		}
+	}
+	return nil, nil, nil, nil, false
 }
 
 func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, map[string]float64, error) {
@@ -826,6 +998,11 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// kept and the better place of the two is used, at a price.
 	focus := map[uint32]float64{}
 	matchedTerms := map[uint32]int{}
+	// Coverage counted over the terms that identify something on their own,
+	// kept alongside so the choice between the two can be made once the whole
+	// query has been read rather than term by term.
+	identifyingTerms := 0
+	matchedIdentifying := map[uint32]int{}
 	strongTerms := map[uint32]int{}
 	anyTerms := map[uint32]int{}
 	// perMessage tracks how many distinct terms hit each message (record
@@ -1023,6 +1200,19 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			rank = 0.1
 		}
 		informative := idf >= dejaVuIDFFloor || minSess <= 2
+		// Identifying is the same bar read against the number the score itself
+		// uses: rare counted in whole sessions. gateIDF deliberately takes the
+		// more generous of its two verdicts so that a subject word is never
+		// called filler, which is what a term has to clear to be spoken about
+		// at all. Coverage is a different question — it multiplies a session's
+		// score by how much of the query it covers — and answering it
+		// generously pays a session for the ordinary words a question is
+		// phrased with. "Can you suggest a hotel for my trip" is four such
+		// words and one that matters.
+		identifying := rank >= dejaVuIDFFloor || minSess <= 2
+		if identifying {
+			identifyingTerms++
+		}
 		// Rare enough to identify something on its own: either well past the
 		// ordinary bar, or living in a single session of the whole corpus.
 		strong := idf >= dejaVuStrongIDFFloor || minSess <= 1
@@ -1055,11 +1245,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			if informative {
 				matchedTerms[ord]++
 			}
+			if identifying {
+				matchedIdentifying[ord]++
+			}
 			if strong {
 				strongTerms[ord]++
 			}
 		}
 	}
+	matchedTerms = coverageCounts(matchedTerms, matchedIdentifying, identifyingTerms)
 	ranked := make([]relevanceScored, 0, len(score))
 	for ord, sc := range score {
 		if sc <= 0 {
@@ -1264,6 +1458,11 @@ func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error)
 		}
 		out = append(out, sessionFromMeta(meta))
 	}
+	// This walk serves sessions without going through sessionsForMetas, so it
+	// is the one path #2070's rule never reached: `deja last` led with the
+	// background agents' own temp tree, 253 rows of 400 on a real store, while
+	// every ranked surface filtered it out (#2541).
+	out = ignoredByPolicy(out)
 	sort.Slice(out, func(i, j int) bool { return newestFirstSession(out[i], out[j]) })
 	if n > 0 && len(out) > n {
 		out = out[:n]
@@ -1308,6 +1507,7 @@ func RecentInProject(dir, project string, n int) ([]model.Session, error) {
 			metas = append(metas, meta)
 		}
 	}
+	metas = metasNotIgnored(metas)
 	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 	if n > 0 && len(metas) > n {
 		metas = metas[:n]
@@ -1342,6 +1542,7 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 			metas = append(metas, meta)
 		}
 	}
+	metas = metasNotIgnored(metas)
 	sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
 	if n > 0 && len(metas) > n {
 		metas = metas[:n]
@@ -1380,6 +1581,20 @@ func recordServable(role string, o query.Options) bool {
 // allowed to see — a file list, a command, or, under --role, the other side of
 // the conversation. Returning it with no messages would be worse than dropping
 // it: the count would say a match exists and the result would show nothing.
+// What this costs, measured on a 1,365-session index (170 MB of record text,
+// 43% of it tool output, 63% of the messages recall hands back):
+//
+//   - a relevance-tier search materialises every message of every session it
+//     ranked — 104 to 124 MB across 29 to 50 sessions per query, 200-400 ms —
+//     to print a few clipped lines. `Limit` does not bound it: it governs what
+//     is shown, not what is loaded.
+//   - the per-prompt hook, which cuts its ranking to twelve first, still loads
+//     41 MB across seven sessions on this project, one of them 37,289 messages,
+//     in 60 ms warm and 385 ms cold.
+//
+// The whole session is loaded because the caller picks which message to show
+// after ranking, and it reads the text to do it. Bounding that — a window
+// around the match rather than the session — is the open question (#2592).
 func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model.Session, error) {
 	all, err := sessionsForMetas(dir, metas)
 	if err != nil {
@@ -1422,6 +1637,49 @@ func ignoredByPolicy(ss []model.Session) []model.Session {
 			continue
 		}
 		out = append(out, s)
+	}
+	return out
+}
+
+// IgnoredMatching counts the sessions a listing would have shown if the ignore
+// rule did not cover them. Every other rule that withholds rows in deja says
+// how many; this one dropped 253 of 400 on a real store and said nothing
+// (#2554). Manifest only, so the listing pays a walk over metas it has just
+// read from the same cached manifest.
+func IgnoredMatching(dir string, o query.Options) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return 0
+	}
+	pol := policy.Load()
+	n := 0
+	for _, meta := range m.Sessions {
+		if !sessionMetaMatches(meta, o) {
+			continue
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
+			n++
+		}
+	}
+	return n
+}
+
+// metasNotIgnored is ignoredByPolicy one step earlier, on the metas a walk is
+// about to cut a window out of. sessionsForMetas filters what it loads, which
+// is right, but by then the window is chosen: three ignored sessions at the top
+// of a project left `handoff` and the session-start block with nothing while
+// three real ones sat below the cut (#2541).
+func metasNotIgnored(metas []SessionMeta) []SessionMeta {
+	pol := policy.Load()
+	out := metas[:0:0]
+	for _, meta := range metas {
+		if pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		out = append(out, meta)
 	}
 	return out
 }
@@ -1488,6 +1746,7 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 				mine = append(mine, meta)
 			}
 		}
+		mine = metasNotIgnored(mine)
 		sort.Slice(mine, func(i, j int) bool { return newestFirstMeta(mine[i], mine[j]) })
 		if perName > 0 && len(mine) > perName {
 			mine = mine[:perName]
@@ -1611,6 +1870,16 @@ func idFoldMatches(id, p string) bool {
 // reader had no way to know they were looking at a choice rather than at the
 // only answer.
 func PrefixMatches(dir, p string) int {
+	return PrefixMatchesAllowed(dir, p, nil)
+}
+
+// PrefixMatchesAllowed counts the same way for the sessions a caller is
+// allowed to see. The note a reader gets about an ambiguous prefix used to
+// count every match, so a rule withholding a peer's work still announced that
+// the work exists, and the advice — reach for a longer prefix — led to a
+// session that answers with the rule instead (#2401). A nil allow counts
+// everything, which is what a caller with no rules of its own wants.
+func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1627,6 +1896,9 @@ func PrefixMatches(dir, p string) int {
 	// with the sign flipped.
 	n := 0
 	for _, meta := range m.Sessions {
+		if allow != nil && !allow(meta.Project) {
+			continue
+		}
 		if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
 			n++
 			continue
@@ -1639,6 +1911,9 @@ func PrefixMatches(dir, p string) int {
 		// The count and the resolver have to agree, or a reader is told an id
 		// matches nothing and then watches it open (#853).
 		for _, meta := range m.Sessions {
+			if allow != nil && !allow(meta.Project) {
+				continue
+			}
 			if idLooselyMatches(meta.ID, p) {
 				n++
 			}
@@ -1647,6 +1922,9 @@ func PrefixMatches(dir, p string) int {
 	if n == 0 {
 		// Same last rung as the resolver: the id in the other case (#1620).
 		for _, meta := range m.Sessions {
+			if allow != nil && !allow(meta.Project) {
+				continue
+			}
 			if idFoldMatches(meta.ID, p) || (meta.OrigID != "" && idFoldMatches(meta.OrigID, p)) {
 				n++
 			}
@@ -2286,6 +2564,11 @@ func TermSessionCounts(dir string, terms []string) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	// Counted over what search would serve. Postings hold every session, the
+	// answer holds none the ignore rule covers, and counting the two
+	// differently had deja say "no session has them together" about a phrase
+	// two withheld sessions carry word for word (#2562).
+	servable := servableSids(dir)
 	out := make(map[string]int, len(terms))
 	for _, t := range terms {
 		key := "t" + t
@@ -2300,11 +2583,90 @@ func TermSessionCounts(dir string, terms []string) map[string]int {
 		}
 		seen := map[uint32]bool{}
 		for _, p := range posts {
+			if servable != nil && !servable[p.Sid] {
+				continue
+			}
 			seen[p.Sid] = true
 		}
 		out[t] = len(seen)
 	}
 	return out
+}
+
+// servableSids is the set of session ordinals the ignore rule leaves in reach.
+// nil when the manifest cannot be read, which the callers treat as "count
+// everything" rather than "count nothing".
+func servableSids(dir string) map[uint32]bool {
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return nil
+	}
+	pol := policy.Load()
+	out := make(map[uint32]bool, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		if !pol.Ignored(meta.Path, meta.Project) {
+			out[meta.Ord] = true
+		}
+	}
+	return out
+}
+
+// IgnoredWithAllTerms counts the sessions that hold every one of these terms
+// and that the ignore rule keeps out of the answer. The listing says what the
+// rule withheld from it (#2554); a search that comes back short or empty owes
+// the reader the same sentence (#2562).
+func IgnoredWithAllTerms(dir string, terms []string) int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	if len(terms) == 0 {
+		return 0
+	}
+	servable := servableSids(dir)
+	if servable == nil {
+		return 0
+	}
+	// Each term matches any of its forms, the way the tiers match. Counting the
+	// exact spelling alone left the line silent for a reader who typed "pool"
+	// while the withheld session wrote "pools" — the moment it is most needed,
+	// since search then serves nothing and the rule is why (#2573).
+	forms := OtherWordForms(dir, terms)
+	var per []map[uint32]bool
+	for _, term := range terms {
+		hit := map[uint32]bool{}
+		for _, form := range append([]string{term}, forms[term]...) {
+			posts, err := postingsFor(dir, "t"+form)
+			if err != nil {
+				continue
+			}
+			for _, p := range posts {
+				if !servable[p.Sid] {
+					hit[p.Sid] = true
+				}
+			}
+		}
+		if len(hit) == 0 {
+			return 0
+		}
+		per = append(per, hit)
+	}
+	if len(per) == 0 {
+		return 0
+	}
+	n := 0
+	for sid := range per[0] {
+		all := true
+		for _, hit := range per[1:] {
+			if !hit[sid] {
+				all = false
+				break
+			}
+		}
+		if all {
+			n++
+		}
+	}
+	return n
 }
 
 func intersectPostings(dir string, keys []string) ([]posting, error) {

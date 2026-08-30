@@ -1087,14 +1087,14 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 		{"top trailing", "{\n  \"theme\": \"dark\",\n}\n", `"mcp"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := updateOpencodeJSONC([]byte(tc.old), "/bin/deja", false)
+			got, _, err := updateOpencodeJSONC([]byte(tc.old), "/bin/deja", false)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !strings.Contains(string(got), tc.want) || !strings.Contains(string(got), `"deja"`) {
 				t.Fatalf("jsonc got:\n%s\nwant contains %q", got, tc.want)
 			}
-			un, err := updateOpencodeJSONC(got, "/bin/deja", true)
+			un, _, err := updateOpencodeJSONC(got, "/bin/deja", true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1108,7 +1108,7 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 	// "mcp" keys and drop the user's other servers, so it errors instead.
 	t.Run("mcp brace on next line errors, not corrupts", func(t *testing.T) {
 		braceNext := "{\n  \"mcp\":\n  {\n    \"other\": {\"type\":\"local\"}\n  }\n}\n"
-		if _, err := updateOpencodeJSONC([]byte(braceNext), "/bin/deja", false); err == nil {
+		if _, _, err := updateOpencodeJSONC([]byte(braceNext), "/bin/deja", false); err == nil {
 			t.Fatal("expected an error rather than a duplicate mcp block")
 		}
 	})

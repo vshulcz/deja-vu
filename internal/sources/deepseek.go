@@ -118,7 +118,12 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 			}
 			s.Touch(parseTimeAny(e["createdAt"]))
 		case "session/title":
-			if title, _ := data["title"].(string); title != "" && s.Title == "" {
+			// The last one wins. dsh names a session twice — a stand-in it cuts
+			// out of the opening message, then the real one when its title
+			// model answers — and the log is append-only, so the latest event
+			// is the name the harness is showing. Keeping the first listed
+			// every dsh session under a sentence cut mid-phrase (#2551).
+			if title, _ := data["title"].(string); title != "" {
 				s.Title = title
 			}
 		case "user/message":

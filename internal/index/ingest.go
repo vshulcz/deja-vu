@@ -1551,6 +1551,35 @@ func askedFromRecords(recs []Record) []uint64 {
 	return out
 }
 
+// countedFromRecords is the message count local ingest keeps as Counted: the
+// records that are a turn of the conversation, not the work records deja
+// derives beside them. It feeds the corpus size the ranking divides by, so an
+// imported session with none counted as a single document (#2569).
+func countedFromRecords(recs []Record) int {
+	n := 0
+	for _, r := range recs {
+		if r.Role == roleFiles || r.Role == roleCommand || r.Role == roleEdit {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
+// wordsFromRecords is sessionWords over the same records: the document length
+// BM25 normalises by. Without it an imported session is scored on the length of
+// the match alone, which is the marathon-wins case search.go describes.
+func wordsFromRecords(recs []Record) int {
+	ms := make([]model.Message, 0, len(recs))
+	for _, r := range recs {
+		if r.Role == roleFiles || r.Role == roleCommand || r.Role == roleEdit {
+			continue
+		}
+		ms = append(ms, model.Message{Role: r.Role, Text: r.Text})
+	}
+	return sessionWords(ms)
+}
+
 // notAsked rejects the text a harness writes under the user role: hook
 // envelopes, interruption notices, resume preambles, the compaction summary.
 // It repeats across sessions by construction, so without this the most
@@ -1647,7 +1676,11 @@ func topTouchedFiles(ms []model.Message) []string {
 // session as records rather than messages. Imported sessions used to carry no
 // Touched, so `deja blame` — which reads it — could not attribute a peer's
 // edits even though `search --role files` surfaced the same records.
-func touchedFromRecords(recs []Record) []string {
+// touchedFromRecords derives the touched-file ranking and the counts behind it.
+// The counts were computed here and thrown away, so an imported session carried
+// a ranking nothing could merge — the shape #1333 fixed for local ingest, still
+// standing for peers (#2558).
+func touchedFromRecords(recs []Record) ([]string, []int) {
 	count := map[string]int{}
 	for _, r := range recs {
 		if r.Role != roleFiles {
@@ -1655,7 +1688,7 @@ func touchedFromRecords(recs []Record) []string {
 		}
 		countTouchedPaths(count, r.Text)
 	}
-	return rankTouched(count)
+	return rankTouchedCounted(count)
 }
 
 // countTouchedPaths tallies the file paths in one `files` record's text, one
@@ -1902,7 +1935,82 @@ func sessionTitleFrom(s model.Session) (title string, fromAgent bool) {
 	if t := earliestTitle(s.Messages, roleToolOutput); t != "" {
 		return toolOutputTitle(t), false
 	}
+	// Nothing here is worth a title on its own — every turn is harness
+	// plumbing, a CLI's own stdout or a notification the runtime spliced in.
+	// #1100 named the tool-only session so it would stop listing as an empty
+	// bracket; this is the same session one step further down. The surfaces
+	// that used to recover a title read .Messages, and they are all fed by
+	// Recent, which returns metadata alone, so the recovery never ran (#2548).
+	if t := earliestAnyText(s.Messages); t != "" {
+		return harnessOutputTitle(t), false
+	}
 	return "", false
+}
+
+// harnessOutputTitlePrefix marks a title borrowed from what the harness itself
+// wrote, the way toolOutputTitlePrefix marks one borrowed from tool output: it
+// rides in the text so every surface says the same thing.
+const harnessOutputTitlePrefix = "harness output: "
+
+// titlePlaceholder reports that a title is only standing in until the session
+// says something of its own. The incremental path fills a title in when it is
+// empty; a session that opens with a slash command would otherwise keep the
+// stand-in forever, with the reader's own first question one line below it.
+func titlePlaceholder(t string) bool {
+	return t == "" || strings.HasPrefix(t, harnessOutputTitlePrefix)
+}
+
+func harnessOutputTitle(t string) string {
+	return harnessOutputTitlePrefix + truncateTitle(stripPlumbingTag(t), 60-len([]rune(harnessOutputTitlePrefix)))
+}
+
+// stripPlumbingTag unwraps the element a harness wraps its own output in —
+// <local-command-stdout>…</local-command-stdout> and its neighbours — so the
+// row reads as the sentence rather than as markup.
+func stripPlumbingTag(t string) string {
+	t = strings.TrimSpace(t)
+	if !strings.HasPrefix(t, "<") {
+		return t
+	}
+	end := strings.Index(t, ">")
+	if end < 0 {
+		return t
+	}
+	name := t[1:end]
+	if i := strings.IndexAny(name, " \t"); i >= 0 {
+		name = name[:i]
+	}
+	rest := strings.TrimSpace(t[end+1:])
+	rest = strings.TrimSuffix(rest, "</"+name+">")
+	return strings.TrimSpace(rest)
+}
+
+// earliestAnyText is the first thing a session says, whoever said it, for the
+// last resort above.
+func earliestAnyText(ms []model.Message) string {
+	best := ""
+	var bestAt time.Time
+	for _, msg := range ms {
+		// Work records are not something anyone said — a file list, an
+		// invocation, a replaced span — and a session named after one reads as
+		// a sentence it never contained.
+		if msg.Role == roleFiles || msg.Role == roleCommand || msg.Role == roleEdit {
+			continue
+		}
+		t := strings.TrimSpace(msg.Text)
+		if t == "" {
+			continue
+		}
+		switch {
+		case best == "":
+		case bestAt.IsZero(), msg.Time.IsZero():
+			continue
+		case !msg.Time.Before(bestAt):
+			continue
+		}
+		best, bestAt = t, msg.Time
+	}
+	return best
 }
 
 // toolOutputTitlePrefix marks a title borrowed from tool output. It rides in
@@ -2849,7 +2957,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			if s.Path != "" && owns {
 				meta.Path = s.Path
 			}
-			if meta.Title == "" {
+			if titlePlaceholder(meta.Title) {
 				// The incremental fallback redacted nothing at all before; keep
 				// sessionTitleFrom's correct fromAgent bit and redact before the
 				// cut, as the full rebuild does.

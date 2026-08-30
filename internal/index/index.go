@@ -62,7 +62,22 @@ import (
 // is one wall however it was printed. A store built before this holds both
 // spellings under different signatures, and nothing re-derives them without
 // the bump — the same shape as 27 and 28 (#1637).
-const version = 29
+// 30: a long digit run inside a line — a port, a pid, an epoch, a goroutine id
+// — is masked before the line is hashed, so one failure is one wall across the
+// numbers the machine hands out. A store built before this holds each run under
+// its own signature, and nothing re-derives them without the bump — the same
+// shape as 27, 28 and 29 (#2369).
+// 31: what counts as a wall at all. A quote no longer drops a line as source
+// (#2430), a generic opening no longer hides the phrase behind it (#2432), the
+// list learned the walls a machine actually hits (#2434), a source line
+// carrying an error is not one (#2436), and the line cap went from 120 to 200
+// characters, which alone recovered a third again of what was recognised
+// (#2438). Measured over a real store: 7,053 signatures before, 8,885 after. A
+// store built under the old rules holds the old signatures and nothing
+// re-derives them — `deja friction` reads the records and sees the difference,
+// while `hook-tool-after` and the environment block read the manifest and stay
+// silent, which is the state this bump exists to end (#2444).
+const version = 31
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -242,10 +257,21 @@ type SessionMeta struct {
 	Hit []uint64 `json:",omitempty"`
 }
 
-// touchedFileCap bounds what goes in SessionMeta.Touched. Enough to say
-// something useful about a session, small enough that a store of a thousand
-// sessions pays kilobytes for it.
-const touchedFileCap = 6
+// touchedFileCap bounds what goes in SessionMeta.Touched.
+//
+// Six was enough to say something about a session and wrong for the thing that
+// reads it: the line before an edit asks how many sessions touched this file,
+// and a session that worked on forty recorded six. Measured over 334 distinct
+// files an agent really edited on this machine, 257 of them had been touched by
+// no session at all as far as the index knew, while 268 were spoken about in
+// sessions the store holds. The surface was blind to three files in four.
+//
+// Forty, from the three points measured: files with no history 257 -> 218 -> 190
+// at 6, 20 and 40, and files the hook can speak about 26 -> 30 -> 36. It costs
+// 700 KB of a 195 MB index and 3 ms on the hook that reads it — measured on the
+// same store, where the line went from silent on 12 of 12 real edits to
+// speaking on 4.
+const touchedFileCap = 40
 
 // askedQuestionCap bounds the hashes stored per session.
 const askedQuestionCap = 8

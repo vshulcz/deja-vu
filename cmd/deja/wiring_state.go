@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 )
 
@@ -27,6 +28,18 @@ type wiringState struct {
 	// set of configs into a home nobody installed into, left the real ones
 	// pointing at the old binary, and marked the record repaired (#885).
 	Home string `json:"home,omitempty"`
+	// Created are the config paths that did not exist before deja wrote them.
+	// #840 established that a file which turns out to be entirely deja's is
+	// deleted on the way out rather than left empty; that test is byte-emptiness,
+	// which the structured writers never reach — they leave `{"mcpServers":{}}`.
+	// Knowing which files deja made is what lets the same rule apply to them
+	// without ever removing a config the reader already had (#2583).
+	Created []string `json:"created,omitempty"`
+	// Blocks are the containers deja added to a config that had none —
+	// "<path>#mcpServers". Removing only deja's entry left the reader with an
+	// empty block they never wrote (#2604); knowing deja added it is what
+	// allows taking it back without touching one they wrote themselves.
+	Blocks []string `json:"blocks,omitempty"`
 	// Exe is the binary path the configs were written with. A move without a
 	// version change is ordinary — a relink, a reinstall of the same release,
 	// a `go install` over a manual download — and left every config pointing
@@ -99,7 +112,34 @@ func recordWiring(targets []string, uninstall bool) {
 			return
 		}
 	}
-	st = wiringState{Version: version, Targets: kept, Exe: exe, Home: homeDir()}
+	created := append([]string(nil), st.Created...)
+	seen := map[string]bool{}
+	for _, p := range created {
+		seen[p] = true
+	}
+	for _, p := range createdByThisRun {
+		if !seen[p] {
+			created = append(created, p)
+			seen[p] = true
+		}
+	}
+	// A path deja no longer wired is not one it will be asked about again.
+	if len(kept) == 0 {
+		created = nil
+	}
+	sort.Strings(created)
+	blocks := append([]string(nil), st.Blocks...)
+	for _, b := range blocksAddedThisRun {
+		if !slices.Contains(blocks, b) {
+			blocks = append(blocks, b)
+		}
+	}
+	blocks = slices.DeleteFunc(blocks, func(b string) bool { return blocksForgottenThisRun[b] })
+	if len(kept) == 0 {
+		blocks = nil
+	}
+	sort.Strings(blocks)
+	st = wiringState{Version: version, Targets: kept, Created: created, Blocks: blocks, Exe: exe, Home: homeDir()}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -116,6 +156,10 @@ func recordWiring(targets []string, uninstall bool) {
 // a caller with somewhere to print can say so; the hook paths call it and stay
 // quiet, because a session start is not the place for maintenance chatter.
 func refreshWiringAfterUpgrade() []string {
+	// Each run answers for itself: the list is process state, and a second call
+	// in one process — the test binary, a long-lived host — must not inherit
+	// the first one's failures.
+	stuckWiring = nil
 	st := readWiringState()
 	if len(st.Targets) == 0 || version == "" {
 		return nil
@@ -145,7 +189,12 @@ func refreshWiringAfterUpgrade() []string {
 		if err != nil {
 			// A harness the user has since removed is not an error worth
 			// surfacing: the next install run will drop it from the record.
+			// One whose config cannot be written is: the record is left
+			// unstamped on purpose (#2212), so every later start repeats the
+			// repair and the same line, and nothing said which target was
+			// stuck or that anything had failed (#2594).
 			failed = true
+			stuckWiring = append(stuckWiring, target)
 			continue
 		}
 		if res.Action != "" && res.Action != "unchanged" {
@@ -163,3 +212,47 @@ func refreshWiringAfterUpgrade() []string {
 	recordWiring(st.Targets, false)
 	return changed
 }
+
+// wiringCreated reports that deja created this config rather than finding it.
+func wiringCreated(path string) bool {
+	for _, p := range readWiringState().Created {
+		if p == path {
+			return true
+		}
+	}
+	for _, p := range createdByThisRun {
+		if p == path {
+			return true
+		}
+	}
+	return false
+}
+
+// stuckWiring is what this process could not rewire. Read by the session start,
+// which is the only surface a person sees on an ordinary day.
+var stuckWiring []string
+
+// blocksAddedThisRun and blocksForgottenThisRun carry what this process added to
+// or took back from a config, until recordWiring folds them into the record.
+var (
+	blocksAddedThisRun     []string
+	blocksForgottenThisRun = map[string]bool{}
+)
+
+func blockKey(path, name string) string { return path + "#" + name }
+
+// noteBlockAdded records that deja, not the reader, put this container there.
+func noteBlockAdded(path, name string) {
+	blocksAddedThisRun = append(blocksAddedThisRun, blockKey(path, name))
+}
+
+// blockWasAdded reports whether deja added it, in this run or an earlier one.
+func blockWasAdded(path, name string) bool {
+	key := blockKey(path, name)
+	if slices.Contains(blocksAddedThisRun, key) {
+		return true
+	}
+	return slices.Contains(readWiringState().Blocks, key)
+}
+
+func forgetBlockAdded(path, name string) { blocksForgottenThisRun[blockKey(path, name)] = true }

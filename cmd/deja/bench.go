@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/bench"
@@ -56,7 +57,7 @@ func runBenchRecall(jsonOutput bool, seed int64) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(root) }()
+	defer func() { releaseBenchTempDir(root) }()
 	indexDir := filepath.Join(root, "index.db")
 	claudeRoot := filepath.Join(root, "claude")
 	if err := writeBenchCorpus(claudeRoot, corpus.Sessions); err != nil {
@@ -272,6 +273,12 @@ func isolateBenchEnv(root, claudeRoot, indexDir string) func() {
 	}
 }
 
+// benchStaleRun is how old a run tree has to be before a later run reclaims it.
+// A run that was interrupted leaves its corpus and index behind — megabytes of
+// it — and nothing else ever looks in that directory again. Bounded by age so a
+// run happening right now, in another shell, is not swept out from under it.
+const benchStaleRun = 24 * time.Hour
+
 func benchmarkTempDir() (string, error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -281,7 +288,36 @@ func benchmarkTempDir() (string, error) {
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return "", err
 	}
+	sweepStaleBenchRuns(parent, time.Now())
 	return os.MkdirTemp(parent, "run-")
+}
+
+// sweepStaleBenchRuns removes what interrupted runs left behind.
+func sweepStaleBenchRuns(parent string, now time.Time) {
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), "run-") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || now.Sub(info.ModTime()) < benchStaleRun {
+			continue
+		}
+		_ = os.RemoveAll(filepath.Join(parent, e.Name()))
+	}
+}
+
+// releaseBenchTempDir drops this run's tree and, if it was the last thing in
+// there, the directory bench made in the user's working directory. `deja bench`
+// left an empty .deja-bench in whatever repo it was run from (#2560).
+func releaseBenchTempDir(dir string) {
+	_ = os.RemoveAll(dir)
+	// Remove, not RemoveAll: a parent still holding another run's tree fails
+	// here and stays, which is the point.
+	_ = os.Remove(filepath.Dir(dir))
 }
 
 func printBenchReport(w io.Writer, report benchReport) {

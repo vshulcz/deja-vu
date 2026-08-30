@@ -10,6 +10,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -30,7 +31,57 @@ const (
 	// turns, so the block is not a nag that fires per action.
 	environmentWalls = 3
 	environmentMax   = 96
+	// environmentMinProjects is how many projects a wall has to appear in
+	// before it is called a fact about the machine. Two is not enough: a
+	// project's own name arrives in several forms — a worktree, a temporary
+	// checkout, the bare directory — so a string that only ever appeared in one
+	// repository still reads as two. Measured here, a name from deja's own test
+	// fixtures cleared a two-project bar on `run` and `compare/fixes`, both
+	// path fragments of the same tree.
+	environmentMinProjects = 3
 )
+
+// spansProjects reports whether a wall was hit in more than one project.
+//
+// The block claims something about the machine — "the tool or module is still
+// missing" — and an error that only ever appeared while working on one
+// repository is that repository's business. Counted in sessions alone, a string
+// this project's own tests print reads as a fact about the machine and is then
+// told to an agent working somewhere else: measured here, a name from deja's
+// own test fixtures was one of the three walls shown in sixteen unrelated
+// projects, in a block that had nothing else in it.
+func spansProjects(ss []index.SessionMeta, projects int) bool {
+	// A machine with one or two projects cannot spread anything across three,
+	// and everything it hits is by definition all it does. Asking for spread
+	// there silences the block for exactly the people with the least history to
+	// fall back on.
+	if projects < environmentMinProjects {
+		return true
+	}
+	seen := map[string]bool{}
+	for _, s := range ss {
+		if s.Project != "" {
+			seen[s.Project] = true
+		}
+	}
+	return len(seen) >= environmentMinProjects
+}
+
+// projectsInStore counts the distinct projects the index holds, which is what
+// decides whether spreading is something this machine could show at all.
+func projectsInStore(dir string) int {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return 0
+	}
+	seen := map[string]bool{}
+	for _, m := range metas {
+		if m.Project != "" {
+			seen[m.Project] = true
+		}
+	}
+	return len(seen)
+}
 
 // environmentBlock names what the machine keeps failing on, or "" when nothing
 // has failed in enough separate sessions to be worth an agent's attention.
@@ -40,14 +91,29 @@ const (
 // received error text drawn from the sessions that denial had just hidden, plus
 // the harnesses and dates behind it (#659). The block reads the manifest
 // directly, so nothing upstream could have filtered it.
+// environmentBlock is environmentBlockFrom without the projects, for callers
+// that only print it.
 func environmentBlock(dir, activation string) string {
+	text, _ := environmentBlockFrom(dir, activation)
+	return text
+}
+
+// environmentBlockFrom also reports the projects whose sessions the walls came
+// from. The block is about the machine and names none of them in its text, so a
+// record without them could not be reached when one of those projects was
+// forgotten (#2349).
+func environmentBlockFrom(dir, activation string) (string, []string) {
 	// Origin is a property of the sessions the walls came from, so the gate has
 	// to be per wall rather than one check up front: a machine can hold both
 	// local and imported sessions hitting the same error.
 	pol := policy.Load()
-	walls := index.TopFriction(dir, environmentWalls, nil)
+	// With room to spare: a wall can fail the policy gate or the project bar
+	// below, and asking for exactly three meant one rejection left the block
+	// short of what it had to say.
+	walls := index.TopFriction(dir, environmentWalls*4, nil)
+	held := projectsInStore(dir)
 	if len(walls) == 0 {
-		return ""
+		return "", nil
 	}
 	var allowed []index.Friction
 	for _, w := range walls {
@@ -59,30 +125,141 @@ func environmentBlock(dir, activation string) string {
 		}
 		// The count is what the reader acts on, so a wall whose evidence is
 		// mostly hidden must not keep claiming the full number.
-		if len(keep) >= index.FrictionMinSessions {
+		if len(keep) >= index.FrictionMinSessions && spansProjects(keep, held) {
 			w.Sessions = keep
 			allowed = append(allowed, w)
 		}
 	}
 	if len(allowed) == 0 {
-		return ""
+		return "", nil
+	}
+	if len(allowed) > environmentWalls {
+		allowed = allowed[:environmentWalls]
 	}
 	walls = allowed
+	// The projects behind the walls, deduped in the order they appear: the
+	// block's own text names the errors and not where they came from.
+	var projects []string
+	seen := map[string]bool{}
+	for _, w := range walls {
+		for _, sess := range w.Sessions {
+			if sess.Project == "" || seen[sess.Project] {
+				continue
+			}
+			seen[sess.Project] = true
+			projects = append(projects, sess.Project)
+		}
+	}
 	var b strings.Builder
 	b.WriteString("This machine, from deja's index of past sessions across every agent used here:\n")
+	knownRemedy := false
 	for _, w := range walls {
-		text := w.Text
-		// Same cut, same reason as the conventions line: bytes, not runes, so a
-		// wall recorded in Russian or Chinese reached the model in pieces.
-		text = truncatePlanBytes(text, environmentMax)
+		// Cut from the middle, not the right. What names a failure is usually
+		// at both ends — the tool at the front, what it could not do at the
+		// back — and a right-hand cut kept `connection to server at "…", port
+		// 5432 failed:` while dropping the "Connection refused" that says what
+		// happened (#2442). Bytes, not runes, for the reason the conventions
+		// line gives: a wall recorded in Russian or Chinese reached the model
+		// in pieces.
+		text := elideMiddleBytes(w.Text, environmentMax)
 		fmt.Fprintf(&b, "- %d separate sessions hit `%s`\n", len(w.Sessions), text)
+		// What was run after it, when deja knows: the block exists to change
+		// the next tool call, and "find your own way past this" is poor advice
+		// from something holding the way past (#2440). Same source `deja fix`
+		// and the tool hook answer from, under the same rule this block is
+		// filtered by.
+		if fix := environmentRemedy(dir, w.Text, activation); fix != "" {
+			fmt.Fprintf(&b, "  what followed it: `%s`\n", fix)
+			knownRemedy = true
+		}
 	}
 	// Without this line the block reads as trivia. With it the model has
 	// something to do differently on its next tool call, which is the only
 	// reason the block is here.
-	b.WriteString("These are environment facts, not history: the tool or module is still missing. " +
-		"Check or use an alternative before running into them again.")
-	return b.String()
+	if knownRemedy {
+		b.WriteString("These are environment facts, not history. Where a command is named above, " +
+			"it is what this machine ran after that error before; check the rest or use an alternative " +
+			"before running into them again.")
+	} else {
+		b.WriteString("These are environment facts, not history: the tool or module is still missing. " +
+			"Check or use an alternative before running into them again.")
+	}
+	return b.String(), projects
+}
+
+// elideMiddleBytes keeps the head and the tail of a line, with an ellipsis
+// between them, inside a byte budget. A tail matters here because the phrase
+// that names a failure — "Connection refused", "no such file or directory",
+// "undefined: X" — is as often at the end of a line as at the front, while the
+// middle is a path or a host.
+func elideMiddleBytes(text string, limit int) string {
+	if limit <= 0 || len(text) <= limit {
+		if limit <= 0 {
+			return ""
+		}
+		return text
+	}
+	const ellipsis = "…"
+	if limit <= len(ellipsis) {
+		return ""
+	}
+	room := limit - len(ellipsis)
+	// A little more of the front than the back: the tool's own name and the
+	// first words are what a reader matches against, and the tail only has to
+	// carry the failing phrase.
+	head := room * 3 / 5
+	tail := room - head
+	return cutBytes(text, head) + ellipsis + cutBytesRight(text, tail)
+}
+
+// cutBytes and cutBytesRight take whole runes from each end.
+func cutBytes(text string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	if len(text) <= n {
+		return text
+	}
+	out := text[:n]
+	for len(out) > 0 && !utf8.ValidString(out) {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
+func cutBytesRight(text string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	if len(text) <= n {
+		return text
+	}
+	out := text[len(text)-n:]
+	for len(out) > 0 && !utf8.ValidString(out) {
+		out = out[1:]
+	}
+	return out
+}
+
+// environmentRemedy is the command this machine ran after a wall, when one is
+// recorded twice or more — the same bar `deja fix` prints without hedging. The
+// block is bounded, so only the first candidate is named and only when it is
+// short enough to be a command rather than a script.
+func environmentRemedy(dir, wall string, activation string) string {
+	pol := policy.Load()
+	fixes := index.FixesFor(dir, wall, 1, func(project string) bool {
+		return pol.Allows(activation, project)
+	})
+	if len(fixes) == 0 || fixes[0].Candidate {
+		return ""
+	}
+	// Stored with the prompt the transcript showed it with; the block quotes it
+	// as a command to run.
+	cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(fixes[0].Command), "$ "))
+	if cmd == "" || len(cmd) > environmentMax {
+		return ""
+	}
+	return safeForStatusline(cmd, environmentMax)
 }
 
 // environmentSpent is per process, which is what makes "once" countable on

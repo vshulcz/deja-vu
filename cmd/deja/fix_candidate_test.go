@@ -59,8 +59,8 @@ func TestFixSaysItIsWaitingRatherThanDenyingTheSighting(t *testing.T) {
 	if strings.Contains(out, "no session on this machine ran a command") {
 		t.Errorf("fix denied the sighting it is holding: %q", out)
 	}
-	if !strings.Contains(out, "confirmed") {
-		t.Errorf("fix does not say what it is waiting for: %q", out)
+	if !strings.Contains(out, "unconfirmed") {
+		t.Errorf("fix does not say the sighting is unconfirmed: %q", out)
 	}
 
 	// An error nobody has hit still gets the plain answer.

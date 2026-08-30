@@ -14,9 +14,15 @@ import (
 func seedFrictionCorpus(t *testing.T) string {
 	t.Helper()
 	tmp := hermeticEnv(t)
-	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
-	if err := os.MkdirAll(store, 0o755); err != nil {
-		t.Fatal(err)
+	// One directory per project: the environment block claims something about
+	// the machine, and a wall of one repository no longer qualifies.
+	var stores []string
+	for i := 0; i < environmentMinProjects; i++ {
+		store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj"+string(rune('0'+i)))
+		if err := os.MkdirAll(store, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		stores = append(stores, store)
 	}
 	errs := []string{
 		"command not found: quibblectl",
@@ -30,7 +36,7 @@ func seedFrictionCorpus(t *testing.T) string {
 			id := "sess" + string(rune('a'+s))
 			if i == 3 {
 				b.WriteString(`{"type":"user","timestamp":"` + stamp + `","sessionId":"` + id +
-					`","cwd":"/proj","message":{"role":"user","content":[{"type":"tool_result","content":"` +
+					`","cwd":"/proj` + string(rune('0'+(s/3)%environmentMinProjects)) + `","message":{"role":"user","content":[{"type":"tool_result","content":"` +
 					errs[s%3] + `"}]},"toolUseResult":{"stdout":"","stderr":"` + errs[s%3] + `"}}` + "\n")
 				continue
 			}
@@ -39,10 +45,10 @@ func seedFrictionCorpus(t *testing.T) string {
 				role = "assistant"
 			}
 			b.WriteString(`{"type":"` + role + `","timestamp":"` + stamp + `","sessionId":"` + id +
-				`","cwd":"/proj","message":{"role":"` + role + `","content":"` +
+				`","cwd":"/proj` + string(rune('0'+(s/3)%environmentMinProjects)) + `","message":{"role":"` + role + `","content":"` +
 				strings.Repeat("quibblectl retry budget ", 24) + `"}}` + "\n")
 		}
-		if err := os.WriteFile(filepath.Join(store, "sess"+string(rune('a'+s))+".jsonl"), []byte(b.String()), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(stores[(s/3)%len(stores)], "sess"+string(rune('a'+s))+".jsonl"), []byte(b.String()), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

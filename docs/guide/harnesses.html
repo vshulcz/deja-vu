@@ -4,12 +4,12 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Code, Codex, Cursor and 17 more agents — deja-vu</title>
-<meta name="description" content="The twenty coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<title>Claude Code, Codex, Cursor and 18 more agents — deja-vu</title>
+<meta name="description" content="The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Claude Code, Codex, Cursor and 17 more agents — deja-vu">
-<meta property="og:description" content="The twenty coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta property="og:title" content="Claude Code, Codex, Cursor and 18 more agents — deja-vu">
+<meta property="og:description" content="The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,14 +25,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Claude Code, Codex, Cursor and 17 more agents — deja-vu">
-<meta name="twitter:description" content="The twenty coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta name="twitter:title" content="Claude Code, Codex, Cursor and 18 more agents — deja-vu">
+<meta name="twitter:description" content="The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The twenty coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Harnesses","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"}]}</script>
 </head>
 <body>
@@ -81,30 +81,31 @@
 <article>
 
 <h1>Harnesses</h1>
-<p class="pagelede">the twenty it reads, and what each one supports<span class="mins" data-mins></span></p>
-<p>deja indexes twenty coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
+<p class="pagelede">the twenty-one it reads, and what each one supports<span class="mins" data-mins></span></p>
+<p>deja indexes twenty-one coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
 <!-- matrix:start -->
 <table>
 <tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Skill</th><th>Command</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>
+<tr><td><a href="../registry/aider.html">aider</a></td><td><code>~/.aider.chat.history.md</code><br><code>${AIDER_CHAT_HISTORY_FILE}</code><br><code>${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md</code></td><td>⚠</td><td>✅</td><td>✕</td><td>⚠</td><td>✕</td><td>✅</td><td>deja aider</td></tr>
+<tr><td><a href="../registry/antigravity.html">Antigravity</a></td><td><code>~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl</code><br><code>${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code><br><code>${DEJA_CLAUDE_ROOT}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code><br><code><vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json</code><br><code>${DEJA_CLINE_ROOT}/*/*.messages.json</code><br><code>${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code><br><code>${CODEX_HOME:-~/.codex}/history.jsonl</code><br><code>${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
-<tr><td><a href="../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code><br><code>${XDG_DATA_HOME}/opencode/opencode.db</code><br><code>${DEJA_OPENCODE_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3</td></tr>
-<tr><td><a href="../registry/aider.html">aider</a></td><td><code>~/.aider.chat.history.md</code><br><code>${AIDER_CHAT_HISTORY_FILE}</code><br><code>${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md</code></td><td>⚠</td><td>✅</td><td>✕</td><td>⚠</td><td>✕</td><td>✅</td><td>deja aider</td></tr>
-<tr><td><a href="../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code><br><code>${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td><a href="../registry/copilot.html">Copilot CLI</a></td><td><code>${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl</code></td><td>✅</td><td>✕</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code><br><code>~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code><br><code>${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl</code><br><code>${DEJA_CURSOR_ROOT}</code><br><code>${DEJA_CURSOR_CLI_ROOT}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3 (IDE chats)</td></tr>
-<tr><td><a href="../registry/antigravity.html">Antigravity</a></td><td><code>~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl</code><br><code>${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
-<tr><td><a href="../registry/grok.html">Grok Build</a></td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code><br><code>${DEJA_GROK_ROOT}/sessions/**/updates.jsonl</code><br><code>${GROK_HOME:-~/.grok}/grok.db</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>?</td><td>✅</td><td>sqlite3 (grok-dev store)</td></tr>
-<tr><td><a href="../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/profiles/*/state.db</code><br><code>${DEJA_HERMES_PROFILES_ROOT}/*/state.db</code><br><code>${DEJA_HERMES_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>paste</td><td>sqlite3</td></tr>
+<tr><td><a href="../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl.zstd</code><br><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl</code><br><code>${DEJA_DEEPSEEK_ROOT}/*/session-*/session.jsonl.zstd</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>zstd</td></tr>
+<tr><td><a href="../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code><br><code>${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/goose.html">Goose</a></td><td><code>${GOOSE_PATH_ROOT}/data/sessions/sessions.db</code><br><code>~/.local/share/goose/sessions/*.jsonl</code><br><code>~/.local/share/goose/sessions/sessions.db</code><br><code>${XDG_DATA_HOME}/goose/sessions/*.jsonl</code><br><code>${XDG_DATA_HOME}/goose/sessions/sessions.db</code><br><code>${DEJA_GOOSE_ROOT}/sessions/*.jsonl</code><br><code>${DEJA_GOOSE_ROOT}/sessions/sessions.db</code><br><code>${DEJA_GOOSE_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>deja goose</td></tr>
-<tr><td><a href="../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td><a href="../registry/grok.html">Grok Build</a></td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code><br><code>${DEJA_GROK_ROOT}/sessions/**/updates.jsonl</code><br><code>${GROK_HOME:-~/.grok}/grok.db</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3 (grok-dev store)</td></tr>
+<tr><td><a href="../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/profiles/*/state.db</code><br><code>${DEJA_HERMES_PROFILES_ROOT}/*/state.db</code><br><code>${DEJA_HERMES_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>paste</td><td>sqlite3</td></tr>
 <tr><td><a href="../registry/kimi.html">Kimi Code</a></td><td><code>${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl</code><br><code>${DEJA_KIMI_ROOT}/sessions/*/*/agents/main/wire.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
-<tr><td><a href="../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/omp.html">omp (Oh My Pi)</a></td><td><code>${DEJA_OMP_ROOT:-~/.omp/agent/sessions}/**/*.jsonl</code><br><code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code><br><code>${XDG_DATA_HOME}/omp/sessions/**/*.jsonl</code><br><code>${XDG_DATA_HOME}/omp/profiles/*/sessions/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl</code><br><code>${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>paste</td><td>—</td></tr>
-<tr><td><a href="../registry/copilot.html">Copilot CLI</a></td><td><code>${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl</code></td><td>✅</td><td>✕</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td><a href="../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code><br><code>${XDG_DATA_HOME}/opencode/opencode.db</code><br><code>${DEJA_OPENCODE_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3</td></tr>
+<tr><td><a href="../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td><a href="../registry/prime.html">prime-agent (PrimeIntellect)</a></td><td><code>${DEJA_PRIME_ROOT:-~/.prime/agent/sessions}/**/*.jsonl</code><br><code>${PRIME_AGENT_SESSION_DIR}/**/*.jsonl</code><br><code>${PRIME_AGENT_CODING_AGENT_SESSION_DIR}/**/*.jsonl</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>?</td><td>paste</td><td>—</td></tr>
+<tr><td><a href="../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/roo.html">Roo Code</a></td><td><code><vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code><br><code>${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json</code><br><code>~/.vscode-mock/global-storage/tasks/*/api_conversation_history.json</code></td><td>✅</td><td>⚠</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>—</td></tr>
-<tr><td><a href="../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl.zstd</code><br><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl</code><br><code>${DEJA_DEEPSEEK_ROOT}/*/session-*/session.jsonl.zstd</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>zstd</td></tr>
 <tr><td><a href="../registry/zed.html">Zed</a></td><td><code>~/Library/Application Support/Zed/threads/threads.db</code><br><code>${XDG_DATA_HOME}/zed/threads/threads.db</code><br><code>%LOCALAPPDATA%/Zed/threads/threads.db</code><br><code>${DEJA_ZED_ROOT}/threads/threads.db</code><br><code>${DEJA_ZED_DB}</code></td><td>✅</td><td>✕</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>sqlite3 + zstd</td></tr>
 </table>
 <p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated</p>

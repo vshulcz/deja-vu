@@ -619,6 +619,15 @@ func Import(dir, inDir string) (int, error) {
 					titleAt[key] = sr.Time
 					titleRankOf[key] = rank
 				}
+			} else if meta.Title == "" && titleRank(sr.Role) > 0 {
+				// The same last resort ingest has: a session of nothing but
+				// harness plumbing arrives titleless and lists as a bare id
+				// here too. A real turn later in the stream replaces the
+				// stand-in, which is what the branch above does (#2548).
+				if t := strings.TrimSpace(text); t != "" {
+					meta.Title = harnessOutputTitle(t)
+					meta.AgentTitle = false
+				}
 			}
 			// A promoted note carries its state in the text: "[rejected] …".
 			// The states themselves live in the other machine's notes.jsonl,
@@ -912,8 +921,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		// imported session carried no Touched, so `deja blame` — which reads
 		// Touched to find who edited a file — could not attribute a peer's edits
 		// even though `search --role files` surfaced the same records.
-		if t := touchedFromRecords(recsByKey[key]); len(t) > 0 {
-			meta.Touched = t
+		if t, hits := touchedFromRecords(recsByKey[key]); len(t) > 0 {
+			meta.Touched, meta.TouchHits = t, hits
 		}
 		// Same reason for the asked-twice signal: without meta.Asked an imported
 		// session can never contribute a repeat to the brief, so a question a
@@ -921,6 +930,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 		if a := askedFromRecords(recsByKey[key]); len(a) > 0 {
 			meta.Asked = a
 		}
+		// And the two counts ranking divides by. A batch carries the records it
+		// carries, so these add up across batches the way the local
+		// incremental path adds them up across appends (#2569).
+		batchCounted := countedFromRecords(recsByKey[key])
+		batchWords := wordsFromRecords(recsByKey[key])
 		// And the friction signal, for the same reason: without meta.Hit the
 		// brief's one wall line never counted an error a peer kept hitting,
 		// though `deja friction` and stats both did.
@@ -949,15 +963,19 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// on hardest (#1333). Six slots mean some earlier path does lose its
 			// place — to a path the session worked on more, which is what the field
 			// holds.
-			meta.Touched = mergeTouched(old.Touched, meta.Touched)
+			meta.Touched, meta.TouchHits = mergeTouchedCounted(old.Touched, old.TouchHits, meta.Touched, meta.TouchHits)
 			meta.Asked = mergeCappedU64(old.Asked, meta.Asked, askedQuestionCap)
 			meta.Hit = mergeCappedU64(old.Hit, meta.Hit, frictionSessionCap)
 			// Same reason: a reversal reported in an earlier batch is not in
 			// this one, so OR with what the row already carried rather than
 			// letting a later batch clear the mark.
 			meta.GaveUp = old.GaveUp || batchGaveUp
+			meta.Counted = old.Counted + batchCounted
+			meta.Words = old.Words + batchWords
 		} else {
 			meta.GaveUp = batchGaveUp
+			meta.Counted = batchCounted
+			meta.Words = batchWords
 			meta.Ord = nextOrd
 			nextOrd++
 		}

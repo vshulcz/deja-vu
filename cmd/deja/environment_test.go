@@ -19,19 +19,28 @@ import (
 func seedWalls(t *testing.T, n int) string {
 	t.Helper()
 	tmp := hermeticEnv(t)
-	root := filepath.Join(tmp, "claude", "proj-w")
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		t.Fatal(err)
+	// Three project directories, because the block claims something about the
+	// machine and a wall of one repository no longer qualifies.
+	var roots []string
+	for i := 0; i < environmentMinProjects; i++ {
+		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, root)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	for i := 0; i < n; i++ {
 		sid := fmt.Sprintf("w%02d", i)
-		body := `{"type":"user","sessionId":"` + sid + `","cwd":"/w/w","timestamp":"2026-07-2` +
+		// Spread over projects: the block claims something about the machine,
+		// and a wall of one repository no longer qualifies.
+		cwd := fmt.Sprintf("/w/proj%d", i%3)
+		body := `{"type":"user","sessionId":"` + sid + `","cwd":"` + cwd + `","timestamp":"2026-07-2` +
 			fmt.Sprint(i%10) + `T10:00:00Z","message":{"role":"user","content":"run the checks"}}` + "\n" +
-			`{"type":"user","sessionId":"` + sid + `","cwd":"/w/w","timestamp":"2026-07-2` +
+			`{"type":"user","sessionId":"` + sid + `","cwd":"` + cwd + `","timestamp":"2026-07-2` +
 			fmt.Sprint(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
 			`"content":"zsh:1: command not found: shellcheck\nModuleNotFoundError: No module named 'yaml'"}]}}` + "\n"
-		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(roots[i%len(roots)], sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

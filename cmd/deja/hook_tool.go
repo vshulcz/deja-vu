@@ -78,6 +78,15 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	// other than the caller, so it answers in its own shape. See hook_spawn.go.
 	if isSpawnTool(input.ToolName) {
 		if !planIndexReady(dir) {
+			// Ask, do not build. #777 gave the per-prompt and session-start hooks
+			// this: an index in a format this build cannot read answers nothing,
+			// which reads as a user with no history, and nothing else asks for the
+			// rebuild that fixes it. A spawned subagent reaches only these hooks —
+			// install.go says so where it wires Task and Agent — so without this a
+			// fleet works against a stale index until its parent types something
+			// (#2567). requestWarmup writes a sentinel and detaches a child; the
+			// action pays neither the read nor the wait.
+			requestWarmup(dir)
 			return nil
 		}
 		return runHookSpawn(dir, input, raw, stdout)
@@ -85,6 +94,15 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	// Never build or repair from here. This runs inside an action the user is
 	// waiting on, and a miss costs nothing while a rebuild costs seconds.
 	if !planIndexReady(dir) {
+		// Ask, do not build. #777 gave the per-prompt and session-start hooks
+		// this: an index in a format this build cannot read answers nothing,
+		// which reads as a user with no history, and nothing else asks for the
+		// rebuild that fixes it. A spawned subagent reaches only these hooks —
+		// install.go says so where it wires Task and Agent — so without this a
+		// fleet works against a stale index until its parent types something
+		// (#2567). requestWarmup writes a sentinel and detaches a child; the
+		// action pays neither the read nor the wait.
+		requestWarmup(dir)
 		return nil
 	}
 	line := toolHookLine(dir, hookCWD(input.CWD), input)
@@ -165,6 +183,24 @@ func applyPatchFiles(patch string) []string {
 	return out
 }
 
+// The line says how many sessions ran this command and stops there. The obvious
+// next sentence — "and every one of them ended at the same error" — was measured
+// on a 1,365-session store and does not hold:
+//
+//   - joining by session, 359 of the 393 commands run in three or more sessions
+//     share a wall two of those sessions hit, and the pairs are nonsense:
+//     `git status --short` with "command not found: python", `cd <repo>` with
+//     "command not found: timeout". Sessions hit many walls; sharing one says
+//     nothing about the command. The commands table holds no session ids either,
+//     so the join needs a full pass over records.bin (248 ms for 275k records).
+//   - joining by adjacency — the error record that follows the command inside
+//     one session — is honest but thin: 3,489 commands are followed by an error
+//     at least once, and only 29 of them were run four times or more and ended
+//     at one error three times or more. `deja fix` and hook-tool-after already
+//     serve that shape from the other side, keyed on the error rather than on
+//     the command.
+//
+// So the count stands alone on purpose (#2587).
 func commandHookLine(dir, cwd, cmd string) string {
 	// "You have run this before" is worthless for an inspection command the
 	// agent runs constantly — git status, git diff, ls, cat. On a real store
@@ -213,10 +249,76 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// exists changes nothing. A command deserves the same: before `npm run
 	// build`, what matters is that it failed here last time and why, not that
 	// it has been run twice.
+	// A decision the user promoted about this very command comes first. The
+	// ranking below asks whether a session's words match the command's, which
+	// on a store where several sessions ran it makes those words too common to
+	// clear the idf floor — measured: every candidate at 0 informative terms,
+	// so the scan never ran and the count printed alone. Whether the promoted
+	// session ran the command is a fact rather than a ranking (#2516).
+	if d := promotedCommandDecision(dir, cwd, cmd); d != "" {
+		return head + " — last time: " + d
+	}
 	if d := commandDecisionLine(dir, cwd, cmd); d != "" {
 		return head + " — last time: " + d
 	}
 	return head + "."
+}
+
+// promotedCommandDecision is the decision this project promoted about the
+// command about to run, or "" when there is none. It reads the promoted
+// sessions of the project — few, and bounded here — and asks each whether it
+// ran this command, which is the same question CommandHistory answers in
+// aggregate.
+//
+// What that costs, measured on a store the size of a working machine (1,500
+// sessions, the command run in 188 of them): this path and the ranking path
+// below add 3–5 ms to a hook that already cost ~19 ms, six session reads in the
+// worst case, three per path (#2522). In the common case the two read the same
+// sessions — one to ask whether a promoted note belongs to it, one to ask
+// whether it ran the command — and passing the session between them would halve
+// that. Not done: 5 ms is not worth the coupling, and this is where a reader
+// would look for the number.
+func promotedCommandDecision(dir, cwd, cmd string) string {
+	names := digest.ProjectNameCandidates(cwd)
+	if len(names) == 0 {
+		return ""
+	}
+	pol := policy.Load()
+	notes := importedConventions(names)
+	for _, n := range sources.LoadPromotedNotes() {
+		if n.State != "accepted" || !inAnyProject(n.Project, names) {
+			continue
+		}
+		if n.Project != "" && !pol.Allows(policy.ActivationAuto, n.Project) {
+			continue
+		}
+		notes = append(notes, n)
+	}
+	sort.Slice(notes, func(i, j int) bool { return notes[i].At.After(notes[j].At) })
+	read := 0
+	for _, note := range notes {
+		if read >= toolHookDecisionScan {
+			break
+		}
+		harness, id, ok := strings.Cut(note.Session, ":")
+		if !ok {
+			continue
+		}
+		read++
+		s, found, err := index.FindByIdentity(dir, harness, id)
+		if err != nil || !found || !index.SessionRanCommand(s, cmd) {
+			continue
+		}
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			text = strings.TrimSpace(note.Title)
+		}
+		if text == "" {
+			continue
+		}
+		return trimTrailingFragment(search.SafeText(clipDecision(text, toolHookDecisionBudget)))
+	}
+	return ""
 }
 
 // commandDecisionLine returns what happened the last time this command ran, or
@@ -231,19 +333,31 @@ func commandDecisionLine(dir, cwd, cmd string) string {
 	if len(terms) == 0 {
 		return ""
 	}
-	ranked, matched, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
+	ranked, _, _, _, err := index.ProjectRelevant(dir, digest.ProjectNameCandidates(cwd), terms, toolHookDecisionScan)
 	if err != nil {
 		return ""
 	}
 	pol := policy.Load()
 	states := sources.PromotedLifecycles()
-	for i, s := range ranked {
-		// Every term or nothing: a build command's words are common, and one
-		// of them matching finds a session about something else entirely.
-		if matched[i] < len(terms) {
+	for _, s := range ranked {
+		// The old rule wanted every one of the command's words to be rare.
+		// Measured on 1,696 sessions, none of the fifteen most-run commands
+		// clears that: a command's words are common by construction, which is
+		// what makes it one this machine runs. `go test ./...` reduces to the
+		// single term "test", and no bar built on rarity admits it (#2520).
+		//
+		// What the rule was after — is this session about this command — is a
+		// fact rather than a ranking: did the session run it. The words still
+		// choose the candidates; running the command earns the line. A session
+		// that merely says "apply" is not the history of `terraform apply`.
+		if !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
 			continue
 		}
-		if !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
+		// The ranked sessions are served without their command records, so the
+		// question is asked of the session as the index holds it. Bounded by
+		// the same scan the ranking is.
+		whole, ok, ferr := index.FindByIdentity(dir, s.Harness, s.ID)
+		if ferr != nil || !ok || !index.SessionRanCommand(whole, cmd) {
 			continue
 		}
 		if len(s.Messages) > toolHookMsgTail {
@@ -313,8 +427,24 @@ func fileHookLine(dir, cwd, path string) string {
 	// it: a line that said "deja blame X has the history" drove no reuse, while
 	// the same moment carrying the prior decision did. So surface the decision
 	// here, and fall back to the pointer only when none can be extracted.
-	if d := fileDecisionLine(dir, inScope); d != "" {
+	// Named for what it is. A promoted note is the user's own decision; a line
+	// the conclusion scan found is the last thing a session said about the
+	// file, which is often "changed the renderer (5)". The line was built on a
+	// measurement — an agent follows a decision where it ignores a pointer —
+	// and calling filler a decision spends exactly that credibility (#2526).
+	// The command line has said the weaker "last time:" all along.
+	if d := promotedDecisionFor(inScope); d != "" {
 		return head + " — prior decision: " + d
+	}
+	if d := fileDecisionLine(dir, inScope); d != "" {
+		// A scanned line is called a decision only when it reads as one. The
+		// scan's own fallback is the newest session's closing sentence, which
+		// is as often "changed the renderer (5)" as it is a decision, and the
+		// same marker list the digest uses can tell them apart.
+		if digest.CarriesDecision(d) {
+			return head + " — prior decision: " + d
+		}
+		return head + " — last session on it ended: " + d
 	}
 	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, name)
 }
@@ -326,6 +456,14 @@ func fileHookLine(dir, cwd, path string) string {
 // digest surfaces, but delivered at the moment the file is about to change.
 func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 	sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+	// A promoted note first. It is the user's own statement about this work,
+	// which is why the session-start block leads with it and calls it standing;
+	// scanning for a conclusion instead handed back whatever the newest session
+	// happened to end with — "looked at retry.go again (5)" in front of "the
+	// retry budget stays at 5" (#2495).
+	if line := promotedDecisionFor(metas); line != "" {
+		return line
+	}
 	states := sources.PromotedLifecycles()
 	for i, meta := range metas {
 		if i >= toolHookDecisionScan {
@@ -346,6 +484,149 @@ func fileDecisionLine(dir string, metas []index.SessionMeta) string {
 		}
 	}
 	return ""
+}
+
+// promotedDecisionFor returns the newest accepted promoted note belonging to one
+// of these sessions. Accepted only, for the reason projectConventions gives: a
+// decision later reversed carries a non-accepted state, and LoadPromotedNotes
+// keeps the latest state per source.
+func promotedDecisionFor(metas []index.SessionMeta) string {
+	if len(metas) == 0 {
+		return ""
+	}
+	want := make(map[string]bool, len(metas))
+	noteKeys := make(map[string]bool, len(metas))
+	for _, meta := range metas {
+		want[meta.Harness+":"+meta.ID] = true
+		noteKeys["deja-note-"+meta.Harness+"-"+meta.ID] = true
+		if meta.OrigID != "" {
+			want[meta.Harness+":"+meta.OrigID] = true
+			noteKeys["deja-note-"+meta.Harness+"-"+meta.OrigID] = true
+		}
+	}
+	// The note's own project as well as the session it came from. The metas
+	// are already scoped by the auto activation, so a note is reached only
+	// through an allowed session — but the note carries a project of its own,
+	// and every other reader of these notes checks it (#2506).
+	pol := policy.Load()
+	var found []sources.PromotedNote
+	keep := func(note sources.PromotedNote) {
+		if note.State != "accepted" {
+			return
+		}
+		if note.Project != "" && !pol.Allows(policy.ActivationAuto, note.Project) {
+			return
+		}
+		found = append(found, note)
+	}
+	for _, note := range sources.LoadPromotedNotes() {
+		if !want[note.Session] {
+			continue
+		}
+		keep(note)
+	}
+	// And the decisions that arrived by sync. Those are not in this machine's
+	// notes file at all — a promotion crosses as a session of its own, carrying
+	// the state, which is how the view page reads them (#2421). It touched no
+	// file, so it is never among the sessions this file has; what ties it back
+	// is the id a note is built from, `deja-note-<harness>-<id>`, derived here
+	// from the session rather than parsed out of the note (harness names carry
+	// dashes, so the id does not invert). Without this a decision promoted on
+	// one machine was a decision in search on the other and filler prose at the
+	// moment of the edit (#2510).
+	for _, meta := range metas {
+		if meta.Lifecycle != "" {
+			keep(noteFromMeta(meta))
+		}
+	}
+	if len(noteKeys) > 0 {
+		for _, note := range index.PromotedNoteMetas(index.DefaultDir(), func(project string) bool {
+			return pol.Allows(policy.ActivationAuto, project)
+		}) {
+			id := note.OrigID
+			if id == "" {
+				id = note.ID
+			}
+			if !noteKeys[id] {
+				continue
+			}
+			keep(noteFromMeta(note))
+		}
+	}
+	return decisionLineOf(found, toolHookDecisionBudget)
+}
+
+// decisionLineOf words what this file or command has standing, newest first.
+//
+// Two, when they fit. A file often has a broad rule and a narrow exception, and
+// the exception is newer almost by definition — it is an exception to something
+// — so showing only the newest handed the agent the half that reverses the
+// rule, with nothing to say the rule existed (#2524). When the second does not
+// fit, the line says one was left out rather than leaving the narrower half
+// standing alone.
+func decisionLineOf(notes []sources.PromotedNote, budget int) string {
+	sort.SliceStable(notes, func(i, j int) bool { return notes[i].At.After(notes[j].At) })
+	var lines []string
+	seen := map[string]bool{}
+	for _, note := range notes {
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			text = strings.TrimSpace(note.Title)
+		}
+		if text == "" {
+			continue
+		}
+		text = trimTrailingFragment(search.SafeText(clipDecision(text, budget)))
+		if text == "" || seen[strings.ToLower(text)] {
+			continue
+		}
+		seen[strings.ToLower(text)] = true
+		lines = append(lines, text)
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	out := lines[0]
+	rest := len(lines) - 1
+	if rest > 0 {
+		if joined := out + "; also: " + lines[1]; len(joined) <= budget {
+			out, rest = joined, rest-1
+		}
+	}
+	if rest > 0 {
+		out += fmt.Sprintf(" (+%d more standing here)", rest)
+	}
+	return out
+}
+
+// noteFromMeta reads the decision a session carries as a promoted note, so the
+// two sources — this machine's notes file and what arrived by sync — can be
+// weighed against each other by one rule.
+func noteFromMeta(meta index.SessionMeta) sources.PromotedNote {
+	when := meta.Updated
+	if t, err := time.Parse(time.RFC3339, meta.LifecycleAt); err == nil {
+		when = t
+	}
+	text := meta.LifecycleNote
+	if strings.TrimSpace(text) == "" {
+		text = meta.Title
+	}
+	return sources.PromotedNote{Project: meta.Project, State: meta.Lifecycle, Title: meta.Title, Text: text, At: when}
+}
+
+// clipDecision keeps a promoted note inside the same budget a scanned
+// conclusion is held to, so one long note cannot take the line over.
+func clipDecision(s string, budget int) string {
+	if len(s) <= budget {
+		return s
+	}
+	// On a rune boundary: a note in Russian or Japanese cut mid-character puts
+	// invalid UTF-8 into the payload an agent is handed.
+	end := budget
+	for end > 0 && !utf8.ValidString(s[:end]) {
+		end--
+	}
+	return s[:end]
 }
 
 // decisionUsable rejects a session whose decision should not be reused: one that

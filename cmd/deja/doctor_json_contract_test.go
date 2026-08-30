@@ -36,7 +36,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	documented := map[string]bool{
 		// doctorReport
 		"schema_version": true, "stores": true, "index": true, "mcp": true,
-		"sqlite3": true, "version": true, "embed": true, "policy": true,
+		"sqlite3": true, "git": true, "version": true, "embed": true, "policy": true,
 		"ingest_health": true, "ingest_files": true, "deep": true,
 		// doctorStore
 		"name": true, "state": true, "paths": true, "files": true,
@@ -55,6 +55,8 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"sync": true, "peers": true, "host": true,
 		"last_push": true, "last_pull": true, "sessions_from_there": true,
 		"stamped_ahead": true,
+		// doctorImportedReport: the machines with no peer row of their own.
+		"imported": true, "machine": true, "sessions": true,
 		// index.HarnessIngest
 		"malformed_lines": true, "clipped_messages": true,
 		// index.FileIngest

@@ -189,21 +189,35 @@ func doctorHooks(w io.Writer) {
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", path)
+		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", reportPath(path))
 		return
 	}
 	var root map[string]any
 	if json.Unmarshal(b, &root) != nil {
-		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", path)
+		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", reportPath(path))
 		return
 	}
 	hooks, _ := root["hooks"].(map[string]any)
-	precompact := hookEventWired(hooks, "PreCompact", "hook-precompact")
-	status := "missing"
-	if precompact {
-		status = "wired"
+	var missing []string
+	for _, h := range claudeHookWiring {
+		if !hookEventWired(hooks, h.Event, h.Sub) {
+			missing = append(missing, h.Event)
+		}
 	}
-	fmt.Fprintf(w, "  %-12s %-11s %s\n", "precompact", status, path)
+	status := "wired"
+	if len(missing) == len(claudeHookWiring) {
+		status = "missing"
+	} else if len(missing) > 0 {
+		status = "out of date"
+	}
+	fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", status, reportPath(path))
+	if len(missing) > 0 && len(missing) < len(claudeHookWiring) {
+		// Named, because the difference is what the machine is missing out on:
+		// a settings.json written by an older deja keeps working and quietly
+		// lacks everything added since.
+		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install`\n",
+			len(claudeHookWiring)-len(missing), len(claudeHookWiring), strings.Join(missing, ", "))
+	}
 }
 
 // doctorWiringExe reports configs that name a binary which is no longer there.
@@ -239,7 +253,7 @@ func doctorCodexHook(w io.Writer) {
 				"codex-hook", "plugin", hooksPath)
 			return
 		}
-		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", hooksPath)
+		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", reportPath(hooksPath))
 		return
 	}
 	cfgPath := filepath.Join(sources.CodexHome(), "config.toml")
@@ -266,7 +280,28 @@ func doctorCodexHook(w io.Writer) {
 			status = "wired"
 		}
 	}
+	// Trusted is not the same as complete: the entry codex approved may be one
+	// written before the other events existed.
+	var missing []string
+	if status == "wired" {
+		var root map[string]any
+		if b, rerr := os.ReadFile(hooksPath); rerr == nil && json.Unmarshal(b, &root) == nil {
+			hooks, _ := root["hooks"].(map[string]any)
+			for _, h := range codexHookWiring {
+				if !hookEventWired(hooks, h.Event, h.Sub) {
+					missing = append(missing, h.Event)
+				}
+			}
+		}
+		if len(missing) > 0 {
+			status = "out of date"
+		}
+	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
+	if len(missing) > 0 {
+		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install`",
+			len(codexHookWiring)-len(missing), len(codexHookWiring), strings.Join(missing, ", "))
+	}
 	if status == "untrusted" {
 		line += "  (codex has not been shown it — open codex once and approve it, or run /hooks; until then `codex exec` runs no hook at all)"
 	}
@@ -391,7 +426,15 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 			// The store is there and deja cannot read it — usually a harness
 			// that changed its format. Silence here reads as "you have no
 			// history with that agent".
-			fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
+			// With the reason. "Please report it" and nothing to report is how
+			// #1642 arrived: a store deja refused, and no way for its owner or
+			// for us to tell which refusal it was.
+			if store.Error != "" {
+				fmt.Fprintf(w, "  warning      %s store cannot be read — %s; please report it\n",
+					store.Name, store.Error)
+			} else {
+				fmt.Fprintf(w, "  warning      %s store cannot be read — its format may have changed; please report it\n", store.Name)
+			}
 		case "denied":
 			// Not a format change and not an empty history: deja is not
 			// allowed to read the files. On macOS this is usually Full Disk
@@ -604,7 +647,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		// A store path can come from the environment (DEJA_NOTES_FILE) or from
 		// disk. On a fixed-width row a newline in it prints a line of its own
 		// that reads as one of doctor's.
-		line := fmt.Sprintf("  %-12s %-9s %s", name, status, search.SafePath(path))
+		line := fmt.Sprintf("  %-12s %-9s %s", name, status, reportPath(path))
 		if detail != "" {
 			line += "  (" + detail + ")"
 		}
@@ -693,6 +736,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// now holds these rows to it.
 	ompRoot := sources.OmpRoot()
 	printFiles("omp", ompRoot, doctorExists(ompRoot), sources.OmpSessionFiles())
+	primeRoot := sources.PrimeRoot()
+	printFiles("prime", primeRoot, doctorExists(primeRoot), sources.PrimeSessionFiles())
 	dshRoot := sources.DeepSeekRoot()
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
 	zedDB := sources.ZedDB()
@@ -764,7 +809,9 @@ func doctorCursorPresent() bool {
 }
 
 func doctorCursorLocation() string {
-	return strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, ", ")
+	// Contracted here rather than by the row: this location is two paths in one
+	// string, and the row's own contraction only reaches the first (#2360).
+	return strings.Join([]string{reportPath(sources.CursorUserRoot()), reportPath(sources.CursorCLIRoot())}, ", ")
 }
 
 func doctorAiderLocation() string {
@@ -861,7 +908,7 @@ func doctorPolicy(w io.Writer, dir string) {
 		// was local-only, on the one screen someone opens to find out what is
 		// allowed (#939).
 		if pol := policy.Load(); pol.Describe(policy.ActivationAuto) != "local+imported" {
-			fmt.Fprintf(w, "  %-12s no file at %s\n", "default", policy.Path())
+			fmt.Fprintf(w, "  %-12s no file at %s\n", "default", reportPath(policy.Path()))
 			withheld, total := policyWithheldCounts(dir)
 			for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
 				line := pol.Describe(activation)
@@ -873,7 +920,7 @@ func doctorPolicy(w io.Writer, dir string) {
 			fmt.Fprintf(w, "  %-12s DEJA_AUTORECALL_LOCAL_ONLY is set in this environment\n", "from env")
 			return
 		}
-		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", policy.Path())
+		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", reportPath(policy.Path()))
 		// Except one thing, which is in force with or without a file and is
 		// the reason a directory can be missing from recall (#2050).
 		printIgnored(w, policy.Load())
@@ -882,7 +929,7 @@ func doctorPolicy(w io.Writer, dir string) {
 	if err != nil {
 		// The permissive default is what is actually in force, and that is the
 		// part worth saying out loud: the file reads like a restriction.
-		fmt.Fprintf(w, "  %-12s %s: %v\n", "unreadable", policy.Path(), err)
+		fmt.Fprintf(w, "  %-12s %s: %v\n", "unreadable", reportPath(policy.Path()), err)
 		fmt.Fprintf(w, "  %-12s every origin activates everywhere until it parses\n", "in force")
 		return
 	}
@@ -934,7 +981,17 @@ func doctorMCP(w io.Writer) {
 		if status != "wired" && c.name == "codex" && codexPluginInstalled() {
 			status = "plugin"
 		}
-		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), c.path)
+		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), reportPath(c.path))
+		// One "wired" can be two registrations: a hand add under another name
+		// — the project is called deja-vu, after all — plus the `deja` a later
+		// install wrote beside it. Each session then starts the server twice
+		// and carries the tool schema twice, and the boolean above cannot say
+		// so (#2269).
+		if status == "wired" && c.dupes != nil {
+			if keys := c.dupes(c.path); len(keys) >= 2 {
+				fmt.Fprintf(w, "  %-12s %s\n", "", doctorMCPDuplicateNote(keys))
+			}
+		}
 		// "Wired" says the server is declared, not that it can start. A config
 		// naming a binary that is gone — a restored backup, a hand edit, a
 		// machine where deja moved and one file was fixed by hand — read as
@@ -949,6 +1006,22 @@ func doctorMCP(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %s\n", "", note)
 		}
 	}
+}
+
+// doctorMCPDuplicateNote is the line a duplicated setup never got to read: it
+// names every key so the reader can decide which one is theirs. Which one to
+// remove is not deja's call — one of them may be a hand add carrying fields
+// deja does not know about (#2269).
+func doctorMCPDuplicateNote(keys []string) string {
+	quoted := make([]string, len(keys))
+	for i, key := range keys {
+		quoted[i] = "`" + strings.ReplaceAll(key, "`", "'") + "`"
+	}
+	names := strings.Join(quoted, ", ")
+	if len(keys) == 2 {
+		return fmt.Sprintf("two entries in this config run deja (%s) — every session starts the server twice", names)
+	}
+	return fmt.Sprintf("%d entries in this config run deja (%s) — every session starts the server %d times", len(keys), names, len(keys))
 }
 
 // dejaCommandMissing returns the deja binary a config names when that file is
@@ -1069,27 +1142,31 @@ type doctorMCPConfig struct {
 	name  string
 	path  string
 	wired func(string) bool
+	// dupes lists every key in the config that runs deja, so doctorMCP can say
+	// when "wired" is really two registrations (#2269). Nil where the format
+	// has no counting probe — the boolean is then all doctor can promise.
+	dupes func(string) []string
 }
 
 func doctorMCPConfigs() []doctorMCPConfig {
 	return []doctorMCPConfig{
-		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers")},
-		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired},
-		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp")},
-		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers")},
-		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers")},
-		{"antigravity", filepath.Join(antigravityConfigHome(), "mcp_config.json"), doctorJSONWired("mcpServers")},
-		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired},
-		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers")},
-		{"kimi", filepath.Join(sources.KimiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
-		{"cline", sources.ClineMCPSettingsPath(), doctorJSONWired("mcpServers")},
-		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
-		{"omp", filepath.Join(sources.OmpConfigDir(), "mcp.json"), doctorJSONWired("mcpServers")},
-		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired},
-		{"copilot", guidancePath("copilot"), doctorFileWired},
-		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired},
-		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired},
-		{"zed", sources.ZedSettingsPath(), doctorZedWired},
+		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired, doctorTOMLDejaKeys},
+		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp"), doctorJSONDejaKeys("mcp")},
+		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"antigravity", filepath.Join(antigravityConfigHome(), "mcp_config.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"grok", filepath.Join(sources.GrokHome(), "config.toml"), doctorTOMLWired, doctorTOMLDejaKeys},
+		{"qwen", filepath.Join(sources.QwenConfigDir(), "settings.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"kimi", filepath.Join(sources.KimiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"cline", sources.ClineMCPSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"omp", filepath.Join(sources.OmpConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired, nil},
+		{"copilot", guidancePath("copilot"), doctorFileWired, nil},
+		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired, nil},
+		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired, nil},
+		{"zed", sources.ZedSettingsPath(), doctorZedWired, nil},
 	}
 }
 
@@ -1170,9 +1247,43 @@ func doctorJSONWired(key string) func(string) bool {
 	}
 }
 
+// doctorJSONDejaKeys lists every key in the config's server block that runs
+// deja: the literal `deja` first, then the hand-named rest in sorted order, so
+// the duplicate line reads the same on every run (#2269). Nil on a file that
+// will not parse — the substring fallback above can say "wired", but it
+// cannot count.
+func doctorJSONDejaKeys(key string) func(string) []string {
+	return func(path string) []string {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		var root map[string]any
+		if json.Unmarshal(b, &root) != nil {
+			return nil
+		}
+		m, _ := root[key].(map[string]any)
+		if m == nil {
+			return nil
+		}
+		var out []string
+		if _, ok := m["deja"]; ok {
+			out = append(out, "deja")
+		}
+		var rest []string
+		for name, entry := range m {
+			if name != "deja" && mcpEntryRunsDeja(entry) {
+				rest = append(rest, name)
+			}
+		}
+		sort.Strings(rest)
+		return append(out, rest...)
+	}
+}
+
 // mcpEntryRunsDeja reports whether an MCP server entry launches deja, in any
-// of the shapes clients accept: a bare command, a command plus args, or a
-// nested transport object.
+// of the shapes clients accept: a bare command, a command plus args, a command
+// written as one list, or a nested transport object.
 func mcpEntryRunsDeja(v any) bool {
 	m, _ := v.(map[string]any)
 	if m == nil {
@@ -1183,9 +1294,18 @@ func mcpEntryRunsDeja(v any) bool {
 			return true
 		}
 	}
-	cmd, _ := m["command"].(string)
-	if commandIsDeja(cmd) {
-		return true
+	switch cmd := m["command"].(type) {
+	case string:
+		if commandIsDeja(cmd) {
+			return true
+		}
+	case []any:
+		// Opencode's entry keeps the command as one list, written by deja's own installer.
+		for _, word := range cmd {
+			if s, ok := word.(string); ok && commandIsDeja(s) {
+				return true
+			}
+		}
 	}
 	// Windows and npx-style wiring puts the binary in args instead.
 	args, _ := m["args"].([]any)
@@ -1211,26 +1331,61 @@ func commandIsDeja(cmd string) bool {
 }
 
 func doctorTOMLWired(path string) bool {
+	return len(doctorTOMLDejaKeys(path)) > 0
+}
+
+// doctorTOMLDejaKeys is the TOML side of the same count: every
+// `[mcp_servers.X]` block that runs deja, the literal `deja` first (its header
+// alone is enough — deja wrote it), then the hand-named rest sorted (#2269).
+// Same reasoning as the JSON probe for the names: a hand-wired server under
+// another name still runs deja. Attribution is per block rather than the old
+// whole-file scan, because a `command` line elsewhere in this config — a hook,
+// say — is not MCP wiring; and args count as well as command, since Windows
+// wiring runs deja behind a `cmd /c` shim.
+func doctorTOMLDejaKeys(path string) []string {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return false
+		return nil
 	}
-	if strings.Contains(string(b), "[mcp_servers.deja]") {
-		return true
-	}
-	// Same reasoning as the JSON probe: a hand-wired server under another
-	// name still runs deja. The TOML here is small and flat enough that
-	// finding a command line naming the binary is enough.
+	found := map[string]bool{}
+	current := ""
 	for _, line := range strings.Split(string(b), "\n") {
-		key, value, ok := strings.Cut(line, "=")
-		if !ok || strings.TrimSpace(key) != "command" {
+		if key, ok := tomlMCPHeader(line); ok {
+			current = key
+			if key == "deja" {
+				found[key] = true
+			}
 			continue
 		}
-		if commandIsDeja(strings.Trim(strings.TrimSpace(value), `"`)) {
-			return true
+		if strings.HasPrefix(strings.TrimSpace(line), "[") {
+			current = ""
+			continue
+		}
+		if current == "" || found[current] {
+			continue
+		}
+		key, value, ok := tomlLineKeyValue(line)
+		if !ok || (key != "command" && key != "args") {
+			continue
+		}
+		for _, value := range tomlStringValues(value) {
+			if commandIsDeja(value) {
+				found[current] = true
+				break
+			}
 		}
 	}
-	return false
+	var out []string
+	if found["deja"] {
+		out = append(out, "deja")
+		delete(found, "deja")
+	}
+	rest := make([]string, 0, len(found))
+	for key := range found {
+		rest = append(rest, key)
+	}
+	sort.Strings(rest)
+	return append(out, rest...)
 }
 
 // indexFormatDirection is a variable so a test can put doctor in front of an
@@ -1243,7 +1398,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	if loc == "" {
 		loc = dir
 	}
-	fmt.Fprintf(w, "  location %s\n", loc)
+	fmt.Fprintf(w, "  location %s\n", reportPath(loc))
 	fmt.Fprintf(w, "  exclusions %d active patterns\n", len(sources.ExclusionPatterns()))
 	// A precise non-claim: users deciding what to trust deserve to read the
 	// boundary in the tool itself, not only in the security docs.
@@ -1254,7 +1409,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// the command people run when memory looks absent, so this is the
 		// worst place to describe it as absent (#873).
 		if st := readWarmupStatus(dir); st != nil {
-			fmt.Fprintf(w, "  status   building now (%s) — recall comes online in a few seconds\n", st.progress())
+			fmt.Fprintf(w, "  status   building now (%s) — recall comes online when it finishes\n", st.progress())
 			return
 		}
 		// A build requested moments ago has published no progress yet, and
@@ -1262,7 +1417,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// running — the first build after install is exactly that state
 		// (#925).
 		if warmupJustRequested(dir) {
-			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online in a few seconds")
+			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online when it finishes")
 			return
 		}
 		// An index whose disk was unplugged is not a missing index, and
@@ -1432,6 +1587,41 @@ func doctorVersion(w io.Writer, lookup doctorVersionLookup) {
 	if current == "dev" || current == "" {
 		fmt.Fprintln(w, "  status   dev build")
 	}
+}
+
+// reportPath is how the human report names a file: control characters
+// sanitised, and a home-prefixed path contracted to ~. The issue template asks
+// a reporter to "run deja doctor and redact local paths before pasting", which
+// is work this report can do for them — ~/.claude/projects is as actionable as
+// the absolute form for the person who ran it (#2360). --json keeps the real
+// path: a tool reading it may need one, and nobody pastes JSON by hand.
+func reportPath(p string) string {
+	if p == "" {
+		return p
+	}
+	// Some rows carry several paths in one string — a store deja looks for in
+	// two places, or a root list from the environment. Contracting the whole
+	// string would only reach the first, which is how the cursor row came out
+	// half in ~ and half in /Users/… .
+	parts := strings.Split(p, string(os.PathListSeparator))
+	for i, part := range parts {
+		parts[i] = search.SafePath(underHome(part))
+	}
+	return strings.Join(parts, string(os.PathListSeparator))
+}
+
+// underHome contracts a home-prefixed path to ~, and leaves everything else
+// alone. The boundary check keeps /home/alicia out of alice's tilde.
+func underHome(p string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || !strings.HasPrefix(p, home) {
+		return p
+	}
+	rest := strings.TrimPrefix(p, home)
+	if rest == "" || rest[0] == '/' || rest[0] == '\\' {
+		return "~" + rest
+	}
+	return p
 }
 
 func doctorCount(n int, noun string) string {

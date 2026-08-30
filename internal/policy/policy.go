@@ -214,6 +214,21 @@ func Diagnose() (exists bool, unknown []string, err error) {
 	if jerr := json.Unmarshal(b, &p); jerr != nil {
 		return true, nil, jerr
 	}
+	// The whole shape, before the keys inside it. A file written from memory or
+	// from another tool's config — `{"rules":[{"project":…,"auto":"deny"}]}` —
+	// parses into an empty policy, denies nothing, and read exactly like a rule
+	// that works, while the checks below only ever looked inside `activations`
+	// (#2504).
+	var top map[string]json.RawMessage
+	if json.Unmarshal(b, &top) == nil {
+		for key := range top {
+			switch key {
+			case "activations", "ignore":
+			default:
+				unknown = append(unknown, key)
+			}
+		}
+	}
 	// A file that parses but names an activation or origin deja never consults
 	// is silently doing nothing, which reads exactly like a rule that works.
 	for activation, rules := range p.Activations {

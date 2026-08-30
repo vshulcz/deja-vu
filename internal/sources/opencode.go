@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -135,7 +136,12 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", "-json", db, ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
+	// What sqlite3 says when it refuses, not merely that it did. "exit status
+	// 1" is what a person was asked to report, and it names neither a renamed
+	// column nor a locked database nor a file that is not a database (#1642).
+	var whyNot bytes.Buffer
+	cmd.Stderr = &whyNot
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -155,7 +161,8 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 			// a whole harness disappear from recall while doctor still calls
 			// the store healthy.
 			if waitErr != nil {
-				return nil, fmt.Errorf("opencode: query failed, the store schema may have changed: %w", waitErr)
+				return nil, fmt.Errorf("opencode: query failed, the store schema may have changed: %w",
+					withStderr(waitErr, &whyNot))
 			}
 			return nil, nil
 		}
@@ -265,7 +272,7 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	if fi, e := os.Stat(OpencodeDB()); e != nil || fi.Size() == 0 {
 		return 0, 0, nil
 	}
-	cmd := exec.Command("sqlite3", "-readonly", OpencodeDB(), ".timeout 5000", "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(OpencodeDB()), ".timeout 5000", "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
 	b, err := cmd.Output()
 	if err != nil {
 		return 0, 0, err
@@ -312,9 +319,16 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	out, err := exec.Command("sqlite3", "-readonly", db, ".timeout 5000", "select id from session order by time_created desc limit 1").Output()
+	probe := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
+		"select id from session order by time_created desc limit 1")
+	var whyNot bytes.Buffer
+	probe.Stderr = &whyNot
+	out, err := probe.Output()
 	if err != nil {
-		return nil, err
+		// This is the first thing doctor runs against the store, so it is the
+		// one whose complaint a person is shown. "exit status 1" named nothing
+		// (#1642).
+		return nil, withStderr(err, &whyNot)
 	}
 	id := strings.TrimSpace(string(out))
 	if id == "" {
@@ -392,4 +406,24 @@ func exitCode(v any) int {
 		return i
 	}
 	return 0
+}
+
+// sqliteStderrMax bounds what a failing sqlite3 is quoted saying. Its first
+// line names the cause; the rest is the query it was handed, which is a
+// screenful and says nothing a reader does not already have.
+const sqliteStderrMax = 200
+
+// withStderr turns "exit status 1" into what the tool actually said.
+func withStderr(err error, buf *bytes.Buffer) error {
+	msg := strings.TrimSpace(buf.String())
+	if msg == "" {
+		return err
+	}
+	if i := strings.IndexAny(msg, "\r\n"); i >= 0 {
+		msg = strings.TrimSpace(msg[:i])
+	}
+	if len(msg) > sqliteStderrMax {
+		msg = strings.TrimSpace(msg[:sqliteStderrMax]) + "…"
+	}
+	return fmt.Errorf("%s (%w)", msg, err)
 }

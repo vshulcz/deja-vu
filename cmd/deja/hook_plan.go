@@ -103,6 +103,15 @@ func planFindings(dir, plan, sessionID string) []string {
 	// This path never asks for a rebuild. A missing, stale, or damaged
 	// snapshot is a silent miss so plan submission cannot block on indexing.
 	if !planIndexReady(dir) {
+		// Ask, do not build. #777 gave the per-prompt and session-start hooks
+		// this: an index in a format this build cannot read answers nothing,
+		// which reads as a user with no history, and nothing else asks for the
+		// rebuild that fixes it. A spawned subagent reaches only these hooks —
+		// install.go says so where it wires Task and Agent — so without this a
+		// fleet works against a stale index until its parent types something
+		// (#2567). requestWarmup writes a sentinel and detaches a child; the
+		// action pays neither the read nor the wait.
+		requestWarmup(dir)
 		return nil
 	}
 
@@ -143,6 +152,22 @@ func planFindings(dir, plan, sessionID string) []string {
 		line := formatPlanFinding(match)
 		if line == "" {
 			continue
+		}
+		// What this machine ran after that error. The plan hook speaks before
+		// the agent walks into the wall, which is the best moment deja has,
+		// and it named the wall and stopped — while `deja fix` answered the
+		// same error with the way past it. Same source, same activation the
+		// walls above are filtered by, and only a confirmed pair (#2458).
+		//
+		// Beside the census command, not instead of it. The two are different
+		// claims — one is what the plan's own step matched in those sessions,
+		// which is usually the command about to be run again; the other is
+		// what followed the error. Withholding the second whenever the first
+		// was found meant the closer the plan came to repeating the failure,
+		// the less deja said (#2485).
+		if fix := planRemedy(dir, match.Wall.Text); fix != "" &&
+			!strings.EqualFold(strings.TrimSpace(fix), strings.TrimSpace(strings.TrimPrefix(match.Command, "$ "))) {
+			line += fmt.Sprintf("; what followed it: %s", strconv.Quote(neutralPlanEvidence(fix)))
 		}
 		findings = append(findings, planFinding{
 			line:     line,
@@ -291,6 +316,28 @@ func planSearchSteps(plan string) [][]string {
 	}
 	return out
 }
+
+// planRemedy is the command recorded after a wall, for the finding above. Only
+// a confirmed pair — a candidate is a guess, and a guess handed to an agent
+// about to act is worse than silence.
+func planRemedy(dir, wall string) string {
+	pol := policy.Load()
+	fixes := index.FixesFor(dir, wall, 1, func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project)
+	})
+	if len(fixes) == 0 || fixes[0].Candidate {
+		return ""
+	}
+	cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(fixes[0].Command), "$ "))
+	if cmd == "" || len(cmd) > planCommandMax {
+		return ""
+	}
+	return cmd
+}
+
+// planCommandMax bounds the remedy clause: the finding rides in a block that
+// is budgeted, and a command longer than this is a script rather than a step.
+const planCommandMax = 120
 
 // formatPlanFinding reports the wall recurrence — the fact a census
 // verified (internal/index/plan.go's PlanCooccurrence doc) — and, only when

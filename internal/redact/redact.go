@@ -65,6 +65,16 @@ var (
 	// authentication failed" has no quoted value and matches nothing.
 	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(\\*["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(\\*["'` + "`" + `])`)
 	pemPrivateRE   = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
+	// A key pasted into a transcript is often not pasted whole: the output was
+	// truncated, the session ended, the tail landed in another message. The
+	// closing marker was required, so the half that carries the key material
+	// was the half that went through (#2409). This runs after the whole-block
+	// pattern and takes the header plus the base64 lines under it — the lines,
+	// not the rest of the message, so the prose around a key survives.
+	// At least one body line: a bare header carries nothing, and eating it
+	// alone would hide the marker that lets the whole-block pattern pair it
+	// with a body that arrives in the next field.
+	pemPrivateOpenRE = regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----(?:[ \t]*\r?\n[A-Za-z0-9+/=]{16,}[ \t]*)+`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
 	// sk-<alnum> keys. xai- stays alphanumeric-only: real xAI keys have no
@@ -179,6 +189,7 @@ func Text(s string) (string, Counts) {
 	lower := strings.ToLower(s)
 	if strings.Contains(s, "-----BEGIN") {
 		s = replaceWhole(s, pemPrivateRE, "private-key", counts)
+		s = replaceWhole(s, pemPrivateOpenRE, "private-key", counts)
 	}
 	if strings.Contains(s, "://") {
 		s = replaceSubmatch(s, connURLRE, "url-credentials", counts, func(m []string) string {

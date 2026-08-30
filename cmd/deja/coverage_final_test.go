@@ -51,7 +51,7 @@ func TestInstallClaudeHookMalformedExisting(t *testing.T) {
 }
 
 func TestUpdateOpencodeJSONCEmptyUninstall(t *testing.T) {
-	b, err := updateOpencodeJSONC(nil, "/bin/deja", true)
+	b, _, err := updateOpencodeJSONC(nil, "/bin/deja", true)
 	if err != nil {
 		t.Fatal(err)
 	}

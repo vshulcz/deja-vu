@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,11 +30,21 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 		fmt.Fprintf(w, "  %-12s %s could not be read — %s\n", "peers", peers.Path(), safeForStatusline(why, 200))
 		return
 	}
+	from := importsByPeerName(dir)
 	if len(list) == 0 {
+		// A directory import is how a first exchange happens, before any
+		// `sync ssh` exists — and the manifest knows which machine each
+		// session came from. Saying "no other machines yet" while five of
+		// their sessions answer recall is the screen contradicting the store
+		// (#2378).
+		if line := importedFromLine(from); line != "" {
+			fmt.Fprintf(w, "  %-12s %s\n", "imported", line)
+			fmt.Fprintf(w, "  %-12s no sync target yet — `deja sync ssh <host>` once, then `deja sync` keeps them all in step\n", "peers")
+			return
+		}
 		fmt.Fprintf(w, "  %-12s no other machines yet — `deja sync ssh <host>` once, then `deja sync` keeps them all in step\n", "peers")
 		return
 	}
-	from := importsByPeerName(dir)
 	// The column is padded by what the terminal draws, not by how many runes
 	// the name has: %-12s gave a 32-character name no padding at all and
 	// treated a CJK name as one column per character (#1821). A name wider
@@ -57,6 +68,10 @@ func doctorPeers(w io.Writer, dir string, now time.Time) {
 		fmt.Fprintf(w, "  %s%s %s\n", names[i], strings.Repeat(" ", pad), state)
 	}
 }
+
+// doctorPeerNameMax bounds the machine name in a peer row. It is a string
+// another machine chose, like the imported line's names (#2364).
+const doctorPeerNameMax = 60
 
 const (
 	// doctorPeerColumn is the narrowest the name column gets, so a machine
@@ -111,12 +126,33 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 	if sessions > 0 {
 		line += fmt.Sprintf(", %s from there", doctorCount(sessions, "session"))
 	}
+	// A peer has two names — the ssh host it was added under, which heads this
+	// row, and the name it calls itself, which is what `deja last` and the
+	// recall lines print for work that came from it. Nothing joined them, so
+	// the row about quicksilver's sessions was headed vlad@10.0.0.7 (#2415).
+	// Said once: a machine added under the name it calls itself repeats
+	// nothing.
+	if m := strings.TrimSpace(p.Machine); m != "" && !sameMachineName(m, p.Host) {
+		line += fmt.Sprintf(" — calls itself %s", safeForStatusline(m, doctorPeerNameMax))
+	}
 	if p.LastError != "" {
 		// The stored error usually quotes the host back, so it carries whatever
 		// the name carried.
 		line += " — last attempt failed: " + safeForStatusline(p.LastError, 200)
 	}
 	return line
+}
+
+// sameMachineName reports whether a machine's own name is already what the
+// host says. The user part of an ssh target is not part of the name — a peer
+// added as vlad@quicksilver that calls itself quicksilver has one name, not
+// two, and saying it twice is noise.
+func sameMachineName(machine, host string) bool {
+	host = strings.TrimSpace(host)
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		host = host[at+1:]
+	}
+	return strings.EqualFold(machine, host)
 }
 
 // doctorAgo is a rough age. Anything under a minute is "just now": a sync that
@@ -189,3 +225,42 @@ func learnPeerMachine(dir, host string, before map[string]int) {
 	// written down.
 	_ = peers.Learn(host, best)
 }
+
+// importedFromLine says what has arrived from machines this one has no sync
+// target for, newest counts first. The names come from another machine, so they
+// are sanitised and bounded like every other borrowed string on this screen.
+func importedFromLine(from map[string]int) string {
+	if len(from) == 0 {
+		return ""
+	}
+	names := make([]string, 0, len(from))
+	total := 0
+	for name, n := range from {
+		names = append(names, name)
+		total += n
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if from[names[i]] != from[names[j]] {
+			return from[names[i]] > from[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	shown := names
+	more := 0
+	if len(shown) > doctorImportedNames {
+		more = len(shown) - doctorImportedNames
+		shown = shown[:doctorImportedNames]
+	}
+	for i, name := range shown {
+		shown[i] = safeForStatusline(hostForEcho(name), 60)
+	}
+	line := fmt.Sprintf("%s from %s", doctorCount(total, "session"), strings.Join(shown, ", "))
+	if more > 0 {
+		line += fmt.Sprintf(" and %d more", more)
+	}
+	return line
+}
+
+// doctorImportedNames bounds how many machine names the line carries; the rest
+// are counted rather than listed.
+const doctorImportedNames = 4

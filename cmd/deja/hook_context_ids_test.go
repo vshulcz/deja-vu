@@ -73,10 +73,10 @@ func TestACachedDigestStillLogsItsSessions(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
 
 	// First call fills the cache; the second must be the hit.
-	if _, _, _, _, _, ids := cachedHookDigest(index.DefaultDir()); len(ids) == 0 {
+	if _, _, _, _, _, ids, _ := cachedHookDigest(index.DefaultDir()); len(ids) == 0 {
 		t.Fatal("the cold path carried no ids, so the cached one cannot be judged")
 	}
-	_, _, _, _, _, cached := cachedHookDigest(index.DefaultDir())
+	_, _, _, _, _, cached, _ := cachedHookDigest(index.DefaultDir())
 	if len(cached) == 0 {
 		t.Error("a cache hit lost the sessions the digest carries")
 	}

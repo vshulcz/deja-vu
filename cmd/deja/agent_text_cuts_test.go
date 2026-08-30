@@ -34,13 +34,18 @@ func TestAgentFacingTextIsCutOnRuneBoundaries(t *testing.T) {
 	}
 }
 
-// A note that fits keeps its whole text, and a title still wins over the body.
+// A note that fits keeps its whole text, and the decision is what the line
+// carries — the title is the session's own opening line, which is the problem
+// rather than what was decided about it (#2456).
 func TestAShortConventionKeepsItsText(t *testing.T) {
 	if got := conventionLine(sources.PromotedNote{Text: "queue retries with full jitter"}); got != "queue retries with full jitter" {
 		t.Errorf("a short note was changed: %q", got)
 	}
-	if got := conventionLine(sources.PromotedNote{Title: "retry policy", Text: "long body"}); got != "retry policy" {
-		t.Errorf("the title should name the note: %q", got)
+	if got := conventionLine(sources.PromotedNote{Title: "retry policy", Text: "queue retries with full jitter"}); got != "queue retries with full jitter" {
+		t.Errorf("the decision should be the line, not the title: %q", got)
+	}
+	if got := conventionLine(sources.PromotedNote{Title: "retry policy"}); got != "retry policy" {
+		t.Errorf("a note with only a title should still say it: %q", got)
 	}
 	// The first sentence, when there is one.
 	if got := conventionLine(sources.PromotedNote{Text: "Retry three times. Then give up."}); got != "Retry three times." {
@@ -70,9 +75,15 @@ func TestTheTruncationMarkIsAnEllipsis(t *testing.T) {
 // block itself, since that is where the cut lives.
 func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 	tmp := hermeticEnv(t)
-	root := filepath.Join(tmp, "claude", "proj-w")
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		t.Fatal(err)
+	// Three project directories: a wall of one repository is no longer a fact
+	// about the machine.
+	var roots []string
+	for i := 0; i < environmentMinProjects; i++ {
+		root := filepath.Join(tmp, "claude", fmt.Sprintf("proj-w%d", i))
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, root)
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	// English shape so it is recognised as a wall, Cyrillic tail so the 96-byte
@@ -88,7 +99,7 @@ func TestTheEnvironmentBlockCutsOnRuneBoundaries(t *testing.T) {
 			`{"type":"user","sessionId":"` + sid + `","cwd":"/w/w","timestamp":"2026-07-2` +
 			fmt.Sprint(i%10) + `T10:05:00Z","message":{"role":"user","content":[{"type":"tool_result",` +
 			`"content":"` + wall + `"}]}}` + "\n"
-		if err := os.WriteFile(filepath.Join(root, sid+".jsonl"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(roots[i%len(roots)], sid+".jsonl"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
