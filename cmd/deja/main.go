@@ -1940,6 +1940,13 @@ func activeFilters(o search.Options, sinceRaw, harnessRaw string) string {
 	if o.Session != "" {
 		parts = append(parts, fmt.Sprintf("session %q", o.Session))
 	}
+	// The one filter this did not know about, and the one most likely to match
+	// nothing: --from exists for the multi-machine case, and the name a reader
+	// types comes off another machine. Unnamed, it fell through to "no sessions
+	// indexed yet — run `deja index`" on a store that was fine (#2642).
+	if o.From != "" {
+		parts = append(parts, fmt.Sprintf("from %q", o.From))
+	}
 	// The same predicate filterRecentSources uses. parseDur accepts a negative
 	// duration, and a negative Since filters nothing — naming it would report a
 	// filter that was never applied and hide the empty-store advice, which is
