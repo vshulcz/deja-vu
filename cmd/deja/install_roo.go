@@ -50,6 +50,16 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 		if !dirWritable(dir) {
 			writeErr = fmt.Errorf("%s: deja cannot write in that directory — check its permissions", shortHome(dir))
 		}
+		if uninstall && writeErr != nil {
+			// Only a host there is something to take out of. A settings file
+			// with no deja in it is not written on the way out either, so a
+			// directory that refuses the write changes nothing there and
+			// naming it would send the reader after a file that is already
+			// the way they want it.
+			if old, err := readConfig(p); err != nil || !mentionsDeja(old) {
+				writeErr = nil
+			}
+		}
 		if !uninstall {
 			// One settings file per host, written in turn: a refusal on the
 			// second host used to leave the first one wired with a .bak beside

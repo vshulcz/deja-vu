@@ -335,3 +335,42 @@ func TestUninstallRooDoesNotNameAHostItNeverTouched(t *testing.T) {
 		})
 	}
 }
+
+// The write reason is for a host there is something to take out of. A host
+// with no deja in its settings — or none at all — is not written on the way
+// out either, so a directory that refuses the write changes nothing there.
+func TestUninstallRooDoesNotNameAHostWithNothingOfDejaInIt(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop a write here")
+	}
+	for _, other := range []string{"", "{\n  \"mcpServers\": {\"mine\": {\"command\": \"x\"}}\n}\n"} {
+		name := "no settings file"
+		if other != "" {
+			name = "someone else's server"
+		}
+		t.Run(name, func(t *testing.T) {
+			hermeticEnv(t)
+			dir := t.TempDir()
+			a := rooHost(t, filepath.Join(dir, "a"), "{\n  \"mcpServers\": {}\n}\n")
+			t.Setenv("DEJA_ROO_ROOTS", a)
+			if _, err := captureRun(t, "install", "roo", "--no-index"); err != nil {
+				t.Fatal(err)
+			}
+			b := rooHost(t, filepath.Join(dir, "b"), other)
+			closed := filepath.Join(b, "settings")
+			if err := os.Chmod(closed, 0o555); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(closed, 0o755) })
+			t.Setenv("DEJA_ROO_ROOTS", strings.Join([]string{a, b}, string(os.PathListSeparator)))
+
+			out, err := captureRun(t, "uninstall", "roo")
+			if err != nil {
+				t.Fatalf("uninstall refused over a host with nothing of deja's in it: %v", err)
+			}
+			if strings.Contains(out, "cannot write") {
+				t.Errorf("a host with nothing to remove was named as one deja gave up on:\n%s", out)
+			}
+		})
+	}
+}

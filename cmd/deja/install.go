@@ -2561,9 +2561,6 @@ func mcpEntryWritable(path, blockKey string) error {
 	if err != nil {
 		return err
 	}
-	if root == nil {
-		return nil
-	}
 	if jsonc {
 		// The text writer inserts rather than replaces, so a key holding
 		// anything but an object would end up in the file twice with the
