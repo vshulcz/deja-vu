@@ -3061,7 +3061,7 @@ func runForget(dir string, args []string) error {
 			fmt.Fprintln(os.Stderr, "deja: nothing is forgotten on this machine")
 		}
 		if len(keys) > 0 {
-			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index\n", keys[0])
+			fmt.Fprintf(os.Stderr, "deja: `deja forget --unforget %s` brings one back and rebuilds the index\n", pasteSafe(keys[0]))
 		}
 		return nil
 	}
