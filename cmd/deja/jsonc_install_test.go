@@ -236,7 +236,7 @@ func TestACommentedConfigKeepsTheFieldsOnDejasOwnEntry(t *testing.T) {
 	if !strings.Contains(got, `"disabled": true`) {
 		t.Errorf("a disabled entry was silently switched on:\n%s", got)
 	}
-	if !strings.Contains(out, "left the entry disabled") {
+	if !strings.Contains(out, "left the entry switched off") {
 		t.Errorf("nothing said the entry is still off:\n%s", out)
 	}
 }

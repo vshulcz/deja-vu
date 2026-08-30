@@ -2289,16 +2289,32 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 	if _, ok := out["command"]; ok {
 		delete(out, "transport")
 	}
-	if disabled, _ := out["disabled"].(bool); disabled {
+	if entrySwitchedOff(out) {
 		// Switching it back on silently would undo a decision deja was not
 		// asked to revisit; leaving it off without a word looks like a install
 		// that worked.
 		if note != "" {
 			note += "; "
 		}
-		note += "left the entry disabled, the way it was — deja will not answer until you turn it back on"
+		note += "left the entry switched off, the way it was — deja will not answer until you turn it back on"
 	}
 	return out, note
+}
+
+// entrySwitchedOff reports whether the reader has turned this entry off.
+//
+// One switch, two spellings: most hosts write `disabled: true`, opencode
+// writes `enabled: false`. The note was keyed to the first, so a config
+// carrying the second reported a clean install for wiring that will never run
+// (#2757).
+func entrySwitchedOff(entry map[string]any) bool {
+	if off, ok := entry["disabled"].(bool); ok && off {
+		return true
+	}
+	if on, ok := entry["enabled"].(bool); ok && !on {
+		return true
+	}
+	return false
 }
 
 // sameEntry compares an entry read out of a config with the one deja is about
