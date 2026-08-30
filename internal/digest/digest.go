@@ -246,9 +246,21 @@ func isStructureLine(l string) bool {
 	if t == "" {
 		return false
 	}
-	switch t[0] {
-	case '-', '*', '#', '|', '+':
+	if t[0] == '|' {
 		return true
+	}
+	// The marker has to be followed by a space, or it is not a marker: a line
+	// opening in bold — "**1. caffeinate in a separate terminal**" — starts
+	// with an asterisk and is a sentence, and "-> then the retry fires" starts
+	// with a dash. Both were counted as structure by the first version of this,
+	// which is how a real conclusion could be mistaken for a list item.
+	rest := strings.TrimLeft(t, "#")
+	if len(rest) < len(t) {
+		return rest == "" || strings.HasPrefix(rest, " ")
+	}
+	switch t[0] {
+	case '-', '*', '+':
+		return strings.HasPrefix(t[1:], " ")
 	}
 	return false
 }

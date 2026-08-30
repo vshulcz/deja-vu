@@ -41,3 +41,34 @@ func TestDocumentItemIsNotWhatTheSessionConcluded(t *testing.T) {
 		t.Error("a row of a long table was taken for a conclusion")
 	}
 }
+
+// A marker with no space after it is not a marker. Found by reading what the
+// document rule still skipped: a bold sentence opens with an asterisk and a
+// pointer opens with a dash, and counting either as structure lets a real
+// conclusion be dropped as a list item.
+func TestBoldAndArrowsAreNotStructure(t *testing.T) {
+	var b strings.Builder
+	for i := range 30 {
+		fmt.Fprintf(&b, "- rule %d: something the document says\n", i)
+	}
+	doc := b.String()
+
+	for _, line := range []string{
+		"**1. caffeinate — in a separate terminal** so it survives the session",
+		"-> the retry fires only after the second failure",
+		"#2740 is the issue this came from",
+	} {
+		if IsDocumentItem(doc, line) {
+			t.Errorf("a sentence was taken for a list item: %q", line)
+		}
+	}
+	for _, line := range []string{
+		"- rule 3: something the document says",
+		"## Constraints",
+		"| bench | queries | median |",
+	} {
+		if !IsDocumentItem(doc, line) {
+			t.Errorf("real structure went unrecognised: %q", line)
+		}
+	}
+}
