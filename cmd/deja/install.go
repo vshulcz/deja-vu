@@ -1161,7 +1161,7 @@ func installClaude(exe string, uninstall bool) (installResult, error) {
 	} else {
 		m["deja"], note = mergeDejaEntry(m["deja"], mcpServerEntry(exe))
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -1451,7 +1451,7 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 		// user last typed.
 		root["statusLine"] = map[string]any{"type": "command", "command": cmd, "refreshInterval": 1000}
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -1733,7 +1733,7 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 		command, args := mcpCommandArgs(exe)
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}})
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -1790,7 +1790,7 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 		command, args := mcpCommandArgs(exe)
 		servers["deja"], note = mergeDejaEntry(servers["deja"], map[string]any{"command": command, "args": args})
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -1838,7 +1838,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 		command, args := mcpCommandArgs(exe)
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"command": command, "args": args})
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -1895,7 +1895,7 @@ func updateOpencodeJSON(old []byte, exe string, uninstall bool) ([]byte, string,
 	} else {
 		m["deja"], note = mergeDejaEntry(m["deja"], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return nil, "", err
 	}

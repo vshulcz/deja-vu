@@ -109,7 +109,7 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		internal["enabled"] = true
 		entries[openclawHookName] = map[string]any{"enabled": true}
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return "", err
 	}

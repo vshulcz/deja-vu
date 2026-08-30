@@ -99,7 +99,7 @@ func setOpenClawPluginEnabled(on bool) (string, error) {
 		}
 		entries[openclawPluginID] = map[string]any{"enabled": true}
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return "", err
 	}

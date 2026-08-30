@@ -45,7 +45,7 @@ func installCursorHooks(exe string, uninstall bool) (installResult, error) {
 	if len(root) == 0 && len(bytes.TrimSpace(old)) == 0 {
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
-	next, err := json.MarshalIndent(root, "", "  ")
+	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err
 	}
