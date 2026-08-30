@@ -22,6 +22,13 @@ func ProjectMatches(project, from, want string) bool {
 	if strings.Contains(strings.ToLower(project), strings.ToLower(want)) {
 		return true
 	}
+	// Only for a want that carries the separator. Without that guard,
+	// `--project mini` would select every session from a machine called mini
+	// rather than a project of that name — a wider answer than the flag has
+	// ever given, and `--from` is the flag for a machine.
+	if !strings.Contains(want, ":") {
+		return false
+	}
 	shown := DisplayProject(project, from)
 	return shown != project && strings.Contains(strings.ToLower(shown), strings.ToLower(want))
 }

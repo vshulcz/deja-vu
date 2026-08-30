@@ -37,7 +37,9 @@ func TestTheProjectFilterTakesTheLabelTheListingPrints(t *testing.T) {
 		{"the label a listing prints", "imported:alpha", "mini", "mini:alpha", true},
 		{"the stored form", "imported:alpha", "mini", "imported:alpha", true},
 		{"the bare project", "imported:alpha", "mini", "alpha", true},
-		{"the machine alone", "imported:alpha", "mini", "mini", true},
+		// The machine alone stays --from's question: the project filter would
+		// otherwise select everything that machine sent.
+		{"the machine alone", "imported:alpha", "mini", "mini", false},
 		{"another machine's label", "imported:alpha", "mini", "laptop:alpha", false},
 		{"another project on this machine", "imported:beta", "mini", "mini:alpha", false},
 		{"a local session is untouched", "alpha", "", "mini:alpha", false},
