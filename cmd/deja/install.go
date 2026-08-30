@@ -140,6 +140,9 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	saidNotes := map[string]bool{}
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
 	type lineItem struct{ target, action, path string }
+	// The real paths, not the display ones: an uninstall reports the snapshots
+	// it left beside the configs it handled, and ~ does not stat (#2676).
+	var touchedPaths []string
 	var done []lineItem
 	guidanceCount := 0
 	mcpCount := 0
@@ -199,6 +202,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				pruneGuidanceDirs(cr.Path)
 			}
 		}
+		touchedPaths = append(touchedPaths, r.Path)
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path)})
 		} else {
@@ -253,6 +257,16 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		installIndexWarmup(dir, mcpCount, hookCount, guidanceCount,
 			targetArgs[0] == "--auto" || targetArgs[0] == "--all")
 	}
+	// An uninstall keeps the snapshot it took of a config the reader already
+	// had — neither the config nor its snapshot is deja's to delete (#840) —
+	// and said nothing about them, on a screen that otherwise names what it
+	// keeps. #2487 added gemini's line for exactly that reason; nine files on
+	// disk are the same shape (#2676).
+	if uninstall {
+		if line := keptSnapshotsLine(touchedPaths); line != "" {
+			fmt.Fprint(os.Stderr, line)
+		}
+	}
 	if banner {
 		info := append(brandInfo(), "")
 		nameW := 0
@@ -276,6 +290,38 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		printLogoMood(os.Stdout, info, mood)
 	}
 	return nil
+}
+
+// keptSnapshotsLine names the .bak files still beside the configs this run
+// touched. Only those: a snapshot next to a file deja handled is one deja took,
+// while an unrelated .bak in the tree belongs to whoever made it.
+func keptSnapshotsLine(touched []string) string {
+	seen := map[string]bool{}
+	var paths []string
+	for _, p := range touched {
+		if p == "" {
+			continue
+		}
+		bak := p + ".bak"
+		if seen[bak] {
+			continue
+		}
+		if _, err := os.Stat(bak); err != nil {
+			continue
+		}
+		seen[bak] = true
+		paths = append(paths, bak)
+	}
+	if len(paths) == 0 {
+		return ""
+	}
+	sort.Strings(paths)
+	where := reportPath(paths[0])
+	if len(paths) > 1 {
+		where = reportPath(paths[0]) + " and " + fmt.Sprintf("%d more", len(paths)-1)
+	}
+	return fmt.Sprintf("deja: kept %d snapshot%s of configs you already had — %s — yours to remove\n",
+		len(paths), pluralS(len(paths)), where)
 }
 
 func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
