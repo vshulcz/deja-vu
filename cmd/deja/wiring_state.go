@@ -247,7 +247,16 @@ func refreshWiringAfterUpgrade() []string {
 			stuckWiring = append(stuckWiring, target)
 			continue
 		}
-		if res.Action != "" && res.Action != "unchanged" {
+		cr, cerr := refreshCommandFile(target, exe)
+		if cerr != nil {
+			failed = true
+			stuckWiring = append(stuckWiring, target)
+			continue
+		}
+		// The command counts as a change of its own. It is text the reader can
+		// have edited, and a rewrite that replaces it has to be announced even
+		// when the wiring beside it was already right (#886).
+		if wiringChanged(res) || wiringChanged(cr) {
 			changed = append(changed, target)
 		}
 	}
@@ -272,6 +281,65 @@ func wiringCreated(path string) bool {
 	}
 	for _, p := range createdByThisRun {
 		if p == path {
+			return true
+		}
+	}
+	return false
+}
+
+// refreshCommandFile rewrites the /deja command for a target that already has
+// one. The command holds the same absolute path the wiring does, and was
+// written by the install command rather than by installTarget, so a move left
+// it running a binary that is gone while everything around it was repaired
+// (#2693).
+//
+// Only a file that is already there: a machine installed with --no-guidance
+// has none, and the repair is not the place to hand it text it declined.
+func refreshCommandFile(target, exe string) (installResult, error) {
+	harness := guidanceHarness(target)
+	if !commandFileWritten(harness) {
+		return installResult{}, nil
+	}
+	return installCommandFile(harness, exe, false)
+}
+
+// wiringChanged reports whether a write did something worth telling the reader
+// about.
+func wiringChanged(r installResult) bool {
+	return r.Action != "" && r.Action != "unchanged"
+}
+
+// commandFileWritten reports whether this harness has a /deja command on disk.
+// Goose keeps the command in config.yaml and the workflow in a recipe beside
+// it, so the recipe is what answers for goose.
+func commandFileWritten(harness string) bool {
+	if harness == "goose" {
+		// Both halves. The writer re-adds the slash_commands entry and creates
+		// config.yaml if it has to, so going by the recipe alone would put back
+		// a command someone took out of the config by hand.
+		if _, err := os.Stat(gooseRecipePath()); err != nil {
+			return false
+		}
+		return gooseSlashCommandPresent()
+	}
+	path := commandFilePath(harness)
+	if path == "" {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// gooseSlashCommandPresent reports whether config.yaml still lists deja's
+// slash command, in any of the three quotings removeGooseSlashCommand knows.
+func gooseSlashCommandPresent() bool {
+	b, err := os.ReadFile(filepath.Join(gooseConfigDir(), "config.yaml"))
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		switch strings.TrimSpace(line) {
+		case `- command: "deja"`, "- command: deja", "- command: 'deja'":
 			return true
 		}
 	}
