@@ -54,7 +54,7 @@ func briefWithholdingRule(withheld map[string]int, total int) string {
 // then it goes wherever the writer goes (#2108); `deja help` always works.
 func runBrief(dir string, w io.Writer) error {
 	justGreeted := false
-	ov, err := index.Overview(dir)
+	ov, err := index.OverviewServable(dir)
 	if err != nil || ov.Sessions == 0 {
 		// Nothing indexed yet. Printing usage here is what a fresh install used
 		// to do, and it is the wrong answer to `deja`: the reader has just
@@ -67,7 +67,7 @@ func runBrief(dir string, w io.Writer) error {
 				return err
 			}
 			justGreeted = greeted
-			if ov, err = index.Overview(dir); err != nil {
+			if ov, err = index.OverviewServable(dir); err != nil {
 				return err
 			}
 		}

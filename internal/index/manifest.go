@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
+
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // IsCurrentVersion reports whether the index on disk was written by this
@@ -556,6 +558,23 @@ type OverviewStats struct {
 // Overview summarizes the index from manifest metadata alone — no record
 // reads — so the zero-argument brief stays instant.
 func Overview(dir string) (OverviewStats, error) {
+	return overview(dir, false)
+}
+
+// OverviewServable is Overview over the sessions recall can actually serve.
+//
+// The two differ by the ignore rule, and the difference is not cosmetic: on a
+// store where that rule covers two thirds of the sessions, Overview reports
+// three times the sessions the screens beside it show and dates the range to a
+// day none of the servable work happened on. `doctor` wants the first number —
+// it reports what the index holds. The brief and the "older than that window"
+// line want the second, because both describe what a reader can be given
+// (#2650).
+func OverviewServable(dir string) (OverviewStats, error) {
+	return overview(dir, true)
+}
+
+func overview(dir string, servable bool) (OverviewStats, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -563,6 +582,7 @@ func Overview(dir string) (OverviewStats, error) {
 	if err != nil {
 		return OverviewStats{}, err
 	}
+	pol := policy.Load()
 	var o OverviewStats
 	now := time.Now()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -573,6 +593,9 @@ func Overview(dir string) (OverviewStats, error) {
 	week := now.AddDate(0, 0, -7)
 	hs := map[string]bool{}
 	for _, meta := range m.Sessions {
+		if servable && pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
 		o.Sessions++
 		hs[meta.Harness] = true
 		if StampedAhead(meta.Updated, now) {

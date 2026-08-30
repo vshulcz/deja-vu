@@ -1839,7 +1839,9 @@ func olderThanWindow(dir string, since time.Duration) string {
 	if since <= 0 {
 		return ""
 	}
-	ov, err := index.Overview(dir)
+	// Servable: this is advice on a search that came back empty, so the
+	// sessions it counts have to be the ones search could have read (#2650).
+	ov, err := index.OverviewServable(dir)
 	if err != nil || ov.Sessions == 0 || ov.Newest.IsZero() {
 		return ""
 	}

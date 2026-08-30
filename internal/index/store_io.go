@@ -18,6 +18,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // recordLogScans counts walks of the record log. There are no per-session
@@ -1139,8 +1141,17 @@ func SpanInventory(dir string) (spans, files int, err error) {
 		return 0, 0, err
 	}
 	seen := map[string]bool{}
+	pol := policy.Load()
 	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		if r.Role != roleEdit {
+			return
+		}
+		// What this machine could hand back, not what the log happens to hold:
+		// `restore` refuses a span from a tree the ignore rule covers (#2630),
+		// so counting it here promised something the command would decline
+		// (#2650).
+		meta, ok := m.Sessions[r.Key]
+		if !ok || pol.Ignored(meta.Path, meta.Project) {
 			return
 		}
 		spans++
