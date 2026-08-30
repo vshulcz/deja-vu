@@ -1282,7 +1282,13 @@ func installClaudeHook(exe string, uninstall bool) (installResult, error) {
 	for _, h := range claudeHookWiring {
 		nextRoot = updateClaudeHook(nextRoot, h.Event, exe+" "+h.Sub, h.Matcher, uninstall)
 	}
-	next, err := json.MarshalIndent(nextRoot, "", "  ")
+	// In the shape the reader wrote it, like every other JSON writer: this was
+	// the last one still marshalling straight, so an install that added hooks
+	// also alphabetised their keys, reindented the file and expanded every
+	// block they had written on one line — in the file that holds their
+	// permissions and their model (#1665, the shape #2641 and #2704 gave the
+	// others).
+	next, err := marshalConfigLike(old, nextRoot)
 	if err != nil {
 		return installResult{}, err
 	}
