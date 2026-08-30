@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // halvedStore indexes sessions in two projects, one of which the reader's
@@ -17,10 +15,14 @@ func halvedStore(t *testing.T) string {
 	setHome(t, home)
 	root := filepath.Join(home, "claude")
 	t.Setenv("DEJA_CLAUDE_ROOT", root)
-	if err := os.MkdirAll(filepath.Dir(policy.Path()), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(policy.Path(), []byte(`{"ignore":["*scratch*"]}`), 0o600); err != nil {
+	// DEJA_POLICY_FILE, not a file under the home: this package shares one
+	// XDG_CONFIG_HOME across its tests, so a policy written through
+	// policy.Path() outlives the test that wrote it and every later test reads
+	// it — which is how a rule of `*scratch*` silenced the default rule three
+	// tests were pinning.
+	policyFile := filepath.Join(home, "policy.json")
+	t.Setenv("DEJA_POLICY_FILE", policyFile)
+	if err := os.WriteFile(policyFile, []byte(`{"ignore":["*scratch*"]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	write := func(project, id, day string) {
