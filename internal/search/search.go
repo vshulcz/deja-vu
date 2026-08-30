@@ -1413,6 +1413,10 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 				break
 			}
 		}
+		if isWorkRecord(m.Role) {
+			// EXPERIMENT: a matched command or its output, never as filler.
+			return carries, hits
+		}
 		keep := carries || m.Role == "user" || (m.Role == "assistant" && prevKept)
 		prevKept = keep
 		return keep, hits
@@ -1425,7 +1429,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil })
+	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return !isWorkRecord(m.Role), nil })
 }
 
 // contextQueryParts is what the digest weighs a turn against: the query's terms
@@ -1526,6 +1530,25 @@ func contextTurnWeights(turns []contextTurn, parts int) []float64 {
 // renders in place.
 var renderContextTurnsWorkers = runtime.NumCPU
 
+// workRecordDigestCap is how much of a matched work record the digest prints. A
+// command and the lines around its error are evidence; the rest of a build log
+// is a wall, and the budget it eats belongs to the conversation.
+const workRecordDigestCap = 600
+
+// renderContextTurn renders one kept turn, bounding work records so a matched
+// log cannot take the whole budget.
+func renderContextTurn(t contextTurn) string {
+	out := SafeText(contextText(t.raw, t.carriesQuery()))
+	if isWorkRecord(t.role) && len(out) > workRecordDigestCap {
+		cut := workRecordDigestCap
+		for cut > 0 && !utf8.RuneStart(out[cut]) {
+			cut--
+		}
+		out = out[:cut] + " […]"
+	}
+	return out
+}
+
 // renderContextTurns renders each kept turn, in parallel when there are enough
 // of them to pay for it. Results are written by index, so the digest is the
 // same bytes in the same order however many cores run it.
@@ -1537,7 +1560,7 @@ func renderContextTurns(turns []contextTurn) []string {
 	}
 	if workers < 2 || len(turns) < 32 {
 		for i, t := range turns {
-			out[i] = SafeText(contextText(t.raw, t.carriesQuery()))
+			out[i] = renderContextTurn(t)
 		}
 		return out
 	}
@@ -1552,7 +1575,7 @@ func renderContextTurns(turns []contextTurn) []string {
 				if i >= len(turns) {
 					return
 				}
-				out[i] = SafeText(contextText(turns[i].raw, turns[i].carriesQuery()))
+				out[i] = renderContextTurn(turns[i])
 			}
 		}()
 	}
@@ -1586,9 +1609,6 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 	var kept []contextTurn
 	parts := 0
 	for _, m := range s.Messages {
-		if isWorkRecord(m.Role) {
-			continue
-		}
 		ok, hits := include(m)
 		if !ok {
 			continue

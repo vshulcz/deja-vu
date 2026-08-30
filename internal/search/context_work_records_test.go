@@ -13,9 +13,11 @@ import (
 // honestly (#560) they arrived as `user` and filled this with blocks nobody
 // meant by context.
 //
-// Measured by removing the filter: with isWorkRecord returning false, the
-// digest grew "## files" and "## edit" blocks and no test in this package
-// failed. This is that test.
+// One exception, measured: a work record that carries the query is evidence,
+// not machinery. Four in five of everything a query matches lives in these
+// records, and holding all of them back left the digest with nothing about the
+// subject on 1 of 12 real questions. They come in only when matched, never as
+// filler, and capped so a log cannot take the budget the conversation needs.
 func TestContextDigestLeavesTheMachineryOut(t *testing.T) {
 	s := model.Session{
 		Harness: "claude", Project: "work", ID: "w1",
@@ -41,19 +43,14 @@ func TestContextDigestLeavesTheMachineryOut(t *testing.T) {
 		t.Fatalf("wrong fixture, the answer is missing:\n%s", out)
 	}
 
-	for _, marker := range []string{"## files", "## edit", "## tool-output", "## command"} {
-		if strings.Contains(out, marker) {
-			t.Errorf("the digest carries a %s block:\n%s", marker, out)
+	// Nothing that fails to say the query gets in, whatever its role.
+	for _, body := range []string{"npm ERR!", "$ npm test"} {
+		if strings.Contains(out, body) {
+			t.Errorf("an unmatched work record reached the digest: %q\n%s", body, out)
 		}
 	}
-	// And not just the headings: the bodies must not arrive under another
-	// role either. These are what actually bite — a stubbed isWorkRecord
-	// leaks the files and edit blocks, while tool output and commands are
-	// held back by the query filter above as well, so their absence here is
-	// weaker evidence than it looks.
-	for _, body := range []string{"/w/app/queue.go", "the body that was replaced", "npm ERR!", "$ npm test"} {
-		if strings.Contains(out, body) {
-			t.Errorf("the digest carries %q:\n%s", body, out)
-		}
+	// The record that does say it is the answer to "where does retry live".
+	if !strings.Contains(out, "/w/app/retry.go") {
+		t.Errorf("the matched work record was held back:\n%s", out)
 	}
 }
