@@ -2530,6 +2530,11 @@ func runBlame(dir string, args []string) error {
 		return nil
 	}
 	search.PrintBlame(os.Stdout, hits, false)
+	// The name the reader has is the one in their editor, and a rename drops
+	// everything said under the old one out of this answer (#1627).
+	if note := earlierNameNote(dir, path, target); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
 	// blame answers "who touched this file". Ten blocks and nothing else reads
 	// as all of them, the misread search already avoids with the same sentence
 	// (#2299). --json keeps its bare array: a machine consumer reading a total
