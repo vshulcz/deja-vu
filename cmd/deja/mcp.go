@@ -478,9 +478,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		// The same lines the CLI prints, from the same writer: this tool used
 		// to keep its own copy of the loop, so a note the CLI learned never
 		// reached the agent (#1634).
-		writeHowEntries(&hb, entries, limit, commandListingLine, ", last ")
+		writeHowEntries(&hb, entries, limit, ", last ")
 		out := strings.TrimRight(hb.String(), "\n")
-		if note := howCapNote(len(entries), limit); note != "" {
+		if note := howCapNote(len(entries), limit, "call again with a higher limit for the rest"); note != "" {
 			// The agent cannot ask a follow-up of its own, so the cut has to
 			// travel with the answer rather than to a terminal it never sees.
 			out += "\n\n" + note

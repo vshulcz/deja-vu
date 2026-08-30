@@ -42,6 +42,13 @@ func TestTheMCPHowToolSaysWhenItCutTheList(t *testing.T) {
 	if !strings.Contains(text, "3 of 13") {
 		t.Errorf("the cut is silent — nothing says how many there were:\n%s", text)
 	}
+	// An agent passes limit as a field; there is no flag for it to raise.
+	if strings.Contains(text, "--limit") {
+		t.Errorf("the agent is told to raise a flag it cannot pass:\n%s", text)
+	}
+	if !strings.Contains(text, "call again with a higher limit") {
+		t.Errorf("the agent is not told how to see the rest:\n%s", text)
+	}
 
 	// The control: an uncut list says nothing extra.
 	text, err = callMCPTool(dir, "how", json.RawMessage(`{"what":"go test","limit":20}`))
