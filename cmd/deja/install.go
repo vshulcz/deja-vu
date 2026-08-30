@@ -241,19 +241,31 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			note(cliSkillName, err)
 		}
 	}
+	// Held, not returned. "finished what it could" is a summary of the run, and
+	// returning it here made it an early exit from reporting the run: the
+	// banner never rendered, so nobody was told which harnesses had been wired,
+	// and the index build below was skipped, leaving those harnesses wired with
+	// nothing to read (#2721).
+	var refusal error
 	if len(refused) > 0 {
 		verb := "install"
 		if uninstall {
 			verb = "uninstall"
 		}
-		return fmt.Errorf("%s finished what it could; %d target%s refused: %s — %s",
+		refusal = fmt.Errorf("%s finished what it could; %d target%s refused: %s — %s",
 			verb, len(refused), pluralS(len(refused)), strings.Join(refused, "; "), refusalRemedy(refusedErrs))
 	}
 	// Every install builds, not only --auto and --all. Installing is the one
 	// moment a person has already accepted a wait — they just ran an installer
 	// — and spending the build here is what keeps the first real use, usually
-	// the first agent turn, instant.
-	if !uninstall && !noIndex {
+	// the first agent turn, instant. A target that refused does not change that
+	// for the ones that did not (#2721).
+	// Something has to have landed. When every target refused there is nothing
+	// to build a store for and nothing to celebrate, and printing the whole
+	// success screen ahead of the refusal is worse than the silence #2721 was
+	// about.
+	wired := len(done) > 0 || mcpCount+hookCount+guidanceCount > 0
+	if !uninstall && !noIndex && wired {
 		installIndexWarmup(dir, mcpCount, hookCount, guidanceCount,
 			targetArgs[0] == "--auto" || targetArgs[0] == "--all")
 	}
@@ -267,7 +279,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			fmt.Fprint(os.Stderr, line)
 		}
 	}
-	if banner {
+	if banner && wired {
 		info := append(brandInfo(), "")
 		nameW := 0
 		for _, d := range done {
@@ -296,7 +308,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 		printLogoMood(os.Stdout, info, mood)
 	}
-	return nil
+	return refusal
 }
 
 // keptSnapshotsLine names the .bak files still beside the configs this run
