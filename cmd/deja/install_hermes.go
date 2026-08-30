@@ -180,19 +180,39 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 func removeHermesMCPBlock(s string) string {
 	lines := strings.Split(s, "\n")
 	var out []string
-	skipping := false
-	for _, l := range lines {
-		if skipping {
-			if strings.HasPrefix(l, "    ") || strings.TrimSpace(l) == "" && len(out) > 0 && strings.HasPrefix(out[len(out)-1], "    ") {
-				continue
-			}
-			skipping = false
-		}
-		if strings.TrimSpace(l) == "deja:" && strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") {
-			skipping = true
+	for i := 0; i < len(lines); i++ {
+		// The indent deja's own key was written at: a block is whatever width
+		// the reader used, and reading it as exactly two left the server wired
+		// on every config written at one or four (#2727). The writer has asked
+		// since #2614; this is the other half.
+		if strings.TrimSpace(lines[i]) != "deja:" || yamlIndentWidth(lines[i]) == 0 {
+			out = append(out, lines[i])
 			continue
 		}
-		out = append(out, l)
+		pad := yamlIndentWidth(lines[i])
+		i++
+		for i < len(lines) {
+			if strings.TrimSpace(lines[i]) == "" {
+				// A blank line is inside the block only if the block goes on
+				// after it. The one that separates deja's block from what
+				// follows belongs to the file, and eating it made a second
+				// install differ from the first.
+				j := i
+				for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
+					j++
+				}
+				if j < len(lines) && yamlIndentWidth(lines[j]) > pad {
+					i = j
+					continue
+				}
+				break
+			}
+			if yamlIndentWidth(lines[i]) <= pad {
+				break
+			}
+			i++
+		}
+		i--
 	}
 	return strings.Join(out, "\n")
 }

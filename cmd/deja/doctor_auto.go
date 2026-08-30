@@ -128,11 +128,30 @@ func doctorAutoRecall(w io.Writer) {
 // both nest ours under a key: a plain "deja appears in the file" check would
 // pass on a disabled entry.
 func doctorGooseWired(path string) bool {
-	return yamlHasKey(path, "  deja:")
+	return yamlHasNestedKey(path, "deja:")
 }
 
 func doctorHermesWired(path string) bool {
-	return yamlHasKey(path, "mcp_servers:") && yamlHasKey(path, "  deja:")
+	return yamlHasKey(path, "mcp_servers:") && yamlHasNestedKey(path, "deja:")
+}
+
+// yamlHasNestedKey is yamlHasKey for a key that has to sit under something.
+// The indent is whatever the reader wrote the block at, and asking for exactly
+// two called a goose deja had just wired at four unwired — while the writer
+// itself follows the block (#2614, #2727). Nested, not top level: `deja:` in
+// the first column is not an entry in anybody's server list.
+func yamlHasNestedKey(path, key string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		trimmed := strings.TrimRight(line, " \t\r")
+		if strings.TrimSpace(trimmed) == key && yamlIndentWidth(trimmed) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // yamlHasKey looks for a key on its own line. Matching a leading newline
