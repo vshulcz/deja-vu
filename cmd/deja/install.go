@@ -2742,6 +2742,31 @@ func jsoncBraceDelta(code string) int {
 // reader spaced the braces.
 var emptyJSONCBlockRE = regexp.MustCompile(`"mcp"\s*:\s*\{\s*\}`)
 
+// mergedJSONCEntryLine builds the entry line to write, carrying over whatever
+// the reader had on deja's own entry. Falls back to the plain line when the
+// dropped text is not one entry this can read: a shape it cannot parse is not a
+// reason to refuse the install, only to write the entry deja knows.
+func mergedJSONCEntryLine(dropped []string, exe string) (string, string) {
+	plain := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
+	next := map[string]any{"type": "local", "command": []string{exe, "mcp"}}
+	joined := strings.TrimSpace(strings.Join(dropped, " "))
+	at := strings.Index(joined, ":")
+	if len(dropped) == 0 || at < 0 {
+		return plain, ""
+	}
+	value := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(joined[at+1:]), ","))
+	var was any
+	if err := json.Unmarshal([]byte(value), &was); err != nil {
+		return plain, ""
+	}
+	merged, note := mergeDejaEntry(was, next)
+	b, err := json.Marshal(merged)
+	if err != nil {
+		return plain, ""
+	}
+	return `    "deja": ` + string(b), note
+}
+
 func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string, error) {
 	line := fmt.Sprintf(`    "deja": {"type":"local","command":[%q,"mcp"]}`, exe)
 	s := string(old)
@@ -2807,6 +2832,14 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		// it, what install told you depended on which of the two names the
 		// config had (#2392).
 		body, dropped, wasLast := dropJSONCEntry(lines[start+1 : end])
+		// What the reader put on our own entry is theirs: an environment
+		// pointing at a store on another disk, an entry switched off. The
+		// parsed path has merged those since #2479; this one rewrote the line
+		// and dropped them without a word (#2742).
+		mergeNote := ""
+		if !uninstall {
+			line, mergeNote = mergedJSONCEntryLine(dropped, exe)
+		}
 		// Our entry used to go last, so the comma joining it to the block sat
 		// on the line above — the reader's. Taking ours out leaves that comma
 		// with nothing after it, which a strict reader of the file rejects, so
@@ -2820,7 +2853,12 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		}
 		note := ""
 		if !uninstall {
-			note = replacedJSONCLineNote(dropped, line)
+			// mergeDejaEntry says the same sentence when it takes an entry
+			// over, so prefer its note: it also carries what merging found.
+			note = mergeNote
+			if note == "" {
+				note = replacedJSONCLineNote(dropped, line)
+			}
 		}
 		if !uninstall {
 			// Ours goes first, carrying its own comma. Written last it needed
