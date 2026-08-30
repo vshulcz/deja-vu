@@ -1276,19 +1276,28 @@ func Recent(dir string, n int) ([]model.Session, error) {
 }
 
 func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error) {
+	ss, _, err := RecentMatchingCounted(dir, n, o)
+	return ss, err
+}
+
+// RecentMatchingCounted is RecentMatching with the number of sessions that
+// matched before the cut. The listing shows ten and said nothing about the
+// rest, which reads as the whole answer — the misread #1632 closed for search
+// (#2638) — and the count is already in hand here.
+func RecentMatchingCounted(dir string, n int, o query.Options) ([]model.Session, int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if ok {
 		defer unlock()
 	}
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]model.Session, 0, len(m.Sessions))
 	for _, meta := range m.Sessions {
@@ -1303,10 +1312,11 @@ func RecentMatching(dir string, n int, o query.Options) ([]model.Session, error)
 	// every ranked surface filtered it out (#2541).
 	out = ignoredByPolicy(out)
 	sort.Slice(out, func(i, j int) bool { return newestFirstSession(out[i], out[j]) })
+	total := len(out)
 	if n > 0 && len(out) > n {
 		out = out[:n]
 	}
-	return out, nil
+	return out, total, nil
 }
 
 // displayPath contracts the home directory to ~ in user-facing messages.
