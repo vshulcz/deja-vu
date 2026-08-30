@@ -176,22 +176,6 @@ func yamlHasChildKey(path, parent, key string) bool {
 	return false
 }
 
-// yamlHasKey looks for a key on its own line. Matching a leading newline
-// instead would miss a config whose first line is the key — which is exactly
-// how a hand-written file tends to start.
-func yamlHasKey(path, key string) bool {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	for _, line := range strings.Split(string(b), "\n") {
-		if strings.TrimRight(line, " \t\r") == key {
-			return true
-		}
-	}
-	return false
-}
-
 // codexHasSeenItsHook reports whether codex has recorded any opinion about the
 // session-start hook. Until it has, codex runs nothing — and in `codex exec`
 // there is no interface in which to approve it, which is how scripted runs end
