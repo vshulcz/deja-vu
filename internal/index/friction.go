@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // Friction is what this machine keeps tripping over: one specific error, in
@@ -529,8 +530,18 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 		return nil
 	}
 	byHash := map[uint64][]SessionMeta{}
+	// The ignore rule, here rather than in allow: allow takes a project, and
+	// the rule matches on the session's path — measured in #2652, every one of
+	// 305 ignored sessions on a real store matched by path and none by
+	// project. So no caller can apply it, and both of these speak unasked: the
+	// brief claimed five sessions for a wall where `deja friction` said three,
+	// and the session-start block counted the same two (#2658).
+	pol := policy.Load()
 	for _, meta := range m.Sessions {
 		if allow != nil && !allow(meta.Project) {
+			continue
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
 			continue
 		}
 		for _, h := range meta.Hit {
