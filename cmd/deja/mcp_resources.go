@@ -120,6 +120,11 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 		note = fmt.Sprintf("deja: %d sessions match %q — this is the most recent; ask for a longer prefix to read another.\n\n",
 			n, neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
 	}
+	// The same word the CLI and recall_context carry: this door takes an id,
+	// so a reader here has named the session as plainly as anyone can (#1624).
+	if line := forgottenSourceNote(s, id); line != "" {
+		note += "deja: " + line + "\n\n"
+	}
 	var b bytes.Buffer
 	search.PrintContext(&b, s, "")
 	// Same transcript, same frame as recall_context. Reading a session through

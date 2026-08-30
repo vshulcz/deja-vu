@@ -4150,13 +4150,40 @@ func forgottenSourceNote(s model.Session, selector string) string {
 	// Only when the reader named that session: an ordinary topical query that
 	// happens to land on the note is not asking about the forgotten source, and
 	// the line would be noise on every such search.
-	if selector == "" || !strings.Contains(key, selector) {
+	//
+	// Named means named. Testing the selector as a substring of the key fired
+	// on "claude" — the harness name is in every key — and on any single
+	// character, while the reverse case never fired at all: over MCP the
+	// selector is usually a sentence, and "what did we decide in s15" is a
+	// reader naming the session as plainly as `s15` is (#1624).
+	if !selectorNamesSession(selector, key) {
 		return ""
 	}
 	if !index.Tombstoned(key) {
 		return ""
 	}
 	return fmt.Sprintf("%s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone", key)
+}
+
+// selectorNamesSession reports whether the reader's selector names this
+// session: the whole key, an id prefix long enough to mean it, or one of the
+// words of a sentence being either of those.
+func selectorNamesSession(selector, key string) bool {
+	if strings.TrimSpace(selector) == "" {
+		return false
+	}
+	_, id, _ := strings.Cut(key, ":")
+	for _, word := range strings.Fields(selector) {
+		if word == key || word == id {
+			return true
+		}
+		// Four characters before a prefix counts: shorter than that and an
+		// ordinary word — "the", "in" — would name a session by accident.
+		if len(word) >= 4 && strings.HasPrefix(id, word) {
+			return true
+		}
+	}
+	return false
 }
 
 // forgetKeyOf names the exact session a selector reached, so a failed forget
