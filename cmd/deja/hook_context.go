@@ -303,12 +303,9 @@ func runHookContext(dir string, plain bool) error {
 		// checkout — and exactly where knowing what this machine is missing
 		// helps most. The block is about the machine, not the project, so it
 		// does not depend on the digest having found anything.
-		// The switch, again: the digest above is empty either because there is
-		// nothing to recall or because recall is off, and this branch cannot
-		// tell those apart. It used to build the block regardless, so a
-		// machine with the kill switch set still had text drawn from its
-		// indexed sessions injected into every session start (#2699).
-		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" && !recallIsOff() {
+		// The block answers for the switch itself since #2701 — the guard that
+		// stood here is what taught it to.
+		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 			out := frameRecall(env)
 			// The block is about the machine and names no project, so without
 			// the projects behind its walls a forget of one of them could not

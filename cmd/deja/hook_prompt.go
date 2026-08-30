@@ -137,6 +137,17 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// second line, a trailing NUL) keeps its recall instead of losing the
 	// whole payload to a syntax error.
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	// The kill switch. It reached the session-start hook and nothing else, so
+	// this hook — every user message, and the wiring for seven harnesses —
+	// kept injecting on a machine with recall off (#2701).
+	//
+	// Ahead of the nudge too, which is a wider reading than #2701 needed: the
+	// nudge is built from the prompt in front of it rather than from the
+	// index, so nothing recalled leaks through it. It is still deja speaking
+	// unasked into a session that asked for none of it.
+	if recallIsOff() {
+		return nil
+	}
 	// The failure the user just reported is worth capturing whether or not
 	// this prompt also earns a recall, so it is decided before the gates that
 	// silence the recall path.

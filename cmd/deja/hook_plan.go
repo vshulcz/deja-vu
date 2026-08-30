@@ -70,6 +70,13 @@ var planFrictionLookup = index.PlanFrictionMatches
 func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
 	var input planHookInput
 	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	// The kill switch, before anything is read. It reached the session-start
+	// hook and nothing else, so a machine with recall off still had text drawn
+	// from its own indexed sessions injected here (#2701).
+	if recallIsOff() {
+		return nil
+	}
+
 	// The matcher should guarantee ExitPlanMode, but a hook wired with a
 	// wider matcher must not answer for tools it was never designed to read.
 	if input.ToolName != "ExitPlanMode" {
