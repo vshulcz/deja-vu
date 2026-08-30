@@ -40,6 +40,42 @@ func indentLines(s, pad string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+// gooseSlashCommandsBlock returns the text after the slash_commands key, for
+// reading the indent its entries are written at.
+func gooseSlashCommandsBlock(s string) string {
+	i := strings.Index("\n"+s, "\nslash_commands:\n")
+	if i < 0 {
+		return ""
+	}
+	return s[i+len("\nslash_commands:\n")-1:]
+}
+
+// gooseListIndent is the indent the entries of a list are written at, and
+// whether there is a list to read one from. Distinct from yamlBlockIndent
+// because "" is an answer here: a sequence in the first column is what every
+// YAML serializer writes, and an entry spliced in at two spaces beside it is a
+// file no parser will read (#2724).
+func gooseListIndent(block string) (string, bool) {
+	for _, line := range strings.Split(block, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if !strings.HasPrefix(trimmed, "- ") {
+			return "", false
+		}
+		return line[:len(line)-len(strings.TrimLeft(line, " \t"))], true
+	}
+	return "", false
+}
+
+// normaliseGooseNewlines is what installGoose does to the same file for the
+// same reason: a CRLF config read line by line leaves every line ending in \r,
+// so nothing matches and the writer added a second key on every run.
+func normaliseGooseNewlines(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
+}
+
 // removeGooseSlashCommand takes our entry out of the slash_commands list and
 // leaves every other entry, and the key itself, where they were.
 func removeGooseSlashCommand(s string) string {
@@ -53,9 +89,13 @@ func removeGooseSlashCommand(s string) string {
 			out = append(out, lines[i])
 			continue
 		}
+		dash := yamlIndentWidth(lines[i])
 		i++
-		// The entry's remaining keys are indented further than its dash.
-		for i < len(lines) && strings.HasPrefix(strings.TrimRight(lines[i], " "), "    ") {
+		// The entry's remaining keys are indented further than its dash — its
+		// dash, not four spaces: a list written at four had its neighbours'
+		// lines eaten as if they were ours, and uninstall came back with the
+		// key and every entry gone (#2724).
+		for i < len(lines) && strings.TrimSpace(lines[i]) != "" && yamlIndentWidth(lines[i]) > dash {
 			i++
 		}
 		i--
@@ -78,7 +118,14 @@ func dropEmptyYAMLKey(s, key string) string {
 		for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
 			j++
 		}
-		if j < len(lines) && strings.HasPrefix(lines[j], "  ") {
+		// Nested is "indented further than the key", not "starts with two
+		// spaces": one space is valid YAML and is not two, so a config written
+		// that way had its key dropped and its entries left behind as a stray
+		// list — which goose then cannot read at all (#2724). A tab is not
+		// legal YAML indentation, and is treated as indentation here anyway,
+		// because leaving a file alone is the safe answer for one this cannot
+		// have written.
+		if j < len(lines) && yamlLineBelongsTo(lines[j], lines[i]) {
 			out = append(out, lines[i])
 			continue
 		}
@@ -116,9 +163,16 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		}
 	}
 
-	next := removeGooseSlashCommand(string(old))
+	next := removeGooseSlashCommand(normaliseGooseNewlines(string(old)))
 	if !uninstall {
-		entry := fmt.Sprintf("  - command: \"deja\"\n    recipe_path: %s\n", yamlQuote(recipe))
+		// At the indent the list already uses, the way the extensions writer
+		// does: a two-space entry spliced into a list written at one, three or
+		// four is a file no YAML parser will read (#2724).
+		pad, ok := gooseListIndent(gooseSlashCommandsBlock(next))
+		if !ok {
+			pad = "  "
+		}
+		entry := fmt.Sprintf("%s- command: \"deja\"\n%s  recipe_path: %s\n", pad, pad, yamlQuote(recipe))
 		if i := strings.Index("\n"+next, "\nslash_commands:\n"); i >= 0 {
 			at := i + len("\nslash_commands:\n") - 1
 			next = next[:at] + entry + next[at:]
@@ -154,4 +208,28 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		}
 	}
 	return installResult{Path: path, Action: a}, nil
+}
+
+// yamlLineBelongsTo reports whether a line is part of the block under a key.
+//
+// Indented further is the ordinary shape. A sequence at the key's own indent is
+// the other one, and it is what every YAML serializer writes —
+// `slash_commands:` followed by `- command: mine` in the first column is a key
+// with an entry, not an empty key beside a stray list, and reading it as the
+// second dropped the key and left the entries orphaned (#2724).
+func yamlLineBelongsTo(line, key string) bool {
+	switch {
+	case yamlIndentWidth(line) > yamlIndentWidth(key):
+		return true
+	case yamlIndentWidth(line) == yamlIndentWidth(key):
+		return strings.HasPrefix(strings.TrimLeft(line, " \t"), "- ")
+	}
+	return false
+}
+
+// yamlIndentWidth is how far a line is indented, counting spaces and tabs
+// alike. YAML forbids tabs, so this is not reading a shape deja writes — it is
+// refusing to mistake one for the top level.
+func yamlIndentWidth(line string) int {
+	return len(line) - len(strings.TrimLeft(line, " \t"))
 }
