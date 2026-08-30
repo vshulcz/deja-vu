@@ -1279,6 +1279,12 @@ func contextByID(dir, q string) (string, idContext, bool) {
 		whole = full
 	}
 	var b bytes.Buffer
+	// The fact before the content, the way the CLI prints it: an agent handed
+	// the note promoted from a session it named has to be told the session was
+	// forgotten (#1624).
+	if line := forgottenSourceNote(whole, q); line != "" {
+		b.WriteString(line + "\n\n")
+	}
 	search.PrintContext(&b, whole, "")
 	return b.String(), idContext{session: whole.ID, size: rawSize([]model.Session{whole})}, true
 }
@@ -1355,6 +1361,13 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		whole = full
 	}
 	var b bytes.Buffer
+	// The same sentence the CLI prints above the answer: an agent handed the
+	// note promoted from a session it named is told the session was forgotten
+	// (#1624). The search path reaches it as often as the id path does — the
+	// note carries the id in its text.
+	if line := forgottenSourceNote(whole, q); line != "" {
+		b.WriteString(line + "\n\n")
+	}
 	search.PrintContext(&b, whole, q)
 	text := b.String()
 	if hits[0].Tier != search.TierExact {

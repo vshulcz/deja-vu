@@ -4123,29 +4123,40 @@ func sharedRowsAmong(dir string, keys []string) int {
 // remember answered with the note and said nothing, so the reply looked like
 // the session itself until you noticed the id had changed (#971).
 func noteForgottenSource(s model.Session, selector string) {
+	if line := forgottenSourceNote(s, selector); line != "" {
+		fmt.Fprintf(os.Stderr, "deja: %s\n", line)
+	}
+}
+
+// forgottenSourceNote is the sentence itself, so every surface can carry it.
+// It lived inside the printer, which meant the CLI said a session was
+// forgotten and the MCP tools handed an agent the same note with the fact
+// removed — and "forgotten" is a decision the reader made about that session,
+// which is the kind of fact recall exists to carry (#1624).
+func forgottenSourceNote(s model.Session, selector string) string {
 	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") {
-		return
+		return ""
 	}
 	src, ok := strings.CutPrefix(s.ID, "deja-note-")
 	if !ok || src == "" {
-		return
+		return ""
 	}
 	// The selector named the source, not the note: a reader who typed the note
 	// id knows what they asked for.
 	if strings.HasPrefix(s.ID, selector) {
-		return
+		return ""
 	}
 	key := strings.Replace(src, "-", ":", 1)
 	// Only when the reader named that session: an ordinary topical query that
 	// happens to land on the note is not asking about the forgotten source, and
 	// the line would be noise on every such search.
 	if selector == "" || !strings.Contains(key, selector) {
-		return
+		return ""
 	}
 	if !index.Tombstoned(key) {
-		return
+		return ""
 	}
-	fmt.Fprintf(os.Stderr, "deja: %s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone\n", key)
+	return fmt.Sprintf("%s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone", key)
 }
 
 // forgetKeyOf names the exact session a selector reached, so a failed forget
