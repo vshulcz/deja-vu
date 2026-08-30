@@ -114,6 +114,9 @@ func doctorAutoRecall(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — reinstall)\n", a.name, "stale", reportPath(path), a.marker)
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
+			if exe := hookExeNote(path, a.name+"-auto"); exe != "" {
+				fmt.Fprintf(w, "  %-12s %s\n", "", exe)
+			}
 		}
 	}
 }

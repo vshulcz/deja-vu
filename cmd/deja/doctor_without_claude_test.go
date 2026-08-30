@@ -21,7 +21,16 @@ func TestDoctorShowsEveryHarnessWithoutClaudeCode(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(home, "index.db"))
 
-	if _, err := installTarget("qwen-auto", "/usr/local/bin/deja", false); err != nil {
+	// A binary that is really there: a hook naming one that is not gets a
+	// second line of its own, and this test is about the table, not that.
+	exe := filepath.Join(home, "bin", "deja")
+	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installTarget("qwen-auto", exe, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".claude", "settings.json")); err == nil {
