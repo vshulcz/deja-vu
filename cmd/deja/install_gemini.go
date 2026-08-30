@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -122,7 +123,22 @@ func enableGeminiHooks() error {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
-		return fmt.Errorf("gemini settings: %w", err)
+		// The MCP entry went in through the text path, which keeps comments,
+		// and then this refused the same file for having them — after it had
+		// been edited, with a .bak left beside it (#2744). Read past them: if
+		// hooks are already on there is nothing to write, and if they are not,
+		// say what to switch on rather than quoting a parser at somebody about
+		// their own comment.
+		var stripped map[string]any
+		if json.Unmarshal(jsoncStripped(old), &stripped) != nil {
+			return fmt.Errorf("gemini settings: %w", err)
+		}
+		if cfg, _ := stripped["hooksConfig"].(map[string]any); cfg != nil {
+			if on, ok := cfg["enabled"].(bool); ok && on {
+				return nil
+			}
+		}
+		return fmt.Errorf("gemini settings has comments deja will not rewrite — set \"hooksConfig\": {\"enabled\": true} in %s by hand", path)
 	}
 	cfg, _ := root["hooksConfig"].(map[string]any)
 	if cfg == nil {
@@ -139,4 +155,17 @@ func enableGeminiHooks() error {
 	}
 	_, err = writeIfChanged(path, old, append(next, '\n'))
 	return err
+}
+
+// jsoncStripped blanks the comments out of a config so it can be read as JSON,
+// leaving the bytes around them where they were.
+func jsoncStripped(b []byte) []byte {
+	lines := strings.Split(string(b), "\n")
+	inBlock := false
+	for i, l := range lines {
+		code, next, _ := jsoncCodeOf(l, inBlock)
+		inBlock = next
+		lines[i] = code
+	}
+	return []byte(strings.Join(lines, "\n"))
 }
