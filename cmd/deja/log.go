@@ -100,8 +100,14 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			sess = fmt.Sprintf(" · %d session%s", e.Sessions, pluralS(e.Sessions))
 		}
 		into := ""
-		if e.Into != "" {
+		switch {
+		case e.Into != "":
 			into = " · into: " + e.Into
+		case e.Unreadable:
+			// The injection happened and the session it went to was in a
+			// payload deja could not decode. Saying so is the difference from
+			// a host that sent nothing at all (#2161).
+			into = " · into: unknown (the host sent a payload deja could not read)"
 		}
 		fmt.Fprintf(w, "%s  %-14s %s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, into, mark)
 	}

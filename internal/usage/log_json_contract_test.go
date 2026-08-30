@@ -42,6 +42,11 @@ func TestLogJSONShapesAreStable(t *testing.T) {
 	assertShape(t, "Event", topLevelJSONKeys(Event{}), map[string]bool{
 		"t": true, "kind": true, "bytes": true, "sessions": true,
 		"empty": true, "raw": true, "ids": true, "into": true,
+		// "unreadable" is additive and optional: an injection whose host sent
+		// a payload deja could not decode has no receiver to name, and without
+		// this its row is identical to one from a host that sent nothing
+		// (#2161).
+		"unreadable": true,
 	})
 	// "into" is additive and optional: it names the agent session an injection
 	// went to, which the log never recorded. Without it the only measure of
@@ -53,5 +58,6 @@ func TestLogJSONShapesAreStable(t *testing.T) {
 	assertShape(t, "Snapshot", topLevelJSONKeys(Snapshot{}), map[string]bool{
 		"t": true, "kind": true, "sessions": true, "bytes": true,
 		"policy": true, "terms": true, "into": true, "projects": true, "digest": true,
+		"unreadable": true,
 	})
 }

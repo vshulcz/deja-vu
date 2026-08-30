@@ -292,7 +292,12 @@ func runHookContext(dir string, plain bool) error {
 		SessionID string `json:"session_id"`
 		CWD       string `json:"cwd"`
 	}
-	_ = json.Unmarshal(readHookStdin(), &input)
+	// Best effort, as every hook is — but not silent about it. A payload deja
+	// cannot decode carries the session this injection went to, and losing it
+	// without a word left the audit log unable to tell that case from a host
+	// that sent nothing at all (#2161).
+	payload := readHookStdin()
+	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	// The harness tells us which project this is; deja read only the
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
@@ -310,7 +315,11 @@ func runHookContext(dir string, plain bool) error {
 			// The block is about the machine and names no project, so without
 			// the projects behind its walls a forget of one of them could not
 			// reach the stored text (#2349).
-			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
+			if unreadable {
+				usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, out, 0, 0, policy.Load().Describe(policy.ActivationAuto), nil, from)
+			} else {
+				usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, input.SessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
+			}
 			if plain {
 				fmt.Fprintln(os.Stdout, out)
 				return nil
@@ -382,7 +391,11 @@ func runHookContext(dir string, plain bool) error {
 	}
 	digest = frameRecall(digest)
 	polName := policy.Load().Describe(policy.ActivationAuto)
-	usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs, servedProjects)
+	if unreadable {
+		usage.RecordDigestPolicySessionsUnread(dir, usage.KindHook, digest, sessions, raw, polName, servedIDs, servedProjects)
+	} else {
+		usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, input.SessionID, sessions, raw, polName, servedIDs, servedProjects)
+	}
 	// What this project was told, so the next session start can say something
 	// else. Without this the novelty ordering has nothing to read and every
 	// start serves the same three sessions (#2038).
