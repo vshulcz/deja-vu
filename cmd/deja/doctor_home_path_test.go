@@ -43,7 +43,13 @@ func TestDoctorContractsTheHomePath(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &report); err != nil {
 		t.Fatalf("doctor --json is not JSON: %v", err)
 	}
-	if !strings.Contains(raw, home) {
+	// As JSON writes it: a Windows path is escaped in the encoding, so looking
+	// for the raw spelling is looking for something no encoder produces.
+	encoded, err := json.Marshal(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(raw, strings.Trim(string(encoded), `"`)) {
 		t.Errorf("doctor --json lost the real path")
 	}
 }
