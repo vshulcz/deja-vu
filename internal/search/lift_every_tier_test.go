@@ -21,9 +21,15 @@ func TestEveryTierPutsANoteAboveItsSource(t *testing.T) {
 		Harness: "deja", ID: "deja-note-claude-longs", Project: "api", Updated: now,
 		Messages: []model.Message{{Role: "user", Text: "[accepted] the goblin pool was too small", Time: now}},
 	}
+	// A session between them, so the lift has to rotate rather than swap: a
+	// two-element fixture cannot tell the two apart.
+	between := model.Session{
+		Harness: "claude", ID: "other", Project: "api", Updated: now,
+		Messages: []model.Message{{Role: "user", Text: "goblin pool notes from an unrelated session", Time: now}},
+	}
 	// Source first, which is the order a score-only ranking produces when the
 	// transcript is the longer text.
-	ss := []model.Session{source, note}
+	ss := []model.Session{source, between, note}
 
 	for name, hits := range map[string][]Hit{
 		"error":     ErrorHits(ss),
@@ -43,6 +49,13 @@ func TestEveryTierPutsANoteAboveItsSource(t *testing.T) {
 		}
 		if noteAt > sourceAt {
 			t.Errorf("%s tier put the transcript above its own note", name)
+		}
+		// And the hit in between kept its place relative to the source rather
+		// than being swapped past it.
+		for i, h := range hits {
+			if h.Session.ID == "other" && i < sourceAt {
+				t.Errorf("%s tier moved an unrelated hit above the source", name)
+			}
 		}
 	}
 }
