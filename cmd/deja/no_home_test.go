@@ -156,6 +156,15 @@ func TestInstallKeepsItsOwnRefusal(t *testing.T) {
 	if !strings.Contains(err.Error(), "HOME") {
 		t.Errorf("the refusal does not name what is missing: %v", err)
 	}
+	// A command deja runs is named; a word the reader typed is not, because
+	// "retry cannot find your home directory" reads as if retry were one.
+	if !strings.HasPrefix(err.Error(), "search ") {
+		t.Errorf("a real command is not named in its own refusal: %v", err)
+	}
+	_, err = homelessRefusal("budget")
+	if err == nil || !strings.HasPrefix(err.Error(), "deja ") {
+		t.Errorf("a query word was named as a command: %v", err)
+	}
 }
 
 // doctor is where the refusal sends the reader, so it runs without a home —

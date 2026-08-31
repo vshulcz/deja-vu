@@ -136,6 +136,20 @@ var worksWithNoHome = map[string]bool{
 	"install": true, "uninstall": true,
 }
 
+// dispatchKnows reports whether a word is a command deja runs, from either
+// half of the dispatcher: the map, and the switch above it that holds the five
+// commands taking their own argument parsing.
+func dispatchKnows(name string) bool {
+	if _, ok := commands[name]; ok {
+		return true
+	}
+	switch name {
+	case "show", "last", "search", "aider", "goose":
+		return true
+	}
+	return false
+}
+
 // homelessRefusal answers what to do when deja cannot find a home directory
 // and nothing else says where its index goes.
 //
@@ -155,7 +169,7 @@ func homelessRefusal(name string) (bool, error) {
 		// Only a name the dispatcher will actually take: `-v` is not a
 		// command, so allowlisting it let it through the guard, miss the map
 		// and land in the bare-query path — which builds an index (#1692).
-		if _, known := commands[name]; known || name == "install" || name == "uninstall" {
+		if _, known := commands[name]; known {
 			return false, nil
 		}
 	}
@@ -165,7 +179,7 @@ func homelessRefusal(name string) (bool, error) {
 	// The command's own name, or deja's: for a bare query the first word is
 	// the reader's, and "retry cannot find your home directory" reads as if
 	// `retry` were a command.
-	if _, known := commands[name]; !known {
+	if !dispatchKnows(name) {
 		name = "deja"
 	}
 	return true, fmt.Errorf("%s cannot find your home directory — set HOME, or DEJA_INDEX_DIR and XDG_CONFIG_HOME to absolute paths", name)
