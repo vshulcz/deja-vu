@@ -225,6 +225,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		skip[input.SessionID] = true
 	}
 	ranked, matched, strong, idfOf, err := index.ProjectRelevantSkipping(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates, skip)
+	// The rule every other surface applies: a promoted note goes in front of
+	// the transcript it was distilled from. This hook ranks sessions and never
+	// builds a search.Hit, so it had no note-over-source rule at all and the
+	// two slots below could go to the transcript while its own note waited
+	// behind it (#2803).
+	search.LiftNoteSessionsAboveTheirSource(ranked)
 	rankedAlreadyShown = 0
 	for _, s := range ranked {
 		if skip[s.ID] {

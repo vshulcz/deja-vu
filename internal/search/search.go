@@ -655,36 +655,73 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 // is dated by its evidence rather than by the day it was filed (V4) the two are
 // equally fresh, so the transcript won its own distillation.
 func liftNotesAboveTheirSource(hits []Hit) {
-	notes := make(map[string]int, len(hits))
-	for i, h := range hits {
-		if h.Session.Harness == notesHarness && strings.HasPrefix(h.Session.ID, "deja-note-") {
-			notes[h.Session.ID] = i
+	order := liftedNoteOrder(len(hits),
+		func(i int) string { return hits[i].Session.Harness },
+		func(i int) string { return hits[i].Session.ID })
+	if order == nil {
+		return
+	}
+	out := make([]Hit, len(hits))
+	for at, from := range order {
+		out[at] = hits[from]
+	}
+	copy(hits, out)
+}
+
+// LiftNoteSessionsAboveTheirSource is the same rule for a caller that ranks
+// sessions and never builds a Hit. The per-prompt hook is one: it had no
+// note-over-source rule at all, so the transcript a note was distilled from
+// went into the block ahead of the note (#2803).
+func LiftNoteSessionsAboveTheirSource(ss []model.Session) {
+	order := liftedNoteOrder(len(ss),
+		func(i int) string { return ss[i].Harness },
+		func(i int) string { return ss[i].ID })
+	if order == nil {
+		return
+	}
+	out := make([]model.Session, len(ss))
+	for at, from := range order {
+		out[at] = ss[from]
+	}
+	copy(ss, out)
+}
+
+// liftedNoteOrder answers where each element goes so that a promoted note sits
+// in front of the transcript it was distilled from, and nothing else moves. It
+// returns nil when there is nothing to lift, so a caller can skip the copy.
+func liftedNoteOrder(n int, harnessAt, idAt func(int) string) []int {
+	notes := make(map[string]int, n)
+	for i := 0; i < n; i++ {
+		if harnessAt(i) == notesHarness && strings.HasPrefix(idAt(i), "deja-note-") {
+			notes[idAt(i)] = i
 		}
 	}
 	if len(notes) == 0 {
-		return
+		return nil
 	}
-	for i := 0; i < len(hits); i++ {
-		h := hits[i]
-		if h.Session.Harness == notesHarness {
+	order := make([]int, 0, n)
+	taken := make(map[int]bool, len(notes))
+	moved := false
+	for i := 0; i < n; i++ {
+		if taken[i] {
 			continue
 		}
-		// Mirrors sources.PromotedNoteID: building the id rather than parsing
-		// one keeps a harness name with a dash in it from splitting wrong.
-		id := "deja-note-" + h.Session.Harness + "-" + h.Session.ID
-		j, ok := notes[id]
-		if !ok || j < i {
-			continue
-		}
-		note := hits[j]
-		copy(hits[i+1:j+1], hits[i:j])
-		hits[i] = note
-		for k := i; k <= j; k++ {
-			if hits[k].Session.Harness == notesHarness && strings.HasPrefix(hits[k].Session.ID, "deja-note-") {
-				notes[hits[k].Session.ID] = k
+		if harnessAt(i) != notesHarness {
+			// Mirrors sources.PromotedNoteID: building the id rather than
+			// parsing one keeps a harness name with a dash in it from
+			// splitting wrong.
+			if j, ok := notes["deja-note-"+harnessAt(i)+"-"+idAt(i)]; ok && j > i {
+				order = append(order, j)
+				taken[j] = true
+				moved = true
 			}
 		}
+		order = append(order, i)
 	}
+	if !moved {
+		return nil
+	}
+	return order
 }
 
 // sortHits orders a ranked result set.
