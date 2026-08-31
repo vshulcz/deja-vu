@@ -88,7 +88,7 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom in
 		// A newline before what the parent closes with, or the chain ends up
 		// against the parent's own brace: `}}` on one line, which parses and
 		// reads as a mistake.
-		if have > 0 && comma == "" {
+		if have > 0 && comma == "" && !strings.HasPrefix(text[at+1:], "\n") {
 			insert += "\n" + strings.Repeat("  ", have)
 		}
 		return text[:at+1] + insert + comma + text[at+1:], nil
@@ -101,8 +101,9 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom in
 		// A newline after the entry when the block was written on one line, so
 		// the reader's first entry keeps a line of its own rather than being
 		// pushed against deja's closing brace.
+		rest := text[block.valueOpen+1:]
 		tail := ""
-		if rest := text[block.valueOpen+1:]; rest != "" && rest[0] != '\n' && rest[0] != '}' {
+		if rest != "" && rest[0] != '\n' && rest[0] != '}' {
 			tail = "\n   "
 		}
 		// And no comma into an empty block: `{"deja": {…},}` is not JSON, and
@@ -111,8 +112,16 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom in
 		comma := ","
 		if strings.TrimSpace(stripJSONComments(text[block.valueOpen+1:block.valueEnd-1])) == "" {
 			comma, tail = "", "\n  "
+			// Unless what follows opens a line of its own — a block whose body
+			// is a comment. The closing brace is already where it belongs, and
+			// a tail here left a blank line behind on the way out, one more on
+			// every round trip.
+			if rest != "" && rest[0] == '\n' {
+				tail = ""
+			}
 		}
-		insert := fmt.Sprintf("\n    %q: %s%s%s", id, entry, comma, tail)
+		depth := strings.Repeat("  ", len(keys)+1)
+		insert := fmt.Sprintf("\n%s%q: %s%s%s", depth, id, entryAtDepth(entry, len(keys)), comma, tail)
 		return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
 	}
 	if uninstall {
@@ -134,7 +143,7 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom in
 		cut := zedEntrySpan(text, found)
 		return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
 	}
-	return text[:found.valueOpen] + entry + text[found.valueEnd:], nil
+	return text[:found.valueOpen] + entryAtDepth(entry, len(keys)) + text[found.valueEnd:], nil
 }
 
 // walkJSONCKeys follows a dotted block key from the top-level object, and
@@ -151,6 +160,17 @@ func walkJSONCKeys(text string, open int, keys []string) (*zedSpan, int) {
 		block, at = found, found.valueOpen+1
 	}
 	return block, len(keys)
+}
+
+// entryAtDepth re-indents an entry to the block it is going into.
+// jsoncEntryText renders at the depth a single-key writer uses, so an entry two
+// keys deep — openclaw's mcp.servers — came out aligned with the block above
+// it, along with the brace that closes it.
+func entryAtDepth(entry string, depth int) string {
+	if depth <= 1 {
+		return entry
+	}
+	return strings.ReplaceAll(entry, "\n    ", "\n"+strings.Repeat("  ", depth+1))
 }
 
 // closeEmptied puts a block deja emptied back the way it found it: writing an
@@ -181,9 +201,6 @@ func closeEmptied(text string, keys []string) string {
 // nestedBlocks is the text of the keys that are missing, one inside the next,
 // with the entry at the bottom.
 func nestedBlocks(keys []string, id, entry, indent string) string {
-	// jsoncEntryText renders at the depth the single-key writers use; a chain
-	// puts the entry deeper than that, and a body left at the old depth reads
-	// as if it belonged to the block above.
 	entry = strings.ReplaceAll(entry, "\n    ", "\n"+indent+strings.Repeat("  ", len(keys)))
 	body := fmt.Sprintf("%q: %s", id, entry)
 	for i := len(keys) - 1; i >= 0; i-- {

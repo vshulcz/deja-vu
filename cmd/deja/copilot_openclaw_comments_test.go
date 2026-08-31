@@ -145,6 +145,7 @@ func TestARoundTripOnACommentedConfigChangesNothing(t *testing.T) {
 		"{\n  // no mcp at all\n  \"theme\": \"dark\"\n}\n",
 		"{\n  // an mcp block with no servers in it\n  \"mcp\": {}\n}\n",
 		"{\n  // servers, but empty\n  \"mcp\": {\n    \"servers\": {}\n  }\n}\n",
+		"{\n  \"mcp\": {\n    // servers go here one day\n  }\n}\n",
 	} {
 		t.Run("", func(t *testing.T) {
 			hermeticEnv(t)
