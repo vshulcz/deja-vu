@@ -531,6 +531,13 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		case err != nil:
 			return "", notesWriteError(err)
 		}
+		// Journalled here, where the write has just happened, rather than after
+		// the index work below. `deja log` is where the user sees what an agent
+		// did with their store, and the recorder sat on the one path where the
+		// index was quiet — so a note stored while a rebuild was running, which
+		// is the state this tool asks for itself, reached the disk and never
+		// the journal.
+		usage.RecordResult(dir, usage.KindRemember, len(a.Text), 1, false)
 		// The note is on disk either way; what is left is making it findable.
 		// On upgrade day that meant rebuilding the whole index inside the call
 		// (#1309), so the agent is told instead — the detached warmup picks it
@@ -553,9 +560,6 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			}
 			return "Saved. " + rememberSavedNote(dir), nil
 		}
-		// The journal is where the user sees what the agent did with their
-		// store; a write belongs there at least as much as a read.
-		usage.RecordResult(dir, usage.KindRemember, len(a.Text), 1, false)
 		return fmt.Sprintf("Remembered under %s.", projectForEcho(a.Project)), nil
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
