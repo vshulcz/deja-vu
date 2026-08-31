@@ -51,9 +51,15 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		// and be left out. A stamp sqlite cannot read at all normalises to
 		// null, and those rows are kept rather than dropped — an unreadable
 		// stamp is a reason to look at a message, not to hide it.
-		const norm = `strftime('%Y-%m-%dT%H:%M:%f',m.created_at)`
+		//
+		// Session-scoped, not message-scoped: what comes back replaces what the
+		// index holds for that session, so a session that hands back only its
+		// newest turn loses the rest (#2075, the shape goose describes in
+		// ParseGooseDBSince).
+		const norm = `strftime('%Y-%m-%dT%H:%M:%f',m2.created_at)`
 		w := sqlEscape(millisecondBackoff(t))
-		where = " and (" + norm + " is null or " + norm + " > '" + w + "')"
+		where = " and s.id in (select m2.session_id from messages m2 where " +
+			norm + " is null or " + norm + " > '" + w + "')"
 	}
 	q := `select s.id as id,s.cwd_last as cwd,s.title as title,` +
 		`m.role as role,m.message_json as body,m.created_at as at ` +

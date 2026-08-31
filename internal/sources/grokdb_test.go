@@ -85,16 +85,15 @@ func TestParseGrokDBSinceFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Both halves matter: the old message must be gone and the new one must
-	// be there. Asserting only the first passed for months while the filter
-	// returned nothing at all, because a missing quote made sqlite reject the
-	// query and the error was swallowed as "no sessions".
+	// The session it picks comes back whole — a partial return replaces what
+	// the index holds for that session and would take the earlier turns with
+	// it (#2075) — so what this asserts is that the new message is there.
+	// Asserting nothing about it passed for months while the filter returned
+	// nothing at all, because a missing quote made sqlite reject the query and
+	// the error was swallowed as "no sessions".
 	var sawNew bool
 	for _, s := range ss {
 		for _, m := range s.Messages {
-			if m.Text == "connection pool exhausted again" {
-				t.Fatalf("since filter returned an older message: %+v", s.Messages)
-			}
 			if m.Text == "raise max_conns" {
 				sawNew = true
 			}

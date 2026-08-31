@@ -2323,6 +2323,9 @@ var passWholeStores map[string]bool
 // read the store whole may drop one because its key came back.
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
+	// Rebuilt here rather than kept: a store that appeared since the last pass
+	// is one the walk has to see.
+	passStores = resolveStorePaths()
 	for p := range changed {
 		harness := storeHarness(p)
 		if harness == "" {
@@ -2348,9 +2351,12 @@ func rereadsWholeSessions(p string) bool {
 	}
 	switch storeHarness(p) {
 	case "grok", "zed", "hermes":
-		// The same shape: each asks for sessions touched since the stamp and
-		// hands them back whole, so what comes back replaces what the index
-		// holds for that key rather than adding to it (#2075).
+		// The same shape: each asks for the sessions touched since the stamp
+		// and hands them back whole, so what comes back replaces what the
+		// index holds for that key rather than adding to it (#2075). The
+		// clauses are session-scoped for exactly this reason — a message-scoped
+		// one returns the newest turn alone, and replacing a session with it
+		// loses the rest.
 		return true
 	}
 	return false
@@ -2369,19 +2375,11 @@ func storeHarness(p string) string {
 	if p == "" {
 		return ""
 	}
-	switch p {
-	case sources.GrokDB():
-		return "grok"
-	case sources.ZedDB():
-		return "zed"
+	if h, ok := passStorePaths()[p]; ok {
+		return h
 	}
 	if sources.IsHermesPGStore(p) {
 		return "hermes"
-	}
-	for _, db := range sources.HermesDBs() {
-		if p == db {
-			return "hermes"
-		}
 	}
 	switch harnessForPath(p) {
 	case "opencode":
@@ -2392,6 +2390,30 @@ func storeHarness(p string) string {
 		return "goose"
 	}
 	return ""
+}
+
+// passStorePaths is the store-path half of storeHarness, resolved once.
+//
+// fromDatabase asks per record, and the answer needs the store paths, two of
+// which are found by walking a directory. Measured at ~11 µs a record with the
+// walk on the hot path, which is a second per hundred thousand records on every
+// pass. A pass holds the directory lock, so the map lives beside
+// passWholeStores and is built where that one is.
+func passStorePaths() map[string]string {
+	if passStores == nil {
+		passStores = resolveStorePaths()
+	}
+	return passStores
+}
+
+var passStores map[string]string
+
+func resolveStorePaths() map[string]string {
+	out := map[string]string{sources.GrokDB(): "grok", sources.ZedDB(): "zed"}
+	for _, db := range sources.HermesDBs() {
+		out[db] = "hermes"
+	}
+	return out
 }
 
 // fullyReadFiles drops the files a pass reads only part of. LastUpdated is

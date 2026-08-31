@@ -74,8 +74,11 @@ func TestGrokSinceHandlesEveryStampShapeItReads(t *testing.T) {
 			if n := count("2026-07-27T09:00:00Z"); n != 2 {
 				t.Errorf("a watermark earlier the same day returned %d messages, want both", n)
 			}
-			if n := count("2026-07-27T12:00:00Z"); n != 1 {
-				t.Errorf("a watermark between the two returned %d messages, want the later one", n)
+			// Whole, not just the later message: the cursor selects sessions,
+			// because what comes back replaces what the index holds for that
+			// session (#2075).
+			if n := count("2026-07-27T12:00:00Z"); n != 2 {
+				t.Errorf("a watermark between the two returned %d messages, want the session whole", n)
 			}
 			if n := count("2026-07-27T16:00:00Z"); n != 0 {
 				t.Errorf("a watermark after both returned %d messages, want none", n)
@@ -95,7 +98,8 @@ func TestGrokSinceHandlesEveryStampShapeItReads(t *testing.T) {
 // A stamp sqlite cannot read normalises to null. Such a row comes back on
 // every incremental pass rather than disappearing from all of them: an
 // unreadable stamp is a reason to look at a message, not to hide it — the rule
-// zed's reader already follows.
+// zed's reader already follows. It brings its session with it, which is how
+// every selected session travels.
 func TestGrokSinceKeepsAMessageWithAnUnreadableStamp(t *testing.T) {
 	db := grokShapeDB(t, "2026-07-27 10:00:00", "not a timestamp at all")
 	at, err := time.Parse(time.RFC3339, "2026-07-27T16:00:00Z")
@@ -110,7 +114,7 @@ func TestGrokSinceKeepsAMessageWithAnUnreadableStamp(t *testing.T) {
 	for _, s := range ss {
 		n += len(s.Messages)
 	}
-	if n != 1 {
-		t.Errorf("%d message(s) came back, want the one whose stamp cannot be read", n)
+	if n != 2 {
+		t.Errorf("%d message(s) came back, want the session holding the one whose stamp cannot be read", n)
 	}
 }
