@@ -566,7 +566,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -1022,7 +1022,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -2779,7 +2779,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -3020,7 +3020,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
 		return filesTouched, messages, 0, err
 	}
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	// Read before writeManifest: the fold in there drains the counters, and the
 	// caller prints its line after this returns (#2007).
@@ -3095,11 +3095,22 @@ func harnessForPath(p string) string {
 	return ""
 }
 
-func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
+// setDatabaseStoreWatermarks stamps every store deja reads through SQLite.
+//
+// Each of the six has a since-the-watermark parser, and dbParse only calls it
+// once the store carries a watermark — so the three that were never stamped
+// (grok, hermes, zed) read their store whole on every pass, for the life of
+// the index (#2075).
+func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
 	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
+	setStoreLastUpdated(files, sessions, "grok", sources.GrokDB())
+	setStoreLastUpdated(files, sessions, "zed", sources.ZedDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
+	}
+	for _, db := range sources.HermesDBs() {
+		setStoreLastUpdated(files, sessions, "hermes", db)
 	}
 }
 

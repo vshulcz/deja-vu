@@ -592,7 +592,7 @@ func TestSetOpencodeLastUpdated(t *testing.T) {
 	t.Setenv("DEJA_OPENCODE_DB", db)
 	files := map[string]FileState{db: {Path: db}}
 	now := time.Now()
-	setOpencodeLastUpdated(files, map[string]SessionMeta{"opencode:s": {Harness: "opencode", Updated: now}})
+	setDatabaseStoreWatermarks(files, map[string]SessionMeta{"opencode:s": {Harness: "opencode", Updated: now}})
 	if files[db].LastUpdated != now.UnixNano() {
 		t.Fatalf("LastUpdated=%d", files[db].LastUpdated)
 	}
