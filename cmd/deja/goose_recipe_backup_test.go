@@ -12,8 +12,7 @@ import (
 // nothing (#2602).
 func TestUninstallPutsBackTheGooseRecipeItReplaced(t *testing.T) {
 	hermeticEnv(t)
-	home := os.Getenv("HOME")
-	path := filepath.Join(home, ".config", "goose", "deja-recipe.yaml")
+	path := gooseRecipePath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -45,11 +44,10 @@ func TestUninstallPutsBackTheGooseRecipeItReplaced(t *testing.T) {
 // A recipe deja wrote itself goes, with nothing left beside it.
 func TestUninstallRemovesTheGooseRecipeItWrote(t *testing.T) {
 	hermeticEnv(t)
-	home := os.Getenv("HOME")
 	if _, err := captureRun(t, "install", "goose", "--no-index"); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(home, ".config", "goose", "deja-recipe.yaml")
+	path := gooseRecipePath()
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("install wrote no recipe: %v", err)
 	}
