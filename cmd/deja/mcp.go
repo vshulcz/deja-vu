@@ -1420,12 +1420,26 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	search.PrintContext(&b, whole, q)
 	text := b.String()
 	if hits[0].Tier != search.TierExact {
-		text = "[" + hits[0].Tier + "]\n" + text
+		text = contextTierLead(hits[0].Tier) + text
 	}
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
 		// The search path reaches a promoted note as often as the id path
 		// does — the note carries the id in its own text.
 		forgottenSourceNote(whole, q, false), nil
+}
+
+// contextTierLead says what the session below it is, for a tier that is not an
+// exact match.
+//
+// A bare `[relevance]` marker was all an agent got above a whole session that
+// matched nothing — recall says "No session is about this" in a sentence, and
+// this tool, which returns far more text, said it in one word that reads like
+// a label on an answer (#2787, the shape #2074 fixed for the counted page).
+func contextTierLead(tier string) string {
+	if tier == search.TierRelevance {
+		return "No session is about this. Nothing matched the query, so the session below is the nearest by wording — treat it as a lead to check, not as a record, and say plainly if it does not answer.\n"
+	}
+	return "[" + tier + "]\n"
 }
 
 func mcpProgress() io.Writer {
