@@ -41,6 +41,16 @@ func TestFrictionCountsTheWithheldSessionsItWouldHaveReported(t *testing.T) {
 	if strings.Contains(note, "hides") {
 		t.Errorf("the hidden session holds nothing friction reports, and the note claims otherwise:\n%s", note)
 	}
+	// The line on stdout counts something else — the sessions a rule took away
+	// that recorded tool output at all — and it still has to be true, and still
+	// has to name the rule that actually applies.
+	out, err := captureRun(t, "friction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "the trust policy withheld the 1 session that recorded tool output") {
+		t.Errorf("the line about what the rule took away is wrong:\n%s", out)
+	}
 
 	// And a hidden session that does hold a failure is still counted: the
 	// sentence has to keep working where it is true.
@@ -57,5 +67,12 @@ func TestFrictionCountsTheWithheldSessionsItWouldHaveReported(t *testing.T) {
 	}
 	if !strings.Contains(note, "hides 1 matching session") {
 		t.Errorf("the session with a failure in it was not counted:\n%s", note)
+	}
+	out, err = captureRun(t, "friction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "withheld the 2 sessions that recorded tool output") {
+		t.Errorf("both sessions recorded tool output; the line says otherwise:\n%s", out)
 	}
 }
