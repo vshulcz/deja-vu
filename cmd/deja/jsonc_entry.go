@@ -72,7 +72,7 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) 
 		if uninstall {
 			return text, nil
 		}
-		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  },", blockKey, id, entry)
+		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  }%s", blockKey, id, entry, rootComma(text, open))
 		return text[:open+1] + insert + text[open+1:], nil
 	}
 	found := zedFindKey(text, block.valueOpen+1, id)
@@ -109,6 +109,20 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) 
 		return text[:cut[0]] + text[cut[1]:], nil
 	}
 	return text[:found.valueOpen] + entry + text[found.valueEnd:], nil
+}
+
+// rootComma is the comma after a block inserted at the top of an object, or
+// nothing when that object holds no other key.
+//
+// Unconditional, it wrote `{"mcpServers": {…},}` into a config whose only line
+// was a comment — not JSON, so every later run refused the target with a
+// message pointing at the reader's own comment. The same shape #2740 fixed one
+// level down, for a block with no entries in it.
+func rootComma(text string, open int) string {
+	if strings.TrimSpace(stripJSONComments(text[open+1:])) == "}" {
+		return ""
+	}
+	return ","
 }
 
 // jsoncEntryText renders an entry the way the writers build it, so the text
@@ -213,7 +227,7 @@ func jsoncSetFlag(text, blockKey, key string, value bool) (string, error) {
 	}
 	block := zedFindKey(text, open+1, blockKey)
 	if block == nil {
-		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  },", blockKey, key, rendered)
+		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  }%s", blockKey, key, rendered, rootComma(text, open))
 		return text[:open+1] + insert + text[open+1:], nil
 	}
 	if at := jsoncScalarValue(text, block, key); at != nil {
