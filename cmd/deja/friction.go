@@ -25,6 +25,23 @@ import (
 // So this reports friction, not knowledge, and it is deliberately a small
 // claim: the same specific error, in N separate sessions.
 
+// hasFrictionLine reports whether a record holds anything friction would put in
+// its answer. The note about what a rule withheld is a sentence about that
+// answer, so a hidden session is only worth counting when it holds one.
+// The threshold friction applies to what it prints — a failure has to recur
+// across sessions — is deliberately not applied here: it cannot be, without
+// building the signature map a second time over records the reader may not see.
+// So the note counts sessions holding a failure, not sessions holding a
+// recurring one, which is the bar `how` uses for the same sentence.
+func hasFrictionLine(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		if _, ok := index.FrictionLine(line); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	for i := 0; i < len(args); i++ {
@@ -74,16 +91,43 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	// the rule is applied and read the ignored tree's errors as this machine's
 	// own (#2630).
 	ignoredSessions := map[string]bool{}
+	// And the sessions a rule took away that recorded tool output at all, green
+	// or not: that is what the lines on stdout are about, and it is a different
+	// number from the one the note above them uses.
+	withheldOutput := map[string]bool{}
+	ignoredOutput := map[string]bool{}
 	// One pass over the record log rather than a load per session: loading by
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
-		if !pol.Allows(policy.ActivationSearch, meta.Project) {
-			withheldSessions[meta.Harness+":"+meta.ID] = true
-			return
-		}
-		if pol.Ignored(meta.Path, meta.Project) {
-			ignoredSessions[meta.Harness+":"+meta.ID] = true
+		// Whether the record is withheld is decided here; whether friction
+		// would have said anything about it is decided below, and that is where
+		// the counts are taken. Counted here, they were about tool output
+		// rather than about failures: a machine whose hidden sessions only ever
+		// printed `ok 12 tests passed` was told a rule was keeping matching
+		// sessions back, and "matching" is the word the sentence uses (#2794,
+		// the sibling of #2766).
+		denied := !pol.Allows(policy.ActivationSearch, meta.Project)
+		ignored := !denied && pol.Ignored(meta.Path, meta.Project)
+		if denied || ignored {
+			// Two counts, because two sentences: the note on stderr says a rule
+			// hides *matching* sessions, and the line on stdout says the
+			// sessions that *recorded tool output* are the ones a rule took
+			// away. A session whose output is all green belongs to the second
+			// and not the first.
+			hit := hasFrictionLine(r.Text)
+			key := meta.Harness + ":" + meta.ID
+			if denied {
+				withheldOutput[key] = true
+				if hit {
+					withheldSessions[key] = true
+				}
+			} else {
+				ignoredOutput[key] = true
+				if hit {
+					ignoredSessions[key] = true
+				}
+			}
 			return
 		}
 		key := meta.Harness + ":" + meta.ID
@@ -166,20 +210,20 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			// someone lands when recall feels thin, so it is the worst place
 			// to say the history is not there (#1044).
 			fmt.Fprintln(stdout, strings.TrimPrefix(emptyIndexHint("nothing recurring"), "deja: "))
-		case len(sessions) == 0 && len(withheldSessions) > 0:
+		case len(sessions) == 0 && len(withheldOutput) > 0:
 			// The sessions that recorded tool output are exactly the ones a
 			// rule took away, and saying the machine never had them is a claim
 			// about the store rather than about the rule — the misread #637
 			// and #1044 closed elsewhere. The stderr note above says the same
 			// thing, and stdout is what a redirect keeps (#2319).
 			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
-				len(withheldSessions), pluralS(len(withheldSessions)))
-		case len(sessions) == 0 && len(ignoredSessions) > 0:
+				len(withheldOutput), pluralS(len(withheldOutput)))
+		case len(sessions) == 0 && len(ignoredOutput) > 0:
 			// The same claim about the store rather than about the rule, for
 			// the other rule: the sessions with the tool output are there and
 			// the ignore rule is what keeps them out (#2630).
 			fmt.Fprintf(stdout, "nothing recurring — the ignore rule keeps the %d session%s that recorded tool output out of recall, which is what friction reads errors from\n",
-				len(ignoredSessions), pluralS(len(ignoredSessions)))
+				len(ignoredOutput), pluralS(len(ignoredOutput)))
 		case len(sessions) == 0 && total == 0:
 			// Every session on this machine is behind a rule, and none of them
 			// recorded tool output — so neither arm above fired and the count
