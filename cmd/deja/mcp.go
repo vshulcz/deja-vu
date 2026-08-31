@@ -597,6 +597,16 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 	// dropped to make room for a sentence about the index. The answer can end
 	// up the note's length over the budget, which is about a hundred bytes and
 	// worth more than the session it would otherwise cost.
+	if len(hits) == 0 {
+		// A bare `[]` is the whole answer, so an agent cannot tell "nobody
+		// touched this file" from "deja has nothing indexed at all" — the
+		// distinction #2862 drew for recall, on the tool that is called before
+		// an edit. Said in the shape this payload already says everything else.
+		if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
+			return string(mustMarshalBlameNote(
+				"this machine has no indexed history yet, so nothing can be found — `deja sources` shows where deja looked")), 0, nil
+		}
+	}
 	body := mustMarshalBlame(hits, 0, false)
 	for len(body) > blameMCPBudget && len(hits) > 1 {
 		hits = hits[:max(len(hits)*3/4, 1)]
@@ -714,6 +724,16 @@ func (s blameSessionJSON) MarshalJSON() ([]byte, error) {
 		out.Updated = &s.Updated
 	}
 	return json.Marshal(out)
+}
+
+// mustMarshalBlameNote answers with one note and no sessions, in the array
+// shape this tool always answers in.
+func mustMarshalBlameNote(note string) []byte {
+	b, err := json.Marshal([]any{map[string]any{"note": note}})
+	if err != nil {
+		return []byte("[]")
+	}
+	return b
 }
 
 func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []byte {
