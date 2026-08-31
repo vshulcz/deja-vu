@@ -889,7 +889,13 @@ func recallText(dir, q, harness string, limit, budget int) (string, error) {
 // answer to it. On the relevance tier the line says what they are instead
 // (#2074).
 func recallCountLine(q, tier string, offset, served, total int) string {
+	q = clampEcho(q)
 	switch {
+	case tier == search.TierRelevance && offset > 0:
+		// The tier before the page: page two of an answer to a question
+		// nothing is about is still not a page of matches, and saying so only
+		// on page one was the same contradiction one line further down.
+		return fmt.Sprintf("nearest by wording to %q (%d-%d of %d ranked, none about it)\n", q, offset+1, offset+served, total)
 	case offset > 0:
 		return fmt.Sprintf("deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+served, total)
 	case tier == search.TierRelevance && served < total:
@@ -927,12 +933,23 @@ func wholeSessionForMCP(dir string, s model.Session) (model.Session, bool, error
 	return index.FindByIdentity(dir, s.Harness, s.ID)
 }
 
-// recallCountLineReserve is what the two lines around the hits cost — the
-// count above them and the "N more, call again with offset=N" below — kept out
-// of the budget the hits spend. Both are written after the loop, and the final
-// trim cut the navigation line off the end, which is the one line an agent
-// needs precisely when the answer was too big to fit.
-const recallCountLineReserve = 160
+// recallCountLineReserve is what the "N more, call again with offset=N" line
+// below the hits costs, kept out of the budget the hits spend. It is written
+// after the loop, and the final trim cut the navigation line off the end,
+// which is the one line an agent needs precisely when the answer was too big
+// to fit.
+//
+// The count line above the hits is measured rather than guessed: it carries
+// the query, and a constant that fitted a short one stopped covering an error
+// string pasted in whole — which is exactly what the tool description asks
+// agents to send.
+const recallCountLineReserve = 64
+
+// recallHeaderReserve is that plus the count line this answer will actually
+// print.
+func recallHeaderReserve(q, tier string, offset, limit, total int) int {
+	return recallCountLineReserve + len(recallCountLine(q, tier, offset, limit, total))
+}
 
 // twinSessionsFor pairs each session with the same session as it exists on
 // another machine, so a page holding both copies can say so. One manifest read
@@ -1020,7 +1037,11 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	demoted := demoteRejected(hits)
 	if offset > 0 {
 		if offset >= total {
-			return fmt.Sprintf("No more matches for %q: %d total, offset %d.", clampEcho(q), total, offset), 0, 0, nil, nil, nil
+			what := "matches"
+			if result.Tier == search.TierRelevance {
+				what = "sessions ranked by wording"
+			}
+			return fmt.Sprintf("No more %s for %q: %d total, offset %d.", what, clampEcho(q), total, offset), 0, 0, nil, nil, nil
 		}
 		hits = hits[offset:]
 	}
@@ -1056,7 +1077,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// the token budget: the header promised fifteen while nine arrived, and the
 	// follow-up line was trimmed off the end (#1308).
 	var hb strings.Builder
-	headerRoom := b.Len() + recallCountLineReserve
+	headerRoom := b.Len() + recallHeaderReserve(q, result.Tier, offset, limit, total)
 	for i, h := range hits {
 		fmt.Fprintf(&hb, "\n%d. [%s] %s · %s · %d matches", i+1,
 			recallListingLine(h.Session.Harness), recallListingLine(h.Session.Project), recallListingLine(h.Session.ID), h.Count)
@@ -1182,7 +1203,13 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// agent asks for offset=served and the arithmetic has to hold.
 	more := ""
 	if left := total - offset - served; left > 0 {
-		more = fmt.Sprintf("\n%d more match(es) — call recall again with offset=%d.\n", left, offset+served)
+		what := "match(es)"
+		if result.Tier == search.TierRelevance {
+			// Nothing matched, so there are no more matches to offer — only
+			// more of the nearest wording.
+			what = "ranked by wording"
+		}
+		more = fmt.Sprintf("\n%d more %s — call recall again with offset=%d.\n", left, what, offset+served)
 	}
 	// The paging line is the instruction, not the evidence: appending it before
 	// the trim made a full page drop the one thing that says how to reach the

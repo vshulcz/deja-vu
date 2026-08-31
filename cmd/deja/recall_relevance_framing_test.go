@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -38,9 +39,14 @@ func TestTheCountLineSaysWhatFollowsIt(t *testing.T) {
 			want: `deja recall for "` + q + `" (2 match(es))`,
 		},
 		{
-			// A page of a longer answer says where it is, and the tier line
-			// above it has already said what these are.
-			name: "the second page", tier: search.TierRelevance, offset: 3, served: 3, total: 37,
+			// Page two of an answer to a question nothing is about is still
+			// not a page of matches: saying so only on page one left the same
+			// contradiction one page further in.
+			name: "the second page of a relevance answer", tier: search.TierRelevance, offset: 3, served: 3, total: 37,
+			want: `nearest by wording to "` + q + `" (4-6 of 37 ranked, none about it)`,
+		},
+		{
+			name: "the second page of a real answer", tier: search.TierExact, offset: 3, served: 3, total: 37,
 			want: `deja recall for "` + q + `" (matches 4-6 of 37)`,
 		},
 	} {
@@ -63,5 +69,40 @@ func TestBothLinesOfARelevanceAnswerSayTheSameThing(t *testing.T) {
 	}
 	if !strings.Contains(line, "none about it") {
 		t.Errorf("the line does not say what the sessions are: %s", line)
+	}
+}
+
+// The query is echoed back, so it is bounded the way every sibling echo is.
+func TestTheCountLineDoesNotEchoAWholeTranscriptBack(t *testing.T) {
+	line := recallCountLine(strings.Repeat("x", 64_000), search.TierExact, 0, 3, 9)
+	if len(line) > 1_000 {
+		t.Errorf("the count line echoed %d bytes of query back", len(line))
+	}
+}
+
+// The room kept for the lines around the hits has to cover the count line as
+// it will actually be written — it carries the query, and the tool
+// description asks agents to paste whole error strings. A constant that fitted
+// a short query stopped covering a long one, and the line an agent navigates
+// by is the one that goes first.
+func TestALongQueryStillLeavesRoomForTheLineThatSaysHowToPage(t *testing.T) {
+	dir := manySessionStore(t, 40)
+	q := "parser rejects frames the pipeline stalled " + strings.Repeat("and the retry budget was exhausted ", 4)
+	arg, _ := json.Marshal(map[string]any{"query": q, "limit": 3})
+	text, err := callMCPTool(dir, "recall", arg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "call recall again with offset=") {
+		t.Errorf("the line an agent pages by was trimmed off:\n%s", text)
+	}
+	// The count line is written whole, with the query in it: the room kept for
+	// it is measured from the line itself rather than guessed at.
+	want := strings.TrimRight(recallCountLine(q, search.TierRelevance, 0, 3, 41), "\n")
+	if !strings.Contains(text, want) {
+		t.Errorf("the count line did not survive whole:\nwant %s\ngot\n%s", want, text)
+	}
+	if len(text) > recallMCPBudget {
+		t.Errorf("the answer is %d bytes, budget is %d", len(text), recallMCPBudget)
 	}
 }
