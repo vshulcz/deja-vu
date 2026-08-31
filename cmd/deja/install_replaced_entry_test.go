@@ -1,11 +1,29 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// dejasOwnClaudeEntry is the entry install writes on this platform: Windows
+// runs deja through cmd, so spelling the Unix form here made install see a
+// changed entry and say so — about wiring it had written itself (#2808).
+func dejasOwnClaudeEntry(t *testing.T) string {
+	t.Helper()
+	command, args := mcpCommandArgs("/usr/local/bin/deja")
+	entry, err := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"deja": map[string]any{"type": "stdio", "command": command, "args": args},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(entry)
+}
 
 // Install writes into files people also edit. Replacing a deja entry someone
 // pointed at their own wrapper is the right thing to do; doing it in the same
@@ -18,8 +36,7 @@ func TestInstallSaysWhenItReplacedAnEntrySomeoneChanged(t *testing.T) {
 	}{
 		{"a config that never mentioned deja",
 			`{"mcpServers":{"mine":{"command":"/usr/local/bin/my-server"}}}`, ""},
-		{"the entry deja itself wrote",
-			`{"mcpServers":{"deja":{"type":"stdio","command":"/usr/local/bin/deja","args":["mcp"]}}}`, ""},
+		{"the entry deja itself wrote", dejasOwnClaudeEntry(t), ""},
 		{"an entry someone pointed at their own wrapper",
 			`{"mcpServers":{"deja":{"command":"/home/me/bin/deja-wrapper","args":["mcp","--quiet"]}}}`,
 			"/home/me/bin/deja-wrapper"},
