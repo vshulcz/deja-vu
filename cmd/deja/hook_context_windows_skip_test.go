@@ -20,7 +20,5 @@ import (
 // Remove this call, not the tests, when #2023 is fixed.
 func skipWindowsEmptySessionID(t *testing.T) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("the session-start hook records an empty session id on Windows (#2023)")
-	}
+	_ = runtime.GOOS // the skip is lifted on this branch to see the failure
 }
