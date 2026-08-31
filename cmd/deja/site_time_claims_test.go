@@ -54,9 +54,14 @@ func TestTimeHintsRankOnlyTheNoExactMatchFallback(t *testing.T) {
 	now := time.Now()
 	lastMonth := now.AddDate(0, -1, 0)
 	dir := datedStore(t, map[string]string{
-		"m_old":  now.AddDate(0, -3, 0).UTC().Format("2006-01-02") + "T10:00:00Z",
-		"m_last": lastMonth.UTC().Format("2006-01-02") + "T10:00:00Z",
-		"m_now":  now.Add(-2*time.Hour).UTC().Format("2006-01-02") + "T10:00:00Z",
+		// The reader's own calendar, not UTC: `last month` resolves against
+		// the local clock, so a fixture dated in UTC lands in the previous
+		// month whenever the two disagree — which on the first of a month
+		// gives today's session the same month token the hint carries, and the
+		// test cannot tell them apart (#2808 turned this up on 1 September).
+		"m_old":  now.AddDate(0, -3, 0).Format("2006-01-02") + "T10:00:00Z",
+		"m_last": lastMonth.Format("2006-01-02") + "T10:00:00Z",
+		"m_now":  now.Format("2006-01-02") + "T10:00:00Z",
 	})
 	_ = dir
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,6 +20,7 @@ import (
 // The reader's own entries are written expanded rather than inline: an inline
 // object is still re-flowed by the JSON writers (#2640), which is a separate
 // complaint and would drown this one.
+
 func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 	for _, tc := range []struct {
 		name, target, rel, body string
@@ -32,7 +34,13 @@ func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 		{"pi, no block", "pi", ".pi/agent/mcp.json", "{\n  \"theme\": \"dark\"\n}\n"},
 		{"omp, no block", "omp", ".omp/agent/mcp.json", "{\n  \"theme\": \"dark\"\n}\n"},
 		{"kimi, no block", "kimi", ".kimi-code/mcp.json", "{\n  \"theme\": \"dark\"\n}\n"},
-		{"zed, no block", "zed", ".config/zed/settings.json", "{\n  \"theme\": \"dark\"\n}\n"},
+		// Zed keeps its settings where the platform puts them rather than
+		// under ~/.config, so this row asks rather than spells (#2808).
+		// Zed keeps its settings where the platform puts them rather than under
+		// ~/.config, and the answer depends on the home this subtest sets — so
+		// the row names nothing and the path is asked for inside the run
+		// (#2808).
+		{"zed, no block", "zed", "", "{\n  \"theme\": \"dark\"\n}\n"},
 		{"deepseek, no patch list", "deepseek", ".dsh/cordis.patch.yml", "# my patches\n"},
 		{"deepseek, their own patch", "deepseek", ".dsh/cordis.patch.yml",
 			"# my patches\n- insert:\n    - id: mine\n      name: \"@me/thing\"\n"},
@@ -51,6 +59,9 @@ func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 			t.Setenv("USERPROFILE", home)
 			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 			path := filepath.Join(home, filepath.FromSlash(tc.rel))
+			if tc.rel == "" {
+				path = sources.ZedSettingsPath()
+			}
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				t.Fatal(err)
 			}
