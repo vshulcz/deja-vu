@@ -99,7 +99,7 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 		// `pytest -v` whose log runs past a megabyte (#1716). What arrived is
 		// still worth reading: pull the output back out of the cut JSON rather
 		// than throwing away a megabyte that begins with the error.
-		out = clampOutput(salvageToolOutput(after(string(raw), `"tool_response"`)))
+		out = salvageFromPayload(string(raw))
 	}
 	if out == "" {
 		return nil
@@ -166,15 +166,52 @@ func toolResponseText(raw json.RawMessage) string {
 	return clampOutput(b.String())
 }
 
-// after returns what follows key, or "" when the key is not there. Scoping the
-// salvage this way keeps it from mining the command in tool_input, which can
-// hold any of the keys below.
+// after returns what follows key where it is used as one, or "" when the key is
+// not there. Scoping the salvage this way keeps it from mining the command in
+// tool_input, which can hold any of the keys below.
+//
+// Where it is used as one, because the first occurrence is inside the command
+// whenever the command mentions it — and this path exists for payloads the
+// decoder could not read, which is where an unescaped `"tool_response"` in a
+// command shows up. A key is followed by a colon; a mention is not (#2051).
 func after(s, key string) string {
-	i := strings.Index(s, key)
-	if i < 0 {
-		return ""
+	for i := 0; ; {
+		j := strings.Index(s[i:], key)
+		if j < 0 {
+			return ""
+		}
+		at := i + j + len(key)
+		if rest := strings.TrimLeft(s[at:], " \t\r\n"); strings.HasPrefix(rest, ":") {
+			return s[at:]
+		}
+		i = at
 	}
-	return s[i+len(key):]
+}
+
+// salvageFromPayload is the whole salvage: scope to the tool's response, pull a
+// value out of it, and bound what comes back.
+func salvageFromPayload(raw string) string {
+	return clampOutput(salvageToolOutput(afterLast(raw, `"tool_response"`)))
+}
+
+// afterLast is after, from the last place the key is used as one. A tool's
+// response is written after the input that produced it, so where a command
+// quotes a whole payload of its own — a shape this path sees, since a command
+// with unescaped quotes in it is why the decoder failed — the real key is the
+// later one (#2051).
+func afterLast(s, key string) string {
+	out := ""
+	for i := 0; ; {
+		j := strings.Index(s[i:], key)
+		if j < 0 {
+			return out
+		}
+		at := i + j + len(key)
+		if rest := strings.TrimLeft(s[at:], " \t\r\n"); strings.HasPrefix(rest, ":") {
+			out = s[at:]
+		}
+		i = at
+	}
 }
 
 // salvageToolOutput pulls the tool's output out of a payload the decoder could
@@ -184,16 +221,19 @@ func after(s, key string) string {
 // starts, unescape what follows, and hand back that.
 func salvageToolOutput(raw string) string {
 	for _, key := range []string{`"stderr"`, `"error"`, `"output"`, `"stdout"`, `"content"`, `"result"`} {
-		i := strings.Index(raw, key)
-		if i < 0 {
-			continue
-		}
-		v, ok := jsonStringAfter(raw[i+len(key):])
-		if !ok {
-			continue
-		}
-		if strings.TrimSpace(v) != "" {
-			return v
+		// Every occurrence, not the first: a mention of the key that is not a
+		// key — `grep "stderr" build.log` — made this give up on the key
+		// entirely and skip the real one further along (#2051).
+		for i := 0; ; {
+			j := strings.Index(raw[i:], key)
+			if j < 0 {
+				break
+			}
+			at := i + j + len(key)
+			if v, ok := jsonStringAfter(raw[at:]); ok && strings.TrimSpace(v) != "" {
+				return v
+			}
+			i = at
 		}
 	}
 	return ""
