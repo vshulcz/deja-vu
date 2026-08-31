@@ -65,3 +65,26 @@ func TestAPolicyNamedByAnAbsolutePathIsStillRead(t *testing.T) {
 		t.Error("a policy under an absolute XDG_CONFIG_HOME was ignored")
 	}
 }
+
+// A relative XDG_CONFIG_HOME is not the reader saying "read nothing": it is a
+// value the spec says to ignore, and the home directory is still there.
+func TestARelativeConfigHomeFallsBackToTheHomeDirectory(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_POLICY_FILE", "")
+	t.Setenv("XDG_CONFIG_HOME", "relconf")
+	if err := os.MkdirAll(filepath.Join(home, ".config", "deja"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"activations":{"search":{"*":false}}}`
+	if err := os.WriteFile(filepath.Join(home, ".config", "deja", "policy.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := Path(), filepath.Join(home, ".config", "deja", "policy.json"); got != want {
+		t.Errorf("Path() = %q, want %q", got, want)
+	}
+	if Load().Allows(ActivationSearch, "anything") {
+		t.Error("the reader's own policy was skipped over a relative XDG_CONFIG_HOME")
+	}
+}

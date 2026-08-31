@@ -920,7 +920,7 @@ func doctorPolicy(w io.Writer, dir string) {
 		// was local-only, on the one screen someone opens to find out what is
 		// allowed (#939).
 		if pol := policy.Load(); pol.Describe(policy.ActivationAuto) != "local+imported" {
-			fmt.Fprintf(w, "  %-12s no file at %s\n", "default", reportPath(policy.Path()))
+			fmt.Fprintf(w, "  %-12s %s\n", "default", noPolicyFileLine())
 			withheld, total := policyWithheldCounts(dir)
 			for _, activation := range []string{policy.ActivationSearch, policy.ActivationMCP, policy.ActivationAuto} {
 				line := pol.Describe(activation)
@@ -932,7 +932,7 @@ func doctorPolicy(w io.Writer, dir string) {
 			fmt.Fprintf(w, "  %-12s DEJA_AUTORECALL_LOCAL_ONLY is set in this environment\n", "from env")
 			return
 		}
-		fmt.Fprintf(w, "  %-12s no file at %s — every origin activates everywhere\n", "default", reportPath(policy.Path()))
+		fmt.Fprintf(w, "  %-12s %s — every origin activates everywhere\n", "default", noPolicyFileLine())
 		// Except one thing, which is in force with or without a file and is
 		// the reason a directory can be missing from recall (#2050).
 		printIgnored(w, policy.Load())
@@ -1670,4 +1670,14 @@ func printIgnored(w io.Writer, pol policy.Policy) {
 		what = "from the file"
 	}
 	fmt.Fprintf(w, "  %-12s %s (%s)\n", "not recalled", strings.Join(pats, ", "), what)
+}
+
+// noPolicyFileLine says where the policy would be, or that there is nowhere
+// for it: with no home directory doctor printed "no file at " and stopped
+// (#2785), on the screen somebody opens to find out where the file goes.
+func noPolicyFileLine() string {
+	if p := policy.Path(); p != "" {
+		return "no file at " + reportPath(p)
+	}
+	return "no policy file — deja cannot find a home directory to look in"
 }

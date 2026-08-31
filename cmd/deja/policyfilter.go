@@ -56,8 +56,8 @@ func ignoredHiddenNoteFor(where string, hidden int) string {
 		return ""
 	}
 	pats := policy.Load().IgnorePatterns()
-	return fmt.Sprintf("deja: the ignore rule keeps %d session%s out of this %s (%s) — see %s\n",
-		hidden, pluralS(hidden), where, strings.Join(pats, ", "), policy.Path())
+	return fmt.Sprintf("deja: the ignore rule keeps %d session%s out of this %s (%s)%s\n",
+		hidden, pluralS(hidden), where, strings.Join(pats, ", "), seePolicyFile())
 }
 
 // policyFilterBlame is policyFilterHits for blame results, which carry whole
@@ -105,4 +105,15 @@ func denyPolicyHidden(id string, s model.Session, w io.Writer) error {
 		return fmt.Errorf("no session matches %q", id)
 	}
 	return nil
+}
+
+// seePolicyFile points at the file the rule is written in, when there is one.
+// The ignore rule has defaults and holds with no file at all, and with no home
+// directory there is no path to name — the sentence used to end in "see " and
+// nothing (#2785).
+func seePolicyFile() string {
+	if p := policy.Path(); p != "" {
+		return " — see " + p
+	}
+	return ""
 }

@@ -1624,11 +1624,11 @@ func printNoMatches(w io.Writer, dir, q string, regex bool) {
 		// put a store hidden by a path pattern under a sentence about the
 		// trust policy, quoting a trust rule that allows everything.
 		if trusted == 0 {
-			fmt.Fprintf(w, "deja: the trust policy withholds every indexed session from this path (%s: %s) — see %s\n",
-				policy.ActivationSearch, policy.Load().Describe(policy.ActivationSearch), policy.Path())
+			fmt.Fprintf(w, "deja: the trust policy withholds every indexed session from this path (%s: %s)%s\n",
+				policy.ActivationSearch, policy.Load().Describe(policy.ActivationSearch), seePolicyFile())
 		} else {
-			fmt.Fprintf(w, "deja: the ignore rule withholds every indexed session from this path (%s) — see %s\n",
-				strings.Join(policy.Load().IgnorePatterns(), ", "), policy.Path())
+			fmt.Fprintf(w, "deja: the ignore rule withholds every indexed session from this path (%s)%s\n",
+				strings.Join(policy.Load().IgnorePatterns(), ", "), seePolicyFile())
 		}
 		return
 	} else if ok {
