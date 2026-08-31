@@ -2271,6 +2271,14 @@ func fromDatabase(r Record) bool {
 	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
 		return true
 	}
+	// grok's database, by path rather than by kind: both grok kinds are
+	// registered under one name, so the kind cannot tell the store from the
+	// session files beside it. Without this the changed-file rule dropped every
+	// session the incremental pass did not ask about, which is what stamping
+	// the store turned on (#2075).
+	if r.SourcePath == sources.GrokDB() {
+		return true
+	}
 	switch h := harnessForPath(r.SourcePath); h {
 	case "cursor-db", "goose-db":
 		return true
@@ -2311,10 +2319,10 @@ var passWholeStores map[string]bool
 // wholeStoresThisPass records them, under both the store path and the harness:
 // a record names the first where it can and the second otherwise.
 //
-// Only these three stores are stamped with a watermark (setStoreLastUpdated).
-// Everything else is read whole on every pass and judged by its path, which is
-// why it needs none of this — a watermark added to another database later would
-// have to join fromDatabase and this function in the same change.
+// Only the stamped stores belong here (setStoreLastUpdated). Everything else is
+// read whole on every pass and judged by its path, which is why it needs none of
+// this — a watermark added to another database later has to join fromDatabase
+// and this function in the same change, and grok did (#2075).
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
 	for p := range changed {
@@ -2326,6 +2334,14 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 			harness = "cursor"
 		case "goose-db":
 			harness = "goose"
+		case "grok":
+			// Both grok kinds are registered under one name, and only the
+			// database carries a watermark: its session files are read whole
+			// and judged by their path, the way this function's comment says.
+			if p != sources.GrokDB() {
+				continue
+			}
+			harness = "grok"
 		default:
 			continue
 		}
@@ -3098,6 +3114,16 @@ func harnessForPath(p string) string {
 func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
 	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
+	// grok's database had a since-the-watermark parser in the registry and
+	// nothing ever stamped it, so every pass read the store whole — the pass
+	// with one new line cost what reading everything costs (#2075).
+	//
+	// Safe to stamp because ParseGrokDBSince selects messages rather than
+	// sessions and normalises both sides with a millisecond backoff (#2150),
+	// which is the opencode and cursor shape. hermes compares whole seconds
+	// with a strict >, and zed returns whole threads; each needs its own fix
+	// before it can be stamped, so neither is here.
+	setStoreLastUpdated(files, sessions, "grok", sources.GrokDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
 	}
