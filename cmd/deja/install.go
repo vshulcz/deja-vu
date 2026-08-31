@@ -2389,6 +2389,13 @@ func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// A comment is not a broken file, and refusing the target over one is
+		// how somebody who annotated their config could not install deja at
+		// all (#2783, the two targets #1664 did not reach).
+		command, args := mcpCommandArgs(exe)
+		return writeJSONCEntry(path, old, "mcpServers",
+			map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}, uninstall)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
@@ -2450,6 +2457,12 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 	var note string
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// Two keys deep, which the text writer takes as a dotted block key
+		// (#2783).
+		command, args := mcpCommandArgs(exe)
+		return writeJSONCEntry(path, old, "mcp.servers",
+			map[string]any{"command": command, "args": args}, uninstall)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
