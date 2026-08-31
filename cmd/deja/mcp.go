@@ -427,7 +427,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			}) {
 				return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", nil
 			}
-			return "No session on this machine ran a command after that error.", nil
+			return "No session on this machine ran a command after that error." + emptyStoreNote(dir), nil
 		}
 		var fb strings.Builder
 		for _, p := range pairs {
@@ -484,7 +484,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
 				return strings.TrimSpace(note), nil
 			}
-			return fmt.Sprintf("No command on this machine mentions %q.", a.What), nil
+			return fmt.Sprintf("No command on this machine mentions %q.", a.What) + emptyStoreNote(dir), nil
 		}
 		limit := int(a.Limit)
 		if limit <= 0 {
@@ -1512,6 +1512,19 @@ func contextIgnoredWords(result index.SearchResult) string {
 		what = "close spellings"
 	}
 	return fmt.Sprintf("No exact match; using %s: %s\n", what, strings.Join(summary, ", "))
+}
+
+// emptyStoreNote is what a tool says when the store holds nothing at all,
+// rather than reporting a real absence. An agent told a thing was never done
+// concludes exactly that and starts over (#680); on a first run every tool is
+// in this state, and recall and blame already say so (#2862, #2863).
+//
+// Empty when the store has something in it, so a caller can append it blind.
+func emptyStoreNote(dir string) string {
+	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
+		return " This machine has no indexed history yet, so nothing can be found — `deja sources` shows where deja looked."
+	}
+	return ""
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in
