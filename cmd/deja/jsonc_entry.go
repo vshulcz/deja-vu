@@ -459,11 +459,27 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 	for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
 		end++
 	}
+	tookComma := false
 	if end < len(text) && text[end] == ',' {
 		end++
+		tookComma = true
 	}
-	for start > 0 && (text[start-1] == ' ' || text[start-1] == '\t' || text[start-1] == '\n') {
+	for start > block.valueOpen+1 && (text[start-1] == ' ' || text[start-1] == '\t' || text[start-1] == '\n') {
 		start--
+	}
+	// The last key in a block has no comma after it, and the one in front of it
+	// is what would be left dangling — `{…,\n  }` is not JSON, and the file is
+	// then refused on every later run with a message pointing at the reader's
+	// own comment (#2740 again, one key over).
+	if !tookComma {
+		for i := start - 1; i > block.valueOpen; i-- {
+			if c := text[i]; c == ' ' || c == '\t' || c == '\n' {
+				continue
+			} else if c == ',' {
+				start = i
+			}
+			break
+		}
 	}
 	return closeEmptied(text[:start]+text[end:], keys), nil
 }

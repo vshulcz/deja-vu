@@ -147,6 +147,26 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		return "", configParseError(path, err)
 	}
 	keys := strings.Split(blockKey, ".")
+	// A key holding something other than an object is a config deja does not
+	// understand, and the text writer would insert a second key of the same
+	// name beside it — where the reader's value wins the decode and deja is
+	// silently unwired (#2399, and #2811 for this writer).
+	holder := root
+	for i, key := range keys {
+		v, present := holder[key]
+		if !present {
+			break
+		}
+		next, isObject := v.(map[string]any)
+		if !isObject {
+			if !on {
+				return "unchanged", nil
+			}
+			return "", fmt.Errorf("%s: %q is not an object deja can edit — left as it was",
+				path, strings.Join(keys[:i+1], "."))
+		}
+		holder = next
+	}
 	holders := chainHolders(root, keys)
 	held := holders[len(keys)-1]
 	have, _ := mapAt(held, keys[len(keys)-1])
@@ -156,8 +176,10 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		}
 		delete(have, id)
 		dropFrom := len(keys)
+		dropFlag := false
 		if len(have) == 0 && blockWasAdded(path, blockKey) {
 			dropFrom = len(keys) - 1
+			dropFlag = flagKey != ""
 			forgetBlockAdded(path, blockKey)
 			// The switch goes with the entries it was for, and so does each
 			// level above that deja created and that holds nothing else.
@@ -175,7 +197,11 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		if err != nil {
 			return "", configParseError(path, err)
 		}
-		if flagKey != "" && dropFrom >= len(keys)-1 {
+		// Only where the entries block deja created has emptied — the same
+		// condition the parsed path uses. Taken on the ordinary
+		// entry-comes-out case it deleted a switch the reader had set
+		// themselves, leaving their own hook wired and turned off (#2811).
+		if dropFlag && dropFrom >= len(keys)-1 {
 			// The chain stayed, so the switch is still in it and comes out on
 			// its own.
 			flagBlock := strings.Join(keys[:len(keys)-1], ".")

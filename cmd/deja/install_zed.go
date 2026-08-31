@@ -160,7 +160,7 @@ func zedHasKey(text string, from int, key string) bool {
 			if end < 0 {
 				return false
 			}
-			if depth == 0 && text[i:end] == want {
+			if depth == 0 && text[i:end] == want && jsoncIsKey(text, end) {
 				return true
 			}
 			i = end - 1
