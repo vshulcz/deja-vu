@@ -2280,7 +2280,7 @@ func fromDatabase(r Record) bool {
 		return true
 	}
 	switch h := harnessForPath(r.SourcePath); h {
-	case "cursor-db", "goose-db":
+	case "cursor-db", "goose-db", "hermes":
 		return true
 	default:
 		// A path that names a per-file kind settles it: two transcripts in
@@ -3124,6 +3124,14 @@ func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]Sess
 	// with a strict >, and zed returns whole threads; each needs its own fix
 	// before it can be stamped, so neither is here.
 	setStoreLastUpdated(files, sessions, "grok", sources.GrokDB())
+	// hermes, once its reader stopped dropping the watermark's own second
+	// (#2075). Several stores on one machine: current builds keep one at the
+	// root and older ones shard per profile, and each is stamped with its own
+	// newest — stamping them alike would give a quiet profile the busy one's
+	// time (#2071).
+	for _, db := range sources.HermesDBs() {
+		setStoreLastUpdated(files, sessions, "hermes", db)
+	}
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
 	}

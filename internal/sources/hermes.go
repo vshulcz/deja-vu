@@ -92,11 +92,18 @@ func ParseHermesDB(db string) ([]model.Session, error) {
 // ParseHermesDBSince reads only what changed, so a re-index of an unchanged
 // profile costs one query instead of the whole history. timestamp is REAL
 // seconds since the epoch in Hermes' schema.
+//
+// A second back from the watermark, which is the guard grok's reader spells in
+// milliseconds (#2150). The column is REAL but a store may write whole seconds
+// into it, and then every message sharing the watermark's second compares equal
+// to it and a strict `>` leaves it out for good — measured on such a store, 0
+// of 2 came back. The cost is re-reading one second of history, and those turns
+// are already held (#2075).
 func ParseHermesDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return parseHermesDBWhere(db, "")
 	}
-	return parseHermesDBWhere(db, fmt.Sprintf(" and timestamp > %d", t.Unix()))
+	return parseHermesDBWhere(db, fmt.Sprintf(" and timestamp > %d", t.Add(-time.Second).Unix()))
 }
 
 func parseHermesDBWhere(db, where string) ([]model.Session, error) {
