@@ -32,6 +32,12 @@ const (
 // (a read-only config mount) runs the write unlocked, which is what deja did
 // before this existed.
 func withLock(fn func() error) error {
+	if Path() == "" {
+		// Nowhere to keep the list means nowhere to keep its lock, and
+		// creating the directory anyway is what put a `.config` in whatever
+		// checkout the command ran in (#2790).
+		return errors.New("no home directory, so there is nowhere to keep the peer list")
+	}
 	path := Path() + ".lock"
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fn()

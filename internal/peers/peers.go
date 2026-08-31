@@ -61,9 +61,19 @@ func Path() string {
 	if p := os.Getenv("DEJA_PEERS_FILE"); p != "" {
 		return p
 	}
+	// A relative XDG_CONFIG_HOME is ignored rather than followed — the spec
+	// says so, and it is what this repository's own xdgConfigHome does.
 	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
+	if !filepath.IsAbs(base) {
 		base = filepath.Join(sources.Home(), ".config")
+	}
+	// And nowhere, rather than somewhere relative: Home() answers "" when there
+	// is no home directory, so this was `.config/deja/peers.json` — and this
+	// file is one deja writes, so `deja peer add` left a list in whatever
+	// checkout it ran in, where nothing would read it again (#2790, the shape
+	// #2785 fixed for the policy file).
+	if !filepath.IsAbs(base) {
+		return ""
 	}
 	return filepath.Join(base, "deja", "peers.json")
 }
@@ -313,6 +323,9 @@ func save(list []Peer) error {
 		return err
 	}
 	path := Path()
+	if path == "" {
+		return errors.New("no home directory, so there is nowhere to keep the peer list")
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
