@@ -36,6 +36,12 @@ const (
 	// same way blame did before #682.
 	KindResource = "resource"
 	KindHandoff  = "handoff"
+	// KindHow and KindFix are the two MCP tools that answer with something to
+	// run. The reasoning KindBlame and KindResource were added on applies to
+	// them twice over: they hand the agent a command, and `deja log` — the
+	// record of what deja put in front of an agent — showed neither (#2858).
+	KindHow = "how"
+	KindFix = "fix"
 	// KindRemember is the MCP remember tool — the one tool that writes to the
 	// store. #682 covered the read tools only, so an agent could add a note
 	// that showed up nowhere in the journal the user reads.
@@ -52,8 +58,11 @@ const (
 
 // servedKinds are the events that hand an agent memory it asked for: the two
 // recall tools, a blame — "the largest thing the server hands over", which is
-// why #682 gave it a kind of its own — and a read of deja://session/…, which
-// hands over a whole session in the same frame recall_context uses.
+// why #682 gave it a kind of its own — a read of deja://session/…, which hands
+// over a whole session in the same frame recall_context uses, and the two
+// tools that answer with a command to run (#2858). A kind counted on one
+// screen and not another is the drift below, so a kind added to the log
+// belongs here or nowhere.
 //
 // Named once because the counters drifted: #1569 aligned five of them and left
 // Impact behind, so a blame was a recall on `deja stats` and nothing on
@@ -61,7 +70,7 @@ const (
 // (#1907).
 func servedKind(kind string) bool {
 	switch kind {
-	case KindRecall, KindContext, KindBlame, KindResource:
+	case KindRecall, KindContext, KindBlame, KindResource, KindHow, KindFix:
 		return true
 	}
 	return false

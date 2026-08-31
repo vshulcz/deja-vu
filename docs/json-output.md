@@ -529,8 +529,8 @@ A top-level array, so no `schema_version`, on the same terms as `blame`. It is
 `[]` and never `null` when there is nothing to report: this is the output a
 script polls, and `null` raises where an empty list iterates zero times.
 
-`t` is when it happened and `kind` is what deja did — `recall`, `recall_context`
-and `blame` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
+`t` is when it happened and `kind` is what deja did — `recall`, `recall_context`,
+`blame`, `how` and `fix` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
 memory offered unasked; `resource` is a read of `deja://session/…`; `remember`
 writes rather than serves; `search` and `handoff` are the reader's own commands.
 A kind this list does not name may still appear: another version of deja may
