@@ -47,8 +47,8 @@ func offsetParse(f func(string, int64) ([]model.Session, error)) func(string, in
 	return func(p string, off, _ int64) ([]model.Session, error) { return f(p, off) }
 }
 
-// dbParse/dbParseFrom handle the two db-backed kinds (opencode, cursor) that
-// filter by time rather than byte offset.
+// dbParse/dbParseFrom handle the db-backed kinds — opencode, cursor, goose,
+// grok, hermes and zed — which filter by time rather than byte offset.
 func dbParse(full func(string) ([]model.Session, error), since func(string, time.Time) ([]model.Session, error)) func(string, int64) ([]model.Session, error) {
 	return func(p string, nano int64) ([]model.Session, error) {
 		if nano > 0 {
