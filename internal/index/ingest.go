@@ -2271,6 +2271,9 @@ func fromDatabase(r Record) bool {
 	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
 		return true
 	}
+	if storeHarness(r.SourcePath) != "" {
+		return true
+	}
 	switch h := harnessForPath(r.SourcePath); h {
 	case "cursor-db", "goose-db":
 		return true
@@ -2295,6 +2298,9 @@ func readWholeThisPass(r Record) bool {
 	if len(passWholeStores) == 0 {
 		return false
 	}
+	if storeHarness(r.SourcePath) != "" {
+		return passWholeStores[r.SourcePath]
+	}
 	switch harnessForPath(r.SourcePath) {
 	case "cursor-db", "goose-db":
 		return passWholeStores[r.SourcePath]
@@ -2311,22 +2317,15 @@ var passWholeStores map[string]bool
 // wholeStoresThisPass records them, under both the store path and the harness:
 // a record names the first where it can and the second otherwise.
 //
-// Only these three stores are stamped with a watermark (setStoreLastUpdated).
-// Everything else is read whole on every pass and judged by its path, which is
-// why it needs none of this — a watermark added to another database later would
-// have to join fromDatabase and this function in the same change.
+// Every store setDatabaseStoreWatermarks stamps belongs here, and storeHarness
+// is the one list of them: a stamped store is parsed from its watermark, so its
+// records must survive a pass that did not hand them back, and only a pass that
+// read the store whole may drop one because its key came back.
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
 	for p := range changed {
-		harness := ""
-		switch harnessForPath(p) {
-		case "opencode":
-			harness = "opencode"
-		case "cursor-db":
-			harness = "cursor"
-		case "goose-db":
-			harness = "goose"
-		default:
+		harness := storeHarness(p)
+		if harness == "" {
 			continue
 		}
 		if old[p].LastUpdated == 0 || rereadsWholeSessions(p) {
@@ -2344,7 +2343,55 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 // this one store, rather than a number that only climbs. Narrowing the clause
 // instead costs the session its earlier turns (#2033), so the re-reading stays.
 func rereadsWholeSessions(p string) bool {
-	return harnessForPath(p) == "goose-db"
+	if harnessForPath(p) == "goose-db" {
+		return true
+	}
+	switch storeHarness(p) {
+	case "grok", "zed", "hermes":
+		// The same shape: each asks for sessions touched since the stamp and
+		// hands them back whole, so what comes back replaces what the index
+		// holds for that key rather than adding to it (#2075).
+		return true
+	}
+	return false
+}
+
+// storeHarness names the harness whose shared store lives at p, and "" for
+// anything else.
+//
+// harnessForPath answers with a kind, and three of the six stores share their
+// kind name with the harness's own transcripts — grok and hermes both have
+// files as well as a database, and a kind name cannot tell them apart. The
+// store paths can, and a record that names one belongs to a store read from a
+// watermark: it must not be dropped because the database changed, and it may be
+// replaced when its key comes back.
+func storeHarness(p string) string {
+	if p == "" {
+		return ""
+	}
+	switch p {
+	case sources.GrokDB():
+		return "grok"
+	case sources.ZedDB():
+		return "zed"
+	}
+	if sources.IsHermesPGStore(p) {
+		return "hermes"
+	}
+	for _, db := range sources.HermesDBs() {
+		if p == db {
+			return "hermes"
+		}
+	}
+	switch harnessForPath(p) {
+	case "opencode":
+		return "opencode"
+	case "cursor-db":
+		return "cursor"
+	case "goose-db":
+		return "goose"
+	}
+	return ""
 }
 
 // fullyReadFiles drops the files a pass reads only part of. LastUpdated is
