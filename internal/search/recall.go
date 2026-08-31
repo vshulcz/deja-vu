@@ -536,7 +536,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		// An envelope can carry the query's words and say nothing a reader
 		// wanted: a wrapped inter-agent notification quoting a session id
 		// matched, and the block opened with truncated JSON (#2735).
-		if digest.IsPlumbing(line) {
+		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) {
 			continue
 		}
 		matchedAt[i] = true
@@ -608,6 +608,14 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 			// removing it changes cost and not output.
 			line, _ := densestLine(m.Text, terms)
 			if line == "" || !digest.CarriesDecision(line) || saysItHasNoMemory(line) {
+				continue
+			}
+			// The same two bars the loop above applies. This path reached the
+			// slot without them, so a captured `⚙ deja_recall {"query":…}`
+			// carrying a decision word — and the log of a question carries the
+			// question's words by construction — was quoted as the answer to
+			// the question it recorded (#2067).
+			if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) {
 				continue
 			}
 			if text := contextText(line, false); strings.TrimSpace(text) != "" {

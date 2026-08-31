@@ -290,6 +290,29 @@ func looksLikeListingDump(line string) bool {
 // read.
 func IsPlumbing(s string) bool { return noisyMessage(s) }
 
+// toolCallRecordRE matches a harness marker, a tool name and the opening of a
+// JSON object of arguments — the shape a captured tool-call log has.
+var toolCallRecordRE = regexp.MustCompile(`[⚙⏺▶►]\s*[A-Za-z_][\w.:-]*\s*\{\s*"`)
+
+// IsToolCallRecord reports whether a line records a call being made rather than
+// anything anyone said.
+//
+// An agent run from inside a session has its stdout captured into that
+// session's transcript, so the log of the queries it sent lands in an assistant
+// message — where the tool role, which is how deja separates machine output,
+// never applies. A later question then matches the record of that same question
+// being asked, and it outranks the answer: asked which wording was picked for
+// the repository description, recall's top hit was a line reading
+// `⚙ deja_recall {"query":"deja-vu repository descriptio…` and the agent
+// invented the rest (#2067).
+//
+// Barred from matching rather than dropped at ingest. That a call happened is
+// what `deja how` and `deja fix` are built on, and this only says such a line
+// is not a candidate for the slot that answers a question.
+func IsToolCallRecord(line string) bool {
+	return toolCallRecordRE.MatchString(line)
+}
+
 func noisyMessage(s string) bool {
 	t := strings.TrimSpace(s)
 	if t == "" {
