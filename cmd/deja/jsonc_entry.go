@@ -121,7 +121,12 @@ func jsoncEntryText(entry map[string]any) (string, error) {
 	return string(b), nil
 }
 
-// writeJSONCEntry is the install path for a config that carries comments.
+// writeJSONCEntry is the install path for a config edited as text.
+//
+// want is the entry the caller would have written through the parsed path, so
+// the two paths put the same thing in the file: claude's entry carries a
+// `type`, and building the entry here instead meant a commented .claude.json
+// got one without it.
 //
 // What to write is decided the same way as for a config without them — the
 // same block reader, the same merge onto an entry that is already there, the
@@ -129,7 +134,7 @@ func jsoncEntryText(entry map[string]any) (string, error) {
 // key order and formatting stay where they are. Deciding it twice is what left
 // this path dropping an env block, flipping `disabled`, writing a second entry
 // beside one under another name, and saying none of it (#2740).
-func writeJSONCEntry(path string, old []byte, blockKey, exe string, uninstall bool) (installResult, error) {
+func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]any, uninstall bool) (installResult, error) {
 	text := string(old)
 	var root map[string]any
 	if err := json.Unmarshal([]byte(stripJSONComments(text)), &root); err != nil {
@@ -176,9 +181,8 @@ func writeJSONCEntry(path string, old []byte, blockKey, exe string, uninstall bo
 		}
 		next, err = jsoncSetEntry(text, blockKey, key, "", true, blockWasAdded(path, blockKey))
 	} else {
-		command, args := mcpCommandArgs(exe)
 		var merged map[string]any
-		merged, note = mergeDejaEntry(m[key], map[string]any{"command": command, "args": args})
+		merged, note = mergeDejaEntry(m[key], want)
 		note = withOtherDejaEntries(note, m, key)
 		var entry string
 		entry, err = jsoncEntryText(merged)
