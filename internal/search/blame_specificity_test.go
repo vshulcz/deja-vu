@@ -22,8 +22,10 @@ func TestBlameOrdersBySpecificityBeforeRecency(t *testing.T) {
 	ss := []model.Session{
 		session("abs", "we edited /work/api/internal/index/ingest.go and fixed the watermark", day(10)),
 		session("rel", "the change went into internal/index/ingest.go, one function", day(11)),
-		session("base", "ingest.go needed a second pass, nothing else", day(12)),
-		session("other", "we touched cmd/tools/ingest.go in the other repo entirely", day(13)),
+		// The bare mention is the newest and says the name most often, so only
+		// the rule about naming a path keeps it behind the others.
+		session("base", "ingest.go ingest.go ingest.go needed a second pass, nothing else about ingest.go", day(13)),
+		session("other", "we touched cmd/tools/ingest.go in the other repo entirely", day(12)),
 	}
 
 	order := func(target BlameTarget) []string {
@@ -57,14 +59,45 @@ func TestBlameOrdersBySpecificityBeforeRecency(t *testing.T) {
 			t.Errorf("bare name: %s came after the bare mention: %v", ahead, bare)
 		}
 	}
-	// And the deepest path wins over a shallower one.
-	if place(bare, "abs") > place(bare, "rel") || place(bare, "abs") > place(bare, "other") {
-		t.Errorf("bare name: the fullest path did not come first: %v", bare)
-	}
+	// Among the sessions that wrote a path, the answer is still what it was —
+	// how much each one has to say about the file. Ordering on how deep the
+	// path is instead put one mention of an unrelated file above a session
+	// that had worked on this one all week.
 	// And the same when the caller names the path: the session that spells it
 	// out in full is not pushed down by a newer one that says less.
 	full := order(BlameTarget{FullPath: "/work/api/internal/index/ingest.go", Base: "ingest.go", Stem: "ingest"})
 	if place(full, "other") < place(full, "rel") || place(full, "other") < place(full, "abs") {
 		t.Errorf("a file in another tree outranked the path asked about: %v", full)
+	}
+}
+
+// Measured on a real store: counting the directories a session wrote made a
+// deeply nested file of the same name in another project the most specific
+// mention there is, and every session that had actually worked on the file
+// fell off the first page (#2840).
+func TestBlameDoesNotPreferADeepUnrelatedPath(t *testing.T) {
+	now := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	worked := model.Session{
+		Harness: "claude", ID: "worked", Project: "api", Updated: now.Add(-72 * time.Hour),
+		Messages: []model.Message{{
+			Role: "assistant", Time: now.Add(-72 * time.Hour),
+			Text: "internal/index/ingest.go again: ingest.go holds the watermark, ingest.go stamps it, and ingest.go is where the pass ends",
+		}},
+	}
+	elsewhere := model.Session{
+		Harness: "opencode", ID: "elsewhere", Project: "other", Updated: now,
+		Messages: []model.Message{{
+			Role: "user", Time: now,
+			Text: "/var/folders/jn/T/opencode/d3fvxl/apps/image2video/cmd/dfprocessing/ingest.go failed to build",
+		}},
+	}
+	hits := Blame([]model.Session{worked, elsewhere},
+		BlameTarget{FullPath: "/work/api/internal/index/ingest.go", Base: "ingest.go", Stem: "ingest"},
+		BlameOptions{All: true})
+	if len(hits) != 2 {
+		t.Fatalf("both sessions name the file: %d hits", len(hits))
+	}
+	if hits[0].Session.ID != "worked" {
+		t.Errorf("a deeper path in another project outranked the session that worked on the file: %s first", hits[0].Session.ID)
 	}
 }

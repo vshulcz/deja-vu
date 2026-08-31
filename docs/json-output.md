@@ -592,10 +592,11 @@ Returns a JSON array of blame hits (same stability rules as exact search):
 ]
 ```
 
-`specificity` is how fully the session named the file — a path counts for more
-than a bare filename, and the deeper the path the more it counts. It is what
-orders the list, ahead of `score`, so the sessions that named the file the way
-the caller did come first.
+`specificity` says whether the session wrote the file as a path or as a bare
+name. It orders the list ahead of `score`, so a session that spelled the path
+out comes before one that only mentioned the filename. It is deliberately
+coarse: ordering on how deep the path was put a same-named file from another
+project above the sessions that had worked on this one.
 
 A hit for a session whose decision was promoted also carries `lifecycle`,
 `lifecycle_note` and `lifecycle_at`. Every state appears there, `accepted`

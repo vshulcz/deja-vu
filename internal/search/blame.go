@@ -191,12 +191,17 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		hits = append(hits, hit)
 	}
 	sort.Slice(hits, func(i, j int) bool {
-		// How specifically the session names the file, before anything else:
-		// the description this answers to says so, and recency alone put a
-		// same-named file from another tree above the sessions that named the
-		// path asked about (#2840).
-		if hits[i].Specificity != hits[j].Specificity {
-			return hits[i].Specificity > hits[j].Specificity
+		// Whether the session named a path at all, before anything else: the
+		// description this answers to promises the most specific mention
+		// first, and recency alone put a bare mention above the sessions that
+		// spelled the path out (#2840).
+		//
+		// Whether, not how deeply — ordering on the depth itself put one
+		// mention of an unrelated file above a session that had worked on this
+		// one for a thousand lines, which is the opposite of what blame
+		// answers.
+		if namedAPath(hits[i]) != namedAPath(hits[j]) {
+			return namedAPath(hits[i])
 		}
 		if hits[i].Score != hits[j].Score {
 			return hits[i].Score > hits[j].Score
@@ -213,6 +218,11 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	liftNotesBy(hits, func(h BlameHit) model.Session { return h.Session })
 	return hits
 }
+
+// namedAPath reports whether the session wrote the file as a path rather than
+// as a bare name. It is the coarse half of specificity — the half that orders
+// the answer; the rest is left to the score, where the number of mentions is.
+func namedAPath(h BlameHit) bool { return h.Specificity > 1.0 }
 
 // BlameCap is how many hits the default listing shows. The rest are behind
 // --all, so a caller that cuts the list here owes the reader the count it cut
@@ -258,10 +268,14 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 	// name: `internal/index/ingest.go` says more about which file it means
 	// than `ingest.go` does, and blame's own description promises the more
 	// specific mention first (#2840).
-	if written := writtenPathDepth(low, base); written > 0 {
-		if candidate := 1.0 + float64(written)/4; candidate > level {
-			level = candidate
-		}
+	//
+	// One step, not a depth. Counting the directories a session wrote made a
+	// deeply nested file of the same name in another project the most specific
+	// mention there is — measured on a real store, `blame cmd/deja/main.go`
+	// answered with an unrelated `…/apps/image2video/cmd/dfprocessing/main.go`
+	// above every session that had actually worked on the file.
+	if level == 1.0 && writtenPathDepth(low, base) > 0 {
+		level = 1.25
 	}
 	for pos := 0; ; {
 		i := strings.Index(low[pos:], base)
