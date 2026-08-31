@@ -224,7 +224,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 // half of specificity — the half that orders the answer; the rest is left to
 // the score, where the number of mentions is.
 //
-// More than once, because naming the path once and saying nothing else is not
+// Said something, because naming the path and saying nothing else is not
 // working on a file: measured on a real store, a pasted absolute path and a
 // `git diff --stat` row each took the top of the answer from the session that
 // had debugged it (#2854).
@@ -265,8 +265,11 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 	// A path with nothing said around it is not a session working on the file:
 	// a `git diff --stat` row and a pasted absolute path each name it once and
 	// took the top of the answer from the session that had debugged it
-	// (#2854). What counts is the path plus something about it.
-	explained := saysMoreThanThePath(low)
+	// (#2854). What counts is the path plus something about it, on the line it
+	// is on — asked of the whole message, a diffstat qualifies on its own
+	// summary line ("2 files changed, 6 insertions(+)") and the rule catches
+	// only messages shorter than three words.
+	explained := aLineSaysMoreThanThePath(low, base)
 	for _, form := range forms {
 		// The bare basename is one of the forms, and it matches inside a path
 		// as well as on its own — so every mention was already "specific" and
@@ -303,19 +306,34 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 	return count, level
 }
 
-// saysMoreThanThePath reports whether a message carries words of its own beside
-// the paths in it. Three, so a diffstat row (`cmd/deja/mcp.go | 4 +-`) and a
-// bare pasted path do not read as a session discussing the file, while a line
-// that says what was done to it does.
+// aLineSaysMoreThanThePath reports whether some line naming the file carries
+// words of its own beside the paths on it. Three, so a diffstat row
+// (`cmd/deja/mcp.go | 4 +-`) and a bare pasted path do not read as a session
+// discussing the file, while a line that says what was done to it does.
+//
+// Per line rather than per message, because a diffstat's own summary line
+// would otherwise vouch for every path above it.
+func aLineSaysMoreThanThePath(low, base string) bool {
+	for _, line := range strings.Split(low, "\n") {
+		if strings.Contains(line, base) && saysMoreThanThePath(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// saysMoreThanThePath counts the words on a line that are not part of a path.
+// Letters by Unicode rather than by ASCII: a session that says what it did in
+// Russian or Chinese is saying it (#2854).
 func saysMoreThanThePath(low string) bool {
 	words := 0
 	for _, field := range strings.Fields(low) {
-		if strings.ContainsAny(field, "/\\") || len(field) < 2 {
+		if strings.ContainsAny(field, "/\\") || utf8.RuneCountInString(field) < 2 {
 			continue
 		}
 		letters := 0
 		for _, r := range field {
-			if r >= 'a' && r <= 'z' {
+			if unicode.IsLetter(r) {
 				letters++
 			}
 		}
