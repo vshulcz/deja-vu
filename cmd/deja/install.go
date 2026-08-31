@@ -2672,7 +2672,10 @@ func installOpencode(exe string, uninstall bool) (installResult, error) {
 	}
 	var next []byte
 	var note string
-	if strings.HasSuffix(path, ".jsonc") {
+	// The content, not the name: opencode reads either file as JSONC, and
+	// picking the writer by extension meant the same commented config was
+	// edited as text under one name and refused under the other (#1664).
+	if strings.HasSuffix(path, ".jsonc") || configIsJSONC(old) {
 		next, note, err = updateOpencodeJSONC(old, exe, uninstall)
 	} else {
 		next, note, err = updateOpencodeJSON(old, path, exe, uninstall)
@@ -2833,6 +2836,59 @@ func jsoncCodeOf(line string, inBlock bool) (code string, stillInBlock bool, end
 	return strings.TrimSpace(b.String()), inBlock, end
 }
 
+// openInlineBlock rewrites `"key": { … }` written on one line into the
+// multi-line shape the rest of this writer reads, keeping whatever the line
+// already held. A line carrying a comment is left alone: the split would have
+// to decide which side of it the entry belongs on, and refusing is the honest
+// answer for a shape nobody writes.
+func openInlineBlock(lines []string, key string) []string {
+	for i, l := range lines {
+		code, _, _ := jsoncCodeOf(l, false)
+		if !strings.Contains(code, `"`+key+`"`) || !strings.Contains(code, "{") {
+			continue
+		}
+		if jsoncBraceDelta(code) > 0 || strings.TrimSpace(code) != strings.TrimSpace(l) {
+			// Either it already spans lines, or the line holds a comment.
+			return lines
+		}
+		open := braceOutsideString(l, '{')
+		close := braceOutsideString(l, '}')
+		if open < 0 || close < open {
+			return lines
+		}
+		indent := l[:len(l)-len(strings.TrimLeft(l, " \t"))]
+		inner := strings.TrimSpace(l[open+1 : close])
+		out := append([]string{}, lines[:i]...)
+		out = append(out, l[:open+1])
+		if inner != "" {
+			out = append(out, indent+"  "+inner)
+		}
+		out = append(out, indent+l[close:])
+		return append(out, lines[i+1:]...)
+	}
+	return lines
+}
+
+// braceOutsideString is the index of the first brace of that kind a parser
+// would read as structure — a path holding one is ordinary (#2475).
+func braceOutsideString(line string, want byte) int {
+	inString, escaped := false, false
+	for i := 0; i < len(line); i++ {
+		switch c := line[i]; {
+		case escaped:
+			escaped = false
+		case c == '\\' && inString:
+			escaped = true
+		case c == '"':
+			inString = !inString
+		case inString:
+		case c == want:
+			return i
+		}
+	}
+	return -1
+}
+
 // jsoncBraceDelta counts the braces of one line's code that a parser reads as
 // structure. Comments are already out — jsoncCodeOf strips them, and keeps
 // string contents because the `"deja"` match and the comma offset both need
@@ -2872,6 +2928,11 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		return []byte("{\n  \"mcp\": {\n" + line + "\n  }\n}\n"), "", nil
 	}
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	// A block that opens and closes on one line has no end line to find, so
+	// the insert landed after its closing brace and the config stopped
+	// parsing (#2777). `"mcp": {}` is what a config nobody has added a server
+	// to looks like.
+	lines = openInlineBlock(lines, "mcp")
 	start, end := -1, -1
 	inBlock := false
 	for i, l := range lines {
