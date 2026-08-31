@@ -286,7 +286,8 @@ func syncSSHPull(dir, host string, full bool) error {
 		// The host stays as written here: the sentence hands over a command to
 		// paste, and a bounded name would name no machine. Same tension as the
 		// tombstone id in #1794.
-		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, remoteOutputForEcho(out), host)
+		return fmt.Errorf("scp: %v: %s — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`",
+			err, remoteOutputForEcho(out), pasteSafe(host))
 	}
 	cleanup()
 	// Taken before the import so only what this exchange brings is attributed
@@ -294,7 +295,7 @@ func syncSSHPull(dir, host string, full bool) error {
 	before := importsByPeerName(dir)
 	n, err := index.Import(dir, ltmp)
 	if err != nil {
-		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, host)
+		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, pasteSafe(host))
 	}
 	learnPeerMachine(dir, host, before)
 	fmt.Fprint(os.Stdout, sshCountLine("imported", n))

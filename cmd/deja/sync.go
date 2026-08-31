@@ -160,7 +160,7 @@ func runSync(dir string, args []string) error {
 		// to paste, and a collapsed path names no directory. Same tension as
 		// the recovery sentence in #1820 and the tombstone id in #1794.
 		if n == 0 && !full && !hasSyncBatches(out) {
-			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", out)
+			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", pasteSafe(out))
 		}
 		// Only when something was written: on a watermarked sync most runs
 		// send nothing, and the line asked the reader to review a file that

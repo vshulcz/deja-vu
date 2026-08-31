@@ -1001,7 +1001,9 @@ func clearedNoteIDs(keys []string) string {
 		if _, ok := known[id]; !ok {
 			continue
 		}
-		ids = append(ids, id)
+		// Quoted one by one: the join renders them as separate code spans, so
+		// quoting the finished list made every id one shell word (#2768).
+		ids = append(ids, pasteSafe(id))
 	}
 	sort.Strings(ids)
 	const shown = 3
@@ -1691,8 +1693,7 @@ func roleServedHint(dir, q string) string {
 		if n == 1 {
 			match = "matches"
 		}
-		fmt.Fprintf(&out, "deja: %d command%s this machine ran %s it — `deja how %s`\n",
-			n, pluralS(n), match, pasteSafe(q))
+		out.WriteString(howOfferLine(n, match, terms))
 	}
 	if n, name := sessionsTouchingWords(dir, terms); n > 0 {
 		fmt.Fprintf(&out, "deja: %d session%s touched %s — `deja blame %s`\n",
@@ -1738,6 +1739,17 @@ func commandsMatchingWords(dir string, terms []string) int {
 		}
 	}
 	return n
+}
+
+// howOfferLine is the half of the hint that offers `deja how`.
+//
+// The words go over as words: `deja how` ANDs its arguments and a quoted
+// phrase becomes one term it then requires contiguously, so quoting the whole
+// query handed over a command that answers "no command on this machine
+// mentions …" under a line that had just counted three (#2768).
+func howOfferLine(n int, match string, terms []string) string {
+	return fmt.Sprintf("deja: %d command%s this machine ran %s it — `deja how %s`\n",
+		n, pluralS(n), match, pasteSafeWords(terms))
 }
 
 // sessionsTouchingWords counts the sessions that touched a file whose name
@@ -3361,7 +3373,7 @@ func runForget(dir string, args []string) error {
 				what = "them"
 			}
 			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s; %s still holds what you wrote there — `deja forget --session %s` removes %s\n",
-				n, pluralS(n), sources.NotesFile(), pasteSafe(clearedNoteIDs(result.Keys)), what)
+				n, pluralS(n), sources.NotesFile(), clearedNoteIDs(result.Keys), what)
 		}
 	}
 	// Nothing matched is a different answer from nothing was dropped: the

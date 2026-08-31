@@ -94,7 +94,12 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		if near := nearestRecordedError(dir, text, func(project string) bool {
 			return pol.Allows(policy.ActivationSearch, project)
 		}); near != "" {
-			fmt.Fprintf(stdout, "deja: nothing recorded for that line — deja matches a whole error line, and the closest it holds is:\n  %s\ntry: deja fix %q\n", near, near)
+			// The echo is read and the argument is pasted, so they are treated
+			// differently: `%q` is Go's quoting, and a shell still expands
+			// `$(…)` and backticks inside double quotes — which an error line
+			// out of a transcript can carry (#2768).
+			fmt.Fprintf(stdout, "deja: nothing recorded for that line — deja matches a whole error line, and the closest it holds is:\n  %s\ntry: deja fix %s\n",
+				search.SafeLine(near), pasteSafe(near))
 			return nil
 		}
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")

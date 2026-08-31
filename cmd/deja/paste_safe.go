@@ -126,13 +126,29 @@ func shellQuoteForPaste(s string) string {
 // pasteSafeCaveat is the shell the quoted form needs, or empty when any shell
 // takes it. Only bash and zsh read `$'…'`; dash and fish pass the `$` and the
 // backslashes through literally, so the command matches nothing and says so
-// with a straight face. Every line that hands over a quoted value carries the
-// caveat, not just the first one that needed it.
+// with a straight face.
+//
+// It belongs on the lines whose whole point is the paste — the tombstone hint,
+// `forget --list`'s way back, promote's corrections line. The hints that end
+// in a command as an aside leave it off: there the caveat would be longer than
+// the offer it qualifies.
 func pasteSafeCaveat(quoted string) string {
 	if strings.HasPrefix(quoted, "$'") {
 		return " (in bash or zsh)"
 	}
 	return ""
+}
+
+// pasteSafeWords renders several values as the separate arguments they are.
+// Quoting them as one string would change what the command does: `deja how`
+// ANDs its arguments, so a phrase in quotes becomes a single term that has to
+// appear contiguously (#2768).
+func pasteSafeWords(words []string) string {
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		out = append(out, pasteSafe(w))
+	}
+	return strings.Join(out, " ")
 }
 
 // tombstoneHint is the sentence both writers print when the note they just
