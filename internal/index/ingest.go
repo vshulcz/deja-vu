@@ -2877,6 +2877,21 @@ func carrySidecars(dir, tmp string) {
 	}
 }
 
+// appendableKind reports whether a kind can be read from where the last pass
+// stopped. Named by kind rather than by path so the guard and the test that
+// keeps it honest ask the same question.
+func appendableKind(kind string) bool {
+	if kind == "" {
+		return false
+	}
+	for _, k := range sources.KindsWithOffsetParsers() {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
 func canAppendIncremental(changed map[string]FileState, old map[string]FileState) bool {
 	if len(changed) == 0 {
 		return false
@@ -2911,9 +2926,11 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 				return false
 			}
 		}
-		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot", "grok":
-		default:
+		// Whether the kind can resume a parse, not whether its name is on a
+		// list: the list grew one harness at a time and six kinds that declare
+		// an offset parser were never added, so their files were re-read whole
+		// on every pass (#2870).
+		if !appendableKind(harnessForPath(p)) {
 			return false
 		}
 	}

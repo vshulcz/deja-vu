@@ -430,6 +430,28 @@ func KindForPath(p string) string {
 	return ""
 }
 
+// KindsWithOffsetParsers names every kind that can resume a parse where the
+// last pass stopped. The index gates its append path on this rather than on a
+// list of harness names it has to remember to grow (#2870).
+func KindsWithOffsetParsers() []string {
+	var out []string
+	for _, h := range Registry() {
+		for _, k := range h.Kinds {
+			if k.ParseFrom != nil {
+				out = append(out, k.Name)
+			}
+		}
+	}
+	return out
+}
+
+// KindAppends reports whether the kind matching p can resume a parse from an
+// offset.
+func KindAppends(p string) bool {
+	k, ok := KindForPathKind(p)
+	return ok && k.ParseFrom != nil
+}
+
 // KindForPathKind returns the full FileKind whose Match accepts p, for
 // callers that need to parse, not just classify.
 func KindForPathKind(p string) (FileKind, bool) {
