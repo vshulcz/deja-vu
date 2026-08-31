@@ -2334,14 +2334,6 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 			harness = "cursor"
 		case "goose-db":
 			harness = "goose"
-		case "grok":
-			// Both grok kinds are registered under one name, and only the
-			// database carries a watermark: its session files are read whole
-			// and judged by their path, the way this function's comment says.
-			if p != sources.GrokDB() {
-				continue
-			}
-			harness = "grok"
 		default:
 			continue
 		}
