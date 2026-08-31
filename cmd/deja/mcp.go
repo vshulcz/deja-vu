@@ -394,109 +394,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		return text, err
 	case "fix":
-		var a struct {
-			Error string    `json:"error"`
-			Limit mcpNumber `json:"limit"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(a.Error) == "" {
-			return "", fmt.Errorf("error text required")
-		}
-		// Before the read, not after: the rebuild used to happen first and the
-		// guard ran when there was nothing left to report (#1306, #1309).
-		if line := buildingNowForAgent(dir); line != "" {
-			return line, nil
-		}
-		if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
-			return "", err
-		}
-		pol := policy.Load()
-		pairs := index.FixesFor(dir, a.Error, int(a.Limit), func(project string) bool {
-			return pol.Allows(policy.ActivationMCP, project)
-		})
-		if len(pairs) == 0 {
-			if !index.LooksLikeError(a.Error) {
-				return "That text does not read like an error line - pass the failing output itself.", nil
-			}
-			// Held-but-unconfirmed is not never-seen, and the agent asking is
-			// the one that would otherwise re-derive the remedy (#2282).
-			if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
-				return pol.Allows(policy.ActivationMCP, project)
-			}) {
-				return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", nil
-			}
-			return "No session on this machine ran a command after that error.", nil
-		}
-		var fb strings.Builder
-		for _, p := range pairs {
-			when := ""
-			if !p.When.IsZero() {
-				when = " (" + p.When.Local().Format("2006-01-02") + ")"
-			}
-			ran := "ran next"
-			if p.Candidate {
-				ran = "ran next, unconfirmed"
-			}
-			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
-				commandListingLine(p.Command))
-		}
-		return strings.TrimRight(fb.String(), "\n"), nil
+		// Recorded like blame and the resource reader: `deja log` is what deja
+		// put in front of an agent, and this is the surface that hands one a
+		// command to run (#2858).
+		return recordedMCPAnswer(dir, usage.KindFix, func() (string, error) { return mcpFix(dir, name, raw) })
 	case "how":
-		var a struct {
-			What    string    `json:"what"`
-			Project string    `json:"project"`
-			Limit   mcpNumber `json:"limit"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(a.What) == "" {
-			return "", fmt.Errorf("what required")
-		}
-		if line := buildingNowForAgent(dir); line != "" {
-			return line, nil
-		}
-		if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
-			return "", err
-		}
-		entries, hidden, ignored, err := howEntries(dir, strings.Fields(a.What), a.Project, policy.ActivationMCP)
-		if err != nil {
-			return "", err
-		}
-		if len(entries) == 0 {
-			// The same reasoning one line down, for the other rule: an agent
-			// told nothing exists invents one, and the ignore rule is exactly
-			// the case where something does exist (#2630).
-			if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
-				return strings.TrimSpace(note), nil
-			}
-			// Not a flat negative when the policy is what emptied the answer:
-			// an agent told nothing exists invents one, and here something does
-			// exist. The CLI has said so since the note was written; this
-			// surface was returning the negative regardless.
-			if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
-				return strings.TrimSpace(note), nil
-			}
-			return fmt.Sprintf("No command on this machine mentions %q.", a.What), nil
-		}
-		limit := int(a.Limit)
-		if limit <= 0 {
-			limit = 8
-		}
-		var hb strings.Builder
-		// The same lines the CLI prints, from the same writer: this tool used
-		// to keep its own copy of the loop, so a note the CLI learned never
-		// reached the agent (#1634).
-		writeHowEntries(&hb, entries, limit, ", last ")
-		out := strings.TrimRight(hb.String(), "\n")
-		if note := howCapNote(len(entries), limit, "call again with a higher limit for the rest"); note != "" {
-			// The agent cannot ask a follow-up of its own, so the cut has to
-			// travel with the answer rather than to a terminal it never sees.
-			out += "\n\n" + note
-		}
-		return out, nil
+		return recordedMCPAnswer(dir, usage.KindHow, func() (string, error) { return mcpHow(dir, name, raw) })
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`
@@ -655,6 +558,126 @@ func keepsQuery(shorter, longer, query string) bool {
 // them bounded — pushed an ordinary reply to 8221 bytes and a long-named one to
 // 8335 (#1797).
 const contextMCPBudget = 8192
+
+// recordedMCPAnswer journals what a tool handed the agent, whatever it was:
+// "no session ran a command after that error" is an answer the agent acts on
+// as much as a remedy is, and a log that held only the successful calls
+// understated what deja said (#2858).
+func recordedMCPAnswer(dir, kind string, answer func() (string, error)) (string, error) {
+	text, err := answer()
+	if err == nil {
+		usage.RecordServedSnapshot(dir, kind, text, 0, 0, nil, policy.Load().Describe(policy.ActivationMCP))
+	}
+	return text, err
+}
+
+func mcpFix(dir, name string, raw json.RawMessage) (string, error) {
+	var a struct {
+		Error string    `json:"error"`
+		Limit mcpNumber `json:"limit"`
+	}
+	if err := decodeToolArgs(name, raw, &a); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(a.Error) == "" {
+		return "", fmt.Errorf("error text required")
+	}
+	// Before the read, not after: the rebuild used to happen first and the
+	// guard ran when there was nothing left to report (#1306, #1309).
+	if line := buildingNowForAgent(dir); line != "" {
+		return line, nil
+	}
+	if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
+		return "", err
+	}
+	pol := policy.Load()
+	pairs := index.FixesFor(dir, a.Error, int(a.Limit), func(project string) bool {
+		return pol.Allows(policy.ActivationMCP, project)
+	})
+	if len(pairs) == 0 {
+		if !index.LooksLikeError(a.Error) {
+			return "That text does not read like an error line - pass the failing output itself.", nil
+		}
+		// Held-but-unconfirmed is not never-seen, and the agent asking is
+		// the one that would otherwise re-derive the remedy (#2282).
+		if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
+			return pol.Allows(policy.ActivationMCP, project)
+		}) {
+			return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", nil
+		}
+		return "No session on this machine ran a command after that error.", nil
+	}
+	var fb strings.Builder
+	for _, p := range pairs {
+		when := ""
+		if !p.When.IsZero() {
+			when = " (" + p.When.Local().Format("2006-01-02") + ")"
+		}
+		ran := "ran next"
+		if p.Candidate {
+			ran = "ran next, unconfirmed"
+		}
+		fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
+			commandListingLine(p.Command))
+	}
+	return strings.TrimRight(fb.String(), "\n"), nil
+}
+
+func mcpHow(dir, name string, raw json.RawMessage) (string, error) {
+	var a struct {
+		What    string    `json:"what"`
+		Project string    `json:"project"`
+		Limit   mcpNumber `json:"limit"`
+	}
+	if err := decodeToolArgs(name, raw, &a); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(a.What) == "" {
+		return "", fmt.Errorf("what required")
+	}
+	if line := buildingNowForAgent(dir); line != "" {
+		return line, nil
+	}
+	if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
+		return "", err
+	}
+	entries, hidden, ignored, err := howEntries(dir, strings.Fields(a.What), a.Project, policy.ActivationMCP)
+	if err != nil {
+		return "", err
+	}
+	if len(entries) == 0 {
+		// The same reasoning one line down, for the other rule: an agent
+		// told nothing exists invents one, and the ignore rule is exactly
+		// the case where something does exist (#2630).
+		if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
+			return strings.TrimSpace(note), nil
+		}
+		// Not a flat negative when the policy is what emptied the answer:
+		// an agent told nothing exists invents one, and here something does
+		// exist. The CLI has said so since the note was written; this
+		// surface was returning the negative regardless.
+		if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
+			return strings.TrimSpace(note), nil
+		}
+		return fmt.Sprintf("No command on this machine mentions %q.", a.What), nil
+	}
+	limit := int(a.Limit)
+	if limit <= 0 {
+		limit = 8
+	}
+	var hb strings.Builder
+	// The same lines the CLI prints, from the same writer: this tool used
+	// to keep its own copy of the loop, so a note the CLI learned never
+	// reached the agent (#1634).
+	writeHowEntries(&hb, entries, limit, ", last ")
+	out := strings.TrimRight(hb.String(), "\n")
+	if note := howCapNote(len(entries), limit, "call again with a higher limit for the rest"); note != "" {
+		// The agent cannot ask a follow-up of its own, so the cut has to
+		// travel with the answer rather than to a terminal it never sees.
+		out += "\n\n" + note
+	}
+	return out, nil
+}
 
 // blameMCPBudget bounds one blame answer. Higher than recall's ~4 KB because a
 // hit is a whole session rather than a snippet, and well under what an agent

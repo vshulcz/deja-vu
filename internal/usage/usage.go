@@ -36,6 +36,12 @@ const (
 	// same way blame did before #682.
 	KindResource = "resource"
 	KindHandoff  = "handoff"
+	// KindHow and KindFix are the two MCP tools that answer with something to
+	// run. The reasoning KindBlame and KindResource were added on applies to
+	// them twice over: they hand the agent a command, and `deja log` — the
+	// record of what deja put in front of an agent — showed neither (#2858).
+	KindHow = "how"
+	KindFix = "fix"
 	// KindRemember is the MCP remember tool — the one tool that writes to the
 	// store. #682 covered the read tools only, so an agent could add a note
 	// that showed up nowhere in the journal the user reads.
