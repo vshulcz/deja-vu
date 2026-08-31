@@ -888,9 +888,16 @@ func recallText(dir, q, harness string, limit, budget int) (string, error) {
 // the question itself — and an agent read three unrelated sessions as the
 // answer to it. On the relevance tier the line says what they are instead
 // (#2074).
-func recallCountLine(q, tier string, offset, served, total int) string {
+func recallCountLine(q, tier string, offset, served, total int, namesTheAsked bool) string {
 	q = clampEcho(q)
 	switch {
+	case tier == search.TierRelevance && namesTheAsked && offset > 0:
+		// "none about it" is the same claim the lead makes, so it follows the
+		// same reading: the exact match failed, and the first session named
+		// what was asked (#2827).
+		return fmt.Sprintf("ranked by wording for %q (%d-%d of %d)\n", q, offset+1, offset+served, total)
+	case tier == search.TierRelevance && namesTheAsked:
+		return fmt.Sprintf("ranked by wording for %q (%d of %d)\n", q, served, total)
 	case tier == search.TierRelevance && offset > 0:
 		// The tier before the page: page two of an answer to a question
 		// nothing is about is still not a page of matches, and saying so only
@@ -948,7 +955,15 @@ const recallCountLineReserve = 64
 // recallHeaderReserve is that plus the count line this answer will actually
 // print.
 func recallHeaderReserve(q, tier string, offset, limit, total int) int {
-	return recallCountLineReserve + len(recallCountLine(q, tier, offset, limit, total))
+	// The longer of the two relevance lines: this reserves room before the
+	// answer is built, and reserving for the shorter one would let the
+	// other overrun what it was promised.
+	short := len(recallCountLine(q, tier, offset, limit, total, true))
+	long := len(recallCountLine(q, tier, offset, limit, total, false))
+	if short > long {
+		long = short
+	}
+	return recallCountLineReserve + long
 }
 
 // twinSessionsFor pairs each session with the same session as it exists on
@@ -1051,6 +1066,11 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	attachAnswers(dir, hits)
 	var b strings.Builder
 	served := 0
+	// One answer for both lines: the lead and the count used to be able to
+	// disagree, and a page that says "the first one names what you asked"
+	// above "none about it" is worse than either alone (#2827).
+	namesTheAsked := result.Tier == search.TierRelevance && len(hits) > 0 &&
+		sessionNamesTheAsked(hits[0].Session, q, result.TermIDF)
 	if stale {
 		fmt.Fprintln(&b, "(index refresh running in the background — the very newest sessions may not appear yet)")
 	}
@@ -1060,6 +1080,13 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Tier == search.TierError {
 		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
+	} else if namesTheAsked {
+		// The same reading recall_context got in #2831: the tier says the
+		// exact match failed, not that the answer is unrelated. On a store
+		// with competition an ordinary question rarely survives the exact AND,
+		// so the sentence below disowned pages whose first session was the
+		// right one (#2827).
+		fmt.Fprintln(&b, "No session matched every word, so these were ranked — the first one names what you asked about. Check that it describes what is happening now before acting on it.")
 	} else if result.Tier == search.TierRelevance {
 		// Not "ranked by relevance", which reads as "here is what I found
 		// about it". Nothing matched: these are the nearest sessions by
@@ -1196,7 +1223,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
-	b.WriteString(recallCountLine(q, result.Tier, offset, served, total))
+	b.WriteString(recallCountLine(q, result.Tier, offset, served, total, namesTheAsked))
 	b.WriteString(hb.String())
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the

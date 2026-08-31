@@ -70,8 +70,11 @@ func TestBothRelevanceLeadsShareTheirSentence(t *testing.T) {
 	if !strings.Contains(contextTierLead(search.TierRelevance, false), nothingIsAboutThis) {
 		t.Error("the single-session lead drifted from the shared sentence")
 	}
-	dir := manySessionStore(t, 40)
-	text, err := callMCPTool(dir, "recall", []byte(`{"query":"stalled retry frames parser pipeline empty"}`))
+	// On a question the store has an answer to, both surfaces say so instead
+	// (#2831); the shared sentence is the other branch, so the fixture has to
+	// be one that reaches it.
+	dir := spreadWordsStore(t)
+	text, err := callMCPTool(dir, "recall", []byte(`{"query":"which crystal did we pick for the antenna array tuning"}`))
 	if err != nil {
 		t.Fatal(err)
 	}

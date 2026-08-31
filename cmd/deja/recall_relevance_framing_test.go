@@ -51,7 +51,7 @@ func TestTheCountLineSaysWhatFollowsIt(t *testing.T) {
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			got := strings.TrimRight(recallCountLine(q, c.tier, c.offset, c.served, c.total), "\n")
+			got := strings.TrimRight(recallCountLine(q, c.tier, c.offset, c.served, c.total, false), "\n")
 			if got != c.want {
 				t.Errorf("got  %s\nwant %s", got, c.want)
 			}
@@ -63,7 +63,7 @@ func TestTheCountLineSaysWhatFollowsIt(t *testing.T) {
 // session is about this, and the line above the payload does not then head it
 // with the question.
 func TestBothLinesOfARelevanceAnswerSayTheSameThing(t *testing.T) {
-	line := recallCountLine("anything at all", search.TierRelevance, 0, 3, 9)
+	line := recallCountLine("anything at all", search.TierRelevance, 0, 3, 9, false)
 	if strings.Contains(line, "deja recall for") {
 		t.Errorf("the payload is headed by the question it does not answer: %s", line)
 	}
@@ -74,7 +74,7 @@ func TestBothLinesOfARelevanceAnswerSayTheSameThing(t *testing.T) {
 
 // The query is echoed back, so it is bounded the way every sibling echo is.
 func TestTheCountLineDoesNotEchoAWholeTranscriptBack(t *testing.T) {
-	line := recallCountLine(strings.Repeat("x", 64_000), search.TierExact, 0, 3, 9)
+	line := recallCountLine(strings.Repeat("x", 64_000), search.TierExact, 0, 3, 9, false)
 	if len(line) > 1_000 {
 		t.Errorf("the count line echoed %d bytes of query back", len(line))
 	}
@@ -98,7 +98,7 @@ func TestALongQueryStillLeavesRoomForTheLineThatSaysHowToPage(t *testing.T) {
 	}
 	// The count line is written whole, with the query in it: the room kept for
 	// it is measured from the line itself rather than guessed at.
-	want := strings.TrimRight(recallCountLine(q, search.TierRelevance, 0, 3, 41), "\n")
+	want := strings.TrimRight(recallCountLine(q, search.TierRelevance, 0, 3, 41, false), "\n")
 	if !strings.Contains(text, want) {
 		t.Errorf("the count line did not survive whole:\nwant %s\ngot\n%s", want, text)
 	}
