@@ -21,15 +21,6 @@ import (
 // object is still re-flowed by the JSON writers (#2640), which is a separate
 // complaint and would drown this one.
 
-// zedSettingsRel is Zed's settings file as a path under the test home.
-func zedSettingsRel() string {
-	rel, err := filepath.Rel(sources.Home(), sources.ZedSettingsPath())
-	if err != nil {
-		return filepath.Join(".config", "zed", "settings.json")
-	}
-	return filepath.ToSlash(rel)
-}
-
 func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 	for _, tc := range []struct {
 		name, target, rel, body string
@@ -45,7 +36,11 @@ func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 		{"kimi, no block", "kimi", ".kimi-code/mcp.json", "{\n  \"theme\": \"dark\"\n}\n"},
 		// Zed keeps its settings where the platform puts them rather than
 		// under ~/.config, so this row asks rather than spells (#2808).
-		{"zed, no block", "zed", zedSettingsRel(), "{\n  \"theme\": \"dark\"\n}\n"},
+		// Zed keeps its settings where the platform puts them rather than under
+		// ~/.config, and the answer depends on the home this subtest sets — so
+		// the row names nothing and the path is asked for inside the run
+		// (#2808).
+		{"zed, no block", "zed", "", "{\n  \"theme\": \"dark\"\n}\n"},
 		{"deepseek, no patch list", "deepseek", ".dsh/cordis.patch.yml", "# my patches\n"},
 		{"deepseek, their own patch", "deepseek", ".dsh/cordis.patch.yml",
 			"# my patches\n- insert:\n    - id: mine\n      name: \"@me/thing\"\n"},
@@ -64,6 +59,9 @@ func TestEveryWriterGivesBackTheBlockItMade(t *testing.T) {
 			t.Setenv("USERPROFILE", home)
 			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 			path := filepath.Join(home, filepath.FromSlash(tc.rel))
+			if tc.rel == "" {
+				path = sources.ZedSettingsPath()
+			}
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				t.Fatal(err)
 			}

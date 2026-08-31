@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"time"
 )
 
@@ -31,6 +33,27 @@ const (
 // by a dead process is taken over, and a directory that cannot hold one at all
 // (a read-only config mount) runs the write unlocked, which is what deja did
 // before this existed.
+
+// lockHeldElsewhere reports whether a refusal to create the lock file means
+// somebody else has it rather than that deja cannot have it.
+//
+// Windows answers a create that races another process's open or delete with a
+// sharing violation rather than "exists", and reading that as "no lock here"
+// let a second writer through: measured under sixteen concurrent writers, one
+// machine's row was lost from the peer list every run. Elsewhere the create is
+// atomic and this never fires.
+func lockHeldElsewhere(err error) bool {
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
+	}
+	switch uintptr(errno) {
+	case 5, 32, 33: // ACCESS_DENIED, SHARING_VIOLATION, LOCK_VIOLATION
+		return runtime.GOOS == "windows"
+	}
+	return false
+}
+
 func withLock(fn func() error) error {
 	list := Path()
 	if list == "" {
@@ -51,7 +74,7 @@ func withLock(fn func() error) error {
 			defer func() { _ = os.Remove(path) }()
 			return fn()
 		}
-		if !errors.Is(err, fs.ErrExist) {
+		if !errors.Is(err, fs.ErrExist) && !lockHeldElsewhere(err) {
 			return fn()
 		}
 		if fi, serr := os.Stat(path); serr == nil && time.Since(fi.ModTime()) > lockStale {
