@@ -36,11 +36,22 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 				return fmt.Errorf("fix: --limit wants a positive number, got %q", args[i])
 			}
 			limit = n
+		case "--":
+			// An error line can start with a dash, and Go's own test output is
+			// the commonest one a reader pastes: `deja fix -- '--- FAIL: …'`
+			// (#2799).
+			parts = append(parts, args[i+1:]...)
+			i = len(args)
 		default:
 			// A flag deja does not know must not be swallowed into the error
 			// text — `deja fix "..." --json` used to search for a string that
 			// contained "--json" and answer "no session ran a command".
-			if strings.HasPrefix(args[i], "-") && args[i] != "-" {
+			//
+			// A pasted failure line is the exception: it starts with the three
+			// dashes go test writes, no flag has that shape, and refusing it
+			// left the reader with a command deja itself had printed and
+			// nothing that would run it (#2799).
+			if strings.HasPrefix(args[i], "-") && args[i] != "-" && !looksLikeAPastedLine(args[i]) {
 				return fmt.Errorf("fix: unknown flag %q", args[i])
 			}
 			parts = append(parts, args[i])
@@ -98,8 +109,8 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			// differently: `%q` is Go's quoting, and a shell still expands
 			// `$(…)` and backticks inside double quotes — which an error line
 			// out of a transcript can carry (#2768).
-			fmt.Fprintf(stdout, "deja: nothing recorded for that line — deja matches a whole error line, and the closest it holds is:\n  %s\ntry: deja fix %s\n",
-				search.SafeLine(near), pasteSafe(near))
+			fmt.Fprintf(stdout, "deja: nothing recorded for that line — deja matches a whole error line, and the closest it holds is:\n  %s\ntry: %s\n",
+				search.SafeLine(near), fixHintCommand(near))
 			return nil
 		}
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
@@ -148,4 +159,21 @@ func nearestRecordedError(dir, text string, allow func(string) bool) string {
 		}
 	}
 	return search.SafeLine(best)
+}
+
+// looksLikeAPastedLine tells a mistyped flag from an error line that happens to
+// start with one. A flag is one word; what a reader pastes is a sentence, and
+// the shape that brought this up is go test's "--- FAIL: TestX (0.01s)".
+func looksLikeAPastedLine(arg string) bool {
+	return strings.HasPrefix(arg, "--- ") || strings.ContainsAny(arg, " \t")
+}
+
+// fixHintCommand is the command deja prints for the reader to paste, escaped so
+// that it runs: a line starting with a dash needs the `--` in front of it, or
+// the command deja just offered answers with "unknown flag" (#2799).
+func fixHintCommand(line string) string {
+	if strings.HasPrefix(line, "-") {
+		return "deja fix -- " + pasteSafe(line)
+	}
+	return "deja fix " + pasteSafe(line)
 }
