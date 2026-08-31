@@ -707,7 +707,7 @@ func printSpawnEdges(w io.Writer, dir string, s model.Session) {
 		if s.Agent != "" {
 			by = " as " + s.Agent
 		}
-		fmt.Fprintf(w, "deja: spawned from %s%s — `deja show %s`\n", digest.Short(s.Parent), by, digest.Short(s.Parent))
+		fmt.Fprintf(w, "deja: spawned from %s%s — `deja show %s`\n", digest.Short(s.Parent), by, pasteSafe(digest.Short(s.Parent)))
 	} else if s.Kind != "" {
 		// A kind with no parent is all the harness recorded; saying which
 		// session asked for it would be a guess.
@@ -1692,10 +1692,11 @@ func roleServedHint(dir, q string) string {
 			match = "matches"
 		}
 		fmt.Fprintf(&out, "deja: %d command%s this machine ran %s it — `deja how %s`\n",
-			n, pluralS(n), match, q)
+			n, pluralS(n), match, pasteSafe(q))
 	}
 	if n, name := sessionsTouchingWords(dir, terms); n > 0 {
-		fmt.Fprintf(&out, "deja: %d session%s touched %s — `deja blame %s`\n", n, pluralS(n), name, name)
+		fmt.Fprintf(&out, "deja: %d session%s touched %s — `deja blame %s`\n",
+			n, pluralS(n), search.SafeLine(name), pasteSafe(name))
 	}
 	return out.String()
 }
@@ -3043,7 +3044,8 @@ func forgetScopeRefusal(selector string, matches int, allMatches bool) error {
 	if strings.Contains(selector, "…") {
 		return fmt.Errorf("%q matches %d sessions — the ids differ in the middle the line elides; `deja last` prints them whole", selector, matches)
 	}
-	return fmt.Errorf("%q is a prefix of %d sessions — `deja forget --session %s --dry-run` lists what would go; add --all-matches to drop them all", selector, matches, selector)
+	return fmt.Errorf("%q is a prefix of %d sessions — `deja forget --session %s --dry-run` lists what would go; add --all-matches to drop them all",
+		selector, matches, pasteSafe(selector))
 }
 
 func runForget(dir string, args []string) error {
@@ -3113,7 +3115,7 @@ func runForget(dir string, args []string) error {
 			// is the whole difference between a dead end and one more word to
 			// type (#2656, the lesson #2191 recorded for --harness).
 			if !strings.HasPrefix(args[i], "-") {
-				return fmt.Errorf("forget: a session id goes after --session — `deja forget --session %s`", args[i])
+				return fmt.Errorf("forget: a session id goes after --session — `deja forget --session %s`", pasteSafe(args[i]))
 			}
 			return fmt.Errorf("forget: unknown flag %q", args[i])
 		}
@@ -3359,7 +3361,7 @@ func runForget(dir string, args []string) error {
 				what = "them"
 			}
 			fmt.Fprintf(os.Stdout, "cleared the borrowed title from %d promoted note%s; %s still holds what you wrote there — `deja forget --session %s` removes %s\n",
-				n, pluralS(n), sources.NotesFile(), clearedNoteIDs(result.Keys), what)
+				n, pluralS(n), sources.NotesFile(), pasteSafe(clearedNoteIDs(result.Keys)), what)
 		}
 	}
 	// Nothing matched is a different answer from nothing was dropped: the
@@ -4249,7 +4251,10 @@ func forgottenSourceNote(s model.Session, selector string, resolved bool) string
 	if !index.Tombstoned(key) {
 		return ""
 	}
-	return fmt.Sprintf("%s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone", key)
+	// Prose, not a command: the key is read here rather than pasted — the
+	// command in this sentence takes no argument — so it is neutralised the
+	// way every other echo is.
+	return fmt.Sprintf("%s is forgotten — this is the note promoted from it; `deja forget --list` names what is gone", safeForStatusline(key, 200))
 }
 
 // selectorNamesSession reports whether the reader's selector names this

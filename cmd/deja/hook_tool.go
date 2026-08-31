@@ -475,7 +475,15 @@ func fileHookLine(dir, cwd, path string) string {
 		}
 		return head + " — last session on it ended: " + d
 	}
-	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, name)
+	return fileHookBlameOffer(head, name)
+}
+
+// fileHookBlameOffer is the line that hands the agent a command to run on the
+// file it is about to touch. The name came out of a transcript, so it is
+// quoted the way every pasted value is: raw, an escape byte in it reaches the
+// terminal and a metacharacter changes what the command does (#2768).
+func fileHookBlameOffer(head, name string) string {
+	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, pasteSafe(name))
 }
 
 // fileDecisionLine returns the single most relevant prior decision recorded

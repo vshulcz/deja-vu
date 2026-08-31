@@ -156,7 +156,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			// — and named a path with nothing to do about it (#871).
 			fmt.Fprintf(stdout, "promoted %s as %s: %s\n", safeForStatusline(src, 200), state, search.SafeNote(title))
 			return fmt.Errorf("the note is kept, but %s could not be written (%s) — export it somewhere you can, or read the note back with `deja show %s`",
-				exportPath, exportFailureReason(err), "deja-note-"+strings.ReplaceAll(src, ":", "-"))
+				exportPath, exportFailureReason(err), pasteSafe("deja-note-"+strings.ReplaceAll(src, ":", "-")))
 		}
 		// The one outbound path that said nothing: `--to` exists to hand a
 		// decision to someone, and `share` and `sync export` both end with this
