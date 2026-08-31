@@ -52,6 +52,14 @@ func matchesAnywhere(pattern, s string) bool {
 	if s == "" {
 		return false
 	}
+	// Both sides in the one spelling. A rule is a directory rule and is
+	// written with forward slashes; a session path on Windows carries
+	// backslashes, and compared as they are the rule matched nothing there —
+	// so a tree deja was told not to recall was recalled on every surface
+	// (#2808). Normalising the rule too means someone who writes it the
+	// Windows way is understood as well.
+	pattern = strings.ReplaceAll(pattern, `\`, "/")
+	s = strings.ReplaceAll(s, `\`, "/")
 	if ok, err := path.Match(pattern, s); err == nil && ok {
 		return true
 	}
