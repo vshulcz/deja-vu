@@ -3,10 +3,14 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // A measurement, not a guard: the session-start hook records an empty session
@@ -48,4 +52,26 @@ func TestWindowsHookPayloadProbe(t *testing.T) {
 
 	t.Errorf("probe: wait=%v via-stdin bytes=%d took=%v id=%q err=%v raw=%q | via-reader bytes=%d raw=%q",
 		hookStdinWait, len(got), took, input.SessionID, unmarshalErr, string(got), len(direct), string(direct))
+
+	// And the hook itself, which is where the empty id is recorded.
+	withStatsStores(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	stale := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "beta", "one.jsonl"), "probeterm", []string{
+		`{"type":"user","sessionId":"probeterm","timestamp":"` + stale +
+			`","message":{"role":"user","content":"pgbouncer runs in transaction mode and prepared statements are off"}}`,
+	})
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "beta")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	t.Setenv("CLAUDE_PROJECT_DIR", cwd)
+	withHookStdin(t, hookPayload(t, map[string]string{"source": "startup", "session_id": "ses_probe", "cwd": cwd}))
+	served := captureStdout(t, func() { runHookContextPlain(t) })
+	log, readErr := os.ReadFile(usage.SnapshotPath(index.DefaultDir()))
+	t.Errorf("probe hook: injected=%d bytes, log err=%v, log=%s", len(served), readErr, log)
 }
