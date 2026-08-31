@@ -21,8 +21,12 @@ func writeClaudeSettings(t *testing.T, events ...string) {
 	}
 	var entries []string
 	for _, e := range events {
-		entries = append(entries, `"`+e+`":[{"matcher":"","hooks":[{"type":"command","command":"`+exe+` `+
-			subFor(e)+`"}]}]`)
+		// The path goes in as JSON writes it: a Windows exe carries
+		// backslashes, and pasting them raw makes the fixture invalid JSON —
+		// which doctor reports as an unreadable config, not as the wiring the
+		// test is about.
+		entries = append(entries, `"`+e+`":[{"matcher":"","hooks":[{"type":"command","command":"`+
+			jsonEscaped(t, exe)+` `+subFor(e)+`"}]}]`)
 	}
 	body := `{"hooks":{` + strings.Join(entries, ",") + `}}`
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")

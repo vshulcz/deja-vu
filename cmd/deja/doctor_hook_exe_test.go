@@ -77,7 +77,12 @@ func TestDoctorNamesHooksRunningABinaryThatIsGone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, bytes.ReplaceAll(b, []byte(gone), []byte(here)), 0o644); err != nil {
+		// Both spellings: a config holds a Windows path escaped, so replacing
+		// the raw one finds nothing and the file still names the binary that
+		// is gone.
+		swapped := bytes.ReplaceAll(b, []byte(gone), []byte(here))
+		swapped = bytes.ReplaceAll(swapped, []byte(jsonEscaped(t, gone)), []byte(jsonEscaped(t, here)))
+		if err := os.WriteFile(path, swapped, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
