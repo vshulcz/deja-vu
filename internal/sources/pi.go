@@ -47,7 +47,7 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		Project: project,
 		Path:    path,
 	}
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		switch typ {
 		case "session":

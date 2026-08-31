@@ -82,8 +82,8 @@ func TestEveryAppendableKindKeepsWhatItAlreadyHad(t *testing.T) {
 			if err := Ensure(dir, "", true, nil); err != nil {
 				t.Fatal(err)
 			}
-			was := countIndexed(t, dir, c.harness)
-			if was == 0 {
+			was := sessionsOf(t, dir, c.harness)
+			if len(was) == 0 {
 				t.Skipf("%s: the fixture indexed nothing, so an append proves nothing", c.harness)
 			}
 
@@ -101,8 +101,29 @@ func TestEveryAppendableKindKeepsWhatItAlreadyHad(t *testing.T) {
 			if !strings.Contains(progress.String(), "updated 1 file") {
 				t.Errorf("growth did not take the append path:\n%s", progress.String())
 			}
-			if got := countIndexed(t, dir, c.harness); got < was {
-				t.Errorf("the append lost what was already indexed: %d records, was %d", got, was)
+			// The same sessions, still carrying what the header told the
+			// parser. An offset parser that resumes past the header loses the
+			// session's identity rather than its bytes: the turn lands under a
+			// key of its own and the session it belongs to never grows.
+			now := sessionsOf(t, dir, c.harness)
+			for key, before := range was {
+				after, ok := now[key]
+				if !ok {
+					t.Errorf("%s is gone after the append", key)
+					continue
+				}
+				if after.Counted < before.Counted {
+					t.Errorf("%s lost turns: %d, was %d", key, after.Counted, before.Counted)
+				}
+				if after.Project != before.Project {
+					t.Errorf("%s changed project: %q, was %q", key, after.Project, before.Project)
+				}
+				if after.Title != before.Title {
+					t.Errorf("%s changed title: %q, was %q", key, after.Title, before.Title)
+				}
+			}
+			if len(now) != len(was) {
+				t.Errorf("the append made %d sessions out of %d", len(now), len(was))
 			}
 			ss, err := Search(dir, search.Options{Query: "appendneedle", All: true})
 			if err != nil {
@@ -126,18 +147,18 @@ func TestEveryAppendableKindKeepsWhatItAlreadyHad(t *testing.T) {
 	}
 }
 
-// countIndexed is how many records a harness has in the store.
-func countIndexed(t *testing.T, dir, harness string) int {
+// sessionsOf is what a harness has in the store, by key.
+func sessionsOf(t *testing.T, dir, harness string) map[string]SessionMeta {
 	t.Helper()
 	metas, err := AllMeta(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := 0
+	out := map[string]SessionMeta{}
 	for _, m := range metas {
 		if m.Harness == harness {
-			n += m.Counted
+			out[m.Harness+":"+m.ID] = m
 		}
 	}
-	return n
+	return out
 }

@@ -445,13 +445,6 @@ func KindsWithOffsetParsers() []string {
 	return out
 }
 
-// KindAppends reports whether the kind matching p can resume a parse from an
-// offset.
-func KindAppends(p string) bool {
-	k, ok := KindForPathKind(p)
-	return ok && k.ParseFrom != nil
-}
-
 // KindForPathKind returns the full FileKind whose Match accepts p, for
 // callers that need to parse, not just classify.
 func KindForPathKind(p string) (FileKind, bool) {

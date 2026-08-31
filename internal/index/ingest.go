@@ -2884,13 +2884,21 @@ func appendableKind(kind string) bool {
 	if kind == "" {
 		return false
 	}
-	for _, k := range sources.KindsWithOffsetParsers() {
-		if k == kind {
-			return true
+	resumableKindsOnce.Do(func() {
+		resumableKinds = map[string]bool{}
+		for _, k := range sources.KindsWithOffsetParsers() {
+			resumableKinds[k] = true
 		}
-	}
-	return false
+	})
+	return resumableKinds[kind]
 }
+
+// The registry is fixed for the life of the process, and this is asked once
+// per changed file: walking it each time cost 4.3 KB of garbage a file.
+var (
+	resumableKinds     map[string]bool
+	resumableKindsOnce sync.Once
+)
 
 func canAppendIncremental(changed map[string]FileState, old map[string]FileState) bool {
 	if len(changed) == 0 {
