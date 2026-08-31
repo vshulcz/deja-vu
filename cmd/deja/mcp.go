@@ -1067,7 +1067,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		// questions about subjects this machine has never held — eight of
 		// eight came back with sessions rather than nothing, and the tool
 		// description promises an empty result means no record (#2074).
-		fmt.Fprintln(&b, "No session is about this. Nothing matched the query, so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+		fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 	}
 	if note := demotedNote(hits, demoted); note != "" {
 		fmt.Fprintln(&b, note+" — read the order as the user's judgement, not as recency.")
@@ -1428,6 +1428,12 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		forgottenSourceNote(whole, q, false), nil
 }
 
+// nothingIsAboutThis is the half both surfaces share. The wording was tuned in
+// #2074 and then written twice — once in the plural over a page of sessions,
+// once in the singular over one — so an edit to either would have drifted from
+// the other without anything noticing.
+const nothingIsAboutThis = "No session is about this. Nothing matched the query,"
+
 // contextTierLead says what the session below it is, for a tier that is not an
 // exact match.
 //
@@ -1437,7 +1443,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 // a label on an answer (#2787, the shape #2074 fixed for the counted page).
 func contextTierLead(tier string) string {
 	if tier == search.TierRelevance {
-		return "No session is about this. Nothing matched the query, so the session below is the nearest by wording — treat it as a lead to check, not as a record, and say plainly if it does not answer.\n"
+		return nothingIsAboutThis + " so the session below is the nearest by wording — treat it as a lead to check, not as a record, and say plainly if it does not answer.\n"
 	}
 	return "[" + tier + "]\n"
 }
