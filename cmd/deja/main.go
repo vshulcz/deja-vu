@@ -3067,7 +3067,7 @@ func forgetScopeRefusal(selector string, matches int, allMatches bool) error {
 	if strings.Contains(selector, "…") {
 		return fmt.Errorf("%q matches %d sessions — the ids differ in the middle the line elides; `deja last` prints them whole", selector, matches)
 	}
-	return fmt.Errorf("%q is a prefix of %d sessions — `deja forget --session %s --dry-run` lists what would go; add --all-matches to drop them all",
+	return fmt.Errorf("%q matches %d sessions — `deja forget --session %s --dry-run` lists what would go; add --all-matches to drop them all",
 		selector, matches, pasteSafe(selector))
 }
 

@@ -584,8 +584,15 @@ func tombstoneMatches(key, prefix string) bool {
 		id = key[i+1:]
 	}
 	// Same widening as the forget selector: the id a reader copies off a
-	// result line carries the elision (#855).
-	return key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix)
+	// result line carries the elision (#855), and a session that arrived by
+	// sync answers to the id it came with — which forget now takes, so undo
+	// has to take it too or the reader can drop a session and not put it back
+	// without reading `forget --list` for an id they never chose (#2843).
+	if key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix) {
+		return true
+	}
+	harness, _, ok := strings.Cut(key, ":")
+	return ok && id == ImportedSessionID(harness, prefix)
 }
 
 // Unforget lifts tombstones and reports how many it lifted. The count is not

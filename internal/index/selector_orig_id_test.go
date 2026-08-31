@@ -21,4 +21,22 @@ func TestASelectorFindsAnImportedSessionByTheIdItCameWith(t *testing.T) {
 	if selectorMatches(meta, "codex:longs") {
 		t.Error("the harness is not being checked")
 	}
+	if selectorMatches(SessionMeta{Harness: "claude", ID: "other", OrigID: "longshoreman"}, "claude:longs") {
+		t.Error("a prefix of another session's original id matched through the harness form")
+	}
+}
+
+// And the round trip: what forget takes, unforget gives back by the same
+// string. Taking a session by an id whose undo needs a different one is worse
+// than not taking it (#2843).
+func TestATombstoneAnswersToTheIdItWasForgottenBy(t *testing.T) {
+	key := "claude:" + ImportedSessionID("claude", "longs")
+	for _, sel := range []string{"longs", key, ImportedSessionID("claude", "longs")} {
+		if !tombstoneMatches(key, sel) {
+			t.Errorf("%q does not lift the tombstone forget wrote for it", sel)
+		}
+	}
+	if tombstoneMatches(key, "someone-elses-session") {
+		t.Error("an unrelated id lifted the tombstone")
+	}
 }
