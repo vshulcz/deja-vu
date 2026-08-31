@@ -195,6 +195,11 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		}
 		return hits[i].Session.ID < hits[j].Session.ID
 	})
+	// And the rule promote promises, which the score cannot express here: a
+	// note mentions the file once where the transcript it distils mentions it
+	// many times, so scoring alone put the transcript above its own note on
+	// every blame (#2829).
+	liftNotesBy(hits, func(h BlameHit) model.Session { return h.Session })
 	return hits
 }
 
