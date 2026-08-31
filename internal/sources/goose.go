@@ -89,7 +89,7 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Path:    path,
 	}
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
 		role, hasRole := m["role"].(string)
 		if !hasRole {
 			if id, _ := m["id"].(string); id != "" {
