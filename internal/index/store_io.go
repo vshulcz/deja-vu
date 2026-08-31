@@ -536,7 +536,7 @@ func consumeField(b []byte) (string, []byte, bool) {
 func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
 	_ = os.RemoveAll(old)
-	if err := os.Rename(dir, old); err != nil && !os.IsNotExist(err) {
+	if err := renameWaiting(dir, old); err != nil && !os.IsNotExist(err) {
 		// The parking spot survived the removal above — a leftover from an
 		// interrupted swap whose permissions stop deja from clearing it. The
 		// bare `rename …: file exists` names two paths nobody chose and gives
@@ -546,7 +546,7 @@ func swapIndexDir(dir, tmp string) error {
 		}
 		return err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
+	if err := renameWaiting(tmp, dir); err != nil {
 		// Put the previous index back rather than leaving nothing.
 		_ = os.Rename(old, dir)
 		return err
@@ -554,6 +554,39 @@ func swapIndexDir(dir, tmp string) error {
 	_ = os.RemoveAll(old)
 	return nil
 }
+
+// renameWaiting is os.Rename with a short wait for a rename another pass is
+// holding the directory open against.
+//
+// Windows refuses to rename a directory while any handle inside it is open, so
+// two ordinary passes at once — a hook's warmup and a `deja index` from a shell
+// — left the loser unable to swap, and the store a session short until
+// something rebuilt it. On Unix the loser renames over the winner and both end
+// up consistent, which is why this went unmeasured (#2228). The reader holding
+// those handles is finishing a read, not doing work, so the wait is short and
+// bounded; a rename still refused at the end is reported rather than retried
+// forever, and the caller puts the previous index back.
+func renameWaiting(from, to string) error {
+	err := renameFile(from, to)
+	for wait := swapRenameWait; err != nil && !os.IsNotExist(err) && wait > 0; wait -= swapRenameStep {
+		time.Sleep(swapRenameStep)
+		err = renameFile(from, to)
+	}
+	return err
+}
+
+const (
+	// swapRenameWait is how long a swap waits out a reader. Measured against
+	// the read it is waiting on: a search opens the store, reads what it needs
+	// and closes, which is milliseconds — so this is generous by two orders of
+	// magnitude and still shorter than the pass that would have to run again.
+	swapRenameWait = 2 * time.Second
+	swapRenameStep = 20 * time.Millisecond
+)
+
+// renameFile is os.Rename, indirected so a test can refuse a rename the way
+// Windows does without needing Windows.
+var renameFile = os.Rename
 
 // recoverIndexDir finishes an interrupted swapIndexDir: if the index dir is
 // missing but its .old sibling survives, restore it.
