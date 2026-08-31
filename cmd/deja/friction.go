@@ -25,6 +25,18 @@ import (
 // So this reports friction, not knowledge, and it is deliberately a small
 // claim: the same specific error, in N separate sessions.
 
+// hasFrictionLine reports whether a record holds anything friction would put in
+// its answer. The note about what a rule withheld is a sentence about that
+// answer, so a hidden session is only worth counting when it holds one.
+func hasFrictionLine(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		if _, _, ok := index.FrictionSignature(line); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func runFriction(dir string, args []string, stdout io.Writer) error {
 	limit := 10
 	for i := 0; i < len(args); i++ {
@@ -78,12 +90,24 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	// identity walks the whole log each time, which put this command at 2m46s
 	// on a 1150-session store.
 	if err := index.EachToolOutput(dir, func(meta index.SessionMeta, r index.Record) {
-		if !pol.Allows(policy.ActivationSearch, meta.Project) {
-			withheldSessions[meta.Harness+":"+meta.ID] = true
-			return
-		}
-		if pol.Ignored(meta.Path, meta.Project) {
-			ignoredSessions[meta.Harness+":"+meta.ID] = true
+		// Whether the record is withheld is decided here; whether friction
+		// would have said anything about it is decided below, and that is where
+		// the counts are taken. Counted here, they were about tool output
+		// rather than about failures: a machine whose hidden sessions only ever
+		// printed `ok 12 tests passed` was told a rule was keeping matching
+		// sessions back, and "matching" is the word the sentence uses (#2794,
+		// the sibling of #2766).
+		denied := !pol.Allows(policy.ActivationSearch, meta.Project)
+		ignored := !denied && pol.Ignored(meta.Path, meta.Project)
+		if denied || ignored {
+			if !hasFrictionLine(r.Text) {
+				return
+			}
+			if denied {
+				withheldSessions[meta.Harness+":"+meta.ID] = true
+			} else {
+				ignoredSessions[meta.Harness+":"+meta.ID] = true
+			}
 			return
 		}
 		key := meta.Harness + ":" + meta.ID
