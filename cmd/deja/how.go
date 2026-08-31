@@ -180,7 +180,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 // hid, and an agent told nothing exists invents something.
 func howEntries(dir string, terms []string, project, activation string) ([]howEntry, int, int, error) {
 	pol := policy.Load()
-	hidden := 0
+	hidden := map[string]bool{}
 	// The other rule that takes sessions out of an answer. It is applied inside
 	// retrieval, and this screen reads the record log instead of ranking, so it
 	// was not applied here at all: a tree the reader asked deja to stay out of
@@ -189,14 +189,15 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 	ignored := map[string]bool{}
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
-		if !pol.Allows(activation, meta.Project) {
-			hidden++
-			return
-		}
-		if pol.Ignored(meta.Path, meta.Project) {
-			ignored[meta.Harness+":"+meta.ID] = true
-			return
-		}
+		// Whether the record is withheld is decided here; whether it was ever
+		// an answer to *this* question is decided below, and the counts are
+		// taken there. Counted here, they were store-wide: `how terraform` on
+		// a machine whose hidden sessions only ever ran `go test` said three
+		// matching sessions were being kept back, and "matching" is the word
+		// the sentence uses (#2766). `files` already scopes its number this
+		// way, by counting over hits that were searched.
+		denied := !pol.Allows(activation, meta.Project)
+		ign := !denied && pol.Ignored(meta.Path, meta.Project)
 		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
 			return
 		}
@@ -213,6 +214,17 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 			if !commandMentions(low, strings.ToLower(t)) {
 				return
 			}
+		}
+		// In scope for the question, so now it is worth saying it is withheld.
+		// Sessions rather than records, which is the noun the line uses: two
+		// commands of one hidden session read as two hidden sessions.
+		if denied {
+			hidden[meta.Harness+":"+meta.ID] = true
+			return
+		}
+		if ign {
+			ignored[meta.Harness+":"+meta.ID] = true
+			return
 		}
 		e := byCmd[low]
 		if e == nil {
@@ -236,7 +248,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 	})
 	if err != nil {
-		return nil, hidden, len(ignored), fmt.Errorf("read: %w", err)
+		return nil, len(hidden), len(ignored), fmt.Errorf("read: %w", err)
 	}
 	out := make([]howEntry, 0, len(byCmd))
 	for _, e := range byCmd {
@@ -254,7 +266,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		}
 		return out[i].Command < out[j].Command
 	})
-	return out, hidden, len(ignored), nil
+	return out, len(hidden), len(ignored), nil
 }
 
 func pluralRuns(n int) string {
