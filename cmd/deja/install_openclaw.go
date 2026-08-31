@@ -132,6 +132,13 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 	return writeIfChanged(path, old, next)
 }
 
+// flagRecordKey names the switch in the wiring state, beside the blocks deja
+// records there. A key of its own rather than the block's, so "deja created
+// this block" and "deja turned this switch on" cannot be confused.
+func flagRecordKey(keys []string, flagKey string) string {
+	return strings.Join(keys[:len(keys)-1], ".") + "." + flagKey
+}
+
 // setOpenClawEntryJSONC writes one of openclaw's entries — the bootstrap hook,
 // or the plugin — into a config carrying comments, as text, so the reader's own
 // lines stay where they are.
@@ -176,14 +183,18 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		}
 		delete(have, id)
 		dropFrom := len(keys)
-		dropFlag := false
+		// The switch comes out only where deja is what turned it on. A reader
+		// who had set it themselves keeps it: deleting it left their own hook
+		// wired and switched off (#2811).
+		dropFlag := flagKey != "" && blockWasAdded(path, flagRecordKey(keys, flagKey))
 		if len(have) == 0 && blockWasAdded(path, blockKey) {
 			dropFrom = len(keys) - 1
-			dropFlag = flagKey != ""
 			forgetBlockAdded(path, blockKey)
 			// The switch goes with the entries it was for, and so does each
 			// level above that deja created and that holds nothing else.
-			delete(held, flagKey)
+			if dropFlag {
+				delete(held, flagKey)
+			}
 			for i := len(keys) - 2; i >= 0; i-- {
 				prefix := strings.Join(keys[:i+1], ".")
 				if len(holders[i+1]) != 1 || !blockWasAdded(path, prefix) {
@@ -201,6 +212,9 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		// condition the parsed path uses. Taken on the ordinary
 		// entry-comes-out case it deleted a switch the reader had set
 		// themselves, leaving their own hook wired and turned off (#2811).
+		if dropFlag {
+			forgetBlockAdded(path, flagRecordKey(keys, flagKey))
+		}
 		if dropFlag && dropFrom >= len(keys)-1 {
 			// The chain stayed, so the switch is still in it and comes out on
 			// its own.
@@ -228,6 +242,11 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		return "", configParseError(path, err)
 	}
 	if flagKey != "" {
+		// Recorded the way a block deja created is, so an uninstall can tell a
+		// switch deja turned on from one the reader set.
+		if _, present := held[flagKey]; !present {
+			noteBlockAdded(path, flagRecordKey(keys, flagKey))
+		}
 		next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, true)
 		if err != nil {
 			return "", configParseError(path, err)

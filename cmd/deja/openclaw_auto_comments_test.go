@@ -98,15 +98,60 @@ func TestOpenClawAutoLeavesTheReadersWiringAlone(t *testing.T) {
 	}
 }
 
-// The switch written last in its block: taking it out has to take the comma in
-// front of it, or what is left is `{…,}` and every later run refuses the file.
+// The switch written last in its block, with a key in front of it: taking it
+// out has to take the comma in front too, or what is left is `{…,}` and every
+// later run refuses the file — including across a comment between the two,
+// which a backward walk stops at.
 func TestOpenClawAutoRemovesASwitchWrittenLast(t *testing.T) {
+	for _, before := range []string{
+		"{\n  // reader's own block\n  \"hooks\": {\n    \"internal\": {}\n  }\n}\n",
+		"{\n  // reader's own block\n  \"hooks\": {\n    \"internal\": {\n      \"timeoutMs\": 500\n    }\n  }\n}\n",
+		"{\n  // reader's own block\n  \"hooks\": {\n    \"internal\": {\n      \"timeoutMs\": 500,\n      // the internal hook system\n      \"other\": true\n    }\n  }\n}\n",
+		"{\n  \"hooks\": {\n    \"internal\": {\n      \"timeoutMs\": 500, /* keep */ \"other\": true\n    }\n  }\n}\n",
+	} {
+		t.Run("", func(t *testing.T) {
+			hermeticEnv(t)
+			path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := installOpenClawAuto("/bin/deja", false); err != nil {
+				t.Fatalf("a commented config was refused: %v", err)
+			}
+			if _, err := installOpenClawAuto("/bin/deja", true); err != nil {
+				t.Fatalf("uninstall refused the commented config: %v", err)
+			}
+			b, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var root map[string]any
+			if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+				t.Fatalf("the file no longer parses: %v\n%s", err, b)
+			}
+			if strings.Contains(string(b), `"enabled"`) {
+				t.Errorf("the switch deja turned on stayed behind:\n%s", b)
+			}
+			if string(b) != before {
+				t.Errorf("the round trip changed the file:\nwant %q\ngot  %q", before, b)
+			}
+		})
+	}
+}
+
+// A switch the reader set themselves is theirs: deja overwrites it while it is
+// installed and leaves it behind on the way out, rather than deleting a setting
+// it never wrote.
+func TestOpenClawAutoKeepsASwitchTheReaderSet(t *testing.T) {
 	hermeticEnv(t)
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	before := "{\n  // reader's own block\n  \"hooks\": {\n    \"internal\": {}\n  }\n}\n"
+	before := "{\n  // mine\n  \"hooks\": {\n    \"internal\": {\n      \"enabled\": false\n    }\n  }\n}\n"
 	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -120,12 +165,49 @@ func TestOpenClawAutoRemovesASwitchWrittenLast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(string(b), `"enabled"`) {
+		t.Errorf("the reader's own switch was deleted:\n%s", b)
+	}
 	var root map[string]any
 	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
 		t.Fatalf("the file no longer parses: %v\n%s", err, b)
 	}
-	if strings.Contains(string(b), "enabled") {
-		t.Errorf("the switch deja turned on stayed behind:\n%s", b)
+}
+
+// A string value equal to a block's name is not that block: the writer read it
+// as one and put a second block in beside the reader's, where the decoder takes
+// the reader's and deja is silently unwired.
+func TestOpenClawAutoIsNotFooledByAValueNamedLikeAKey(t *testing.T) {
+	hermeticEnv(t)
+	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	before := "{\n  // a value can be spelled like a key\n  \"hooks\": {\n    \"note\": \"internal\",\n    \"internal\": {\n      \"entries\": {\n        \"mine\": { \"enabled\": true }\n      }\n    }\n  }\n}\n"
+	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installOpenClawAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install refused the config: %v", err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(b), `"internal"`); n != 2 {
+		// The key itself and the reader's string value: one of each, and no
+		// second block.
+		t.Errorf("%d occurrences of the key, so a second block went in beside it:\n%s", n, b)
+	}
+	var root map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+		t.Fatalf("the file no longer parses: %v\n%s", err, b)
+	}
+	hooks, _ := root["hooks"].(map[string]any)
+	internal, _ := mapAt(hooks, "internal")
+	entries, _ := mapAt(internal, "entries")
+	if entries[openclawHookName] == nil {
+		t.Errorf("the entry did not reach the reader's own block:\n%s", b)
 	}
 }
 

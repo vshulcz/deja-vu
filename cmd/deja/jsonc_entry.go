@@ -471,9 +471,14 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 	// is what would be left dangling — `{…,\n  }` is not JSON, and the file is
 	// then refused on every later run with a message pointing at the reader's
 	// own comment (#2740 again, one key over).
+	//
+	// Looked for on the comment-blanked copy, whose offsets are the original's:
+	// a comment sitting between the two keys ends in a non-whitespace byte, and
+	// a backward walk that stops there never reaches the comma (#2811).
 	if !tookComma {
+		blank := stripJSONComments(text)
 		for i := start - 1; i > block.valueOpen; i-- {
-			if c := text[i]; c == ' ' || c == '\t' || c == '\n' {
+			if c := blank[i]; c == ' ' || c == '\t' || c == '\n' {
 				continue
 			} else if c == ',' {
 				start = i
