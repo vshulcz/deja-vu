@@ -622,6 +622,17 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 	return hits
 }
 
+// LiftNotesAboveTheirSource is liftNotesAboveTheirSource for a caller that
+// reordered the hits after ranking.
+//
+// The lift runs inside Run, and the semantic rerank runs after it — so on a
+// machine with a sidecar the transcript could be put back above its own note,
+// which is what `promote` promises it will not be (#2083). Anything that
+// re-sorts a ranked set has to restore the order the ranking chose.
+func LiftNotesAboveTheirSource(hits []Hit) {
+	liftNotesAboveTheirSource(hits)
+}
+
 // liftNotesAboveTheirSource keeps a promoted note in front of the transcript it
 // was distilled from. The two say the same thing, so nothing is buried by the
 // swap — but the note says it in one line with a state attached, and that is

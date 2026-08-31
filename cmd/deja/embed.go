@@ -133,6 +133,11 @@ func maybeRerank(dir string, hits []search.Hit, o search.Options, notice *os.Fil
 		fmt.Fprintln(notice, "deja: semantic rerank failed; using lexical order")
 		return hits
 	}
+	// The rerank is a new order over the same hits, and it does not know that
+	// a promoted note and the transcript it was distilled from are not rivals:
+	// it put the transcript back above its own note, which is the ordering
+	// `promote` tells the reader it has just arranged (#2083).
+	search.LiftNotesAboveTheirSource(out)
 	return out
 }
 
@@ -159,6 +164,9 @@ func maybeSemantic(dir string, hits []search.Hit, o search.Options, notice *os.F
 	if err != nil || len(out) == 0 {
 		return hits, false
 	}
+	// A ranking of its own, so the same rule applies: a note and the
+	// transcript it was distilled from are not rivals (#2083).
+	search.LiftNotesAboveTheirSource(out)
 	fmt.Fprintln(notice, "deja: no lexical match, semantic results:")
 	return out, true
 }
