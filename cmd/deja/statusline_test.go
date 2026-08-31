@@ -15,6 +15,7 @@ import (
 )
 
 func TestStatuslineEmpty(t *testing.T) {
+	hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
 	var out bytes.Buffer
 	if err := runStatusline(index.DefaultDir(), strings.NewReader("{}"), &out); err != nil {
@@ -48,6 +49,7 @@ func TestDrainStdinNonFileReader(t *testing.T) {
 }
 
 func TestStatuslineMissingUsageFile(t *testing.T) {
+	hermeticEnv(t)
 	tmp := t.TempDir()
 	t.Setenv("HOME", filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
@@ -62,6 +64,7 @@ func TestStatuslineMissingUsageFile(t *testing.T) {
 }
 
 func TestStatuslineCountsRecalls(t *testing.T) {
+	hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	usage.Record(dir, usage.KindRecall, 2048)
@@ -78,6 +81,7 @@ func TestStatuslineCountsRecalls(t *testing.T) {
 }
 
 func TestStatuslineSingular(t *testing.T) {
+	hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
 	usage.Record(dir, usage.KindContext, 100)
@@ -154,6 +158,7 @@ func TestStatuslineConflictOffersAWorkingCommand(t *testing.T) {
 // zero — and the line still has to say what did arrive. Reporting "0 B
 // injected" there is the same untrue-line problem #1403 was opened about.
 func TestStatuslineReportsInjectionsWhenNoAgentAsked(t *testing.T) {
+	hermeticEnv(t)
 	dir := filepath.Join(t.TempDir(), "index.db")
 	for range 5 {
 		usage.RecordResult(dir, usage.KindHook, 400, 1, false)
