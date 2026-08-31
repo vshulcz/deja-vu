@@ -291,8 +291,11 @@ func TestOpenClawAutoRemovesASwitchTheReaderMoved(t *testing.T) {
 	if entry == "" {
 		t.Fatalf("could not find the entry deja wrote:\n%s", b)
 	}
+	// A key of the reader's own between the entries block and the switch, or
+	// the entries block takes its own comma with it when it goes and the walk
+	// has nothing to find.
 	moved := "{\n  // mine\n  \"hooks\": {\n    \"internal\": {\n      \"entries\": {\n        " +
-		entry + "\n      },\n      // deja turned this on\n      \"enabled\": true\n    }\n  }\n}\n"
+		entry + "\n      },\n      \"timeoutMs\": 500,\n      // deja turned this on\n      \"enabled\": true\n    }\n  }\n}\n"
 	if err := os.WriteFile(path, []byte(moved), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -313,5 +316,8 @@ func TestOpenClawAutoRemovesASwitchTheReaderMoved(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "// mine") {
 		t.Errorf("the reader's own comment was dropped:\n%s", b)
+	}
+	if !strings.Contains(string(b), `"timeoutMs": 500`) {
+		t.Errorf("the reader's own key went with it:\n%s", b)
 	}
 }

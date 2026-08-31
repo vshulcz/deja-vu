@@ -260,7 +260,9 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 			noteBlockAdded(path, flagRecordKey(keys, flagKey))
 		case was == false:
 			// Theirs, and off: deja needs it on while it is installed, so what
-			// it changed is written down to be put back.
+			// it changed is written down to be put back. The boolean only —
+			// deja cannot know what a `null` or a `0` there was meant to say,
+			// and writing a guess back is worse than leaving the switch on.
 			noteBlockAdded(path, flagRecordKey(keys, flagKey)+"=false")
 		}
 		next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, true)
