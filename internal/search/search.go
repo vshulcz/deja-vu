@@ -641,23 +641,29 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 // is dated by its evidence rather than by the day it was filed (V4) the two are
 // equally fresh, so the transcript won its own distillation.
 func liftNotesAboveTheirSource(hits []Hit) {
+	liftNotesBy(hits, func(h Hit) model.Session { return h.Session })
+}
+
+// liftNotesBy is the rule itself, over anything that names a session: blame
+// ranks its own hit type and had the same omission (#2829).
+func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 	notes := make(map[string]int, len(hits))
 	for i, h := range hits {
-		if h.Session.Harness == notesHarness && strings.HasPrefix(h.Session.ID, "deja-note-") {
-			notes[h.Session.ID] = i
+		if s := of(h); s.Harness == notesHarness && strings.HasPrefix(s.ID, "deja-note-") {
+			notes[s.ID] = i
 		}
 	}
 	if len(notes) == 0 {
 		return
 	}
 	for i := 0; i < len(hits); i++ {
-		h := hits[i]
-		if h.Session.Harness == notesHarness {
+		src := of(hits[i])
+		if src.Harness == notesHarness {
 			continue
 		}
 		// Mirrors sources.PromotedNoteID: building the id rather than parsing
 		// one keeps a harness name with a dash in it from splitting wrong.
-		id := "deja-note-" + h.Session.Harness + "-" + h.Session.ID
+		id := "deja-note-" + src.Harness + "-" + src.ID
 		j, ok := notes[id]
 		if !ok || j < i {
 			continue
@@ -666,8 +672,8 @@ func liftNotesAboveTheirSource(hits []Hit) {
 		copy(hits[i+1:j+1], hits[i:j])
 		hits[i] = note
 		for k := i; k <= j; k++ {
-			if hits[k].Session.Harness == notesHarness && strings.HasPrefix(hits[k].Session.ID, "deja-note-") {
-				notes[hits[k].Session.ID] = k
+			if s := of(hits[k]); s.Harness == notesHarness && strings.HasPrefix(s.ID, "deja-note-") {
+				notes[s.ID] = k
 			}
 		}
 	}
