@@ -431,6 +431,35 @@ func CommandExitStatus(s string) (int, bool) {
 	return n, true
 }
 
+// CommandExitOutcome splits a command from the exit status a source appended to
+// it, for every reader of that suffix.
+//
+// recorded is whether the marker is there as the shape it is written in — two
+// spaces, the marker, digits, end of record. Read anywhere in the record it
+// took `echo "  → exit 1" >> notes.txt` for a command that failed (#2820); read
+// without the digits it cut prose that merely ends like the marker (#2048).
+func CommandExitOutcome(s string) (cmd string, code int, recorded bool) {
+	trimmed := strings.TrimRight(s, " \t\r\n")
+	i := strings.LastIndex(trimmed, commandExitMarker)
+	if i < 0 {
+		return s, 0, false
+	}
+	token := trimmed[i+len(commandExitMarker):]
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return s, 0, false
+	}
+	n := 0
+	for _, r := range token {
+		if r < '0' || r > '9' {
+			// Not the marker but prose that ends like it — "→ exit later" —
+			// and cutting the line there loses what the command was (#2048).
+			return s, 0, false
+		}
+		n = n*10 + int(r-'0')
+	}
+	return strings.TrimSpace(trimmed[:i]), n, true
+}
+
 // firstTextLine is the first line of a record, which for a command record is
 // the invocation itself.
 func firstTextLine(s string) string {

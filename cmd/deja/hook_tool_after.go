@@ -405,18 +405,9 @@ const exitMarker = "  → exit "
 // it read was `0"` — a command that mentions deja's own marker is still just a
 // command (#2048).
 func withoutFailedExit(cmd string) (string, bool) {
-	i := strings.LastIndex(cmd, exitMarker)
-	if i < 0 {
+	rest, code, recorded := index.CommandExitOutcome(cmd)
+	if !recorded {
 		return cmd, true
 	}
-	code := cmd[i+len(exitMarker):]
-	if code == "" {
-		return cmd, true
-	}
-	for _, r := range code {
-		if r < '0' || r > '9' {
-			return cmd, true
-		}
-	}
-	return strings.TrimSpace(cmd[:i]), code == "0"
+	return rest, code == 0
 }
