@@ -13,6 +13,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -121,18 +122,41 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		}
 		return nil
 	}
-	// A prompt can never start with "-" today, but keep the invariant explicit
-	// so a future digest change cannot turn the prompt into a flag.
-	if strings.HasPrefix(digest, "-") {
-		digest = " " + digest
-	}
-	argv, _ := handoffCommand(target, digest)
+	argv, _ := handoffArgv(target, digest)
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return fmt.Errorf("handoff: %s is not installed (looked for %q in PATH)", target, argv[0])
 	}
 	c := exec.Command(argv[0], argv[1:]...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
+}
+
+// handoffArgv is the command that opens the target with this digest as its
+// first prompt. One seam, so the sanitising below cannot be wired past: the
+// exec path used to build the argv from the raw digest a few lines from the
+// printed path that sanitised it.
+func handoffArgv(target, digest string) ([]string, bool) {
+	return handoffCommand(target, handoffPrompt(digest))
+}
+
+// handoffPrompt is the digest as it leaves for another agent's command line.
+//
+// The printed handoff has always gone through printSanitized — secrets
+// redacted, bidi and zero-width characters stripped — and --exec passed the
+// digest raw, so one session left this machine clean when pasted and unclean
+// when handed over directly. The two differ in how the text leaves, not in
+// what it is.
+//
+// The leading-dash guard rides here too: a prompt can never start with "-"
+// today, but a future digest change must not be able to turn the prompt into
+// a flag for the target.
+func handoffPrompt(digest string) string {
+	redacted, _ := redact.Text(digest)
+	out := stripBidiAndInvisible(redacted)
+	if strings.HasPrefix(out, "-") {
+		out = " " + out
+	}
+	return out
 }
 
 func humanAge(d time.Duration) string {
