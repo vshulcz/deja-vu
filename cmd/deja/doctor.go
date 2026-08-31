@@ -1547,6 +1547,40 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		fmt.Fprintf(w, "  ingest   %s: %d unusable line%s skipped, %d path%s unreadable%s — see `deja doctor --json`\n",
 			h, e.MalformedLines, pluralS(e.MalformedLines), e.FailedFiles, pluralS(e.FailedFiles), clipped)
 	}
+	reportFutureDated(w, dir)
+}
+
+// reportFutureDated names the sessions stamped ahead of the clock.
+//
+// One note dated next year sits at the top of `deja last` and stays there. deja
+// cannot tell a skewed clock from a deliberate date, so the ordering is left
+// alone — but saying nothing leaves the reader with a store that looks wrong
+// for no visible reason, and the usual causes are a typo'd year in a
+// hand-edited note file or a millisecond stamp read as seconds (#2063).
+func reportFutureDated(w io.Writer, dir string) {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return
+	}
+	// A minute of slack: clocks between machines disagree by seconds, and a
+	// session synced from a peer a moment ago is not a finding.
+	cutoff := time.Now().Add(time.Minute)
+	newest, count := time.Time{}, 0
+	var newestID string
+	for _, meta := range metas {
+		if !meta.Updated.After(cutoff) {
+			continue
+		}
+		count++
+		if meta.Updated.After(newest) {
+			newest, newestID = meta.Updated, meta.Harness+":"+meta.ID
+		}
+	}
+	if count == 0 {
+		return
+	}
+	fmt.Fprintf(w, "  clock    %d session%s stamped in the future, newest %s (%s) — it sorts above real work in `deja last` until the date is corrected\n",
+		count, pluralS(count), newest.Local().Format("2006-01-02"), safeForStatusline(newestID, 80))
 }
 
 // strandedUpdateStagings counts the staging files an interrupted update left
