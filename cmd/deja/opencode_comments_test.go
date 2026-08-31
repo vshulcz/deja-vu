@@ -66,6 +66,8 @@ func TestOpencodeOpensAnInlineBlockRatherThanWritingPastIt(t *testing.T) {
 	for _, before := range []string{
 		"{\n  \"theme\": \"opencode\",\n  \"mcp\": {}\n}\n",
 		"{\n  \"mcp\": {\"other\": {\"type\":\"local\",\"command\":[\"x\"]}}\n}\n",
+		// The block spans lines, but its first server sits on the opening one.
+		"{\n  \"mcp\": { \"other\": {\"type\":\"local\",\"command\":[\"x\"]}\n  }\n}\n",
 		"{\n  // annotated\n  \"mcp\": {}\n}\n",
 	} {
 		t.Run(strings.TrimSpace(strings.SplitN(before, "\n", 3)[1]), func(t *testing.T) {
@@ -99,5 +101,72 @@ func TestOpencodeOpensAnInlineBlockRatherThanWritingPastIt(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The shapes the writer cannot edit are refused, and the file is left exactly
+// as it was. Writing past a block it could not open is what made a config
+// unreadable while install reported success (#2777).
+func TestOpencodeLeavesAConfigItCannotEditAlone(t *testing.T) {
+	for _, before := range []string{
+		// A comment on the line the block opens and closes on: there is no
+		// side of it the entry can go without changing what the reader wrote.
+		"{\n  \"mcp\": {} // mine\n}\n",
+		"{\n  \"mcp\": /* mine */ {}\n}\n",
+		// A whole config on one line: the block would be spliced above the
+		// object rather than inside it.
+		"{\"theme\": \"x\"} // mine\n",
+		"{} // mine\n",
+	} {
+		t.Run(strings.TrimSpace(before), func(t *testing.T) {
+			hermeticEnv(t)
+			dir := filepath.Join(opencodeConfigHome(), "opencode")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(dir, "opencode.json")
+			if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := captureRun(t, "install", "opencode", "--no-index"); err == nil {
+				t.Error("a config deja cannot edit was reported as installed")
+			}
+			b, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(b) != before {
+				t.Errorf("the config was written to anyway:\n%s", b)
+			}
+		})
+	}
+}
+
+// An inline block with servers in it keeps its shape: the split has to fall on
+// the brace that closes the block, not on the first one in the line.
+func TestOpencodeSplitsAnInlineBlockAtItsOwnBrace(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(opencodeConfigHome(), "opencode")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "opencode.jsonc")
+	before := "{\n  \"mcp\": {\"a\": {\"type\":\"local\",\"command\":[\"x\"]}}\n}\n"
+	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "opencode", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var probe map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &probe); err != nil {
+		t.Fatalf("the config no longer parses: %v\n%s", err, b)
+	}
+	if strings.Contains(string(b), "}}") {
+		t.Errorf("the split fell inside the reader's own server:\n%s", b)
 	}
 }

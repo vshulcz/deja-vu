@@ -2841,32 +2841,87 @@ func jsoncCodeOf(line string, inBlock bool) (code string, stillInBlock bool, end
 // already held. A line carrying a comment is left alone: the split would have
 // to decide which side of it the entry belongs on, and refusing is the honest
 // answer for a shape nobody writes.
-func openInlineBlock(lines []string, key string) []string {
+func openInlineBlock(lines []string, key string) ([]string, bool) {
 	for i, l := range lines {
 		code, _, _ := jsoncCodeOf(l, false)
 		if !strings.Contains(code, `"`+key+`"`) || !strings.Contains(code, "{") {
 			continue
 		}
-		if jsoncBraceDelta(code) > 0 || strings.TrimSpace(code) != strings.TrimSpace(l) {
-			// Either it already spans lines, or the line holds a comment.
-			return lines
+		if jsoncBraceDelta(code) > 0 {
+			// The block spans lines, but its first server may sit on the
+			// opening line — `"mcp": { "a": {…}` — and then the lines between
+			// the ends hold nothing, so deja's entry went in with no comma
+			// after the reader's and the file stopped parsing.
+			open := braceOutsideString(l, '{')
+			if open < 0 {
+				return lines, false
+			}
+			rest := strings.TrimSpace(l[open+1:])
+			if rest == "" {
+				return lines, true
+			}
+			if strings.TrimSpace(code) != strings.TrimSpace(l) {
+				return lines, false
+			}
+			indent := l[:len(l)-len(strings.TrimLeft(l, " \t"))]
+			out := append([]string{}, lines[:i]...)
+			out = append(out, l[:open+1], indent+"  "+rest)
+			return append(out, lines[i+1:]...), true
+		}
+		if strings.TrimSpace(code) != strings.TrimSpace(l) {
+			// A comment on the line the block opens and closes on. Splitting
+			// it would have to decide which side of the comment the entry
+			// belongs on, and there is no answer that keeps the reader's
+			// meaning — so the caller refuses rather than writing past the
+			// block, which is what a silent pass-through did (#2777).
+			return lines, false
 		}
 		open := braceOutsideString(l, '{')
-		close := braceOutsideString(l, '}')
-		if open < 0 || close < open {
-			return lines
+		end := matchingBrace(l, open)
+		if open < 0 || end < 0 {
+			return lines, false
 		}
 		indent := l[:len(l)-len(strings.TrimLeft(l, " \t"))]
-		inner := strings.TrimSpace(l[open+1 : close])
+		inner := strings.TrimSpace(l[open+1 : end])
 		out := append([]string{}, lines[:i]...)
 		out = append(out, l[:open+1])
 		if inner != "" {
 			out = append(out, indent+"  "+inner)
 		}
-		out = append(out, indent+l[close:])
-		return append(out, lines[i+1:]...)
+		out = append(out, indent+l[end:])
+		return append(out, lines[i+1:]...), true
 	}
-	return lines
+	return lines, true
+}
+
+// matchingBrace is the `}` that closes the `{` at open, counting depth and
+// skipping strings. Taking the first structural `}` instead split a non-empty
+// inline block inside its first server: it still parsed, but it left the
+// reader's file reindented into something that reads as broken.
+func matchingBrace(line string, open int) int {
+	if open < 0 || open >= len(line) || line[open] != '{' {
+		return -1
+	}
+	depth, inString, escaped := 0, false, false
+	for i := open; i < len(line); i++ {
+		switch c := line[i]; {
+		case escaped:
+			escaped = false
+		case c == '\\' && inString:
+			escaped = true
+		case c == '"':
+			inString = !inString
+		case inString:
+		case c == '{':
+			depth++
+		case c == '}':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // braceOutsideString is the index of the first brace of that kind a parser
@@ -2932,7 +2987,13 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	// the insert landed after its closing brace and the config stopped
 	// parsing (#2777). `"mcp": {}` is what a config nobody has added a server
 	// to looks like.
-	lines = openInlineBlock(lines, "mcp")
+	lines, canOpen := openInlineBlock(lines, "mcp")
+	if !canOpen {
+		if uninstall {
+			return []byte(strings.Join(lines, "\n") + "\n"), "", nil
+		}
+		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
+	}
 	start, end := -1, -1
 	inBlock := false
 	for i, l := range lines {
@@ -3027,6 +3088,12 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}
 	insert := len(lines) - 1
+	// The block is spliced in above the file's closing brace, so the file has
+	// to have one of its own on that line. On a config written as a single
+	// line the splice put the new block *before* the object (#2777).
+	if insert < 1 || strings.TrimSpace(stripJSONComments(lines[insert])) != "}" {
+		return nil, "", fmt.Errorf("opencode config is not laid out in a way deja can add to — add the deja server by hand")
+	}
 	comma := ""
 	for i := insert - 1; i >= 0; i-- {
 		trim := strings.TrimSpace(lines[i])
