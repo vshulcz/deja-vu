@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -80,6 +81,11 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 			return "unchanged", nil
 		}
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// A comment is not a broken file, and this writer shares openclaw.json
+		// with the MCP one — so refusing here left a target that wrote half its
+		// wiring, or could not take its own hook back out (#2811).
+		return setOpenClawEntryJSONC(path, old, "hooks.internal.entries", openclawHookName, "enabled", on)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return "", configParseError(path, err)
 	}
@@ -124,6 +130,84 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 	}
 	next = append(next, '\n')
 	return writeIfChanged(path, old, next)
+}
+
+// setOpenClawEntryJSONC writes one of openclaw's entries — the bootstrap hook,
+// or the plugin — into a config carrying comments, as text, so the reader's own
+// lines stay where they are.
+//
+// flagKey is the switch beside the entries block, "" where there is none. For
+// the hook it matters as much as the entry does: without it the pack is
+// discovered, listed as ready, and never invoked, so the two are written
+// together and taken back out together (#2811).
+func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string, on bool) (string, error) {
+	text := string(old)
+	var root map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(text)), &root); err != nil {
+		return "", configParseError(path, err)
+	}
+	keys := strings.Split(blockKey, ".")
+	holders := chainHolders(root, keys)
+	held := holders[len(keys)-1]
+	have, _ := mapAt(held, keys[len(keys)-1])
+	if !on {
+		if have[id] == nil {
+			return "unchanged", nil
+		}
+		delete(have, id)
+		dropFrom := len(keys)
+		if len(have) == 0 && blockWasAdded(path, blockKey) {
+			dropFrom = len(keys) - 1
+			forgetBlockAdded(path, blockKey)
+			// The switch goes with the entries it was for, and so does each
+			// level above that deja created and that holds nothing else.
+			delete(held, flagKey)
+			for i := len(keys) - 2; i >= 0; i-- {
+				prefix := strings.Join(keys[:i+1], ".")
+				if len(holders[i+1]) != 1 || !blockWasAdded(path, prefix) {
+					break
+				}
+				dropFrom = i
+				forgetBlockAdded(path, prefix)
+			}
+		}
+		next, err := jsoncSetEntry(text, blockKey, id, "", true, dropFrom)
+		if err != nil {
+			return "", configParseError(path, err)
+		}
+		if flagKey != "" && dropFrom >= len(keys)-1 {
+			// The chain stayed, so the switch is still in it and comes out on
+			// its own.
+			flagBlock := strings.Join(keys[:len(keys)-1], ".")
+			next, err = jsoncRemoveKey(next, flagBlock, flagKey, len(keys)-1)
+			if err != nil {
+				return "", configParseError(path, err)
+			}
+		}
+		return writeIfChanged(path, old, []byte(next))
+	}
+	if have == nil {
+		for i := range keys {
+			if _, ok := holders[i][keys[i]].(map[string]any); !ok {
+				noteBlockAdded(path, strings.Join(keys[:i+1], "."))
+			}
+		}
+	}
+	entry, err := jsoncEntryText(map[string]any{"enabled": true})
+	if err != nil {
+		return "", err
+	}
+	next, err := jsoncSetEntry(text, blockKey, id, entry, false, len(keys))
+	if err != nil {
+		return "", configParseError(path, err)
+	}
+	if flagKey != "" {
+		next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, true)
+		if err != nil {
+			return "", configParseError(path, err)
+		}
+	}
+	return writeIfChanged(path, old, []byte(next))
 }
 
 func mapAt(parent map[string]any, key string) (map[string]any, bool) {
