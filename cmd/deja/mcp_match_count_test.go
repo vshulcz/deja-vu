@@ -104,7 +104,7 @@ func TestRelevanceHitsAreNotCalledMatches(t *testing.T) {
 	if strings.Contains(text, "matched)") {
 		t.Errorf("relevance-tier sessions were reported as matches:\n%s", firstLines(text, 4))
 	}
-	if !strings.Contains(text, "ranked)") {
+	if !strings.Contains(text, "ranked, none about it)") {
 		t.Errorf("the count line does not say what the number is:\n%s", firstLines(text, 4))
 	}
 }

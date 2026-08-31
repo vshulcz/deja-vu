@@ -881,6 +881,33 @@ func recallText(dir, q, harness string, limit, budget int) (string, error) {
 	return text, err
 }
 
+// recallCountLine introduces the sessions below it.
+//
+// It said "deja recall for <the query>" whatever the tier, so an answer whose
+// first line says no session is about this went on to head the payload with
+// the question itself — and an agent read three unrelated sessions as the
+// answer to it. On the relevance tier the line says what they are instead
+// (#2074).
+func recallCountLine(q, tier string, offset, served, total int) string {
+	switch {
+	case offset > 0:
+		return fmt.Sprintf("deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+served, total)
+	case tier == search.TierRelevance && served < total:
+		return fmt.Sprintf("nearest by wording to %q (%d of %d ranked, none about it)\n", q, served, total)
+	case tier == search.TierRelevance:
+		return fmt.Sprintf("nearest by wording to %q (%d ranked, none about it)\n", q, served)
+	case served < total:
+		// How many came back is not how many matched, and the agent is the
+		// reader that cannot ask a human. "(5 match(es))" reads as five exist,
+		// which is a different answer from sixteen thousand matched and here
+		// are five — one is worth acting on, the other is a sample that will
+		// fill a context window with whatever ranked highest (#1308).
+		return fmt.Sprintf("deja recall for %q (%d of %d matched)\n", q, served, total)
+	default:
+		return fmt.Sprintf("deja recall for %q (%d match(es))\n", q, served)
+	}
+}
+
 // wholeSessionForMCP reads one session for a caller that must not wait.
 //
 // `findByPrefix` is the CLI helper and opens with a blocking `index.Ensure` —
@@ -1148,23 +1175,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
-	switch {
-	case offset > 0:
-		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+served, total)
-	case served < total && result.Tier == search.TierRelevance:
-		// The tier line above already says nothing matched; these are the
-		// nearest sessions, so calling them matches here would contradict it.
-		fmt.Fprintf(&b, "deja recall for %q (%d of %d ranked)\n", q, served, total)
-	case served < total:
-		// How many came back is not how many matched, and the agent is the
-		// reader that cannot ask a human. "(5 match(es))" reads as five exist,
-		// which is a different answer from sixteen thousand matched and here
-		// are five — one is worth acting on, the other is a sample that will
-		// fill a context window with whatever ranked highest (#1308).
-		fmt.Fprintf(&b, "deja recall for %q (%d of %d matched)\n", q, served, total)
-	default:
-		fmt.Fprintf(&b, "deja recall for %q (%d match(es))\n", q, served)
-	}
+	b.WriteString(recallCountLine(q, result.Tier, offset, served, total))
 	b.WriteString(hb.String())
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
