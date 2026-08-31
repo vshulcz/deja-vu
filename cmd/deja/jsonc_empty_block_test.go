@@ -40,3 +40,17 @@ func TestJSONCEmptyBlockStaysParseable(t *testing.T) {
 		t.Errorf("the entry is not in the mcp block:\n%s", got)
 	}
 }
+
+// The spacing between an inline block's braces is not deja's to leave behind:
+// "mcp": { } used to come back as a line ending in a space.
+func TestJSONCInlineBlockLeavesNoTrailingSpace(t *testing.T) {
+	out, _, err := updateOpencodeJSONC([]byte("{\n  \"mcp\": { }\n}\n"), "/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range strings.Split(string(out), "\n") {
+		if l != strings.TrimRight(l, " \t") {
+			t.Errorf("a line ends in whitespace: %q\n%s", l, out)
+		}
+	}
+}

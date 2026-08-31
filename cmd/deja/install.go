@@ -2914,7 +2914,10 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		at := strings.LastIndex(lines[start], "{")
 		head := lines[start][:at+1]
 		tail := lines[start][at+1:]
-		tail = strings.Replace(tail, "}", "", 1)
+		// What is left of the line after the brace deja took over: a trailing
+		// comment stays, the spacing that used to sit between the two braces
+		// does not — "mcp": { } left a line ending in a space of deja's making.
+		tail = strings.TrimRight(strings.Replace(tail, "}", "", 1), " \t")
 		out := append([]string{}, lines[:start]...)
 		out = append(out, head, line, indent+"}"+tail)
 		out = append(out, lines[start+1:]...)
