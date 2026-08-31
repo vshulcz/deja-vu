@@ -203,30 +203,55 @@ func sessionSaysItMoved(dir, id, from, to string) bool {
 		// Not what a file says about itself: an edit's payload is carried in
 		// the message text, so a file whose contents read "renamed from x" was
 		// voting for a rename nobody performed.
-		if m.Role == sources.RoleFiles || m.Role == "tool_result" {
+		if m.Role == sources.RoleFiles || m.Role == sources.RoleEdit || m.Role == "tool_result" {
 			continue
 		}
 		text := strings.ToLower(m.Text)
-		i, j := strings.Index(text, from), strings.Index(text, to)
-		if i < 0 || j < 0 {
-			continue
-		}
-		if movedBetween(text, min(i, j), max(i, j)+len(to)) {
+		if sessionTextSaysItMoved(text, from, to) {
 			return true
 		}
 	}
 	return false
 }
 
+// sessionTextSaysItMoved asks whether one message says these two names were
+// the same file under two names. Both have to be there, and the verb has to
+// sit beside one of them.
+func sessionTextSaysItMoved(text, from, to string) bool {
+	text, from, to = strings.ToLower(text), strings.ToLower(from), strings.ToLower(to)
+	i, j := strings.Index(text, from), strings.Index(text, to)
+	if i < 0 || j < 0 {
+		return false
+	}
+	first, last := i, j+len(to)
+	if j < i {
+		first, last = j, i+len(from)
+	}
+	return movedBetween(text, first, last)
+}
+
 // movedBetween looks for the verb in the span that holds both names, rather
 // than anywhere in the message: a turn that renames two other files and
 // mentions ours in passing said nothing about ours (#1627).
-//
-// "remove" is not "move": it contains it, and matching the substring made the
-// deletion case — the one thing this note cannot tell from a rename — vote
-// for itself.
 func movedBetween(text string, from, to int) bool {
-	span := text[max(0, from-moveVerbReach):min(len(text), to+moveVerbReach)]
+	// Ahead of the pair, or in a gap short enough to be one clause. A rename
+	// is written before its names — "rename x to y", "git mv x y" — and
+	// anything between two mentions far apart is somebody else's sentence:
+	// "old.go still leaks; also rename helper.go to helpers.go; and new.go
+	// needs the same guard" put an unrelated rename between ours.
+	if hasMoveVerb(text[max(0, from-moveVerbReach):from]) {
+		return true
+	}
+	if to-from <= moveVerbReach {
+		return hasMoveVerb(text[from:min(len(text), to)])
+	}
+	return false
+}
+
+// hasMoveVerb reads the words that mean a name was moved. "remove" is not
+// "move": it contains it, and matching the substring made the deletion case —
+// the one thing this note cannot tell from a rename — vote for itself.
+func hasMoveVerb(span string) bool {
 	for _, verb := range []string{"rename", "renaming", "renamed", "git mv ", "mv "} {
 		if strings.Contains(span, verb) {
 			return true

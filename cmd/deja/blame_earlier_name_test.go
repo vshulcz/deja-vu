@@ -30,6 +30,11 @@ func TestBlameNamesTheFileTheHistoryStopsAt(t *testing.T) {
 			`","cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` +
 			path + `","old_string":"a","new_string":"b"}}]}}`
 	}
+	edit := func(id, day, path, old string) string {
+		return `{"type":"assistant","timestamp":"2026-07-` + day + `T10:00:00Z","sessionId":"` + id +
+			`","cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` +
+			path + `","old_string":"` + old + `","new_string":"// nothing to see"}}]}}`
+	}
 	say := func(id, day, text string) string {
 		return `{"type":"user","timestamp":"2026-07-` + day + `T10:01:00Z","sessionId":"` + id +
 			`","cwd":"/proj","message":{"role":"user","content":"` + text + `"}}`
@@ -65,6 +70,16 @@ func TestBlameNamesTheFileTheHistoryStopsAt(t *testing.T) {
 	write("eight.jsonl",
 		say("hhhh0008", "13", "the table test needs another case"),
 		touch("hhhh0008", "13", "/proj/internal/tbl/foo_test.go"))
+	// The word came from a file, not from anybody: an edit carries its payload
+	// in the message text, so a file whose own contents read "renamed from"
+	// used to vote for a rename nobody performed.
+	write("eleven.jsonl",
+		say("kkkk0011", "11", "update the docs"),
+		edit("kkkk0011", "11", "/proj/internal/edge/quiet.go", "// renamed from loud.go in v2"),
+		touch("kkkk0011", "11", "/proj/internal/edge/loud.go"))
+	write("twelve.jsonl",
+		say("llll0012", "13", "the edge case again"),
+		touch("llll0012", "13", "/proj/internal/edge/quiet.go"))
 	// A move out of another directory, worded as a rename: a name that moved
 	// house is not the name this file's history continues under, and pointing
 	// at it is how the note would start naming vendored copies.
@@ -122,8 +137,9 @@ func TestBlameNamesTheFileTheHistoryStopsAt(t *testing.T) {
 	}
 
 	// And the cases that are not a rename by any reading: a pair that met
-	// once, and a test file beside its subject.
-	for _, file := range []string{"internal/other/cache.go", "internal/tbl/foo_test.go"} {
+	// once, a test file beside its subject, and a file whose own contents
+	// carried the word.
+	for _, file := range []string{"internal/other/cache.go", "internal/tbl/foo_test.go", "internal/edge/quiet.go"} {
 		note, err = captureRunStderr(t, "blame", file)
 		if err != nil {
 			t.Fatal(err)
@@ -151,17 +167,12 @@ func TestOnlyASentenceAboutTheseTwoNamesCounts(t *testing.T) {
 		{"remove old_name.go, new_name.go covers everything it did", false},
 		{"old_name.go removed, new_name.go takes over", false},
 		{"old_name.go and new_name.go both call the same helper", false},
+		// Far apart, with somebody else's rename in between.
+		{"old_name.go still leaks; also rename helper.go to helpers.go; and new_name.go needs the same guard", false},
 	} {
-		span := c.text
-		i, j := strings.Index(span, "old_name.go"), strings.Index(span, "new_name.go")
-		if i < 0 || j < 0 {
-			t.Fatalf("fixture does not name both files: %q", c.text)
-		}
-		from, to := i, j+len("new_name.go")
-		if j < i {
-			from, to = j, i+len("old_name.go")
-		}
-		if got := movedBetween(span, from, to); got != c.want {
+		// Through the same span the reader of a session goes through, so the
+		// table guards what production does rather than its own arithmetic.
+		if got := sessionTextSaysItMoved(c.text, "old_name.go", "new_name.go"); got != c.want {
 			t.Errorf("movedBetween(%q) = %v, want %v", c.text, got, c.want)
 		}
 	}
