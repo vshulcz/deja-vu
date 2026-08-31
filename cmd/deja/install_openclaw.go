@@ -104,10 +104,9 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		// rule the text writer got in #2811).
 		if len(entries) == 0 {
 			delete(internal, "entries")
-			switch was := hookSwitchWas(path); {
-			case was == nil:
+			if was := hookSwitchWas(path); was == nil {
 				delete(internal, "enabled")
-			default:
+			} else {
 				internal["enabled"] = was
 			}
 			forgetHookSwitch(path)
