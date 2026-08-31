@@ -330,10 +330,15 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				continue
 			}
 			cmd := strings.TrimSpace(firstLineOf(ms[j].Text))
-			if cmd == "" || len(cmd) > fixCommandMax {
+			if cmd == "" || len(cmd) > fixCommandMax || opensMoreInput(cmd) {
 				// A heredoc or pasted script right after the error is not the
 				// remedy; keep scanning the window for the real one-liner two
 				// records on, instead of abandoning the error entirely.
+				//
+				// The length bound is what caught most of those, and it caught
+				// them by luck: a short first line — `python - <<'EOF'` — was
+				// stored whole and handed to an agent as the command to run,
+				// where it waits on input that is not coming (#2051).
 				continue
 			}
 			if lastSeen[sig] > j {
@@ -362,6 +367,26 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		}
 	}
 	return out
+}
+
+// opensMoreInput reports whether a command's first line is only the start of
+// one. A pair stores that line and a reader runs it, so a heredoc opener is not
+// a remedy but a hang.
+func opensMoreInput(cmd string) bool {
+	// A herestring is a whole command — `psql <<< "$sql"` reads from the line
+	// it is on — so it is not one of these.
+	for i := 0; ; {
+		j := strings.Index(cmd[i:], "<<")
+		if j < 0 {
+			break
+		}
+		at := i + j
+		if !strings.HasPrefix(cmd[at+2:], "<") {
+			return true
+		}
+		i = at + 3
+	}
+	return strings.HasSuffix(cmd, "\\")
 }
 
 // firstFrictionLine returns the first line of a record that names something
