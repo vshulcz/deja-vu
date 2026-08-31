@@ -622,6 +622,23 @@ func scoreBM25(documents []bm25Document, df []int, corpusDocuments int, avgLengt
 	return hits
 }
 
+// liftedNotes applies the note-over-source rule to a tier that ranks by
+// position rather than by a score the sort respects, and re-stamps the scores
+// so a caller that re-sorts reads the same order back.
+//
+// The rule lived in the sort, so it reached the tiers that go through it and
+// missed the two that build their hits already ranked: a pasted error and the
+// "ranked by relevance" screen put a note behind the transcript it was
+// distilled from, which is the ordering `promote` prints a promise about
+// (#2803).
+func liftedNotes(hits []Hit) []Hit {
+	liftNotesAboveTheirSource(hits)
+	for i := range hits {
+		hits[i].Score = float64(len(hits) - i)
+	}
+	return hits
+}
+
 // liftNotesAboveTheirSource keeps a promoted note in front of the transcript it
 // was distilled from. The two say the same thing, so nothing is buried by the
 // swap — but the note says it in one line with a state attached, and that is
@@ -2161,7 +2178,7 @@ func ErrorHits(ss []model.Session) []Hit {
 		}
 		hits = append(hits, hit)
 	}
-	return hits
+	return liftedNotes(hits)
 }
 
 // sessionHolds says whether a term appears anywhere in a session, stopping at
@@ -2303,7 +2320,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 		hit.Score = float64(len(ss) - rank)
 		hits = append(hits, hit)
 	}
-	return hits
+	return liftedNotes(hits)
 }
 
 // SafeText neutralises what a terminal acts on rather than prints. Transcript
