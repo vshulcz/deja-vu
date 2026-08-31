@@ -44,6 +44,19 @@ func TestHowAndFixOverMCPAreRecorded(t *testing.T) {
 			if last.Digest != text {
 				t.Errorf("digest is not what was handed over:\n%q\n%q", last.Digest, text)
 			}
+			// The count, because a row with none is marked as having found
+			// nothing — and these answers served a command.
+			if last.Sessions == 0 {
+				t.Errorf("an answer that served a command was recorded as finding nothing: %#v", last)
+			}
+			// And the log agrees with itself: the event a reader sees must
+			// not say "(empty result)" over an answer that served something.
+			for _, e := range usage.Events(dir, 100) {
+				if e.Kind == c.kind && e.FoundNothing() {
+					t.Errorf("the log says the answer found nothing: %#v", e)
+					break
+				}
+			}
 		})
 	}
 }
@@ -65,9 +78,9 @@ func seedHowFixIndex(t *testing.T) string {
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/api","timestamp":"2026-07-0` +
 				id[1:2] + `T10:00:01Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"zsh:1: command not found: timeout"}]}}`,
 			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/api","timestamp":"2026-07-0` +
-				id[1:2] + `T10:00:02Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"curl --max-time 5 example.internal"}}]}}`,
+				id[1:2] + `T10:00:02Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"brew install coreutils"}}]}}`,
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/api","timestamp":"2026-07-0` +
-				id[1:2] + `T10:00:03Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"200 OK"}]}}`,
+				id[1:2] + `T10:00:03Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"==> Installing coreutils"}]}}`,
 		}
 		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 			t.Fatal(err)
