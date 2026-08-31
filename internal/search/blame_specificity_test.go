@@ -36,15 +36,14 @@ func TestBlameOrdersBySpecificityBeforeRecency(t *testing.T) {
 		}
 		return out
 	}
-	// The shape ResolveBlamePath builds: it always makes the path absolute, so
-	// a target with an empty FullPath is one production cannot produce and a
-	// test written against it proves nothing.
+	// Asked by a bare filename deja has no tree to prefer, so the rule sits
+	// out and nothing moves: crediting whatever directories a session happened
+	// to write handed `blame Makefile` to three other projects, measured on a
+	// real store. What follows is the query that carries a path.
 	bare := order(BlameTarget{FullPath: "/work/api/ingest.go", Base: "ingest.go", Stem: "ingest"})
 	if len(bare) < 4 {
 		t.Fatalf("every session names the file: %v", bare)
 	}
-	// The two that name the path asked about come before the bare mention and
-	// before the file in another tree.
 	place := func(list []string, id string) int {
 		for i, got := range list {
 			if got == id {
@@ -53,24 +52,19 @@ func TestBlameOrdersBySpecificityBeforeRecency(t *testing.T) {
 		}
 		return -1
 	}
-	// Every session that wrote a path around the name says more about which
-	// file it means than the one that wrote the name alone, whichever tree it
-	// names — with only a base name to go on, deja cannot prefer a tree, and
-	// the promise it makes is about specificity, not about guessing.
-	for _, ahead := range []string{"abs", "rel", "other"} {
-		if place(bare, ahead) > place(bare, "base") {
-			t.Errorf("bare name: %s came after the bare mention: %v", ahead, bare)
-		}
-	}
-	// Among the sessions that wrote a path, the answer is still what it was —
-	// how much each one has to say about the file. Ordering on how deep the
-	// path is instead put one mention of an unrelated file above a session
-	// that had worked on this one all week.
+
 	// And the same when the caller names the path: the session that spells it
 	// out in full is not pushed down by a newer one that says less.
 	full := order(BlameTarget{FullPath: "/work/api/internal/index/ingest.go", Base: "ingest.go", Stem: "ingest"})
-	if place(full, "other") < place(full, "rel") || place(full, "other") < place(full, "abs") {
-		t.Errorf("a file in another tree outranked the path asked about: %v", full)
+	// The two that wrote the path asked about come first, however new or
+	// talkative the others are: the bare mention says the name four times and
+	// is the newest, and the file in another tree wrote a path of its own.
+	for _, ahead := range []string{"abs", "rel"} {
+		for _, behind := range []string{"base", "other"} {
+			if place(full, ahead) > place(full, behind) {
+				t.Errorf("%s came after %s: %v", ahead, behind, full)
+			}
+		}
 	}
 }
 

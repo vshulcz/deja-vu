@@ -271,19 +271,13 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 			}
 		}
 	}
-	// What the session wrote around the name, for a caller who gave only the
-	// name: `internal/index/ingest.go` says more about which file it means
-	// than `ingest.go` does, and blame's own description promises the more
-	// specific mention first (#2840).
-	//
-	// One step, not a depth. Counting the directories a session wrote made a
-	// deeply nested file of the same name in another project the most specific
-	// mention there is — measured on a real store, `blame cmd/deja/main.go`
-	// answered with an unrelated `…/apps/image2video/cmd/dfprocessing/main.go`
-	// above every session that had actually worked on the file.
-	if level == 1.0 && writtenPathDepth(low, base) > 0 {
-		level = 1.25
-	}
+	// Only the target's own directories count, which is what the forms above
+	// are. Crediting any directory a session wrote instead — measured on a
+	// real store — handed `blame Makefile` to three other projects' Makefiles
+	// and dropped this repo's own from rank 2 to rank 24, because "wrote a
+	// deep path" is a proxy for working in a deep tree rather than for meaning
+	// this file. A target with no directory of its own leaves every mention at
+	// 1.0, and the rule sits out (#2840).
 	for pos := 0; ; {
 		i := strings.Index(low[pos:], base)
 		if i < 0 {
@@ -296,51 +290,6 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 		pos = i + len(base)
 	}
 	return count, level
-}
-
-// writtenPathDepth is how many directories a session wrote in front of the
-// name, at the deepest place it named it. Zero when the name stands alone.
-func writtenPathDepth(low, base string) int {
-	deepest := 0
-	for pos := 0; ; {
-		i := strings.Index(low[pos:], base)
-		if i < 0 {
-			return deepest
-		}
-		i += pos
-		pos = i + len(base)
-		if !pathComponentOrWord(low, i, pos) {
-			continue
-		}
-		depth := 0
-		for j := i; j > 0 && low[j-1] == '/'; {
-			k := j - 1
-			for k > 0 && isPathByte(low[k-1]) {
-				k--
-			}
-			if k == j-1 {
-				break
-			}
-			depth++
-			j = k
-		}
-		if depth > deepest {
-			deepest = depth
-		}
-	}
-}
-
-// isPathByte reports whether a byte can sit inside a path component as an
-// agent writes one. Deliberately narrow: a quote or a space ends the path, and
-// reading past one would count an English sentence as directories.
-func isPathByte(b byte) bool {
-	switch {
-	case b >= 'a' && b <= 'z', b >= '0' && b <= '9':
-		return true
-	case b == '.' || b == '-' || b == '_':
-		return true
-	}
-	return false
 }
 
 func pathFormCount(s, form string) int {
