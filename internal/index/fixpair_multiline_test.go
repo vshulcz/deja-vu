@@ -8,10 +8,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// The exit status a source records is appended to the whole command record,
-// and a pair stores its first line — so for a heredoc or a pasted script the
-// marker is left behind and what the reader is handed is a command that failed,
-// offered as the one that settled the error (#2051).
+// A guard rather than a fix: #2051 expected the marker to be lost with the
+// rest of the record, because a pair stores only the first line. It is not —
+// commandFailed reads the whole record — and this is what says so, so the
+// next change to either end has to keep it true.
 func TestAFailedMultiLineCommandIsNotAFix(t *testing.T) {
 	now := time.Now()
 	script := "python - <<'EOF'\nimport socket\nsocket.create_connection(('db', 5432))\nEOF  → exit 1"
@@ -25,22 +25,23 @@ func TestAFailedMultiLineCommandIsNotAFix(t *testing.T) {
 	}
 }
 
-// And what is stored carries the marker when the source recorded one, so a
-// reader downstream can still tell: the pair is the whole command's story, not
-// its opening line.
-func TestAStoredCommandKeepsTheExitItWasJudgedOn(t *testing.T) {
+// Skipping a heredoc is not abandoning the error: the window keeps being
+// scanned, and the one-liner two records on is the pair worth having.
+func TestTheCommandAfterASkippedHeredocIsStillThePair(t *testing.T) {
 	now := time.Now()
 	ms := []model.Message{
 		{Role: "tool-output", Text: "connection refused on port 5432", Time: now},
-		{Role: "command", Text: "pg_isready -h db -p 5432\n  → exit 0", Time: now.Add(time.Minute)},
-		{Role: "tool-output", Text: "db:5432 - accepting connections", Time: now.Add(2 * time.Minute)},
+		{Role: "command", Text: "python - <<'EOF'\nimport socket\nEOF", Time: now.Add(time.Minute)},
+		{Role: "tool-output", Text: "ok", Time: now.Add(2 * time.Minute)},
+		{Role: "command", Text: "docker compose up -d db", Time: now.Add(3 * time.Minute)},
+		{Role: "tool-output", Text: "db started", Time: now.Add(4 * time.Minute)},
 	}
 	pairs := fixPairsIn(ms, "claude:s1", "p")
 	if len(pairs) != 1 {
-		t.Fatalf("want one pair, got %d", len(pairs))
+		t.Fatalf("want one pair, got %d: %+v", len(pairs), pairs)
 	}
-	if strings.Contains(pairs[0].Command, "exit") {
-		t.Errorf("a successful run carried its exit status into the stored command: %q", pairs[0].Command)
+	if pairs[0].Command != "docker compose up -d db" {
+		t.Errorf("wrong command stored: %q", pairs[0].Command)
 	}
 }
 
@@ -58,5 +59,19 @@ func TestAHeredocFirstLineIsNotOfferedAsTheFix(t *testing.T) {
 		if strings.Contains(p.Command, "<<") {
 			t.Errorf("a heredoc opener was stored as the fix: %q", p.Command)
 		}
+	}
+}
+
+// A herestring is a whole command, not the opening of one.
+func TestAHerestringIsStillAFix(t *testing.T) {
+	now := time.Now()
+	ms := []model.Message{
+		{Role: "tool-output", Text: "connection refused on port 5432", Time: now},
+		{Role: "command", Text: `psql <<< "select 1"`, Time: now.Add(time.Minute)},
+		{Role: "tool-output", Text: "1", Time: now.Add(2 * time.Minute)},
+	}
+	pairs := fixPairsIn(ms, "claude:s1", "p")
+	if len(pairs) != 1 || pairs[0].Command != `psql <<< "select 1"` {
+		t.Errorf("a herestring was read as an opener: %+v", pairs)
 	}
 }

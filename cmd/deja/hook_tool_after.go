@@ -174,19 +174,7 @@ func toolResponseText(raw json.RawMessage) string {
 // whenever the command mentions it — and this path exists for payloads the
 // decoder could not read, which is where an unescaped `"tool_response"` in a
 // command shows up. A key is followed by a colon; a mention is not (#2051).
-func after(s, key string) string {
-	for i := 0; ; {
-		j := strings.Index(s[i:], key)
-		if j < 0 {
-			return ""
-		}
-		at := i + j + len(key)
-		if rest := strings.TrimLeft(s[at:], " \t\r\n"); strings.HasPrefix(rest, ":") {
-			return s[at:]
-		}
-		i = at
-	}
-}
+func after(s, key string) string { return afterKey(s, key, false) }
 
 // salvageFromPayload is the whole salvage: scope to the tool's response, pull a
 // value out of it, and bound what comes back.
@@ -199,7 +187,11 @@ func salvageFromPayload(raw string) string {
 // quotes a whole payload of its own — a shape this path sees, since a command
 // with unescaped quotes in it is why the decoder failed — the real key is the
 // later one (#2051).
-func afterLast(s, key string) string {
+func afterLast(s, key string) string { return afterKey(s, key, true) }
+
+// afterKey is both: what follows the first or the last place key is used as
+// one. A key is followed by a colon; a mention of it in a command is not.
+func afterKey(s, key string, last bool) string {
 	out := ""
 	for i := 0; ; {
 		j := strings.Index(s[i:], key)
@@ -209,6 +201,9 @@ func afterLast(s, key string) string {
 		at := i + j + len(key)
 		if rest := strings.TrimLeft(s[at:], " \t\r\n"); strings.HasPrefix(rest, ":") {
 			out = s[at:]
+			if !last {
+				return out
+			}
 		}
 		i = at
 	}

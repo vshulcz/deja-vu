@@ -373,7 +373,19 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 // one. A pair stores that line and a reader runs it, so a heredoc opener is not
 // a remedy but a hang.
 func opensMoreInput(cmd string) bool {
-	return strings.Contains(cmd, "<<") || strings.HasSuffix(cmd, "\\")
+	// A herestring is a whole command — `psql <<< "$sql"` reads from the line
+	// it is on — so it is not one of these.
+	for i := strings.Index(cmd, "<<"); i >= 0; i = strings.Index(cmd[i:], "<<") {
+		rest := cmd[i+2:]
+		if !strings.HasPrefix(rest, "<") {
+			return true
+		}
+		i += 3
+		if i >= len(cmd) {
+			break
+		}
+	}
+	return strings.HasSuffix(cmd, "\\")
 }
 
 // firstFrictionLine returns the first line of a record that names something
