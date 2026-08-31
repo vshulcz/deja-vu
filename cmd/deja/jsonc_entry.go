@@ -67,13 +67,23 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) 
 	if open < 0 {
 		return "", fmt.Errorf("does not look like a settings object; add %q by hand", blockKey)
 	}
-	block := zedFindKey(text, open+1, blockKey)
+	keys := strings.Split(blockKey, ".")
+	block, have := walkJSONCKeys(text, open, keys)
 	if block == nil {
 		if uninstall {
 			return text, nil
 		}
-		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  }%s", blockKey, id, entry, rootComma(text, open))
-		return text[:open+1] + insert + text[open+1:], nil
+		// The keys that are missing, nested inside the deepest one that is
+		// there: openclaw keeps its servers under `mcp.servers`, so a config
+		// with an `mcp` block and no `servers` in it gets one key, and a config
+		// with neither gets both (#2783).
+		at, comma, indent := open, rootComma(text, open), "  "
+		if have > 0 {
+			parent, _ := walkJSONCKeys(text, open, keys[:have])
+			at, comma, indent = parent.valueOpen, blockComma(text, parent), "    "
+		}
+		insert := nestedBlocks(keys[have:], id, entry, indent)
+		return text[:at+1] + insert + comma + text[at+1:], nil
 	}
 	found := zedFindKey(text, block.valueOpen+1, id)
 	if found == nil {
@@ -109,6 +119,42 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) 
 		return text[:cut[0]] + text[cut[1]:], nil
 	}
 	return text[:found.valueOpen] + entry + text[found.valueEnd:], nil
+}
+
+// walkJSONCKeys follows a dotted block key from the top-level object, and
+// reports how many of its keys were found: a caller that has to create the rest
+// needs to know where to put them.
+func walkJSONCKeys(text string, open int, keys []string) (*zedSpan, int) {
+	at := open + 1
+	var block *zedSpan
+	for i, key := range keys {
+		found := zedFindKey(text, at, key)
+		if found == nil {
+			return nil, i
+		}
+		block, at = found, found.valueOpen+1
+	}
+	return block, len(keys)
+}
+
+// nestedBlocks is the text of the keys that are missing, one inside the next,
+// with the entry at the bottom.
+func nestedBlocks(keys []string, id, entry, indent string) string {
+	body := fmt.Sprintf("%q: %s", id, entry)
+	for i := len(keys) - 1; i >= 0; i-- {
+		inner := indent + strings.Repeat("  ", i+1)
+		body = fmt.Sprintf("%q: {\n%s%s\n%s}", keys[i], inner, body, indent+strings.Repeat("  ", i))
+	}
+	return "\n" + indent + body
+}
+
+// blockComma is rootComma for a block rather than the whole file: no comma
+// after a key inserted into an object that holds nothing else.
+func blockComma(text string, block *zedSpan) string {
+	if strings.TrimSpace(stripJSONComments(text[block.valueOpen+1:block.valueEnd-1])) == "" {
+		return ""
+	}
+	return ","
 }
 
 // rootComma is the comma after a block inserted at the top of an object, or
@@ -158,15 +204,37 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 	// mcpBlock reads null as "no block", which is right where the writer can
 	// replace the value; here the write is a text insert, so it would leave a
 	// second key of the same name with the reader's value winning (#2740).
-	if v, present := root[blockKey]; present {
-		if _, isObject := v.(map[string]any); !isObject {
+	keys := strings.Split(blockKey, ".")
+	holder := root
+	for _, key := range keys[:len(keys)-1] {
+		v, present := holder[key]
+		if !present {
+			holder = nil
+			break
+		}
+		next, isObject := v.(map[string]any)
+		if !isObject {
 			if uninstall {
 				return installResult{Path: path, Action: "unchanged"}, nil
 			}
-			return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, blockKey)
+			return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, key)
+		}
+		holder = next
+	}
+	if holder != nil {
+		if v, present := holder[keys[len(keys)-1]]; present {
+			if _, isObject := v.(map[string]any); !isObject {
+				if uninstall {
+					return installResult{Path: path, Action: "unchanged"}, nil
+				}
+				return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, blockKey)
+			}
 		}
 	}
-	m, _, err := mcpBlock(root, blockKey, path)
+	if holder == nil {
+		holder = map[string]any{}
+	}
+	m, _, err := mcpBlock(holder, keys[len(keys)-1], path)
 	if err != nil {
 		// A block that is not an object is a config deja does not understand,
 		// and writing a second key of the same name would leave the reader's
