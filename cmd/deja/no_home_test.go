@@ -17,8 +17,8 @@ import (
 // parent does not wait for, so a glob taken when the call returns sees nothing
 // whether or not the guard is there.
 func TestNoHomeHelperProcess(t *testing.T) {
-	args := os.Getenv("DEJA_NO_HOME_ARGS")
-	if args == "" {
+	args, running := os.LookupEnv("DEJA_NO_HOME_ARGS")
+	if !running {
 		return
 	}
 	// TestMain gives every test in this package a home of its own, so the
@@ -29,8 +29,12 @@ func TestNoHomeHelperProcess(t *testing.T) {
 			os.Exit(2)
 		}
 	}
+	var argv []string
+	if args != "" {
+		argv = strings.Split(args, "\x1f")
+	}
 	code := 0
-	if err := run(strings.Split(args, "\x1f")); err != nil {
+	if err := run(argv); err != nil {
 		code = 1
 	}
 	os.Exit(code)
@@ -60,9 +64,10 @@ func runWithNoHome(t *testing.T, args ...string) (int, []string) {
 		code = exit.ExitCode()
 	}
 	// The warmup is detached, so what it writes lands after the process is
-	// gone: wait for it rather than racing it.
+	// gone: wait for it rather than racing it. Short, because every clean arm
+	// pays the whole wait.
 	var left []string
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 8; i++ {
 		found, err := filepath.Glob(filepath.Join(wd, "*"))
 		if err != nil {
 			t.Fatal(err)
@@ -108,6 +113,15 @@ func TestWithNoHomeNothingIsWrittenWhereDejaHappensToRun(t *testing.T) {
 		// These write nothing without a home, and refusing them takes away the
 		// commands a reader needs precisely when deja cannot find one.
 		{args: []string{"version"}},
+		// Both spellings of the same command answer the same way, and neither
+		// falls through to the bare-query path, which builds an index.
+		{args: []string{"--version"}},
+		{args: []string{"-version"}},
+		// Not a command at all: allowlisting it let it past the guard, miss
+		// the dispatch map and land in the query path.
+		{args: []string{"-v"}, wantCode: 1},
+		// No arguments at all, which is the brief on a terminal.
+		{args: nil, wantCode: 1},
 		{args: []string{"help"}},
 		{args: []string{"completion", "bash"}},
 		{args: []string{"sources"}},
@@ -141,5 +155,18 @@ func TestInstallKeepsItsOwnRefusal(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "HOME") {
 		t.Errorf("the refusal does not name what is missing: %v", err)
+	}
+}
+
+// doctor is where the refusal sends the reader, so it runs without a home —
+// but --deep takes the index lock first, which left a lock file in whatever
+// directory they were standing in.
+func TestDoctorDeepDoesNotTakeALockItCannotHold(t *testing.T) {
+	code, left := runWithNoHome(t, "doctor", "--deep")
+	if code == 0 {
+		t.Error("deep verify of an index that cannot exist reported success")
+	}
+	if len(left) > 0 {
+		t.Errorf("doctor --deep wrote into the working directory: %v", left)
 	}
 }

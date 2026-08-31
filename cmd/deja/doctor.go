@@ -68,6 +68,14 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	report := collectDoctorReport(lookup, dir)
 	var deepReport *index.DeepReport
 	if deep {
+		// doctor is what the no-home refusal sends the reader to, so it runs
+		// without one — but --deep takes the index lock before it reads, and
+		// with a relative index dir that left `.cache/deja/index.db.lock` in
+		// whatever directory they were standing in (#1692). There is no
+		// database at a path like that to verify anyway.
+		if !filepath.IsAbs(dir) {
+			return fmt.Errorf("doctor --deep cannot find your index — set HOME, or DEJA_INDEX_DIR to an absolute path")
+		}
 		dr, err := index.DeepVerify(dir)
 		if err != nil {
 			return fmt.Errorf("doctor: deep verify: %w", err)
