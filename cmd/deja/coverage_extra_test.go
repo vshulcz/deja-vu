@@ -366,12 +366,16 @@ func TestMCPRecallAndProgressBranches(t *testing.T) {
 	if mcpProgress() != os.Stderr {
 		t.Fatal("debug progress did not use stderr")
 	}
+	// The store here is empty, which is its own answer now: "nothing matched"
+	// on a machine with no history reads as a miss and sends an agent
+	// rephrasing (#680, one step earlier). The wording for a real miss is
+	// covered where a fixture actually holds sessions.
 	text, err := recallText(index.DefaultDir(), "nomatch", "", 0, 30)
-	if err != nil || !strings.Contains(text, "No prior deja sessions") {
+	if err != nil || !strings.Contains(text, "no indexed history") {
 		t.Fatalf("recallText no match = %q err=%v", text, err)
 	}
 	ctx, err := recallContext(index.DefaultDir(), "nomatch")
-	if err != nil || !strings.Contains(ctx, "No prior deja sessions") {
+	if err != nil || !strings.Contains(ctx, "no indexed history") {
 		t.Fatalf("recallContext no match = %q err=%v", ctx, err)
 	}
 }

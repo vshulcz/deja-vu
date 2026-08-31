@@ -247,6 +247,15 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 		return fmt.Sprintf("No indexed session matched %q — the index is behind and cannot be updated (%s is not writable), so recent work may be missing from this answer.",
 			q, filepath.Dir(dir))
 	}
+	// Nothing has ever been indexed: this is a first run, not a miss. The
+	// sentence above reads as "your query missed", which on a fresh machine
+	// sends an agent rephrasing a question nothing can answer yet — the same
+	// mistake #680 named, one step earlier. Said only when the store is
+	// genuinely empty; a store with sessions that simply did not match keeps
+	// the ordinary answer.
+	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
+		return "This machine has no indexed history yet, so nothing can match — `deja sources` shows where deja looked for it. Do not read this as the work never happening."
+	}
 	return fmt.Sprintf("No prior deja sessions matched %q.", q)
 }
 
