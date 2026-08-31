@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 func grokTestDB(t *testing.T) string {
@@ -23,6 +25,8 @@ INSERT INTO messages VALUES ('s1',0,'user','{"role":"user","content":"connection
 INSERT INTO messages VALUES ('s1',1,'assistant','{"role":"assistant","content":[{"type":"text","text":"raise max_conns"},{"type":"tool_use","id":"t1"}]}','2026-07-27T10:00:05.000Z');
 INSERT INTO messages VALUES ('s1',2,'tool','{"role":"tool","content":"ignored"}','2026-07-27T10:00:06.000Z');
 INSERT INTO messages VALUES ('s1',3,'assistant','{"role":"assistant","content":[{"type":"tool_use","id":"t2"}]}','2026-07-27T10:00:07.000Z');
+INSERT INTO sessions VALUES ('s0','w1','Yesterday','/work/api','2026-07-26T09:00:00.000Z');
+INSERT INTO messages VALUES ('s0',0,'user','{"role":"user","content":"nothing touched this one again"}','2026-07-26T09:00:00.000Z');
 `
 	cmd := exec.Command("sqlite3", db)
 	cmd.Stdin = stringsReader(schema)
@@ -46,10 +50,17 @@ func TestParseGrokDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 {
+	// Two: the fixture also holds the session the since filter has to leave
+	// out, which is the one TestParseGrokDBSinceFilters is about.
+	if len(ss) != 2 {
 		t.Fatalf("sessions = %d", len(ss))
 	}
-	s := ss[0]
+	var s model.Session
+	for _, got := range ss {
+		if got.ID == "s1" {
+			s = got
+		}
+	}
 	// Project is the directory's short name, not the whole cwd path: trust
 	// policy and per-project scoping key on the same name the file-based grok
 	// parser produces (projectName), so /work/api and its sibling must both
@@ -93,6 +104,12 @@ func TestParseGrokDBSinceFilters(t *testing.T) {
 	// the error was swallowed as "no sessions".
 	var sawNew bool
 	for _, s := range ss {
+		// The exclusion the cursor is for: a session with nothing newer than
+		// the watermark stays out, or an incremental pass would rebuild the
+		// whole store on every write.
+		if s.ID == "s0" {
+			t.Errorf("a session untouched since the watermark came back: %+v", s.Messages)
+		}
 		for _, m := range s.Messages {
 			if m.Text == "raise max_conns" {
 				sawNew = true

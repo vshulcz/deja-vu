@@ -2271,18 +2271,10 @@ func fromDatabase(r Record) bool {
 	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
 		return true
 	}
-	if storeHarness(r.SourcePath) != "" {
-		return true
-	}
-	switch h := harnessForPath(r.SourcePath); h {
-	case "cursor-db", "goose-db":
-		return true
-	default:
-		// A path that names a per-file kind settles it: two transcripts in
-		// different projects can share a filename-derived id, and judging those
-		// by key erased the sibling that was never re-read (#699).
-		return false
-	}
+	// A path that names a per-file kind settles it: two transcripts in
+	// different projects can share a filename-derived id, and judging those by
+	// key erased the sibling that was never re-read (#699).
+	return storeHarness(r.SourcePath) != ""
 }
 
 // readWholeThisPass reports whether the pass re-read this record's store in
@@ -2299,10 +2291,6 @@ func readWholeThisPass(r Record) bool {
 		return false
 	}
 	if storeHarness(r.SourcePath) != "" {
-		return passWholeStores[r.SourcePath]
-	}
-	switch harnessForPath(r.SourcePath) {
-	case "cursor-db", "goose-db":
 		return passWholeStores[r.SourcePath]
 	}
 	harness, _, ok := strings.Cut(r.Key, ":")
@@ -2400,6 +2388,9 @@ func storeHarness(p string) string {
 // pass. A pass holds the directory lock, so the map lives beside
 // passWholeStores and is built where that one is.
 func passStorePaths() map[string]string {
+	// wholeStoresThisPass builds it at the top of a pass, before anything asks.
+	// The fallback is for a caller outside a pass — a search recovering a
+	// damaged index reads records without one.
 	if passStores == nil {
 		passStores = resolveStorePaths()
 	}
@@ -2631,6 +2622,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
 		files[p] = f
 	}
+	// First, so everything below reads the same list of stores.
+	wholeStoresThisPass(changed, old.Files)
 	// After the loop, because a file whose parse failed is dropped from
 	// `changed` there and keeps what it already held — starting it over would
 	// throw the counts away on the one pass that could not read it.
@@ -2641,7 +2634,6 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// append path's — a db's counts can only grow until a full rebuild.
 	reread := fullyReadFiles(changed, old.Files)
 	parsedThisPass(reread)
-	wholeStoresThisPass(changed, old.Files)
 	// A file the pass read is a file that opens, whether or not it read all of
 	// it, so an error recorded when it did not has to go.
 	readThisPass(changed)
