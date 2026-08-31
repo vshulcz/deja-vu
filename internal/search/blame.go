@@ -220,8 +220,14 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 }
 
 // namedAPath reports whether the session wrote the file as a path rather than
-// as a bare name. It is the coarse half of specificity — the half that orders
-// the answer; the rest is left to the score, where the number of mentions is.
+// as a bare name, and said enough for that to be evidence. It is the coarse
+// half of specificity — the half that orders the answer; the rest is left to
+// the score, where the number of mentions is.
+//
+// More than once, because naming the path once and saying nothing else is not
+// working on a file: measured on a real store, a pasted absolute path and a
+// `git diff --stat` row each took the top of the answer from the session that
+// had debugged it (#2854).
 func namedAPath(h BlameHit) bool { return h.Specificity > 1.0 }
 
 // BlameCap is how many hits the default listing shows. The rest are behind
@@ -256,12 +262,17 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 	low := strings.ToLower(filepath.ToSlash(text))
 	count := 0
 	level := 1.0
+	// A path with nothing said around it is not a session working on the file:
+	// a `git diff --stat` row and a pasted absolute path each name it once and
+	// took the top of the answer from the session that had debugged it
+	// (#2854). What counts is the path plus something about it.
+	explained := saysMoreThanThePath(low)
 	for _, form := range forms {
 		// The bare basename is one of the forms, and it matches inside a path
 		// as well as on its own — so every mention was already "specific" and
 		// the rule below could never fire. A name is what the caller asked
 		// with; a path is what says which file the session meant (#2840).
-		if !strings.Contains(strings.Trim(form, "/"), "/") {
+		if !strings.Contains(strings.Trim(form, "/"), "/") || !explained {
 			continue
 		}
 		if pathFormCount(low, form) > 0 {
@@ -290,6 +301,32 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 		pos = i + len(base)
 	}
 	return count, level
+}
+
+// saysMoreThanThePath reports whether a message carries words of its own beside
+// the paths in it. Three, so a diffstat row (`cmd/deja/mcp.go | 4 +-`) and a
+// bare pasted path do not read as a session discussing the file, while a line
+// that says what was done to it does.
+func saysMoreThanThePath(low string) bool {
+	words := 0
+	for _, field := range strings.Fields(low) {
+		if strings.ContainsAny(field, "/\\") || len(field) < 2 {
+			continue
+		}
+		letters := 0
+		for _, r := range field {
+			if r >= 'a' && r <= 'z' {
+				letters++
+			}
+		}
+		if letters >= 2 {
+			words++
+			if words >= 3 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func pathFormCount(s, form string) int {
