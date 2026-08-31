@@ -284,16 +284,8 @@ func outputReadsAsFailure(text string) bool {
 // commandFailed reads the exit status the record carries, for the harnesses
 // that store one (codex and opencode append it; Claude does not).
 func commandFailed(text string) bool {
-	i := strings.LastIndex(text, "→ exit ")
-	if i < 0 {
-		return false
-	}
-	code := strings.TrimSpace(text[i+len("→ exit "):])
-	if j := strings.IndexAny(code, " \n"); j >= 0 {
-		code = code[:j]
-	}
-	n, err := strconv.Atoi(code)
-	return err == nil && n != 0
+	_, code, recorded := CommandExitOutcome(text)
+	return recorded && code != 0
 }
 
 // outputFailed reports whether what came back from the command is itself an
