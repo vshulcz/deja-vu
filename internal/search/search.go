@@ -640,21 +640,8 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 // carries the query words in its title and the note does not, and once a note
 // is dated by its evidence rather than by the day it was filed (V4) the two are
 // equally fresh, so the transcript won its own distillation.
-
 func liftNotesAboveTheirSource(hits []Hit) {
 	liftNotesBy(hits, func(h Hit) model.Session { return h.Session })
-}
-
-// firstBelow is the highest-ranked hit at or after i among the ones recorded
-// for an id: the pair is made with the best copy of the note, and a copy that
-// already outranks the source is left where it is.
-func firstBelow(at []int, i int) (int, bool) {
-	for _, j := range at {
-		if j >= i {
-			return j, true
-		}
-	}
-	return 0, false
 }
 
 // indexNotes is where each promoted note sits, by the id it names, in rank
@@ -702,38 +689,41 @@ func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 	if len(notes) == 0 {
 		return
 	}
-	for i := 0; i < len(hits); i++ {
+	// One pass, emitting each source's notes just before it. Reordering in
+	// place meant reindexing after every rotation, which is a map rebuild per
+	// pair over the whole matched set — measured at 622ms and a gigabyte on a
+	// store where every transcript outranked its own note (#2833).
+	done := make([]bool, len(hits))
+	out := make([]T, 0, len(hits))
+	for i := range hits {
 		src := of(hits[i])
-		if src.Harness == notesHarness {
-			continue
-		}
-		// Mirrors sources.PromotedNoteID: building the id rather than parsing
-		// one keeps a harness name with a dash in it from splitting wrong.
-		//
-		// Both ids. The note names the session as it was on the machine that
-		// made it — which is the local id when this machine promoted it, and
-		// the original when the note travelled — and after a sync a session
-		// carries `imported-…` locally with the original in OrigID. Either can
-		// be the one the note was built from, so both are tried (#2833).
-		j, ok := -1, false
-		for _, id := range []string{
-			"deja-note-" + src.Harness + "-" + src.ID,
-			"deja-note-" + src.Harness + "-" + sessionOrigID(src),
-		} {
-			if j, ok = firstBelow(notes[id], i); ok {
-				break
+		if src.Harness != notesHarness {
+			// Both ids. The note names the session as it was on the machine
+			// that made it — the local id where this machine promoted it, the
+			// original where the note travelled — and after a sync a session
+			// carries `imported-…` locally with the original in OrigID (#2833).
+			//
+			// Every copy that has not been placed yet, in rank order, so two
+			// machines' notes about one session both land above it and this
+			// machine's own comes first.
+			for _, id := range []string{
+				"deja-note-" + src.Harness + "-" + src.ID,
+				"deja-note-" + src.Harness + "-" + sessionOrigID(src),
+			} {
+				for _, j := range notes[id] {
+					if j > i && !done[j] {
+						done[j] = true
+						out = append(out, hits[j])
+					}
+				}
 			}
 		}
-		if !ok {
-			continue
+		if !done[i] {
+			done[i] = true
+			out = append(out, hits[i])
 		}
-		note := hits[j]
-		copy(hits[i+1:j+1], hits[i:j])
-		hits[i] = note
-		// Rebuilt rather than patched: the rotation moved everything between
-		// the two, and the id may name more than one of them.
-		notes = indexNotes(hits, of)
 	}
+	copy(hits, out)
 }
 
 // sortHits orders a ranked result set.
