@@ -46,8 +46,11 @@ func NotesFile() string {
 		return p
 	}
 	// An explicit XDG_DATA_HOME wins on every platform so relocation and
-	// hermetic tests behave the same everywhere.
-	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+	// hermetic tests behave the same everywhere — an absolute one. A relative
+	// value is ignored, as the spec says and as this repository already does
+	// for XDG_CONFIG_HOME: followed, it puts the notes in whatever directory
+	// the command ran in (#2790).
+	if dir := os.Getenv("XDG_DATA_HOME"); filepath.IsAbs(dir) {
 		return filepath.Join(dir, "deja", "notes.jsonl")
 	}
 	if runtime.GOOS == "windows" {

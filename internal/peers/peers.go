@@ -316,6 +316,10 @@ func forgetLocked(host string) (bool, error) {
 	return true, save(out)
 }
 
+// errNoHome is what every writer answers when there is nowhere to keep the
+// list. It names the way out, as deja's own homeless refusal does.
+var errNoHome = errors.New("no home directory, so there is nowhere to keep the peer list — set HOME or XDG_CONFIG_HOME to an absolute path")
+
 func save(list []Peer) error {
 	sort.Slice(list, func(i, j int) bool { return list[i].Host < list[j].Host })
 	b, err := json.MarshalIndent(file{Peers: list}, "", "  ")
@@ -324,7 +328,7 @@ func save(list []Peer) error {
 	}
 	path := Path()
 	if path == "" {
-		return errors.New("no home directory, so there is nowhere to keep the peer list")
+		return errNoHome
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
