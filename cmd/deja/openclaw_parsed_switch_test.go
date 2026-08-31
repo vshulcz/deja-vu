@@ -55,6 +55,12 @@ func TestTheParsedPathGivesBackASwitchTheReaderSet(t *testing.T) {
 			if _, err := installOpenClawAuto("/bin/deja", false); err != nil {
 				t.Fatal(err)
 			}
+			// Twice: reinstalling after an upgrade is ordinary, and the second
+			// install reads the switch deja itself set — recording that would
+			// hand the reader back deja's own value as if it were theirs.
+			if _, err := installOpenClawAuto("/bin/deja", false); err != nil {
+				t.Fatal(err)
+			}
 			// While installed the switch is on whatever the reader had.
 			if on := readOpenClawSwitch(t, path); on != true {
 				t.Errorf("the hook was wired with the switch %v, so it never runs", on)

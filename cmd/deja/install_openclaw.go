@@ -147,20 +147,32 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 // beside the blocks it records there. Three states rather than two: the reader
 // had it on, the reader had it off, or there was nothing there and it is
 // deja's to remove.
-func hookSwitchKeys(path string) (on, off string) {
+func hookSwitchKeys() (deja, on, off string) {
 	keys := strings.Split(openclawHookEntries, ".")
 	base := flagRecordKey(keys, openclawHookSwitch)
-	return base + "=true", base + "=false"
+	// The bare key is the one the text writer uses for "deja put this here",
+	// so a config that gains or loses a comment between install and uninstall
+	// still reads the same record (#2830).
+	return base, base + "=true", base + "=false"
 }
 
 // noteHookSwitch records what was under the switch before deja wrote to it.
 func noteHookSwitch(path string, was any) {
-	on, off := hookSwitchKeys(path)
+	deja, on, off := hookSwitchKeys()
+	// Once. A second install reads the switch deja itself set on the first, so
+	// recording again would say the reader had it on and hand it back that way
+	// — which is #2830 again, by way of an upgrade.
+	for _, k := range []string{deja, on, off} {
+		if blockWasAdded(path, k) {
+			return
+		}
+	}
 	switch v, ok := was.(bool); {
 	case !ok:
 		// Absent, or something that is not a boolean: deja overwrites it and
 		// takes it away again, since it cannot know what a `null` or a `0`
 		// there was meant to say.
+		noteBlockAdded(path, deja)
 	case v:
 		noteBlockAdded(path, on)
 	default:
@@ -170,7 +182,7 @@ func noteHookSwitch(path string, was any) {
 
 // hookSwitchWas is what to put back, or nil where the switch is deja's own.
 func hookSwitchWas(path string) any {
-	on, off := hookSwitchKeys(path)
+	_, on, off := hookSwitchKeys()
 	switch {
 	case blockWasAdded(path, on):
 		return true
@@ -181,7 +193,8 @@ func hookSwitchWas(path string) any {
 }
 
 func forgetHookSwitch(path string) {
-	on, off := hookSwitchKeys(path)
+	deja, on, off := hookSwitchKeys()
+	forgetBlockAdded(path, deja)
 	forgetBlockAdded(path, on)
 	forgetBlockAdded(path, off)
 }
