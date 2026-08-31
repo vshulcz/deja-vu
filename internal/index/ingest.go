@@ -566,7 +566,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -1022,7 +1022,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -2271,15 +2271,10 @@ func fromDatabase(r Record) bool {
 	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
 		return true
 	}
-	switch h := harnessForPath(r.SourcePath); h {
-	case "cursor-db", "goose-db":
-		return true
-	default:
-		// A path that names a per-file kind settles it: two transcripts in
-		// different projects can share a filename-derived id, and judging those
-		// by key erased the sibling that was never re-read (#699).
-		return false
-	}
+	// A path that names a per-file kind settles it: two transcripts in
+	// different projects can share a filename-derived id, and judging those by
+	// key erased the sibling that was never re-read (#699).
+	return storeHarness(r.SourcePath) != ""
 }
 
 // readWholeThisPass reports whether the pass re-read this record's store in
@@ -2295,8 +2290,7 @@ func readWholeThisPass(r Record) bool {
 	if len(passWholeStores) == 0 {
 		return false
 	}
-	switch harnessForPath(r.SourcePath) {
-	case "cursor-db", "goose-db":
+	if storeHarness(r.SourcePath) != "" {
 		return passWholeStores[r.SourcePath]
 	}
 	harness, _, ok := strings.Cut(r.Key, ":")
@@ -2311,22 +2305,18 @@ var passWholeStores map[string]bool
 // wholeStoresThisPass records them, under both the store path and the harness:
 // a record names the first where it can and the second otherwise.
 //
-// Only these three stores are stamped with a watermark (setStoreLastUpdated).
-// Everything else is read whole on every pass and judged by its path, which is
-// why it needs none of this — a watermark added to another database later would
-// have to join fromDatabase and this function in the same change.
+// Every store setDatabaseStoreWatermarks stamps belongs here, and storeHarness
+// is the one list of them: a stamped store is parsed from its watermark, so its
+// records must survive a pass that did not hand them back, and only a pass that
+// read the store whole may drop one because its key came back.
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
+	// Rebuilt here rather than kept: a store that appeared since the last pass
+	// is one the walk has to see.
+	passStores = resolveStorePaths()
 	for p := range changed {
-		harness := ""
-		switch harnessForPath(p) {
-		case "opencode":
-			harness = "opencode"
-		case "cursor-db":
-			harness = "cursor"
-		case "goose-db":
-			harness = "goose"
-		default:
+		harness := storeHarness(p)
+		if harness == "" {
 			continue
 		}
 		if old[p].LastUpdated == 0 || rereadsWholeSessions(p) {
@@ -2344,7 +2334,77 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 // this one store, rather than a number that only climbs. Narrowing the clause
 // instead costs the session its earlier turns (#2033), so the re-reading stays.
 func rereadsWholeSessions(p string) bool {
-	return harnessForPath(p) == "goose-db"
+	if harnessForPath(p) == "goose-db" {
+		return true
+	}
+	switch storeHarness(p) {
+	case "grok", "zed", "hermes":
+		// The same shape: each asks for the sessions touched since the stamp
+		// and hands them back whole, so what comes back replaces what the
+		// index holds for that key rather than adding to it (#2075). The
+		// clauses are session-scoped for exactly this reason — a message-scoped
+		// one returns the newest turn alone, and replacing a session with it
+		// loses the rest.
+		return true
+	}
+	return false
+}
+
+// storeHarness names the harness whose shared store lives at p, and "" for
+// anything else.
+//
+// harnessForPath answers with a kind, and three of the six stores share their
+// kind name with the harness's own transcripts — grok and hermes both have
+// files as well as a database, and a kind name cannot tell them apart. The
+// store paths can, and a record that names one belongs to a store read from a
+// watermark: it must not be dropped because the database changed, and it may be
+// replaced when its key comes back.
+func storeHarness(p string) string {
+	if p == "" {
+		return ""
+	}
+	if h, ok := passStorePaths()[p]; ok {
+		return h
+	}
+	if sources.IsHermesPGStore(p) {
+		return "hermes"
+	}
+	switch harnessForPath(p) {
+	case "opencode":
+		return "opencode"
+	case "cursor-db":
+		return "cursor"
+	case "goose-db":
+		return "goose"
+	}
+	return ""
+}
+
+// passStorePaths is the store-path half of storeHarness, resolved once.
+//
+// fromDatabase asks per record, and the answer needs the store paths, two of
+// which are found by walking a directory. Measured at ~11 µs a record with the
+// walk on the hot path, which is a second per hundred thousand records on every
+// pass. A pass holds the directory lock, so the map lives beside
+// passWholeStores and is built where that one is.
+func passStorePaths() map[string]string {
+	// wholeStoresThisPass builds it at the top of a pass, before anything asks.
+	// The fallback is for a caller outside a pass — a search recovering a
+	// damaged index reads records without one.
+	if passStores == nil {
+		passStores = resolveStorePaths()
+	}
+	return passStores
+}
+
+var passStores map[string]string
+
+func resolveStorePaths() map[string]string {
+	out := map[string]string{sources.GrokDB(): "grok", sources.ZedDB(): "zed"}
+	for _, db := range sources.HermesDBs() {
+		out[db] = "hermes"
+	}
+	return out
 }
 
 // fullyReadFiles drops the files a pass reads only part of. LastUpdated is
@@ -2562,6 +2622,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
 		files[p] = f
 	}
+	// First, so everything below reads the same list of stores.
+	wholeStoresThisPass(changed, old.Files)
 	// After the loop, because a file whose parse failed is dropped from
 	// `changed` there and keeps what it already held — starting it over would
 	// throw the counts away on the one pass that could not read it.
@@ -2572,7 +2634,6 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// append path's — a db's counts can only grow until a full rebuild.
 	reread := fullyReadFiles(changed, old.Files)
 	parsedThisPass(reread)
-	wholeStoresThisPass(changed, old.Files)
 	// A file the pass read is a file that opens, whether or not it read all of
 	// it, so an error recorded when it did not has to go.
 	readThisPass(changed)
@@ -2779,7 +2840,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -3020,7 +3081,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
 		return filesTouched, messages, 0, err
 	}
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	// Read before writeManifest: the fold in there drains the counters, and the
 	// caller prints its line after this returns (#2007).
@@ -3095,11 +3156,22 @@ func harnessForPath(p string) string {
 	return ""
 }
 
-func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
+// setDatabaseStoreWatermarks stamps every store deja reads through SQLite.
+//
+// Each of the six has a since-the-watermark parser, and dbParse only calls it
+// once the store carries a watermark — so the three that were never stamped
+// (grok, hermes, zed) read their store whole on every pass, for the life of
+// the index (#2075).
+func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
 	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
+	setStoreLastUpdated(files, sessions, "grok", sources.GrokDB())
+	setStoreLastUpdated(files, sessions, "zed", sources.ZedDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
+	}
+	for _, db := range sources.HermesDBs() {
+		setStoreLastUpdated(files, sessions, "hermes", db)
 	}
 }
 

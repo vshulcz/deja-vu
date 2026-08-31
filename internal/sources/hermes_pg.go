@@ -108,7 +108,10 @@ func pgNumber(s string) any {
 func ParseHermesPG(dsn string, sinceNano int64) ([]model.Session, error) {
 	where := hermesPGWhere
 	if sinceNano > 0 {
-		where += fmt.Sprintf(" and timestamp > %d", time.Unix(0, sinceNano).Unix())
+		// By session, for the reason ParseHermesDBSince gives.
+		where += fmt.Sprintf(
+			" and session_id in (select session_id from messages where timestamp > %d)",
+			time.Unix(0, sinceNano).Unix())
 	}
 	sql := `select coalesce(json_agg(m),'[]') from (` +
 		`select session_id,role,content,timestamp from messages where ` + where +
