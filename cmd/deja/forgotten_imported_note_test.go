@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,12 +38,69 @@ func TestAnImportedNoteStillNamesItsForgottenSource(t *testing.T) {
 		Harness: "deja", ID: "imported-ccc333", OrigID: "deja-note-claude-longs",
 		Project: "imported:api",
 	}
-	if got := forgottenSourceNote(index.DefaultDir(), note, "claude:longs", false); !strings.Contains(got, "forgotten") {
+	if got := forgottenSourceNote(note, "claude:longs", false); !strings.Contains(got, "forgotten") {
 		t.Errorf("an imported note says nothing about the session it distils: %q", got)
 	}
 
 	local := model.Session{Harness: "deja", ID: "deja-note-claude-longs", Project: "api"}
-	if got := forgottenSourceNote(index.DefaultDir(), local, "claude:longs", false); !strings.Contains(got, "forgotten") {
+	if got := forgottenSourceNote(local, "claude:longs", false); !strings.Contains(got, "forgotten") {
 		t.Errorf("the local case regressed: %q", got)
+	}
+}
+
+// And the case where the transcript travelled too: it is tombstoned under the
+// id it has here, while the note names the id it had there. Asking about
+// either has to say the session is gone (#2839).
+func TestAnImportedSourceIsStillNamedAsForgotten(t *testing.T) {
+	tmp := hermeticEnv(t)
+	exp := filepath.Join(tmp, "transfer")
+	if err := os.MkdirAll(exp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var batch []byte
+	for _, r := range []index.SyncRecord{
+		{Harness: "claude", SessionID: "longs", Project: "api", Role: "user", Text: "the goblin pool deadlocks"},
+	} {
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch = append(batch, append(b, '\n')...)
+	}
+	if err := os.WriteFile(filepath.Join(exp, "deja-sync.jsonl"), batch, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "sync", "import", exp); err != nil {
+		t.Fatal(err)
+	}
+	metas, err := index.AllMeta(index.DefaultDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := ""
+	for _, m := range metas {
+		if m.OrigID == "longs" {
+			local = m.ID
+		}
+	}
+	if local == "" {
+		t.Fatalf("the imported session is not in the index: %+v", metas)
+	}
+	if _, err := captureRunStderr(t, "forget", "--session", local); err != nil {
+		t.Fatal(err)
+	}
+
+	note := model.Session{
+		Harness: "deja", ID: "imported-ccc333", OrigID: "deja-note-claude-longs",
+		Project: "imported:api",
+	}
+	got := forgottenSourceNote(note, "claude:longs", false)
+	if !strings.Contains(got, "forgotten") {
+		t.Errorf("a forgotten imported source is not named: %q", got)
+	}
+	// And it names the key `deja forget --list` will show, which is the local
+	// one rather than the id the note carries.
+	if !strings.Contains(got, local) {
+		t.Errorf("the line names a key the reader cannot find: %q, local key holds %q", got, local)
 	}
 }

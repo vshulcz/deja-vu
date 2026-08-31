@@ -124,7 +124,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// so a reader here has named the session as plainly as anyone can (#1624).
 	// This door takes an id and FindByPrefix resolved it, so a prefix here
 	// is honest by construction.
-	if line := forgottenSourceNote(dir, s, id, true); line != "" {
+	if line := forgottenSourceNote(s, id, true); line != "" {
 		note += "deja: " + line + "\n\n"
 	}
 	var b bytes.Buffer

@@ -1342,7 +1342,7 @@ func contextByID(dir, q string) (string, idContext, bool) {
 	return b.String(), idContext{session: whole.ID, size: rawSize([]model.Session{whole}),
 		// FindByPrefix resolved this session from the selector, so a prefix
 		// here is honest by construction.
-		note: forgottenSourceNote(dir, whole, q, true)}, true
+		note: forgottenSourceNote(whole, q, true)}, true
 }
 
 // recallContextResult keeps the four-value shape its callers and tests read.
@@ -1425,7 +1425,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
 		// The search path reaches a promoted note as often as the id path
 		// does — the note carries the id in its own text.
-		forgottenSourceNote(dir, whole, q, false), nil
+		forgottenSourceNote(whole, q, false), nil
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in
