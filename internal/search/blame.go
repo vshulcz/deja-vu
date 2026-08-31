@@ -326,18 +326,30 @@ func aLineSaysMoreThanThePath(low, base string) bool {
 // Letters by Unicode rather than by ASCII: a session that says what it did in
 // Russian or Chinese is saying it (#2854).
 func saysMoreThanThePath(low string) bool {
-	words := 0
+	words, unspaced := 0, 0
 	for _, field := range strings.Fields(low) {
-		if strings.ContainsAny(field, "/\\") || utf8.RuneCountInString(field) < 2 {
+		if strings.ContainsAny(field, "/\\") {
 			continue
 		}
-		letters := 0
+		letters, script := 0, 0
 		for _, r := range field {
-			if unicode.IsLetter(r) {
-				letters++
+			if !unicode.IsLetter(r) {
+				continue
+			}
+			letters++
+			// Chinese, Japanese and Korean put no spaces between words, so a
+			// whole sentence arrives as one field and counting fields counts
+			// it as one word. Their letters are counted instead, which is the
+			// same question asked in the units that script uses (#2854).
+			if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul) {
+				script++
 			}
 		}
-		if letters >= 2 {
+		unspaced += script
+		if unspaced >= 4 {
+			return true
+		}
+		if letters >= 2 && utf8.RuneCountInString(field) >= 2 {
 			words++
 			if words >= 3 {
 				return true

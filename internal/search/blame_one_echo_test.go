@@ -102,3 +102,27 @@ func TestWordsAreCountedInAnyScript(t *testing.T) {
 		t.Errorf("a session that said what it did was not read as saying it: %+v", hits)
 	}
 }
+
+// Chinese and Japanese put no spaces between words, so counting fields counted
+// a whole sentence as one and the rule read it as saying nothing.
+func TestAScriptWithoutSpacesStillCounts(t *testing.T) {
+	now := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	target := BlameTarget{FullPath: "/work/api/cmd/deja/mcp.go", Base: "mcp.go", Stem: "mcp"}
+	for _, text := range []string{
+		"我修好了 cmd/deja/mcp.go 的问题",
+		"cmd/deja/mcp.go のバグを直した",
+	} {
+		said := model.Session{
+			Harness: "claude", ID: "said", Project: "api", Updated: now.Add(-48 * time.Hour),
+			Messages: []model.Message{{Role: "assistant", Time: now.Add(-48 * time.Hour), Text: text}},
+		}
+		bare := model.Session{
+			Harness: "claude", ID: "bare", Project: "api", Updated: now,
+			Messages: []model.Message{{Role: "user", Time: now, Text: "mcp.go mcp.go mcp.go again"}},
+		}
+		hits := Blame([]model.Session{said, bare}, target, BlameOptions{All: true})
+		if len(hits) != 2 || hits[0].Session.ID != "said" {
+			t.Errorf("%q was read as saying nothing: %+v", text, hits)
+		}
+	}
+}
