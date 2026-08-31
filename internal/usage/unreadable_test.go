@@ -61,3 +61,31 @@ func TestAReadablePayloadIsNotFlagged(t *testing.T) {
 		t.Errorf("the snapshot carries the flag for a payload deja read:\n%s", b)
 	}
 }
+
+// The déjà vu hook's own recorder: the prompt is what it recalls from, so a
+// decode that fails on a later field still injects — and the row carries the
+// receiver the payload did name beside the flag about the payload (#2773).
+func TestTheDejaVuRecorderKeepsBothTheFlagAndTheReceiver(t *testing.T) {
+	dir := t.TempDir()
+	RecordDigestFromUnread(dir, KindDejaVu, "a digest", "ses_vu", 2, 4000,
+		[]string{"pgbouncer"}, []string{"beta"}, []string{"claude:one"})
+
+	events := read(Path(dir))
+	if len(events) != 1 {
+		t.Fatalf("want one event, got %d", len(events))
+	}
+	if !events[0].Unreadable || events[0].Into != "ses_vu" {
+		t.Errorf("the event lost half of what it was told: %+v", events[0])
+	}
+	b, err := os.ReadFile(SnapshotPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap Snapshot
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(b))), &snap); err != nil {
+		t.Fatal(err)
+	}
+	if !snap.Unreadable || snap.Into != "ses_vu" || len(snap.Terms) != 1 {
+		t.Errorf("the snapshot lost a field on the way: %+v", snap)
+	}
+}
