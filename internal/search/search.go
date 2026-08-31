@@ -641,6 +641,36 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 // is dated by its evidence rather than by the day it was filed (V4) the two are
 // equally fresh, so the transcript won its own distillation.
 
+func liftNotesAboveTheirSource(hits []Hit) {
+	liftNotesBy(hits, func(h Hit) model.Session { return h.Session })
+}
+
+// firstBelow is the highest-ranked hit at or after i among the ones recorded
+// for an id: the pair is made with the best copy of the note, and a copy that
+// already outranks the source is left where it is.
+func firstBelow(at []int, i int) (int, bool) {
+	for _, j := range at {
+		if j >= i {
+			return j, true
+		}
+	}
+	return 0, false
+}
+
+// indexNotes is where each promoted note sits, by the id it names, in rank
+// order. Every hit holding an id rather than one of them: two machines can
+// promote the same session, and keeping only the last put the peer's copy
+// above this machine's own note.
+func indexNotes[T any](hits []T, of func(T) model.Session) map[string][]int {
+	notes := make(map[string][]int, len(hits))
+	for i, h := range hits {
+		if id := noteID(of(h)); id != "" {
+			notes[id] = append(notes[id], i)
+		}
+	}
+	return notes
+}
+
 // noteID is the id a promoted note has on the machine that made it, and "" for
 // a session that is not one. Mirrors cmd/deja's promotedNoteID: after a sync
 // the local id is `imported-…` and the real one rides in OrigID (#975, #2833).
@@ -665,19 +695,10 @@ func sessionOrigID(s model.Session) string {
 	return s.ID
 }
 
-func liftNotesAboveTheirSource(hits []Hit) {
-	liftNotesBy(hits, func(h Hit) model.Session { return h.Session })
-}
-
 // liftNotesBy is the rule itself, over anything that names a session: blame
 // ranks its own hit type and had the same omission (#2829).
 func liftNotesBy[T any](hits []T, of func(T) model.Session) {
-	notes := make(map[string]int, len(hits))
-	for i, h := range hits {
-		if id := noteID(of(h)); id != "" {
-			notes[id] = i
-		}
-	}
+	notes := indexNotes(hits, of)
 	if len(notes) == 0 {
 		return
 	}
@@ -689,23 +710,29 @@ func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 		// Mirrors sources.PromotedNoteID: building the id rather than parsing
 		// one keeps a harness name with a dash in it from splitting wrong.
 		//
-		// From the id the source had on the machine that made the note, which
-		// is what the note names. After a sync the local id is `imported-…`
-		// and the original is in OrigID, so a pair that travelled was never
-		// recognised as one (#2833).
-		id := "deja-note-" + src.Harness + "-" + sessionOrigID(src)
-		j, ok := notes[id]
-		if !ok || j < i {
+		// Both ids. The note names the session as it was on the machine that
+		// made it — which is the local id when this machine promoted it, and
+		// the original when the note travelled — and after a sync a session
+		// carries `imported-…` locally with the original in OrigID. Either can
+		// be the one the note was built from, so both are tried (#2833).
+		j, ok := -1, false
+		for _, id := range []string{
+			"deja-note-" + src.Harness + "-" + src.ID,
+			"deja-note-" + src.Harness + "-" + sessionOrigID(src),
+		} {
+			if j, ok = firstBelow(notes[id], i); ok {
+				break
+			}
+		}
+		if !ok {
 			continue
 		}
 		note := hits[j]
 		copy(hits[i+1:j+1], hits[i:j])
 		hits[i] = note
-		for k := i; k <= j; k++ {
-			if id := noteID(of(hits[k])); id != "" {
-				notes[id] = k
-			}
-		}
+		// Rebuilt rather than patched: the rotation moved everything between
+		// the two, and the id may name more than one of them.
+		notes = indexNotes(hits, of)
 	}
 }
 
