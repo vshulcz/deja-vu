@@ -2280,7 +2280,7 @@ func fromDatabase(r Record) bool {
 		return true
 	}
 	switch h := harnessForPath(r.SourcePath); h {
-	case "cursor-db", "goose-db", "hermes":
+	case "cursor-db", "goose-db", "hermes", "zed":
 		return true
 	default:
 		// A path that names a per-file kind settles it: two transcripts in
@@ -2334,6 +2334,12 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 			harness = "cursor"
 		case "goose-db":
 			harness = "goose"
+		case "zed":
+			// A thread is a session and comes back whole, so the record it
+			// replaces has to be droppable — without this the earlier turns of
+			// a continued thread were added a second time (#2075). One store
+			// and one kind, so naming the harness is naming the store.
+			harness = "zed"
 		default:
 			continue
 		}
@@ -2352,7 +2358,18 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 // this one store, rather than a number that only climbs. Narrowing the clause
 // instead costs the session its earlier turns (#2033), so the re-reading stays.
 func rereadsWholeSessions(p string) bool {
-	return harnessForPath(p) == "goose-db"
+	switch harnessForPath(p) {
+	case "goose-db":
+		return true
+	case "zed":
+		// zed's cursor selects threads, and a thread is a session: a continued
+		// one comes back whole, so its earlier turns were added a second time
+		// — measured, the first turn of a thread that gained a second was held
+		// twice (#2075). The SQL still asks only for the touched threads, so
+		// what this gives up is the record bookkeeping, not the read.
+		return true
+	}
+	return false
 }
 
 // fullyReadFiles drops the files a pass reads only part of. LastUpdated is
@@ -3124,6 +3141,10 @@ func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]Sess
 	for _, db := range sources.HermesDBs() {
 		setStoreLastUpdated(files, sessions, "hermes", db)
 	}
+	// zed, whose cursor selects threads rather than messages: a continued
+	// thread comes back whole, so it joins rereadsWholeSessions below in the
+	// same change — the goose shape, not the opencode one (#2075).
+	setStoreLastUpdated(files, sessions, "zed", sources.ZedDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
 	}
