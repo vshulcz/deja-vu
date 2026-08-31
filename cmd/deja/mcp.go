@@ -496,7 +496,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// travel with the answer rather than to a terminal it never sees.
 			out += "\n\n" + note
 		}
-		return out, nil
+		// Framed like every other agent-facing recall: these are command lines
+		// lifted out of transcripts, which recall_frame.go names as data an
+		// attacker may have influenced — and they are the most directly
+		// actionable thing deja serves, since an agent may run them. This was
+		// the one MCP answer with neither frame nor note (#2827's sweep).
+		return frameRecall(out), nil
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`
