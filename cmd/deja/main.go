@@ -973,7 +973,7 @@ func cmdCtx(dir string, rest []string) error {
 	// A short selector never reaches the id branch above, so a forgotten
 	// session's note arrives as an ordinary hit — and the answer still has to
 	// say the session is gone (#971).
-	noteForgottenSource(hits[0].Session, q, false)
+	noteForgottenSource(dir, hits[0].Session, q, false)
 	// The hit carries the matching snippets, not the session: for a promoted
 	// note that meant the correction — which rarely repeats the words of the
 	// decision — was missing, and the command whose whole job is packaging
@@ -2210,7 +2210,7 @@ func findByPrefix(dir, p string) (model.Session, bool, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if s, ok, err := index.FindByPrefix(dir, p); err == nil {
 			if ok {
-				noteForgottenSource(s, p, true)
+				noteForgottenSource(dir, s, p, true)
 			}
 			return s, ok, nil
 		}
@@ -4231,8 +4231,8 @@ func sharedRowsAmong(dir string, keys []string) int {
 // session that has been forgotten. Asking for the session by the id you
 // remember answered with the note and said nothing, so the reply looked like
 // the session itself until you noticed the id had changed (#971).
-func noteForgottenSource(s model.Session, selector string, resolved bool) {
-	if line := forgottenSourceNote(s, selector, resolved); line != "" {
+func noteForgottenSource(dir string, s model.Session, selector string, resolved bool) {
+	if line := forgottenSourceNote(dir, s, selector, resolved); line != "" {
 		fmt.Fprintf(os.Stderr, "deja: %s\n", line)
 	}
 }
@@ -4245,7 +4245,7 @@ func noteForgottenSource(s model.Session, selector string, resolved bool) {
 // forgotten and the MCP tools handed an agent the same note with the fact
 // removed — and "forgotten" is a decision the reader made about that session,
 // which is the kind of fact recall exists to carry (#1624).
-func forgottenSourceNote(s model.Session, selector string, resolved bool) string {
+func forgottenSourceNote(dir string, s model.Session, selector string, resolved bool) string {
 	// Through promotedNoteID, so a note that arrived by sync is one: its local
 	// id is `imported-…` and the id it names lives in OrigID (#2839).
 	noteID := promotedNoteID(s)
@@ -4274,6 +4274,9 @@ func forgottenSourceNote(s model.Session, selector string, resolved bool) string
 	if !selectorNamesSession(selector, key, resolved) {
 		return ""
 	}
+	// The key the note names is the source's key on the machine that made it,
+	// and a source that arrived by sync carries `imported-…` here — so forget
+	// tombstones both names, and asking by either finds it (#2839).
 	if !index.Tombstoned(key) {
 		return ""
 	}

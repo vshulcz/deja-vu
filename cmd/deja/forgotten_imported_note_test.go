@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -36,12 +37,12 @@ func TestAnImportedNoteStillNamesItsForgottenSource(t *testing.T) {
 		Harness: "deja", ID: "imported-ccc333", OrigID: "deja-note-claude-longs",
 		Project: "imported:api",
 	}
-	if got := forgottenSourceNote(note, "claude:longs", false); !strings.Contains(got, "forgotten") {
+	if got := forgottenSourceNote(index.DefaultDir(), note, "claude:longs", false); !strings.Contains(got, "forgotten") {
 		t.Errorf("an imported note says nothing about the session it distils: %q", got)
 	}
 
 	local := model.Session{Harness: "deja", ID: "deja-note-claude-longs", Project: "api"}
-	if got := forgottenSourceNote(local, "claude:longs", false); !strings.Contains(got, "forgotten") {
+	if got := forgottenSourceNote(index.DefaultDir(), local, "claude:longs", false); !strings.Contains(got, "forgotten") {
 		t.Errorf("the local case regressed: %q", got)
 	}
 }
