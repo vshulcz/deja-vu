@@ -1748,8 +1748,19 @@ func commandsMatchingWords(dir string, terms []string) int {
 // query handed over a command that answers "no command on this machine
 // mentions …" under a line that had just counted three (#2768).
 func howOfferLine(n int, match string, terms []string) string {
-	return fmt.Sprintf("deja: %d command%s this machine ran %s it — `deja how %s`\n",
-		n, pluralS(n), match, pasteSafeWords(terms))
+	// A term can start with a dash — someone asking about `-run` or `--limit`
+	// — and `deja how` would read it as a flag it does not have, or as one it
+	// does and swallow the next word. The command's own escape says the rest
+	// is the query.
+	dashed := ""
+	for _, t := range terms {
+		if strings.HasPrefix(t, "-") {
+			dashed = "-- "
+			break
+		}
+	}
+	return fmt.Sprintf("deja: %d command%s this machine ran %s it — `deja how %s%s`\n",
+		n, pluralS(n), match, dashed, pasteSafeWords(terms))
 }
 
 // sessionsTouchingWords counts the sessions that touched a file whose name

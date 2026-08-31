@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // carriesControl reports whether a printed line would reach the terminal with
@@ -41,6 +42,12 @@ func TestTheHintsThatOfferACommandQuoteWhatTheyOffer(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "one.jsonl"), []byte(touched+"\n"+ran+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// A command is worth remembering once two sessions ran it, which is what
+	// the table the `deja how` half reads is built from.
+	again := strings.ReplaceAll(ran, "aaaa0001", "bbbb0002")
+	if err := os.WriteFile(filepath.Join(store, "two.jsonl"), []byte(again+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	dir := filepath.Join(tmp, "index.db")
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
@@ -58,14 +65,17 @@ func TestTheHintsThatOfferACommandQuoteWhatTheyOffer(t *testing.T) {
 	if strings.Contains(hint, "blame parser&&x.go") {
 		t.Errorf("a shell metacharacter is unquoted in a command to paste:\n%q", hint)
 	}
-	// And the words half, which `deja how` reads as separate arguments: it ANDs
-	// them, so a quoted phrase becomes one term it then requires contiguously —
-	// the count in the sentence above was taken over the words (#2768).
-	if got := howOfferLine(3, "match", []string{"pool", "size"}); !strings.Contains(got, "`deja how pool size`") {
-		t.Errorf("the words were handed over as something other than words: %q", got)
+	// And the words half, through the hint itself: `deja how` ANDs its
+	// arguments, so a quoted phrase becomes one term it then requires
+	// contiguously — the count in the sentence above was taken over the words
+	// (#2768). Asserted on the wiring, because the wiring is what decides
+	// whether the offer and the count can disagree.
+	hint = roleServedHint(dir, "parser test")
+	if !strings.Contains(hint, "deja how") {
+		t.Fatalf("the command half of the hint is missing, so this half guards nothing:\n%s", hint)
 	}
-	if got := howOfferLine(3, "match", []string{"pool&&x", "size"}); !strings.Contains(got, "`deja how 'pool&&x' size`") {
-		t.Errorf("a metacharacter in one word was not quoted on its own: %q", got)
+	if !strings.Contains(hint, "`deja how parser test`") {
+		t.Errorf("the words were not handed over as they were counted:\n%q", hint)
 	}
 }
 
@@ -95,5 +105,43 @@ func TestTheFixHintQuotesTheErrorItOffers(t *testing.T) {
 		if !strings.HasPrefix(got, "'") && !strings.HasPrefix(got, "$'") {
 			t.Errorf("%q was handed over unquoted: %s", near, got)
 		}
+	}
+}
+
+// A query word can start with a dash — somebody asking about `-run` or
+// `--limit` — and `deja how` reads it as a flag it does not have, or as one it
+// does, swallowing the next word. The command's own escape says the rest is
+// the query.
+func TestTheHowOfferEscapesAQueryThatLooksLikeFlags(t *testing.T) {
+	for _, c := range []struct {
+		terms []string
+		want  string
+	}{
+		{[]string{"go", "test"}, "`deja how go test`"},
+		{[]string{"-run", "parser"}, "`deja how -- -run parser`"},
+		{[]string{"why", "--limit", "ignored"}, "`deja how -- why --limit ignored`"},
+	} {
+		got := howOfferLine(3, "match", c.terms)
+		if !strings.Contains(got, c.want) {
+			t.Errorf("howOfferLine(%v) = %q, want it to carry %s", c.terms, got, c.want)
+		}
+	}
+}
+
+// The line promote prints when it takes a mark back offers the note's id, and
+// the same sentence echoes the session it came from: one is pasted, the other
+// is read.
+func TestTheTakenBackLineQuotesTheIdItOffers(t *testing.T) {
+	line := markTakenBack("claude:has space", "accepted", sources.Lifecycle{State: "rejected"})
+	if line == "" {
+		t.Fatal("the fixture no longer produces the line this test is about")
+	}
+	if strings.Contains(line, "`deja show deja-note-claude-has space`") {
+		t.Errorf("the id is unquoted in a command to paste: %q", line)
+	}
+	esc := string(rune(0x1b))
+	line = markTakenBack("claude:esc"+esc+"[31mX", "accepted", sources.Lifecycle{State: "rejected"})
+	if carriesControl(line) {
+		t.Errorf("a control byte reached the terminal: %q", line)
 	}
 }

@@ -247,8 +247,10 @@ func markTakenBack(src, state string, prior sources.Lifecycle) string {
 	if !prior.At.IsZero() {
 		when = " from " + prior.At.Format("2006-01-02")
 	}
-	return fmt.Sprintf("this takes back the %s mark%s: hits for %s are no longer labelled. Both marks stay in the note — `deja show deja-note-%s`",
-		prior.State, when, src, strings.ReplaceAll(src, ":", "-"))
+	// The echo is read and the id is pasted, so they are treated differently —
+	// the same split the line above this one makes (#2768).
+	return fmt.Sprintf("this takes back the %s mark%s: hits for %s are no longer labelled. Both marks stay in the note — `deja show %s`",
+		prior.State, when, safeForStatusline(src, 200), pasteSafe("deja-note-"+strings.ReplaceAll(src, ":", "-")))
 }
 
 // distillSession quotes the session instead of summarizing it: the first user
