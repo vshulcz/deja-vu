@@ -15,10 +15,10 @@ import (
 func TestTheExecHandoffSanitisesLikeThePrintedOne(t *testing.T) {
 	// A bidi override and a zero-width space, which no index-time pass removes
 	// because they are a display concern, and a token shaped like a secret.
-	raw := "continue the work‮reversed​ here: ghp_0123456789abcdefghijklmnopqrstuvwxyzAB"
+	raw := "continue the work\u202ereversed\u200b here: ghp_0123456789abcdefghijklmnopqrstuvwxyzAB"
 
 	got := handoffPrompt(raw)
-	for _, bad := range []string{"‮", "​"} {
+	for _, bad := range []string{"\u202e", "\u200b"} {
 		if strings.Contains(got, bad) {
 			t.Errorf("an invisible character survived into the prompt: %q", got)
 		}
@@ -35,12 +35,12 @@ func TestTheExecHandoffSanitisesLikeThePrintedOne(t *testing.T) {
 // sanitised prompt. Before this the two sat a few lines apart and the exec one
 // took the raw digest.
 func TestTheExecArgvCarriesTheSanitisedPrompt(t *testing.T) {
-	argv, ok := handoffArgv("claude", "work‮reversed here ghp_0123456789abcdefghijklmnopqrstuvwxyzAB")
+	argv, ok := handoffArgv("claude", "work\u202ereversed here ghp_0123456789abcdefghijklmnopqrstuvwxyzAB")
 	if !ok || len(argv) < 2 {
 		t.Fatalf("no argv for a known target: %v", argv)
 	}
 	joined := strings.Join(argv, " ")
-	if strings.Contains(joined, "‮") || strings.Contains(joined, "ghp_0123456789abcdefghijklmnopqrstuvwxyzAB") {
+	if strings.Contains(joined, "\u202e") || strings.Contains(joined, "ghp_0123456789abcdefghijklmnopqrstuvwxyzAB") {
 		t.Errorf("the command line carries what the printed handoff would have removed: %q", joined)
 	}
 }
