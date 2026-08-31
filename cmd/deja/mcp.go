@@ -1447,12 +1447,37 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	search.PrintContext(&b, whole, q)
 	text := b.String()
 	if hits[0].Tier != search.TierExact {
-		text = contextTierLead(hits[0].Tier, sessionNamesTheAsked(whole, q, result.TermIDF)) + text
+		text = contextTierLead(hits[0].Tier, sessionNamesTheAsked(whole, q, result.TermIDF)) +
+			contextIgnoredWords(result) + text
 	}
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
 		// The search path reaches a promoted note as often as the id path
 		// does — the note carries the id in its own text.
 		forgottenSourceNote(whole, q, false), nil
+}
+
+// contextIgnoredWords names the query words the search could not use, the way
+// the counted page already does.
+//
+// When the subject of a question is a word no session holds, the stemmed tier
+// answers on what is left. recall says which words it threw away — "ignored: no
+// session matches it with the rest" — and this tool, which hands an agent a
+// whole session rather than a line, printed only `[stemmed]`. So the surface
+// carrying the most text was the one that did not say the question's subject
+// had been dropped, which is what an agent then answers from (#2827).
+func contextIgnoredWords(result index.SearchResult) string {
+	if !result.Stemmed && !result.Fuzzy {
+		return ""
+	}
+	summary := fuzzySummary(result.Variants)
+	if len(summary) == 0 {
+		return ""
+	}
+	what := "word forms"
+	if result.Fuzzy && !result.Stemmed {
+		what = "close spellings"
+	}
+	return fmt.Sprintf("No exact match; using %s: %s\n", what, strings.Join(summary, ", "))
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in
