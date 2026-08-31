@@ -105,7 +105,8 @@ func TestASwapThatCannotRenameKeepsTheOldIndex(t *testing.T) {
 	// failed rename and the restore share that window, with a floor under the
 	// restore so it is never left none of it.
 	if took := time.Since(start); took > swapRenameWait+restoreRenameFloor+swapRenameStep {
-		t.Errorf("the index was away for %v, past the %v a reader waits", took, swapRenameWait)
+		t.Errorf("the index was away for %v, past the %v it may take", took,
+			swapRenameWait+restoreRenameFloor+swapRenameStep)
 	}
 	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "old" {
 		t.Errorf("the previous index is not where it was: %q %v", b, err)
@@ -223,5 +224,46 @@ func TestASwapDoesNotWaitOutAnUnrecognisedRefusal(t *testing.T) {
 	// happen, not one that took the index with it.
 	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "old" {
 		t.Errorf("the previous index is not where it was: %q %v", b, err)
+	}
+}
+
+// The parking step is the rename nobody is waiting on — the index is still
+// where readers look until it lands — so it waits far past the window that
+// bounds the pair after it. That is the case #2228 is about: a pass that spent
+// seconds building the new index must not give up because a search held a
+// handle for a quarter of a second.
+func TestTheParkingStepWaitsPastTheReadersWindow(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	tmp := dir + ".tmp"
+	for _, d := range []string{dir, tmp} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "records.bin"), []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	onWindows(t)
+	// Past the reader's window by a margin, and well inside the parking step's.
+	refusals := int32(swapRenameWait/swapRenameStep) + 5
+	var left atomic.Int32
+	left.Store(refusals)
+	real := renameFile
+	renameFile = func(from, to string) error {
+		if filepath.Base(from) == "index.db" && left.Add(-1) >= 0 {
+			return heldOpen(from, to)
+		}
+		return real(from, to)
+	}
+	t.Cleanup(func() { renameFile = real })
+
+	if err := swapIndexDir(dir, tmp); err != nil {
+		t.Fatalf("the swap gave up on the parking step: %v", err)
+	}
+	if left.Load() >= 0 {
+		t.Fatalf("the parking step was never held for the whole window: %d refusals left", left.Load())
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "new" {
+		t.Errorf("the new index is not in place: %q %v", b, err)
 	}
 }
