@@ -2842,8 +2842,13 @@ func jsoncCodeOf(line string, inBlock bool) (code string, stillInBlock bool, end
 // to decide which side of it the entry belongs on, and refusing is the honest
 // answer for a shape nobody writes.
 func openInlineBlock(lines []string, key string) ([]string, bool) {
+	inBlock := false
 	for i, l := range lines {
-		code, _, _ := jsoncCodeOf(l, false)
+		// The comment state carries between lines: read on its own, a line
+		// inside a /* … */ looks like code, and splitting it rewrote a block
+		// the reader had commented out.
+		code, next, _ := jsoncCodeOf(l, inBlock)
+		inBlock = next
 		if !strings.Contains(code, `"`+key+`"`) || !strings.Contains(code, "{") {
 			continue
 		}
@@ -2856,10 +2861,15 @@ func openInlineBlock(lines []string, key string) ([]string, bool) {
 			if open < 0 {
 				return lines, false
 			}
-			rest := strings.TrimSpace(l[open+1:])
-			if rest == "" {
+			// What a parser reads, not what the line holds: a comment after the
+			// opening brace — `"mcp": { // my servers` — is not a server on
+			// the opening line, and refusing it took an ordinary shape away
+			// from exactly the readers #1664 was opened for.
+			codeOpen := braceOutsideString(code, '{')
+			if codeOpen < 0 || strings.TrimSpace(code[codeOpen+1:]) == "" {
 				return lines, true
 			}
+			rest := strings.TrimSpace(l[open+1:])
 			if strings.TrimSpace(code) != strings.TrimSpace(l) {
 				return lines, false
 			}
@@ -2990,7 +3000,10 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	lines, canOpen := openInlineBlock(lines, "mcp")
 	if !canOpen {
 		if uninstall {
-			return []byte(strings.Join(lines, "\n") + "\n"), "", nil
+			// The file as it was, byte for byte: this is a config deja has
+			// just declined to edit, and rejoining the lines wrote the split
+			// back out — and gave a file with no trailing newline one.
+			return old, "", nil
 		}
 		return nil, "", fmt.Errorf("opencode config has an \"mcp\" block deja could not edit without risking it — add the deja server by hand")
 	}

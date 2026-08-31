@@ -68,6 +68,8 @@ func TestOpencodeOpensAnInlineBlockRatherThanWritingPastIt(t *testing.T) {
 		"{\n  \"mcp\": {\"other\": {\"type\":\"local\",\"command\":[\"x\"]}}\n}\n",
 		// The block spans lines, but its first server sits on the opening one.
 		"{\n  \"mcp\": { \"other\": {\"type\":\"local\",\"command\":[\"x\"]}\n  }\n}\n",
+		// A comment after the opening brace is not a server on that line.
+		"{\n  \"mcp\": { // my servers\n    \"other\": {\"type\":\"local\",\"command\":[\"x\"]}\n  }\n}\n",
 		"{\n  // annotated\n  \"mcp\": {}\n}\n",
 	} {
 		t.Run(strings.TrimSpace(strings.SplitN(before, "\n", 3)[1]), func(t *testing.T) {
@@ -168,5 +170,32 @@ func TestOpencodeSplitsAnInlineBlockAtItsOwnBrace(t *testing.T) {
 	}
 	if strings.Contains(string(b), "}}") {
 		t.Errorf("the split fell inside the reader's own server:\n%s", b)
+	}
+}
+
+// A config deja declines to edit is not written to on the way out either: the
+// uninstall path rejoined the lines it had split while deciding, so a block
+// commented out with /* … */ came back reshaped by a run that refused to
+// touch it.
+func TestUninstallLeavesAConfigItCannotEditByteIdentical(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(opencodeConfigHome(), "opencode")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "opencode.jsonc")
+	before := "{\n  /* off\n  \"mcp\": {},\n  */\n  \"theme\": \"x\"\n}"
+	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "uninstall", "opencode"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != before {
+		t.Errorf("a config the uninstall did not edit was rewritten:\n%q\nwant\n%q", b, before)
 	}
 }
