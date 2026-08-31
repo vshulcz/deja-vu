@@ -1140,12 +1140,20 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
 	switch {
+	case result.Tier == search.TierRelevance:
+		// Nothing matched, and the header is the line an agent reads as the
+		// answer's title. "deja recall for <query>" one line under "no session
+		// is about this" contradicts it, and with an offset the old header
+		// called them matches outright — the two shapes #2074 measured an
+		// agent inventing facts from.
+		if offset > 0 {
+			fmt.Fprintf(&b, "deja recall: no session about %q; nearest by wording, %d-%d of %d ranked\n",
+				q, offset+1, offset+served, total)
+			break
+		}
+		fmt.Fprintf(&b, "deja recall: no session about %q; nearest by wording (%d of %d ranked)\n", q, served, total)
 	case offset > 0:
 		fmt.Fprintf(&b, "deja recall for %q (matches %d-%d of %d)\n", q, offset+1, offset+served, total)
-	case served < total && result.Tier == search.TierRelevance:
-		// The tier line above already says nothing matched; these are the
-		// nearest sessions, so calling them matches here would contradict it.
-		fmt.Fprintf(&b, "deja recall for %q (%d of %d ranked)\n", q, served, total)
 	case served < total:
 		// How many came back is not how many matched, and the agent is the
 		// reader that cannot ask a human. "(5 match(es))" reads as five exist,
