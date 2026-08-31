@@ -9,14 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -536,19 +539,22 @@ func consumeField(b []byte) (string, []byte, bool) {
 func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
 	_ = os.RemoveAll(old)
-	if err := renameWaiting(dir, old); err != nil && !os.IsNotExist(err) {
-		// The parking spot survived the removal above — a leftover from an
-		// interrupted swap whose permissions stop deja from clearing it. The
-		// bare `rename …: file exists` names two paths nobody chose and gives
-		// nothing to do about either (#1009).
-		if _, statErr := os.Stat(old); statErr == nil {
-			return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
-		}
+	// The parking spot survived the removal above — a leftover from an
+	// interrupted swap whose permissions stop deja from clearing it. The bare
+	// `rename …: file exists` names two paths nobody chose and gives nothing to
+	// do about either (#1009). Decided before the wait: no amount of waiting
+	// clears it, and the reader has to act on the message either way.
+	if _, statErr := os.Stat(old); statErr == nil {
+		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
+	}
+	if err := renameWaiting(dir, old); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	if err := renameWaiting(tmp, dir); err != nil {
-		// Put the previous index back rather than leaving nothing.
-		_ = os.Rename(old, dir)
+		// Put the previous index back rather than leaving nothing — and with
+		// the same wait, since this runs exactly when renames on this
+		// directory are being refused.
+		_ = renameWaiting(old, dir)
 		return err
 	}
 	_ = os.RemoveAll(old)
@@ -568,20 +574,53 @@ func swapIndexDir(dir, tmp string) error {
 // forever, and the caller puts the previous index back.
 func renameWaiting(from, to string) error {
 	err := renameFile(from, to)
-	for wait := swapRenameWait; err != nil && !os.IsNotExist(err) && wait > 0; wait -= swapRenameStep {
+	for wait := swapRenameWait; err != nil && renameHeldOpen(err) && wait > 0; wait -= swapRenameStep {
 		time.Sleep(swapRenameStep)
 		err = renameFile(from, to)
 	}
 	return err
 }
 
+// renameHeldOpen reports whether a refusal is the kind that clears on its own.
+// A handle in the directory is; a read-only filesystem, a path that is a file,
+// a parking spot deja cannot replace (#1009) are not, and waiting two seconds
+// to say so delays a message the reader has to act on either way.
+//
+// By errno rather than by fs.ErrPermission, which does not discriminate here:
+// Windows reports both a sharing refusal and a real ACL denial as
+// ERROR_ACCESS_DENIED.
+func renameHeldOpen(err error) bool {
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
+	}
+	switch uintptr(errno) {
+	case 5, 32, 33: // ACCESS_DENIED, SHARING_VIOLATION, LOCK_VIOLATION
+		// Those numbers mean something else on Unix, where the rename does not
+		// fail this way at all, so the wait is Windows' alone. A variable
+		// rather than runtime.GOOS so a test can stand where Windows is.
+		return renameOS == "windows"
+	}
+	return false
+}
+
+// renameOS is runtime.GOOS, indirected for the tests that inject a refusal.
+var renameOS = runtime.GOOS
+
 const (
-	// swapRenameWait is how long a swap waits out a reader. Measured against
-	// the read it is waiting on: a search opens the store, reads what it needs
-	// and closes, which is milliseconds — so this is generous by two orders of
-	// magnitude and still shorter than the pass that would have to run again.
-	swapRenameWait = 2 * time.Second
-	swapRenameStep = 20 * time.Millisecond
+	// swapRenameWait is how long a swap waits out a reader, and it is bounded
+	// by what a reader will wait for it: swapWindowTries × swapWindowWait is
+	// 200ms, after which a reader stops looking and gets the bare ENOENT that
+	// swapInFlight exists to absorb. Waiting longer than that turns one pass
+	// losing its swap into every reader losing (#2228).
+	//
+	// The same refusal atomicfile.publish waits out, measured on windows CI at
+	// 20 × 5ms; this is the same order, in the steps the reader side uses.
+	swapRenameWait = swapWindowTries * swapWindowWait
+	swapRenameStep = swapWindowWait
 )
 
 // renameFile is os.Rename, indirected so a test can refuse a rename the way
@@ -599,7 +638,9 @@ func recoverIndexDir(dir string) {
 		return
 	}
 	if _, err := os.Stat(dir + ".old"); err == nil {
-		_ = os.Rename(dir+".old", dir)
+		// The same wait: this is the crash-recovery path, and a refusal here
+		// leaves the index missing for the whole run.
+		_ = renameWaiting(dir+".old", dir)
 	}
 }
 
