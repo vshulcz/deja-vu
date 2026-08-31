@@ -442,7 +442,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
 				commandListingLine(p.Command))
 		}
-		return strings.TrimRight(fb.String(), "\n"), nil
+		// Framed like `how` (#2844) and for a sharper reason: this hands an
+		// agent a command at the moment it has just hit an error, which is
+		// the moment it is most likely to run it without reading. The
+		// command came out of a transcript, which recall_frame.go names as
+		// data an attacker may have influenced.
+		return frameRecall(strings.TrimRight(fb.String(), "\n")), nil
 	case "how":
 		var a struct {
 			What    string    `json:"what"`
