@@ -4246,16 +4246,19 @@ func noteForgottenSource(s model.Session, selector string, resolved bool) {
 // removed — and "forgotten" is a decision the reader made about that session,
 // which is the kind of fact recall exists to carry (#1624).
 func forgottenSourceNote(s model.Session, selector string, resolved bool) string {
-	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") {
+	// Through promotedNoteID, so a note that arrived by sync is one: its local
+	// id is `imported-…` and the id it names lives in OrigID (#2839).
+	noteID := promotedNoteID(s)
+	if noteID == "" {
 		return ""
 	}
-	src, ok := strings.CutPrefix(s.ID, "deja-note-")
+	src, ok := strings.CutPrefix(noteID, "deja-note-")
 	if !ok || src == "" {
 		return ""
 	}
 	// The selector named the source, not the note: a reader who typed the note
-	// id knows what they asked for.
-	if strings.HasPrefix(s.ID, selector) {
+	// id knows what they asked for — either id of it.
+	if strings.HasPrefix(s.ID, selector) || strings.HasPrefix(noteID, selector) {
 		return ""
 	}
 	key := strings.Replace(src, "-", ":", 1)
