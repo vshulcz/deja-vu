@@ -499,7 +499,10 @@ func Handoff(s model.Session, budget int, quote func(string) string) string {
 	// own instruction (#2866).
 	var quoted strings.Builder
 	quoted.WriteString(body)
-	if tail := tailSection(s, budget-b.Len()); tail != "" {
+	// The body is in `quoted` rather than in `b` now, so the tail's budget has
+	// to count both — measured, it was handed the whole body's worth of extra
+	// room and a 2000-byte package came back at 3159.
+	if tail := tailSection(s, budget-b.Len()-quoted.Len()); tail != "" {
 		quoted.WriteString("\n\n## Where it stopped\n\n")
 		quoted.WriteString(tail)
 	}

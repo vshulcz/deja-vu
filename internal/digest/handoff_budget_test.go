@@ -43,4 +43,12 @@ func TestALongSessionStillHandsOverItsConclusions(t *testing.T) {
 	if len(block) > 4000+200 {
 		t.Errorf("the block ran past its budget: %d bytes", len(block))
 	}
+	// The quoted half is written into a builder of its own now, and the tail's
+	// budget has to count it: measured, it was handed the whole body's worth
+	// of extra room and a 2000-byte package came back at 3159 (#2866).
+	const open, close = "<q>\n", "\n</q>"
+	framed := Handoff(s, 4000, func(text string) string { return open + text + close })
+	if len(framed) > 4000+200+len(open)+len(close) {
+		t.Errorf("the framed block ran past its budget: %d bytes", len(framed))
+	}
 }
