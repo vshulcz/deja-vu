@@ -392,10 +392,21 @@ func jsoncSetFlag(text, blockKey, key string, value bool) (string, error) {
 	if value {
 		rendered = "true"
 	}
-	block := zedFindKey(text, open+1, blockKey)
+	// A dotted block key, for a switch that lives deeper than the top level:
+	// openclaw's is `hooks.internal.enabled` (#2811).
+	keys := strings.Split(blockKey, ".")
+	block, have := walkJSONCKeys(text, open, keys)
 	if block == nil {
-		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  }%s", blockKey, key, rendered, rootComma(text, open))
-		return text[:open+1] + insert + text[open+1:], nil
+		at, comma, indent := open, rootComma(text, open), "  "
+		if have > 0 {
+			parent, _ := walkJSONCKeys(text, open, keys[:have])
+			at, comma, indent = parent.valueOpen, blockComma(text, parent), strings.Repeat("  ", have+1)
+		}
+		insert := nestedBlocks(keys[have:], key, rendered, indent)
+		if have > 0 && comma == "" && !strings.HasPrefix(text[at+1:], "\n") {
+			insert += "\n" + strings.Repeat("  ", have)
+		}
+		return text[:at+1] + insert + comma + text[at+1:], nil
 	}
 	if at := jsoncScalarValue(text, block, key); at != nil {
 		return text[:at[0]] + rendered + text[at[1]:], nil
@@ -408,8 +419,74 @@ func jsoncSetFlag(text, blockKey, key string, value bool) (string, error) {
 	if strings.TrimSpace(stripJSONComments(text[block.valueOpen+1:block.valueEnd-1])) == "" {
 		comma, tail = "", "\n  "
 	}
-	insert := fmt.Sprintf("\n    %q: %s%s%s", key, rendered, comma, tail)
+	insert := fmt.Sprintf("\n%s%q: %s%s%s", strings.Repeat("  ", len(keys)+1), key, rendered, comma, tail)
 	return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
+}
+
+// jsoncRemoveKey takes a scalar setting back out, and the blocks it was the
+// last thing in when deja is what created them. It is the other half of
+// jsoncSetFlag: a switch deja turned on has to go off the same way the entry
+// beside it goes (#2811).
+func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
+	open := zedTopLevelOpen(text)
+	if open < 0 {
+		return text, nil
+	}
+	keys := strings.Split(blockKey, ".")
+	if dropFrom < len(keys) {
+		chain, have := walkJSONCKeys(text, open, keys[:dropFrom+1])
+		if chain == nil || have <= dropFrom {
+			return text, nil
+		}
+		cut := zedEntrySpan(text, chain)
+		return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
+	}
+	block, have := walkJSONCKeys(text, open, keys)
+	if block == nil || have < len(keys) {
+		return text, nil
+	}
+	at := jsoncScalarValue(text, block, key)
+	if at == nil {
+		return text, nil
+	}
+	// From the key's own quote to the end of its value, plus the comma behind
+	// it and the whitespace in front, the way an entry is taken out.
+	start := strings.LastIndex(text[:at[0]], `"`+key+`"`)
+	if start < 0 {
+		return text, nil
+	}
+	end := at[1]
+	for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
+		end++
+	}
+	tookComma := false
+	if end < len(text) && text[end] == ',' {
+		end++
+		tookComma = true
+	}
+	for start > block.valueOpen+1 && (text[start-1] == ' ' || text[start-1] == '\t' || text[start-1] == '\n') {
+		start--
+	}
+	// The last key in a block has no comma after it, and the one in front of it
+	// is what would be left dangling — `{…,\n  }` is not JSON, and the file is
+	// then refused on every later run with a message pointing at the reader's
+	// own comment (#2740 again, one key over).
+	//
+	// Looked for on the comment-blanked copy, whose offsets are the original's:
+	// a comment sitting between the two keys ends in a non-whitespace byte, and
+	// a backward walk that stops there never reaches the comma (#2811).
+	if !tookComma {
+		blank := stripJSONComments(text)
+		for i := start - 1; i > block.valueOpen; i-- {
+			if c := blank[i]; c == ' ' || c == '\t' || c == '\n' {
+				continue
+			} else if c == ',' {
+				start = i
+			}
+			break
+		}
+	}
+	return closeEmptied(text[:start]+text[end:], keys), nil
 }
 
 // jsoncScalarValue is where a scalar setting's value sits inside a block, or
