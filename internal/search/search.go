@@ -639,6 +639,14 @@ func liftedNotes(hits []Hit) []Hit {
 	return hits
 }
 
+// LiftNotesAboveTheirSource applies the note-over-source rule to a hit list a
+// caller outside this package built. The semantic path is such a caller: it
+// ranks by cosine alone and never goes through the sort the rule lived in
+// (#2803).
+func LiftNotesAboveTheirSource(hits []Hit) {
+	liftNotesAboveTheirSource(hits)
+}
+
 // liftNotesAboveTheirSource keeps a promoted note in front of the transcript it
 // was distilled from. The two say the same thing, so nothing is buried by the
 // swap — but the note says it in one line with a state attached, and that is
