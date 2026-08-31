@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +20,10 @@ func TestWindowsRedProbe(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("the probe is about Windows")
 	}
-	tmp := hermeticEnv(t)
+	// Exactly the statusline tests' own setup: they pin the index directory
+	// and nothing else, so what they see is the runner's own home — which is
+	// what a hermetic probe cannot show.
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
 
 	// The statusline family: five tests, all reporting "the index cannot
 	// answer", which needs indexNeedsRebuild and history to be true together.
@@ -34,14 +38,22 @@ func TestWindowsRedProbe(t *testing.T) {
 	t.Errorf("probe statusline: needsRebuild=%v history=%v stores=%v",
 		indexNeedsRebuild(index.DefaultDir()), !noAgentHistoryFound(), stores)
 
-	// The install family: what a writer sees for a config it is about to
-	// touch, and whether the paths it derives are where the test put them.
-	t.Errorf("probe install: home=%q claude=%q appdata=%q openclaw=%q zed=%q",
-		sources.Home(), os.Getenv("DEJA_CLAUDE_ROOT"), os.Getenv("APPDATA"),
-		sources.OpenClawStateDir(), sources.ZedSettingsPath())
+	// Every store the history check walks, with how many files it found in
+	// each: the hermetic run said "no history", so the answer is in the
+	// runner's own home.
+	var walked []string
+	for _, check := range doctorStoreChecks() {
+		walked = append(walked, fmt.Sprintf("%s=%d", check.name, len(check.files)))
+	}
+	t.Errorf("probe stores: %v", walked)
+
+	// And what the install family derives, since those paths are the other
+	// thing that differs here.
+	t.Errorf("probe install: home=%q appdata=%q openclaw=%q zed=%q",
+		sources.Home(), os.Getenv("APPDATA"), sources.OpenClawStateDir(), sources.ZedSettingsPath())
 
 	// The ignore-rule family: eight tests, all about what a rule withholds.
 	// The rule is a path pattern, and paths are what differ here.
-	t.Errorf("probe paths: tmp=%q sep=%q index=%q notes=%q",
-		tmp, string(filepath.Separator), index.DefaultDir(), sources.NotesFile())
+	t.Errorf("probe paths: home=%q sep=%q index=%q notes=%q",
+		sources.Home(), string(filepath.Separator), index.DefaultDir(), sources.NotesFile())
 }
