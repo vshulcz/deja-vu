@@ -9,14 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -536,24 +539,127 @@ func consumeField(b []byte) (string, []byte, bool) {
 func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
 	_ = os.RemoveAll(old)
-	if err := os.Rename(dir, old); err != nil && !os.IsNotExist(err) {
-		// The parking spot survived the removal above — a leftover from an
-		// interrupted swap whose permissions stop deja from clearing it. The
-		// bare `rename …: file exists` names two paths nobody chose and gives
-		// nothing to do about either (#1009).
-		if _, statErr := os.Stat(old); statErr == nil {
-			return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
-		}
+	// The parking spot survived the removal above — a leftover from an
+	// interrupted swap whose permissions stop deja from clearing it. The bare
+	// `rename …: file exists` names two paths nobody chose and gives nothing to
+	// do about either (#1009). Decided before the wait: no amount of waiting
+	// clears it, and the reader has to act on the message either way.
+	if _, statErr := os.Stat(old); statErr == nil {
+		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
+	}
+	// The parking step can afford to wait: the index is still where readers
+	// look until it succeeds, so nobody is waiting on it, and this is the
+	// rename a pass that spent seconds building tmp would otherwise give up on
+	// for the sake of a search that held a handle for a quarter of a second.
+	if err := renameWaiting(dir, old, parkRenameWait); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
-		// Put the previous index back rather than leaving nothing.
-		_ = os.Rename(old, dir)
+	// From here the index is not where readers look, so this rename and the
+	// restore that may follow it share one deadline: the window a reader waits
+	// out, spent once between them rather than twice.
+	deadline := time.Now().Add(swapRenameWait)
+	if err := renameWaitingUntil(tmp, dir, deadline); err != nil {
+		// Put the previous index back rather than leaving nothing, with
+		// whatever is left of that window — this runs exactly when renames on
+		// this directory are being refused.
+		floor := time.Now().Add(restoreRenameFloor)
+		if floor.After(deadline) {
+			// A little past the window rather than none of it: the restore is
+			// the one rename that must not fail, and a second rename that
+			// spent the whole budget would otherwise leave it none.
+			deadline = floor
+		}
+		_ = renameWaitingUntil(old, dir, deadline)
 		return err
 	}
 	_ = os.RemoveAll(old)
 	return nil
 }
+
+// renameWaiting is os.Rename with a short wait for a rename another pass is
+// holding the directory open against.
+//
+// Windows refuses to rename a directory while any handle inside it is open, so
+// two ordinary passes at once — a hook's warmup and a `deja index` from a shell
+// — left the loser unable to swap, and the store a session short until
+// something rebuilt it. On Unix the loser renames over the winner and both end
+// up consistent, which is why this went unmeasured (#2228). The reader holding
+// those handles is finishing a read, not doing work, so the wait is short and
+// bounded; a rename still refused at the end is reported rather than retried
+// forever, and the caller puts the previous index back.
+func renameWaiting(from, to string, wait time.Duration) error {
+	return renameWaitingUntil(from, to, time.Now().Add(wait))
+}
+
+// renameWaitingUntil is renameWaiting against a deadline the caller keeps, so a
+// swap and the restore that follows it share one window rather than each
+// getting a fresh one — two full budgets in a row is the index away for twice
+// as long as a reader will wait (#2228).
+func renameWaitingUntil(from, to string, deadline time.Time) error {
+	err := renameFile(from, to)
+	for err != nil && renameHeldOpen(err) && time.Now().Before(deadline) {
+		time.Sleep(swapRenameStep)
+		err = renameFile(from, to)
+	}
+	return err
+}
+
+// renameHeldOpen reports whether a refusal is the kind that clears on its own.
+// A handle in the directory is; a read-only filesystem, a path that is a file,
+// a parking spot deja cannot replace (#1009) are not, and waiting two seconds
+// to say so delays a message the reader has to act on either way.
+//
+// By errno rather than by fs.ErrPermission, which does not discriminate here:
+// Windows reports both a sharing refusal and a real ACL denial as
+// ERROR_ACCESS_DENIED.
+func renameHeldOpen(err error) bool {
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
+	}
+	switch uintptr(errno) {
+	case 5, 32, 33: // ACCESS_DENIED, SHARING_VIOLATION, LOCK_VIOLATION
+		// Those numbers mean something else on Unix, where the rename does not
+		// fail this way at all, so the wait is Windows' alone. A variable
+		// rather than runtime.GOOS so a test can stand where Windows is.
+		return renameOS == "windows"
+	}
+	return false
+}
+
+// renameOS is runtime.GOOS, indirected for the tests that inject a refusal.
+var renameOS = runtime.GOOS
+
+const (
+	// swapRenameWait is how long a swap waits out a reader, and it is bounded
+	// by what a reader will wait for it: swapWindowTries × swapWindowWait is
+	// 200ms, after which a reader stops looking and gets the bare ENOENT that
+	// swapInFlight exists to absorb. Waiting longer than that turns one pass
+	// losing its swap into every reader losing (#2228).
+	//
+	// The same refusal atomicfile.publish waits out, measured on windows CI at
+	// 20 × 5ms; this is the same order, in the steps the reader side uses.
+	swapRenameWait = swapWindowTries * swapWindowWait
+	swapRenameStep = swapWindowWait
+	// parkRenameWait is the other side of that: the parking step and the
+	// crash-recovery restore happen while the index is still (or already)
+	// where readers look, so nothing is waiting on them and the only cost of
+	// waiting is the pass's own. Long enough to outlast a search holding a
+	// handle, short enough that a directory nobody will ever release still
+	// reports inside a scheduled run.
+	parkRenameWait = 2 * time.Second
+	// restoreRenameFloor is what the restore gets when the rename before it
+	// spent the shared window. Three attempts, which is what the refusal this
+	// waits out clears in.
+	restoreRenameFloor = 3 * swapRenameStep
+)
+
+// renameFile is os.Rename, indirected so a test can refuse a rename the way
+// Windows does without needing Windows.
+var renameFile = os.Rename
 
 // recoverIndexDir finishes an interrupted swapIndexDir: if the index dir is
 // missing but its .old sibling survives, restore it.
@@ -566,7 +672,9 @@ func recoverIndexDir(dir string) {
 		return
 	}
 	if _, err := os.Stat(dir + ".old"); err == nil {
-		_ = os.Rename(dir+".old", dir)
+		// The same wait: this is the crash-recovery path, and a refusal here
+		// leaves the index missing for the whole run.
+		_ = renameWaiting(dir+".old", dir, parkRenameWait)
 	}
 }
 
