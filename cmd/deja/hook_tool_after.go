@@ -392,11 +392,6 @@ func fixLine(p index.FixPair, sessions int) string {
 	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }
 
-// exitMarker is the shape a source appends when it knows what a command
-// returned: two spaces, the marker, the digits, end of string
-// (internal/sources/codex.go:259, internal/sources/opencode.go:202).
-const exitMarker = "  → exit "
-
 // withoutFailedExit drops the recorded exit status from a command, and reports
 // false when that status says the command failed.
 //

@@ -380,23 +380,8 @@ func normalizeCommand(s string) string {
 // runs and 7 (#2590). The status stays in the records, where the fix-pair miner
 // reads it (commandFailed).
 func withoutExitStatus(s string) string {
-	i := strings.LastIndex(s, commandExitMarker)
-	if i < 0 {
-		return s
-	}
-	code := s[i+len(commandExitMarker):]
-	if code == "" {
-		return s
-	}
-	// Digits to the end, or it is not the marker: looking for it anywhere cut
-	// `echo "→ exit 0"` down to `echo "`, the trap #2048 already recorded for
-	// the after-hook's reading of the same suffix.
-	for _, r := range code {
-		if r < '0' || r > '9' {
-			return s
-		}
-	}
-	return strings.TrimSpace(s[:i])
+	cmd, _, _ := CommandExitOutcome(s)
+	return cmd
 }
 
 // commandExitMarker is the shape a source appends when it knows what a command
@@ -413,22 +398,8 @@ func CommandWithoutExitStatus(s string) string { return withoutExitStatus(s) }
 // surfaces that group commands themselves and then have to say what those runs
 // did. The same strict shape: two spaces, the marker, digits to the end.
 func CommandExitStatus(s string) (int, bool) {
-	i := strings.LastIndex(s, commandExitMarker)
-	if i < 0 {
-		return 0, false
-	}
-	code := s[i+len(commandExitMarker):]
-	if code == "" {
-		return 0, false
-	}
-	n := 0
-	for _, r := range code {
-		if r < '0' || r > '9' {
-			return 0, false
-		}
-		n = n*10 + int(r-'0')
-	}
-	return n, true
+	_, code, recorded := CommandExitOutcome(s)
+	return code, recorded
 }
 
 // CommandExitOutcome splits a command from the exit status a source appended to
@@ -445,7 +416,7 @@ func CommandExitOutcome(s string) (cmd string, code int, recorded bool) {
 		return s, 0, false
 	}
 	token := trimmed[i+len(commandExitMarker):]
-	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+	if token == "" {
 		return s, 0, false
 	}
 	n := 0
