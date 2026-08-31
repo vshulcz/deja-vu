@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
@@ -727,11 +728,10 @@ func blankOpeningNow(low string) string {
 		at := i + j
 		opens := true
 		for k := at - 1; k >= 0; k-- {
-			r := rune(out[k])
-			if r == ' ' || r == '\t' || r == '*' || r == '#' {
+			if out[k] == ' ' || out[k] == '\t' || out[k] == '*' || out[k] == '#' {
 				continue
 			}
-			opens = !isWordByte(out[k])
+			opens = !endsWord(out[:k+1])
 			break
 		}
 		if opens {
@@ -741,17 +741,20 @@ func blankOpeningNow(low string) string {
 	}
 }
 
-// isWordByte says whether a byte belongs to a word rather than to punctuation.
-// Cyrillic is multi-byte, and every continuation byte is >= 0x80, so this reads
-// "part of a word" for them too.
-func isWordByte(b byte) bool {
-	switch {
-	case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b >= '0' && b <= '9':
-		return true
-	case b >= 0x80:
-		return true
+// endsWord says whether text ends inside a word rather than at punctuation.
+//
+// This read the last byte and called anything >= 0x80 part of a word, on the
+// grounds that Cyrillic is multi-byte. So is Russian punctuation: «», the em
+// dash, the ellipsis. A line reading «Теперь SQL — два SELECT» has its state
+// word preceded by a guillemet, which the byte test called a letter, so the
+// word did not read as opening a clause and a plan was promoted as an outcome —
+// the exact case blankOpeningNow exists to catch (#2734).
+func endsWord(text string) bool {
+	r, size := utf8.DecodeLastRuneInString(text)
+	if size == 0 || r == utf8.RuneError {
+		return false
 	}
-	return false
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // CarriesDecisionExcept is the same, ignoring markers the asker used. A marker
@@ -768,7 +771,7 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 	}
 	low = blankOpeningNow(low)
 	for _, d := range decisionMarkers {
-		if !strings.Contains(low, d) {
+		if !marksLine(low, d) {
 			continue
 		}
 		skip := false
@@ -785,6 +788,42 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 	return false
 }
 
+// marksLine reports whether a marker fires on a line, which it does only where
+// it begins a word.
+//
+// Markers were plain substrings, so they fired inside longer words that mean
+// something else or the opposite: "released" inside "[Unreleased]", "decision:"
+// inside "reviewDecision:", "solution" inside "pollution", "fixed" inside
+// "unfixed". Measured on 85k assistant lines from a real store, 82 promoted
+// lines were promoted on nothing else (#2734).
+//
+// The end of the word is deliberately left open. Half the markers are Russian
+// verbs whose inflections are how they are actually written — "решили",
+// "исправили", "заработала" — and pinning the tail would drop the forms the
+// list was extended for.
+func marksLine(low, marker string) bool {
+	if marker == "" {
+		return false
+	}
+	// The first rune, not the first byte: every Cyrillic marker starts with a
+	// multi-byte one, and reading a single byte of it decoded as an error and
+	// took the boundary rule out of play for half the list.
+	if first, _ := utf8.DecodeRuneInString(marker); !unicode.IsLetter(first) && !unicode.IsDigit(first) {
+		return strings.Contains(low, marker)
+	}
+	for i := 0; ; {
+		j := strings.Index(low[i:], marker)
+		if j < 0 {
+			return false
+		}
+		at := i + j
+		if at == 0 || !endsWord(low[:at]) {
+			return true
+		}
+		i = at + 1
+	}
+}
+
 // selectConclusions keeps assistant messages that carry a decision marker,
 // plus the final message (the outcome), in transcript order. Conversational
 // sessions where nothing matches keep everything — the filter only kicks in
@@ -798,7 +837,7 @@ func selectConclusions(ms []model.Message) []model.Message {
 		low := strings.ToLower(m.Text)
 		marked := false
 		for _, d := range decisionMarkers {
-			if strings.Contains(low, d) {
+			if marksLine(low, d) {
 				marked = true
 				break
 			}
