@@ -135,3 +135,39 @@ func TestANestedBlockIsCreatedInACommentedConfig(t *testing.T) {
 		})
 	}
 }
+
+// Install then uninstall leaves the file as it found it, chain and all: deja
+// writes `mcp` as well as `servers` into a config that had neither, and the
+// parsed path deletes both on the way out, so the text path has to as well
+// (#2783).
+func TestARoundTripOnACommentedConfigChangesNothing(t *testing.T) {
+	for _, before := range []string{
+		"{\n  // no mcp at all\n  \"theme\": \"dark\"\n}\n",
+		"{\n  // an mcp block with no servers in it\n  \"mcp\": {}\n}\n",
+		"{\n  // servers, but empty\n  \"mcp\": {\n    \"servers\": {}\n  }\n}\n",
+	} {
+		t.Run("", func(t *testing.T) {
+			hermeticEnv(t)
+			path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := installOpenClawMCP("/bin/deja", false); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := installOpenClawMCP("/bin/deja", true); err != nil {
+				t.Fatal(err)
+			}
+			b, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(b) != before {
+				t.Errorf("the round trip changed the file:\nwant %q\ngot  %q", before, b)
+			}
+		})
+	}
+}

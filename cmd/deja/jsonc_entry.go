@@ -62,7 +62,9 @@ func stripJSONComments(text string) string {
 
 // jsoncSetEntry writes deja's entry into a JSONC object under blockKey, or
 // takes it out, leaving every other byte of the file alone.
-func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) (string, error) {
+// dropFrom says how much of the chain an uninstall takes with the entry: the
+// index of the outermost key to remove, or len(keys) for the entry alone.
+func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom int) (string, error) {
 	open := zedTopLevelOpen(text)
 	if open < 0 {
 		return "", fmt.Errorf("does not look like a settings object; add %q by hand", blockKey)
@@ -80,9 +82,15 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) 
 		at, comma, indent := open, rootComma(text, open), "  "
 		if have > 0 {
 			parent, _ := walkJSONCKeys(text, open, keys[:have])
-			at, comma, indent = parent.valueOpen, blockComma(text, parent), "    "
+			at, comma, indent = parent.valueOpen, blockComma(text, parent), strings.Repeat("  ", have+1)
 		}
 		insert := nestedBlocks(keys[have:], id, entry, indent)
+		// A newline before what the parent closes with, or the chain ends up
+		// against the parent's own brace: `}}` on one line, which parses and
+		// reads as a mistake.
+		if have > 0 && comma == "" {
+			insert += "\n" + strings.Repeat("  ", have)
+		}
 		return text[:at+1] + insert + comma + text[at+1:], nil
 	}
 	found := zedFindKey(text, block.valueOpen+1, id)
@@ -108,15 +116,23 @@ func jsoncSetEntry(text, blockKey, id, entry string, uninstall, dropBlock bool) 
 		return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
 	}
 	if uninstall {
-		if dropBlock {
-			return zedDropEntry(text, block, found), nil
+		if dropFrom < len(keys) {
+			// The chain deja created, from the outermost key it wrote: the
+			// parsed path deletes an emptied `mcp` along with its `servers`,
+			// and a round trip has to leave the file as it found it (#2783).
+			if dropFrom < len(keys)-1 {
+				chain, _ := walkJSONCKeys(text, open, keys[:dropFrom+1])
+				cut := zedEntrySpan(text, chain)
+				return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
+			}
+			return closeEmptied(zedDropEntry(text, block, found), keys), nil
 		}
 		// The entry alone. zedDropEntry takes the block with the last entry in
 		// it, which is right for a block deja created and wrong for one the
 		// reader wrote — the rule #2604 and #2583 settled for the other
 		// writers (#2740).
 		cut := zedEntrySpan(text, found)
-		return text[:cut[0]] + text[cut[1]:], nil
+		return closeEmptied(text[:cut[0]]+text[cut[1]:], keys), nil
 	}
 	return text[:found.valueOpen] + entry + text[found.valueEnd:], nil
 }
@@ -137,9 +153,38 @@ func walkJSONCKeys(text string, open int, keys []string) (*zedSpan, int) {
 	return block, len(keys)
 }
 
+// closeEmptied puts a block deja emptied back the way it found it: writing an
+// entry into `"servers": {}` opens the braces onto their own lines, and taking
+// the entry out again left them there, so an install followed by an uninstall
+// did not give the reader their file back.
+//
+// Whitespace only, checked on the raw text: a block holding a comment and
+// nothing else is one the reader wrote something in, and it keeps its shape.
+func closeEmptied(text string, keys []string) string {
+	for i := len(keys); i > 0; i-- {
+		open := zedTopLevelOpen(text)
+		if open < 0 {
+			return text
+		}
+		block, have := walkJSONCKeys(text, open, keys[:i])
+		if block == nil || have < i {
+			continue
+		}
+		body := text[block.valueOpen+1 : block.valueEnd-1]
+		if body != "" && strings.TrimSpace(body) == "" {
+			text = text[:block.valueOpen+1] + text[block.valueEnd-1:]
+		}
+	}
+	return text
+}
+
 // nestedBlocks is the text of the keys that are missing, one inside the next,
 // with the entry at the bottom.
 func nestedBlocks(keys []string, id, entry, indent string) string {
+	// jsoncEntryText renders at the depth the single-key writers use; a chain
+	// puts the entry deeper than that, and a body left at the old depth reads
+	// as if it belonged to the block above.
+	entry = strings.ReplaceAll(entry, "\n    ", "\n"+indent+strings.Repeat("  ", len(keys)))
 	body := fmt.Sprintf("%q: %s", id, entry)
 	for i := len(keys) - 1; i >= 0; i-- {
 		inner := indent + strings.Repeat("  ", i+1)
@@ -206,6 +251,7 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 	// second key of the same name with the reader's value winning (#2740).
 	keys := strings.Split(blockKey, ".")
 	holder := root
+	have := 0
 	for _, key := range keys[:len(keys)-1] {
 		v, present := holder[key]
 		if !present {
@@ -220,6 +266,7 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 			return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, key)
 		}
 		holder = next
+		have++
 	}
 	if holder != nil {
 		if v, present := holder[keys[len(keys)-1]]; present {
@@ -249,7 +296,12 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		m = map[string]any{}
-		noteBlockAdded(path, blockKey)
+		// Every level deja writes, not only the last: an uninstall that knows
+		// it created `mcp` as well as `servers` can leave the file as it found
+		// it (#2783).
+		for i := have; i < len(keys); i++ {
+			noteBlockAdded(path, strings.Join(keys[:i+1], "."))
+		}
 	}
 	key := dejaEntryKey(m)
 	var note string
@@ -258,10 +310,23 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 		delete(m, key)
 		removeAdoptedDejaEntries(path, blockKey, m)
 		note = leftDejaEntriesNote(m)
+		dropFrom := len(keys)
 		if len(m) == 0 && blockWasAdded(path, blockKey) {
+			dropFrom = len(keys) - 1
 			forgetBlockAdded(path, blockKey)
+			// And up, while each level holds nothing but the one below it and
+			// deja is what put it there.
+			holders := chainHolders(root, keys)
+			for i := len(keys) - 2; i >= 0; i-- {
+				prefix := strings.Join(keys[:i+1], ".")
+				if len(holders[i+1]) != 1 || !blockWasAdded(path, prefix) {
+					break
+				}
+				dropFrom = i
+				forgetBlockAdded(path, prefix)
+			}
 		}
-		next, err = jsoncSetEntry(text, blockKey, key, "", true, blockWasAdded(path, blockKey))
+		next, err = jsoncSetEntry(text, blockKey, key, "", true, dropFrom)
 	} else {
 		var merged map[string]any
 		merged, note = mergeDejaEntry(m[key], want)
@@ -271,13 +336,30 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 		if err != nil {
 			return installResult{}, err
 		}
-		next, err = jsoncSetEntry(text, blockKey, key, entry, false, false)
+		next, err = jsoncSetEntry(text, blockKey, key, entry, false, len(keys))
 	}
 	if err != nil {
 		return installResult{}, configParseError(path, err)
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))
 	return installResult{Path: path, Action: a, Note: note}, werr
+}
+
+// chainHolders is the object each key of a dotted block key lives in, so an
+// uninstall can ask what a level would hold once the one below it is gone. A
+// level that is not there yet is an empty map, which holds nothing.
+func chainHolders(root map[string]any, keys []string) []map[string]any {
+	out := make([]map[string]any, len(keys))
+	at := root
+	for i, key := range keys {
+		out[i] = at
+		next, _ := at[key].(map[string]any)
+		if next == nil {
+			next = map[string]any{}
+		}
+		at = next
+	}
+	return out
 }
 
 // jsoncSetFlag turns a boolean setting on inside a block, in a config that
