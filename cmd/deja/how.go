@@ -213,14 +213,6 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 	ignored := map[string]bool{}
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
-		if !pol.Allows(activation, meta.Project) {
-			hidden[meta.Harness+":"+meta.ID] = true
-			return
-		}
-		if pol.Ignored(meta.Path, meta.Project) {
-			ignored[meta.Harness+":"+meta.ID] = true
-			return
-		}
 		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
 			return
 		}
@@ -237,6 +229,21 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 			if !commandMentions(low, strings.ToLower(t)) {
 				return
 			}
+		}
+		// The rules after the question, not before it: the sentence says the
+		// policy "hides N matching sessions", and counting every withheld
+		// session that ran any command at all made that number about the
+		// store rather than about what was asked — `deja how terraform` said
+		// three were hidden on a machine whose hidden sessions only ever ran
+		// `go test` (#2766). `files` is the shape this follows: it counts
+		// from what was already searched.
+		if !pol.Allows(activation, meta.Project) {
+			hidden[meta.Harness+":"+meta.ID] = true
+			return
+		}
+		if pol.Ignored(meta.Path, meta.Project) {
+			ignored[meta.Harness+":"+meta.ID] = true
+			return
 		}
 		e := byCmd[low]
 		if e == nil {
