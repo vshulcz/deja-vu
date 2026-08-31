@@ -4246,16 +4246,19 @@ func noteForgottenSource(s model.Session, selector string, resolved bool) {
 // removed — and "forgotten" is a decision the reader made about that session,
 // which is the kind of fact recall exists to carry (#1624).
 func forgottenSourceNote(s model.Session, selector string, resolved bool) string {
-	if s.Harness != "deja" || !strings.HasPrefix(s.ID, "deja-note-") {
+	// Through promotedNoteID, so a note that arrived by sync is one: its local
+	// id is `imported-…` and the id it names lives in OrigID (#2839).
+	noteID := promotedNoteID(s)
+	if noteID == "" {
 		return ""
 	}
-	src, ok := strings.CutPrefix(s.ID, "deja-note-")
+	src, ok := strings.CutPrefix(noteID, "deja-note-")
 	if !ok || src == "" {
 		return ""
 	}
 	// The selector named the source, not the note: a reader who typed the note
-	// id knows what they asked for.
-	if strings.HasPrefix(s.ID, selector) {
+	// id knows what they asked for — either id of it.
+	if strings.HasPrefix(s.ID, selector) || strings.HasPrefix(noteID, selector) {
 		return ""
 	}
 	key := strings.Replace(src, "-", ":", 1)
@@ -4271,7 +4274,16 @@ func forgottenSourceNote(s model.Session, selector string, resolved bool) string
 	if !selectorNamesSession(selector, key, resolved) {
 		return ""
 	}
-	if !index.Tombstoned(key) {
+	// The key the note names is the source's key on the machine that made it,
+	// and a source that arrived by sync is keyed here by the id the import
+	// gave it — which is a pure function of that key, so it can be rebuilt
+	// rather than looked up. Asking about the original alone said nothing
+	// about a session the reader had forgotten here (#2839).
+	harness, id, _ := strings.Cut(key, ":")
+	if imported := harness + ":" + index.ImportedSessionID(harness, id); index.Tombstoned(imported) {
+		// Named as the reader will find it in `deja forget --list`.
+		key = imported
+	} else if !index.Tombstoned(key) {
 		return ""
 	}
 	// Prose, not a command: the key is read here rather than pasted — the
