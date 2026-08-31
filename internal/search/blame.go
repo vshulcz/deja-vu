@@ -257,6 +257,13 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 	count := 0
 	level := 1.0
 	for _, form := range forms {
+		// The bare basename is one of the forms, and it matches inside a path
+		// as well as on its own — so every mention was already "specific" and
+		// the rule below could never fire. A name is what the caller asked
+		// with; a path is what says which file the session meant (#2840).
+		if !strings.Contains(strings.Trim(form, "/"), "/") {
+			continue
+		}
 		if pathFormCount(low, form) > 0 {
 			candidate := 1.0 + float64(len(strings.Split(form, "/")))/4
 			if candidate > level {

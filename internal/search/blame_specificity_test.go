@@ -36,7 +36,10 @@ func TestBlameOrdersBySpecificityBeforeRecency(t *testing.T) {
 		}
 		return out
 	}
-	bare := order(BlameTarget{Base: "ingest.go", Stem: "ingest"})
+	// The shape ResolveBlamePath builds: it always makes the path absolute, so
+	// a target with an empty FullPath is one production cannot produce and a
+	// test written against it proves nothing.
+	bare := order(BlameTarget{FullPath: "/work/api/ingest.go", Base: "ingest.go", Stem: "ingest"})
 	if len(bare) < 4 {
 		t.Fatalf("every session names the file: %v", bare)
 	}
