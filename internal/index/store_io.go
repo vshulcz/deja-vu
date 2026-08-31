@@ -547,14 +547,29 @@ func swapIndexDir(dir, tmp string) error {
 	if _, statErr := os.Stat(old); statErr == nil {
 		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
 	}
-	if err := renameWaiting(dir, old); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	// The parking step can afford to wait: the index is still where readers
+	// look until it succeeds, so nobody is waiting on it, and this is the
+	// rename a pass that spent seconds building tmp would otherwise give up on
+	// for the sake of a search that held a handle for a quarter of a second.
+	if err := renameWaiting(dir, old, parkRenameWait); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := renameWaiting(tmp, dir); err != nil {
-		// Put the previous index back rather than leaving nothing — and with
-		// the same wait, since this runs exactly when renames on this
-		// directory are being refused.
-		_ = renameWaiting(old, dir)
+	// From here the index is not where readers look, so this rename and the
+	// restore that may follow it share one deadline: the window a reader waits
+	// out, spent once between them rather than twice.
+	deadline := time.Now().Add(swapRenameWait)
+	if err := renameWaitingUntil(tmp, dir, deadline); err != nil {
+		// Put the previous index back rather than leaving nothing, with
+		// whatever is left of that window — this runs exactly when renames on
+		// this directory are being refused.
+		floor := time.Now().Add(restoreRenameFloor)
+		if floor.After(deadline) {
+			// A little past the window rather than none of it: the restore is
+			// the one rename that must not fail, and a second rename that
+			// spent the whole budget would otherwise leave it none.
+			deadline = floor
+		}
+		_ = renameWaitingUntil(old, dir, deadline)
 		return err
 	}
 	_ = os.RemoveAll(old)
@@ -572,9 +587,17 @@ func swapIndexDir(dir, tmp string) error {
 // those handles is finishing a read, not doing work, so the wait is short and
 // bounded; a rename still refused at the end is reported rather than retried
 // forever, and the caller puts the previous index back.
-func renameWaiting(from, to string) error {
+func renameWaiting(from, to string, wait time.Duration) error {
+	return renameWaitingUntil(from, to, time.Now().Add(wait))
+}
+
+// renameWaitingUntil is renameWaiting against a deadline the caller keeps, so a
+// swap and the restore that follows it share one window rather than each
+// getting a fresh one — two full budgets in a row is the index away for twice
+// as long as a reader will wait (#2228).
+func renameWaitingUntil(from, to string, deadline time.Time) error {
 	err := renameFile(from, to)
-	for wait := swapRenameWait; err != nil && renameHeldOpen(err) && wait > 0; wait -= swapRenameStep {
+	for err != nil && renameHeldOpen(err) && time.Now().Before(deadline) {
 		time.Sleep(swapRenameStep)
 		err = renameFile(from, to)
 	}
@@ -621,6 +644,17 @@ const (
 	// 20 × 5ms; this is the same order, in the steps the reader side uses.
 	swapRenameWait = swapWindowTries * swapWindowWait
 	swapRenameStep = swapWindowWait
+	// parkRenameWait is the other side of that: the parking step and the
+	// crash-recovery restore happen while the index is still (or already)
+	// where readers look, so nothing is waiting on them and the only cost of
+	// waiting is the pass's own. Long enough to outlast a search holding a
+	// handle, short enough that a directory nobody will ever release still
+	// reports inside a scheduled run.
+	parkRenameWait = 2 * time.Second
+	// restoreRenameFloor is what the restore gets when the rename before it
+	// spent the shared window. Three attempts, which is what the refusal this
+	// waits out clears in.
+	restoreRenameFloor = 3 * swapRenameStep
 )
 
 // renameFile is os.Rename, indirected so a test can refuse a rename the way
@@ -640,7 +674,7 @@ func recoverIndexDir(dir string) {
 	if _, err := os.Stat(dir + ".old"); err == nil {
 		// The same wait: this is the crash-recovery path, and a refusal here
 		// leaves the index missing for the whole run.
-		_ = renameWaiting(dir+".old", dir)
+		_ = renameWaiting(dir+".old", dir, parkRenameWait)
 	}
 }
 

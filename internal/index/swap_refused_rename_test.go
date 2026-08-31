@@ -101,10 +101,11 @@ func TestASwapThatCannotRenameKeepsTheOldIndex(t *testing.T) {
 	if err := swapIndexDir(dir, tmp); err == nil {
 		t.Fatal("a rename refused for the whole wait was reported as a swap")
 	}
-	// Bounded by what a reader will wait for it, not by "eventually": a
-	// raised ceiling has to be visible here.
-	if took := time.Since(start); took > 2*swapRenameWait {
-		t.Errorf("the swap waited %v, past the %v ceiling", took, swapRenameWait)
+	// Bounded by what a reader will wait for it, not by "eventually": the
+	// failed rename and the restore share that window, with a floor under the
+	// restore so it is never left none of it.
+	if took := time.Since(start); took > swapRenameWait+restoreRenameFloor+swapRenameStep {
+		t.Errorf("the index was away for %v, past the %v a reader waits", took, swapRenameWait)
 	}
 	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "old" {
 		t.Errorf("the previous index is not where it was: %q %v", b, err)
@@ -161,6 +162,9 @@ func TestASwapDoesNotWaitOutARefusalThatWillNotClear(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if err := os.WriteFile(filepath.Join(dir, "records.bin"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	onWindows(t)
 	real := renameFile
 	renameFile = func(from, to string) error {
@@ -178,6 +182,11 @@ func TestASwapDoesNotWaitOutARefusalThatWillNotClear(t *testing.T) {
 	if took := time.Since(start); took > swapRenameStep*2 {
 		t.Errorf("waited %v on a refusal that cannot clear", took)
 	}
+	// And the previous index is back: a fail-fast is still a swap that did not
+	// happen, not one that took the index with it.
+	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "old" {
+		t.Errorf("the previous index is not where it was: %q %v", b, err)
+	}
 }
 
 // And a refusal that is not an errno at all — whatever a filesystem driver or
@@ -189,6 +198,9 @@ func TestASwapDoesNotWaitOutAnUnrecognisedRefusal(t *testing.T) {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "records.bin"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 	onWindows(t)
 	real := renameFile
@@ -206,5 +218,10 @@ func TestASwapDoesNotWaitOutAnUnrecognisedRefusal(t *testing.T) {
 	}
 	if took := time.Since(start); took > swapRenameStep*2 {
 		t.Errorf("waited %v on a refusal deja cannot read", took)
+	}
+	// And the previous index is back: a fail-fast is still a swap that did not
+	// happen, not one that took the index with it.
+	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "old" {
+		t.Errorf("the previous index is not where it was: %q %v", b, err)
 	}
 }
