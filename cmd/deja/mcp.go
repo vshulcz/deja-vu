@@ -1420,7 +1420,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	search.PrintContext(&b, whole, q)
 	text := b.String()
 	if hits[0].Tier != search.TierExact {
-		text = contextTierLead(hits[0].Tier) + text
+		text = contextTierLead(hits[0].Tier, sessionNamesTheAsked(whole, q, result.TermIDF)) + text
 	}
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
 		// The search path reaches a promoted note as often as the id path
@@ -1441,11 +1441,74 @@ const nothingIsAboutThis = "No session is about this. Nothing matched the query,
 // matched nothing — recall says "No session is about this" in a sentence, and
 // this tool, which returns far more text, said it in one word that reads like
 // a label on an answer (#2787, the shape #2074 fixed for the counted page).
-func contextTierLead(tier string) string {
+func contextTierLead(tier string, namesTheAsked bool) string {
 	if tier == search.TierRelevance {
+		if namesTheAsked {
+			// The tier says the exact match failed; it does not say the answer
+			// is unrelated. On a store with any competition an ordinary
+			// question rarely survives the exact AND, so the sentence below
+			// fired on 20 of 20 questions lifted verbatim out of indexed
+			// sessions — disowning the right answer teaches an agent to
+			// ignore the line, which costs what #2074 bought with it (#2827).
+			return "No session matched every word, so this one was ranked — it does name what you asked about. Check that it describes what is happening now before acting on it.\n"
+		}
 		return nothingIsAboutThis + " so the session below is the nearest by wording — treat it as a lead to check, not as a record, and say plainly if it does not answer.\n"
 	}
 	return "[" + tier + "]\n"
+}
+
+// sessionNamesTheAsked reports whether the served session holds the query's
+// most identifying word — the one the ranking itself weighted highest.
+//
+// That is the difference between "nothing matched exactly" and "nothing here is
+// about this". A subject the store has never held has none of the query's rare
+// words anywhere; a question whose answer is served at rank 1 has them in the
+// session below the line (#2827).
+//
+// Two things about TermIDF decide the shape here, both established by reading
+// relevantMetasCounts rather than assumed: it is keyed by the query's terms as
+// typed, not by their stem forms, and a term the corpus does not hold never
+// reaches it at all. So the terms are RelevanceTerms, not RelevanceMatchTerms —
+// the latter adds stem forms that are absent from the map by construction, and
+// reading them made every question look like it named something unknown. And a
+// term missing from the map is the subject of an absent question, which is why
+// it answers no rather than being skipped.
+func sessionNamesTheAsked(s model.Session, q string, idf map[string]float64) bool {
+	terms := index.RelevanceTerms(q)
+	if len(terms) == 0 {
+		return false
+	}
+	rarest, best := "", -1.0
+	for _, t := range terms {
+		w, ok := idf[t]
+		if !ok {
+			return false
+		}
+		if w > best {
+			rarest, best = t, w
+		}
+	}
+	// The stem forms belong here, where the text is read: the session may say
+	// "pooling" where the question said "pool".
+	forms := index.RelevanceMatchTerms(rarest)
+	holds := func(text string) bool {
+		low := strings.ToLower(text)
+		for _, f := range forms {
+			if f != "" && strings.Contains(low, strings.ToLower(f)) {
+				return true
+			}
+		}
+		return false
+	}
+	if holds(s.Title) {
+		return true
+	}
+	for _, m := range s.Messages {
+		if holds(m.Text) {
+			return true
+		}
+	}
+	return false
 }
 
 func mcpProgress() io.Writer {
