@@ -54,9 +54,14 @@ func TestTimeHintsRankOnlyTheNoExactMatchFallback(t *testing.T) {
 	now := time.Now()
 	lastMonth := now.AddDate(0, -1, 0)
 	dir := datedStore(t, map[string]string{
-		"m_old":  now.AddDate(0, -3, 0).UTC().Format("2006-01-02") + "T10:00:00Z",
-		"m_last": lastMonth.UTC().Format("2006-01-02") + "T10:00:00Z",
-		"m_now":  now.Add(-2*time.Hour).UTC().Format("2006-01-02") + "T10:00:00Z",
+		// Dated in the same calendar deja reads "last month" in — the local
+		// one. Formatted through UTC and taken two hours back, the newest
+		// session landed in the previous month whenever the run happened early
+		// on the first of a month, so "last month" matched it too and the hint
+		// had nothing to tell apart. It failed that way on 2026-09-01.
+		"m_old":  now.AddDate(0, -3, 0).Format("2006-01-02") + "T10:00:00Z",
+		"m_last": lastMonth.Format("2006-01-02") + "T10:00:00Z",
+		"m_now":  now.Format("2006-01-02") + "T10:00:00Z",
 	})
 	_ = dir
 
