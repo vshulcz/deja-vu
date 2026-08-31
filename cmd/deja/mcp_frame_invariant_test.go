@@ -19,7 +19,7 @@ import (
 // added later would be missing it in the same silence, so the property is
 // pinned here rather than left to the next sweep.
 func TestEveryMCPAnswerCarryingTranscriptTextSaysItIsUntrusted(t *testing.T) {
-	tmp := hermeticEnv(t)
+	hermeticEnv(t)
 	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-app")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestEveryMCPAnswerCarryingTranscriptTextSaysItIsUntrusted(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	dir := filepath.Join(tmp, "index.db")
+	dir := index.DefaultDir()
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -63,5 +63,32 @@ func TestEveryMCPAnswerCarryingTranscriptTextSaysItIsUntrusted(t *testing.T) {
 		if !strings.Contains(text, "untrusted reference data") {
 			t.Errorf("%s: hands over transcript text with nothing saying where it came from:\n%s", tc.tool, firstLines(text, 3))
 		}
+	}
+
+	// The resources surface is the fifth way an agent gets a session out of
+	// deja, and it once skipped this wrapper — the comment at the call site
+	// says so. It goes through a different entry point than the tools above,
+	// which is why it was outside the loop and outside this property.
+	answers := driveMCP(t,
+		`{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"deja://session/claude:s1"}}`)
+	if len(answers) == 0 {
+		t.Fatal("the resources surface answered nothing at all")
+	}
+	res, ok := answers[0]["result"]
+	if !ok {
+		t.Fatalf("the resource read failed: %v", answers[0])
+	}
+	// Unwrapped here rather than through resourceText: driveMCP round-trips
+	// through JSON, so the contents arrive as []any.
+	contents, ok := res.(map[string]any)["contents"].([]any)
+	if !ok || len(contents) == 0 {
+		t.Fatalf("the resource answered with no contents: %v", res)
+	}
+	text, _ := contents[0].(map[string]any)["text"].(string)
+	if !strings.Contains(text, "zonkomatic") {
+		t.Fatalf("resource: served nothing from the fixture, so its framing is untested:\n%s", firstLines(text, 3))
+	}
+	if !strings.Contains(text, "untrusted reference data") {
+		t.Errorf("resource: hands over a whole session with nothing saying where it came from:\n%s", firstLines(text, 3))
 	}
 }
