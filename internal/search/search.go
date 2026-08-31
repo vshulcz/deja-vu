@@ -2172,6 +2172,10 @@ func ErrorHits(ss []model.Session) []Hit {
 		}
 		hits = append(hits, hit)
 	}
+	// The rule promote promises holds here too: a tier that builds its own hits
+	// has to arrange them the way Run does, or a pasted error answers with the
+	// transcript above the note made from it (#2803).
+	liftNotesAboveTheirSource(hits)
 	return hits
 }
 
@@ -2314,6 +2318,9 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 		hit.Score = float64(len(ss) - rank)
 		hits = append(hits, hit)
 	}
+	// As in Run and in ErrorHits: what promote promises is a property of the
+	// answer, not of one tier (#2803).
+	liftNotesAboveTheirSource(hits)
 	return hits
 }
 
