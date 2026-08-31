@@ -78,7 +78,7 @@ func TestHandoffDigestShape(t *testing.T) {
 			{Role: "assistant", Text: "staging pgbouncer caps at 20, bump pool_size"},
 		},
 	}
-	d := digest.Handoff(s, handoffBudget)
+	d := digest.Handoff(s, handoffBudget, nil)
 	for _, want := range []string{
 		"picking up work handed off from a claude session",
 		"project gateway",
@@ -186,7 +186,7 @@ func TestPrefixArgAndProjectCandidates(t *testing.T) {
 func TestHandoffDigestHasPullPointer(t *testing.T) {
 	s := model.Session{ID: "abcdef123456xyz", Harness: "claude", Project: "p",
 		Messages: []model.Message{{Role: "user", Text: "real problem statement here"}}}
-	d := digest.Handoff(s, handoffBudget)
+	d := digest.Handoff(s, handoffBudget, nil)
 	if !strings.Contains(d, "compact slice of session abcdef123456") ||
 		!strings.Contains(d, "recall_context") || !strings.Contains(d, "deja show") {
 		t.Fatalf("pull pointer missing:\n%s", d)
