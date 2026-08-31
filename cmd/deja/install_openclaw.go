@@ -85,7 +85,7 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		// A comment is not a broken file, and this writer shares openclaw.json
 		// with the MCP one — so refusing here left a target that wrote half its
 		// wiring, or could not take its own hook back out (#2811).
-		return setOpenClawEntryJSONC(path, old, "hooks.internal.entries", openclawHookName, "enabled", on)
+		return setOpenClawEntryJSONC(path, old, openclawHookEntries, openclawHookName, openclawHookSwitch, on)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return "", configParseError(path, err)
 	}
@@ -97,10 +97,20 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 			return "unchanged", nil
 		}
 		delete(entries, openclawHookName)
-		// Leave the user's other hooks — and the master switch — alone.
+		// Leave the user's other hooks alone — and the switch, unless deja is
+		// what turned it on. It records that at install time, the way it
+		// records a block it created, so an uninstall gives back a setting the
+		// reader had rather than deleting one deja only overwrote (#2830, the
+		// rule the text writer got in #2811).
 		if len(entries) == 0 {
 			delete(internal, "entries")
-			delete(internal, "enabled")
+			switch was := hookSwitchWas(path); {
+			case was == nil:
+				delete(internal, "enabled")
+			default:
+				internal["enabled"] = was
+			}
+			forgetHookSwitch(path)
 		}
 		if len(internal) == 0 {
 			delete(hooks, "internal")
@@ -121,6 +131,7 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 			entries = map[string]any{}
 			internal["entries"] = entries
 		}
+		noteHookSwitch(path, internal["enabled"])
 		internal["enabled"] = true
 		entries[openclawHookName] = map[string]any{"enabled": true}
 	}
@@ -131,6 +142,56 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 	next = append(next, '\n')
 	return writeIfChanged(path, old, next)
 }
+
+// hookSwitchKeys name what deja found under the switch, in the wiring state
+// beside the blocks it records there. Three states rather than two: the reader
+// had it on, the reader had it off, or there was nothing there and it is
+// deja's to remove.
+func hookSwitchKeys(path string) (on, off string) {
+	keys := strings.Split(openclawHookEntries, ".")
+	base := flagRecordKey(keys, openclawHookSwitch)
+	return base + "=true", base + "=false"
+}
+
+// noteHookSwitch records what was under the switch before deja wrote to it.
+func noteHookSwitch(path string, was any) {
+	on, off := hookSwitchKeys(path)
+	switch v, ok := was.(bool); {
+	case !ok:
+		// Absent, or something that is not a boolean: deja overwrites it and
+		// takes it away again, since it cannot know what a `null` or a `0`
+		// there was meant to say.
+	case v:
+		noteBlockAdded(path, on)
+	default:
+		noteBlockAdded(path, off)
+	}
+}
+
+// hookSwitchWas is what to put back, or nil where the switch is deja's own.
+func hookSwitchWas(path string) any {
+	on, off := hookSwitchKeys(path)
+	switch {
+	case blockWasAdded(path, on):
+		return true
+	case blockWasAdded(path, off):
+		return false
+	}
+	return nil
+}
+
+func forgetHookSwitch(path string) {
+	on, off := hookSwitchKeys(path)
+	forgetBlockAdded(path, on)
+	forgetBlockAdded(path, off)
+}
+
+const (
+	// openclawHookEntries and openclawHookSwitch are where the bootstrap hook
+	// lives and the switch that runs it, named once so the two writers agree.
+	openclawHookEntries = "hooks.internal.entries"
+	openclawHookSwitch  = "enabled"
+)
 
 // flagRecordKey names the switch in the wiring state, beside the blocks deja
 // records there. A key of its own rather than the block's, so "deja created
