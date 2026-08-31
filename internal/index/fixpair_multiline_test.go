@@ -75,3 +75,22 @@ func TestAHerestringIsStillAFix(t *testing.T) {
 		t.Errorf("a herestring was read as an opener: %+v", pairs)
 	}
 }
+
+// A herestring followed by a heredoc: the shape the carve-out has to read
+// correctly, and the one a scan that advances by a relative offset never
+// finishes reading at all.
+func TestAHerestringBeforeAHeredocStillOpensMoreInput(t *testing.T) {
+	for cmd, want := range map[string]bool{
+		"tr a b <<<x; cat <<EOF":      true,
+		`cmp <<<"$a" <<<"$b"`:         false,
+		"a<<<a<<":                     true,
+		"psql -h db <<'SQL'":          true,
+		`psql <<< "select 1"`:         false,
+		"docker run --rm \\\\":        true,
+		`cat <<<"$h" && psql <<'SQL'`: true,
+	} {
+		if got := opensMoreInput(cmd); got != want {
+			t.Errorf("opensMoreInput(%q) = %v, want %v", cmd, got, want)
+		}
+	}
+}

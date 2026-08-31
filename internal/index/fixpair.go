@@ -375,15 +375,16 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 func opensMoreInput(cmd string) bool {
 	// A herestring is a whole command — `psql <<< "$sql"` reads from the line
 	// it is on — so it is not one of these.
-	for i := strings.Index(cmd, "<<"); i >= 0; i = strings.Index(cmd[i:], "<<") {
-		rest := cmd[i+2:]
-		if !strings.HasPrefix(rest, "<") {
-			return true
-		}
-		i += 3
-		if i >= len(cmd) {
+	for i := 0; ; {
+		j := strings.Index(cmd[i:], "<<")
+		if j < 0 {
 			break
 		}
+		at := i + j
+		if !strings.HasPrefix(cmd[at+2:], "<") {
+			return true
+		}
+		i = at + 3
 	}
 	return strings.HasSuffix(cmd, "\\")
 }
