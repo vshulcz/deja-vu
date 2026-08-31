@@ -166,15 +166,28 @@ func toolResponseText(raw json.RawMessage) string {
 	return clampOutput(b.String())
 }
 
-// after returns what follows key, or "" when the key is not there. Scoping the
-// salvage this way keeps it from mining the command in tool_input, which can
-// hold any of the keys below.
+// after returns what follows key where the key is used as a key — the next
+// non-space character is a colon — or "" when it is not there at all. Scoping
+// the salvage this way keeps it from mining the command in tool_input, which
+// can hold any of the keys below.
+//
+// The colon is the whole point. This took the first occurrence anywhere, and
+// on this path the payload is one the decoder could not read — a command
+// spliced in without escaping is how a payload gets that way — so a command
+// running `grep -n "tool_response" hook.go` moved the scope inside itself, and
+// the salvage returned what that same command echoed (#2051).
 func after(s, key string) string {
-	i := strings.Index(s, key)
-	if i < 0 {
-		return ""
+	for i := 0; ; {
+		j := strings.Index(s[i:], key)
+		if j < 0 {
+			return ""
+		}
+		at := i + j + len(key)
+		if rest := strings.TrimLeft(s[at:], " \t\r\n"); strings.HasPrefix(rest, ":") {
+			return s[at:]
+		}
+		i = i + j + 1
 	}
-	return s[i+len(key):]
 }
 
 // salvageToolOutput pulls the tool's output out of a payload the decoder could
@@ -183,16 +196,16 @@ func after(s, key string) string {
 // rather than error — correctly, for real tool output. So find where the value
 // starts, unescape what follows, and hand back that.
 func salvageToolOutput(raw string) string {
+	// `after` finds each key where it is a key, which is what keeps a mention
+	// of "stderr" inside another value from standing in for the field: read at
+	// the mention, the scan gave up on stderr and answered with stdout, the
+	// half of the payload without the error in it (#2051).
 	for _, key := range []string{`"stderr"`, `"error"`, `"output"`, `"stdout"`, `"content"`, `"result"`} {
-		i := strings.Index(raw, key)
-		if i < 0 {
+		at := after(raw, key)
+		if at == "" {
 			continue
 		}
-		v, ok := jsonStringAfter(raw[i+len(key):])
-		if !ok {
-			continue
-		}
-		if strings.TrimSpace(v) != "" {
+		if v, ok := jsonStringAfter(at); ok && strings.TrimSpace(v) != "" {
 			return v
 		}
 	}
