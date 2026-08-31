@@ -586,10 +586,16 @@ Returns a JSON array of blame hits (same stability rules as exact search):
     "count": 3,
     "snippets": ["… parser.go …"],
     "score": 1.5,
+    "specificity": 1.75,
     "tier": "exact"
   }
 ]
 ```
+
+`specificity` is how fully the session named the file — a path counts for more
+than a bare filename, and the deeper the path the more it counts. It is what
+orders the list, ahead of `score`, so the sessions that named the file the way
+the caller did come first.
 
 A hit for a session whose decision was promoted also carries `lifecycle`,
 `lifecycle_note` and `lifecycle_at`. Every state appears there, `accepted`

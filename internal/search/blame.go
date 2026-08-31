@@ -35,7 +35,10 @@ type BlameHit struct {
 	Count    int           `json:"count"`
 	Snippets []string      `json:"snippets"`
 	Score    float64       `json:"score"`
-	Tier     string        `json:"tier"`
+	// Specificity is how fully the session named the file — a path against a
+	// bare name — and is what orders the answer before the score does (#2840).
+	Specificity float64 `json:"specificity"`
+	Tier        string  `json:"tier"`
 	// Lifecycle carries a decision that did not hold. blame answers "who
 	// decided this", and it was answering with the accepted line of a decision
 	// that had been taken back (#1017).
@@ -184,9 +187,17 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			score *= 1.35
 		}
 		hit.Score = score * freshnessDecay(session.Updated, now)
+		hit.Specificity = specificity
 		hits = append(hits, hit)
 	}
 	sort.Slice(hits, func(i, j int) bool {
+		// How specifically the session names the file, before anything else:
+		// the description this answers to says so, and recency alone put a
+		// same-named file from another tree above the sessions that named the
+		// path asked about (#2840).
+		if hits[i].Specificity != hits[j].Specificity {
+			return hits[i].Specificity > hits[j].Specificity
+		}
 		if hits[i].Score != hits[j].Score {
 			return hits[i].Score > hits[j].Score
 		}
@@ -243,6 +254,15 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 			}
 		}
 	}
+	// What the session wrote around the name, for a caller who gave only the
+	// name: `internal/index/ingest.go` says more about which file it means
+	// than `ingest.go` does, and blame's own description promises the more
+	// specific mention first (#2840).
+	if written := writtenPathDepth(low, base); written > 0 {
+		if candidate := 1.0 + float64(written)/4; candidate > level {
+			level = candidate
+		}
+	}
 	for pos := 0; ; {
 		i := strings.Index(low[pos:], base)
 		if i < 0 {
@@ -255,6 +275,51 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 		pos = i + len(base)
 	}
 	return count, level
+}
+
+// writtenPathDepth is how many directories a session wrote in front of the
+// name, at the deepest place it named it. Zero when the name stands alone.
+func writtenPathDepth(low, base string) int {
+	deepest := 0
+	for pos := 0; ; {
+		i := strings.Index(low[pos:], base)
+		if i < 0 {
+			return deepest
+		}
+		i += pos
+		pos = i + len(base)
+		if !pathComponentOrWord(low, i, pos) {
+			continue
+		}
+		depth := 0
+		for j := i; j > 0 && low[j-1] == '/'; {
+			k := j - 1
+			for k > 0 && isPathByte(low[k-1]) {
+				k--
+			}
+			if k == j-1 {
+				break
+			}
+			depth++
+			j = k
+		}
+		if depth > deepest {
+			deepest = depth
+		}
+	}
+}
+
+// isPathByte reports whether a byte can sit inside a path component as an
+// agent writes one. Deliberately narrow: a quote or a space ends the path, and
+// reading past one would count an English sentence as directories.
+func isPathByte(b byte) bool {
+	switch {
+	case b >= 'a' && b <= 'z', b >= '0' && b <= '9':
+		return true
+	case b == '.' || b == '-' || b == '_':
+		return true
+	}
+	return false
 }
 
 func pathFormCount(s, form string) int {

@@ -13,7 +13,7 @@ import (
 func TestBlameHitShapeIsStable(t *testing.T) {
 	want := map[string]bool{
 		"session": true, "title": true, "count": true, "snippets": true,
-		"score": true, "tier": true,
+		"score": true, "specificity": true, "tier": true,
 		"lifecycle": true, "lifecycle_note": true, "lifecycle_at": true,
 	}
 	got := map[string]bool{}
