@@ -657,7 +657,8 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 func liftNotesAboveTheirSource(hits []Hit) {
 	order := liftedNoteOrder(len(hits),
 		func(i int) string { return hits[i].Session.Harness },
-		func(i int) string { return hits[i].Session.ID })
+		func(i int) string { return hits[i].Session.ID },
+		func(i int) string { return hits[i].Session.OrigID })
 	if order == nil {
 		return
 	}
@@ -675,7 +676,8 @@ func liftNotesAboveTheirSource(hits []Hit) {
 func LiftNoteSessionsAboveTheirSource(ss []model.Session) {
 	order := liftedNoteOrder(len(ss),
 		func(i int) string { return ss[i].Harness },
-		func(i int) string { return ss[i].ID })
+		func(i int) string { return ss[i].ID },
+		func(i int) string { return ss[i].OrigID })
 	if order == nil {
 		return
 	}
@@ -689,11 +691,26 @@ func LiftNoteSessionsAboveTheirSource(ss []model.Session) {
 // liftedNoteOrder answers where each element goes so that a promoted note sits
 // in front of the transcript it was distilled from, and nothing else moves. It
 // returns nil when there is nothing to lift, so a caller can skip the copy.
-func liftedNoteOrder(n int, harnessAt, idAt func(int) string) []int {
+func liftedNoteOrder(n int, harnessAt, idAt, origAt func(int) string) []int {
+	// A session that arrived by sync has its local id rewritten to imported-…
+	// and keeps the real one in OrigID. Both sides of the pair need reading
+	// that way — the note's own id, and the source's key a note is built from
+	// — or an imported note is never recognised and the transcript it distils
+	// outranks it everywhere this rule reaches (#2833). lifecycle.go and
+	// hook_tool.go already consult OrigID for the same reason (#975).
+	noteID := func(i int) string {
+		if id := idAt(i); strings.HasPrefix(id, "deja-note-") {
+			return id
+		}
+		if orig := origAt(i); strings.HasPrefix(orig, "deja-note-") {
+			return orig
+		}
+		return ""
+	}
 	notes := make(map[string]int, n)
 	for i := 0; i < n; i++ {
-		if harnessAt(i) == notesHarness && strings.HasPrefix(idAt(i), "deja-note-") {
-			notes[idAt(i)] = i
+		if harnessAt(i) == notesHarness && noteID(i) != "" {
+			notes[noteID(i)] = i
 		}
 	}
 	if len(notes) == 0 {
@@ -709,11 +726,21 @@ func liftedNoteOrder(n int, harnessAt, idAt func(int) string) []int {
 		if harnessAt(i) != notesHarness {
 			// Mirrors sources.PromotedNoteID: building the id rather than
 			// parsing one keeps a harness name with a dash in it from
-			// splitting wrong.
-			if j, ok := notes["deja-note-"+harnessAt(i)+"-"+idAt(i)]; ok && j > i {
+			// splitting wrong. Built from the source's own id and from the one
+			// it had before it was imported, since either may be what the note
+			// was made against.
+			for _, key := range []string{idAt(i), origAt(i)} {
+				if key == "" {
+					continue
+				}
+				j, ok := notes["deja-note-"+harnessAt(i)+"-"+key]
+				if !ok || j <= i || taken[j] {
+					continue
+				}
 				order = append(order, j)
 				taken[j] = true
 				moved = true
+				break
 			}
 		}
 		order = append(order, i)
