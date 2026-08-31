@@ -664,12 +664,15 @@ const blameMCPBudget = 8192
 // blameHitJSON is what the MCP blame tool returns: the same shape as the CLI's
 // --json minus the session's message list.
 type blameHitJSON struct {
-	Session  blameSessionJSON `json:"session"`
-	Title    string           `json:"title,omitempty"`
-	Count    int              `json:"count"`
-	Score    float64          `json:"score"`
-	Tier     string           `json:"tier,omitempty"`
-	Snippets []string         `json:"snippets,omitempty"`
+	Session blameSessionJSON `json:"session"`
+	Title   string           `json:"title,omitempty"`
+	Count   int              `json:"count"`
+	Score   float64          `json:"score"`
+	// Specificity is what orders the list, ahead of the score, so an agent
+	// reading these rows can see why one came first (#2840).
+	Specificity float64  `json:"specificity"`
+	Tier        string   `json:"tier,omitempty"`
+	Snippets    []string `json:"snippets,omitempty"`
 }
 
 type blameSessionJSON struct {
@@ -728,7 +731,8 @@ func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []by
 				Started: h.Session.Started, Updated: h.Session.Updated, Touched: h.Session.Touched,
 			},
 			Title: search.SafeNoteTitle(h.Session.Title), Count: h.Count, Score: h.Score,
-			Tier: h.Tier, Snippets: h.Snippets,
+			Specificity: h.Specificity,
+			Tier:        h.Tier, Snippets: h.Snippets,
 		})
 	}
 	if omitted > 0 {
