@@ -136,7 +136,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// than unmarshalled, so a host that writes anything after the object (a
 	// second line, a trailing NUL) keeps its recall instead of losing the
 	// whole payload to a syntax error.
-	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	payload := readHookPayload(stdin, hookStdinWait)
+	// The error is kept, not swallowed: a decode that fails on a later field —
+	// `{"prompt":"…","session_id":123}` — reads the prompt, injects on it, and
+	// leaves a row saying the host named no session, when it named one deja
+	// could not read (#2773). The prompt is what this hook recalls from, so a
+	// payload it cannot read at all injects nothing and this never fires.
+	unreadable := json.NewDecoder(bytes.NewReader(payload)).Decode(&input) != nil
 	// The kill switch. It reached the session-start hook and nothing else, so
 	// this hook — every user message, and the wiring for seven harnesses —
 	// kept injecting on a machine with recall off (#2701).
@@ -411,8 +417,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
 	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
-	usage.RecordDigestFrom(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
-		terms, sessionProjects(ss), sessionIDs(ss))
+	if unreadable {
+		usage.RecordDigestFromUnread(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+			terms, sessionProjects(ss), sessionIDs(ss))
+	} else {
+		usage.RecordDigestFrom(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
+			terms, sessionProjects(ss), sessionIDs(ss))
+	}
 	if plain {
 		fmt.Fprintln(stdout, out)
 		return nil

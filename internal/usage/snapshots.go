@@ -201,6 +201,17 @@ func RecordDigestPolicySessionsFrom(indexDir, kind, digest, into string, session
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
+// RecordDigestFromUnread is RecordDigestFrom for a hook whose payload could
+// not be decoded. A decode that fails on one field keeps the ones it read, so
+// the receiver — when the payload did name one — travels as it does anywhere
+// else; the flag is about the payload (#2773, the shape #2161 fixed for the
+// session-start hook).
+func RecordDigestFromUnread(indexDir, kind, digest, into string, sessions int, raw int64, terms, projects, ids []string) {
+	at := time.Now().UTC()
+	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at, true)
+	snapshotWriteAt(indexDir, kind, digest, into, sessions, "", terms, projects, at, true)
+}
+
 // RecordDigestPolicySessionsUnread is RecordDigestPolicySessionsFrom for a
 // hook whose payload could not be decoded. The memory goes out regardless — an
 // agent that asked for context gets it — and the row says the payload was

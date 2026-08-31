@@ -57,11 +57,10 @@ func dejaVuRows(t *testing.T, dir string) []usage.Snapshot {
 	return out
 }
 
-// The session-start hook injects whatever the payload said, so a payload it
-// could not read left a row with no receiver (#2769). This hook cannot: the
-// prompt is what it recalls from, and a payload it cannot read has no prompt
-// in it — so it injects nothing and records nothing. There is no row to
-// mislabel, which is why #2773 is not the same bug.
+// A payload this hook cannot read at all injects nothing: the prompt is what
+// it recalls from, and there is none. That covers the whole-payload failures —
+// what it does not cover is a decode that fails on a later field, which is
+// where the real hole was (see the test below).
 func TestAPayloadTheDejaVuHookCannotReadInjectsNothingAtAll(t *testing.T) {
 	for _, c := range []struct{ name, payload string }{
 		{"prose", "not a payload at all"},
@@ -110,6 +109,36 @@ func TestTheDejaVuHookRecordsTheReceiverThePayloadNamed(t *testing.T) {
 			}
 			if rows[0].Into != c.into {
 				t.Errorf("into = %q, want %q", rows[0].Into, c.into)
+			}
+		})
+	}
+}
+
+// The hole #2773 named, found by measurement rather than by reading: a decode
+// that fails on a *later* field reads the prompt, injects on it, and leaves a
+// row saying the host named no session — for a payload that named one deja
+// could not read. Identical, in the log, to a host that named none.
+func TestADecodeThatFailsAfterThePromptIsRecordedAsUnreadable(t *testing.T) {
+	for _, payload := range []string{
+		`{"prompt":"pgbouncer transaction mode prepared statements","session_id":123}`,
+		`{"prompt":"pgbouncer transaction mode prepared statements","session_id":{"a":1}}`,
+		`{"prompt":"pgbouncer transaction mode prepared statements","cwd":7}`,
+	} {
+		t.Run(payload, func(t *testing.T) {
+			dir := seedDejaVuStore(t)
+			var out bytes.Buffer
+			if err := runHookPromptMode(dir, strings.NewReader(payload), &out, true); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), "transaction mode") {
+				t.Fatalf("the premise moved — this payload is meant to inject:\n%s", out.String())
+			}
+			rows := dejaVuRows(t, dir)
+			if len(rows) != 1 {
+				t.Fatalf("want one déjà vu row, got %d", len(rows))
+			}
+			if !rows[0].Unreadable {
+				t.Errorf("the row reads as a host that named no session: %+v", rows[0])
 			}
 		})
 	}
