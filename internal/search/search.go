@@ -640,6 +640,31 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 // carries the query words in its title and the note does not, and once a note
 // is dated by its evidence rather than by the day it was filed (V4) the two are
 // equally fresh, so the transcript won its own distillation.
+
+// noteID is the id a promoted note has on the machine that made it, and "" for
+// a session that is not one. Mirrors cmd/deja's promotedNoteID: after a sync
+// the local id is `imported-…` and the real one rides in OrigID (#975, #2833).
+func noteID(s model.Session) string {
+	if s.Harness != notesHarness {
+		return ""
+	}
+	if strings.HasPrefix(s.ID, "deja-note-") {
+		return s.ID
+	}
+	if strings.HasPrefix(s.OrigID, "deja-note-") {
+		return s.OrigID
+	}
+	return ""
+}
+
+// sessionOrigID is the id a session had where it was recorded.
+func sessionOrigID(s model.Session) string {
+	if s.OrigID != "" {
+		return s.OrigID
+	}
+	return s.ID
+}
+
 func liftNotesAboveTheirSource(hits []Hit) {
 	liftNotesBy(hits, func(h Hit) model.Session { return h.Session })
 }
@@ -649,8 +674,8 @@ func liftNotesAboveTheirSource(hits []Hit) {
 func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 	notes := make(map[string]int, len(hits))
 	for i, h := range hits {
-		if s := of(h); s.Harness == notesHarness && strings.HasPrefix(s.ID, "deja-note-") {
-			notes[s.ID] = i
+		if id := noteID(of(h)); id != "" {
+			notes[id] = i
 		}
 	}
 	if len(notes) == 0 {
@@ -663,7 +688,12 @@ func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 		}
 		// Mirrors sources.PromotedNoteID: building the id rather than parsing
 		// one keeps a harness name with a dash in it from splitting wrong.
-		id := "deja-note-" + src.Harness + "-" + src.ID
+		//
+		// From the id the source had on the machine that made the note, which
+		// is what the note names. After a sync the local id is `imported-…`
+		// and the original is in OrigID, so a pair that travelled was never
+		// recognised as one (#2833).
+		id := "deja-note-" + src.Harness + "-" + sessionOrigID(src)
 		j, ok := notes[id]
 		if !ok || j < i {
 			continue
@@ -672,8 +702,8 @@ func liftNotesBy[T any](hits []T, of func(T) model.Session) {
 		copy(hits[i+1:j+1], hits[i:j])
 		hits[i] = note
 		for k := i; k <= j; k++ {
-			if s := of(hits[k]); s.Harness == notesHarness && strings.HasPrefix(s.ID, "deja-note-") {
-				notes[s.ID] = k
+			if id := noteID(of(hits[k])); id != "" {
+				notes[id] = k
 			}
 		}
 	}
