@@ -215,6 +215,17 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 		if dropFlag {
 			forgetBlockAdded(path, flagRecordKey(keys, flagKey))
 		}
+		// A switch deja turned on over the reader's own "off" goes back to off
+		// rather than staying on: an uninstall that leaves internal hooks
+		// running for someone who had switched them off is a setting deja
+		// changed and did not give back.
+		if !dropFlag && flagKey != "" && blockWasAdded(path, flagRecordKey(keys, flagKey)+"=false") {
+			forgetBlockAdded(path, flagRecordKey(keys, flagKey)+"=false")
+			next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, false)
+			if err != nil {
+				return "", configParseError(path, err)
+			}
+		}
 		if dropFlag && dropFrom >= len(keys)-1 {
 			// The chain stayed, so the switch is still in it and comes out on
 			// its own.
@@ -244,8 +255,13 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 	if flagKey != "" {
 		// Recorded the way a block deja created is, so an uninstall can tell a
 		// switch deja turned on from one the reader set.
-		if _, present := held[flagKey]; !present {
+		switch was, present := held[flagKey]; {
+		case !present:
 			noteBlockAdded(path, flagRecordKey(keys, flagKey))
+		case was == false:
+			// Theirs, and off: deja needs it on while it is installed, so what
+			// it changed is written down to be put back.
+			noteBlockAdded(path, flagRecordKey(keys, flagKey)+"=false")
 		}
 		next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, true)
 		if err != nil {

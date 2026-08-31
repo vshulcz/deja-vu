@@ -168,6 +168,12 @@ func TestOpenClawAutoKeepsASwitchTheReaderSet(t *testing.T) {
 	if !strings.Contains(string(b), `"enabled"`) {
 		t.Errorf("the reader's own switch was deleted:\n%s", b)
 	}
+	// And it is theirs, value and all: an install that switched internal hooks
+	// on for someone who had switched them off is not something an uninstall
+	// should leave behind.
+	if !strings.Contains(string(b), "\"enabled\": false") {
+		t.Errorf("the reader had it off and it came back on:\n%s", b)
+	}
 	var root map[string]any
 	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
 		t.Fatalf("the file no longer parses: %v\n%s", err, b)
@@ -248,5 +254,64 @@ func TestOpenClawAutoRefusesALevelItCannotEdit(t *testing.T) {
 				t.Fatalf("the file no longer parses: %v\n%s", err, b)
 			}
 		})
+	}
+}
+
+// The population this writer is for: someone who hand-edits an annotated
+// config. They move deja's switch to the end of the block and put a note above
+// it, and the uninstall has to take the comma in front of it with it — the one
+// after it is not there to take (#2811).
+func TestOpenClawAutoRemovesASwitchTheReaderMoved(t *testing.T) {
+	hermeticEnv(t)
+	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{\n  // mine\n  \"hooks\": {\n    \"internal\": {}\n  }\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installOpenClawAuto("/bin/deja", false); err != nil {
+		t.Fatalf("a commented config was refused: %v", err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"enabled"`) {
+		t.Fatalf("the switch was not written, so there is nothing to take out:\n%s", b)
+	}
+	// The reader tidies: the switch goes last, with a line about it. Written
+	// out rather than edited, so the fixture is exactly the shape being tested.
+	var entry string
+	if i := strings.Index(string(b), `"deja-recall"`); i >= 0 {
+		if j := strings.Index(string(b)[i:], "}"); j >= 0 {
+			entry = string(b)[i : i+j+1]
+		}
+	}
+	if entry == "" {
+		t.Fatalf("could not find the entry deja wrote:\n%s", b)
+	}
+	moved := "{\n  // mine\n  \"hooks\": {\n    \"internal\": {\n      \"entries\": {\n        " +
+		entry + "\n      },\n      // deja turned this on\n      \"enabled\": true\n    }\n  }\n}\n"
+	if err := os.WriteFile(path, []byte(moved), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := installOpenClawAuto("/bin/deja", true); err != nil {
+		t.Fatalf("uninstall refused the config: %v", err)
+	}
+	b, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+		t.Fatalf("the file no longer parses: %v\n%s", err, b)
+	}
+	if strings.Contains(string(b), `"enabled"`) {
+		t.Errorf("the switch deja turned on stayed behind:\n%s", b)
+	}
+	if !strings.Contains(string(b), "// mine") {
+		t.Errorf("the reader's own comment was dropped:\n%s", b)
 	}
 }
