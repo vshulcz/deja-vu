@@ -45,7 +45,7 @@ func TestTranscriptControlCharactersDoNotReachAnySurface(t *testing.T) {
 	surfaces := map[string]string{
 		"deja show (search.PrintSession)": show.String(),
 		"deja share (digest)":             digest.Share(s, 4000),
-		"deja handoff (digest)":           digest.Handoff(s, 4000),
+		"deja handoff (digest)":           digest.Handoff(s, 4000, nil),
 		"deja last / stats title":         stats.Title(s),
 		"deja ctx (search.PrintContext)":  ctxOut.String(),
 		"snippet (search.Snippet)":        search.Snippet(ctrlProbeUser, "control probe"),
@@ -100,7 +100,7 @@ func TestInvisibleTextDoesNotReachAnySurface(t *testing.T) {
 	surfaces := map[string]string{
 		"deja show (search.PrintSession)": show.String(),
 		"deja share (digest)":             digest.Share(s, 4000),
-		"deja handoff (digest)":           digest.Handoff(s, 4000),
+		"deja handoff (digest)":           digest.Handoff(s, 4000, nil),
 		"deja last / stats title":         stats.Title(s),
 		"deja ctx (search.PrintContext)":  ctxOut.String(),
 		"mcp recall (search.Snippet)":     search.Snippet(payload, "deploy"),

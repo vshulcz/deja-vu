@@ -30,7 +30,7 @@ func TestALongSessionStillHandsOverItsConclusions(t *testing.T) {
 	add("assistant", "the cause was the per-request pool checkout; a shared pool and a 200ms budget brought p99 to 240ms", 400)
 	add("user", "good — leave the retries alone for now", 401)
 
-	block := Handoff(s, 4000)
+	block := Handoff(s, 4000, nil)
 	if !strings.Contains(block, "cut the p99 on the orders endpoint") {
 		t.Errorf("the problem statement is missing:\n%s", block)
 	}

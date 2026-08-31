@@ -57,7 +57,7 @@ func TestShareHeaderFieldsStayOnTheirLines(t *testing.T) {
 // An id carrying one left the rest of that id standing at the top of what
 // another agent is handed.
 func TestHandoffDropsTheWholeShareHeader(t *testing.T) {
-	out := Handoff(hostileSession(), 4000)
+	out := Handoff(hostileSession(), 4000, nil)
 	if strings.Contains(out, "deja share") {
 		t.Errorf("the share header survived into the handoff: %q", out)
 	}
@@ -91,7 +91,7 @@ func TestShareHeaderUnchangedForPlainFields(t *testing.T) {
 func TestHandoffAdviceIDIsTypeable(t *testing.T) {
 	s := hostileSession()
 	s.ID = "x1abcdef\nfake"
-	out := Handoff(s, 4000)
+	out := Handoff(s, 4000, nil)
 	if !strings.Contains(out, "deja show x1abcdef`") {
 		t.Errorf("the advice does not name a usable id:\n%s", out)
 	}

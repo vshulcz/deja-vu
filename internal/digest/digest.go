@@ -451,7 +451,14 @@ func cleanSession(s model.Session) model.Session {
 // Handoff is the package the target agent starts from: framing header,
 // the user's problem statements, key conclusions, and the tail of the
 // conversation — the "where it stopped" part a plain summary loses.
-func Handoff(s model.Session, budget int) string {
+// quote wraps the half of the package that is the session talking. cmd/deja
+// passes the frame every other agent-facing surface uses; the digest package
+// builds the package rather than owning the policy about what an agent may
+// trust.
+func Handoff(s model.Session, budget int, quote func(string) string) string {
+	if quote == nil {
+		quote = func(text string) string { return text }
+	}
 	s = cleanSession(s)
 	var b strings.Builder
 	date := "unknown"
@@ -486,11 +493,17 @@ func Handoff(s model.Session, budget int) string {
 			body = strings.TrimRight(body[:i], " \t\n")
 		}
 	}
-	b.WriteString(body)
+	// Everything from here is the session talking, and the receiving agent
+	// reads this as its first prompt — so the quote says it is a quote. A
+	// directive planted in a transcript arrived looking like part of deja's
+	// own instruction (#2866).
+	var quoted strings.Builder
+	quoted.WriteString(body)
 	if tail := tailSection(s, budget-b.Len()); tail != "" {
-		b.WriteString("\n\n## Where it stopped\n\n")
-		b.WriteString(tail)
+		quoted.WriteString("\n\n## Where it stopped\n\n")
+		quoted.WriteString(tail)
 	}
+	b.WriteString(quote(quoted.String()))
 	// The digest is a lossy slice by construction. Tell the receiving agent it
 	// can pull deeper instead of being stuck with the summary: push+pull, not
 	// one-shot push.

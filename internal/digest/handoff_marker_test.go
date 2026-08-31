@@ -32,7 +32,7 @@ func TestAHandoffDoesNotContinuePastACutMarker(t *testing.T) {
 	add("assistant", "stopping here: the pool change is merged, the retry work is untouched", 402)
 
 	for budget := 2000; budget <= 8000; budget += 500 {
-		block := Handoff(s, budget)
+		block := Handoff(s, budget, nil)
 		i := strings.Index(block, "…")
 		if i < 0 {
 			continue

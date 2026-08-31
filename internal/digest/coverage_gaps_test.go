@@ -65,7 +65,7 @@ func TestHandoffFramesThePackagedContext(t *testing.T) {
 			{Role: "assistant", Text: "raised max_conns and added jitter to the retries"},
 		},
 	}
-	got := Handoff(s, 4096)
+	got := Handoff(s, 4096, nil)
 	for _, want := range []string{"handed off", "claude", "api", "2026-05-01"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("handoff missing %q:\n%s", want, got)
@@ -80,7 +80,7 @@ func TestHandoffFramesThePackagedContext(t *testing.T) {
 	// A session with no timestamp still hands off; saying "unknown" beats
 	// printing a zero date that reads as 1 January year one.
 	s.Updated = time.Time{}
-	if got := Handoff(s, 4096); !strings.Contains(got, "unknown") {
+	if got := Handoff(s, 4096, nil); !strings.Contains(got, "unknown") {
 		t.Fatalf("undated session lost its date framing:\n%s", got)
 	}
 }

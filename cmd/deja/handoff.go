@@ -102,7 +102,10 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		// "this session is 11d old old" (#743).
 		fmt.Fprintf(os.Stderr, "deja: note — this session is %s; if you meant newer work, pass an id-prefix (see `deja last`)\n", age)
 	}
-	digest := digest.Handoff(s, handoffBudget)
+	// The quoted half carries the same frame recall does: this text becomes
+	// the next agent's first prompt, and nothing else said which half of it
+	// was the session's (#2866).
+	digest := digest.Handoff(s, handoffBudget, frameRecall)
 	usage.RecordDigestPolicyFrom(dir, usage.KindHandoff, digest, "", 1, rawSize([]model.Session{s}), projectsOf(s), "")
 	if !doExec {
 		printSanitized(stdout, digest)
