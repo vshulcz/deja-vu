@@ -21,6 +21,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -1085,6 +1086,11 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	if stale {
 		fmt.Fprintln(&b, "(index refresh running in the background — the very newest sessions may not appear yet)")
 	}
+	// Whether the question named something the store does not hold. The word
+	// forms line already says which word was dropped; what it did not say is
+	// that dropping the subject leaves an answer about the rest of the
+	// sentence, which is the shape #657 measured on twenty invented subjects.
+	absent := namedSomethingAbsent(result.Variants)
 	if result.Stemmed {
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Fuzzy {
@@ -1098,6 +1104,27 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		// questions about subjects this machine has never held — eight of
 		// eight came back with sessions rather than nothing, and the tool
 		// description promises an empty result means no record (#2074).
+		//
+		// But only where it is true. The tier is reached whenever the exact
+		// AND misses, which a real question does all the time: measured on
+		// this store, four of five questions about work done that same day
+		// were headed "No session is about this" while the session below was
+		// exactly about it (#657). A session that speaks one of the question's
+		// identifying words is about it as far as deja can tell, and saying
+		// otherwise teaches the reader to ignore the line that matters.
+		// The query's own words, not the stem forms the ranking also tries:
+		// the idf map is keyed by what the reader typed.
+		asked, _ := query.QueryParts(q)
+		if !absent && relevanceHitsAreAboutIt(hits, asked, result.TermIDF) {
+			fmt.Fprintln(&b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
+		} else {
+			fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+		}
+	}
+	if absent && result.Tier != search.TierRelevance {
+		// The tier below relevance already says which word it dropped; this
+		// says what dropping it means, in the words the relevance tier uses
+		// for the same situation.
 		fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 	}
 	if note := demotedNote(hits, demoted); note != "" {
@@ -1457,6 +1484,69 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 		// The search path reaches a promoted note as often as the id path
 		// does — the note carries the id in its own text.
 		forgottenSourceNote(whole, q, false), nil
+}
+
+// relevanceHitsAreAboutIt reports whether some session being served is about
+// the question, or whether the page is only the nearest wording to it.
+//
+// The test is whether one session holds the whole question. The tier is
+// reached whenever the exact AND misses, which happens both when the store has
+// never held the subject and when it holds it and the reader phrased it
+// differently — and the strong warning was printed over both: measured on this
+// store, four of five questions about that same day's work were headed "No
+// session is about this" while the session below was exactly about it (#657).
+//
+// A session that speaks every word of the question the store knows is about it
+// as far as deja can tell. A page where the words are spread across different
+// sessions — one holds half, another the other half — is not, and keeps the
+// warning it earned in #2074.
+func relevanceHitsAreAboutIt(hits []search.Hit, terms []string, idf map[string]float64) bool {
+	if len(hits) == 0 || len(terms) == 0 || idf == nil {
+		return false
+	}
+	known := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if _, ok := idf[t]; ok {
+			known = append(known, t)
+		}
+	}
+	// A word the store does not hold at all is the #657 case and is decided by
+	// the caller before this; here it only means the question is not fully
+	// known, so nothing can hold all of it.
+	if len(known) == 0 || len(known) != len(terms) {
+		return false
+	}
+	for _, h := range hits {
+		if sessionSpeaksEvery(h.Session, known) {
+			return true
+		}
+	}
+	return false
+}
+
+// sessionSpeaksEvery reports whether one session says every one of these words
+// somewhere in what a person or the agent said.
+func sessionSpeaksEvery(s model.Session, terms []string) bool {
+	for _, t := range terms {
+		if !search.SpeechCarriesAnyTerm(s, []string{t}) {
+			return false
+		}
+	}
+	return true
+}
+
+// namedSomethingAbsent reports whether a word of the question was dropped for
+// having nothing in the store: the recovery tiers record such a term with an
+// empty variant, which is how the "ignored" note is written.
+func namedSomethingAbsent(variants map[string][]string) bool {
+	for _, values := range variants {
+		for _, v := range values {
+			if v == "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in
