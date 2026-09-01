@@ -460,6 +460,11 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
 	ss = filterTombstonedSet(ss, dead)
+	// Nothing to search until the whole corpus is written, and on a first
+	// install that is the fourteen seconds a user decides in (#505). Publish
+	// the newest slice first: it is a valid index of a few hundred sessions,
+	// it lands in about a second, and the full one replaces it moments later.
+	publishNewestFirst(dir, ss, progress)
 	// A full build passes every session through the exclusion patterns, so
 	// this is the one place the current set can be claimed as applied. An
 	// incremental build carries the old stamp forward: it keeps records it
@@ -887,6 +892,57 @@ func dropEmptySessions(m *Manifest, wrote map[string]bool) {
 func ReportEmptySessions() int {
 	return int(emptied.Swap(0))
 }
+
+// publishNewestFirst writes an index of the newest sessions and swaps it in,
+// so a first build answers before it finishes. Best effort in every sense: any
+// failure leaves the build to write the whole thing as it always did.
+//
+// Only on a first build, and only a big one — replacing an index that already
+// answers with a smaller one would be a regression, and on a small corpus the
+// full build is already fast enough that the extra pass is the slower path.
+//
+// The file states are deliberately not carried into it. They are the record of
+// what has been parsed, and claiming the whole corpus for an index holding a
+// slice of it would let the next incremental run skip files whose sessions
+// were never written.
+func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
+	if HasManifest(dir) || len(ss) < partialPublishFrom {
+		return
+	}
+	newest := append([]model.Session(nil), ss...)
+	sort.Slice(newest, func(i, j int) bool { return newest[i].Updated.After(newest[j].Updated) })
+	newest = newest[:partialPublishSessions]
+	tmp := dir + ".part"
+	_ = os.RemoveAll(tmp)
+	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
+		return
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	// The counters this pass moves belong to the build that follows it, so
+	// they are put back where it left them: writeSessions zeroes and fills
+	// them, and a line saying "3 empty transcripts" must count the whole
+	// corpus rather than this slice of it.
+	wasEmptied, wasCollisions, wasMerged := emptied.Load(), collisions.Load(), merged.Load()
+	err := writeSessions(tmp, dir, newest, nil, "")
+	emptied.Store(wasEmptied)
+	collisions.Store(wasCollisions)
+	merged.Store(wasMerged)
+	if err != nil {
+		return
+	}
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: searchable now with the %d most recent sessions while the rest is indexed\n", len(newest))
+	}
+}
+
+// partialPublishFrom is the corpus size at which the wait is worth a second
+// pass, and partialPublishSessions how much of it lands first. A few hundred
+// sessions is what a person has touched recently enough to ask about, and it
+// writes in about a second where the whole corpus takes fourteen.
+const (
+	partialPublishFrom     = 400
+	partialPublishSessions = 200
+)
 
 func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileState, scope string) error {
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{})
