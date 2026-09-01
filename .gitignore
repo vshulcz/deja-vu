@@ -57,6 +57,7 @@ deja-stats.svg
 /relnotes
 /reusebench
 /searchbench
+/semanticgap
 /staleoverlap
 
 # Where story.py drops the film's frames when it is run without --out. Three
