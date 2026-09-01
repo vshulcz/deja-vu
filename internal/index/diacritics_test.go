@@ -109,3 +109,70 @@ func TestAMarkContinuesTheWordItSitsOn(t *testing.T) {
 		t.Errorf("a leading mark joined words: %q", got)
 	}
 }
+
+// One marked word in one session must not open the fuzzy tier for every short
+// word a reader types. The floor exists to keep three-letter queries and CJK
+// bigrams out of variant generation (#338); the exemption for a marked form is
+// asked of the term, not of the corpus.
+func TestAMarkedWordDoesNotOpenTheFloorForEveryShortQuery(t *testing.T) {
+	const vowelled = "\u0643\u064e\u062a\u064e\u0628\u064e"
+	dir := seedOneWord(t, vowelled+" the parser")
+	// "teh" is one edit from "the", which the corpus holds. It is three runes,
+	// so it sits below the floor and must find nothing.
+	res, err := SearchDetailed(dir, query.Options{Query: "teh", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) != 0 {
+		t.Errorf("a three-letter typo was expanded because the corpus held an Arabic word: tier=%q variants=%v",
+			res.Tier, res.Variants)
+	}
+	// The Arabic word itself is still reachable from the way it is typed.
+	res, err = SearchDetailed(dir, query.Options{Query: "\u0643\u062a\u0628", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) != 1 {
+		t.Errorf("the marked word became unreachable: %d hits tier=%q", len(res.Sessions), res.Tier)
+	}
+}
+
+// Thai tone marks are the whole word: ขาว is white, ข่าว is news, ข้าว is rice.
+// A mark being free on the close tier joins them there — that is the tier's
+// job — but each must answer its own query exactly, and a word that only lost
+// its marks must not outrank a real correction.
+func TestThaiToneMarksStillTellWordsApart(t *testing.T) {
+	const (
+		white = "\u0e02\u0e32\u0e27"
+		news  = "\u0e02\u0e48\u0e32\u0e27"
+		rice  = "\u0e02\u0e49\u0e32\u0e27"
+	)
+	dir := seedOneWord(t, rice)
+	res, err := SearchDetailed(dir, query.Options{Query: rice, All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) != 1 || res.Tier != query.TierExact {
+		t.Errorf("rice did not answer its own query exactly: %d hits tier=%q", len(res.Sessions), res.Tier)
+	}
+	for _, other := range []string{white, news} {
+		res, err := SearchDetailed(dir, query.Options{Query: other, All: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Tier == query.TierExact {
+			t.Errorf("a different Thai word answered on the exact tier: %q", other)
+		}
+	}
+}
+
+// A variation selector says how to draw the rune in front of it. It is a mark
+// by category, and gluing it on made an ordinary word a different token.
+func TestAVariationSelectorIsNotPartOfTheWord(t *testing.T) {
+	if got := tokens("widget\ufe0f"); len(got) != 1 || got[0] != "widget" {
+		t.Errorf("tokens(widget+VS16) = %q, want the plain word", got)
+	}
+	if got := tokens("press 1\ufe0f\u20e3 to continue"); len(got) == 0 {
+		t.Fatal("no tokens")
+	}
+}
