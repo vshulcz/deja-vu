@@ -752,6 +752,16 @@ func isLocalProject(project string) bool {
 	return !strings.HasPrefix(project, "imported:")
 }
 
+// freshnessFloor bounds how much a session's age can cost it. The decay used
+// to be 1/(1+age), which keeps 3% of a score after a month and 0.3% after a
+// year; BM25 does not span three orders of magnitude, so the exact tier
+// ordered by date and let topicality break the ties, the opposite of what it
+// says it does (#1269). At a floor of 0.5 age can halve a score, not erase it:
+// recency still leads between answers that say the same thing, and a session
+// that answers the question outranks a newer one that only mentions it.
+const freshnessFloor = 0.5
+
+// freshnessDecay weighs a session's age between freshnessFloor and 1.
 func freshnessDecay(updated, now time.Time) float64 {
 	if updated.IsZero() {
 		return 0
@@ -760,7 +770,7 @@ func freshnessDecay(updated, now time.Time) float64 {
 	if age <= 0 {
 		return 1
 	}
-	return 1 / (1 + age)
+	return freshnessFloor + (1-freshnessFloor)/(1+age)
 }
 
 // windowScanLimit bounds how many places of one token are enumerated when
