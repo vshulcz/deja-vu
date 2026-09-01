@@ -1,10 +1,10 @@
 package embed
 
 import (
-	"errors"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
