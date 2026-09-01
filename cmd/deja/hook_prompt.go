@@ -1307,7 +1307,14 @@ func sessionIDs(ss []model.Session) []string {
 	return out
 }
 
-const promptHookLead = "deja found prior sessions matching this request. If one genuinely helps, use it and tell the user in one short line what deja-vu recalled; otherwise ignore silently.\n"
+// promptHookLead says what the block is before it says what to do with it.
+// "deja found prior sessions matching this request" reads as a judgement that
+// they answer it, and an agent acted on that: asked about one service with
+// another's symptom in the prompt, it applied the neighbouring session's
+// decision and said history had settled it — naming the mismatch in the same
+// sentence (#2370). The match is on wording, and the lead now says so and asks
+// for the one check that catches it.
+const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line what deja-vu recalled; otherwise ignore silently.\n"
 
 // digestBudget is how much room the block gets. A match resting on a single
 // rare word is a weaker claim than one resting on two, and it is where most of
