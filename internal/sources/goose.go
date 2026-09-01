@@ -140,18 +140,18 @@ func gooseText(v any) string {
 	}
 }
 
-// gooseTypeFilter keeps subagent turns and cron-recipe runs out of recall:
-// Goose stores them in the same table as the user's own sessions. The
-// user-visible session types (user and acp) belong in recall, while terminal,
-// gateway and hidden remain excluded. The column exists only on newer stores,
-// and naming it on an older one fails the whole query, so it is probed rather
-// than assumed.
+// gooseTypeFilter keeps subagent turns, cron-recipe runs and gateway traffic
+// out of recall: Goose stores them in the same table as the user's own
+// sessions. The user-visible session types (user, acp and terminal) belong in
+// recall, while gateway, hidden, subagent and scheduled remain excluded. The
+// column exists only on newer stores, and naming it on an older one fails the
+// whole query, so it is probed rather than assumed.
 func gooseTypeFilter(db string) string {
 	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", "pragma table_info(sessions)").Output()
 	if err != nil || !bytes.Contains(out, []byte("session_type")) {
 		return ""
 	}
-	return " and (s.session_type is null or s.session_type = '' or s.session_type in ('user','acp'))"
+	return " and (s.session_type is null or s.session_type = '' or s.session_type in ('user','acp','terminal'))"
 }
 
 func ParseGooseDB(db string) ([]model.Session, error) {
