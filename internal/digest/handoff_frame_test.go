@@ -32,7 +32,7 @@ func TestTheHandoffMarksWhereTheTranscriptStarts(t *testing.T) {
 	if lead < 0 || open < 0 || planted < 0 {
 		t.Fatalf("the handoff lost one of its parts:\n%s", out)
 	}
-	if !(lead < open && open < planted) {
+	if lead >= open || open >= planted {
 		t.Errorf("the quoted transcript is not marked before it starts:\n%s", out)
 	}
 	if !strings.Contains(out, "Continue from there") {
