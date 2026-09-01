@@ -357,11 +357,33 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if investigationCommand(cmd) {
 				continue
 			}
+			// A command that names a scratch file is not a remedy anyone can
+			// run, including the session that ran it: an agent scripts an edit
+			// into a temp file, runs it, then re-runs the suite, and the whole
+			// line reads as the fix for the failing test. On a real store that
+			// was 38 of 186 confirmed pairs (#2163). Keep scanning — the
+			// durable command usually follows.
+			if namesAnEphemeralPath(cmd) {
+				continue
+			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
 			break
 		}
 	}
 	return out
+}
+
+// ephemeralPathRE matches a path under a directory whose contents do not
+// survive: the system temp roots, and the per-session scratch directories an
+// agent harness hands its tools. Anchored on a boundary and on the separator
+// that follows, so a package path like ./internal/tmp/ and the word inside a
+// commit message are left alone.
+var ephemeralPathRE = regexp.MustCompile(`(^|[\s"'=(])(/tmp/|/var/folders/|/private/tmp/|\$TMPDIR/|\${TMPDIR}/)|/\.claude/jobs/[^/]+/tmp/`)
+
+// namesAnEphemeralPath reports whether the command reaches for a file that is
+// gone by the time deja would serve it.
+func namesAnEphemeralPath(cmd string) bool {
+	return ephemeralPathRE.MatchString(cmd)
 }
 
 // firstFrictionLine returns the first line of a record that names something
