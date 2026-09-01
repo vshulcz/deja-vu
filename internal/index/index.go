@@ -90,7 +90,9 @@ import (
 // indexed as three one-letter tokens and हिन्दी as two, and the words
 // themselves were never in the index for any query to reach. A store built
 // under the old rules holds the letters rather than the words, and nothing
-// re-derives them without the bump (#1941).
+// re-derives them without the bump (#1941). A variation selector is category
+// Mn but says how to draw the rune in front of it, so it is not one of those
+// marks and does not join the word (#2896).
 const version = 33
 const maxIndexedText = 64 * 1024
 
