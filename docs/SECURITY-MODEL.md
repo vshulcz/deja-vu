@@ -66,7 +66,10 @@ of these commands is run:
 
 - `deja update` connects to GitHub over HTTPS to read release metadata and
   download the selected archive and `checksums.txt`. It verifies the archive's
-  SHA-256 checksum before replacing the binary.
+  SHA-256 checksum before replacing the binary. It does not check the cosign
+  signature over `checksums.txt`, so the check catches a corrupt download but
+  not a tampered release; verify the signature yourself (below) if you need
+  that guarantee.
 - `deja sync ssh <host>` runs the system `ssh` and `scp` clients against the
   host supplied by the user. The remote peer receives redacted JSONL sync
   batches and imports them into its own index. `--pull` reverses that flow.
