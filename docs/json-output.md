@@ -23,7 +23,7 @@ a `schema_version` field so consumers can detect breaking changes.
   would be written into every line of that file. And the surface answers `null`
   when no digest has been recorded: a shape that is sometimes absent cannot be
   relied on to carry a version.
-- **`deja bench recall|context|prompt --json`** are object-shaped and carry no
+- **`deja bench recall|context|prompt|block --json`** are object-shaped and carry no
   `schema_version` either. They report a benchmark run to whoever asked for it,
   not a contract anything downstream parses on a schedule.
 

@@ -338,7 +338,22 @@ With Ollama or LM Studio, embedding stays local and needs no key.
 ```sh
 deja bench recall     # ranking regression floor, CI fails if recall drops
 deja bench context    # 30 seeded task chains plus five negative controls
+deja bench block      # does the answer survive into what deja hands over
 ```
+
+`bench block` asks the question the other two cannot: with the right session in
+hand, does the block carry what that session settled. Eight sessions discuss each
+subject and one of them settles it, in the middle of its own transcript rather
+than at the end — so the baseline arm, the newest turns of the top hit, scores
+zero and an arm above zero had to choose.
+
+| Arm | Carries the answer | Median tokens |
+|---|---|---|
+| `deja-block` (session-start block) | 1.00 | 665 |
+| `deja-digest` (context digest) | 1.00 | 1656 |
+| `newest-turn` (baseline) | 0.00 | 289 |
+| `cold` | 0.00 | 0 |
+
 
 The context experiment compares deja-recall against full-history, naive grep and cold
 context. With the default seed:
