@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -216,7 +217,13 @@ func tokenCatalogCached(dir string) (map[string]bool, error) {
 	return idx.set, nil
 }
 
+// catalogReads counts how often the token catalog was consulted, for the test
+// that pins the fuzzy tier's early exit (#2898). Reading it is the only way to
+// tell "answered no without looking" from "looked, then answered no".
+var catalogReads atomic.Int64
+
 func tokenIndexCached(dir string) (*tokenIndex, error) {
+	catalogReads.Add(1)
 	sig, err := bucketsSignature(dir)
 	if err != nil {
 		c, cerr := tokenCatalog(dir)

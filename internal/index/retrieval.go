@@ -2983,9 +2983,14 @@ func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][
 	if !hasFuzzyToken(terms, nil) {
 		// Every term is below the length floor. One of them may still be a
 		// word whose marked form is in the index, which only the catalog can
-		// say; a catalog that will not read means no, the same answer this
-		// path gave before it asked.
+		// say — but a mark strips to a non-ASCII base, so an ASCII term has
+		// none and the catalog stays unread. That keeps the answer this path
+		// gave before it asked, and keeps it free (#2898).
+		if !anyNonASCII(terms) {
+			return nil, nil, nil
+		}
 		cat, err := tokenIndexCached(dir)
+		// A catalog that will not read means no, as it did before.
 		if err != nil || !hasFuzzyToken(terms, cat) {
 			return nil, nil, nil
 		}
@@ -3544,6 +3549,16 @@ func oneSuffixStep(word string) []string {
 	return out
 }
 
+// anyNonASCII reports whether any term could carry or shed a combining mark.
+func anyNonASCII(terms []string) bool {
+	for _, term := range terms {
+		if !isASCIIString(term) {
+			return true
+		}
+	}
+	return false
+}
+
 func hasFuzzyToken(terms []string, idx *tokenIndex) bool {
 	for _, term := range terms {
 		// The 4-rune floor also keeps CJK bigrams (always 2 runes) out of
@@ -3691,10 +3706,13 @@ func damerauDistance(a, b string, max int) int {
 }
 
 func damerauDistanceRunes(a, b string, max int) int {
-	ar, br := []rune(a), []rune(b)
-	if abs(len(ar)-len(br)) > max {
+	// Before the conversion: an edit changes the length by one, so a pair too
+	// far apart in runes cannot match however it is spelled, and counting
+	// costs no allocation.
+	if abs(utf8.RuneCountInString(a)-utf8.RuneCountInString(b)) > max {
 		return max + 1
 	}
+	ar, br := []rune(a), []rune(b)
 	prev := make([]int, len(br)+1)
 	for j := range prev {
 		prev[j] = j
