@@ -245,6 +245,8 @@ rm -rf ~/.cache/deja
 
 按场景写的，不是按功能：
 
+- [编码智能体记得之前的对话吗？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html)——每个智能体在会话之间留下了什么，又丢掉了什么
+- [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)——`~/.claude/projects` 会长到多大，删掉要付出什么代价
 - [智能体把你刚才的上下文弄丢了](https://vshulcz.github.io/deja-vu/guide/lost-context.html)——崩溃之后、清空之后，或者会话回来时空空如也
 - [上下文窗口满了](https://vshulcz.github.io/deja-vu/guide/context-window-full.html)——压缩到底保住了什么，实测数据，以及可以换成什么做法
 - [接着昨天的会话做](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html)——跨所有智能体找到它，再回到它原来所属的那一个里打开

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Does Claude Code remember previous conversations? — deja-vu</title>
+<meta name="description" content="Claude Code, Codex, Cursor and Gemini CLI all forget between sessions. What each one keeps on disk, what compaction really preserves, and three ways to get history back.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Does your coding agent remember previous conversations?">
+<meta property="og:description" content="Why every coding agent starts empty, what each keeps on disk, and three ways to give it the history back.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Does your coding agent remember previous conversations?">
+<meta name="twitter:description" content="Why every coding agent starts empty, what each keeps on disk, and three ways to give it the history back.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Does your coding agent remember previous conversations?", "description": "Claude Code, Codex, Cursor and Gemini CLI all forget between sessions. What each one keeps on disk, what compaction really preserves, and three ways to get history back.", "url": "https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Does my agent remember?", "item": "https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Claude Code remember previous conversations?", "acceptedAnswer": {"@type": "Answer", "text": "No. An agent's memory is its context window, and the window is discarded when the session ends. The transcript is still written to disk under ~/.claude/projects, but nothing reads it back, so a new session starts empty."}}, {"@type": "Question", "name": "Do Codex, Cursor and Gemini CLI remember past sessions?", "acceptedAnswer": {"@type": "Answer", "text": "No. All of them write a transcript you can read afterwards, and several can resume one specific past session, but none of them search across your earlier sessions on their own."}}, {"@type": "Question", "name": "Does compaction count as memory?", "acceptedAnswer": {"@type": "Answer", "text": "Only within the same session, and only as prose. Measured over 43 real compactions, the summary kept 77% of the decisions and 0.2% of the commands that had been run."}}, {"@type": "Question", "name": "How do I make my coding agent remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Three options: write facts into a rules file such as CLAUDE.md by hand, install a memory service that records forward from installation, or index the transcripts already on disk so history from before you installed anything is searchable."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html" aria-current="page">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Does your coding agent remember previous conversations?</h1>
+<p class="pagelede">short answer: no — but the conversations are still on your disk<span class="mins" data-mins></span></p>
+
+<p>Claude Code, Codex CLI, Cursor, Gemini CLI and the rest all behave the same way here. Inside one session the agent remembers everything you said. Start a new session and it knows nothing about the last one — not the bug you fixed together yesterday, not the approach you already tried and rejected, not the command that finally worked.</p>
+<p>That is not a bug or a setting you forgot to turn on. An agent's memory <i>is</i> its context window, and the window is thrown away when the session ends.</p>
+
+<h2>What each agent actually keeps</h2>
+<p>Three different things get called "memory", and none of them is what you want on its own:</p>
+<table>
+<tr><th>Mechanism</th><th>Carries across sessions</th><th>What it holds</th></tr>
+<tr><td>Context window</td><td>No</td><td>Everything in the current session, until it fills up</td></tr>
+<tr><td>Rules file (<code>CLAUDE.md</code>, <code>AGENTS.md</code>)</td><td>Yes</td><td>Only what you typed into it by hand</td></tr>
+<tr><td>Session transcript on disk</td><td>Yes, but nothing reads it</td><td>Every turn, command and error, verbatim</td></tr>
+</table>
+<p>So the honest answer to "does it remember?" is: your agent wrote down everything that happened, and then never opened the file again.</p>
+
+<h2>Per agent</h2>
+<p>Every agent below writes a transcript you can read. "Resume" means the harness can re-open one specific past session and continue it; none of them search across sessions on their own.</p>
+<table>
+<tr><th>Agent</th><th>Remembers across sessions</th><th>Can resume one session</th><th>Transcript</th></tr>
+<tr><td>Claude Code</td><td>No</td><td>Yes (<code>--resume</code>)</td><td><code>~/.claude/projects/**/*.jsonl</code></td></tr>
+<tr><td>Codex CLI</td><td>No</td><td>Yes</td><td><code>~/.codex/sessions/**/rollout-*.jsonl</code></td></tr>
+<tr><td>Cursor</td><td>No</td><td>Yes</td><td><code>state.vscdb</code> (SQLite) and <code>~/.cursor</code></td></tr>
+<tr><td>Gemini CLI</td><td>No</td><td>Yes</td><td><code>~/.gemini/tmp/*/chats/</code></td></tr>
+<tr><td>Copilot CLI</td><td>No</td><td>Yes</td><td><code>~/.copilot/session-state/*/events.jsonl</code></td></tr>
+<tr><td>opencode</td><td>No</td><td>Yes</td><td>local database</td></tr>
+<tr><td>aider</td><td>No</td><td>No</td><td><code>~/.aider.chat.history.md</code></td></tr>
+<tr><td>Zed</td><td>No</td><td>No</td><td>application-support database</td></tr>
+</table>
+<p>The <a href="../registry/README.html">format registry</a> has all twenty-one, with the exact glob for each and what a record looks like.</p>
+
+<h2>"But it summarised the session — isn't that memory?"</h2>
+<p>Compaction is what happens when a long session runs out of window: earlier turns are replaced by a summary so the rest keeps fitting. The summary stays inside that session, and it is prose.</p>
+<p>Measured over 43 real compactions from one machine's history (method and corpus in the <a href="benchmarks.html">benchmarks</a>):</p>
+<ul>
+<li><b>77%</b> of the decisions survived the summary.</li>
+<li><b>0.2%</b> of the commands that had actually been run survived it.</li>
+</ul>
+<p>Which matches what it feels like: the agent still knows you chose Postgres, and has no idea what the migration command was.</p>
+
+<h2>How to make it remember</h2>
+<p>Three options, in the order people usually try them.</p>
+<h3>1. Write it down yourself</h3>
+<p>A rules file is read at the start of every session, so anything in it is remembered forever. It is the right home for conventions, the build command, and things not to touch. It is a bad home for history: you have to predict in advance what will matter, and nobody writes down a problem they have not hit twice yet. See <a href="rules-files.html">when CLAUDE.md grows</a>.</p>
+<h3>2. A memory service</h3>
+<p>Memory platforms record facts from the moment you install them, usually through an extraction model. They start empty — the months you already worked are not in them — and they put a network call in a loop that did not have one. <a href="compare.html">Compared here</a>.</p>
+<h3>3. Read the transcripts that already exist</h3>
+<p>Nothing needs recording, because the recording already happened. An index over those files answers "have I seen this before?" including for every session from before you installed anything. That is what <a href="https://github.com/vshulcz/deja-vu">deja</a> is:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<pre>$ deja "connection pool exhausted"
+[claude] api   · Jul 8 · 8f31c0a9 — 2 matches
+  login started failing after refresh token rotation; jwt kid mismatch in tests
+  fixed by reloading jwks cache after rotateKey and adding a clock-skew test
+[codex]  web   · Jul 1 · b77d91e2 — 1 match
+  refresh token cookie needed SameSite=Lax in local callback flow</pre>
+<p>With auto-recall wired in, the agent runs that lookup itself — at session start, on a prompt that matches earlier work, before it edits a file or runs a command, and after a command fails. It is local: no account, no upload, no model call. <a href="agents.html">Which agent supports which moment</a>.</p>
+
+<p>You do not need any of this to read your own history — the files are yours and they are plain text. <a href="session-files-on-disk.html">What is in them</a> · <a href="find-a-session.html">Finding one session</a> · <a href="getting-started.html">Getting started</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
