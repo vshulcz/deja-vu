@@ -319,6 +319,13 @@ func isStructureLine(l string) bool {
 	return false
 }
 
+// IsListingDump reports whether a line is a listing rather than a sentence.
+// Exported for the snippet path, which had its own smaller pair of filters —
+// a numbered-line check and a tool-dump check — and no notion of a listing at
+// all, so `wc -l` output and a run of paths were quoted as the passage that
+// explains a file.
+func IsListingDump(line string) bool { return looksLikeListingDump(line) }
+
 func looksLikeListingDump(line string) bool {
 	fields := strings.Fields(line)
 	if len(fields) < 8 {
