@@ -195,7 +195,15 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 			} else if len(result.Sessions) > 0 {
 				return result, nil
 			}
-			return relevanceSearch(dir, m, o)
+			ranked, rerr := relevanceSearch(dir, m, o)
+			if rerr != nil || len(ranked.Sessions) > 0 {
+				return ranked, rerr
+			}
+			// Nothing anywhere. The neighbour map holds the one link left to
+			// try — the project's own word for what the reader asked about —
+			// and asking it over the question's identifying words is what
+			// makes it readable by a sentence (#2331).
+			return cooccurNarrowedSearch(dir, m, o)
 		}
 		ss, err := scanRecords(dir, m, o, nil)
 		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
