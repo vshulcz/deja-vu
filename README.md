@@ -307,6 +307,10 @@ export DEJA_EMBED_MODEL='text-embedding-3-small'
 deja embed
 ```
 
+With no `DEJA_EMBED_URL` set, deja probes `localhost:11434` and `localhost:1234`,
+so a machine already running Ollama or LM Studio is picked up without being asked.
+`DEJA_EMBED_OFF=1` turns that probe off — a configured `DEJA_EMBED_URL` still wins.
+
 For another authenticated OpenAI-compatible endpoint, set `DEJA_EMBED_KEY` explicitly:
 
 ```sh
