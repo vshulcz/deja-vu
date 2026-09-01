@@ -952,7 +952,7 @@ func Conclusions(s model.Session, budget int, max int) []string {
 	if len(assistants) == 0 {
 		return nil
 	}
-	picked := dedupeStatus(selectConclusions(assistants))
+	picked := concludingFirst(dedupeStatus(selectConclusions(assistants)))
 	// Newest first: the last thing concluded outranks the first thing tried.
 	var out []string
 	spent := 0
@@ -991,6 +991,34 @@ func Conclusions(s model.Session, budget int, max int) []string {
 		}
 	}
 	return out
+}
+
+// concludingFirst puts the messages that settle something last, so the
+// newest-first walk reaches them before the budget is gone.
+//
+// selectConclusions keeps a message for carrying a decision marker, for
+// containing a code fence, or for being the last one — three reasons, and only
+// the first is about concluding anything. A message kept for its code fence
+// that happens to be newer than the real conclusion took the slot: on a real
+// store that was 28 of the 62 sessions whose block still missed what they
+// settled (#2243).
+//
+// Order within each group is untouched, so "the last thing concluded outranks
+// the first thing tried" still holds — among the messages that concluded
+// anything, and then among the rest.
+func concludingFirst(ms []model.Message) []model.Message {
+	var plain, concluding []model.Message
+	for _, m := range ms {
+		if CarriesDecision(MessageText(m.Text)) {
+			concluding = append(concluding, m)
+			continue
+		}
+		plain = append(plain, m)
+	}
+	// No guard for the all-one-group cases: appending an empty half leaves the
+	// order exactly as it was, and a guard that cannot change an answer is a
+	// line no test can hold.
+	return append(plain, concluding...)
 }
 
 // decisionLead is the part of a picked message the block quotes: its opening
