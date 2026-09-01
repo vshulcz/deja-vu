@@ -34,22 +34,7 @@ func TestASmallStoresAnswerReachesTheInjectedBlock(t *testing.T) {
 	// fixture worth anything — a small store wins trivially when nothing else
 	// in the corpus shares its vocabulary, and that is not the case #1556
 	// measured.
-	noise := []string{
-		"the battery of tests for the cycle detector kept flaking on ci",
-		"a referral from the docs page credits the wrong campaign in analytics",
-		"the resolver in the sandbox build reads the wrong config for dns",
-		"the font in the pdf export is fine, the missing glyph is in the ui",
-		"the clock in the ledger dashboard drifts, the skew banner is cosmetic",
-	}
-	for i := 0; i < 200; i++ {
-		at := time.Now().Add(-time.Duration(i+2) * time.Hour).UTC().Format(time.RFC3339)
-		text := noise[i%len(noise)]
-		writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-app", fmt.Sprintf("big%d.jsonl", i)), "",
-			[]string{
-				line("user", fmt.Sprintf("big%d", i), at, fmt.Sprintf("%s (shard %d)", text, i)),
-				line("assistant", fmt.Sprintf("big%d", i), at, fmt.Sprintf("we raised the shard %d prefetch and it settled", i)),
-			})
-	}
+	seedBigStore(t, claudeRoot)
 
 	// The small store: five sessions, each settling something no claude
 	// session mentions.
@@ -141,6 +126,29 @@ func rankLabel(rank int) string {
 	return fmt.Sprint(rank)
 }
 
+// seedBigStore writes the dominant harness: 200 sessions of ordinary project
+// work, each touching the vocabulary of the questions the tests ask, and each
+// repeated five ways apart from a shard number — which is what a real store
+// looks like and what makes near-duplicates worth collapsing.
+func seedBigStore(t *testing.T, claudeRoot string) {
+	t.Helper()
+	noise := []string{
+		"the battery of tests for the cycle detector kept flaking on ci",
+		"a referral from the docs page credits the wrong campaign in analytics",
+		"the resolver in the sandbox build reads the wrong config for dns",
+		"the font in the pdf export is fine, the missing glyph is in the ui",
+		"the clock in the ledger dashboard drifts, the skew banner is cosmetic",
+	}
+	for i := 0; i < 200; i++ {
+		at := time.Now().Add(-time.Duration(i+2) * time.Hour).UTC().Format(time.RFC3339)
+		id := fmt.Sprintf("big%d", i)
+		writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-app", id+".jsonl"), "", []string{
+			line("user", id, at, fmt.Sprintf("%s (shard %d)", noise[i%len(noise)], i)),
+			line("assistant", id, at, fmt.Sprintf("we raised the shard %d prefetch and it settled", i)),
+		})
+	}
+}
+
 func line(role, id, at, text string) string {
 	b, err := json.Marshal(map[string]any{
 		"type": role, "sessionId": id, "timestamp": at, "cwd": "/tmp/app",
@@ -192,4 +200,37 @@ func promptHookContext(t *testing.T, prompt string) string {
 		t.Fatalf("bad hook json %q: %v", out.String(), err)
 	}
 	return resp.HookSpecificOutput.AdditionalContext
+}
+
+// Two sessions that say the same thing about the question, differing only in a
+// number, are one answer. Spending both slots on them costs the reader the
+// other answer entirely — which is what the clock-skew row of the fixture
+// above was: two copies of one dashboard complaint, while the session that
+// answers the question sat first in search and never appeared (#1556).
+func TestTwoSessionsThatDifferByANumberAreOneAnswer(t *testing.T) {
+	hermeticEnv(t)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	codexRoot := os.Getenv("DEJA_CODEX_ROOT")
+	seedBigStore(t, claudeRoot)
+	writeCodexRollout(t, codexRoot, "answer", time.Now().Add(-30*24*time.Hour).UTC(),
+		"batches from the eu region are being refused at import",
+		"the ledger rejects a batch whose clock skew exceeds ninety seconds")
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(t.TempDir(), "tmp", "app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+
+	block := promptHookContext(t, "how much clock skew will the ledger tolerate on a batch")
+	if n := strings.Count(block, "the skew banner is cosmetic"); n > 1 {
+		t.Errorf("the block spent %d slots on one answer:\n%s", n, block)
+	}
+	// And the slot the duplicate gave up goes to the session that answers the
+	// question, which sits below the ranking window the forty copies filled.
+	if !strings.Contains(block, "ninety seconds") {
+		t.Errorf("the answer never reached the block:\n%s", block)
+	}
 }
