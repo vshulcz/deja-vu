@@ -2979,12 +2979,24 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 const commonTokenPostings = 200
 
 func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
-	if !hasFuzzyToken(terms) {
-		return nil, nil, nil
+	var idx *tokenIndex
+	if !hasFuzzyToken(terms, nil) {
+		// Every term is below the length floor. One of them may still be a
+		// word whose marked form is in the index, which only the catalog can
+		// say; a catalog that will not read means no, the same answer this
+		// path gave before it asked.
+		cat, err := tokenIndexCached(dir)
+		if err != nil || !hasFuzzyToken(terms, cat) {
+			return nil, nil, nil
+		}
+		idx = cat
 	}
-	idx, err := tokenIndexCached(dir)
-	if err != nil {
-		return nil, nil, err
+	if idx == nil {
+		cat, err := tokenIndexCached(dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		idx = cat
 	}
 	perToken := make([]map[int64]posting, len(terms))
 	variants := map[string][]string{}
@@ -3532,11 +3544,20 @@ func oneSuffixStep(word string) []string {
 	return out
 }
 
-func hasFuzzyToken(terms []string) bool {
+func hasFuzzyToken(terms []string, idx *tokenIndex) bool {
 	for _, term := range terms {
+		n := len([]rune(term))
 		// The 4-rune floor also keeps CJK bigrams (always 2 runes) out of
 		// fuzzy variant generation entirely — no variant-space blowup (#338).
-		if len([]rune(term)) >= 4 {
+		if n >= 4 {
+			return true
+		}
+		// A shorter word is let in only to reach its own marked form. Arabic
+		// writes its vowels as combining marks, so كتب is three runes and the
+		// written-out كَتَبَ is six: the word a reader types is below the floor
+		// while the word in the index is above it (#1941). This costs nothing
+		// where no such token exists, and bigrams stay out.
+		if n == 3 && idx != nil && idx.hasMarkedNear(n, 1) {
 			return true
 		}
 	}
@@ -3579,15 +3600,41 @@ func closeTokens(query string, idx *tokenIndex) []string {
 	if qr >= 8 {
 		limit = 2
 	}
+	bareQuery, queryMarked := unmarked(query)
+	bareLen := len([]rune(bareQuery))
+	seen := make(map[string]bool)
+	consider := func(token string) {
+		if seen[token] {
+			return
+		}
+		d := damerauDistance(query, token, limit)
+		if d > limit {
+			// A combining mark is free here. Arabic is normally typed without
+			// harakat and each mark is a rune of its own, so كتب sat three
+			// edits from كَتَبَ while café sat one from cafe: one rule, two
+			// outcomes, and the reader who got nothing was the one whose
+			// script writes its vowels as marks (#1941).
+			if bareToken, tokenMarked := unmarked(token); queryMarked || tokenMarked {
+				d = damerauDistance(bareQuery, bareToken, limit)
+			}
+		}
+		if d > limit {
+			return
+		}
+		seen[token] = true
+		matches = append(matches, match{token: token, distance: d})
+	}
 	// An edit changes the length by at most one and a transposition not at
 	// all, so only tokens within the limit of the query's length can match.
 	// Walking those buckets replaces a Damerau-Levenshtein run against every
 	// token in the corpus — ~200k of them — with a few short slices.
-	idx.candidates(qr, limit, func(token string) {
-		if d := damerauDistance(query, token, limit); d <= limit {
-			matches = append(matches, match{token: token, distance: d})
-		}
-	})
+	idx.candidates(qr, limit, consider)
+	// Marks are free, so a marked token is reached by the length it has
+	// without them, and a marked query reaches unmarked tokens by its own.
+	idx.markedCandidates(bareLen, limit, consider)
+	if queryMarked {
+		idx.candidates(bareLen, limit, consider)
+	}
 	sort.Slice(matches, func(i, j int) bool {
 		if matches[i].distance == matches[j].distance {
 			return matches[i].token < matches[j].token
@@ -3668,6 +3715,31 @@ func damerauDistanceRunes(a, b string, max int) int {
 	return prev[len(br)]
 }
 
+// unmarked strips combining marks from s, reporting whether any were there.
+// Category Mn is what a mark is: Arabic harakat, Hebrew niqqud, Vietnamese and
+// Greek tone marks in their decomposed form. A string without one is returned
+// untouched, so ordinary text pays one scan and no allocation.
+func unmarked(s string) (string, bool) {
+	has := false
+	for _, r := range s {
+		if r >= 0x0300 && unicode.Is(unicode.Mn, r) {
+			has = true
+			break
+		}
+	}
+	if !has {
+		return s, false
+	}
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r >= 0x0300 && unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		out = append(out, r)
+	}
+	return string(out), true
+}
+
 func abs(n int) int {
 	if n < 0 {
 		return -n
@@ -3717,7 +3789,14 @@ func tokens(s string) []string {
 		b.Reset()
 	}
 	for _, r := range strings.ToLower(s) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+		// A combining mark continues the word it sits on. Latin NFD is already
+		// composed away above, but Arabic harakat and Hebrew niqqud have no
+		// precomposed form, so the mark ended the token and كَتَبَ was indexed
+		// as three one-letter tokens — the word itself was not in the index at
+		// all (#1941). A mark cannot start a token, so a stray one still
+		// separates.
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' ||
+			(b.Len() > 0 && r >= 0x0300 && unicode.Is(unicode.Mn, r)) {
 			b.WriteRune(r)
 			if b.Len() > 64 {
 				flush()

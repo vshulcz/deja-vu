@@ -78,23 +78,47 @@ var catalogCache struct {
 type tokenIndex struct {
 	set   map[string]bool
 	byLen [][]string
+	// Tokens carrying a combining mark, bucketed by the length they have
+	// without it. The close tier treats a mark as free, and a marked token is
+	// as many runes longer than its unmarked form as it has marks, so the
+	// ordinary length window never reaches it (#1941). Marked tokens are a
+	// small minority of any corpus, so this second bucket list costs little.
+	markedByLen [][]string
 }
 
 const maxIndexedTokenLen = 64
 
 func newTokenIndex(set map[string]bool) *tokenIndex {
-	idx := &tokenIndex{set: set, byLen: make([][]string, maxIndexedTokenLen+2)}
+	idx := &tokenIndex{
+		set:         set,
+		byLen:       make([][]string, maxIndexedTokenLen+2),
+		markedByLen: make([][]string, maxIndexedTokenLen+2),
+	}
 	for tok := range set {
 		n := len(tok)
-		if !isASCIIString(tok) {
+		ascii := isASCIIString(tok)
+		if !ascii {
 			n = utf8.RuneCountInString(tok)
 		}
-		if n > maxIndexedTokenLen {
-			n = maxIndexedTokenLen + 1 // one overflow bucket, always scanned
+		idx.byLen[bucketFor(n)] = append(idx.byLen[bucketFor(n)], tok)
+		if ascii {
+			continue // no ASCII byte is a combining mark
 		}
-		idx.byLen[n] = append(idx.byLen[n], tok)
+		if bare, marked := unmarked(tok); marked {
+			b := bucketFor(utf8.RuneCountInString(bare))
+			idx.markedByLen[b] = append(idx.markedByLen[b], tok)
+		}
 	}
 	return idx
+}
+
+// bucketFor clamps a rune length to the bucket that holds it; anything longer
+// than maxIndexedTokenLen shares one overflow bucket, which is always scanned.
+func bucketFor(n int) int {
+	if n > maxIndexedTokenLen {
+		return maxIndexedTokenLen + 1
+	}
+	return n
 }
 
 // candidates visits the tokens whose rune length is within limit of n, plus
@@ -115,6 +139,47 @@ func (t *tokenIndex) candidates(n, limit int, fn func(string)) {
 	for _, tok := range t.byLen[maxIndexedTokenLen+1] {
 		fn(tok)
 	}
+}
+
+// markedCandidates visits the tokens whose length without their combining
+// marks is within limit of n. The close tier compares those in the same
+// unmarked form, so a query typed without marks reaches the word written with
+// them however many marks it carries.
+func (t *tokenIndex) markedCandidates(n, limit int, fn func(string)) {
+	lo, hi := n-limit, n+limit
+	if lo < 0 {
+		lo = 0
+	}
+	if hi > maxIndexedTokenLen {
+		hi = maxIndexedTokenLen
+	}
+	for l := lo; l <= hi && l < len(t.markedByLen); l++ {
+		for _, tok := range t.markedByLen[l] {
+			fn(tok)
+		}
+	}
+	for _, tok := range t.markedByLen[maxIndexedTokenLen+1] {
+		fn(tok)
+	}
+}
+
+// hasMarkedNear reports whether any token carrying a combining mark has an
+// unmarked length within limit of n. Cheap enough to ask before deciding
+// whether a short term is worth the candidate walk.
+func (t *tokenIndex) hasMarkedNear(n, limit int) bool {
+	lo, hi := n-limit, n+limit
+	if lo < 0 {
+		lo = 0
+	}
+	if hi > maxIndexedTokenLen {
+		hi = maxIndexedTokenLen
+	}
+	for l := lo; l <= hi && l < len(t.markedByLen); l++ {
+		if len(t.markedByLen[l]) > 0 {
+			return true
+		}
+	}
+	return len(t.markedByLen[maxIndexedTokenLen+1]) > 0
 }
 
 // bucketsSignature changes whenever any bucket file is added, removed, resized

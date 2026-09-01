@@ -43,15 +43,13 @@ func seedOneWord(t *testing.T, word string) string {
 // word from the same one written without them. Nothing on the exact tier joins
 // them.
 //
-// What does join them, for Latin, is the close tier: café and cafe are one edit
-// apart, inside its limit of one for a short word. The Arabic pair is out of
-// reach twice over — the candidate walk only visits tokens within the limit of
-// the query's length, so a three-rune query never sees the six-rune stored form,
-// and even if it did the two are three edits apart. One rule, two outcomes.
-//
-// This records which is which. Note what it cannot tell you: raising the tier's
-// edit limit alone would not change the Arabic rows, because the length bucket
-// excludes the candidate before any distance is computed.
+// The close tier does, in every script. For Latin that fell out of the edit
+// limit — café and cafe are one edit apart. Arabic is normally typed without
+// harakat, and each mark is a rune of its own, so the same pair sat three edits
+// apart and outside the length window besides: one rule, two outcomes, and the
+// reader who got nothing was the one whose script writes its vowels as marks
+// (#1941). A combining mark is now free on this tier, which is what makes the
+// two Arabic rows below the same shape as the two Latin ones.
 func TestWhichTierJoinsAWordToItsMarkedForm(t *testing.T) {
 	const (
 		vowelled = "\u0643\u064e\u062a\u064e\u0628\u064e" // a fatha on each letter
@@ -68,8 +66,8 @@ func TestWhichTierJoinsAWordToItsMarkedForm(t *testing.T) {
 		tier                string
 	}{
 		{"arabic, same form", vowelled, vowelled, 1, query.TierExact},
-		{"arabic, marks dropped from the query", vowelled, plain, 0, ""},
-		{"arabic, marks added to the query", plain, vowelled, 0, ""},
+		{"arabic, marks dropped from the query", vowelled, plain, 1, query.TierClose},
+		{"arabic, marks added to the query", plain, vowelled, 1, query.TierClose},
 		{"latin, same form", accented, accented, 1, query.TierExact},
 		{"latin, accent dropped from the query", accented, bare, 1, query.TierClose},
 		{"latin, accent added to the query", bare, accented, 1, query.TierClose},
@@ -85,5 +83,27 @@ func TestWhichTierJoinsAWordToItsMarkedForm(t *testing.T) {
 		if c.hits > 0 && res.Tier != c.tier {
 			t.Errorf("%s: answered on the %q tier, want %q", c.name, res.Tier, c.tier)
 		}
+	}
+}
+
+// The tokenizer is where the Arabic pair was lost before the tier ever ran: a
+// mark is not a letter, so it ended the word and the index held single letters
+// instead of the word. Hebrew with niqqud is the same shape.
+func TestAMarkContinuesTheWordItSitsOn(t *testing.T) {
+	for _, c := range []struct {
+		name, text, want string
+	}{
+		{"arabic harakat", "\u0643\u064e\u062a\u064e\u0628\u064e", "\u0643\u064e\u062a\u064e\u0628\u064e"},
+		{"hebrew niqqud", "\u05e9\u05b8\u05dc\u05d5\u05b9\u05dd", "\u05e9\u05b8\u05dc\u05d5\u05b9\u05dd"},
+	} {
+		got := tokens(c.text)
+		if len(got) != 1 || got[0] != c.want {
+			t.Errorf("%s: tokens(%q) = %q, want the one word", c.name, c.text, got)
+		}
+	}
+	// A mark with no letter in front of it still separates, so a stray one
+	// cannot glue two words together.
+	if got := tokens("alpha \u064e beta"); len(got) != 2 {
+		t.Errorf("a leading mark joined words: %q", got)
 	}
 }
