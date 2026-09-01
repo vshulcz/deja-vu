@@ -255,6 +255,29 @@ jobs:
       - name: Every scripts/ binary is ignored
         run: go run ./scripts/ignorecheck
 
+  stale:
+    name: not behind on what it touches
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # merge-base needs the history of both sides.
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+      # A squash merge applies the branch's own diff, so a branch cut before
+      # another PR landed silently restores that PR's old lines — mergeable,
+      # green, reviewed, and a revert (#2911). Requiring every branch to be up
+      # to date prevents it and costs a rebase per PR; this asks for one only
+      # where the base has moved on a file the branch also touches.
+      - name: Rebase needed on the files this branch changes
+        run: |
+          git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"
+          go run ./scripts/staleoverlap -base "origin/${{ github.event.pull_request.base.ref }}" -head HEAD
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest
