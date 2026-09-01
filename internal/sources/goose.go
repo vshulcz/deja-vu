@@ -113,11 +113,12 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		if t.IsZero() {
 			t = parseTimeAny(m["timestamp"])
 		}
-		s.Touch(t)
-		text := gooseText(m["content"])
-		if text != "" {
-			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
+		speech, toolOut, commands, paths := gooseParts(m["content"])
+		if speech == "" && toolOut == "" && len(commands) == 0 && len(paths) == 0 {
+			return
 		}
+		s.Touch(t)
+		appendGooseParts(&s, role, t, speech, toolOut, commands, paths)
 	})
 	if s.Project == "" {
 		s.Project = "goose"
@@ -176,6 +177,148 @@ func gooseText(v any) string {
 	default:
 		return textFromContent(v)
 	}
+}
+
+// appendGooseParts files one row's content under the roles deja indexes, the
+// way the Claude reader does: speech under the speaker, tool output under the
+// role that marks it as a printout, and the command and the paths as their own
+// records so `how`, `blame` and the fix pairs can find them.
+func appendGooseParts(s *model.Session, role string, t time.Time, speech, toolOut string, commands, paths []string) {
+	if speech != "" {
+		s.Messages = append(s.Messages, model.Message{Role: role, Text: capParsedMessage(speech), Time: t})
+	}
+	if toolOut != "" {
+		s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(toolOut), Time: t})
+	}
+	if IndexToolPaths() && len(paths) > 0 {
+		s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: strings.Join(paths, "\n"), Time: t})
+	}
+	for _, cmd := range commands {
+		s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+	}
+}
+
+// gooseParts splits a goose content array into the four things deja indexes
+// separately. goose stores far more than speech in the same column — measured
+// against goose 1.48.0 by importing a transcript and reading the row back:
+//
+//	toolRequest  {"type":"toolRequest","id":..,"toolCall":{"status":"success",
+//	              "value":{"name":"Bash","arguments":{"command":"go build ./..."}}}}
+//	toolResponse {"type":"toolResponse","id":..,"toolResult":{"status":"success",
+//	              "value":{"resultType":"complete","content":[{"type":"text","text":".."}],
+//	              "isError":false}}}
+//
+// Only `text` parts were read, so a goose store contributed no commands and no
+// tool output at all: `how` had nothing to answer from, and friction and the
+// fix pairs never saw the error a build printed. Every other harness that
+// records structured tool output has had this since the roles were named.
+//
+// The response arrives on a `user` row — goose files a tool result as the
+// user's turn, the same way Claude Code does — so a row that holds only
+// responses is tool output rather than something a person said.
+func gooseParts(v any) (speech, toolOut string, commands, paths []string) {
+	items, ok := gooseContentArray(v)
+	if !ok {
+		return gooseText(v), "", nil, nil
+	}
+	var say, out []string
+	for _, it := range items {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch m["type"] {
+		case "text":
+			if t := withoutGooseTurnContext(str(m["text"])); t != "" {
+				say = append(say, t)
+			}
+		case "toolRequest":
+			name, args := gooseToolCall(m)
+			if cmd := strings.TrimSpace(str(args["command"])); cmd != "" && worthIndexing(cmd) {
+				commands = append(commands, "$ "+cmd)
+			}
+			// The editor tools name the file they are about to change, which is
+			// what blame reads. `path` is what goose's own editor takes; a tool
+			// from an extension may spell it either way.
+			for _, key := range []string{"path", "file_path"} {
+				if pth := strings.TrimSpace(str(args[key])); pth != "" {
+					paths = append(paths, pth)
+					break
+				}
+			}
+			_ = name
+		case "toolResponse":
+			if t := gooseToolResult(m); t != "" {
+				out = append(out, t)
+			}
+		}
+	}
+	return strings.Join(say, "\n"), strings.Join(out, "\n"), commands, paths
+}
+
+// withoutGooseTurnContext removes the block goose injects ahead of a turn —
+// the clock, the working directory and the standing task list, wrapped in
+// <turn-context>. goose writes it as a message of the user's own role, so
+// every turn on a real store added one and deja indexed it as something the
+// person said. Stripped rather than dropped whole, because a turn that carries
+// both the envelope and real words must keep the words.
+func withoutGooseTurnContext(text string) string {
+	for {
+		open := strings.Index(text, "<turn-context>")
+		if open < 0 {
+			break
+		}
+		close := strings.Index(text[open:], "</turn-context>")
+		if close < 0 {
+			text = text[:open]
+			break
+		}
+		text = text[:open] + text[open+close+len("</turn-context>"):]
+	}
+	return strings.TrimSpace(text)
+}
+
+// gooseContentArray unwraps the column, which holds the array either as JSON
+// text or already decoded, depending on how it was read.
+func gooseContentArray(v any) ([]any, bool) {
+	switch x := v.(type) {
+	case string:
+		var parsed any
+		if json.Unmarshal([]byte(x), &parsed) != nil {
+			return nil, false
+		}
+		items, ok := parsed.([]any)
+		return items, ok
+	case []any:
+		return x, true
+	}
+	return nil, false
+}
+
+func gooseToolCall(m map[string]any) (string, map[string]any) {
+	call, _ := m["toolCall"].(map[string]any)
+	value, _ := call["value"].(map[string]any)
+	args, _ := value["arguments"].(map[string]any)
+	return str(value["name"]), args
+}
+
+// gooseToolResult reads the text a tool produced, from either side of the
+// status: an error carries what went wrong, which is the half friction and the
+// fix pairs are built on.
+func gooseToolResult(m map[string]any) string {
+	res, _ := m["toolResult"].(map[string]any)
+	if value, ok := res["value"].(map[string]any); ok {
+		if t := textFromContent(value["content"]); t != "" {
+			return t
+		}
+	}
+	if e, ok := res["error"].(map[string]any); ok {
+		return strings.TrimSpace(str(e["message"]))
+	}
+	if t := strings.TrimSpace(str(res["error"])); t != "" {
+		return t
+	}
+	return ""
 }
 
 // gooseTypeFilter keeps out of recall what goose wrote for itself: Goose
@@ -311,17 +454,16 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 			by[id] = s
 		}
 		role := str(r["role"])
-		txt := gooseText(r["content_json"])
-		if txt == "" {
-			continue
-		}
-		txt = capParsedMessage(txt)
 		t := parseTimeAny(r["created_timestamp"])
 		if t.IsZero() {
 			t = s.Updated
 		}
+		speech, toolOut, commands, paths := gooseParts(r["content_json"])
+		if speech == "" && toolOut == "" && len(commands) == 0 && len(paths) == 0 {
+			continue
+		}
 		s.Touch(t)
-		s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
+		appendGooseParts(s, role, t, speech, toolOut, commands, paths)
 	}
 	if _, err := dec.Token(); err != nil {
 		_ = cmd.Wait()
