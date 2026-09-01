@@ -144,13 +144,37 @@ func gooseText(v any) string {
 // Goose stores them in the same table as the user's own sessions. The column
 // exists only on newer stores, and naming it on an older one fails the whole
 // query, so it is probed rather than assumed.
+//
+// What goose calls its own work is what deja excludes, rather than what it
+// calls the reader's. Written the other way round — everything but `user`
+// dropped — someone whose work reached goose through an editor (`acp`) or the
+// CLI (`terminal`) found none of it in recall, and nothing said why: the store
+// held the sessions and deja had thrown them away for carrying a type it was
+// never told about (#2873). A type goose adds next is a person's work until it
+// is known not to be.
 func gooseTypeFilter(db string) string {
 	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", "pragma table_info(sessions)").Output()
 	if err != nil || !bytes.Contains(out, []byte("session_type")) {
 		return ""
 	}
-	return " and (s.session_type is null or s.session_type = '' or s.session_type = 'user')"
+	quoted := make([]string, 0, len(gooseMachineTypes))
+	for _, t := range gooseMachineTypes {
+		quoted = append(quoted, "'"+t+"'")
+	}
+	return " and (s.session_type is null or s.session_type not in (" + strings.Join(quoted, ",") + "))"
 }
+
+// gooseMachineTypes are the session types goose writes for its own work rather
+// than the reader's: a subagent it spawned (spelled both ways across versions)
+// and a run its scheduler started.
+//
+// Read off goose's own enum rather than guessed — user, scheduled, sub_agent,
+// hidden, terminal, gateway, acp. `hidden` is not on this list although the
+// name suggests it: goose writes it for `goose run --no-session`, which is the
+// reader working without keeping a session, and for two wizards that store no
+// conversation at all and fall out of the role join anyway. `gateway` is a
+// person reaching goose from a chat app. Both are history someone made.
+var gooseMachineTypes = []string{"subagent", "sub_agent", "scheduled"}
 
 func ParseGooseDB(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, "", 0)
