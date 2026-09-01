@@ -518,6 +518,14 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// main() installs index.LockWaitNotice, a closure that reads os.Stderr
+	// when it fires. Left installed, it outlives this test: any later test
+	// that swaps os.Stderr while something else waits for the index lock
+	// races with it, which is what `go test -race` caught on Go 1.25
+	// (TestForgetAgainstARebuildDropsOnlyWhatItNamed). The global belongs to
+	// the process main() would own, so it is put back here.
+	oldNotice := index.LockWaitNotice
+	t.Cleanup(func() { index.LockWaitNotice = oldNotice })
 	os.Args = []string{"deja", "version"}
 	os.Stdout = w
 	main()
