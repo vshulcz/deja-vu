@@ -19,6 +19,12 @@ import (
 )
 
 type benchMetric struct {
+	// RecallAt1 and MRR are what move when the ranking changes. On this corpus
+	// every query returns exactly five hits, so recall@5 says only whether the
+	// session came back at all and recall@10 cannot differ from it — reversing
+	// the ranking left both at 1.00 (#2933).
+	RecallAt1             float64 `json:"recall_at_1"`
+	MRR                   float64 `json:"mrr"`
 	RecallAt5             float64 `json:"recall_at_5"`
 	RecallAt10            float64 `json:"recall_at_10"`
 	MedianMS              float64 `json:"median_latency_ms"`
@@ -126,7 +132,12 @@ func measureSemanticOnlyRephrased(dir string, queries []bench.Query, client *emb
 
 func measureRecall(dir string, queries []bench.Query, client *embed.Client) (benchMetric, error) {
 	latencies := make([]time.Duration, 0, len(queries))
-	got5, got10 := 0, 0
+	got5, got10, got1 := 0, 0, 0
+	// Reciprocal rank, so the order inside the page is measured. Every query
+	// on this corpus returns exactly five hits, which made recall@5 the same
+	// question as "was it returned at all" and recall@10 a copy of it —
+	// reversing the ranking left both at 1.00 (#2933).
+	rr := 0.0
 	for _, q := range queries {
 		started := time.Now()
 		result, err := index.SearchWithRecoveryDetailed(dir, search.Options{Query: q.Text, All: true}, io.Discard)
@@ -153,16 +164,43 @@ func measureRecall(dir string, queries []bench.Query, client *embed.Client) (ben
 			}
 		}
 		latencies = append(latencies, time.Since(started))
+		if containsRelevant(hits, q.Relevant, 1) {
+			got1++
+		}
 		if containsRelevant(hits, q.Relevant, 5) {
 			got5++
 		}
 		if containsRelevant(hits, q.Relevant, 10) {
 			got10++
 		}
+		if rank := rankOfRelevant(hits, q.Relevant); rank > 0 {
+			rr += 1 / float64(rank)
+		}
 	}
 	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
 	median := latencies[len(latencies)/2]
-	return benchMetric{RecallAt5: float64(got5) / float64(len(queries)), RecallAt10: float64(got10) / float64(len(queries)), MedianMS: float64(median) / float64(time.Millisecond)}, nil
+	return benchMetric{
+		RecallAt1:  float64(got1) / float64(len(queries)),
+		RecallAt5:  float64(got5) / float64(len(queries)),
+		RecallAt10: float64(got10) / float64(len(queries)),
+		MRR:        rr / float64(len(queries)),
+		MedianMS:   float64(median) / float64(time.Millisecond),
+	}, nil
+}
+
+// rankOfRelevant is where the wanted session landed, 1-based, or 0 when it did
+// not come back at all.
+func rankOfRelevant(hits []search.Hit, ids []string) int {
+	wanted := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		wanted[id] = true
+	}
+	for i, hit := range hits {
+		if wanted[hit.Session.ID] {
+			return i + 1
+		}
+	}
+	return 0
 }
 
 func containsRelevant(hits []search.Hit, ids []string, limit int) bool {
@@ -322,10 +360,13 @@ func releaseBenchTempDir(dir string) {
 
 func printBenchReport(w io.Writer, report benchReport) {
 	fmt.Fprintf(w, "deja bench recall\ncorpus: %d session%s, %d quer%s\n", report.Sessions, pluralS(report.Sessions), report.Queries, pluralY(report.Queries))
-	fmt.Fprintln(w, "mode    recall@5  recall@10  median latency")
-	fmt.Fprintf(w, "lexical %.2f      %.2f       %.2f ms\n", report.Lexical.RecallAt5, report.Lexical.RecallAt10, report.Lexical.MedianMS)
+	fmt.Fprintln(w, "mode    recall@1  recall@5  recall@10  mrr   median latency")
+	fmt.Fprintf(w, "lexical %.2f      %.2f      %.2f       %.3f %.2f ms\n",
+		report.Lexical.RecallAt1, report.Lexical.RecallAt5, report.Lexical.RecallAt10, report.Lexical.MRR, report.Lexical.MedianMS)
 	if report.Hybrid != nil {
-		fmt.Fprintf(w, "hybrid  %.2f      %.2f       %.2f ms  semantic-only rephrased %.2f\n", report.Hybrid.RecallAt5, report.Hybrid.RecallAt10, report.Hybrid.MedianMS, report.Hybrid.SemanticOnlyRephrased)
+		fmt.Fprintf(w, "hybrid  %.2f      %.2f      %.2f       %.3f %.2f ms  semantic-only rephrased %.2f\n",
+			report.Hybrid.RecallAt1, report.Hybrid.RecallAt5, report.Hybrid.RecallAt10, report.Hybrid.MRR,
+			report.Hybrid.MedianMS, report.Hybrid.SemanticOnlyRephrased)
 	} else {
 		fmt.Fprintln(w, "hybrid: endpoint unavailable, skipped")
 	}
