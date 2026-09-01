@@ -177,3 +177,26 @@ func TestAVariationSelectorIsNotPartOfTheWord(t *testing.T) {
 		t.Fatal("no tokens")
 	}
 }
+
+// A query of short ASCII terms is below the fuzzy floor and cannot reach a
+// marked form either — a mark strips to a non-ASCII base — so it must answer
+// without reading the catalog. Reading it is what #338's floor was avoiding
+// (#2898).
+func TestAShortAsciiQueryDoesNotReadTheCatalog(t *testing.T) {
+	dir := seedOneWord(t, "\u0643\u064e\u062a\u064e\u0628\u064e")
+	before := catalogReads.Load()
+	if _, _, err := fuzzyPostings(dir, []string{"abc", "xyz"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := catalogReads.Load() - before; got != 0 {
+		t.Errorf("the catalog was read %d times for a query that cannot match anything", got)
+	}
+	// A short non-ASCII term does reach it, which is what the exemption is for.
+	before = catalogReads.Load()
+	if _, _, err := fuzzyPostings(dir, []string{"\u0643\u062a\u0628"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if catalogReads.Load() == before {
+		t.Error("a marked word's plain form never consulted the catalog")
+	}
+}
