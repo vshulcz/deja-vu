@@ -3,7 +3,6 @@ package bench
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -155,19 +154,18 @@ func GenerateBlock(seed int64) BlockCorpus {
 	return BlockCorpus{Chains: chains, Hash: blockHash(chains)}
 }
 
+// blockHash identifies the corpus a report was produced from, including the
+// filler the seed varies — two runs that disagree on a number have to be able
+// to say whether they disagreed about the corpus first.
 func blockHash(chains []BlockChain) string {
 	h := sha256.New()
 	for _, c := range chains {
-		b, err := json.Marshal(struct {
-			ID      string
-			Terms   []string
-			Settled string
-		}{c.ID, c.Terms, c.Settled})
-		if err != nil {
-			continue
+		fmt.Fprintf(h, "%s\n%s\n%s\n", c.ID, strings.Join(c.Terms, " "), c.Settled)
+		for _, s := range c.Sessions {
+			for _, m := range s.Messages {
+				fmt.Fprintf(h, "%s\x00%s\n", m.Role, m.Text)
+			}
 		}
-		h.Write(b)
-		h.Write([]byte("\n"))
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }

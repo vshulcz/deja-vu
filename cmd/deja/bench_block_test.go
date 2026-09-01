@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -86,5 +88,55 @@ func TestBlockReportPrintsEveryArm(t *testing.T) {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("the report does not mention %q:\n%s", want, b.String())
 		}
+	}
+}
+
+// End to end, the same shape the context bench is guarded with: the report
+// parses, every arm is present, the baseline is beaten, and nothing is written
+// outside the scratch directory.
+func TestBlockJSONAndIsolation(t *testing.T) {
+	outside := t.TempDir()
+	t.Setenv("HOME", outside)
+	t.Setenv("USERPROFILE", outside)
+	t.Setenv("DEJA_EMBED_URL", "http://127.0.0.1:1")
+	out, err := captureRun(t, "bench", "block", "--json", "--seed", "7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report blockReport
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("invalid block JSON %q: %v", out, err)
+	}
+	if report.Chains != bench.BlockChainCount || report.Priors != bench.BlockPriorCount {
+		t.Fatalf("unexpected block report: %#v", report)
+	}
+	for _, arm := range []string{"deja-block", "deja-digest", "newest-turn", "cold"} {
+		if _, ok := report.Arms[arm]; !ok {
+			t.Fatalf("missing arm %q", arm)
+		}
+	}
+	// The whole point: deja's surfaces carry the answer and the baseline does
+	// not. A run where the baseline scores is a corpus that stopped asking.
+	if report.Arms["deja-block"].Carries <= report.Arms["newest-turn"].Carries {
+		t.Errorf("the block did not beat the baseline: %+v", report.Arms)
+	}
+	if report.Arms["cold"].Carries != 0 {
+		t.Errorf("the empty arm carried something: %+v", report.Arms["cold"])
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("benchmark wrote outside scratch: %v", entries)
+	}
+}
+
+func TestBlockArgs(t *testing.T) {
+	if _, err := captureRun(t, "bench", "block", "--bad"); err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatal("invalid block flag did not fail")
+	}
+	if _, err := captureRun(t, "bench", "block", "--seed"); err == nil {
+		t.Fatal("missing seed did not fail")
 	}
 }
