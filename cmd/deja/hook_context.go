@@ -741,7 +741,7 @@ func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatche
 	if digest == "" {
 		return
 	}
-	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld, IDs: ids}); err == nil {
+	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld, IDs: ids, Projects: projects}); err == nil {
 		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
 	}
 }
