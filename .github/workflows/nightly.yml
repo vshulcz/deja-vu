@@ -48,7 +48,7 @@ jobs:
       # goreleaser catalogs an SBOM per archive and shells out to syft to do
       # it; without this the build gets all the way to archiving and dies.
       - if: steps.changed.outputs.run == 'true'
-        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
 
       # The nightly is only worth shipping if it passes what a release passes.
       - if: steps.changed.outputs.run == 'true'
