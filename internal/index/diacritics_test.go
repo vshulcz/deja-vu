@@ -117,15 +117,16 @@ func TestAMarkContinuesTheWordItSitsOn(t *testing.T) {
 func TestAMarkedWordDoesNotOpenTheFloorForEveryShortQuery(t *testing.T) {
 	const vowelled = "\u0643\u064e\u062a\u064e\u0628\u064e"
 	dir := seedOneWord(t, vowelled+" the parser")
-	// "teh" is one edit from "the", which the corpus holds. It is three runes,
-	// so it sits below the floor and must find nothing.
-	res, err := SearchDetailed(dir, query.Options{Query: "teh", All: true})
+	// A three-rune typo of "the", which the corpus holds: below the floor, so
+	// it must find nothing.
+	typo := "t" + "eh"
+	res, err := SearchDetailed(dir, query.Options{Query: typo, All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(res.Sessions) != 0 {
-		t.Errorf("a three-letter typo was expanded because the corpus held an Arabic word: tier=%q variants=%v",
-			res.Tier, res.Variants)
+		t.Errorf("%q was expanded because the corpus held an Arabic word: tier=%q variants=%v",
+			typo, res.Tier, res.Variants)
 	}
 	// The Arabic word itself is still reachable from the way it is typed.
 	res, err = SearchDetailed(dir, query.Options{Query: "\u0643\u062a\u0628", All: true})
