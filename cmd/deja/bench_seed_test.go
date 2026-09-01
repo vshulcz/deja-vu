@@ -23,13 +23,14 @@ func benchCorpusHash(t *testing.T, sub string, args ...string) string {
 	return report.CorpusHash
 }
 
-// `deja help` documents `bench recall|context|prompt [--json] [--seed n]`, and
-// two of the three did not honor it: recall exited 1 on --seed, prompt took
-// the flag and measured seed 1 anyway. A benchmark whose seed does nothing
-// cannot be re-run on another corpus, which is the point of publishing one.
+// `deja help` documents `bench recall|context|prompt|block [--json] [--seed n]`,
+// and two of the first three did not honor it: recall exited 1 on --seed,
+// prompt took the flag and measured seed 1 anyway. A benchmark whose seed does
+// nothing cannot be re-run on another corpus, which is the point of publishing
+// one. Every subcommand with a seeded corpus belongs in this loop.
 func TestBenchSeedChangesTheCorpusOnEverySubcommand(t *testing.T) {
 	hermeticEnv(t)
-	for _, sub := range []string{"recall", "context", "prompt"} {
+	for _, sub := range []string{"recall", "context", "prompt", "block"} {
 		one := benchCorpusHash(t, sub, "--seed", "1", "--json")
 		other := benchCorpusHash(t, sub, "--seed", "7", "--json")
 		if one == "" || other == "" {

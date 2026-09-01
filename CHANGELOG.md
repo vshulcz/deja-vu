@@ -8,6 +8,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [0.19.2] - 2026-09-01
+
+A release about what deja hands over and whether it can be trusted. The week's
+bug hunt landed with it, and the theme that runs through both is the same: a
+surface that says something it does not know is worse than one that says
+nothing.
+
+### Added
+- prime-agent sessions are indexed. (#2623)
+- goose sessions reach recall whichever way a person got to goose — over ACP
+  from an editor, from the CLI, from a chat gateway, or from a run that kept no
+  session. The filter was an allow-list of `session_type = 'user'`, so a store
+  full of ACP sessions had none of them in recall and nothing said why.
+  (#2874, #2908)
+- `--json` for `fix`, `friction` and `how`, in the shape `docs/json-output.md`
+  describes. Each envelope carries the counts a caller cannot recover from the
+  rows — how many recurring errors there were before `--limit`, the threshold a
+  row had to clear, what a rule withheld — so an empty result can be told apart
+  from a hidden one. (#2895, #2919)
+- `deja bench block` scores what the block says rather than what it chose. The
+  other three benches print the same numbers with the block emptied; this one
+  goes to zero, and its baseline — the newest turns of the top hit — scores zero
+  so an arm above it had to find the answer. (#2940)
+- `recall_context` says how many other sessions matched the question, so a
+  digest chosen from forty no longer reads as the only thing deja held. (#2894)
+- `doctor` names the sessions stamped ahead of the clock. (#2824)
+- `DEJA_EMBED_OFF=1` switches off the localhost probe for an embedding endpoint.
+  Without it a machine running Ollama answered differently from one that was
+  not, including in deja's own test suite. (#2937)
+
+### Changed
+- Every answer that carries text out of a transcript says that the text is
+  untrusted — the MCP tools, the resources, the hooks, and the commands `how`
+  and `fix` hand an agent. Pinned by a property test per surface rather than
+  case by case. (#2844, #2847, #2848, #2850, #2852, #2859)
+- A growing session is read from where the last pass stopped rather than whole,
+  for goose, qwen, omp, OpenClaw and prime; the grok, hermes and zed stores are
+  asked only for what changed. One appended turn against a 300-file store went
+  from 1045 ms to 58 ms. (#2812, #2813, #2818, #2876, #2877, #2902)
+- `install` reads a config before writing it: it updates the entry that already
+  runs deja instead of adding a second, keeps the shape and the comments it
+  found, edits an inline block that opens and closes on one line, asks about
+  every host a target touches before writing any of them, and refuses a config
+  it cannot read rather than writing over it. (#2648, #2737, #2739, #2743,
+  #2747, #2748, #2752, #2753, #2755, #2756, #2758, #2761, #2778, #2780)
+- A rephrased question reaches its answer through the project's own words, and
+  ranking pays for coverage only on the words that identify something.
+  (#2480, #2484)
+
+### Fixed
+- The block quotes the sentence that concludes rather than the opening of the
+  message that carries it, and a message kept for its code fence no longer
+  takes the slot the conclusion needs. Measured against a real store, blocks
+  carrying what the session settled went from 265 of 456 to 440 of 452 at the
+  session-start budget. (#2906, #2913, #2922)
+- A sentence with no stopword in it is no longer read as a listing dump, and a
+  sentence that opens with a number is no longer read as a numbered one. The
+  first rule counted path-shaped fields and never read the count; over 277375
+  prose lines of a real store it dropped 20294 of them, of which 55 were
+  listings. (#2916, #2918)
+- `blame` and the search excerpts stopped quoting `wc -l` output and runs of
+  paths as the passage that explains a file. The snippet path had its own
+  smaller set of filters and no notion of a listing at all. (#2925)
+- `friction` sanitises a recorded error line before printing it. An ANSI escape
+  recoloured the rest of the terminal and U+202E reversed the reading order of
+  everything after it; every other surface already ran a recorded line through
+  the same sanitiser. (#2910)
+- An empty store is described as an empty store. `recall`, `blame`, `how` and
+  `fix` blamed the query instead, and a store emptied by `forget` was reported
+  as a first run. (#2862, #2863, #2865, #2882)
+- A remedy that names a scratch file is not mined as one. On a real store 38 of
+  186 confirmed pairs pointed at a path under a temp directory — a command
+  nobody can run by the time deja serves it. (#2903)
+- pi transcripts keep their session header when a parse resumes past it, so an
+  appended turn lands in the session it continues rather than beside it. (#2901)
+- A promoted note stays ahead of the transcript it distils, on the error and
+  relevance tiers, in the per-prompt hook, and when either side arrived by sync.
+  (#2804, #2821, #2823, #2838)
+- A recalled session that names what was asked is no longer disowned by the line
+  above it, and the recall header stopped claiming a query it did not match.
+  (#2789, #2831, #2834, #2837)
+- `how` counts the sessions the policy hid that match the question, not every
+  withheld session on the machine. (#2765, #2792, #2795)
+- CI status is not promoted as what a session concluded, a bullet of a document
+  the agent wrote is not recalled as a decision, and harness envelopes stay out
+  of the session-start block. (#2736, #2741, #2745, #2774)
+- The trust policy is read from a home directory or from nowhere, and with no
+  home directory deja writes nothing where it happens to be run. (#2782, #2788)
+- `handoff` marks where the quoted session starts and ends, and sanitises the
+  digest `--exec` hands to the next agent. (#2867, #2891)
+- The week's bug hunt, 124 fixes, merged. (#2616, #2733)
+
 ## [0.19.1] - 2026-08-28
 
 A patch release about reach and honesty. Memory now arrives where an agent
@@ -862,6 +954,7 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
 [Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...HEAD
+[0.19.2]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vshulcz/deja-vu/compare/v0.17.3...v0.18.0
