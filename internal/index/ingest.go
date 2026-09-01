@@ -1223,11 +1223,44 @@ func signalLine(l string) bool {
 // eachIndexKey calls fn once per distinct token a message earns. Both the
 // in-memory incremental path and the spilling full build go through it, so
 // neither can drift from the other on what a message indexes to.
+// eachIndexKey calls fn once per distinct key a record contributes. The keys
+// are streamed rather than collected: a CJK message produces a bigram per rune
+// pair, and building the slice only to walk it once cost a third of the keying
+// time on a Han corpus (#492).
 func eachIndexKey(text string, when time.Time, fn func(tok string)) {
-	seen := map[string]bool{}
-	for _, tok := range append(indexKeys(text), dateTokens(when)...) {
+	emit := dedupe(fn)
+	textKeys(text, emit)
+	for _, tok := range dateTokens(when) {
+		emit(tok)
+	}
+}
+
+// eachTextKey is eachIndexKey without the date keys, for the caller that keys
+// text alone.
+func eachTextKey(text string, fn func(tok string)) {
+	textKeys(text, dedupe(fn))
+}
+
+// textKeys emits every key the text contributes, repeats included; the callers
+// above put one dedupe in front of it rather than one per source.
+func textKeys(text string, emit func(tok string)) {
+	for _, tok := range tokens(text) {
+		emit("t" + tok)
+	}
+	for _, part := range identifierParts(text) {
+		emit("t" + part)
+	}
+	cjkIndexKeys(text, emit)
+}
+
+// dedupe wraps fn so it sees each key once. The three key sources overlap —
+// a word is a token and can be an identifier part as well — and a posting list
+// must not hold the same offset twice.
+func dedupe(fn func(tok string)) func(tok string) {
+	seen := make(map[string]bool, 64)
+	return func(tok string) {
 		if seen[tok] {
-			continue
+			return
 		}
 		seen[tok] = true
 		fn(tok)
@@ -2715,18 +2748,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if err != nil {
 			return err
 		}
-		seen := map[string]bool{}
-		for _, tok := range append(indexKeys(r.Text), dateTokens(r.Time)...) {
-			if seen[tok] {
-				continue
-			}
-			seen[tok] = true
+		eachIndexKey(r.Text, r.Time, func(tok string) {
 			b := bucket(tok)
 			if buckets[b] == nil {
 				buckets[b] = map[string][]posting{}
 			}
 			buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: meta.Ord})
-		}
+		})
 		if _, exists := m.Sessions[r.Key]; exists {
 			return nil
 		}
@@ -3085,17 +3113,20 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					return filesTouched, messages, 0, err
 				}
 				messages++
-				seen := map[string]bool{}
-				for _, tok := range indexKeys(text) {
-					if seen[tok] {
-						continue
+				var keyErr error
+				eachTextKey(text, func(tok string) {
+					if keyErr != nil {
+						return
 					}
-					seen[tok] = true
 					data, err := loadBucket(tok)
 					if err != nil {
-						return filesTouched, messages, 0, err
+						keyErr = err
+						return
 					}
 					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
+				})
+				if keyErr != nil {
+					return filesTouched, messages, 0, keyErr
 				}
 			}
 		}
