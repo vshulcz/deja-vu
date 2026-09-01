@@ -1,6 +1,6 @@
 {
   "name": "deja",
-  "version": "0.1.0",
+  "version": "0.19.2",
   "description": "Recall the sessions your other coding agents already wrote \u2014 Claude Code, Codex, Cursor, opencode and sixteen more, including work from before deja was installed.",
   "keywords": [
     "memory",
