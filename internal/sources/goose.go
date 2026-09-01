@@ -178,19 +178,39 @@ func gooseText(v any) string {
 	}
 }
 
-// gooseTypeFilter keeps subagent turns, cron-recipe runs and gateway traffic
-// out of recall: Goose stores them in the same table as the user's own
-// sessions. The user-visible session types (user, acp and terminal) belong in
-// recall, while gateway, hidden, subagent and scheduled remain excluded. The
-// column exists only on newer stores, and naming it on an older one fails the
-// whole query, so it is probed rather than assumed.
+// gooseTypeFilter keeps out of recall what goose wrote for itself: Goose
+// stores subagent turns and scheduled runs in the same table as the reader's
+// own sessions. The column exists only on newer stores, and naming it on an
+// older one fails the whole query, so it is probed rather than assumed.
+//
+// Stated as what to exclude rather than what to keep. #2874 named the three
+// types a person reaches goose through today, which fixed the report; written
+// that way round, a type goose adds next is dropped silently and nothing says
+// why — the failure that produced #2873 in the first place. So: a type is a
+// person's work until goose is known to write it for itself.
 func gooseTypeFilter(db string) string {
 	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", "pragma table_info(sessions)").Output()
 	if err != nil || !bytes.Contains(out, []byte("session_type")) {
 		return ""
 	}
-	return " and (s.session_type is null or s.session_type = '' or s.session_type in ('user','acp','terminal'))"
+	quoted := make([]string, 0, len(gooseMachineTypes))
+	for _, t := range gooseMachineTypes {
+		quoted = append(quoted, "'"+t+"'")
+	}
+	return " and (s.session_type is null or s.session_type not in (" + strings.Join(quoted, ",") + "))"
 }
+
+// gooseMachineTypes are the session types goose writes for its own work rather
+// than the reader's: a subagent it spawned, spelled both ways across versions,
+// and a run its scheduler started.
+//
+// Read off goose's own enum — user, scheduled, sub_agent, hidden, terminal,
+// gateway, acp — rather than guessed. `hidden` is not on this list although
+// the name suggests it: goose writes it for `goose run --no-session`, the
+// reader working without keeping a session, and for two wizards that store no
+// conversation and fall out of the role join anyway. `gateway` is a person
+// reaching goose from a chat app. Both are history someone made.
+var gooseMachineTypes = []string{"subagent", "sub_agent", "scheduled"}
 
 func ParseGooseDB(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, "", 0)
