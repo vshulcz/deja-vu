@@ -3715,14 +3715,23 @@ func damerauDistanceRunes(a, b string, max int) int {
 	return prev[len(br)]
 }
 
-// unmarked strips combining marks from s, reporting whether any were there.
-// Category Mn is what a mark is: Arabic harakat, Hebrew niqqud, Vietnamese and
-// Greek tone marks in their decomposed form. A string without one is returned
-// untouched, so ordinary text pays one scan and no allocation.
+// isMark reports whether r is a combining mark: Mn covers Arabic harakat,
+// Hebrew niqqud, Thai vowel signs and the Greek and Vietnamese tone marks in
+// their decomposed form, and Mc the spacing matras of the Indic scripts, which
+// are as much part of their word as any of those. The range test in front
+// keeps ordinary text to one comparison per rune — every mark sits above
+// U+0300.
+func isMark(r rune) bool {
+	return r >= 0x0300 && (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r))
+}
+
+// unmarked strips combining marks from s, reporting whether any were there. A
+// string without one is returned untouched, so ordinary text pays one scan and
+// no allocation.
 func unmarked(s string) (string, bool) {
 	has := false
 	for _, r := range s {
-		if r >= 0x0300 && unicode.Is(unicode.Mn, r) {
+		if isMark(r) {
 			has = true
 			break
 		}
@@ -3732,7 +3741,7 @@ func unmarked(s string) (string, bool) {
 	}
 	out := make([]rune, 0, len(s))
 	for _, r := range s {
-		if r >= 0x0300 && unicode.Is(unicode.Mn, r) {
+		if isMark(r) {
 			continue
 		}
 		out = append(out, r)
@@ -3790,13 +3799,14 @@ func tokens(s string) []string {
 	}
 	for _, r := range strings.ToLower(s) {
 		// A combining mark continues the word it sits on. Latin NFD is already
-		// composed away above, but Arabic harakat and Hebrew niqqud have no
-		// precomposed form, so the mark ended the token and كَتَبَ was indexed
-		// as three one-letter tokens — the word itself was not in the index at
-		// all (#1941). A mark cannot start a token, so a stray one still
+		// composed away above, but Arabic harakat, Hebrew niqqud, Thai vowel
+		// signs and the Indic matras have no precomposed form, so the mark
+		// ended the token: كَتَبَ was indexed as three one-letter tokens and
+		// हिन्दी as two, and the words themselves were not in the index at all
+		// (#1941). A mark cannot start a token, so a stray one still
 		// separates.
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' ||
-			(b.Len() > 0 && r >= 0x0300 && unicode.Is(unicode.Mn, r)) {
+			(b.Len() > 0 && isMark(r)) {
 			b.WriteRune(r)
 			if b.Len() > 64 {
 				flush()

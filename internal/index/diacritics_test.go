@@ -95,6 +95,8 @@ func TestAMarkContinuesTheWordItSitsOn(t *testing.T) {
 	}{
 		{"arabic harakat", "\u0643\u064e\u062a\u064e\u0628\u064e", "\u0643\u064e\u062a\u064e\u0628\u064e"},
 		{"hebrew niqqud", "\u05e9\u05b8\u05dc\u05d5\u05b9\u05dd", "\u05e9\u05b8\u05dc\u05d5\u05b9\u05dd"},
+		{"thai vowel signs", "\u0e01\u0e34\u0e19", "\u0e01\u0e34\u0e19"},
+		{"devanagari matras", "\u0939\u093f\u0928\u094d\u0926\u0940", "\u0939\u093f\u0928\u094d\u0926\u0940"},
 	} {
 		got := tokens(c.text)
 		if len(got) != 1 || got[0] != c.want {
