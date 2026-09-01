@@ -161,44 +161,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 			"instructions":    mcpInstructions(dir),
 		}, 0, ""
 	case "tools/list":
-		return map[string]any{"tools": []map[string]any{
-			{
-				"name":        "recall",
-				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with an exact error string, function name, file path or flag when you have one — that is the strongest key there is. Otherwise ask in your own words, as a phrase or a question: the search falls back to ranking when nothing matches exactly, and a sentence is not rejected. Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. A bracketed marker on a result is the user's own later judgement on that session; act on what it says. Follow up with recall_context when one session looks right and you need its full story. When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
-				"annotations": map[string]any{"title": "Search past sessions", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "An exact token — error string, function name, flag — matches strongest. Failing that, the question in your own words; several words are tried together first and then ranked, so a phrase still finds things."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}, "offset": map[string]any{"type": "number", "description": "Skip this many ranked matches — page through results without re-ranking."}}, "required": []string{"query"}},
-			},
-			{
-				"name":        "recall_context",
-				"description": "Return a full markdown digest (~8KB) of the single best-matching prior session — problem, decisions, outcome — when a bare recall hit is not enough and you need the reasoning behind it. Use after recall, or directly when the user asks 'remind me how we handled X' or 'what was the whole story with Y'. Query terms are matched against transcript text, so a token likely to appear verbatim — an error string, function name, or flag — finds it fastest; the question in your own words works too. Not for browsing many sessions — use recall for that; this returns one deep digest. When it genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
-				"annotations": map[string]any{"title": "Digest one past session", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
-			},
-			{
-				"name":        "blame",
-				"description": "Before editing, refactoring, or deleting a file, find the prior sessions that discussed it so you know why it is shaped the way it is. Call whenever you are about to change a file, or when the user asks 'why is this like this', 'what was this for', 'is it safe to remove this'. Most specific mentions come first. This is session history across AI tools, not git blame — it explains intent and past decisions, not commit authorship. Give an absolute path, relative path, or bare filename.",
-				"annotations": map[string]any{"title": "Why is this file like this", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string", "description": "Absolute, relative, or bare filename."}, "harness": map[string]any{"type": "string"}, "project": map[string]any{"type": "string"}, "since": map[string]any{"type": "string", "description": "Age such as 30d or 24h."}, "limit": map[string]any{"type": "number"}, "all": map[string]any{"type": "boolean"}}, "required": []string{"path"}},
-			},
-			{
-				"name":        "fix",
-				"description": "You just hit an error — before diagnosing it, ask what this machine ran the last time that same error appeared. Pass the failing output verbatim (a whole stack trace is fine; every line is checked). Returns the commands that followed that error in past sessions without it coming back. Evidence from the user's own history, not a guaranteed fix: read the command, decide whether it applies, and say so if you reuse it. An empty result means this machine has no record of that error being followed by a command.",
-				"annotations": map[string]any{"title": "What was run after this error before", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "string", "description": "The failing output, verbatim. Multi-line pastes are fine."}, "limit": map[string]any{"type": "number", "description": "Max pairs to return (default 3)."}}, "required": []string{"error"}},
-			},
-			{
-				"name":        "how",
-				"description": "How this user actually runs a thing on this machine — the real command with the real flags, taken from commands their agents ran, ordered by how many separate sessions ran it. Call before inventing a build, test, deploy or debug invocation: a guessed command is plausible and fails on this setup. Query with the tool or target ('go test', 'docker compose', 'terraform apply', a script name). Optionally scope to a project. Command records are kept out of ordinary search, so this is the only way to reach them.",
-				"annotations": map[string]any{"title": "How this is run here", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"what": map[string]any{"type": "string", "description": "Tool or target, e.g. 'go test', 'docker compose', a script name. Every word must appear in the command."}, "project": map[string]any{"type": "string", "description": "Optional project substring filter."}, "limit": map[string]any{"type": "number", "description": "Max commands to return (default 8)."}}, "required": []string{"what"}},
-			},
-			{
-				"name":        "remember",
-				"description": "Store one durable decision or conclusion so a future session can recall it. Call right after a decision is settled, a tricky bug is resolved, or the user says 'remember this', 'note that for next time', 'don't forget we chose X'. Write a single self-contained fact (e.g. 'We use Postgres advisory locks for the job queue because Redis lost messages under load'). Do NOT store transcripts, routine conversation, or anything already obvious from the code. text is required; project defaults to notes.",
-				"annotations": map[string]any{"title": "Remember a decision", "readOnlyHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}, "tags": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional navigation tags, searchable as #tag."}}, "required": []string{"text"}},
-			},
-		}}, 0, ""
+		return map[string]any{"tools": []map[string]any{dejaTool()}}, 0, ""
 	case "ping":
 		// Part of the spec at the version we claim, and both sides must
 		// answer it with an empty result. A host that pings for keepalive
@@ -284,7 +247,83 @@ func jsonTypeName(k reflect.Kind) string {
 	}
 }
 
+// dejaTool is the whole surface as one tool with a mode.
+//
+// Six tools were six envelopes: the same query, harness, project and limit
+// declared six times, and six descriptions each arguing they were the entry
+// point — which is how `how` lost to `recall` on a question about a command
+// (#1298). One envelope costs less and asks the model an easier question:
+// which capability, not which tool.
+//
+// The old names still answer for a client that has them wired; they are not
+// listed, so they cost nothing per session.
+func dejaTool() map[string]any {
+	return map[string]any{
+		"name": "deja",
+		"description": "This user's own past coding sessions, across every AI tool they use (Claude Code, Codex, Cursor, opencode, aider, gemini and others). " +
+			"Not general knowledge and not library docs — only what happened on this machine. Pick a mode:\n" +
+			"- recall: search past sessions. The moment the user implies work already happened (\"didn't we fix this?\", \"what was that error\", \"what did we decide about X\"), and always before debugging an error or re-implementing something. An exact error string, function name or path is the strongest query; a question in your own words works too.\n" +
+			"- context: the full story of the single best-matching session — problem, decisions, outcome — when a recall hit is not enough.\n" +
+			"- blame: why a file is the way it is, before you edit, refactor or delete it. Session history, not git authorship.\n" +
+			"- fix: you just hit an error. What this machine ran, or changed, after that same error before. Pass the failing output verbatim.\n" +
+			"- how: the real command with the real flags this user runs for a thing — build, test, deploy — instead of a guessed one.\n" +
+			"- remember: store one durable decision so a later session can recall it. Only after something is settled.\n" +
+			"A bracketed marker on a result is the user's own later judgement on that session; act on what it says. " +
+			"When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
+		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember"}, "description": "Which capability to use."},
+				"query":   map[string]any{"type": "string", "description": "recall and context: an exact token — error string, function name, flag — or the question in your own words."},
+				"path":    map[string]any{"type": "string", "description": "blame: absolute, relative, or bare filename."},
+				"error":   map[string]any{"type": "string", "description": "fix: the failing output, verbatim. Multi-line pastes are fine."},
+				"what":    map[string]any{"type": "string", "description": "how: tool or target, e.g. 'go test', 'docker compose', a script name."},
+				"text":    map[string]any{"type": "string", "description": "remember: one durable fact, decision or conclusion."},
+				"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "remember: optional navigation tags, searchable as #tag."},
+				"harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."},
+				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where the note is filed (default notes)."},
+				"since":   map[string]any{"type": "string", "description": "blame: age such as 30d or 24h."},
+				"limit":   map[string]any{"type": "number", "description": "Max results."},
+				"offset":  map[string]any{"type": "number", "description": "recall: skip this many ranked matches, to page without re-ranking."},
+				"all":     map[string]any{"type": "boolean", "description": "blame: every project, not just this one."},
+			},
+			"required": []string{"mode"},
+		},
+	}
+}
+
+// dispatcherModes maps a mode onto the call that implements it. The old tool
+// names are the same strings, which is why a client with them wired keeps
+// working.
+var dispatcherModes = map[string]string{
+	"recall":   "recall",
+	"search":   "recall",
+	"context":  "recall_context",
+	"digest":   "recall_context",
+	"blame":    "blame",
+	"fix":      "fix",
+	"how":      "how",
+	"remember": "remember",
+}
+
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
+	if name == "deja" {
+		var a struct {
+			Mode string `json:"mode"`
+		}
+		if err := decodeToolArgs(name, raw, &a); err != nil {
+			return "", err
+		}
+		mode := strings.ToLower(strings.TrimSpace(a.Mode))
+		target, ok := dispatcherModes[mode]
+		if !ok {
+			// Named, not guessed at: a model that invents a mode gets the list
+			// rather than an empty answer it will read as "no history".
+			return "", fmt.Errorf("mode %q is not one of recall, context, blame, fix, how, remember", a.Mode)
+		}
+		return callMCPTool(dir, target, raw)
+	}
 	switch name {
 	case "recall":
 		var a struct {

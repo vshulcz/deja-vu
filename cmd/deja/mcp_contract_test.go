@@ -107,9 +107,52 @@ func TestMCPToolContract(t *testing.T) {
 				t.Fatalf("tool %q missing required[]: %#v", name, schema)
 			}
 		}
-		for _, want := range []string{"recall", "recall_context", "blame", "remember"} {
-			if !got[want] {
-				t.Fatalf("tools/list missing %q; got %v", want, got)
+		// One tool, and the capabilities are its modes. The names below are
+		// what the agent picks between, so they are what this asserts.
+		if !got["deja"] {
+			t.Fatalf("tools/list missing the deja tool; got %v", got)
+		}
+		tool := tools[0].(map[string]any)
+		schema := tool["inputSchema"].(map[string]any)
+		props := schema["properties"].(map[string]any)
+		mode, ok := props["mode"].(map[string]any)
+		if !ok {
+			t.Fatalf("the tool has no mode: %#v", props)
+		}
+		modes := map[string]bool{}
+		for _, m := range mode["enum"].([]any) {
+			modes[m.(string)] = true
+		}
+		for _, want := range []string{"recall", "context", "blame", "fix", "how", "remember"} {
+			if !modes[want] {
+				t.Fatalf("mode %q is gone; got %v", want, modes)
+			}
+		}
+	})
+
+	// The names the six tools had still answer, so an agent configured before
+	// the dispatcher keeps working.
+	t.Run("the old tool names still answer", func(t *testing.T) {
+		for _, name := range []string{"recall", "recall_context", "blame", "fix", "how"} {
+			args := `{"query":"frobnicator","path":"parser.go","error":"boom","what":"go test"}`
+			resp := driveMCP(t, `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"`+name+`","arguments":`+args+`}}`)
+			if _, bad := resp[0]["error"]; bad {
+				t.Errorf("the %q name stopped answering: %v", name, resp[0])
+			}
+		}
+	})
+
+	// And the dispatcher reaches the same answer the old name did.
+	t.Run("a mode answers like the tool it replaced", func(t *testing.T) {
+		resp := driveMCP(t, `{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"frobnicator","harness":"claude"}}}`)
+		text := callText(t, resp[0])
+		if !strings.Contains(text, "frobnicator") {
+			t.Fatalf("mode recall = %q, want the frobnicator sessions", text)
+		}
+		bad := driveMCP(t, `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"teleport","query":"frobnicator"}}}`)
+		if _, isErr := bad[0]["error"]; !isErr {
+			if text := callText(t, bad[0]); !strings.Contains(text, "not one of") {
+				t.Fatalf("an invented mode was not named as one: %v", bad[0])
 			}
 		}
 	})

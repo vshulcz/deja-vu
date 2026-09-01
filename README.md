@@ -212,18 +212,24 @@ Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html
 
 ### MCP tools
 
-The server exposes `recall`, `recall_context`, `blame`, `fix`, `how` and `remember`.
-`deja install` wires them in, so this is only needed to configure an agent by hand.
+The server exposes one tool, `deja`, with a `mode`. `deja install` wires it in, so
+this is only needed to configure an agent by hand. The six older tool names
+(`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer for
+anything already wired to them.
 
 <details>
 <summary>Arguments and return shapes</summary>
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
+| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?` | Depends on the mode, below. |
+
+| Mode | Arguments it reads | Returns |
+| --- | --- | --- |
 | `recall` | `query`, `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
-| `recall_context` | `query`, `harness?` | Markdown digest of the best-matching session. |
+| `context` | `query`, `harness?` | Markdown digest of the best-matching session. |
 | `blame` | `path`, `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
-| `fix` | `error`, `project?`, `limit?` | What this machine ran after that same error before. |
+| `fix` | `error`, `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | `what`, `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `remember` | `text`, `project?`, `tags?` | Stores a durable decision for later recall. |
 
