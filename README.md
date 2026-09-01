@@ -341,7 +341,7 @@ deja bench context    # 30 seeded task chains plus five negative controls
 deja bench block      # does the answer survive into what deja hands over
 ```
 
-`bench block` asks the question the other two cannot: with the right session in
+`bench block` asks the question the other three cannot: with the right session in
 hand, does the block carry what that session settled. Eight sessions discuss each
 subject and one of them settles it, in the middle of its own transcript rather
 than at the end — so the baseline arm, the newest turns of the top hit, scores

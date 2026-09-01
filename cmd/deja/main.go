@@ -3582,9 +3582,9 @@ Usage:
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja files <topic> [--project name] [--limit n]
   deja restore <path> [--span n] [-o|--out file] [--force]
-  deja friction [--limit n]
-  deja fix "<error text>" [--limit n]  (what was run after this error before)
-  deja how <what> [--project name] [--limit n]  (commands this machine actually ran)
+  deja friction [--limit n] [--json]
+  deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
+  deja how <what> [--project name] [--limit n] [--json]  (commands this machine actually ran)
   deja sync export <dir> [--full] [--peer name]
   deja sync import <dir>
   deja sync                       (exchange with every machine deja knows, both ways)
@@ -3599,7 +3599,7 @@ Usage:
   deja warmup
   deja index [--rebuild]
   deja embed
-  deja bench recall|context|prompt [--json] [--seed n]
+  deja bench recall|context|prompt|block [--json] [--seed n]
   deja brief         (the screen a bare deja prints on a terminal)
   deja log [n] [--last] [--json]
   deja statusline
