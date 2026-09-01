@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -78,22 +79,24 @@ var catalogCache struct {
 type tokenIndex struct {
 	set   map[string]bool
 	byLen [][]string
-	// Tokens carrying a combining mark, bucketed by the length they have
-	// without it. The close tier treats a mark as free, and a marked token is
-	// as many runes longer than its unmarked form as it has marks, so the
-	// ordinary length window never reaches it (#1941). Marked tokens are a
-	// small minority of any corpus, so this second bucket list costs little.
-	markedByLen [][]string
+	// The tokens that carry a combining mark. The close tier treats a mark as
+	// free, and a marked token is as many runes longer than its unmarked form
+	// as it has marks, so the ordinary length window never reaches it
+	// (#1941). Collected here on the way past and keyed by their unmarked
+	// form on first use: a lookup rather than a walk, because on a corpus
+	// where most tokens are marked — the Arabic and Thai stores this exists
+	// for — walking them cost 36 ms per term, and the only thing that walk
+	// could find is what the lookup returns. Built lazily because a query
+	// that has no unmarked form to ask about never pays for it.
+	marked     []string
+	byUnmarked map[string][]string
+	markedOnce sync.Once
 }
 
 const maxIndexedTokenLen = 64
 
 func newTokenIndex(set map[string]bool) *tokenIndex {
-	idx := &tokenIndex{
-		set:         set,
-		byLen:       make([][]string, maxIndexedTokenLen+2),
-		markedByLen: make([][]string, maxIndexedTokenLen+2),
-	}
+	idx := &tokenIndex{set: set, byLen: make([][]string, maxIndexedTokenLen+2)}
 	for tok := range set {
 		n := len(tok)
 		ascii := isASCIIString(tok)
@@ -104,12 +107,30 @@ func newTokenIndex(set map[string]bool) *tokenIndex {
 		if ascii {
 			continue // no ASCII byte is a combining mark
 		}
-		if bare, marked := unmarked(tok); marked {
-			b := bucketFor(utf8.RuneCountInString(bare))
-			idx.markedByLen[b] = append(idx.markedByLen[b], tok)
+		if hasMark(tok) {
+			idx.marked = append(idx.marked, tok)
 		}
 	}
 	return idx
+}
+
+// markedForms keys the marked tokens by their unmarked form, once.
+func (t *tokenIndex) markedForms() map[string][]string {
+	t.markedOnce.Do(func() {
+		if len(t.marked) == 0 {
+			return
+		}
+		t.byUnmarked = make(map[string][]string, len(t.marked))
+		for _, tok := range t.marked {
+			if bare, _ := unmarked(tok); bare != "" {
+				t.byUnmarked[bare] = append(t.byUnmarked[bare], tok)
+			}
+		}
+		for _, forms := range t.byUnmarked {
+			sort.Strings(forms) // one order, whatever the map hands back
+		}
+	})
+	return t.byUnmarked
 }
 
 // bucketFor clamps a rune length to the bucket that holds it; anything longer
@@ -141,45 +162,31 @@ func (t *tokenIndex) candidates(n, limit int, fn func(string)) {
 	}
 }
 
-// markedCandidates visits the tokens whose length without their combining
-// marks is within limit of n. The close tier compares those in the same
-// unmarked form, so a query typed without marks reaches the word written with
-// them however many marks it carries.
-func (t *tokenIndex) markedCandidates(n, limit int, fn func(string)) {
-	lo, hi := n-limit, n+limit
-	if lo < 0 {
-		lo = 0
+// markedFormsOf is the tokens that are word with combining marks on it, or —
+// when word itself carries marks — the tokens that carry different ones, plus
+// the bare form if the corpus holds it. Nothing else: a mark is free on the
+// close tier, and nothing else is.
+func (t *tokenIndex) markedFormsOf(word string) []string {
+	bare, marked := unmarked(word)
+	if bare == "" {
+		return nil
 	}
-	if hi > maxIndexedTokenLen {
-		hi = maxIndexedTokenLen
+	forms := t.markedForms()[bare]
+	if !marked {
+		return forms
 	}
-	for l := lo; l <= hi && l < len(t.markedByLen); l++ {
-		for _, tok := range t.markedByLen[l] {
-			fn(tok)
+	// A marked query reaches the bare word as well as its other spellings,
+	// and never itself.
+	out := make([]string, 0, len(forms)+1)
+	if t.set[bare] {
+		out = append(out, bare)
+	}
+	for _, f := range forms {
+		if f != word {
+			out = append(out, f)
 		}
 	}
-	for _, tok := range t.markedByLen[maxIndexedTokenLen+1] {
-		fn(tok)
-	}
-}
-
-// hasMarkedNear reports whether any token carrying a combining mark has an
-// unmarked length within limit of n. Cheap enough to ask before deciding
-// whether a short term is worth the candidate walk.
-func (t *tokenIndex) hasMarkedNear(n, limit int) bool {
-	lo, hi := n-limit, n+limit
-	if lo < 0 {
-		lo = 0
-	}
-	if hi > maxIndexedTokenLen {
-		hi = maxIndexedTokenLen
-	}
-	for l := lo; l <= hi && l < len(t.markedByLen); l++ {
-		if len(t.markedByLen[l]) > 0 {
-			return true
-		}
-	}
-	return len(t.markedByLen[maxIndexedTokenLen+1]) > 0
+	return out
 }
 
 // bucketsSignature changes whenever any bucket file is added, removed, resized

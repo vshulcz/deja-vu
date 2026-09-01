@@ -3546,18 +3546,19 @@ func oneSuffixStep(word string) []string {
 
 func hasFuzzyToken(terms []string, idx *tokenIndex) bool {
 	for _, term := range terms {
-		n := len([]rune(term))
 		// The 4-rune floor also keeps CJK bigrams (always 2 runes) out of
 		// fuzzy variant generation entirely — no variant-space blowup (#338).
-		if n >= 4 {
+		if len([]rune(term)) >= 4 {
 			return true
 		}
-		// A shorter word is let in only to reach its own marked form. Arabic
+		// A shorter word is let in only to reach its own marked form: Arabic
 		// writes its vowels as combining marks, so كتب is three runes and the
-		// written-out كَتَبَ is six: the word a reader types is below the floor
-		// while the word in the index is above it (#1941). This costs nothing
-		// where no such token exists, and bigrams stay out.
-		if n == 3 && idx != nil && idx.hasMarkedNear(n, 1) {
+		// written-out كَتَبَ is six — the word a reader types is below the floor
+		// while the word in the index is above it (#1941). The question is
+		// asked of the term itself, not of the corpus: one Arabic word in one
+		// session must not open the tier for every three-letter word a reader
+		// types.
+		if idx != nil && len(idx.markedFormsOf(term)) > 0 {
 			return true
 		}
 	}
@@ -3600,25 +3601,9 @@ func closeTokens(query string, idx *tokenIndex) []string {
 	if qr >= 8 {
 		limit = 2
 	}
-	bareQuery, queryMarked := unmarked(query)
-	bareLen := len([]rune(bareQuery))
 	seen := make(map[string]bool)
-	consider := func(token string) {
-		if seen[token] {
-			return
-		}
-		d := damerauDistance(query, token, limit)
-		if d > limit {
-			// A combining mark is free here. Arabic is normally typed without
-			// harakat and each mark is a rune of its own, so كتب sat three
-			// edits from كَتَبَ while café sat one from cafe: one rule, two
-			// outcomes, and the reader who got nothing was the one whose
-			// script writes its vowels as marks (#1941).
-			if bareToken, tokenMarked := unmarked(token); queryMarked || tokenMarked {
-				d = damerauDistance(bareQuery, bareToken, limit)
-			}
-		}
-		if d > limit {
+	consider := func(token string, d int) {
+		if seen[token] || d > limit {
 			return
 		}
 		seen[token] = true
@@ -3628,12 +3613,30 @@ func closeTokens(query string, idx *tokenIndex) []string {
 	// all, so only tokens within the limit of the query's length can match.
 	// Walking those buckets replaces a Damerau-Levenshtein run against every
 	// token in the corpus — ~200k of them — with a few short slices.
-	idx.candidates(qr, limit, consider)
-	// Marks are free, so a marked token is reached by the length it has
-	// without them, and a marked query reaches unmarked tokens by its own.
-	idx.markedCandidates(bareLen, limit, consider)
-	if queryMarked {
-		idx.candidates(bareLen, limit, consider)
+	idx.candidates(qr, limit, func(token string) {
+		if seen[token] {
+			return
+		}
+		consider(token, damerauDistance(query, token, limit))
+	})
+	// And the same word written with its marks, or without them. Arabic is
+	// normally typed without harakat and each mark is a rune of its own, so
+	// كتب sat three edits from كَتَبَ while café sat one from cafe: one rule,
+	// two outcomes, and the reader who got nothing was the one whose script
+	// writes its vowels as marks (#1941).
+	//
+	// A lookup, not a walk: the marked forms of a word are the tokens that
+	// strip to it, which is a map, and a walk over every marked token cost 36
+	// ms a term on a corpus where most tokens carry marks. It also keeps the
+	// rule honest — a mark is free, and nothing else is, so ข้าว is reachable
+	// from ขาว but neither is reachable from a third word.
+	//
+	// Scored as one edit rather than none, because in Thai and Hebrew the mark
+	// is what tells two words apart: a real typo correction must not sort
+	// behind a word that merely lost its vowels, and the eight-variant cap
+	// below must not fill with them.
+	for _, token := range idx.markedFormsOf(query) {
+		consider(token, 1)
 	}
 	sort.Slice(matches, func(i, j int) bool {
 		if matches[i].distance == matches[j].distance {
@@ -3722,21 +3725,37 @@ func damerauDistanceRunes(a, b string, max int) int {
 // keeps ordinary text to one comparison per rune — every mark sits above
 // U+0300.
 func isMark(r rune) bool {
-	return r >= 0x0300 && (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r))
+	if r < 0x0300 || isVariationSelector(r) {
+		return false
+	}
+	return unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r)
+}
+
+// isVariationSelector reports whether r only says how to draw the rune in
+// front of it. They are category Mn, but gluing one to a word made "widget️"
+// — the word plus an emoji presentation selector — a different token from
+// "widget", which demoted an ordinary query off the exact tier.
+func isVariationSelector(r rune) bool {
+	return (r >= 0xFE00 && r <= 0xFE0F) || (r >= 0xE0100 && r <= 0xE01EF)
+}
+
+// hasMark reports whether s carries a combining mark, without building the
+// stripped form: the index builder asks this of every non-ASCII token it sees
+// and only strips the ones that answer yes.
+func hasMark(s string) bool {
+	for _, r := range s {
+		if isMark(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // unmarked strips combining marks from s, reporting whether any were there. A
 // string without one is returned untouched, so ordinary text pays one scan and
 // no allocation.
 func unmarked(s string) (string, bool) {
-	has := false
-	for _, r := range s {
-		if isMark(r) {
-			has = true
-			break
-		}
-	}
-	if !has {
+	if !hasMark(s) {
 		return s, false
 	}
 	out := make([]rune, 0, len(s))
