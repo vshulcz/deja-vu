@@ -25,7 +25,7 @@ func ExpandCJKTokens(toks []string) []string {
 		hasCJK := false
 		allCJK := true
 		for _, r := range runes {
-			if cjkfold.IsCJK(r) {
+			if cjkfold.Unspaced(r) {
 				hasCJK = true
 			} else {
 				allCJK = false
@@ -42,12 +42,12 @@ func ExpandCJKTokens(toks []string) []string {
 		}
 		i := 0
 		for i < len(runes) {
-			if !cjkfold.IsCJK(runes[i]) {
+			if !cjkfold.Unspaced(runes[i]) {
 				i++
 				continue
 			}
 			j := i
-			for j < len(runes) && cjkfold.IsCJK(runes[j]) {
+			for j < len(runes) && cjkfold.Unspaced(runes[j]) {
 				j++
 			}
 			out = append(out, cjkfold.Bigrams(string(runes[i:j]))...)
