@@ -1405,7 +1405,7 @@ func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer)
 		return r, err
 	}
 	if progress != nil {
-		fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+		fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
 	}
 	if rerr := EnsureForSearch(dir, o, true, progress); rerr != nil {
 		return SearchResult{}, rerr
