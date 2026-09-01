@@ -50,8 +50,19 @@ const (
 	// straight from the default branch, so its version is the one a
 	// listing shows.
 	agentPlugin = "plugin.json"
-	releaseAPI  = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
-	assetBase   = "https://github.com/vshulcz/deja-vu/releases/download"
+	// The Kimi Code plugin is packed into the release archive, so the version
+	// in its manifest is the one a Kimi user reads. It sat at 0.1.0 from the
+	// day it was added — the same way the Codex plugin did, and for the same
+	// reason: the workflow that validates its shape never compares its version
+	// to anything.
+	kimiPlugin = "kimi.plugin.json"
+	// Packed under extensions/, and a test pins the two to agree.
+	kimiPacked = "extensions/kimi/kimi.plugin.json"
+	// doctor compares the installed copy against this constant to tell a
+	// user their zip install is behind, so it has to move with the manifest.
+	kimiConst  = "cmd/deja/kimi_plugin.go"
+	releaseAPI = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+	assetBase  = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
 type pins struct {
@@ -131,6 +142,9 @@ func write(root string, p pins) error {
 		codexPlugin:     renderPluginVersion(codexPlugin),
 		claudePlugin:    renderPluginVersion(claudePlugin),
 		geminiExtension: renderPluginVersion(geminiExtension),
+		kimiPlugin:      renderPluginVersion(kimiPlugin),
+		kimiPacked:      renderPluginVersion(kimiPacked),
+		kimiConst:       renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:     renderPluginVersion(agentPlugin),
 	} {
 		body, err := render(p)
@@ -223,6 +237,23 @@ func renderInstaller(p pins) ([]byte, error) { return edit(installer, p) }
 // descriptions, prompts and pointers that no release derives, so regenerating
 // them from a template here would drop whatever someone adds later — the same
 // reason the winget files are edited rather than rendered.
+// renderGoVersionConst pins a Go constant that mirrors a manifest's version.
+// Without it the constant and the manifest drift, and the drift is exactly
+// what the constant exists to report.
+func renderGoVersionConst(path, name string) func(pins) ([]byte, error) {
+	re := regexp.MustCompile(`(const ` + name + ` = )"[^"]*"`)
+	return func(p pins) ([]byte, error) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if !re.MatchString(string(b)) {
+			return nil, fmt.Errorf("%s has no %s to pin", path, name)
+		}
+		return []byte(re.ReplaceAllString(string(b), `${1}"`+p.version+`"`)), nil
+	}
+}
+
 func renderPluginVersion(path string) func(pins) ([]byte, error) {
 	return func(p pins) ([]byte, error) {
 		b, err := os.ReadFile(path)
@@ -303,6 +334,9 @@ func runCheck(root string) error {
 		codexPlugin:     renderPluginVersion(codexPlugin),
 		claudePlugin:    renderPluginVersion(claudePlugin),
 		geminiExtension: renderPluginVersion(geminiExtension),
+		kimiPlugin:      renderPluginVersion(kimiPlugin),
+		kimiPacked:      renderPluginVersion(kimiPacked),
+		kimiConst:       renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:     renderPluginVersion(agentPlugin),
 	} {
 		want, err := render(p)
