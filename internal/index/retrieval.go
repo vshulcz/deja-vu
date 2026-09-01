@@ -1759,6 +1759,20 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 // RecentProjects is RecentProject for several project names at once: one
 // manifest read and one records pass instead of names × sessions scans.
 func RecentProjects(dir string, projects []string, perName int) ([]model.Session, error) {
+	return RecentProjectsUnder(dir, projects, "", perName)
+}
+
+// RecentProjectsUnder is RecentProjects plus the sessions whose work happened
+// inside root, whatever they are called.
+//
+// A project is a name derived from where a session was started, and a caller
+// can guess the names above it — a subdirectory finds its repository (#2039).
+// Downward it cannot: there is no list of the names a repository's
+// subdirectories might have produced, so standing at the root found nothing of
+// what happened inside it (#2040). The files a session touched are already in
+// the manifest and say where the work was, so the root asks that instead of
+// guessing.
+func RecentProjectsUnder(dir string, projects []string, root string, perName int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1799,7 +1813,48 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 			}
 		}
 	}
+	// And what happened under the caller's own directory, however it was
+	// named. Ranked among themselves by recency and held to the same per-name
+	// cap, so a repository with many subdirectories cannot crowd out the
+	// sessions recorded against it directly.
+	if under := metasWorkingUnder(m, root, seen); len(under) > 0 {
+		sort.Slice(under, func(i, j int) bool { return newestFirstMeta(under[i], under[j]) })
+		if perName > 0 && len(under) > perName {
+			under = under[:perName]
+		}
+		metas = append(metas, under...)
+	}
 	return sessionsForMetas(dir, metas)
+}
+
+// metasWorkingUnder is the sessions whose touched files sit under root and
+// which no name has already claimed. Nothing when root is empty, so a caller
+// that does not know where it stands is unaffected.
+func metasWorkingUnder(m Manifest, root string, seen map[string]bool) []SessionMeta {
+	if strings.TrimSpace(root) == "" {
+		return nil
+	}
+	prefix := strings.ToLower(filepath.ToSlash(filepath.Clean(root)))
+	if prefix == "" || prefix == "/" || prefix == "." {
+		// Every path is under "/" and none is meaningfully under it.
+		return nil
+	}
+	prefix += "/"
+	var out []SessionMeta
+	for _, meta := range m.Sessions {
+		k := meta.Harness + ":" + meta.ID
+		if seen[k] {
+			continue
+		}
+		for _, p := range meta.Touched {
+			if strings.HasPrefix(strings.ToLower(filepath.ToSlash(p)), prefix) {
+				seen[k] = true
+				out = append(out, meta)
+				break
+			}
+		}
+	}
+	return metasNotIgnored(out)
 }
 
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
