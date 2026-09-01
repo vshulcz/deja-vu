@@ -37,8 +37,14 @@ func TestAnEmptyStoreSaysSoRatherThanBlamingTheQuery(t *testing.T) {
 		if strings.Contains(text, "matched") && !strings.Contains(text, "no indexed history") {
 			t.Errorf("%s: an empty store answers as though the query missed:\n%s", tool, firstLines(text, 3))
 		}
-		if !strings.Contains(text, "no indexed history") {
+		if !strings.Contains(text, "no indexed history yet") {
 			t.Errorf("%s: does not say the store is empty:\n%s", tool, firstLines(text, 3))
+		}
+		// A store nobody has forgotten anything from is a first run, and must
+		// not be described as a removal — the two sentences share a prefix, so
+		// the assertion above cannot tell them apart on its own (#2862).
+		if strings.Contains(text, "forgotten") {
+			t.Errorf("%s: a first run was reported as a deliberate removal:\n%s", tool, firstLines(text, 3))
 		}
 	}
 }

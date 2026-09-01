@@ -254,7 +254,7 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	// genuinely empty; a store with sessions that simply did not match keeps
 	// the ordinary answer.
 	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
-		return "This machine has no indexed history yet, so nothing can match — `deja sources` shows where deja looked for it. Do not read this as the work never happening."
+		return emptyStoreSentence("so nothing can match")
 	}
 	return fmt.Sprintf("No prior deja sessions matched %q.", q)
 }

@@ -603,8 +603,7 @@ func blameTextResult(dir string, o search.BlameOptions, path string, limit int) 
 		// distinction #2862 drew for recall, on the tool that is called before
 		// an edit. Said in the shape this payload already says everything else.
 		if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
-			return string(mustMarshalBlameNote(
-				"this machine has no indexed history yet, so nothing can be found — `deja sources` shows where deja looked")), 0, nil
+			return string(mustMarshalBlameNote(emptyStoreSentence("so nothing can be found"))), 0, nil
 		}
 	}
 	body := mustMarshalBlame(hits, 0, false)
@@ -1522,9 +1521,31 @@ func contextIgnoredWords(result index.SearchResult) string {
 // Empty when the store has something in it, so a caller can append it blind.
 func emptyStoreNote(dir string) string {
 	if metas, err := index.AllMeta(dir); err == nil && len(metas) == 0 {
-		return " This machine has no indexed history yet, so nothing can be found — `deja sources` shows where deja looked."
+		return " " + emptyStoreSentence("so nothing can be found")
 	}
 	return ""
+}
+
+// emptyStoreSentence says why an empty store is empty.
+//
+// "No indexed history yet" is right on a first run and wrong after the reader
+// forgot everything: the history existed, and "yet" claims it never did. deja
+// can tell the two apart — forgetting leaves tombstones — and the search screen
+// already separates them on its own output.
+func emptyStoreSentence(because string) string {
+	if n := len(index.Tombstones()); n > 0 {
+		return fmt.Sprintf("This machine has no indexed history left, %s — %d session%s %s been forgotten here (`deja forget --list`). This is a deliberate removal, not an absence of work.",
+			because, n, pluralS(n), pluralHave(n))
+	}
+	return "This machine has no indexed history yet, " + because + " — `deja sources` shows where deja looked for it. Do not read this as the work never happening."
+}
+
+// pluralHave keeps the sentence above readable for one session and for many.
+func pluralHave(n int) string {
+	if n == 1 {
+		return "has"
+	}
+	return "have"
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in
