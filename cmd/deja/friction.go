@@ -11,6 +11,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // `deja friction` names what this machine keeps tripping over.
@@ -226,10 +227,16 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 }
 
 func trimFriction(l string) string {
+	// Sanitised first. A wall is text out of a transcript deja did not write,
+	// and this was the one surface printing it as recorded: an ANSI escape
+	// recoloured the rest of the screen and U+202E reversed the reading order
+	// of everything after it. Every other place a recorded line is shown runs
+	// it through SafeLine; this now does too.
+	//
 	// Rune-safe: a wall recorded in Russian or Chinese was cut mid-character
 	// and printed as a broken byte (#1319). The bound includes the mark, so a
 	// line loses one character rather than gaining one.
-	return truncatePlanBytes(l, 79)
+	return truncatePlanBytes(search.SafeLine(l), 79)
 }
 
 // emptiedBy names the rule that leaves a path nothing to read. Both can be in
