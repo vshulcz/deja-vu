@@ -497,6 +497,11 @@
           "state": "todo",
           "why": "prime-agent is read but not wired: this landed as a source so its sessions are searchable, and no install path writes to its config yet. Work, not a design limit — the agent has an MCP client and a hooks surface inherited from the pi lineage",
           "source": "https://github.com/vshulcz/deja-vu/issues/2529"
+        },
+        "resume": {
+          "state": "todo",
+          "why": "prime-agent is read but not wired: this landed as a source so its sessions are searchable, and no install path writes to its config yet. Work, not a design limit — the agent has an MCP client and a hooks surface inherited from the pi lineage",
+          "source": "https://github.com/vshulcz/deja-vu/issues/2529"
         }
       }
     },
