@@ -1052,7 +1052,14 @@ func Conclusions(s model.Session, budget int, max int) []string {
 				// cut, so it can be marked the way every other surface marks
 				// one; a caller asking for several keeps the old rule, since
 				// there text would follow the marker.
-				if max == 1 && len(out) == 0 {
+				// The condition is that nothing follows the marker, and an
+				// empty out is that whatever max was asked for: this breaks
+				// immediately after, so the cut is the last line either way.
+				// Keyed on max alone, a session whose only conclusion is one
+				// long sentence answered a caller asking for three lines with
+				// silence and a caller asking for one with the sentence —
+				// 9 of 452 sessions on a real store.
+				if len(out) == 0 {
 					if cut := markedCut(line, budget); cut != "" {
 						out = append(out, cut)
 					}
