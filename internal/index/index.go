@@ -84,7 +84,14 @@ import (
 // missing those sessions, and the db path only re-reads what has been touched
 // since its watermark, so without the bump they stay missing until each is
 // used again — the same shape as 21, 22 and 23 (#2873).
-const version = 32
+// 33: a combining mark continues the word it sits on. Latin NFD was composed
+// away already, but Arabic harakat, Hebrew niqqud, Thai vowel signs and the
+// Indic matras have no precomposed form, so the mark ended the token: كَتَبَ was
+// indexed as three one-letter tokens and हिन्दी as two, and the words
+// themselves were never in the index for any query to reach. A store built
+// under the old rules holds the letters rather than the words, and nothing
+// re-derives them without the bump (#1941).
+const version = 33
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
