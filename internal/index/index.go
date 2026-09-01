@@ -110,8 +110,11 @@ import (
 // posting in its block rather than in full. A block is sorted by offset and
 // records.bin is written in session order, so on a real store 99.66% of
 // postings already hold a session id no smaller than the one before them.
-// Measured by two contributors on two real stores, buckets fall 16.11% and
-// 11.95%; the bucket magic moves with it so a reader that skips the version
+// Measured here at 5.91% of buckets on a mixed store, and by two contributors
+// at 16.11% and 11.95% on theirs — none of those three is reproducible from
+// this repository, which is why the first number is the one taken on the
+// machine that merged it. The bucket magic moves with it so a reader that
+// skips the version
 // check — an index directory that cannot be locked is served without one —
 // gets errCorruptIndex rather than session ids that are wrong without saying
 // so (#492).
@@ -130,7 +133,15 @@ const maxRecordSize = 8 << 20
 // repo deliberately supports. Reading old posting bytes under a new rule
 // there would hand back session ids that are wrong rather than absent, and
 // nothing would say so; failing the magic check instead makes it a corrupt
-// index, which callers already treat as a cache miss (#492).
+// index (#492).
+//
+// What that costs, stated because the first version of this comment said the
+// opposite: on a writable index it is a cache miss — the recovery path
+// rebuilds and the reader sees an answer. On a read-only directory it is not.
+// The rebuild cannot run, so `deja search` exits non-zero with no results
+// until the index is replaced by hand. That is the right trade against wrong
+// session ids served silently, and it is a break for anyone shipping a
+// pre-34 index inside a read-only image.
 var bucketMagic = []byte("DJB2")
 
 // errCorruptIndex marks unreadable index structures (e.g. a bucket file cut

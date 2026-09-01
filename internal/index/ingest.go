@@ -2667,7 +2667,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		filesTouched, messages, unreadable, err := appendIncremental(dir, harness, scope, old, files, changed)
 		if IsCorrupt(err) {
 			if progress != nil {
-				fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+				fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
 			}
 			return rebuild(dir, harness, scope, files, progress)
 		}

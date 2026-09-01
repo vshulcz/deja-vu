@@ -804,7 +804,11 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	}
 	if string(magic) != string(bucketMagic) {
 		f.Close()
-		return nil, nil, fmt.Errorf("%w: bad bucket magic", errCorruptIndex)
+		// Named for what it is. The magic moves when the posting format
+		// changes, and every reader of an index written by another version
+		// lands here — telling them the index is damaged sends them looking
+		// for a disk fault they do not have (#492).
+		return nil, nil, fmt.Errorf("%w: %s", errCorruptIndex, wrongBucketFormat(magic))
 	}
 	count, err := binary.ReadUvarint(r)
 	if err != nil {
@@ -869,7 +873,52 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	return entries, f, nil
 }
 
-// encodePostings encodes a posting block with per-block offset and session deltas.
+// damagedOrOutdated names the two reasons an index cannot be read. A format
+// this build does not write is not damage, and saying so sent a reader looking
+// for a disk fault (#492).
+func damagedOrOutdated(err error) string {
+	if err != nil && strings.Contains(err.Error(), "bucket format") {
+		return "index written by another version of deja"
+	}
+	return "index damaged"
+}
+
+// wrongBucketFormat says which of the two shapes a bucket file is in, so the
+// message a reader gets names the version rather than a fault.
+func wrongBucketFormat(magic []byte) string {
+	// Only a magic deja itself has written means another version. Anything
+	// else is a header that is not one, which is damage — and calling that a
+	// version difference would send a reader to the release notes for a disk
+	// fault.
+	for _, known := range formerBucketMagics {
+		if string(magic) == known {
+			return fmt.Sprintf("postings written by an older deja (bucket format %s, this build reads %s)",
+				known, string(bucketMagic))
+		}
+	}
+	return fmt.Sprintf("bad bucket magic %q", printableMagic(magic))
+}
+
+// formerBucketMagics are the bucket headers earlier releases wrote. A reader
+// that meets one is behind or ahead of a format change rather than looking at
+// a damaged file.
+var formerBucketMagics = []string{"DJB1"}
+
+// printableMagic keeps a corrupt header out of the terminal as raw bytes.
+func printableMagic(magic []byte) string {
+	out := make([]rune, 0, len(magic))
+	for _, b := range magic {
+		if b < 0x20 || b > 0x7e {
+			out = append(out, '?')
+			continue
+		}
+		out = append(out, rune(b))
+	}
+	return string(out)
+}
+
+// encodePostings encodes a posting block with per-block offset and session
+// deltas.
 func encodePostings(posts []posting) []byte {
 	if len(posts) == 0 {
 		return nil
@@ -906,8 +955,13 @@ func encodePostings(posts []posting) []byte {
 }
 
 // decodePostings mirrors encodePostings. A truncated varint ends the walk and
-// yields what was whole: a bucket cut short by a crash is a cache miss, not a
-// panic, and two callers already depend on the prefix coming back.
+// yields what was whole rather than panicking.
+//
+// Defensive only: every caller sizes its buffer from the directory entry and
+// gets io.EOF from ReadAt before a short block reaches here, and openBucketDir
+// bounds each block against the file size. Nothing in the product depends on
+// the prefix coming back — an earlier version of this comment claimed two
+// callers did, and none does.
 func decodePostings(b []byte) []posting {
 	out := make([]posting, 0)
 	var prev int64
