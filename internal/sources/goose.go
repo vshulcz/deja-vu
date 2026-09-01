@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -89,20 +90,20 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Path:    path,
 	}
+	// The first line is the session's header — id, description, working_dir —
+	// and an offset parse starts past it, so a resumed read fell back to the
+	// filename and to the project literal "goose". Read it whatever the
+	// offset: it is one line, and without it appending a turn renamed the
+	// session's project (#2870).
+	if offset > 0 {
+		if head, herr := firstJSONLObject(path); herr == nil {
+			applyGooseHeader(&s, head)
+		}
+	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		role, hasRole := m["role"].(string)
 		if !hasRole {
-			if id, _ := m["id"].(string); id != "" {
-				s.ID = id
-			}
-			if desc, _ := m["description"].(string); strings.TrimSpace(desc) != "" {
-				s.Title = strings.TrimSpace(desc)
-			}
-			if wd, _ := m["working_dir"].(string); wd != "" {
-				s.Project = projectName(wd)
-			}
-			s.Touch(parseTimeAny(m["created_at"]))
-			s.Touch(parseTimeAny(m["updated_at"]))
+			applyGooseHeader(&s, m)
 			return
 		}
 		if role != "user" && role != "assistant" {
@@ -125,6 +126,43 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// firstJSONLObject decodes the first line of a .jsonl file, which is where a
+// store that writes a header puts it.
+func firstJSONLObject(path string) (map[string]any, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	// The same reader size the offset scanner uses, so a long header line is
+	// read here exactly where it would be read there.
+	line, err := bufio.NewReaderSize(f, 1024*1024).ReadBytes('\n')
+	if err != nil && len(line) == 0 {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(line, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// applyGooseHeader reads the session's own line: the header goose writes first,
+// carrying the id, the description and the directory the work happened in.
+func applyGooseHeader(s *model.Session, m map[string]any) {
+	if id, _ := m["id"].(string); id != "" {
+		s.ID = id
+	}
+	if desc, _ := m["description"].(string); strings.TrimSpace(desc) != "" {
+		s.Title = strings.TrimSpace(desc)
+	}
+	if wd, _ := m["working_dir"].(string); wd != "" {
+		s.Project = projectName(wd)
+	}
+	s.Touch(parseTimeAny(m["created_at"]))
+	s.Touch(parseTimeAny(m["updated_at"]))
 }
 
 func gooseText(v any) string {
